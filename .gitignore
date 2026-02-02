@@ -137,3 +137,17 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# License private key (never commit!)
+license-private-key.pem
+
+# Test license generation script (for development only)
+scripts/generate-test-license.cjs
+
+# Private notes (not for AI or version control)
+my-notes.txt
+
+# Track .claude/ directory for AI context and configuration
+# (explicitly documented - .claude/ is tracked by default)
+
+.DS_Store

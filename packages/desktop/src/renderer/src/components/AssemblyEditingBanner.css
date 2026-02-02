@@ -1,0 +1,57 @@
+/* Assembly Editing Banner Styles */
+
+.assembly-editing-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  background: var(--color-accent);
+  color: #1a1a1a;
+  font-size: 0.875rem;
+  gap: 1rem;
+}
+
+.banner-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.banner-icon {
+  font-size: 1rem;
+}
+
+.banner-text strong {
+  font-weight: 600;
+}
+
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.assembly-editing-banner .btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.assembly-editing-banner .btn-ghost {
+  color: #1a1a1a;
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+.assembly-editing-banner .btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.1);
+  border-color: rgba(0, 0, 0, 0.3);
+}
+
+.assembly-editing-banner .btn-filled.btn-primary {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.assembly-editing-banner .btn-filled.btn-primary:hover {
+  background: #333;
+}

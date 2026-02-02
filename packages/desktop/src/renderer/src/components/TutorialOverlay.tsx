@@ -1,0 +1,178 @@
+import React, { useEffect, useState } from 'react';
+import { TutorialStep } from '../hooks/useTutorial';
+import { TutorialTooltip } from './TutorialTooltip';
+
+interface TutorialOverlayProps {
+  step: TutorialStep;
+  stepNumber: number;
+  totalSteps: number;
+  progress: number;
+  isFirstStep: boolean;
+  isLastStep: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  onSkip: () => void;
+}
+
+export function TutorialOverlay({
+  step,
+  stepNumber,
+  totalSteps,
+  progress,
+  isFirstStep,
+  isLastStep,
+  onNext,
+  onPrevious,
+  onSkip
+}: TutorialOverlayProps) {
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+
+  // Find target element and calculate spotlight position
+  useEffect(() => {
+    if (step.targetSelector) {
+      const element = document.querySelector(step.targetSelector);
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        setTargetRect(rect);
+
+        // Calculate tooltip position based on step position preference
+        const padding = 20;
+        let x = 0;
+        let y = 0;
+
+        switch (step.position) {
+          case 'top':
+            x = rect.left + rect.width / 2 - 200; // Center horizontally (assuming 400px width)
+            y = rect.top - 280; // Above target
+            break;
+          case 'bottom':
+            x = rect.left + rect.width / 2 - 200;
+            y = rect.bottom + padding;
+            break;
+          case 'left':
+            x = rect.left - 420; // To the left
+            y = rect.top + rect.height / 2 - 140;
+            break;
+          case 'right':
+            x = rect.right + padding;
+            y = rect.top + rect.height / 2 - 140;
+            break;
+          case 'center':
+          default:
+            x = window.innerWidth / 2 - 200;
+            y = window.innerHeight / 2 - 140;
+        }
+
+        // Apply custom offset if provided
+        if (step.offset) {
+          x += step.offset.x;
+          y += step.offset.y;
+        }
+
+        // Keep tooltip within viewport bounds
+        x = Math.max(20, Math.min(x, window.innerWidth - 420));
+        y = Math.max(20, Math.min(y, window.innerHeight - 300));
+
+        setTooltipPosition({ x, y });
+      } else {
+        // No target found, center the tooltip
+        setTargetRect(null);
+        setTooltipPosition({
+          x: window.innerWidth / 2 - 200,
+          y: window.innerHeight / 2 - 140
+        });
+      }
+    } else {
+      // No target selector, center the tooltip
+      setTargetRect(null);
+      setTooltipPosition({
+        x: window.innerWidth / 2 - 200,
+        y: window.innerHeight / 2 - 140
+      });
+    }
+  }, [step]);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onSkip();
+      } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        onNext();
+      } else if (e.key === 'ArrowLeft' && !isFirstStep) {
+        e.preventDefault();
+        e.stopPropagation();
+        onPrevious();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [isFirstStep, onNext, onPrevious, onSkip]);
+
+  return (
+    <div className="tutorial-overlay">
+      {/* Dark backdrop with spotlight cutout */}
+      <svg className="tutorial-overlay-svg">
+        <defs>
+          <mask id={`spotlight-mask-${step.id}`}>
+            <rect x="0" y="0" width="100%" height="100%" fill="white" />
+            {targetRect && (
+              <rect
+                x={targetRect.left - 8}
+                y={targetRect.top - 8}
+                width={targetRect.width + 16}
+                height={targetRect.height + 16}
+                rx="8"
+                fill="black"
+              />
+            )}
+          </mask>
+        </defs>
+        <rect
+          x="0"
+          y="0"
+          width="100%"
+          height="100%"
+          fill="rgba(0, 0, 0, 0.75)"
+          mask={`url(#spotlight-mask-${step.id})`}
+        />
+        {targetRect && (
+          <rect
+            x={targetRect.left - 8}
+            y={targetRect.top - 8}
+            width={targetRect.width + 16}
+            height={targetRect.height + 16}
+            rx="8"
+            fill="none"
+            style={{ stroke: 'var(--color-accent)' }}
+            strokeWidth="3"
+            strokeDasharray="8 4"
+          />
+        )}
+      </svg>
+
+      {/* Tooltip - allow interaction */}
+      <div className="tutorial-overlay-content">
+        <TutorialTooltip
+          title={step.title}
+          content={step.content}
+          position={tooltipPosition}
+          stepNumber={stepNumber}
+          totalSteps={totalSteps}
+          progress={progress}
+          isFirstStep={isFirstStep}
+          isLastStep={isLastStep}
+          onNext={onNext}
+          onPrevious={onPrevious}
+          onSkip={onSkip}
+        />
+      </div>
+    </div>
+  );
+}

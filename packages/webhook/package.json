@@ -1,0 +1,16 @@
+{
+  "name": "carvd-studio-webhook-service",
+  "version": "1.0.0",
+  "description": "Webhook service for automated license key generation via Lemon Squeezy",
+  "type": "module",
+  "main": "api/webhook.js",
+  "scripts": {
+    "test": "node test-webhook.js"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.3"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
