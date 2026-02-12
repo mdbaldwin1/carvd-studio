@@ -152,15 +152,14 @@ test.describe('Happy Path Workflow', () => {
   let window: Page;
 
   test.beforeAll(async () => {
-    const appPath = path.join(__dirname, '../../');
+    // Use path.resolve (not path.join) to avoid trailing slash.
+    // On Windows, Playwright launches via cmd.exe (shell: true) and quotes
+    // each arg. A path ending in "\" creates "desktop\" — an escaped quote
+    // in MSVC arg parsing — corrupting all subsequent args including
+    // --remote-debugging-port, which prevents Playwright from completing.
+    const appPath = path.resolve(__dirname, '../..');
 
-    // Use cwd instead of passing appPath in args. On Windows, Playwright
-    // launches via cmd.exe (shell: true) and a path with trailing backslash
-    // creates an escaped quote sequence (desktop\") that corrupts the
-    // --remote-debugging-port flag, preventing "DevTools listening on ws://..."
-    // from ever appearing on stderr (Playwright hangs waiting for it).
-    // With cwd, Electron finds package.json in the current directory.
-    const args = ['--test-mode'];
+    const args = [appPath, '--test-mode'];
     if (process.env.CI) {
       // CI needs --no-sandbox to avoid sandbox permission issues.
       // Do NOT use --disable-gpu — it kills WebGL, crashing Three.js / R3F.
@@ -169,7 +168,6 @@ test.describe('Happy Path Workflow', () => {
 
     electronApp = await electron.launch({
       args,
-      cwd: appPath,
       env: {
         ...process.env,
         NODE_ENV: 'test'
