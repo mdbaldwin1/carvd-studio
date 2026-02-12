@@ -2,17 +2,67 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to release (e.g., v1.0.0)'
-        required: true
+    branches: [main]
+  workflow_dispatch: {}
 
 jobs:
-  release:
-    name: Build & Release
+  # ── Step 1: Determine version and create git tag ────────────────────────────
+  prepare:
+    name: Prepare Release
+    # Skip version-bump commits to prevent infinite loops
+    if: "!contains(github.event.head_commit.message, 'chore(release):')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      should_release: ${{ steps.check.outputs.should_release }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from package.json
+        id: version
+        run: |
+          VERSION=$(node -p "require('./packages/desktop/package.json').version")
+          TAG="v${VERSION}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "📦 Version: $VERSION (tag: $TAG)"
+
+      - name: Check if version is already released
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+
+          # Check if this tag already exists
+          if gh release view "$TAG" &>/dev/null; then
+            echo "⚠️  Release $TAG already exists - skipping"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ New version $TAG - proceeding with release"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create git tag
+        if: steps.check.outputs.should_release == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+  # ── Step 2: Build and package for each platform ─────────────────────────────
+  build:
+    name: Build (${{ matrix.platform }})
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -26,6 +76,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -36,7 +88,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup test license key
+      - name: Setup license key
         run: echo "${{ secrets.LICENSE_PRIVATE_KEY }}" > license-private-key.pem
         working-directory: packages/desktop
 
@@ -49,26 +101,19 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: |
-          # Create temporary keychain
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
 
-          # Decode certificate
           echo "$CSC_LINK" | base64 --decode > certificate.p12
 
-          # Create keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Import certificate
           security import certificate.p12 -k "$KEYCHAIN_PATH" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Set keychain as default
           security list-keychain -d user -s "$KEYCHAIN_PATH"
-
-          # Clean up
           rm certificate.p12
 
       - name: Package app (macOS)
@@ -113,11 +158,12 @@ jobs:
             packages/desktop/dist/latest.yml
           retention-days: 7
 
+  # ── Step 3: Create GitHub Release with artifacts ────────────────────────────
   create-release:
     name: Create GitHub Release
-    needs: release
+    needs: [prepare, build]
+    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
-
     permissions:
       contents: write
 
@@ -137,20 +183,11 @@ jobs:
           name: windows-build
           path: dist/win
 
-      - name: Get version from tag
-        id: get_version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          fi
-
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          name: Release ${{ steps.get_version.outputs.version }}
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: Carvd Studio ${{ needs.prepare.outputs.tag }}
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -163,19 +200,28 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update Vercel VITE_APP_VERSION
-        if: ${{ secrets.VERCEL_TOKEN != '' && secrets.VERCEL_PROJECT_ID != '' }}
+  # ── Step 4: Update Vercel environment variable ──────────────────────────────
+  update-vercel:
+    name: Update Vercel Version
+    needs: [prepare, create-release]
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Update VITE_APP_VERSION in Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          # Strip the 'v' prefix from version (v1.0.0 -> 1.0.0)
-          VERSION="${{ steps.get_version.outputs.version }}"
-          VERSION="${VERSION#v}"
+          VERSION="${{ needs.prepare.outputs.version }}"
+
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "⚠️  VERCEL_TOKEN or VERCEL_PROJECT_ID not set - skipping"
+            exit 0
+          fi
 
           echo "Updating VITE_APP_VERSION to $VERSION..."
 
-          # Install Vercel CLI
           npm install -g vercel
 
           # Remove existing env var (ignore error if doesn't exist)
@@ -184,4 +230,81 @@ jobs:
           # Add new version
           echo "$VERSION" | vercel env add VITE_APP_VERSION production --token "$VERCEL_TOKEN"
 
-          echo "✓ Updated VITE_APP_VERSION to $VERSION in Vercel"
+          echo "✅ Updated VITE_APP_VERSION to $VERSION in Vercel"
+
+  # ── Step 5: Bump patch version on develop for next release ──────────────────
+  bump-develop:
+    name: Bump Version on Develop
+    needs: [prepare, create-release]
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout develop branch
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Compute next patch version
+        id: next
+        run: |
+          CURRENT="${{ needs.prepare.outputs.version }}"
+          IFS='.' read -ra PARTS <<< "$CURRENT"
+          NEXT="${PARTS[0]}.${PARTS[1]}.$((PARTS[2] + 1))"
+          echo "version=$NEXT" >> $GITHUB_OUTPUT
+          echo "📦 Next development version: $NEXT"
+
+      - name: Create version bump branch and PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NEXT="${{ steps.next.outputs.version }}"
+          BRANCH="chore/bump-version-to-${NEXT}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+
+          # Update version in desktop package.json
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('packages/desktop/package.json', 'utf-8'));
+            pkg.version = '${NEXT}';
+            fs.writeFileSync('packages/desktop/package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+          git add packages/desktop/package.json
+          git commit -m "chore(release): bump version to ${NEXT} for next development cycle"
+
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --base develop \
+            --head "$BRANCH" \
+            --title "chore: bump version to ${NEXT}" \
+            --body "Automated version bump after release of v${{ needs.prepare.outputs.version }}. Merge when ready to start the next development cycle."
+
+  # ── Summary ─────────────────────────────────────────────────────────────────
+  summary:
+    name: Release Summary
+    needs: [prepare, build, create-release, update-vercel, bump-develop]
+    if: always() && needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Print summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Step | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | **${{ needs.prepare.outputs.tag }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| GitHub Release | ${{ needs.create-release.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Vercel Update | ${{ needs.update-vercel.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Develop Bump | ${{ needs.bump-develop.result }} |" >> $GITHUB_STEP_SUMMARY
