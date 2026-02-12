@@ -17,9 +17,15 @@ test.describe('Happy Path Workflow', () => {
     const electronPath = require('electron') as unknown as string;
     const appPath = path.join(__dirname, '../../');
 
+    // On Linux CI, Electron needs --no-sandbox due to SUID sandbox restrictions
+    const args = [appPath];
+    if (process.env.CI && process.platform === 'linux') {
+      args.unshift('--no-sandbox');
+    }
+
     electronApp = await electron.launch({
       executablePath: electronPath,
-      args: [appPath],
+      args,
       env: {
         ...process.env,
         NODE_ENV: 'test'
@@ -32,7 +38,9 @@ test.describe('Happy Path Workflow', () => {
   });
 
   test.afterAll(async () => {
-    await electronApp.close();
+    if (electronApp) {
+      await electronApp.close();
+    }
   });
 
   test('complete workflow: skip tutorial → add part → assign stock → verify', async () => {
@@ -47,7 +55,9 @@ test.describe('Happy Path Workflow', () => {
     await expect(window.locator('.app-header')).toBeVisible();
 
     // Step 3: Add a new part (if "Add Part" button exists)
-    const addPartButton = window.getByRole('button', { name: /add part|new part|\+/i }).first();
+    const addPartButton = window
+      .getByRole('button', { name: /add part|new part|\+/i })
+      .first();
     if (await addPartButton.isVisible({ timeout: 2000 }).catch(() => false)) {
       await addPartButton.click();
       await window.waitForTimeout(500);
@@ -82,10 +92,14 @@ test.describe('Happy Path Workflow', () => {
 
   test('license modal appears for unlicensed user', async () => {
     // If no valid license, license modal should appear
-    const licenseModal = window.locator('[role="dialog"]').filter({ hasText: /license|activate/i });
+    const licenseModal = window
+      .locator('[role="dialog"]')
+      .filter({ hasText: /license|activate/i });
 
     // Either license modal appears, or app loads normally (license already activated)
-    const modalVisible = await licenseModal.isVisible({ timeout: 5000 }).catch(() => false);
+    const modalVisible = await licenseModal
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
 
     if (modalVisible) {
       // License modal is showing
