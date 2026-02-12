@@ -53,10 +53,17 @@ jobs:
       - name: Create git tag
         if: steps.check.outputs.should_release == 'true'
         run: |
+          TAG="${{ steps.version.outputs.tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "${{ steps.version.outputs.tag }}"
-          git push origin "${{ steps.version.outputs.tag }}"
+
+          # Create tag if it doesn't already exist (idempotent)
+          if git rev-parse "$TAG" &>/dev/null; then
+            echo "Tag $TAG already exists - reusing"
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
 
   # ── Step 2: Build and package for each platform ─────────────────────────────
   build:
@@ -66,9 +73,12 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: macos-latest
+          # Use macos-13 (Intel) - electron-builder's app-builder-bin has
+          # compatibility issues with ARM64 (macos-latest) CI runners
+          - os: macos-13
             platform: mac
           - os: windows-latest
             platform: win
