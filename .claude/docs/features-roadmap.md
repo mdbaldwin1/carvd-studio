@@ -47,7 +47,10 @@ Core features complete. UX polish in progress for 1.0 release.
 ### Infrastructure
 - License system (Lemon Squeezy API + 7-day offline cache)
 - Auto-updater (electron-updater + GitHub Releases)
-- CI/CD (test.yml + release.yml)
+- CI/CD: `test.yml` (unit + e2e on all platforms) + `release.yml` (automated builds & GitHub Releases)
+- Release pipeline: macOS (code-signed, notarization tabled) + Windows (unsigned)
+- Website: SPA routing via `vercel.json`, deployed from main via Vercel
+- Dependabot: Weekly dependency updates targeting develop branch
 - Welcome tutorial (3 steps)
 
 ## Keyboard Shortcuts

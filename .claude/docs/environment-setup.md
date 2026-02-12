@@ -13,28 +13,37 @@ This document lists all environment variables and secrets needed for each deploy
 |--------|-------------|------------|
 | `LICENSE_PRIVATE_KEY` | RSA private key for test license generation | Run `npm run generate-keys` locally, copy contents of `license-private-key.pem` |
 
-### Required for Release Builds (macOS)
-| Secret | Description | How to Get |
-|--------|-------------|------------|
-| `APPLE_ID` | Your Apple Developer email | Apple Developer account |
-| `APPLE_ID_PASSWORD` | App-specific password | appleid.apple.com → Security → App-Specific Passwords |
-| `APPLE_TEAM_ID` | 10-character team ID | developer.apple.com → Membership |
-| `CSC_LINK` | Base64-encoded .p12 certificate | Export from Keychain, then `base64 -i cert.p12` |
-| `CSC_KEY_PASSWORD` | Password for the .p12 file | Set when exporting |
+### Required for Release Builds (macOS Code Signing)
+| Secret | Description | How to Get | Status |
+|--------|-------------|------------|--------|
+| `CSC_LINK` | Base64-encoded .p12 certificate | Export from Keychain, then `base64 -i cert.p12` | ✅ Configured |
+| `CSC_KEY_PASSWORD` | Password for the .p12 file | Set when exporting | ✅ Configured |
+
+**Note:** The release workflow creates a custom keychain, imports the certificate along with Apple intermediate certificates (DeveloperIDG2CA.cer and DeveloperIDCA.cer), and passes it to electron-builder via `CSC_KEYCHAIN`.
+
+### Required for macOS Notarization (Currently Tabled)
+| Secret | Description | How to Get | Status |
+|--------|-------------|------------|--------|
+| `APPLE_ID` | Your Apple Developer email | Apple Developer account | ✅ Configured |
+| `APPLE_ID_PASSWORD` | App-specific password | appleid.apple.com → Security → App-Specific Passwords | ✅ Configured |
+| `APPLE_TEAM_ID` | 10-character team ID | developer.apple.com → Membership | ✅ Configured |
+
+**Note:** Notarization is currently disabled in release.yml (env vars commented out). The builds are code-signed but not notarized. Re-enable notarization by uncommenting the `APPLE_ID`, `APPLE_ID_PASSWORD`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` env vars in the "Package app (macOS)" step. You may need to re-export the .p12 with the full certificate chain included.
 
 ### Optional for Release Builds (Windows)
-| Secret | Description | How to Get |
-|--------|-------------|------------|
-| `WINDOWS_CERTIFICATE` | Base64-encoded code signing cert | Purchase from CA (Sectigo, DigiCert, etc.) |
-| `WINDOWS_CERTIFICATE_PASSWORD` | Password for the certificate | Set when exporting |
+| Secret | Description | How to Get | Status |
+|--------|-------------|------------|--------|
+| `WINDOWS_CERTIFICATE` | Base64-encoded code signing cert | Purchase from CA (Sectigo, DigiCert, etc.) | Not configured |
+| `WINDOWS_CERTIFICATE_PASSWORD` | Password for the certificate | Set when exporting | Not configured |
 
-### Optional for Auto-Updating Website Version
-| Secret | Description | How to Get |
-|--------|-------------|------------|
-| `VERCEL_TOKEN` | Vercel API token | vercel.com → Settings → Tokens → Create |
-| `VERCEL_PROJECT_ID` | Your website project ID | Vercel Dashboard → Project → Settings → General → Project ID |
+### Required for Auto-Updating Website Version
+| Secret | Description | How to Get | Status |
+|--------|-------------|------------|--------|
+| `VERCEL_TOKEN` | Vercel API token | vercel.com → Settings → Tokens → Create | ✅ Configured |
+| `VERCEL_ORG_ID` | Your Vercel organization/team ID | Vercel Dashboard → Settings → General → Team ID, or `.vercel/project.json` | **Needs to be added** |
+| `VERCEL_PROJECT_ID` | Your website project ID | Vercel Dashboard → Project → Settings → General → Project ID | ✅ Configured |
 
-When these are configured, the release workflow automatically updates `VITE_APP_VERSION` in Vercel after creating a release.
+When all three are configured, the release workflow automatically updates `VITE_APP_VERSION` in Vercel after creating a release.
 
 ---
 
@@ -93,11 +102,14 @@ npm run generate-keys
 - [ ] `VITE_APP_VERSION` in Vercel (auto-updated by release workflow if VERCEL_TOKEN is set)
 
 ### Full Release Pipeline
-- [ ] All GitHub Secrets above
+- [x] `LICENSE_PRIVATE_KEY` in GitHub Secrets
+- [x] `CSC_LINK` + `CSC_KEY_PASSWORD` in GitHub Secrets (macOS code signing)
+- [x] `APPLE_ID` + `APPLE_ID_PASSWORD` + `APPLE_TEAM_ID` in GitHub Secrets (for notarization, currently disabled)
+- [x] `VERCEL_TOKEN` + `VERCEL_PROJECT_ID` in GitHub Secrets
+- [ ] `VERCEL_ORG_ID` in GitHub Secrets (required for Vercel version update)
 - [ ] All Vercel env vars above
-- [ ] Apple Developer account (for macOS signing)
 - [ ] Lemon Squeezy product configured with license keys enabled
-- [ ] (Optional) `VERCEL_TOKEN` + `VERCEL_PROJECT_ID` in GitHub for auto-version updates
+- [ ] (Optional) Windows code signing certificate
 
 ---
 

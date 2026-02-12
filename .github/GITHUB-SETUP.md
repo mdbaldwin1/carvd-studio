@@ -153,20 +153,21 @@ Feature branches → develop → main
 **Location:** `Settings → Secrets and variables → Actions → Secrets`
 
 ### Currently Configured:
-- [x] `LICENSE_PRIVATE_KEY` ✅
+- [x] `LICENSE_PRIVATE_KEY` ✅ - RSA private key for test license generation
+- [x] `CSC_LINK` ✅ - Base64-encoded .p12 certificate (macOS code signing)
+- [x] `CSC_KEY_PASSWORD` ✅ - Password for the .p12 file
+- [x] `APPLE_ID` ✅ - Apple Developer email (for notarization, currently disabled)
+- [x] `APPLE_ID_PASSWORD` ✅ - App-specific password (for notarization, currently disabled)
+- [x] `APPLE_TEAM_ID` ✅ - 10-character team ID (for notarization, currently disabled)
+- [x] `VERCEL_TOKEN` ✅ - Vercel API token
+- [x] `VERCEL_PROJECT_ID` ✅ - Vercel website project ID
 
-### Required for Release Workflow:
+### Still Needed:
+- [ ] `VERCEL_ORG_ID` - Vercel organization/team ID (required alongside VERCEL_PROJECT_ID)
 
-**Apple (macOS Code Signing):**
-- [ ] `APPLE_ID`
-- [ ] `APPLE_ID_PASSWORD`
-- [ ] `APPLE_TEAM_ID`
-- [ ] `CSC_LINK`
-- [ ] `CSC_KEY_PASSWORD`
-
-**Windows (Optional Code Signing):**
-- [ ] `WINDOWS_CERTIFICATE`
-- [ ] `WINDOWS_CERTIFICATE_PASSWORD`
+### Optional (Not Configured):
+- [ ] `WINDOWS_CERTIFICATE` - Windows code signing certificate
+- [ ] `WINDOWS_CERTIFICATE_PASSWORD` - Password for the certificate
 
 ### Variables (Optional)
 
@@ -190,42 +191,11 @@ These are non-sensitive values visible in logs:
   - Get notified of vulnerable dependencies
 - [x] **Dependabot security updates:** ✅ Enabled
   - Auto-creates PRs to fix vulnerabilities
-- [ ] **Dependabot version updates:** ⏳ Enable after creating config
-
-**To enable version updates, create:** `.github/dependabot.yml`
-
-```yaml
-version: 2
-updates:
-  # Desktop app dependencies
-  - package-ecosystem: "npm"
-    directory: "/packages/desktop"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    groups:
-      electron:
-        patterns:
-          - "electron*"
-      testing:
-        patterns:
-          - "*vitest*"
-          - "*playwright*"
-          - "*testing-library*"
-
-  # Website dependencies
-  - package-ecosystem: "npm"
-    directory: "/packages/website"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-
-  # GitHub Actions
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "monthly"
-```
+- [x] **Dependabot version updates:** ✅ Configured via `.github/dependabot.yml`
+  - Desktop deps: Weekly on Mondays, targets `develop` branch
+  - Root workspace deps: Weekly on Mondays, targets `develop` branch
+  - GitHub Actions: Monthly, targets `develop` branch
+  - Groups: electron, testing, threejs dependencies
 
 ### Code Scanning (CodeQL)
 - [x] **Code scanning:** ✅ Enable CodeQL
@@ -346,7 +316,7 @@ The repository is public to allow users to download releases from GitHub. The li
 
 ## Setup Checklist
 
-### Immediate (Now):
+### Completed:
 - [x] ✅ Create `develop` branch
 - [x] ✅ Configure branch protection for `main`
 - [x] ✅ Configure branch protection for `develop`
@@ -354,17 +324,20 @@ The repository is public to allow users to download releases from GitHub. The li
 - [x] ✅ Enable Dependabot security updates
 - [x] ✅ Enable secret scanning
 - [x] ✅ Make repository public
-- [ ] Configure Actions workflow permissions
+- [x] ✅ Configure Actions workflow permissions
+- [x] ✅ Add Apple code signing secrets
+- [x] ✅ Add Vercel secrets (TOKEN + PROJECT_ID)
+- [x] ✅ Create `.github/dependabot.yml` for automated updates
+- [x] ✅ Release workflow tested and working (v0.1.0 released)
+- [x] ✅ CI test workflow working on all platforms
 
-### Before First Release:
-- [ ] Add Lemon Squeezy secrets
-- [ ] Add Apple code signing secrets
-- [ ] (Optional) Add Windows code signing secrets
-- [ ] Test workflow runs
-- [ ] Verify required status checks
+### Still Needed:
+- [ ] Add `VERCEL_ORG_ID` secret (Vercel version update fails without it)
+- [ ] Enable macOS notarization (currently code-signed but not notarized)
+- [ ] (Optional) Add Windows code signing certificate
+- [ ] Set up Lemon Squeezy product and configure checkout URL
 
 ### Optional Enhancements:
-- [x] ✅ Create `.github/dependabot.yml` for automated updates
 - [ ] Enable CodeQL scanning
 - [ ] Create CODEOWNERS file
 - [ ] Set up production environment with approvals
@@ -394,23 +367,24 @@ git push -u origin feature/my-feature
 
 ### Preparing a Release:
 ```bash
+# On develop, bump the version
+cd packages/desktop
+node scripts/version-bump.cjs patch  # or minor, major
+git push origin develop
+
 # Create PR from develop to main
 # Go to GitHub → Create PR
-# Base: main
-# Compare: develop
+# Base: main, Compare: develop
 # Tests run automatically
-# Review changes
 # Merge when ready
 
-# After merge to main, create release tag
-git checkout main
-git pull
-npm run version:bump -- minor  # or patch, major
-git push origin main
-git push origin v1.2.0
-
-# Release workflow triggers automatically
-# Builds, signs, and uploads to Lemon Squeezy + GitHub Releases
+# After merge to main, release workflow triggers automatically:
+# 1. Reads version from packages/desktop/package.json
+# 2. Skips if that version is already released
+# 3. Builds macOS (x64 + arm64) and Windows
+# 4. Creates GitHub Release with DMG, ZIP, EXE artifacts
+# 5. Updates VITE_APP_VERSION in Vercel
+# 6. Creates a version bump PR targeting develop
 ```
 
 ### Hotfix Process:
@@ -443,5 +417,5 @@ git push origin develop
 
 ---
 
-**Last Updated:** 2026-02-10
-**Status:** Core configuration complete
+**Last Updated:** 2026-02-12
+**Status:** Core configuration complete, release pipeline operational
