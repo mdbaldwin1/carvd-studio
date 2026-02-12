@@ -21,14 +21,14 @@ This document lists all environment variables and secrets needed for each deploy
 
 **Note:** The release workflow creates a custom keychain, imports the certificate along with Apple intermediate certificates (DeveloperIDG2CA.cer and DeveloperIDCA.cer), and passes it to electron-builder via `CSC_KEYCHAIN`.
 
-### Required for macOS Notarization (Currently Tabled)
+### Required for macOS Notarization
 | Secret | Description | How to Get | Status |
 |--------|-------------|------------|--------|
 | `APPLE_ID` | Your Apple Developer email | Apple Developer account | ✅ Configured |
 | `APPLE_ID_PASSWORD` | App-specific password | appleid.apple.com → Security → App-Specific Passwords | ✅ Configured |
 | `APPLE_TEAM_ID` | 10-character team ID | developer.apple.com → Membership | ✅ Configured |
 
-**Note:** Notarization is currently disabled in release.yml (env vars commented out). The builds are code-signed but not notarized. Re-enable notarization by uncommenting the `APPLE_ID`, `APPLE_ID_PASSWORD`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` env vars in the "Package app (macOS)" step. You may need to re-export the .p12 with the full certificate chain included.
+**Note:** Notarization runs automatically via the `afterSign` hook in electron-builder, which calls `scripts/notarize.cjs`. The script uses `@electron/notarize` with `notarytool` to submit the app to Apple. The release workflow passes the Apple credentials as environment variables.
 
 ### Optional for Release Builds (Windows)
 | Secret | Description | How to Get | Status |
@@ -108,7 +108,7 @@ npm run generate-keys
 ### Full Release Pipeline
 - [x] `LICENSE_PRIVATE_KEY` in GitHub Secrets
 - [x] `CSC_LINK` + `CSC_KEY_PASSWORD` in GitHub Secrets (macOS code signing)
-- [x] `APPLE_ID` + `APPLE_ID_PASSWORD` + `APPLE_TEAM_ID` in GitHub Secrets (for notarization, currently disabled)
+- [x] `APPLE_ID` + `APPLE_ID_PASSWORD` + `APPLE_TEAM_ID` in GitHub Secrets (macOS notarization)
 - [x] `VERCEL_TOKEN` + `VERCEL_PROJECT_ID` in GitHub Secrets
 - [x] `VERCEL_ORG_ID` in GitHub Secrets (required for Vercel version update)
 - [ ] All Vercel env vars above
