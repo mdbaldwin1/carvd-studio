@@ -160,6 +160,9 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
+          # Prevent npm install --production from detecting the workspace
+          # and wiping devDependencies from the hoisted root node_modules
+          npm_config_workspaces: "false"
         run: npx electron-builder --mac --publish never --project packages/desktop
 
       - name: Package app (Windows)
@@ -168,6 +171,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
+          npm_config_workspaces: "false"
         run: npx electron-builder --win --publish never --project packages/desktop
 
       - name: Upload artifacts (macOS)
