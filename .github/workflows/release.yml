@@ -272,12 +272,13 @@ jobs:
       - name: Update VITE_APP_VERSION in Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           VERSION="${{ needs.prepare.outputs.version }}"
 
-          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
-            echo "⚠️  VERCEL_TOKEN or VERCEL_PROJECT_ID not set - skipping"
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_PROJECT_ID" ] || [ -z "$VERCEL_ORG_ID" ]; then
+            echo "⚠️  Vercel secrets not fully configured - skipping"
             exit 0
           fi
 
