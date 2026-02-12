@@ -96,50 +96,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Resolve and verify the app-builder binary. npm workspaces can cause
-      # the binary to be missing or unexecutable after npm ci.
-      - name: Verify app-builder-bin
+      # Copy app-builder binary to a safe location outside node_modules.
+      # electron-builder runs "npm install --production" during packaging,
+      # which in a workspace context can delete devDependencies (including
+      # app-builder-bin) from the hoisted root node_modules.
+      - name: Prepare app-builder binary
         id: app-builder
         shell: bash
         run: |
           BINARY=$(node -p "require('app-builder-bin').appBuilderPath")
-          echo "path=$BINARY" >> $GITHUB_OUTPUT
-          echo "Expected binary: $BINARY"
+          BASENAME=$(basename "$BINARY")
+          SAFE_PATH="${RUNNER_TEMP}/${BASENAME}"
 
-          # Reinstall if binary is missing
-          if [ ! -f "$BINARY" ]; then
-            echo "Binary missing - reinstalling..."
-            VERSION=$(node -p "require('./node_modules/app-builder-bin/package.json').version")
-            rm -rf node_modules/app-builder-bin
-            npm install "app-builder-bin@${VERSION}" --no-save --install-links
-          fi
+          echo "Source: $BINARY"
+          echo "Safe copy: $SAFE_PATH"
 
-          # Fix permissions and macOS quarantine
-          chmod +x "$BINARY"
-          if command -v xattr &>/dev/null; then
-            xattr -cr node_modules/app-builder-bin/ 2>/dev/null || true
-          fi
+          cp "$BINARY" "$SAFE_PATH"
+          chmod +x "$SAFE_PATH"
 
-          # Debug: show file details
-          ls -la "$BINARY"
-          file "$BINARY" 2>/dev/null || true
-
-          # CRITICAL: verify the binary actually executes
-          echo "Testing binary execution..."
-          "$BINARY" --help > /dev/null 2>&1 && echo "Binary executes OK" || {
-            echo "ERROR: Binary exists but cannot execute!"
-            echo "Attempting to diagnose..."
-            # Check dynamic library dependencies
-            if command -v otool &>/dev/null; then
-              otool -L "$BINARY" 2>&1 || true
-            fi
-            if command -v ldd &>/dev/null; then
-              ldd "$BINARY" 2>&1 || true
-            fi
-            # Try running with explicit output
-            "$BINARY" --help 2>&1 || true
+          # Verify the copy executes
+          "$SAFE_PATH" --help > /dev/null 2>&1 && echo "Binary OK" || {
+            echo "ERROR: Binary copy failed to execute"
             exit 1
           }
+
+          echo "safe_path=$SAFE_PATH" >> $GITHUB_OUTPUT
 
       - name: Setup license key
         run: echo "${{ secrets.LICENSE_PRIVATE_KEY }}" > license-private-key.pem
@@ -178,27 +159,16 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Verify binary still exists right before packaging
-          BINARY="${{ steps.app-builder.outputs.path }}"
-          echo "Pre-package check: $(ls -la "$BINARY" 2>&1)"
-          "$BINARY" --help > /dev/null 2>&1 && echo "Binary still runs" || echo "Binary no longer runs!"
-
-          # Run electron-builder from root using --project flag to avoid
-          # CWD-related module resolution issues
-          npx electron-builder --mac --publish never --project packages/desktop
+          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
+        run: npx electron-builder --mac --publish never --project packages/desktop
 
       - name: Package app (Windows)
         if: matrix.platform == 'win'
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Verify binary still exists right before packaging
-          BINARY="${{ steps.app-builder.outputs.path }}"
-          echo "Pre-package check: binary exists=$(test -f "$BINARY" && echo yes || echo no)"
-
-          # Run electron-builder from root using --project flag
-          npx electron-builder --win --publish never --project packages/desktop
+          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
+        run: npx electron-builder --win --publish never --project packages/desktop
 
       - name: Upload artifacts (macOS)
         if: matrix.platform == 'mac'
