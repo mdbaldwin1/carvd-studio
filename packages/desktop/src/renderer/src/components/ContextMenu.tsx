@@ -1,6 +1,6 @@
-/* global HTMLDivElement, Node */
-import React, { useEffect, useRef, useMemo } from 'react';
-import { useProjectStore, getContainingGroupId, getAllDescendantPartIds } from '../store/projectStore';
+import React, { useEffect, useLayoutEffect, useRef, useMemo, useState } from 'react';
+import { useProjectStore, getContainingGroupId, getAllDescendantPartIds, captureCanvas } from '../store/projectStore';
+import { getFeatureLimits } from '../utils/featureLimits';
 
 export function ContextMenu() {
   const contextMenu = useProjectStore((s) => s.contextMenu);
@@ -32,8 +32,58 @@ export function ContextMenu() {
   const addToGroup = useProjectStore((s) => s.addToGroup);
   const mergeGroups = useProjectStore((s) => s.mergeGroups);
   const openSaveAssemblyModal = useProjectStore((s) => s.openSaveAssemblyModal);
+  const captureManualThumbnail = useProjectStore((s) => s.captureManualThumbnail);
+  const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
+  const licenseMode = useProjectStore((s) => s.licenseMode);
+  const limits = getFeatureLimits(licenseMode);
+  const canUseAssemblies = limits.canUseAssemblies;
+  const canUseGroups = limits.canUseGroups;
 
   const menuRef = useRef<HTMLDivElement>(null);
+  const [adjustedPosition, setAdjustedPosition] = useState<{ x: number; y: number } | null>(null);
+
+  // Adjust menu position to stay within viewport bounds
+  useLayoutEffect(() => {
+    if (!contextMenu || !menuRef.current) {
+      setAdjustedPosition(null);
+      return;
+    }
+
+    const menu = menuRef.current;
+    const rect = menu.getBoundingClientRect();
+    const padding = 8; // Minimum distance from viewport edge
+
+    let newX = contextMenu.x;
+    let newY = contextMenu.y;
+
+    // Check right edge
+    if (newX + rect.width > window.innerWidth - padding) {
+      newX = window.innerWidth - rect.width - padding;
+    }
+    // Check bottom edge
+    if (newY + rect.height > window.innerHeight - padding) {
+      newY = window.innerHeight - rect.height - padding;
+    }
+    // Check left edge
+    if (newX < padding) {
+      newX = padding;
+    }
+    // Check top edge
+    if (newY < padding) {
+      newY = padding;
+    }
+
+    // Only update if position changed
+    if (newX !== contextMenu.x || newY !== contextMenu.y) {
+      setAdjustedPosition({ x: newX, y: newY });
+    } else {
+      setAdjustedPosition(null);
+    }
+  }, [contextMenu]);
+
+  // Get the effective position (adjusted or original)
+  const menuX = adjustedPosition?.x ?? contextMenu?.x ?? 0;
+  const menuY = adjustedPosition?.y ?? contextMenu?.y ?? 0;
 
   // Close on click outside
   useEffect(() => {
@@ -88,6 +138,11 @@ export function ContextMenu() {
       closeContextMenu();
     };
 
+    const handleExportImage = async () => {
+      await captureCanvas();
+      closeContextMenu();
+    };
+
     const handleCenterViewHere = () => {
       if (worldPos) {
         requestCenterCameraAtPosition(worldPos);
@@ -128,14 +183,19 @@ export function ContextMenu() {
       closeContextMenu();
     };
 
+    const handleCaptureThumbnail = async () => {
+      await captureManualThumbnail();
+      closeContextMenu();
+    };
+
     return (
       <div
         ref={menuRef}
         className="context-menu"
         style={{
           position: 'fixed',
-          left: contextMenu.x,
-          top: contextMenu.y,
+          left: menuX,
+          top: menuY,
           zIndex: 1000
         }}
       >
@@ -150,6 +210,13 @@ export function ContextMenu() {
             Paste Here
           </button>
         )}
+        <div className="context-menu-divider" />
+        <button className="context-menu-item" onClick={handleExportImage}>
+          Export as Image
+        </button>
+        <button className="context-menu-item" onClick={handleCaptureThumbnail}>
+          Capture Thumbnail
+        </button>
         <div className="context-menu-divider" />
         <div className="context-menu-header">Snap Guides</div>
         <button className="context-menu-item" onClick={handleAddXGuide} disabled={!worldPos}>
@@ -193,8 +260,8 @@ export function ContextMenu() {
         className="context-menu"
         style={{
           position: 'fixed',
-          left: contextMenu.x,
-          top: contextMenu.y,
+          left: menuX,
+          top: menuY,
           zIndex: 1000
         }}
       >
@@ -249,13 +316,25 @@ export function ContextMenu() {
   // For "Merge Groups": show when 2+ groups are selected
   const canMergeGroups = selectedGroupIds.length >= 2;
 
+  // For "Add Groups to Group": show when 2+ groups are selected
+  // Lists the selected groups as targets - clicking one adds all OTHER selected groups to it
+  const canAddGroupsToGroup = selectedGroupIds.length >= 2;
+  const targetGroupsForGroupAdd = canAddGroupsToGroup ? groups.filter((g) => selectedGroupIds.includes(g.id)) : [];
+
   const handleCopy = () => {
     copySelectedParts();
     closeContextMenu();
   };
 
   const handleDelete = () => {
-    deleteSelectedParts();
+    // Delete selected groups first (recursive mode deletes group and all contents)
+    for (const groupId of selectedGroupIds) {
+      deleteGroup(groupId, 'recursive');
+    }
+    // Then delete any directly selected parts (that weren't in deleted groups)
+    if (selectedPartIds.length > 0) {
+      deleteSelectedParts();
+    }
     closeContextMenu();
   };
 
@@ -316,6 +395,15 @@ export function ContextMenu() {
     closeContextMenu();
   };
 
+  const handleAddGroupsToGroup = (targetGroupId: string) => {
+    // Add all OTHER selected groups to the target group
+    const groupsToAdd = selectedGroupIds.filter((id) => id !== targetGroupId);
+    if (groupsToAdd.length > 0) {
+      addToGroup(targetGroupId, groupsToAdd, 'group');
+    }
+    closeContextMenu();
+  };
+
   const handleToggleReference = () => {
     toggleReference(effectiveSelectedPartIds);
     closeContextMenu();
@@ -357,7 +445,12 @@ export function ContextMenu() {
       <button className="context-menu-item" onClick={handleCopy}>
         Copy
       </button>
-      <button className="context-menu-item" onClick={handleSaveAsAssembly}>
+      <button
+        className="context-menu-item"
+        onClick={handleSaveAsAssembly}
+        disabled={!canUseAssemblies}
+        title={!canUseAssemblies ? 'Upgrade to use assemblies' : undefined}
+      >
         Save as Assembly
       </button>
       <button
@@ -378,7 +471,12 @@ export function ContextMenu() {
         </button>
       )}
       {canCreateGroup && (
-        <button className="context-menu-item" onClick={handleGroup}>
+        <button
+          className="context-menu-item"
+          onClick={handleGroup}
+          disabled={!canUseGroups}
+          title={!canUseGroups ? 'Upgrade to use groups' : undefined}
+        >
           Create Group (G)
         </button>
       )}
@@ -395,10 +493,7 @@ export function ContextMenu() {
       {canAddToGroup && (
         <>
           {targetGroupsForAdd.length === 1 ? (
-            <button
-              className="context-menu-item"
-              onClick={() => handleAddToGroup(targetGroupsForAdd[0]!.id)}
-            >
+            <button className="context-menu-item" onClick={() => handleAddToGroup(targetGroupsForAdd[0]!.id)}>
               Add to "{targetGroupsForAdd[0]!.name}" ({ungroupedPartIds.length})
             </button>
           ) : (
@@ -408,11 +503,7 @@ export function ContextMenu() {
               </button>
               <div className="context-menu-submenu-items">
                 {targetGroupsForAdd.map((group) => (
-                  <button
-                    key={group!.id}
-                    className="context-menu-item"
-                    onClick={() => handleAddToGroup(group!.id)}
-                  >
+                  <button key={group!.id} className="context-menu-item" onClick={() => handleAddToGroup(group!.id)}>
                     {group!.name}
                   </button>
                 ))}
@@ -433,6 +524,18 @@ export function ContextMenu() {
             <button className="context-menu-item" onClick={() => handleMergeGroups('deep')}>
               Deep (Flatten to Parts)
             </button>
+          </div>
+        </div>
+      )}
+      {canAddGroupsToGroup && targetGroupsForGroupAdd.length > 0 && (
+        <div className="context-menu-submenu">
+          <button className="context-menu-item context-menu-item-has-submenu">Add to Group ▸</button>
+          <div className="context-menu-submenu-items">
+            {targetGroupsForGroupAdd.map((group) => (
+              <button key={group.id} className="context-menu-item" onClick={() => handleAddGroupsToGroup(group.id)}>
+                Add to "{group.name}"
+              </button>
+            ))}
           </div>
         </div>
       )}

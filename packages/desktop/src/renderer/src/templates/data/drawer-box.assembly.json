@@ -1,0 +1,129 @@
+{
+  "id": "built-in-drawer-box",
+  "name": "Drawer Box",
+  "description": "Standard drawer box with solid wood sides and plywood bottom. 14\"W x 12\"D x 4\"H.",
+  "thumbnail": "🗃️",
+  "category": "storage",
+  "parts": [
+    {
+      "_refId": "part-front",
+      "name": "Drawer Front",
+      "length": 14,
+      "width": 4,
+      "thickness": 0.75,
+      "relativePosition": { "x": 0, "y": 2, "z": 5.625 },
+      "rotation": { "x": 90, "y": 0, "z": 0 },
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#8b5a2b",
+      "notes": "Drawer front - add hardware as needed",
+      "embeddedStock": {
+        "name": "3/4\" Maple",
+        "length": 96,
+        "width": 6,
+        "thickness": 0.75,
+        "grainDirection": "length",
+        "pricingUnit": "board_foot",
+        "pricePerUnit": 8,
+        "color": "#8b5a2b"
+      }
+    },
+    {
+      "_refId": "part-back",
+      "name": "Drawer Back",
+      "length": 12.5,
+      "width": 3.5,
+      "thickness": 0.5,
+      "relativePosition": { "x": 0, "y": 2, "z": -5.75 },
+      "rotation": { "x": 90, "y": 0, "z": 0 },
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#d2b48c",
+      "notes": "Drawer back - can be shorter than sides for dado joint",
+      "embeddedStock": {
+        "name": "1/2\" Baltic Birch",
+        "length": 60,
+        "width": 60,
+        "thickness": 0.5,
+        "grainDirection": "length",
+        "pricingUnit": "per_item",
+        "pricePerUnit": 35,
+        "color": "#d2b48c"
+      }
+    },
+    {
+      "_refId": "part-left-side",
+      "name": "Left Side",
+      "length": 12,
+      "width": 4,
+      "thickness": 0.5,
+      "relativePosition": { "x": -6.75, "y": 2, "z": 0 },
+      "rotation": { "x": 90, "y": 0, "z": 90 },
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#d2b48c",
+      "notes": "Dado for bottom, rabbet for front/back",
+      "embeddedStock": {
+        "name": "1/2\" Baltic Birch",
+        "length": 60,
+        "width": 60,
+        "thickness": 0.5,
+        "grainDirection": "length",
+        "pricingUnit": "per_item",
+        "pricePerUnit": 35,
+        "color": "#d2b48c"
+      }
+    },
+    {
+      "_refId": "part-right-side",
+      "name": "Right Side",
+      "length": 12,
+      "width": 4,
+      "thickness": 0.5,
+      "relativePosition": { "x": 6.75, "y": 2, "z": 0 },
+      "rotation": { "x": 90, "y": 0, "z": 90 },
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#d2b48c",
+      "notes": "Dado for bottom, rabbet for front/back",
+      "embeddedStock": {
+        "name": "1/2\" Baltic Birch",
+        "length": 60,
+        "width": 60,
+        "thickness": 0.5,
+        "grainDirection": "length",
+        "pricingUnit": "per_item",
+        "pricePerUnit": 35,
+        "color": "#d2b48c"
+      }
+    },
+    {
+      "_refId": "part-bottom",
+      "name": "Drawer Bottom",
+      "length": 13,
+      "width": 11.5,
+      "thickness": 0.25,
+      "relativePosition": { "x": 0, "y": 0.375, "z": 0 },
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "grainSensitive": false,
+      "grainDirection": "length",
+      "color": "#c4a574",
+      "notes": "1/4\" plywood bottom - fits in dado",
+      "embeddedStock": {
+        "name": "1/4\" Baltic Birch",
+        "length": 48,
+        "width": 48,
+        "thickness": 0.25,
+        "grainDirection": "length",
+        "pricingUnit": "per_item",
+        "pricePerUnit": 25,
+        "color": "#c4a574"
+      }
+    }
+  ],
+  "groups": [{ "_refId": "group-sides", "name": "Sides" }],
+  "groupMembers": [
+    { "groupRefId": "group-sides", "memberType": "part", "memberRefId": "part-left-side" },
+    { "groupRefId": "group-sides", "memberType": "part", "memberRefId": "part-right-side" }
+  ]
+}

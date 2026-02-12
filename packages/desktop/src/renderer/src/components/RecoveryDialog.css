@@ -1,3 +1,8 @@
+/* Recovery dialog needs higher z-index to appear over StartScreen */
+.modal-overlay:has(.recovery-dialog) {
+  z-index: 1001;
+}
+
 .recovery-dialog {
   max-width: 450px;
 }

@@ -198,5 +198,4 @@ Before releasing:
 ## Links
 
 - [Monorepo Root README](../../README.md)
-- [Webhook Service](../webhook/README.md)
 - [Website](../website/README.md)

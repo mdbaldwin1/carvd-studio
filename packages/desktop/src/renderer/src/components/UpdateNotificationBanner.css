@@ -1,0 +1,110 @@
+/* Update Notification Banner Styles */
+
+.update-notification-banner {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--color-primary);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  box-shadow: 0 2px 8px var(--color-overlay);
+  z-index: 1000;
+}
+
+.update-notification-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+.update-notification-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.update-notification-available .update-notification-icon,
+.update-notification-downloading .update-notification-icon {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.update-notification-ready .update-notification-icon {
+  background: var(--color-success-bg);
+}
+
+.update-notification-error .update-notification-icon {
+  background: var(--color-danger-bg);
+}
+
+.update-notification-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.update-notification-title {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.update-notification-message {
+  opacity: 0.9;
+  font-size: 0.8125rem;
+}
+
+.update-notification-progress {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.update-notification-progress-bar {
+  height: 100%;
+  background: var(--color-text);
+  transition: width 0.3s ease;
+}
+
+.update-notification-banner .btn {
+  flex-shrink: 0;
+}
+
+.update-notification-banner .btn-primary {
+  background: var(--color-text);
+  color: var(--color-primary);
+  border-color: var(--color-text);
+}
+
+.update-notification-banner .btn-primary:hover {
+  background: var(--color-text-muted);
+}
+
+.update-notification-banner .btn-ghost {
+  color: var(--color-text);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.update-notification-banner .btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

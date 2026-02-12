@@ -35,7 +35,7 @@ npm run build --workspace=@carvd/website
 ## Deployment
 
 This website can be deployed to:
-- **Vercel** (recommended - same as webhook service)
+- **Vercel** (recommended)
 - **Netlify**
 - **Cloudflare Pages**
 - Any static hosting service

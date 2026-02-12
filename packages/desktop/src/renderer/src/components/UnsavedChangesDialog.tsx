@@ -5,7 +5,7 @@
 import { useProjectStore } from '../store/projectStore';
 import './UnsavedChangesDialog.css';
 
-export type UnsavedChangesAction = 'new' | 'open' | 'close' | 'custom';
+export type UnsavedChangesAction = 'new' | 'open' | 'close' | 'home' | 'custom';
 
 interface UnsavedChangesDialogProps {
   isOpen: boolean;
@@ -38,6 +38,8 @@ export function UnsavedChangesDialog({
         return `Do you want to save changes to "${projectName}" before opening another project?`;
       case 'close':
         return `Do you want to save changes to "${projectName}" before closing?`;
+      case 'home':
+        return `Do you want to save changes to "${projectName}" before returning to the start screen?`;
       default:
         return `Do you want to save changes to "${projectName}"?`;
     }
@@ -46,10 +48,9 @@ export function UnsavedChangesDialog({
   const getDiscardLabel = () => {
     switch (action) {
       case 'new':
-        return "Don't Save";
       case 'open':
-        return "Don't Save";
       case 'close':
+      case 'home':
         return "Don't Save";
       default:
         return 'Discard';

@@ -1,0 +1,53 @@
+version: 2
+updates:
+  # Desktop app dependencies
+  - package-ecosystem: "npm"
+    directory: "/packages/desktop"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    groups:
+      # Group Electron-related updates
+      electron:
+        patterns:
+          - "electron"
+          - "electron-*"
+      # Group testing dependencies
+      testing:
+        patterns:
+          - "*vitest*"
+          - "*playwright*"
+          - "*testing-library*"
+      # Group Three.js and related
+      threejs:
+        patterns:
+          - "three"
+          - "@types/three"
+    labels:
+      - "dependencies"
+      - "desktop"
+
+  # Root workspace dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "workspace"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+    open-pull-requests-limit: 2
+    labels:
+      - "dependencies"
+      - "github-actions"

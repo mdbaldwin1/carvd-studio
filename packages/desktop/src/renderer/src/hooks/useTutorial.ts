@@ -23,7 +23,7 @@ export function useTutorial(steps: TutorialStep[]) {
   });
 
   const start = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       isActive: true,
       currentStepIndex: 0
@@ -31,7 +31,7 @@ export function useTutorial(steps: TutorialStep[]) {
   }, []);
 
   const next = useCallback(() => {
-    setState(prev => {
+    setState((prev) => {
       if (prev.currentStepIndex < prev.steps.length - 1) {
         return {
           ...prev,
@@ -43,7 +43,7 @@ export function useTutorial(steps: TutorialStep[]) {
   }, []);
 
   const previous = useCallback(() => {
-    setState(prev => {
+    setState((prev) => {
       if (prev.currentStepIndex > 0) {
         return {
           ...prev,
@@ -55,21 +55,21 @@ export function useTutorial(steps: TutorialStep[]) {
   }, []);
 
   const skip = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       isActive: false
     }));
   }, []);
 
   const complete = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       isActive: false
     }));
   }, []);
 
   const goToStep = useCallback((index: number) => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       currentStepIndex: Math.max(0, Math.min(index, prev.steps.length - 1))
     }));

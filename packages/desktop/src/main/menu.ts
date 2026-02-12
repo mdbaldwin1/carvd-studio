@@ -4,6 +4,7 @@
 
 import { Menu, MenuItemConstructorOptions, BrowserWindow, app } from 'electron';
 import { getRecentProjects } from './store';
+import { checkForUpdatesManual } from './updater';
 
 const isMac = process.platform === 'darwin';
 
@@ -11,9 +12,10 @@ const isMac = process.platform === 'darwin';
  * Send a menu command to the renderer process
  */
 function sendMenuCommand(command: string, ...args: unknown[]) {
-  const focusedWindow = BrowserWindow.getFocusedWindow();
-  if (focusedWindow) {
-    focusedWindow.webContents.send('menu-command', command, ...args);
+  // Try focused window first, fall back to first available window
+  const targetWindow = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+  if (targetWindow) {
+    targetWindow.webContents.send('menu-command', command, ...args);
   }
 }
 
@@ -87,6 +89,11 @@ export function buildMenuTemplate(): MenuItemConstructorOptions[] {
         accelerator: 'CmdOrCtrl+N',
         click: () => sendMenuCommand('new-project')
       },
+      {
+        label: 'New from Template...',
+        accelerator: 'CmdOrCtrl+Shift+N',
+        click: () => sendMenuCommand('new-from-template')
+      },
       { type: 'separator' },
       {
         label: 'Open...',
@@ -109,7 +116,19 @@ export function buildMenuTemplate(): MenuItemConstructorOptions[] {
         click: () => sendMenuCommand('save-project-as')
       },
       { type: 'separator' },
-      isMac ? { role: 'close' } : { role: 'quit' }
+      {
+        label: 'Add to Favorites',
+        accelerator: 'CmdOrCtrl+Shift+F',
+        click: () => sendMenuCommand('add-to-favorites')
+      },
+      { type: 'separator' },
+      {
+        label: 'Close Project',
+        accelerator: 'CmdOrCtrl+W',
+        click: () => sendMenuCommand('close-project')
+      },
+      { type: 'separator' },
+      isMac ? { role: 'quit' } : { role: 'quit' }
     ]
   });
 
@@ -191,14 +210,42 @@ export function buildMenuTemplate(): MenuItemConstructorOptions[] {
         accelerator: 'CmdOrCtrl+/',
         click: () => sendMenuCommand('show-shortcuts')
       },
-      { type: 'separator' },
       {
-        label: 'Learn More',
+        label: 'Documentation',
         click: async () => {
           const { shell } = require('electron');
-          await shell.openExternal('https://github.com/your-repo/carvd-studio');
+          await shell.openExternal('https://carvd-studio.com/docs');
         }
-      }
+      },
+      { type: 'separator' },
+      {
+        label: 'Privacy Policy',
+        click: async () => {
+          const { shell } = require('electron');
+          await shell.openExternal('https://carvd-studio.com/privacy');
+        }
+      },
+      {
+        label: 'Terms of Service',
+        click: async () => {
+          const { shell } = require('electron');
+          await shell.openExternal('https://carvd-studio.com/terms');
+        }
+      },
+      { type: 'separator' },
+      {
+        label: 'Check for Updates...',
+        click: () => checkForUpdatesManual()
+      },
+      ...(!isMac
+        ? [
+            { type: 'separator' } as MenuItemConstructorOptions,
+            {
+              label: 'About Carvd Studio',
+              click: () => sendMenuCommand('show-about')
+            }
+          ]
+        : [])
     ]
   });
 

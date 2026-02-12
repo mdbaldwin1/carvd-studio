@@ -19,11 +19,7 @@ export function LoadingSpinner({ size = 'medium', message, className = '' }: Loa
 
   return (
     <div className={`loading-spinner-container ${className}`}>
-      <div
-        className={`loading-spinner ${sizeClass}`}
-        role="status"
-        aria-label="Loading"
-      />
+      <div className={`loading-spinner ${sizeClass}`} role="status" aria-label="Loading" />
       {message && <p className="loading-spinner-message">{message}</p>}
     </div>
   );

@@ -17,12 +17,7 @@ interface RecoveryDialogProps {
   onDiscard: () => void;
 }
 
-export function RecoveryDialog({
-  isOpen,
-  recoveryInfo,
-  onRestore,
-  onDiscard
-}: RecoveryDialogProps) {
+export function RecoveryDialog({ isOpen, recoveryInfo, onRestore, onDiscard }: RecoveryDialogProps) {
   if (!isOpen || !recoveryInfo) return null;
 
   const formatDate = (isoString: string) => {
@@ -53,9 +48,7 @@ export function RecoveryDialog({
             </div>
           </div>
 
-          <p className="recovery-question">
-            Would you like to restore this work?
-          </p>
+          <p className="recovery-question">Would you like to restore this work?</p>
         </div>
 
         <div className="modal-footer recovery-actions">

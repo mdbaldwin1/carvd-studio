@@ -32,14 +32,33 @@ export default [
         clearInterval: 'readonly',
         HTMLInputElement: 'readonly',
         HTMLTextAreaElement: 'readonly',
+        HTMLButtonElement: 'readonly',
+        HTMLDivElement: 'readonly',
+        HTMLElement: 'readonly',
         PointerEvent: 'readonly',
         MouseEvent: 'readonly',
         KeyboardEvent: 'readonly',
+        Node: 'readonly',
+        DOMRect: 'readonly',
+        URL: 'readonly',
+        Blob: 'readonly',
+        Response: 'readonly',
+        RequestInit: 'readonly',
+        AbortController: 'readonly',
+        fetch: 'readonly',
+        crypto: 'readonly',
+        sessionStorage: 'readonly',
+        atob: 'readonly',
+        confirm: 'readonly',
+        alert: 'readonly',
+        React: 'readonly',
         // Node.js globals
         process: 'readonly',
         __dirname: 'readonly',
         module: 'readonly',
         require: 'readonly',
+        Buffer: 'readonly',
+        NodeJS: 'readonly',
         // Electron globals
         Electron: 'readonly'
       }
@@ -69,6 +88,13 @@ export default [
       react: {
         version: 'detect'
       }
+    }
+  },
+  {
+    // Main process files use require() for dynamic imports
+    files: ['src/main/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off'
     }
   },
   prettierConfig
