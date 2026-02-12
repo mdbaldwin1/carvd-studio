@@ -178,19 +178,27 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.path }}
         run: |
-          cd packages/desktop
-          npx electron-builder --mac --publish never
+          # Verify binary still exists right before packaging
+          BINARY="${{ steps.app-builder.outputs.path }}"
+          echo "Pre-package check: $(ls -la "$BINARY" 2>&1)"
+          "$BINARY" --help > /dev/null 2>&1 && echo "Binary still runs" || echo "Binary no longer runs!"
+
+          # Run electron-builder from root using --project flag to avoid
+          # CWD-related module resolution issues
+          npx electron-builder --mac --publish never --project packages/desktop
 
       - name: Package app (Windows)
         if: matrix.platform == 'win'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.path }}
         run: |
-          cd packages/desktop
-          npx electron-builder --win --publish never
+          # Verify binary still exists right before packaging
+          BINARY="${{ steps.app-builder.outputs.path }}"
+          echo "Pre-package check: binary exists=$(test -f "$BINARY" && echo yes || echo no)"
+
+          # Run electron-builder from root using --project flag
+          npx electron-builder --win --publish never --project packages/desktop
 
       - name: Upload artifacts (macOS)
         if: matrix.platform == 'mac'
