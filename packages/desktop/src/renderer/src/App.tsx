@@ -1,18 +1,27 @@
 import { Canvas } from '@react-three/fiber';
-import { ChevronDown, ChevronRight, Library, Redo2, Settings, Undo2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Library, Redo2, Save, Search, Settings, Sun, Undo2, X } from 'lucide-react';
+import { ColorPicker } from './components/ColorPicker';
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
+import { AboutModal } from './components/AboutModal';
 import { AddAssemblyModal } from './components/AddAssemblyModal';
 import { AddStockModal } from './components/AddStockModal';
+import { StartScreen } from './components/StartScreen';
+import { NewProjectDialog } from './components/NewProjectDialog';
 import { AppSettingsModal } from './components/AppSettingsModal';
+import { ImportAppStateModal } from './components/ImportAppStateModal';
 import { AssemblyEditingBanner } from './components/AssemblyEditingBanner';
 import { AssemblyEditingExitDialog } from './components/AssemblyEditingExitDialog';
+import { TemplateEditingBanner } from './components/TemplateEditingBanner';
+import { TemplateSetupDialog, TemplateSaveDialog, TemplateDiscardDialog } from './components/TemplateEditingExitDialog';
+import { UpdateNotificationBanner } from './components/UpdateNotificationBanner';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { ContextMenu } from './components/ContextMenu';
 import { CutListModal } from './components/CutListModal';
 import { EditStockModal } from './components/EditStockModal';
 import { useMenuCommands } from './hooks/useMenuCommands';
 import { FractionInput } from './components/FractionInput';
+import { HelpTooltip } from './components/HelpTooltip';
 import { HierarchicalPartsList } from './components/HierarchicalPartsList';
 import { ImportToLibraryDialog } from './components/ImportToLibraryDialog';
 import { LicenseActivationModal } from './components/LicenseActivationModal';
@@ -20,22 +29,31 @@ import { ProjectSettingsModal } from './components/ProjectSettingsModal';
 import { RecoveryDialog } from './components/RecoveryDialog';
 import { SaveAssemblyModal } from './components/SaveAssemblyModal';
 import { StockLibraryModal } from './components/StockLibraryModal';
+import { TemplateBrowserModal } from './components/TemplateBrowserModal';
+import { TemplatesScreen } from './components/TemplatesScreen';
 import { Toast } from './components/Toast';
+import { TrialBanner } from './components/TrialBanner';
+import { TrialExpiredModal } from './components/TrialExpiredModal';
 import { Workspace } from './components/Workspace';
 import { WelcomeTutorial } from './components/WelcomeTutorial';
 import { STOCK_COLORS } from './constants';
+import { logger } from './utils/logger';
+import { getFeatureLimits } from './utils/featureLimits';
 import { useAppSettings } from './hooks/useAppSettings';
 import { useAutoRecovery } from './hooks/useAutoRecovery';
+import { useAutoSave } from './hooks/useAutoSave';
 import { useAssemblyEditing } from './hooks/useAssemblyEditing';
 import { useAssemblyLibrary } from './hooks/useAssemblyLibrary';
+import { useTemplateEditing } from './hooks/useTemplateEditing';
 import { useEffectiveStockConstraints } from './hooks/useEffectiveStockConstraints';
 import { useDevTools } from './hooks/useDevTools';
 import { useFileOperations } from './hooks/useFileOperations';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useLibraryImportCheck } from './hooks/useLibraryImportCheck';
+import { useLicenseStatus } from './hooks/useLicenseStatus';
 import { useStockLibrary } from './hooks/useStockLibrary';
 import { useProjectStore } from './store/projectStore';
-import { Assembly, Stock } from './types';
+import { Assembly, LightingMode, Project, Stock } from './types';
 import { formatMeasurementWithUnit } from './utils/fractions';
 import { getPartBounds } from './utils/snapToPartsUtil';
 import { generateSeedProject } from './utils/seedData';
@@ -54,16 +72,12 @@ function SelectionBox() {
 
   return (
     <div
+      className="selection-rectangle"
       style={{
-        position: 'fixed',
         left: `${left}px`,
         top: `${top}px`,
         width: `${width}px`,
-        height: `${height}px`,
-        border: '1px dashed #3498db',
-        backgroundColor: 'rgba(52, 152, 219, 0.1)',
-        pointerEvents: 'none',
-        zIndex: 100
+        height: `${height}px`
       }}
     />
   );
@@ -155,15 +169,19 @@ function HotkeyHints({ show }: { show: boolean }) {
 interface SidebarProps {
   onOpenProjectSettings: () => void;
   onOpenCutList: () => void;
+  onCreateNewAssembly?: () => void;
+  onShowLicenseModal?: () => void;
 }
 
-function Sidebar({ onOpenProjectSettings, onOpenCutList }: SidebarProps) {
+function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, onShowLicenseModal }: SidebarProps) {
   const parts = useProjectStore((s) => s.parts);
   const projectStocks = useProjectStore((s) => s.stocks);
   const projectAssemblies = useProjectStore((s) => s.assemblies);
   const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
   const units = useProjectStore((s) => s.units);
   const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
+  const licenseMode = useProjectStore((s) => s.licenseMode);
+  const canUseAssemblies = getFeatureLimits(licenseMode).canUseAssemblies;
   const addPart = useProjectStore((s) => s.addPart);
   const addProjectStock = useProjectStore((s) => s.addStock);
   const updateProjectStock = useProjectStore((s) => s.updateStock);
@@ -186,10 +204,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList }: SidebarProps) {
   } = useStockLibrary();
 
   // App-level assembly library (persisted)
-  const {
-    assemblies: libraryAssemblies,
-    deleteAssembly: deleteLibraryAssembly
-  } = useAssemblyLibrary();
+  const { assemblies: libraryAssemblies, deleteAssembly: deleteLibraryAssembly } = useAssemblyLibrary();
 
   // Use library or project stocks/assemblies based on editing mode
   const stocks = isEditingAssembly ? libraryStocks : projectStocks;
@@ -206,10 +221,27 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList }: SidebarProps) {
   const [editingStock, setEditingStock] = useState<Stock | null>(null);
   const [stockToDelete, setStockToDelete] = useState<{ stock: Stock; partCount: number } | null>(null);
 
-  // Collapsed sections state
-  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  // Collapsed sections state (assemblies collapsed by default, stock open)
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    stock: false,
+    assemblies: true
+  });
   const toggleSection = (section: string) => {
     setCollapsedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  // Search state for sidebar sections
+  const [searchOpen, setSearchOpen] = useState<Record<string, boolean>>({});
+  const [searchTerms, setSearchTerms] = useState<Record<string, string>>({});
+  const toggleSearch = (section: string) => {
+    setSearchOpen((prev) => {
+      const isOpening = !prev[section];
+      // Clear search term when closing
+      if (!isOpening) {
+        setSearchTerms((t) => ({ ...t, [section]: '' }));
+      }
+      return { ...prev, [section]: isOpening };
+    });
   };
 
   // Track the anchor point for shift-click range selection
@@ -303,6 +335,16 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList }: SidebarProps) {
           </span>
           <h2>{isEditingAssembly ? 'Stock Library' : 'Stock'}</h2>
           <button
+            className={`btn btn-icon-sm btn-ghost btn-secondary ${searchOpen.stock ? 'active' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleSearch('stock');
+            }}
+            title="Search"
+          >
+            <Search size={12} />
+          </button>
+          <button
             className="btn btn-icon-sm btn-ghost btn-secondary"
             onClick={(e) => {
               e.stopPropagation();
@@ -319,6 +361,29 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList }: SidebarProps) {
             +
           </button>
         </div>
+        {searchOpen.stock && (
+          <div className="section-search">
+            <input
+              type="text"
+              placeholder="Search stock..."
+              value={searchTerms.stock || ''}
+              onChange={(e) => setSearchTerms((t) => ({ ...t, stock: e.target.value }))}
+              onClick={(e) => e.stopPropagation()}
+              autoFocus
+            />
+            {searchTerms.stock && (
+              <button
+                className="section-search-clear"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSearchTerms((t) => ({ ...t, stock: '' }));
+                }}
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        )}
         <div className="section-content">
           <div className="section-content-inner">
             {stocks.length === 0 ? (
@@ -327,48 +392,52 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList }: SidebarProps) {
               </p>
             ) : (
               <ul className="stock-list">
-                {stocks.map((stock) => {
-                  const partCount = parts.filter((p) => p.stockId === stock.id).length;
-                  return (
-                    <li
-                      key={stock.id}
-                      className="stock-item"
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('application/carvd-stock', stock.id);
-                        e.dataTransfer.effectAllowed = 'copy';
-                      }}
-                      title={`Drag onto canvas to create part\n${formatMeasurementWithUnit(stock.length, units)} × ${formatMeasurementWithUnit(stock.width, units)} × ${formatMeasurementWithUnit(stock.thickness, units)}${!isEditingAssembly ? `\n${partCount} part${partCount !== 1 ? 's' : ''} assigned` : ''}`}
-                    >
-                      <span className="stock-color" style={{ backgroundColor: stock.color }} />
-                      <span className="stock-name">{stock.name}</span>
-                      {!isEditingAssembly && partCount > 0 && <span className="stock-part-count">{partCount}</span>}
-                      <span className="stock-thickness">{formatMeasurementWithUnit(stock.thickness, units)}</span>
-                      <div className="stock-actions">
-                        <button
-                          className="btn btn-icon-sm btn-ghost btn-secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingStock(stock);
-                          }}
-                          title={isEditingAssembly ? 'Edit library stock' : 'Edit stock'}
-                        >
-                          ✎
-                        </button>
-                        <button
-                          className="btn btn-icon-sm btn-ghost btn-danger"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteStock(stock);
-                          }}
-                          title={isEditingAssembly ? 'Delete from library' : 'Remove from project'}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
+                {stocks
+                  .filter(
+                    (stock) => !searchTerms.stock || stock.name.toLowerCase().includes(searchTerms.stock.toLowerCase())
+                  )
+                  .map((stock) => {
+                    const partCount = parts.filter((p) => p.stockId === stock.id).length;
+                    return (
+                      <li
+                        key={stock.id}
+                        className="stock-item"
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('application/carvd-stock', stock.id);
+                          e.dataTransfer.effectAllowed = 'copy';
+                        }}
+                        title={`Drag onto canvas to create part\n${formatMeasurementWithUnit(stock.length, units)} × ${formatMeasurementWithUnit(stock.width, units)} × ${formatMeasurementWithUnit(stock.thickness, units)}${!isEditingAssembly ? `\n${partCount} part${partCount !== 1 ? 's' : ''} assigned` : ''}`}
+                      >
+                        <span className="stock-color" style={{ backgroundColor: stock.color }} />
+                        <span className="stock-name">{stock.name}</span>
+                        {!isEditingAssembly && partCount > 0 && <span className="stock-part-count">{partCount}</span>}
+                        <span className="stock-thickness">{formatMeasurementWithUnit(stock.thickness, units)}</span>
+                        <div className="stock-actions">
+                          <button
+                            className="btn btn-icon-sm btn-ghost btn-secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingStock(stock);
+                            }}
+                            title={isEditingAssembly ? 'Edit library stock' : 'Edit stock'}
+                          >
+                            ✎
+                          </button>
+                          <button
+                            className="btn btn-icon-sm btn-ghost btn-danger"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteStock(stock);
+                            }}
+                            title={isEditingAssembly ? 'Delete from library' : 'Remove from project'}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
               </ul>
             )}
           </div>
@@ -386,63 +455,129 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList }: SidebarProps) {
             {collapsedSections.assemblies ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
           </span>
           <h2>{isEditingAssembly ? 'Assembly Library' : 'Assemblies'}</h2>
-          {isEditingAssembly ? (
-            <button
-              className="btn btn-icon-sm btn-ghost btn-secondary"
-              disabled
-              onClick={(e) => e.stopPropagation()}
-              title="Finish editing current assembly first"
-            >
-              +
-            </button>
-          ) : (
-            <button
-              className="btn btn-icon-sm btn-ghost btn-secondary"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsAddAssemblyModalOpen(true);
-              }}
-              title="Add Assembly from Library"
-            >
-              +
-            </button>
-          )}
+          <button
+            className={`btn btn-icon-sm btn-ghost btn-secondary ${searchOpen.assemblies ? 'active' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleSearch('assemblies');
+            }}
+            title="Search"
+          >
+            <Search size={12} />
+          </button>
+          {canUseAssemblies &&
+            (isEditingAssembly ? (
+              <button
+                className="btn btn-icon-sm btn-ghost btn-secondary"
+                disabled
+                onClick={(e) => e.stopPropagation()}
+                title="Finish editing current assembly first"
+              >
+                +
+              </button>
+            ) : (
+              <button
+                className="btn btn-icon-sm btn-ghost btn-secondary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsAddAssemblyModalOpen(true);
+                }}
+                title="Add Assembly from Library"
+              >
+                +
+              </button>
+            ))}
         </div>
+        {searchOpen.assemblies && (
+          <div className="section-search">
+            <input
+              type="text"
+              placeholder="Search assemblies..."
+              value={searchTerms.assemblies || ''}
+              onChange={(e) => setSearchTerms((t) => ({ ...t, assemblies: e.target.value }))}
+              onClick={(e) => e.stopPropagation()}
+              autoFocus
+            />
+            {searchTerms.assemblies && (
+              <button
+                className="section-search-clear"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSearchTerms((t) => ({ ...t, assemblies: '' }));
+                }}
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        )}
         <div className="section-content">
           <div className="section-content-inner">
-            {assemblies.length === 0 ? (
+            {!canUseAssemblies ? (
+              <p className="placeholder-text upgrade-hint">
+                Assemblies require a license.{' '}
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onShowLicenseModal?.();
+                  }}
+                >
+                  Upgrade
+                </a>
+              </p>
+            ) : assemblies.length === 0 ? (
               <p className="placeholder-text">
-                {isEditingAssembly ? 'No assemblies in library yet.' : 'No assemblies yet. Click + to add from library.'}
+                {isEditingAssembly
+                  ? 'No assemblies in library yet.'
+                  : 'No assemblies yet. Click + to add from library.'}
               </p>
             ) : (
               <ul className="assembly-list">
-                {assemblies.map((assembly) => (
-                  <li
-                    key={assembly.id}
-                    className="assembly-item"
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData('application/carvd-assembly', assembly.id);
-                      e.dataTransfer.setData('application/carvd-assembly-source', isEditingAssembly ? 'library' : 'project');
-                      e.dataTransfer.effectAllowed = 'copy';
-                    }}
-                    title={`Drag onto canvas to place\n${assembly.parts.length} part${assembly.parts.length !== 1 ? 's' : ''}${assembly.description ? `\n${assembly.description}` : ''}`}
-                  >
-                    <span className="assembly-icon">📦</span>
-                    <span className="assembly-name">{assembly.name}</span>
-                    <span className="assembly-count">{assembly.parts.length}</span>
-                    <button
-                      className="btn btn-icon-sm btn-ghost btn-danger"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteAssembly(assembly.id);
+                {assemblies
+                  .filter(
+                    (assembly) =>
+                      !searchTerms.assemblies ||
+                      assembly.name.toLowerCase().includes(searchTerms.assemblies.toLowerCase())
+                  )
+                  .map((assembly) => (
+                    <li
+                      key={assembly.id}
+                      className="assembly-item"
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('application/carvd-assembly', assembly.id);
+                        e.dataTransfer.setData(
+                          'application/carvd-assembly-source',
+                          isEditingAssembly ? 'library' : 'project'
+                        );
+                        e.dataTransfer.effectAllowed = 'copy';
                       }}
-                      title={isEditingAssembly ? 'Delete from library' : 'Remove from project'}
+                      title={`Drag onto canvas to place\n${assembly.parts.length} part${assembly.parts.length !== 1 ? 's' : ''}${assembly.description ? `\n${assembly.description}` : ''}`}
                     >
-                      ×
-                    </button>
-                  </li>
-                ))}
+                      {assembly.thumbnailData ? (
+                        <img
+                          src={`data:image/png;base64,${assembly.thumbnailData.data}`}
+                          alt=""
+                          className="assembly-thumbnail"
+                        />
+                      ) : (
+                        <span className="assembly-icon">{assembly.thumbnail || '📦'}</span>
+                      )}
+                      <span className="assembly-name">{assembly.name}</span>
+                      <span className="assembly-count">{assembly.parts.length}</span>
+                      <button
+                        className="btn btn-icon-sm btn-ghost btn-danger"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteAssembly(assembly.id);
+                        }}
+                        title={isEditingAssembly ? 'Delete from library' : 'Remove from project'}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
               </ul>
             )}
           </div>
@@ -461,6 +596,16 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList }: SidebarProps) {
           </span>
           <h2>Parts</h2>
           <button
+            className={`btn btn-icon-sm btn-ghost btn-secondary ${searchOpen.parts ? 'active' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleSearch('parts');
+            }}
+            title="Search"
+          >
+            <Search size={12} />
+          </button>
+          <button
             className="btn btn-icon-sm btn-ghost btn-secondary"
             onClick={(e) => {
               e.stopPropagation();
@@ -471,10 +616,34 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList }: SidebarProps) {
             +
           </button>
         </div>
+        {searchOpen.parts && (
+          <div className="section-search">
+            <input
+              type="text"
+              placeholder="Search parts..."
+              value={searchTerms.parts || ''}
+              onChange={(e) => setSearchTerms((t) => ({ ...t, parts: e.target.value }))}
+              onClick={(e) => e.stopPropagation()}
+              autoFocus
+            />
+            {searchTerms.parts && (
+              <button
+                className="section-search-clear"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSearchTerms((t) => ({ ...t, parts: '' }));
+                }}
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        )}
         <div className="section-content">
           <div className="section-content-inner">
             <HierarchicalPartsList
               onPartClick={handlePartClick}
+              searchFilter={searchTerms.parts}
               onDuplicate={duplicatePart}
               onDelete={(partId) => requestDeleteParts([partId])}
             />
@@ -550,6 +719,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList }: SidebarProps) {
           const addAssembly = useProjectStore.getState().addAssembly;
           addAssembly(assembly);
         }}
+        onCreateNew={onCreateNewAssembly}
       />
 
       {/* Bottom Section - hidden during assembly editing */}
@@ -600,7 +770,7 @@ function PropertiesPanel() {
   const modKey = isMac ? '⌘' : 'Ctrl';
 
   // Check stock constraint violations for a part (warnings always shown regardless of settings)
-  const getConstraintWarnings = (part: typeof parts[0]): string[] => {
+  const getConstraintWarnings = (part: (typeof parts)[0]): string[] => {
     const warnings: string[] = [];
     if (!part.stockId) return warnings;
 
@@ -621,13 +791,17 @@ function PropertiesPanel() {
       if (part.glueUpPanel && partLength <= stock.length) {
         // This is a valid glue-up panel - no warning needed
       } else {
-        warnings.push(`Part dimensions (${formatMeasurementWithUnit(partLength, units)} × ${formatMeasurementWithUnit(partWidth, units)}) exceed stock (${formatMeasurementWithUnit(stock.length, units)} × ${formatMeasurementWithUnit(stock.width, units)})`);
+        warnings.push(
+          `Part dimensions (${formatMeasurementWithUnit(partLength, units)} × ${formatMeasurementWithUnit(partWidth, units)}) exceed stock (${formatMeasurementWithUnit(stock.length, units)} × ${formatMeasurementWithUnit(stock.width, units)})`
+        );
       }
     }
 
     // Check thickness
     if (part.thickness > stock.thickness) {
-      warnings.push(`Part thickness (${formatMeasurementWithUnit(part.thickness, units)}) exceeds stock (${formatMeasurementWithUnit(stock.thickness, units)})`);
+      warnings.push(
+        `Part thickness (${formatMeasurementWithUnit(part.thickness, units)}) exceeds stock (${formatMeasurementWithUnit(stock.thickness, units)})`
+      );
     }
 
     // Check grain constraints (always warn, regardless of setting)
@@ -641,7 +815,7 @@ function PropertiesPanel() {
   };
 
   // Calculate axis-aligned bounding box for a part (considering rotation)
-  const getPartAABB = (part: typeof parts[0]) => {
+  const getPartAABB = (part: (typeof parts)[0]) => {
     // Use proper rotation-aware bounds calculation
     const bounds = getPartBounds(part);
     return {
@@ -659,19 +833,30 @@ function PropertiesPanel() {
     // Small epsilon for floating point comparison
     const epsilon = 0.001;
     return (
-      a.minX < b.maxX - epsilon && a.maxX > b.minX + epsilon &&
-      a.minY < b.maxY - epsilon && a.maxY > b.minY + epsilon &&
-      a.minZ < b.maxZ - epsilon && a.maxZ > b.minZ + epsilon
+      a.minX < b.maxX - epsilon &&
+      a.maxX > b.minX + epsilon &&
+      a.minY < b.maxY - epsilon &&
+      a.maxY > b.minY + epsilon &&
+      a.minZ < b.maxZ - epsilon &&
+      a.maxZ > b.minZ + epsilon
     );
   };
 
   // Check for overlapping parts (always check, regardless of setting)
-  const getOverlappingParts = (part: typeof parts[0]): string[] => {
+  // Returns empty array if the part has ignoreOverlap flag set
+  const getOverlappingParts = (part: (typeof parts)[0]): string[] => {
+    // Skip overlap checking if the part has ignoreOverlap flag
+    if (part.ignoreOverlap) {
+      return [];
+    }
+
     const overlapping: string[] = [];
     const partAABB = getPartAABB(part);
 
     for (const other of parts) {
       if (other.id === part.id) continue;
+      // Skip parts that have ignoreOverlap flag set
+      if (other.ignoreOverlap) continue;
       const otherAABB = getPartAABB(other);
       if (aabbsOverlap(partAABB, otherAABB)) {
         overlapping.push(other.name);
@@ -773,7 +958,9 @@ function PropertiesPanel() {
           </div>
 
           <div className="property-group">
-            <p className="selection-info">{memberCount} member{memberCount !== 1 ? 's' : ''}</p>
+            <p className="selection-info">
+              {memberCount} member{memberCount !== 1 ? 's' : ''}
+            </p>
           </div>
 
           <div className="property-group btn-group">
@@ -821,7 +1008,8 @@ function PropertiesPanel() {
       <aside className="properties-panel">
         <h2>Properties</h2>
         <p className="selection-info">
-          {selectedPartIds.length} part{selectedPartIds.length !== 1 ? 's' : ''}, {selectedGroupIds.length} group{selectedGroupIds.length !== 1 ? 's' : ''} selected
+          {selectedPartIds.length} part{selectedPartIds.length !== 1 ? 's' : ''}, {selectedGroupIds.length} group
+          {selectedGroupIds.length !== 1 ? 's' : ''} selected
         </p>
         <p className="hint">
           Press G to group selection
@@ -866,7 +1054,6 @@ function PropertiesPanel() {
             ))}
             <option value="___create___">+ Add New Stock...</option>
           </select>
-          <p className="hint">Assigns stock to all selected parts</p>
         </div>
 
         <div className="property-group btn-group">
@@ -877,11 +1064,6 @@ function PropertiesPanel() {
             Delete All
           </button>
         </div>
-        <p className="hint">
-          Press Delete to remove selected parts
-          <br />
-          {modKey}+C to copy, {modKey}+V to paste
-        </p>
 
         {/* Create Stock Modal for assignment */}
         <EditStockModal
@@ -890,6 +1072,15 @@ function PropertiesPanel() {
           stock={null}
           onUpdateStock={handleCreateStockAndAssign}
           createMode={true}
+          defaultDimensions={
+            selectedParts[0]
+              ? {
+                  length: selectedParts[0].length,
+                  width: selectedParts[0].width,
+                  thickness: selectedParts[0].thickness
+                }
+              : undefined
+          }
         />
       </aside>
     );
@@ -915,7 +1106,8 @@ function PropertiesPanel() {
   // Calculate max dimensions based on stock (if constrained)
   // Glue-up panels can exceed stock width (they'll be made from multiple boards)
   const maxLength = isDimensionConstrained && assignedStock ? assignedStock.length : undefined;
-  const maxWidth = isDimensionConstrained && assignedStock && !selectedPart.glueUpPanel ? assignedStock.width : undefined;
+  const maxWidth =
+    isDimensionConstrained && assignedStock && !selectedPart.glueUpPanel ? assignedStock.width : undefined;
   const maxThickness = isDimensionConstrained && assignedStock ? assignedStock.thickness : undefined;
 
   // Dimension change handlers that enforce constraints
@@ -1001,51 +1193,75 @@ function PropertiesPanel() {
         <label>Dimensions (L × W × T)</label>
         <div className="dimension-inputs">
           <FractionInput
+            key={`${selectedPart.id}-length`}
             value={selectedPart.length}
             onChange={handleLengthChange}
             min={0.5}
           />
           <span>×</span>
           <FractionInput
+            key={`${selectedPart.id}-width`}
             value={selectedPart.width}
             onChange={handleWidthChange}
             min={0.5}
           />
           <span>×</span>
           <FractionInput
+            key={`${selectedPart.id}-thickness`}
             value={selectedPart.thickness}
             onChange={handleThicknessChange}
             min={0.25}
           />
         </div>
         {isDimensionConstrained && assignedStock && (
-          <p className="hint">Max: {formatMeasurementWithUnit(assignedStock.length, units)} × {formatMeasurementWithUnit(assignedStock.width, units)} × {formatMeasurementWithUnit(assignedStock.thickness, units)} (from {assignedStock.name})</p>
+          <p className="hint">
+            Max: {formatMeasurementWithUnit(assignedStock.length, units)} ×{' '}
+            {formatMeasurementWithUnit(assignedStock.width, units)} ×{' '}
+            {formatMeasurementWithUnit(assignedStock.thickness, units)} (from {assignedStock.name})
+          </p>
         )}
       </div>
 
-      <div className="property-group">
-        <label>Position (X, Y, Z)</label>
-        <div className="dimension-inputs">
-          <FractionInput
-            value={selectedPart.position.x}
-            onChange={handlePositionXChange}
+      <details className="property-group collapsible-section">
+        <summary>
+          Position (X, Y, Z)
+          <HelpTooltip
+            text="Use arrow keys to nudge selected parts. Hold Shift for 1 inch increments."
+            docsSection="shortcuts"
+            inline
           />
-          <span>,</span>
-          <FractionInput
-            value={selectedPart.position.y}
-            onChange={handlePositionYChange}
-          />
-          <span>,</span>
-          <FractionInput
-            value={selectedPart.position.z}
-            onChange={handlePositionZChange}
-          />
+        </summary>
+        <div className="collapsible-content">
+          <div className="dimension-inputs">
+            <FractionInput
+              key={`${selectedPart.id}-posX`}
+              value={selectedPart.position.x}
+              onChange={handlePositionXChange}
+            />
+            <span>,</span>
+            <FractionInput
+              key={`${selectedPart.id}-posY`}
+              value={selectedPart.position.y}
+              onChange={handlePositionYChange}
+            />
+            <span>,</span>
+            <FractionInput
+              key={`${selectedPart.id}-posZ`}
+              value={selectedPart.position.z}
+              onChange={handlePositionZChange}
+            />
+          </div>
         </div>
-        <p className="hint">Use arrow keys to nudge (Shift = 1")</p>
-      </div>
+      </details>
 
       <div className="property-group">
-        <label>Stock</label>
+        <div className="label-with-help">
+          <label>Stock</label>
+          <HelpTooltip
+            text="Assign a stock material to this part. Color and grain direction are inherited from the assigned stock."
+            docsSection="stock"
+          />
+        </div>
         <select
           value={selectedPart.stockId || ''}
           onChange={(e) => handleStockAssignment(selectedPart.id, e.target.value || null)}
@@ -1058,87 +1274,97 @@ function PropertiesPanel() {
           ))}
           <option value="___create___">+ Add New Stock...</option>
         </select>
-        {selectedPart.stockId && <p className="hint">Color and grain inherited from stock</p>}
         {(() => {
           const warnings = getConstraintWarnings(selectedPart);
           if (warnings.length === 0) return null;
           return (
             <div className="constraint-warnings">
               {warnings.map((warning, index) => (
-                <p key={index} className="constraint-warning">{warning}</p>
+                <p key={index} className="constraint-warning">
+                  {warning}
+                </p>
               ))}
             </div>
           );
         })()}
       </div>
 
-      {/* Overlap warnings */}
+      {/* Overlap warnings and settings */}
       {(() => {
         const overlapping = getOverlappingParts(selectedPart);
-        if (overlapping.length === 0) return null;
         return (
           <div className="property-group">
-            <div className="constraint-warnings overlap-warnings">
-              <p className="constraint-warning">
-                Overlaps with: {overlapping.join(', ')}
-              </p>
-            </div>
+            {overlapping.length > 0 && !selectedPart.ignoreOverlap && (
+              <div className="constraint-warnings overlap-warnings">
+                <p className="constraint-warning">Overlaps with: {overlapping.join(', ')}</p>
+              </div>
+            )}
+            <label>
+              <input
+                type="checkbox"
+                checked={selectedPart.ignoreOverlap || false}
+                onChange={(e) => updatePart(selectedPart.id, { ignoreOverlap: e.target.checked })}
+              />{' '}
+              Allow Overlap
+              <HelpTooltip
+                text="If checked, this part can overlap with other parts without showing warnings. Useful for intentional overlaps like notched shelves."
+                docsSection="parts"
+                inline
+              />
+            </label>
           </div>
         );
       })()}
 
       <div className="property-group">
-        <label>Color</label>
-        <input
-          type="color"
-          value={selectedPart.color}
-          onChange={(e) => updatePart(selectedPart.id, { color: e.target.value })}
-          disabled={isColorConstrained}
-        />
-        {isColorConstrained && <p className="hint">Locked to stock color ({assignedStock?.name})</p>}
+        <div className="label-with-help">
+          <label>Color</label>
+          {isColorConstrained && (
+            <HelpTooltip
+              text={`Color is locked to the assigned stock (${assignedStock?.name}). Disable "Constrain Color" in Project Settings to customize.`}
+              docsSection="settings"
+            />
+          )}
+        </div>
+        {isColorConstrained ? (
+          <input type="color" value={selectedPart.color} disabled />
+        ) : (
+          <ColorPicker value={selectedPart.color} onChange={(color) => updatePart(selectedPart.id, { color })} />
+        )}
       </div>
 
       <div className="property-group">
-        <label className={isGrainConstrained ? 'disabled' : ''}>
-          <input
-            type="checkbox"
-            checked={selectedPart.grainSensitive}
-            onChange={(e) => updatePart(selectedPart.id, { grainSensitive: e.target.checked })}
-            disabled={isGrainConstrained}
-          />{' '}
-          Grain Sensitive
-        </label>
-        <p className="hint">If checked, part won't be rotated during cut optimization</p>
-        {isGrainConstrained && <p className="hint">Locked by stock grain constraint ({assignedStock?.name})</p>}
-
-        {selectedPart.grainSensitive && (
-          <div className="grain-direction">
-            <label>Grain Direction</label>
-            <div className="radio-group">
-              <label className={isGrainConstrained ? 'disabled' : ''}>
-                <input
-                  type="radio"
-                  name={`grain-${selectedPart.id}`}
-                  checked={selectedPart.grainDirection === 'length'}
-                  onChange={() => updatePart(selectedPart.id, { grainDirection: 'length' })}
-                  disabled={isGrainConstrained}
-                />{' '}
-                Along Length ({formatMeasurementWithUnit(selectedPart.length, units)})
-              </label>
-              <label className={isGrainConstrained ? 'disabled' : ''}>
-                <input
-                  type="radio"
-                  name={`grain-${selectedPart.id}`}
-                  checked={selectedPart.grainDirection === 'width'}
-                  onChange={() => updatePart(selectedPart.id, { grainDirection: 'width' })}
-                  disabled={isGrainConstrained}
-                />{' '}
-                Along Width ({formatMeasurementWithUnit(selectedPart.width, units)})
-              </label>
-            </div>
-            {isGrainConstrained && <p className="hint">Locked to {assignedStock?.grainDirection} (from {assignedStock?.name})</p>}
-          </div>
-        )}
+        <div className="label-with-help">
+          <label>Grain Direction</label>
+          <HelpTooltip
+            text={
+              isGrainConstrained
+                ? `Locked by stock grain constraint (${assignedStock?.name}). Disable "Constrain Grain" in Project Settings to customize.`
+                : 'Controls whether the part can be rotated during cut list optimization to maximize material usage.'
+            }
+            docsSection="cut-lists"
+          />
+        </div>
+        <select
+          value={selectedPart.grainSensitive ? selectedPart.grainDirection : 'none'}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === 'none') {
+              updatePart(selectedPart.id, { grainSensitive: false });
+            } else {
+              updatePart(selectedPart.id, {
+                grainSensitive: true,
+                grainDirection: value as 'length' | 'width'
+              });
+            }
+          }}
+          disabled={isGrainConstrained}
+          className={isGrainConstrained ? 'disabled' : ''}
+        >
+          <option value="length">Along Length ({formatMeasurementWithUnit(selectedPart.length, units)})</option>
+          <option value="width">Along Width ({formatMeasurementWithUnit(selectedPart.width, units)})</option>
+          <option value="none">N/A (can rotate)</option>
+        </select>
       </div>
 
       {/* Glue-Up Panel option - for wide panels that exceed stock width */}
@@ -1151,45 +1377,56 @@ function PropertiesPanel() {
               onChange={(e) => updatePart(selectedPart.id, { glueUpPanel: e.target.checked })}
             />{' '}
             Glue-Up Panel
+            <HelpTooltip
+              text="Wide panel made by edge-gluing multiple narrower boards. The cut list will calculate how many boards are needed."
+              docsSection="cut-lists"
+              inline
+            />
           </label>
-          <p className="hint">Wide panel made by edge-gluing multiple boards</p>
-          {selectedPart.glueUpPanel && (() => {
-            const cutWidth = selectedPart.width + (selectedPart.extraWidth || 0);
-            const boardsNeeded = Math.ceil(cutWidth / assignedStock.width);
-            return (
-              <p className="hint glue-up-info">
-                Requires {boardsNeeded} board{boardsNeeded !== 1 ? 's' : ''} of {assignedStock.name}
-              </p>
-            );
-          })()}
+          {selectedPart.glueUpPanel &&
+            (() => {
+              const cutWidth = selectedPart.width + (selectedPart.extraWidth || 0);
+              const boardsNeeded = Math.ceil(cutWidth / assignedStock.width);
+              return (
+                <p className="hint glue-up-info">
+                  Requires {boardsNeeded} board{boardsNeeded !== 1 ? 's' : ''} of {assignedStock.name}
+                </p>
+              );
+            })()}
         </div>
       )}
 
-      <div className="property-group">
-        <label>Notes</label>
-        <textarea
-          className="part-notes-textarea"
-          value={selectedPart.notes || ''}
-          onChange={(e) => updatePart(selectedPart.id, { notes: e.target.value })}
-          placeholder="Fabrication notes (edge banding, joinery, etc.)"
-          rows={3}
-        />
-      </div>
+      <details className="property-group collapsible-section">
+        <summary>
+          Notes
+          {selectedPart.notes && <span className="has-content-indicator">●</span>}
+        </summary>
+        <div className="collapsible-content">
+          <textarea
+            className="part-notes-textarea"
+            value={selectedPart.notes || ''}
+            onChange={(e) => updatePart(selectedPart.id, { notes: e.target.value })}
+            placeholder="Fabrication notes (edge banding, joinery, etc.)"
+            rows={3}
+          />
+        </div>
+      </details>
 
       <details className="property-group joinery-adjustments">
         <summary>
           Joinery Adjustments
-          {(selectedPart.extraLength || selectedPart.extraWidth) && (
-            <span className="joinery-indicator">●</span>
-          )}
+          {(selectedPart.extraLength || selectedPart.extraWidth) && <span className="joinery-indicator">●</span>}
+          <HelpTooltip
+            text="Add extra material for joinery (tenons, dado insertions, etc.). These values affect the cut list dimensions but not the 3D visualization."
+            docsSection="joinery"
+            inline
+          />
         </summary>
-        <p className="hint joinery-description">
-          Add extra material for joinery (tenons, dado insertions, etc.). These values affect the cut list but not the 3D visualization.
-        </p>
         <div className="joinery-inputs">
           <div className="joinery-input-row">
             <label>Extra Length</label>
             <FractionInput
+              key={`${selectedPart.id}-extraLength`}
               value={selectedPart.extraLength || 0}
               onChange={(extraLength) => updatePart(selectedPart.id, { extraLength: extraLength || undefined })}
               min={0}
@@ -1198,6 +1435,7 @@ function PropertiesPanel() {
           <div className="joinery-input-row">
             <label>Extra Width</label>
             <FractionInput
+              key={`${selectedPart.id}-extraWidth`}
               value={selectedPart.extraWidth || 0}
               onChange={(extraWidth) => updatePart(selectedPart.id, { extraWidth: extraWidth || undefined })}
               min={0}
@@ -1206,6 +1444,19 @@ function PropertiesPanel() {
         </div>
       </details>
 
+      <div className="property-group properties-learn-more">
+        <a
+          href="#"
+          className="learn-more-link text-xs"
+          onClick={(e) => {
+            e.preventDefault();
+            window.electronAPI?.openExternal?.('https://carvd-studio.com/docs#parts');
+          }}
+        >
+          Learn more about working with parts
+        </a>
+      </div>
+
       {/* Create Stock Modal for assignment */}
       <EditStockModal
         isOpen={isCreateStockModalOpen}
@@ -1213,6 +1464,11 @@ function PropertiesPanel() {
         stock={null}
         onUpdateStock={handleCreateStockAndAssign}
         createMode={true}
+        defaultDimensions={{
+          length: selectedPart.length,
+          width: selectedPart.width,
+          thickness: selectedPart.thickness
+        }}
       />
     </aside>
   );
@@ -1249,6 +1505,85 @@ function UndoRedoButtons() {
   );
 }
 
+interface BrightnessPopupProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+function BrightnessPopup({ isOpen, onClose }: BrightnessPopupProps) {
+  const { settings, updateSettings } = useAppSettings();
+  const brightness = settings.brightnessMultiplier ?? 1.0;
+  const lightingMode = settings.lightingMode ?? 'default';
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  const presets: { key: LightingMode; label: string }[] = [
+    { key: 'default', label: 'Default' },
+    { key: 'bright', label: 'Bright' },
+    { key: 'studio', label: 'Studio' },
+    { key: 'dramatic', label: 'Dramatic' }
+  ];
+
+  // Close on click outside
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    // Delay to avoid catching the opening click
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+    }, 0);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="brightness-popup" ref={popupRef}>
+      <div className="brightness-slider-row">
+        <Sun size={14} />
+        <input
+          type="range"
+          min={0.25}
+          max={2.0}
+          step={0.05}
+          value={brightness}
+          onChange={(e) => updateSettings({ brightnessMultiplier: parseFloat(e.target.value) })}
+        />
+        <span className="brightness-value">{Math.round(brightness * 100)}%</span>
+      </div>
+      <div className="brightness-popup-divider" />
+      <div className="brightness-presets">
+        {presets.map((p) => (
+          <button
+            key={p.key}
+            className={lightingMode === p.key ? 'active' : ''}
+            onClick={() => updateSettings({ lightingMode: p.key })}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DisplayToolbar() {
   const displayMode = useProjectStore((s) => s.displayMode);
   const showGrid = useProjectStore((s) => s.showGrid);
@@ -1260,6 +1595,7 @@ function DisplayToolbar() {
   const toggleGrainDirection = useProjectStore((s) => s.toggleGrainDirection);
   const setSnapToPartsEnabled = useProjectStore((s) => s.setSnapToPartsEnabled);
   const clearReferences = useProjectStore((s) => s.clearReferences);
+  const [brightnessOpen, setBrightnessOpen] = useState(false);
 
   return (
     <div className="display-toolbar">
@@ -1285,6 +1621,17 @@ function DisplayToolbar() {
         >
           Ghost
         </button>
+      </div>
+      <div className="display-toolbar-divider" />
+      <div className="display-toolbar-group brightness-toolbar-group">
+        <button
+          className={brightnessOpen ? 'toggle-active' : ''}
+          onClick={() => setBrightnessOpen(!brightnessOpen)}
+          title="Adjust lighting"
+        >
+          <Sun size={14} />
+        </button>
+        <BrightnessPopup isOpen={brightnessOpen} onClose={() => setBrightnessOpen(false)} />
       </div>
       <div className="display-toolbar-divider" />
       <div className="display-toolbar-group">
@@ -1320,7 +1667,7 @@ function DisplayToolbar() {
 }
 
 function CanvasWithDrop() {
-  const stocks = useProjectStore((s) => s.stocks);
+  const projectStocks = useProjectStore((s) => s.stocks);
   const parts = useProjectStore((s) => s.parts);
   const assemblies = useProjectStore((s) => s.assemblies);
   const addPart = useProjectStore((s) => s.addPart);
@@ -1360,7 +1707,11 @@ function CanvasWithDrop() {
     // Check for stock drop
     const stockId = e.dataTransfer.getData('application/carvd-stock');
     if (stockId) {
-      const stock = stocks.find((s) => s.id === stockId);
+      // Look for stock in both project stocks and library (for assembly editing mode)
+      let stock = projectStocks.find((s) => s.id === stockId);
+      if (!stock) {
+        stock = stockLibrary.find((s) => s.id === stockId);
+      }
       if (!stock) return;
 
       // Find next available part number
@@ -1429,14 +1780,53 @@ function CanvasWithDrop() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <Canvas camera={{ position: [30, 30, 30], fov: 50 }} gl={{ antialias: true }}>
+      <Canvas camera={{ position: [60, 50, 60], fov: 50 }} gl={{ antialias: true, preserveDrawingBuffer: true }}>
         <Workspace />
       </Canvas>
       <DisplayToolbar />
       <HotkeyHints show={appSettings.showHotkeyHints} />
+      {appSettings.showHotkeyHints && (
+        <div className="camera-controls-legend">
+          <div className="legend-item">
+            <kbd>LMB</kbd> Orbit
+          </div>
+          <div className="legend-item">
+            <kbd>RMB</kbd> Pan
+          </div>
+          <div className="legend-item">
+            <kbd>Scroll</kbd> Zoom
+          </div>
+          <div className="legend-item">
+            <kbd>F</kbd> Focus
+          </div>
+        </div>
+      )}
       {isDragOver && (
         <div className="drop-indicator">
           <span>{dropType === 'assembly' ? 'Drop to place assembly' : 'Drop to create part'}</span>
+        </div>
+      )}
+      {/* Empty state overlay - rendered outside Canvas so it doesn't move with camera */}
+      {parts.length === 0 && (
+        <div className="empty-state-overlay">
+          <div className="empty-state-content">
+            <div className="empty-state-icon">🛠️</div>
+            <h2 className="empty-state-title">Start Building</h2>
+            <p className="empty-state-description">
+              Add parts to your design to get started. You can create parts from the sidebar or drag stock materials
+              onto the canvas.
+            </p>
+            <div className="empty-state-hints">
+              <div className="empty-state-hint">
+                <kbd>P</kbd>
+                <span>Add new part</span>
+              </div>
+              <div className="empty-state-hint">
+                <span className="empty-state-hint-label">Drag stock →</span>
+                <span>Create part from stock</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1447,16 +1837,8 @@ function App() {
   useKeyboardShortcuts();
   useDevTools(); // Dev tools for testing (only active in dev mode)
 
-  // File operations - UnsavedChangesDialogComponent for handling unsaved changes
-  const { UnsavedChangesDialogComponent } = useFileOperations();
-
   // Auto-recovery for crash protection
-  const {
-    hasRecovery,
-    recoveryInfo,
-    restoreRecovery,
-    discardRecovery
-  } = useAutoRecovery();
+  const { hasRecovery, recoveryInfo, restoreRecovery, discardRecovery } = useAutoRecovery();
 
   // Library import check - detects project items not in library
   const {
@@ -1481,11 +1863,92 @@ function App() {
     requestExit: requestAssemblyExit
   } = useAssemblyEditing();
 
+  // Start screen state (defined early so it can be used in template editing callbacks)
+  const [showStartScreen, setShowStartScreen] = useState(true);
+  const [showTemplatesScreen, setShowTemplatesScreen] = useState(false);
+
+  // Template editing mode
+  const {
+    isEditingTemplate,
+    editingTemplateName,
+    editingTemplateDescription,
+    isCreatingNewTemplate,
+    showSaveDialog: showTemplateSaveDialog,
+    showDiscardDialog: showTemplateDiscardDialog,
+    showNewTemplateSetupDialog,
+    startEditing: startTemplateEditing,
+    startCreatingNew: startCreatingNewTemplate,
+    confirmNewTemplateSetup,
+    cancelNewTemplateSetup,
+    openSaveDialog: openTemplateSaveDialog,
+    saveTemplate: saveTemplateDirectly,
+    saveAndExit: saveTemplateAndExit,
+    requestDiscard: requestTemplateDiscard,
+    discardAndExit: discardTemplateAndExit,
+    cancelDialog: cancelTemplateDialog
+  } = useTemplateEditing({
+    onSaveComplete: () => {
+      // After saving a template, return to the templates screen
+      setShowTemplatesScreen(true);
+      setShowStartScreen(false);
+    },
+    onDiscardComplete: () => {
+      // After discarding, return to the templates screen
+      setShowTemplatesScreen(true);
+      setShowStartScreen(false);
+    }
+  });
+
+  // File operations - now after editing hooks so we can route save commands appropriately
+  const {
+    UnsavedChangesDialogComponent,
+    FileRecoveryModalComponent,
+    handleNew,
+    handleOpen,
+    handleOpenRecent,
+    handleRelocateFile,
+    handleSave,
+    handleGoHome
+  } = useFileOperations({
+    isEditingTemplate,
+    onSaveTemplate: saveTemplateDirectly,
+    isEditingAssembly,
+    onSaveAssembly: saveAssemblyAndExit,
+    onGoHome: () => {
+      newProject(); // Reset project state to clear isDirty flag
+      setShowStartScreen(true);
+    }
+  });
+
+  // Auto-save - saves project automatically when changes are made (if enabled in settings)
+  useAutoSave({
+    onInitialSaveNeeded: handleSave,
+    blocked: isEditingTemplate || isEditingAssembly || showStartScreen
+  });
+
   // Platform detection for custom title bar
   const [platform, setPlatform] = useState<string>('');
   useEffect(() => {
     window.electronAPI.getPlatform().then(setPlatform);
   }, []);
+
+  // Trial and license status
+  const {
+    mode: licenseMode,
+    hasFullAccess,
+    trial: trialStatus,
+    shouldShowBanner: shouldShowTrialBanner,
+    shouldShowExpiredModal,
+    acknowledgeExpired,
+    refresh: refreshLicenseStatus,
+    isLoading: isLicenseLoading
+  } = useLicenseStatus();
+
+  // Sync license mode to project store for feature limit enforcement
+  const setStoreLicenseMode = useProjectStore((s) => s.setLicenseMode);
+  useEffect(() => {
+    setStoreLicenseMode(licenseMode);
+  }, [licenseMode, setStoreLicenseMode]);
 
   // License management
   const [isLicenseValid, setIsLicenseValid] = useState<boolean | null>(null); // null = checking, true = valid, false = invalid
@@ -1500,30 +1963,41 @@ function App() {
     licenseActivatedAt: null
   });
 
-  // Check license on app start
+  // Check license on app start - now integrates with trial system
   useEffect(() => {
     const checkLicense = async () => {
       try {
         const result = await window.electronAPI.checkLicenseValid();
         const data = await window.electronAPI.getLicenseData();
 
-        setLicenseData({
-          licenseEmail: data.licenseEmail,
-          licenseOrderId: data.licenseOrderId,
-          licenseActivatedAt: data.licenseActivatedAt
-        });
+        if (data) {
+          setLicenseData({
+            licenseEmail: data.email || null,
+            licenseOrderId: data.orderId?.toString() || null,
+            licenseActivatedAt: data.validatedAt ? new Date(data.validatedAt).toISOString() : null
+          });
+        } else {
+          setLicenseData({
+            licenseEmail: null,
+            licenseOrderId: null,
+            licenseActivatedAt: null
+          });
+        }
 
         if (result.valid) {
           setIsLicenseValid(true);
           setShowLicenseModal(false);
         } else {
           setIsLicenseValid(false);
-          setShowLicenseModal(true);
+          // Don't show license modal immediately - let trial system handle it
+          // Only show if trial is expired and user explicitly wants to activate
+          setShowLicenseModal(false);
         }
       } catch (error) {
-        console.error('Failed to check license:', error);
+        logger.error('Failed to check license:', error);
         setIsLicenseValid(false);
-        setShowLicenseModal(true);
+        // On error, also let trial system handle the flow
+        setShowLicenseModal(false);
       }
     };
 
@@ -1532,51 +2006,327 @@ function App() {
 
   // Welcome tutorial management
   const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialFromTemplate, setTutorialFromTemplate] = useState(false);
   const loadProject = useProjectStore((s) => s.loadProject);
+  const newProject = useProjectStore((s) => s.newProject);
+
+  // New project dialog state
+  const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
 
   // Check if welcome tutorial should be shown on first run
   useEffect(() => {
     const checkWelcome = async () => {
       try {
         const hasCompletedWelcome = await window.electronAPI.getHasCompletedWelcome();
-        if (!hasCompletedWelcome && isLicenseValid === true) {
+        // Show tutorial if user has full access (licensed or trial) and hasn't completed it
+        if (!hasCompletedWelcome && hasFullAccess) {
           // Load sample project for tutorial
           const sampleProject = generateSeedProject();
           loadProject(sampleProject);
           setShowTutorial(true);
+          setShowStartScreen(false); // Hide start screen during tutorial
         }
       } catch (error) {
-        console.error('Failed to check welcome status:', error);
+        logger.error('Failed to check welcome status:', error);
       }
     };
 
-    // Only check after license is validated
-    if (isLicenseValid !== null) {
+    // Only check after license/trial status is loaded
+    if (!isLicenseLoading) {
       checkWelcome();
     }
-  }, [isLicenseValid, loadProject]);
+  }, [isLicenseLoading, hasFullAccess, loadProject]);
 
   const handleTutorialComplete = async () => {
     setShowTutorial(false);
+
+    // If tutorial was started from template, keep the user in the editor with their project
+    if (tutorialFromTemplate) {
+      setTutorialFromTemplate(false); // Reset the flag
+      // Don't show start screen, let user continue editing the tutorial project
+    } else {
+      // First-run tutorial: show start screen for user to choose what to do
+      setShowStartScreen(true);
+      // Reset the project to empty state
+      const now = new Date().toISOString();
+      const emptyProject: Project = {
+        version: '1',
+        name: 'Untitled Project',
+        units: 'imperial',
+        gridSize: 1,
+        parts: [],
+        stocks: [],
+        assemblies: [],
+        groups: [],
+        groupMembers: [],
+        createdAt: now,
+        modifiedAt: now
+      };
+      loadProject(emptyProject);
+    }
+
     try {
       await window.electronAPI.setHasCompletedWelcome(true);
     } catch (error) {
-      console.error('Failed to save welcome completion:', error);
+      logger.error('Failed to save welcome completion:', error);
     }
+  };
+
+  // Track project file path to auto-hide start screen when a project is loaded
+  const filePath = useProjectStore((s) => s.filePath);
+
+  // Hide start screen when a project is loaded from file
+  useEffect(() => {
+    if (filePath && showStartScreen) {
+      setShowStartScreen(false);
+    }
+  }, [filePath, showStartScreen]);
+
+  // Start screen handlers
+  const handleStartScreenNewProject = () => {
+    setShowNewProjectDialog(true);
+  };
+
+  const handleStartScreenSelectTemplate = (project: Project) => {
+    loadProject(project);
+    markDirty(); // Mark as dirty since it's a new unsaved project
+    setShowStartScreen(false);
+  };
+
+  const handleStartScreenStartTutorial = (project: Project) => {
+    loadProject(project);
+    markDirty(); // Mark as dirty since it's a new unsaved project
+    setShowStartScreen(false);
+    setTutorialFromTemplate(true); // Track that this tutorial was started from template
+    setShowTutorial(true); // Show the tutorial overlay
+  };
+
+  const handleStartScreenOpenProject = async () => {
+    // The handleOpen function will load the project into the store
+    // and the useEffect above will hide the start screen when projectFilePath is set
+    await handleOpen();
+  };
+
+  const handleStartScreenOpenRecent = async (filePath: string) => {
+    // The handleOpenRecent function will load the project into the store
+    // and the useEffect above will hide the start screen when projectFilePath is set
+    await handleOpenRecent(filePath);
+  };
+
+  const handleStartScreenViewAllTemplates = () => {
+    setShowTemplatesScreen(true);
+  };
+
+  // Templates Screen handlers
+  const handleTemplatesScreenBack = () => {
+    setShowTemplatesScreen(false);
+  };
+
+  const handleTemplatesScreenSelectTemplate = (project: Project) => {
+    loadProject(project);
+    markDirty();
+    setShowTemplatesScreen(false);
+    setShowStartScreen(false);
+  };
+
+  const handleTemplatesScreenStartTutorial = (project: Project) => {
+    loadProject(project);
+    markDirty();
+    setShowTemplatesScreen(false);
+    setShowStartScreen(false);
+    setTutorialFromTemplate(true);
+    setShowTutorial(true);
+  };
+
+  const handleTemplatesScreenEditTemplate = async (template: import('./templates').UserTemplate) => {
+    const success = await startTemplateEditing(template);
+    if (success) {
+      setShowTemplatesScreen(false);
+      setShowStartScreen(false);
+    }
+  };
+
+  const handleTemplatesScreenNewTemplate = async () => {
+    const success = await startCreatingNewTemplate();
+    if (success) {
+      setShowTemplatesScreen(false);
+      setShowStartScreen(false);
+    }
+  };
+
+  // Handle recovery restore - need to hide start screen after successful restore
+  const handleRecoveryRestore = async () => {
+    const success = await restoreRecovery();
+    if (success) {
+      setShowStartScreen(false);
+    }
+  };
+
+  const handleNewProjectDialogCreate = (options: {
+    name: string;
+    units: 'imperial' | 'metric';
+    selectedMaterials: string[];
+  }) => {
+    // Create a new project with the selected options
+    const now = new Date().toISOString();
+
+    // Get default stocks for the selected materials
+    const defaultStocks = getDefaultStocksForMaterials(options.selectedMaterials, options.units);
+
+    const newProject: Project = {
+      version: '1',
+      name: options.name,
+      units: options.units,
+      gridSize: options.units === 'imperial' ? 1 : 25, // 1 inch or 25mm
+      parts: [],
+      stocks: defaultStocks,
+      assemblies: [],
+      groups: [],
+      groupMembers: [],
+      createdAt: now,
+      modifiedAt: now
+    };
+
+    loadProject(newProject);
+    markDirty(); // Mark as dirty since it's a new unsaved project
+    setShowNewProjectDialog(false);
+    setShowStartScreen(false);
+  };
+
+  const handleNewProjectCancel = () => {
+    setShowNewProjectDialog(false);
+  };
+
+  // Helper function to get default stocks for selected materials
+  const getDefaultStocksForMaterials = (materialIds: string[], units: 'imperial' | 'metric'): Stock[] => {
+    // Default stock definitions (same as in NewProjectDialog)
+    const defaultStockDefinitions: Record<string, Omit<Stock, 'id'>> = {
+      'default-plywood-3/4': {
+        name: units === 'imperial' ? '3/4" Plywood' : '18mm Plywood',
+        length: units === 'imperial' ? 96 : 2440,
+        width: units === 'imperial' ? 48 : 1220,
+        thickness: units === 'imperial' ? 0.75 : 18,
+        grainDirection: 'length',
+        pricingUnit: 'per_item',
+        pricePerUnit: 50,
+        color: '#D4A574'
+      },
+      'default-plywood-1/2': {
+        name: units === 'imperial' ? '1/2" Plywood' : '12mm Plywood',
+        length: units === 'imperial' ? 96 : 2440,
+        width: units === 'imperial' ? 48 : 1220,
+        thickness: units === 'imperial' ? 0.5 : 12,
+        grainDirection: 'length',
+        pricingUnit: 'per_item',
+        pricePerUnit: 40,
+        color: '#C9956C'
+      },
+      'default-plywood-1/4': {
+        name: units === 'imperial' ? '1/4" Plywood' : '6mm Plywood',
+        length: units === 'imperial' ? 96 : 2440,
+        width: units === 'imperial' ? 48 : 1220,
+        thickness: units === 'imperial' ? 0.25 : 6,
+        grainDirection: 'length',
+        pricingUnit: 'per_item',
+        pricePerUnit: 30,
+        color: '#BE8A64'
+      },
+      'default-oak-4/4': {
+        name: units === 'imperial' ? '4/4 Oak' : '25mm Oak',
+        length: units === 'imperial' ? 96 : 2440,
+        width: units === 'imperial' ? 6 : 150,
+        thickness: units === 'imperial' ? 0.75 : 19,
+        grainDirection: 'length',
+        pricingUnit: 'board_foot',
+        pricePerUnit: 8,
+        color: '#B8860B'
+      },
+      'default-poplar-4/4': {
+        name: units === 'imperial' ? '4/4 Poplar' : '25mm Poplar',
+        length: units === 'imperial' ? 96 : 2440,
+        width: units === 'imperial' ? 6 : 150,
+        thickness: units === 'imperial' ? 0.75 : 19,
+        grainDirection: 'length',
+        pricingUnit: 'board_foot',
+        pricePerUnit: 4,
+        color: '#90EE90'
+      },
+      'default-pine-4/4': {
+        name: units === 'imperial' ? '4/4 Pine' : '25mm Pine',
+        length: units === 'imperial' ? 96 : 2440,
+        width: units === 'imperial' ? 6 : 150,
+        thickness: units === 'imperial' ? 0.75 : 19,
+        grainDirection: 'length',
+        pricingUnit: 'board_foot',
+        pricePerUnit: 3,
+        color: '#F4E4BC'
+      },
+      'default-walnut-4/4': {
+        name: units === 'imperial' ? '4/4 Walnut' : '25mm Walnut',
+        length: units === 'imperial' ? 96 : 2440,
+        width: units === 'imperial' ? 6 : 150,
+        thickness: units === 'imperial' ? 0.75 : 19,
+        grainDirection: 'length',
+        pricingUnit: 'board_foot',
+        pricePerUnit: 12,
+        color: '#5D4037'
+      },
+      'default-maple-4/4': {
+        name: units === 'imperial' ? '4/4 Hard Maple' : '25mm Hard Maple',
+        length: units === 'imperial' ? 96 : 2440,
+        width: units === 'imperial' ? 6 : 150,
+        thickness: units === 'imperial' ? 0.75 : 19,
+        grainDirection: 'length',
+        pricingUnit: 'board_foot',
+        pricePerUnit: 9,
+        color: '#F5DEB3'
+      },
+      'default-cherry-4/4': {
+        name: units === 'imperial' ? '4/4 Cherry' : '25mm Cherry',
+        length: units === 'imperial' ? 96 : 2440,
+        width: units === 'imperial' ? 6 : 150,
+        thickness: units === 'imperial' ? 0.75 : 19,
+        grainDirection: 'length',
+        pricingUnit: 'board_foot',
+        pricePerUnit: 10,
+        color: '#8B4513'
+      },
+      'default-mdf-3/4': {
+        name: units === 'imperial' ? '3/4" MDF' : '18mm MDF',
+        length: units === 'imperial' ? 96 : 2440,
+        width: units === 'imperial' ? 48 : 1220,
+        thickness: units === 'imperial' ? 0.75 : 18,
+        grainDirection: 'none',
+        pricingUnit: 'per_item',
+        pricePerUnit: 35,
+        color: '#A89078'
+      }
+    };
+
+    return materialIds
+      .filter((id) => defaultStockDefinitions[id])
+      .map((id) => ({
+        id: crypto.randomUUID(),
+        ...defaultStockDefinitions[id]
+      }));
   };
 
   const handleLicenseActivate = async (licenseKey: string) => {
     try {
-      const result = await window.electronAPI.verifyLicense(licenseKey);
+      const result = await window.electronAPI.activateLicense(licenseKey);
       if (result.valid) {
         const data = await window.electronAPI.getLicenseData();
-        setLicenseData({
-          licenseEmail: data.licenseEmail,
-          licenseOrderId: data.licenseOrderId,
-          licenseActivatedAt: data.licenseActivatedAt
-        });
+        if (data) {
+          setLicenseData({
+            licenseEmail: data.email || null,
+            licenseOrderId: data.orderId?.toString() || null,
+            licenseActivatedAt: data.validatedAt ? new Date(data.validatedAt).toISOString() : null
+          });
+        }
         setIsLicenseValid(true);
         setShowLicenseModal(false);
+        // Refresh the license status hook to update trial UI
+        refreshLicenseStatus();
         return { success: true };
       } else {
         return { success: false, error: result.error || 'Invalid license key' };
@@ -1595,15 +2345,18 @@ function App() {
         licenseActivatedAt: null
       });
       setIsLicenseValid(false);
-      setShowLicenseModal(true);
+      // Refresh the license status hook - it will determine if trial modal should show
+      refreshLicenseStatus();
+      // Don't show license modal immediately - let trial system handle the flow
     } catch (error) {
-      console.error('Failed to deactivate license:', error);
+      logger.error('Failed to deactivate license:', error);
     }
   };
 
   // Project name and dirty state for header
   const projectName = useProjectStore((s) => s.projectName);
   const isDirty = useProjectStore((s) => s.isDirty);
+  const markDirty = useProjectStore((s) => s.markDirty);
 
   // Part deletion confirmation
   const parts = useProjectStore((s) => s.parts);
@@ -1662,6 +2415,52 @@ function App() {
   const [isStockLibraryOpen, setIsStockLibraryOpen] = useState(false);
   const [isAppSettingsOpen, setIsAppSettingsOpen] = useState(false);
   const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
+  const [isTemplateBrowserOpen, setIsTemplateBrowserOpen] = useState(false);
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  const [isImportAppStateOpen, setIsImportAppStateOpen] = useState(false);
+
+  // Handler for creating a project from a template
+  const handleCreateFromTemplate = async (project: Project) => {
+    loadProject(project);
+    // Mark as dirty since this is a new project (not saved to disk yet)
+    markDirty();
+
+    // Add template stocks to the app-level stock library (if not already present)
+    // Compare by name, dimensions, and thickness to avoid duplicates
+    for (const templateStock of project.stocks) {
+      const exists = stockLibrary.some(
+        (s) =>
+          s.name === templateStock.name &&
+          s.length === templateStock.length &&
+          s.width === templateStock.width &&
+          s.thickness === templateStock.thickness
+      );
+      if (!exists) {
+        await addToLibrary({ ...templateStock });
+      }
+    }
+
+    // Add template assemblies to the app-level assembly library (if any and not already present)
+    if (project.assemblies && project.assemblies.length > 0) {
+      const { addAssembly } = await import('./hooks/useAssemblyLibrary').then((m) => {
+        // We need to call the hook, but we can't use hooks directly here
+        // So we'll use the electronAPI directly
+        return { addAssembly: null };
+      });
+      // For assemblies, we'll add them via electronAPI directly
+      for (const templateAssembly of project.assemblies) {
+        const exists = assemblyLibrary.some((a) => a.name === templateAssembly.name);
+        if (!exists) {
+          try {
+            const currentAssemblies = (await window.electronAPI.getPreference('assemblyLibrary')) || [];
+            await window.electronAPI.setPreference('assemblyLibrary', [...currentAssemblies, templateAssembly]);
+          } catch (error) {
+            logger.error('Failed to add template assembly to library:', error);
+          }
+        }
+      }
+    }
+  };
 
   const {
     stocks: stockLibrary,
@@ -1673,12 +2472,24 @@ function App() {
   const {
     assemblies: assemblyLibrary,
     updateAssembly: updateLibraryAssembly,
-    deleteAssembly: deleteLibraryAssembly
+    deleteAssembly: deleteLibraryAssembly,
+    duplicateAssembly: duplicateLibraryAssembly
   } = useAssemblyLibrary();
 
   // Native menu commands handler
   useMenuCommands({
-    onOpenSettings: () => setIsAppSettingsOpen(true)
+    onOpenSettings: () => setIsAppSettingsOpen(true),
+    onOpenTemplateBrowser: () => setIsTemplateBrowserOpen(true),
+    onShowAbout: () => setIsAboutModalOpen(true),
+    // File operations with unsaved changes handling
+    onNewProject: handleNew,
+    onOpenProject: handleOpen,
+    onOpenRecentProject: handleOpenRecent,
+    onCloseProject: handleGoHome,
+    // Template/assembly editing mode - route save commands appropriately
+    isEditingTemplate,
+    onSaveTemplate: saveTemplateDirectly,
+    onSaveAssembly: saveAssemblyAndExit
   });
 
   // Get names of parts pending deletion for the confirmation message
@@ -1686,53 +2497,118 @@ function App() {
     ? parts.filter((p) => pendingDeletePartIds.includes(p.id)).map((p) => p.name)
     : [];
 
+  // Determine if we should show the main editor or a full-screen overlay
+  // Note: showTutorial is NOT excluded here because the tutorial needs the editor
+  // elements to be visible for targeting (sidebar, canvas, properties panel)
+  // With trial system: user can use editor if licensed, in trial, OR in free mode (with limits)
+  // Note: licenseMode covers all cases - we don't need a separate isLicenseValid check
+  const canUseApp = licenseMode === 'licensed' || licenseMode === 'trial' || licenseMode === 'free';
+  const showMainEditor = canUseApp && !showStartScreen && !isLicenseLoading;
+
   return (
     <div className="app">
-      <header className={`app-header ${platform ? `platform-${platform}` : ''}`}>
-        <div className="header-left">
-          <div className="header-title">
-            <span className="app-name">Carvd Studio</span>
-            <span className="title-separator">/</span>
-            <span className="project-name">{projectName}{isDirty && <span className="dirty-indicator"> •</span>}</span>
-          </div>
-        </div>
-        <div className="header-actions">
-          <div className="header-actions-group">
-            <UndoRedoButtons />
-          </div>
-          <div className="header-divider" />
-          <div className="header-actions-group">
-            <button
-              className="btn btn-icon-sm btn-outlined btn-secondary"
-              onClick={() => setIsStockLibraryOpen(true)}
-              title="Stock Library"
-            >
-              <Library size={18} />
-            </button>
-            <button
-              className="btn btn-icon-sm btn-outlined btn-secondary"
-              onClick={() => setIsAppSettingsOpen(true)}
-              title="App Settings"
-            >
-              <Settings size={18} />
-            </button>
-          </div>
-        </div>
-      </header>
-      {/* Assembly Editing Banner */}
-      {isEditingAssembly && (
-        <AssemblyEditingBanner
-          assemblyName={editingAssemblyName}
-          isCreatingNew={isCreatingNewAssembly}
-          onSave={saveAssemblyAndExit}
-          onCancel={requestAssemblyExit}
-        />
+      {/* Only show header and main content when not on start screen */}
+      {showMainEditor && (
+        <>
+          <header className={`app-header ${platform ? `platform-${platform}` : ''}`}>
+            <div className="header-left">
+              <div className="header-title">
+                <button className="app-name-btn" onClick={handleGoHome} title="Return to start screen">
+                  Carvd Studio
+                </button>
+                <span className="title-separator">/</span>
+                <span className="project-name">
+                  {projectName}
+                  {isDirty && <span className="dirty-indicator"> •</span>}
+                </span>
+              </div>
+            </div>
+            <div className="header-actions">
+              <div className="header-actions-group">
+                <UndoRedoButtons />
+                <button
+                  className={`btn btn-icon-sm ${isDirty ? 'btn-filled btn-primary' : 'btn-outlined btn-secondary'}`}
+                  onClick={handleSave}
+                  title="Save (Cmd+S)"
+                >
+                  <Save size={18} />
+                </button>
+              </div>
+              <div className="header-divider" />
+              <div className="header-actions-group">
+                <button
+                  className="btn btn-icon-sm btn-outlined btn-secondary"
+                  onClick={() => setIsStockLibraryOpen(true)}
+                  title="Stock Library"
+                >
+                  <Library size={18} />
+                </button>
+                <button
+                  className="btn btn-icon-sm btn-outlined btn-secondary"
+                  onClick={() => setIsAppSettingsOpen(true)}
+                  title="App Settings"
+                >
+                  <Settings size={18} />
+                </button>
+              </div>
+              {licenseMode === 'free' && (
+                <>
+                  <div className="header-divider" />
+                  <button
+                    className="btn btn-sm btn-filled btn-primary upgrade-btn"
+                    onClick={() => {
+                      // Open purchase page in browser
+                      window.open('https://carvd-studio.com/pricing', '_blank');
+                      // Also open license modal to enter key
+                      setShowLicenseModal(true);
+                    }}
+                  >
+                    Upgrade
+                  </button>
+                </>
+              )}
+            </div>
+          </header>
+          {/* Update Notification Banner */}
+          <UpdateNotificationBanner />
+          {/* Trial Banner (shown days 7-14 of trial) */}
+          {shouldShowTrialBanner && trialStatus && (
+            <TrialBanner
+              daysRemaining={trialStatus.daysRemaining}
+              onActivateLicense={() => setShowLicenseModal(true)}
+              onPurchase={() => {}}
+            />
+          )}
+          {/* Assembly Editing Banner */}
+          {isEditingAssembly && (
+            <AssemblyEditingBanner
+              assemblyName={editingAssemblyName}
+              isCreatingNew={isCreatingNewAssembly}
+              onSave={saveAssemblyAndExit}
+              onCancel={requestAssemblyExit}
+            />
+          )}
+          {/* Template Editing Banner */}
+          {isEditingTemplate && (
+            <TemplateEditingBanner
+              templateName={editingTemplateName}
+              isCreatingNew={isCreatingNewTemplate}
+              onSave={saveTemplateDirectly}
+              onDiscard={requestTemplateDiscard}
+            />
+          )}
+          <main className="app-main">
+            <Sidebar
+              onOpenProjectSettings={() => setIsProjectSettingsOpen(true)}
+              onOpenCutList={openCutListModal}
+              onCreateNewAssembly={startCreatingNewAssembly}
+              onShowLicenseModal={() => setShowLicenseModal(true)}
+            />
+            <CanvasWithDrop />
+            <PropertiesPanel />
+          </main>
+        </>
       )}
-      <main className="app-main">
-        <Sidebar onOpenProjectSettings={() => setIsProjectSettingsOpen(true)} onOpenCutList={openCutListModal} />
-        <CanvasWithDrop />
-        <PropertiesPanel />
-      </main>
       <ContextMenu />
       <SelectionBox />
       <Toast />
@@ -1746,6 +2622,7 @@ function App() {
         assemblies={assemblyLibrary}
         onUpdateAssembly={updateLibraryAssembly}
         onDeleteAssembly={deleteLibraryAssembly}
+        onDuplicateAssembly={duplicateLibraryAssembly}
         onEditAssemblyIn3D={startAssemblyEditing}
         onCreateNewAssembly={startCreatingNewAssembly}
       />
@@ -1766,10 +2643,23 @@ function App() {
         onCancel={cancelDeleteParts}
       />
 
+      {/* Trial Expired Modal */}
+      {shouldShowExpiredModal && (
+        <TrialExpiredModal
+          onActivateLicense={() => {
+            acknowledgeExpired();
+            setShowLicenseModal(true);
+          }}
+          onPurchase={acknowledgeExpired}
+          onContinueFree={acknowledgeExpired}
+        />
+      )}
+
       {/* License Activation Modal */}
       <LicenseActivationModal
         isOpen={showLicenseModal}
         onActivate={handleLicenseActivate}
+        onClose={() => setShowLicenseModal(false)}
       />
 
       {/* App Settings Modal */}
@@ -1778,12 +2668,32 @@ function App() {
         onClose={() => setIsAppSettingsOpen(false)}
         settings={appSettings}
         onUpdateSettings={updateAppSettings}
+        licenseMode={licenseMode}
         licenseData={licenseData}
         onDeactivateLicense={handleLicenseDeactivate}
+        onShowLicenseModal={() => setShowLicenseModal(true)}
+        onShowImportModal={() => setIsImportAppStateOpen(true)}
       />
 
+      {/* Import App State Modal */}
+      <ImportAppStateModal isOpen={isImportAppStateOpen} onClose={() => setIsImportAppStateOpen(false)} />
+
+      {/* About Modal */}
+      <AboutModal isOpen={isAboutModalOpen} onClose={() => setIsAboutModalOpen(false)} />
+
       {/* Project Settings Modal */}
-      <ProjectSettingsModal isOpen={isProjectSettingsOpen} onClose={() => setIsProjectSettingsOpen(false)} />
+      <ProjectSettingsModal
+        isOpen={isProjectSettingsOpen}
+        onClose={() => setIsProjectSettingsOpen(false)}
+        isEditingTemplate={isEditingTemplate}
+      />
+
+      {/* Template Browser Modal */}
+      <TemplateBrowserModal
+        isOpen={isTemplateBrowserOpen}
+        onClose={() => setIsTemplateBrowserOpen(false)}
+        onCreateProject={handleCreateFromTemplate}
+      />
 
       {/* Save Assembly Modal */}
       <SaveAssemblyModalWrapper />
@@ -1793,12 +2703,13 @@ function App() {
 
       {/* Unsaved Changes Dialog */}
       <UnsavedChangesDialogComponent />
+      <FileRecoveryModalComponent />
 
       {/* Auto-Recovery Dialog */}
       <RecoveryDialog
         isOpen={hasRecovery}
         recoveryInfo={recoveryInfo}
-        onRestore={restoreRecovery}
+        onRestore={handleRecoveryRestore}
         onDiscard={discardRecovery}
       />
 
@@ -1821,8 +2732,65 @@ function App() {
         onCancel={cancelAssemblyExit}
       />
 
+      {/* Template Save Dialog */}
+      <TemplateSaveDialog
+        isOpen={showTemplateSaveDialog}
+        templateName={editingTemplateName}
+        templateDescription={editingTemplateDescription}
+        isCreatingNew={isCreatingNewTemplate}
+        onSave={saveTemplateAndExit}
+        onCancel={cancelTemplateDialog}
+      />
+
+      {/* Template Discard Confirmation Dialog */}
+      <TemplateDiscardDialog
+        isOpen={showTemplateDiscardDialog}
+        templateName={editingTemplateName}
+        isCreatingNew={isCreatingNewTemplate}
+        onDiscard={discardTemplateAndExit}
+        onCancel={cancelTemplateDialog}
+      />
+
+      {/* Template Setup Dialog (shown before entering edit mode for new templates) */}
+      <TemplateSetupDialog
+        isOpen={showNewTemplateSetupDialog}
+        onConfirm={confirmNewTemplateSetup}
+        onCancel={cancelNewTemplateSetup}
+      />
+
       {/* Welcome Tutorial (first-run experience) */}
       {showTutorial && <WelcomeTutorial onComplete={handleTutorialComplete} />}
+
+      {/* Start Screen (shown when no project is loaded, or while checking license/trial) */}
+      {showStartScreen && canUseApp && !showTutorial && !isLicenseLoading && (
+        <StartScreen
+          onNewProject={handleStartScreenNewProject}
+          onOpenFile={handleStartScreenOpenProject}
+          onOpenProject={handleStartScreenOpenRecent}
+          onRelocateFile={handleRelocateFile}
+          onSelectTemplate={handleStartScreenSelectTemplate}
+          onStartTutorial={handleStartScreenStartTutorial}
+          onViewAllTemplates={handleStartScreenViewAllTemplates}
+        />
+      )}
+
+      {/* Templates Screen (full-screen view of all templates) */}
+      {showTemplatesScreen && (
+        <TemplatesScreen
+          onBack={handleTemplatesScreenBack}
+          onSelectTemplate={handleTemplatesScreenSelectTemplate}
+          onStartTutorial={handleTemplatesScreenStartTutorial}
+          onEditTemplate={handleTemplatesScreenEditTemplate}
+          onNewTemplate={handleTemplatesScreenNewTemplate}
+        />
+      )}
+
+      {/* New Project Dialog */}
+      <NewProjectDialog
+        isOpen={showNewProjectDialog}
+        onClose={handleNewProjectCancel}
+        onCreateProject={handleNewProjectDialogCreate}
+      />
     </div>
   );
 }
@@ -1843,25 +2811,14 @@ function SaveAssemblyModalWrapper() {
     }
   };
 
-  return (
-    <SaveAssemblyModal
-      isOpen={saveAssemblyModalOpen}
-      onClose={closeSaveAssemblyModal}
-      onSave={handleSave}
-    />
-  );
+  return <SaveAssemblyModal isOpen={saveAssemblyModalOpen} onClose={closeSaveAssemblyModal} onSave={handleSave} />;
 }
 
 function CutListModalWrapper() {
   const cutListModalOpen = useProjectStore((s) => s.cutListModalOpen);
   const closeCutListModal = useProjectStore((s) => s.closeCutListModal);
 
-  return (
-    <CutListModal
-      isOpen={cutListModalOpen}
-      onClose={closeCutListModal}
-    />
-  );
+  return <CutListModal isOpen={cutListModalOpen} onClose={closeCutListModal} />;
 }
 
 export default App;

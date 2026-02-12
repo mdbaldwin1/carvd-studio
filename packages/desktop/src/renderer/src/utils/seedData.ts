@@ -1,11 +1,14 @@
 /**
- * Seed data for testing - Computer Desk with Drawer Pedestal
+ * Seed data for tutorial - Simple Writing Desk
  *
- * Design: 60"W x 30"D x 30"H computer desk with:
- * - Left-side drawer pedestal (3 drawers)
- * - Open right side with support panel
- * - Cable management area at back
- * - Optional keyboard tray
+ * Design: 48"W x 24"D x 30"H simple desk with:
+ * - Flat desktop
+ * - 4 legs
+ * - Front and back stretchers
+ * - Side stretchers
+ *
+ * This design is intentionally simple to demonstrate the app without
+ * overwhelming new users with complex geometry.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -13,19 +16,14 @@ import { Part, Stock, Group, GroupMember, Project, Rotation3D } from '../types';
 
 // Stock IDs (generated once for consistency)
 const PLYWOOD_3_4_ID = uuidv4();
-const PLYWOOD_1_2_ID = uuidv4();
-const WALNUT_ID = uuidv4();
+const MAPLE_ID = uuidv4();
 
-// Colors from constants
+// Colors
 const LIGHT_OAK = '#c4a574';
-const MAPLE = '#d4a574';
-const DARK_WALNUT = '#8b5a2b';
+const MAPLE_COLOR = '#f5deb3';
 
 // Default rotation (no rotation)
 const NO_ROTATION: Rotation3D = { x: 0, y: 0, z: 0 };
-// Rotated to stand vertically (panel on edge)
-const VERTICAL_XZ: Rotation3D = { x: 90, y: 0, z: 0 };
-const VERTICAL_YZ: Rotation3D = { x: 0, y: 0, z: 90 };
 
 /**
  * Generate the stock materials for the desk
@@ -44,26 +42,15 @@ export function generateStocks(): Stock[] {
       color: LIGHT_OAK
     },
     {
-      id: PLYWOOD_1_2_ID,
-      name: '1/2" Baltic Birch Plywood',
+      id: MAPLE_ID,
+      name: '8/4 Hard Maple',
       length: 96,
-      width: 48,
-      thickness: 0.5,
-      grainDirection: 'length',
-      pricingUnit: 'per_item',
-      pricePerUnit: 45,
-      color: MAPLE
-    },
-    {
-      id: WALNUT_ID,
-      name: '4/4 Walnut Board',
-      length: 96,
-      width: 8,
-      thickness: 0.75,
+      width: 6,
+      thickness: 1.75,
       grainDirection: 'length',
       pricingUnit: 'board_foot',
-      pricePerUnit: 12,
-      color: DARK_WALNUT
+      pricePerUnit: 8,
+      color: MAPLE_COLOR
     }
   ];
 }
@@ -84,7 +71,6 @@ function createPart(
     notes?: string;
     grainSensitive?: boolean;
     grainDirection?: 'length' | 'width';
-    glueUpPanel?: boolean;
   }
 ): Part {
   return {
@@ -99,8 +85,7 @@ function createPart(
     grainSensitive: options?.grainSensitive ?? true,
     grainDirection: options?.grainDirection || 'length',
     color,
-    notes: options?.notes,
-    glueUpPanel: options?.glueUpPanel
+    notes: options?.notes
   };
 }
 
@@ -110,304 +95,149 @@ function createPart(
 export function generateParts(): Part[] {
   const parts: Part[] = [];
 
+  // Desk dimensions
+  const DESK_WIDTH = 48; // X axis
+  const DESK_DEPTH = 24; // Z axis
+  const DESK_HEIGHT = 30; // Y axis
+  const TOP_THICKNESS = 0.75;
+  const LEG_SIZE = 1.75; // Square legs
+
+  // Leg positions (inset 2" from edges)
+  const LEG_INSET = 2;
+  const LEG_X_OFFSET = DESK_WIDTH / 2 - LEG_INSET - LEG_SIZE / 2;
+  const LEG_Z_OFFSET = DESK_DEPTH / 2 - LEG_INSET - LEG_SIZE / 2;
+  const LEG_HEIGHT = DESK_HEIGHT - TOP_THICKNESS;
+
+  // Stretcher dimensions
+  const STRETCHER_WIDTH = 3;
+  const STRETCHER_THICKNESS = 0.75;
+  const STRETCHER_HEIGHT = 6; // Height from floor to stretcher center
+
   // ============================================
   // DESKTOP
   // ============================================
-  // Desktop top at Y=30", so center Y = 30 - 0.375 = 29.625
-  parts.push(
-    createPart('Desktop', 60, 30, 0.75, { x: 0, y: 29.625, z: 0 }, PLYWOOD_3_4_ID, LIGHT_OAK, {
-      notes: 'Main work surface - edge band front edge'
-    })
-  );
-
-  // ============================================
-  // LEFT PEDESTAL (Drawer Cabinet)
-  // Pedestal: 16" wide x 26" deep x 28.5" tall
-  // Positioned at left side of desk
-  // Left edge at X = -30 (edge of 60" desk)
-  // Pedestal center X = -30 + 8 = -22
-  // ============================================
-
-  // Pedestal Left Side (outer) - stands vertically
-  // Panel is 26"L x 28.5"W x 0.75"T, rotated to stand up
-  // After rotation: 26" deep (Z), 28.5" tall (Y), 0.75" thick (X)
-  // Position: X = -29.625 (against left edge), Y = 14.25, Z = 0
+  // Desktop top at Y=30", center Y = 30 - 0.375 = 29.625
   parts.push(
     createPart(
-      'Pedestal Left Side',
-      26,
-      28.5,
-      0.75,
-      { x: -29.625, y: 14.25, z: 0 },
+      'Desktop',
+      DESK_WIDTH,
+      DESK_DEPTH,
+      TOP_THICKNESS,
+      { x: 0, y: DESK_HEIGHT - TOP_THICKNESS / 2, z: 0 },
       PLYWOOD_3_4_ID,
       LIGHT_OAK,
-      { rotation: VERTICAL_YZ, notes: 'Outer pedestal panel' }
-    )
-  );
-
-  // Pedestal Right Side (inner) - stands vertically
-  // Position: X = -14.375 (16" from left side minus thickness)
-  parts.push(
-    createPart(
-      'Pedestal Right Side',
-      26,
-      28.5,
-      0.75,
-      { x: -14.375, y: 14.25, z: 0 },
-      PLYWOOD_3_4_ID,
-      LIGHT_OAK,
-      { rotation: VERTICAL_YZ, notes: 'Inner pedestal panel - drill for shelf pins' }
-    )
-  );
-
-  // Pedestal Bottom - horizontal
-  // Width between sides: 16 - 1.5 = 14.5"
-  // Position: X = -22, Y = 0.375, Z = 0
-  parts.push(
-    createPart(
-      'Pedestal Bottom',
-      14.5,
-      26,
-      0.75,
-      { x: -22, y: 0.375, z: 0 },
-      PLYWOOD_3_4_ID,
-      LIGHT_OAK,
-      { notes: 'Pedestal floor panel' }
-    )
-  );
-
-  // Pedestal Top Rail - horizontal, under desktop
-  parts.push(
-    createPart(
-      'Pedestal Top Rail',
-      14.5,
-      4,
-      0.75,
-      { x: -22, y: 28.125, z: 11 },
-      PLYWOOD_3_4_ID,
-      LIGHT_OAK,
-      { notes: 'Front support rail' }
-    )
-  );
-
-  // Pedestal Back - vertical panel
-  parts.push(
-    createPart(
-      'Pedestal Back',
-      14.5,
-      27.75,
-      0.75,
-      { x: -22, y: 14.25, z: -12.625 },
-      PLYWOOD_3_4_ID,
-      LIGHT_OAK,
-      { rotation: VERTICAL_XZ, notes: 'Back panel - drill cable hole' }
+      { notes: 'Main work surface' }
     )
   );
 
   // ============================================
-  // DRAWERS (3 drawers in pedestal)
-  // Each drawer opening ~8.5" tall
-  // Drawer box: 13.5"W x 24"D x 7"H (inside)
+  // LEGS (4)
   // ============================================
+  // Legs are vertical, so we use rotation to stand them up
+  // A 1.75" x 1.75" x leg_height piece, rotated to stand vertical
 
-  const drawerOpeningHeight = 8.5;
-  const drawerBoxHeight = 7;
-  const drawerBoxWidth = 13.5;
-  const drawerBoxDepth = 24;
-
-  for (let i = 0; i < 3; i++) {
-    const drawerNum = i + 1;
-    const drawerBottomY = 1.5 + i * drawerOpeningHeight; // Starting 1.5" from bottom
-    const drawerCenterY = drawerBottomY + drawerBoxHeight / 2;
-    const drawerCenterX = -22;
-    const drawerCenterZ = 1; // Slightly forward of pedestal center
-
-    // Drawer Front (box front, not face)
-    parts.push(
-      createPart(
-        `Drawer ${drawerNum} Front`,
-        drawerBoxWidth,
-        drawerBoxHeight,
-        0.75,
-        { x: drawerCenterX, y: drawerCenterY, z: drawerCenterZ + drawerBoxDepth / 2 - 0.375 },
-        PLYWOOD_3_4_ID,
-        LIGHT_OAK,
-        { rotation: VERTICAL_XZ }
-      )
-    );
-
-    // Drawer Back
-    parts.push(
-      createPart(
-        `Drawer ${drawerNum} Back`,
-        drawerBoxWidth,
-        drawerBoxHeight,
-        0.75,
-        { x: drawerCenterX, y: drawerCenterY, z: drawerCenterZ - drawerBoxDepth / 2 + 0.375 },
-        PLYWOOD_3_4_ID,
-        LIGHT_OAK,
-        { rotation: VERTICAL_XZ }
-      )
-    );
-
-    // Drawer Left Side
-    parts.push(
-      createPart(
-        `Drawer ${drawerNum} Left Side`,
-        drawerBoxDepth - 1.5,
-        drawerBoxHeight,
-        0.75,
-        { x: drawerCenterX - drawerBoxWidth / 2 + 0.375, y: drawerCenterY, z: drawerCenterZ },
-        PLYWOOD_3_4_ID,
-        LIGHT_OAK,
-        { rotation: { x: 90, y: 90, z: 0 } }
-      )
-    );
-
-    // Drawer Right Side
-    parts.push(
-      createPart(
-        `Drawer ${drawerNum} Right Side`,
-        drawerBoxDepth - 1.5,
-        drawerBoxHeight,
-        0.75,
-        { x: drawerCenterX + drawerBoxWidth / 2 - 0.375, y: drawerCenterY, z: drawerCenterZ },
-        PLYWOOD_3_4_ID,
-        LIGHT_OAK,
-        { rotation: { x: 90, y: 90, z: 0 } }
-      )
-    );
-
-    // Drawer Bottom (1/2" plywood)
-    parts.push(
-      createPart(
-        `Drawer ${drawerNum} Bottom`,
-        drawerBoxWidth - 1,
-        drawerBoxDepth - 1,
-        0.5,
-        { x: drawerCenterX, y: drawerBottomY + 0.5, z: drawerCenterZ },
-        PLYWOOD_1_2_ID,
-        MAPLE,
-        { grainSensitive: false }
-      )
-    );
-
-    // Drawer Face (walnut - visible front, glue-up panel since walnut boards are 8" wide)
-    parts.push(
-      createPart(
-        `Drawer ${drawerNum} Face`,
-        15,
-        drawerOpeningHeight - 0.25,
-        0.75,
-        { x: drawerCenterX, y: drawerCenterY + 0.25, z: 13.375 },
-        WALNUT_ID,
-        DARK_WALNUT,
-        { rotation: VERTICAL_XZ, notes: 'Glue-up from 2 boards, sand to 220 grit', glueUpPanel: true }
-      )
-    );
-  }
-
-  // ============================================
-  // RIGHT SIDE SUPPORT
-  // ============================================
-
-  // Right Support Panel - stands vertically
+  // Front Left Leg
   parts.push(
     createPart(
-      'Right Support Panel',
-      26,
-      28.5,
-      0.75,
-      { x: 29.625, y: 14.25, z: 0 },
-      PLYWOOD_3_4_ID,
-      LIGHT_OAK,
-      { rotation: VERTICAL_YZ, notes: 'Right side support' }
+      'Front Left Leg',
+      LEG_HEIGHT,
+      LEG_SIZE,
+      LEG_SIZE,
+      { x: -LEG_X_OFFSET, y: LEG_HEIGHT / 2, z: LEG_Z_OFFSET },
+      MAPLE_ID,
+      MAPLE_COLOR,
+      { rotation: { x: 0, y: 0, z: 90 } }
+    )
+  );
+
+  // Front Right Leg
+  parts.push(
+    createPart(
+      'Front Right Leg',
+      LEG_HEIGHT,
+      LEG_SIZE,
+      LEG_SIZE,
+      { x: LEG_X_OFFSET, y: LEG_HEIGHT / 2, z: LEG_Z_OFFSET },
+      MAPLE_ID,
+      MAPLE_COLOR,
+      { rotation: { x: 0, y: 0, z: 90 } }
+    )
+  );
+
+  // Back Left Leg
+  parts.push(
+    createPart(
+      'Back Left Leg',
+      LEG_HEIGHT,
+      LEG_SIZE,
+      LEG_SIZE,
+      { x: -LEG_X_OFFSET, y: LEG_HEIGHT / 2, z: -LEG_Z_OFFSET },
+      MAPLE_ID,
+      MAPLE_COLOR,
+      { rotation: { x: 0, y: 0, z: 90 } }
+    )
+  );
+
+  // Back Right Leg
+  parts.push(
+    createPart(
+      'Back Right Leg',
+      LEG_HEIGHT,
+      LEG_SIZE,
+      LEG_SIZE,
+      { x: LEG_X_OFFSET, y: LEG_HEIGHT / 2, z: -LEG_Z_OFFSET },
+      MAPLE_ID,
+      MAPLE_COLOR,
+      { rotation: { x: 0, y: 0, z: 90 } }
     )
   );
 
   // ============================================
-  // BACK STRETCHER / CABLE MANAGEMENT
+  // STRETCHERS (3 sides - back and both sides, front open for legroom)
   // ============================================
+  // Stretchers connect the legs for rigidity
 
-  // Back Stretcher (connects pedestal to right panel)
+  // Back Stretcher (connects back legs, runs left-right)
+  const backStretcherLength = DESK_WIDTH - 2 * LEG_INSET - LEG_SIZE;
   parts.push(
     createPart(
       'Back Stretcher',
-      42.5,
-      6,
-      0.75,
-      { x: 7.25, y: 26, z: -12.625 },
+      backStretcherLength,
+      STRETCHER_WIDTH,
+      STRETCHER_THICKNESS,
+      { x: 0, y: STRETCHER_HEIGHT, z: -LEG_Z_OFFSET },
       PLYWOOD_3_4_ID,
       LIGHT_OAK,
-      { rotation: VERTICAL_XZ, notes: 'Drill 2" hole for cables' }
+      { rotation: { x: 90, y: 0, z: 0 } }
     )
   );
 
-  // Front Stretcher (under desktop, for rigidity)
-  parts.push(
-    createPart('Front Stretcher', 42.5, 4, 0.75, { x: 7.25, y: 28.125, z: 11 }, PLYWOOD_3_4_ID, LIGHT_OAK)
-  );
-
-  // ============================================
-  // KEYBOARD TRAY
-  // ============================================
-
+  // Left Stretcher (connects left legs, runs front-back)
+  const sideStretcherLength = DESK_DEPTH - 2 * LEG_INSET - LEG_SIZE;
   parts.push(
     createPart(
-      'Keyboard Tray',
-      26,
-      12,
-      0.75,
-      { x: 7.25, y: 25.5, z: 6 },
+      'Left Stretcher',
+      sideStretcherLength,
+      STRETCHER_WIDTH,
+      STRETCHER_THICKNESS,
+      { x: -LEG_X_OFFSET, y: STRETCHER_HEIGHT, z: 0 },
       PLYWOOD_3_4_ID,
       LIGHT_OAK,
-      { notes: 'Mount on slides for pull-out' }
+      { rotation: { x: 90, y: 0, z: 90 } }
     )
   );
 
-  // ============================================
-  // DECORATIVE TRIM (Walnut)
-  // ============================================
-
-  // Desktop Front Edge Trim
+  // Right Stretcher (connects right legs, runs front-back)
   parts.push(
     createPart(
-      'Desktop Front Edge',
-      60,
-      1.5,
-      0.75,
-      { x: 0, y: 29.625, z: 15.375 },
-      WALNUT_ID,
-      DARK_WALNUT,
-      { rotation: VERTICAL_XZ, notes: 'Glue and brad nail to desktop front' }
-    )
-  );
-
-  // Desktop Side Edge Trim (left)
-  parts.push(
-    createPart(
-      'Desktop Left Edge',
-      30,
-      1.5,
-      0.75,
-      { x: -30.375, y: 29.625, z: 0 },
-      WALNUT_ID,
-      DARK_WALNUT,
-      { rotation: { x: 90, y: 90, z: 0 }, notes: 'Glue and brad nail to desktop side' }
-    )
-  );
-
-  // Desktop Side Edge Trim (right)
-  parts.push(
-    createPart(
-      'Desktop Right Edge',
-      30,
-      1.5,
-      0.75,
-      { x: 30.375, y: 29.625, z: 0 },
-      WALNUT_ID,
-      DARK_WALNUT,
-      { rotation: { x: 90, y: 90, z: 0 }, notes: 'Glue and brad nail to desktop side' }
+      'Right Stretcher',
+      sideStretcherLength,
+      STRETCHER_WIDTH,
+      STRETCHER_THICKNESS,
+      { x: LEG_X_OFFSET, y: STRETCHER_HEIGHT, z: 0 },
+      PLYWOOD_3_4_ID,
+      LIGHT_OAK,
+      { rotation: { x: 90, y: 0, z: 90 } }
     )
   );
 
@@ -422,29 +252,15 @@ export function generateGroups(parts: Part[]): { groups: Group[]; groupMembers: 
   const groupMembers: GroupMember[] = [];
 
   // Create main groups
-  const desktopGroupId = uuidv4();
-  const pedestalGroupId = uuidv4();
-  const drawer1GroupId = uuidv4();
-  const drawer2GroupId = uuidv4();
-  const drawer3GroupId = uuidv4();
-  const supportGroupId = uuidv4();
-  const trimGroupId = uuidv4();
+  const legsGroupId = uuidv4();
+  const stretchersGroupId = uuidv4();
 
-  groups.push(
-    { id: desktopGroupId, name: 'Desktop Assembly' },
-    { id: pedestalGroupId, name: 'Left Pedestal' },
-    { id: drawer1GroupId, name: 'Drawer 1' },
-    { id: drawer2GroupId, name: 'Drawer 2' },
-    { id: drawer3GroupId, name: 'Drawer 3' },
-    { id: supportGroupId, name: 'Right Support & Stretchers' },
-    { id: trimGroupId, name: 'Edge Trim' }
-  );
+  groups.push({ id: legsGroupId, name: 'Legs' }, { id: stretchersGroupId, name: 'Stretchers' });
 
   // Helper to add part to group by name pattern
   const addPartsToGroup = (groupId: string, namePattern: RegExp | string) => {
     parts.forEach((part) => {
-      const matches =
-        typeof namePattern === 'string' ? part.name === namePattern : namePattern.test(part.name);
+      const matches = typeof namePattern === 'string' ? part.name === namePattern : namePattern.test(part.name);
       if (matches) {
         groupMembers.push({
           id: uuidv4(),
@@ -456,31 +272,11 @@ export function generateGroups(parts: Part[]): { groups: Group[]; groupMembers: 
     });
   };
 
-  // Desktop Assembly
-  addPartsToGroup(desktopGroupId, 'Desktop');
-  addPartsToGroup(desktopGroupId, 'Keyboard Tray');
+  // Group legs together
+  addPartsToGroup(legsGroupId, /Leg$/);
 
-  // Pedestal Structure (not drawers)
-  addPartsToGroup(pedestalGroupId, /^Pedestal/);
-
-  // Individual Drawers
-  addPartsToGroup(drawer1GroupId, /^Drawer 1/);
-  addPartsToGroup(drawer2GroupId, /^Drawer 2/);
-  addPartsToGroup(drawer3GroupId, /^Drawer 3/);
-
-  // Nest drawer groups inside pedestal
-  groupMembers.push(
-    { id: uuidv4(), groupId: pedestalGroupId, memberType: 'group', memberId: drawer1GroupId },
-    { id: uuidv4(), groupId: pedestalGroupId, memberType: 'group', memberId: drawer2GroupId },
-    { id: uuidv4(), groupId: pedestalGroupId, memberType: 'group', memberId: drawer3GroupId }
-  );
-
-  // Right Support & Stretchers
-  addPartsToGroup(supportGroupId, 'Right Support Panel');
-  addPartsToGroup(supportGroupId, /Stretcher/);
-
-  // Edge Trim
-  addPartsToGroup(trimGroupId, /Edge$/);
+  // Group stretchers together
+  addPartsToGroup(stretchersGroupId, /Stretcher$/);
 
   return { groups, groupMembers };
 }
@@ -497,7 +293,7 @@ export function generateSeedProject(): Project {
 
   return {
     version: '1.0',
-    name: 'Computer Desk with Drawers',
+    name: 'Simple Writing Desk',
     stocks,
     parts,
     groups,
@@ -507,30 +303,27 @@ export function generateSeedProject(): Project {
     gridSize: 0.0625, // 1/16"
     kerfWidth: 0.125, // 1/8" kerf
     overageFactor: 0.1, // 10% overage
-    projectNotes: `Computer Desk Design
+    projectNotes: `Simple Writing Desk
 
-Dimensions: 60"W x 30"D x 30"H
+Dimensions: 48"W x 24"D x 30"H
 
-Features:
-- 3-drawer pedestal on left side
-- Open leg room on right
-- Keyboard tray (mount on slides)
-- Cable management hole in back stretcher
-- Walnut edge banding for premium look
+A clean, straightforward desk design perfect for learning Carvd Studio.
 
 Materials:
-- 3/4" Baltic Birch Plywood for structure
-- 1/2" Baltic Birch for drawer bottoms
-- 4/4 Walnut for drawer faces and trim
+- 3/4" Baltic Birch Plywood for desktop and stretchers
+- 8/4 Hard Maple for legs
 
-Assembly Notes:
-1. Build pedestal box first
-2. Assemble drawer boxes, test fit slides
-3. Attach drawer faces with adjustable screws
-4. Connect pedestal to right panel with stretchers
-5. Attach desktop from below
-6. Apply edge trim with glue and brad nails
-7. Sand and finish`,
+Features:
+- Solid plywood top
+- Four sturdy maple legs
+- Cross stretchers for stability
+
+Try these things:
+1. Click parts to select them
+2. Use X, Y, Z keys to rotate
+3. Drag parts to move them
+4. Press G to group selected parts
+5. Generate a cut list to see the shopping list`,
     stockConstraints: {
       constrainDimensions: true,
       constrainGrain: true,
@@ -567,7 +360,7 @@ export function generateStockLibraryItems() {
       grainDirection: 'length' as const,
       pricingUnit: 'per_item' as const,
       pricePerUnit: 45,
-      color: MAPLE
+      color: '#d4a574'
     },
     {
       id: uuidv4(),
@@ -589,7 +382,7 @@ export function generateStockLibraryItems() {
       grainDirection: 'length' as const,
       pricingUnit: 'board_foot' as const,
       pricePerUnit: 12,
-      color: DARK_WALNUT
+      color: '#8b5a2b'
     },
     {
       id: uuidv4(),
@@ -611,6 +404,17 @@ export function generateStockLibraryItems() {
       grainDirection: 'length' as const,
       pricingUnit: 'board_foot' as const,
       pricePerUnit: 6,
+      color: '#f5deb3'
+    },
+    {
+      id: uuidv4(),
+      name: '8/4 Hard Maple',
+      length: 96,
+      width: 6,
+      thickness: 1.75,
+      grainDirection: 'length' as const,
+      pricingUnit: 'board_foot' as const,
+      pricePerUnit: 10,
       color: '#f5deb3'
     },
     {

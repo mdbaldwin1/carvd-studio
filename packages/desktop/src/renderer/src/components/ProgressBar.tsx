@@ -36,9 +36,7 @@ export function ProgressBar({
     <div className={`progress-bar-container ${className}`}>
       <div className="progress-bar-header">
         {message && <span className="progress-bar-message">{message}</span>}
-        {showPercentage && (
-          <span className="progress-bar-percentage">{Math.round(clampedProgress)}%</span>
-        )}
+        {showPercentage && <span className="progress-bar-percentage">{Math.round(clampedProgress)}%</span>}
       </div>
       <div className="progress-bar-track">
         <div

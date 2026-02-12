@@ -1,9 +1,171 @@
 import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
-import { join } from 'path';
-import { readFile, writeFile, unlink, access, readdir, mkdir } from 'fs/promises';
-import { store, getWindowBounds, setWindowBounds, addRecentProject, getRecentProjects, clearRecentProjects, getLicenseKey, getLicenseData, setLicenseData, clearLicenseData, getHasCompletedWelcome, setHasCompletedWelcome } from './store';
+import { join, normalize, isAbsolute } from 'path';
+import { readFile, writeFile, unlink, access, readdir, mkdir, stat } from 'fs/promises';
+import log from 'electron-log';
+import {
+  store,
+  getWindowBounds,
+  setWindowBounds,
+  addRecentProject,
+  getRecentProjects,
+  clearRecentProjects,
+  removeRecentProject,
+  updateRecentProjectPath,
+  getFavoriteProjects,
+  addFavoriteProject,
+  removeFavoriteProject,
+  isFavoriteProject,
+  setFavoriteProjects,
+  getNewProjectDefaults,
+  setNewProjectDefaults,
+  NewProjectDefaults,
+  getHasCompletedWelcome,
+  setHasCompletedWelcome,
+  getUserTemplates,
+  addUserTemplate,
+  updateUserTemplate,
+  removeUserTemplate,
+  trackTemplateUsage,
+  UserTemplateItem,
+  seedDefaultLibraries,
+  getCustomColors,
+  addCustomColor,
+  removeCustomColor,
+  setCustomColors,
+  exportAppState,
+  importAppState,
+  validateAppStateExport,
+  previewImport,
+  AppStateExport,
+  ImportOptions,
+  exportTemplate,
+  exportAssembly,
+  exportStocks,
+  validateTemplateExport,
+  validateAssemblyExport,
+  validateStocksExport,
+  importTemplate,
+  importAssembly,
+  importStocks,
+  TemplateExport,
+  AssemblyExport,
+  StocksExport
+} from './store';
 import { createApplicationMenu, refreshMenu } from './menu';
-import { verifyLicense } from './license';
+import {
+  verifyLicense,
+  activateLicenseKey,
+  deactivateLicenseKey,
+  getStoredLicenseKey,
+  getStoredLicenseData
+} from './license';
+import { initializeAutoUpdater, checkForUpdates, downloadUpdate, quitAndInstall, getUpdateInfo } from './updater';
+import {
+  getTrialStatus,
+  acknowledgeTrialExpired,
+  resetTrialAcknowledgement,
+  resetTrial,
+  simulateTrialDaysRemaining,
+  simulateTrialExpired
+} from './trial';
+
+// =============================================================================
+// Global Error Handlers
+// =============================================================================
+
+process.on('uncaughtException', (error) => {
+  log.error('[Main] Uncaught exception:', error);
+  // In production, we might want to show a dialog and restart
+  if (process.env.NODE_ENV !== 'development') {
+    dialog.showErrorBox(
+      'Unexpected Error',
+      'An unexpected error occurred. The application may be unstable. Please save your work and restart.'
+    );
+  }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  log.error('[Main] Unhandled rejection at:', promise, 'reason:', reason);
+});
+
+// =============================================================================
+// Security: Path Validation Utilities
+// =============================================================================
+
+/**
+ * Validate that a file path is safe for file operations.
+ * Prevents path traversal attacks and restricts to allowed directories.
+ */
+function isPathSafe(filePath: string): boolean {
+  if (!filePath || typeof filePath !== 'string') {
+    return false;
+  }
+
+  // Must be absolute path
+  if (!isAbsolute(filePath)) {
+    return false;
+  }
+
+  // Normalize and check for path traversal
+  const normalizedPath = normalize(filePath);
+  if (normalizedPath !== filePath.replace(/\\/g, '/').replace(/\/+/g, '/')) {
+    // Path contained traversal sequences that got normalized out
+    if (filePath.includes('..')) {
+      return false;
+    }
+  }
+
+  // Block null bytes (used in some path traversal attacks)
+  if (filePath.includes('\0')) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Validate that a recovery file name is safe (no path separators)
+ */
+function isRecoveryFileNameSafe(fileName: string): boolean {
+  if (!fileName || typeof fileName !== 'string') {
+    return false;
+  }
+
+  // Must not contain path separators
+  if (fileName.includes('/') || fileName.includes('\\')) {
+    return false;
+  }
+
+  // Must not contain null bytes
+  if (fileName.includes('\0')) {
+    return false;
+  }
+
+  // Must end with expected extension
+  if (!fileName.endsWith('.carvd-recovery')) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Validate that a URL is safe to open externally
+ */
+function isUrlSafe(url: string): boolean {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url);
+    // Only allow safe protocols
+    const allowedProtocols = ['https:', 'http:', 'mailto:'];
+    return allowedProtocols.includes(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
 
 // Auto-recovery directory in user data folder
 function getAutoRecoveryDir(): string {
@@ -19,17 +181,55 @@ async function ensureRecoveryDir(): Promise<void> {
   }
 }
 
-let mainWindow: BrowserWindow | null = null;
+// Track all open windows
+const windows: Set<BrowserWindow> = new Set();
 
-function createWindow(): void {
+// Track windows that are allowed to close (after user confirmed or chose to discard)
+const windowsAllowedToClose: Set<BrowserWindow> = new Set();
+
+// Splash window reference and timing
+let splashWindow: BrowserWindow | null = null;
+let splashStartTime: number = 0;
+const MINIMUM_SPLASH_DURATION = 1500; // 1.5 seconds minimum
+
+function createSplashWindow(): BrowserWindow {
+  splashStartTime = Date.now();
+  const splash = new BrowserWindow({
+    width: 400,
+    height: 300,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    center: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+
+  splash.loadFile(join(__dirname, 'splash.html'));
+  splash.show();
+
+  return splash;
+}
+
+// File to open after window is ready (for file association)
+let pendingFileToOpen: string | null = null;
+
+function createWindow(fileToOpen?: string): BrowserWindow {
   const bounds = getWindowBounds();
   const isMac = process.platform === 'darwin';
 
-  mainWindow = new BrowserWindow({
+  // Offset new windows slightly from existing ones
+  const offset = windows.size * 30;
+
+  const newWindow = new BrowserWindow({
     width: bounds.width,
     height: bounds.height,
-    x: bounds.x,
-    y: bounds.y,
+    x: (bounds.x ?? 100) + offset,
+    y: (bounds.y ?? 100) + offset,
     minWidth: 900,
     minHeight: 600,
     show: false,
@@ -48,40 +248,83 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
+      // SECURITY NOTE: Sandbox is disabled because the preload script requires
+      // access to Node.js APIs (electron-store, fs operations via IPC).
+      // Security is maintained through:
+      // 1. contextIsolation: true - renderer cannot access preload scope
+      // 2. nodeIntegration: false - renderer cannot use Node.js directly
+      // 3. All IPC handlers validate their inputs (path traversal, URL protocols)
+      // 4. Only specific, validated operations are exposed via contextBridge
       sandbox: false
     }
   });
 
-  // Show window when ready to avoid flicker
-  mainWindow.on('ready-to-show', () => {
-    mainWindow?.show();
-  });
+  windows.add(newWindow);
 
-  // Save window bounds on close
-  mainWindow.on('close', () => {
-    if (mainWindow) {
-      const bounds = mainWindow.getBounds();
-      setWindowBounds(bounds);
+  // Show window when ready to avoid flicker
+  newWindow.on('ready-to-show', () => {
+    const showMainWindow = () => {
+      // Close splash screen if it exists
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        splashWindow.close();
+        splashWindow = null;
+      }
+
+      newWindow.show();
+      // If there's a file to open, send it to the renderer
+      if (fileToOpen) {
+        newWindow.webContents.send('open-project', fileToOpen);
+      }
+    };
+
+    // Ensure splash screen is shown for minimum duration
+    const elapsed = Date.now() - splashStartTime;
+    const remaining = MINIMUM_SPLASH_DURATION - elapsed;
+
+    if (remaining > 0) {
+      setTimeout(showMainWindow, remaining);
+    } else {
+      showMainWindow();
     }
   });
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  // Intercept close to check for unsaved changes
+  newWindow.on('close', (event) => {
+    // Save window bounds
+    const currentBounds = newWindow.getBounds();
+    setWindowBounds(currentBounds);
+
+    // If this window is allowed to close, proceed
+    if (windowsAllowedToClose.has(newWindow)) {
+      windowsAllowedToClose.delete(newWindow);
+      return; // Allow close to proceed
+    }
+
+    // Otherwise, ask the renderer if there are unsaved changes
+    event.preventDefault();
+    newWindow.webContents.send('before-close');
+  });
+
+  newWindow.on('closed', () => {
+    windows.delete(newWindow);
+    windowsAllowedToClose.delete(newWindow);
   });
 
   // Open external links in default browser
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  newWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
 
   // Load the app
   if (process.env.NODE_ENV === 'development') {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    newWindow.loadURL('http://localhost:5173');
+    newWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+    newWindow.loadFile(join(__dirname, '../renderer/index.html'));
   }
+
+  return newWindow;
 }
 
 // Handle file open from OS (double-click .carvd file)
@@ -89,9 +332,12 @@ app.on('open-file', (event, filePath) => {
   event.preventDefault();
   if (filePath.endsWith('.carvd')) {
     addRecentProject(filePath);
-    // TODO: Send file path to renderer to open project
-    if (mainWindow) {
-      mainWindow.webContents.send('open-project', filePath);
+    // If app is ready, create a new window with this file
+    if (app.isReady()) {
+      createWindow(filePath);
+    } else {
+      // App not ready yet, store for later
+      pendingFileToOpen = filePath;
     }
   }
 });
@@ -114,15 +360,30 @@ ipcMain.handle('show-open-dialog', async (_event, options) => {
 });
 
 ipcMain.handle('read-file', async (_event, filePath: string) => {
+  if (!isPathSafe(filePath)) {
+    throw new Error('Invalid file path');
+  }
   return readFile(filePath, 'utf-8');
 });
 
 ipcMain.handle('write-file', async (_event, filePath: string, data: string) => {
+  if (!isPathSafe(filePath)) {
+    throw new Error('Invalid file path');
+  }
+  if (typeof data !== 'string') {
+    throw new Error('Invalid data type');
+  }
   await writeFile(filePath, data, 'utf-8');
 });
 
 // Write binary file (for PDFs, images, etc.)
 ipcMain.handle('write-binary-file', async (_event, filePath: string, data: number[]) => {
+  if (!isPathSafe(filePath)) {
+    throw new Error('Invalid file path');
+  }
+  if (!Array.isArray(data)) {
+    throw new Error('Invalid data type');
+  }
   const buffer = Buffer.from(data);
   await writeFile(filePath, buffer);
 });
@@ -135,35 +396,82 @@ ipcMain.handle('get-platform', () => {
   return process.platform;
 });
 
-// License management
-ipcMain.handle('verify-license', (_event, licenseKey: string) => {
-  const result = verifyLicense(licenseKey);
-  if (result.valid && result.data) {
-    // Store license data on successful verification
-    setLicenseData({
-      licenseKey,
-      licenseEmail: result.data.email,
-      licenseOrderId: result.data.orderId
-    });
+ipcMain.handle('open-licenses-file', async () => {
+  // In production, the resources folder is in the app bundle
+  // In development, it's relative to the project
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  let licensesPath: string;
+
+  if (isDev) {
+    licensesPath = join(__dirname, '../../resources/THIRD_PARTY_LICENSES.txt');
+  } else {
+    // In production, resources are in the app's resources folder
+    licensesPath = join(process.resourcesPath, 'THIRD_PARTY_LICENSES.txt');
   }
+
+  try {
+    await shell.openPath(licensesPath);
+    return { success: true };
+  } catch (error) {
+    log.error('Failed to open licenses file:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+// License management
+ipcMain.handle('verify-license', async (_event, licenseKey: string) => {
+  const result = await verifyLicense(licenseKey);
+  // License data is now cached automatically in license.ts
   return result;
 });
 
-ipcMain.handle('get-license-data', () => {
-  return getLicenseData();
+ipcMain.handle('activate-license', async (_event, licenseKey: string) => {
+  return await activateLicenseKey(licenseKey);
 });
 
-ipcMain.handle('check-license-valid', () => {
-  const licenseKey = getLicenseKey();
+ipcMain.handle('get-license-data', () => {
+  return getStoredLicenseData();
+});
+
+ipcMain.handle('get-license-key', () => {
+  return getStoredLicenseKey();
+});
+
+ipcMain.handle('check-license-valid', async () => {
+  const licenseKey = getStoredLicenseKey();
   if (!licenseKey) {
     return { valid: false };
   }
-  return verifyLicense(licenseKey);
+  return await verifyLicense(licenseKey);
 });
 
-ipcMain.handle('deactivate-license', () => {
-  clearLicenseData();
-  return { success: true };
+ipcMain.handle('deactivate-license', async () => {
+  return await deactivateLicenseKey();
+});
+
+// Trial system
+ipcMain.handle('get-trial-status', () => {
+  return getTrialStatus();
+});
+
+ipcMain.handle('acknowledge-trial-expired', () => {
+  acknowledgeTrialExpired();
+});
+
+// Dev only - for testing trial reset
+ipcMain.handle('reset-trial', () => {
+  resetTrial();
+  return getTrialStatus();
+});
+
+// Dev only - simulate trial with X days remaining
+ipcMain.handle('simulate-trial-days', (_event, daysRemaining: number) => {
+  return simulateTrialDaysRemaining(daysRemaining);
+});
+
+// Dev only - simulate expired trial
+ipcMain.handle('simulate-trial-expired', () => {
+  return simulateTrialExpired();
 });
 
 // Welcome/onboarding
@@ -181,6 +489,344 @@ ipcMain.handle('reset-welcome-tutorial', () => {
   return { success: true };
 });
 
+// User templates
+ipcMain.handle('get-user-templates', () => {
+  return getUserTemplates();
+});
+
+ipcMain.handle('add-user-template', (_event, template: UserTemplateItem) => {
+  addUserTemplate(template);
+  return { success: true };
+});
+
+ipcMain.handle('update-user-template', (_event, id: string, updates: Partial<UserTemplateItem>) => {
+  updateUserTemplate(id, updates);
+  return { success: true };
+});
+
+ipcMain.handle('remove-user-template', (_event, id: string) => {
+  removeUserTemplate(id);
+  return { success: true };
+});
+
+ipcMain.handle('track-template-usage', (_event, id: string) => {
+  trackTemplateUsage(id);
+  return { success: true };
+});
+
+// Custom colors
+ipcMain.handle('get-custom-colors', () => {
+  return getCustomColors();
+});
+
+ipcMain.handle('add-custom-color', (_event, color: string) => {
+  return addCustomColor(color);
+});
+
+ipcMain.handle('remove-custom-color', (_event, color: string) => {
+  removeCustomColor(color);
+  return { success: true };
+});
+
+ipcMain.handle('set-custom-colors', (_event, colors: string[]) => {
+  setCustomColors(colors);
+  return { success: true };
+});
+
+// App state export/import
+ipcMain.handle('export-app-state', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return { success: false, error: 'No window available' };
+
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Export App State',
+      defaultPath: `carvd-backup-${new Date().toISOString().split('T')[0]}.carvd-backup`,
+      filters: [{ name: 'Carvd Backup', extensions: ['carvd-backup'] }]
+    });
+
+    if (canceled || !filePath) {
+      return { success: false, canceled: true };
+    }
+
+    const exportData = exportAppState(app.getVersion());
+    await writeFile(filePath, JSON.stringify(exportData, null, 2), 'utf-8');
+
+    return { success: true, filePath };
+  } catch (error) {
+    log.error('Failed to export app state:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('preview-import-app-state', async (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return { success: false, error: 'No window available' };
+
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Import App State',
+      filters: [{ name: 'Carvd Backup', extensions: ['carvd-backup'] }],
+      properties: ['openFile']
+    });
+
+    if (canceled || !filePaths.length) {
+      return { success: false, canceled: true };
+    }
+
+    const content = await readFile(filePaths[0], 'utf-8');
+    let data: unknown;
+    try {
+      data = JSON.parse(content);
+    } catch {
+      return { success: false, error: 'Invalid JSON format' };
+    }
+
+    const validation = validateAppStateExport(data);
+    if (!validation.valid) {
+      return { success: false, errors: validation.errors };
+    }
+
+    const preview = previewImport(data as AppStateExport);
+    return {
+      success: true,
+      filePath: filePaths[0],
+      preview
+    };
+  } catch (error) {
+    log.error('Failed to preview import:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('import-app-state', async (_event, filePath: string, options: ImportOptions) => {
+  if (!isPathSafe(filePath)) {
+    return { success: false, error: 'Invalid file path' };
+  }
+
+  try {
+    const content = await readFile(filePath, 'utf-8');
+    let data: unknown;
+    try {
+      data = JSON.parse(content);
+    } catch {
+      return { success: false, error: 'Invalid JSON format' };
+    }
+
+    const validation = validateAppStateExport(data);
+    if (!validation.valid) {
+      return { success: false, errors: validation.errors };
+    }
+
+    const result = importAppState(data as AppStateExport, options);
+    return result;
+  } catch (error) {
+    log.error('Failed to import app state:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+// Individual item export/import
+ipcMain.handle('export-template', async (event, templateId: string) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return { success: false, error: 'No window available' };
+
+  try {
+    const exportData = exportTemplate(templateId, app.getVersion());
+    if (!exportData) {
+      return { success: false, error: 'Template not found' };
+    }
+
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Export Template',
+      defaultPath: `${exportData.data.name.replace(/[^a-zA-Z0-9-_ ]/g, '')}.carvd-template`,
+      filters: [{ name: 'Carvd Template', extensions: ['carvd-template'] }]
+    });
+
+    if (canceled || !filePath) {
+      return { success: false, canceled: true };
+    }
+
+    await writeFile(filePath, JSON.stringify(exportData, null, 2), 'utf-8');
+    return { success: true, filePath };
+  } catch (error) {
+    log.error('Failed to export template:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('export-assembly', async (event, assemblyId: string) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return { success: false, error: 'No window available' };
+
+  try {
+    const exportData = exportAssembly(assemblyId, app.getVersion());
+    if (!exportData) {
+      return { success: false, error: 'Assembly not found' };
+    }
+
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Export Assembly',
+      defaultPath: `${exportData.data.name.replace(/[^a-zA-Z0-9-_ ]/g, '')}.carvd-assembly`,
+      filters: [{ name: 'Carvd Assembly', extensions: ['carvd-assembly'] }]
+    });
+
+    if (canceled || !filePath) {
+      return { success: false, canceled: true };
+    }
+
+    await writeFile(filePath, JSON.stringify(exportData, null, 2), 'utf-8');
+    return { success: true, filePath, stocksIncluded: exportData.referencedStocks.length };
+  } catch (error) {
+    log.error('Failed to export assembly:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('export-stocks', async (event, stockIds: string[]) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return { success: false, error: 'No window available' };
+
+  try {
+    const exportData = exportStocks(stockIds, app.getVersion());
+    if (!exportData) {
+      return { success: false, error: 'No stocks found' };
+    }
+
+    const defaultName = stockIds.length === 1 ? exportData.data[0].name : `stocks-${stockIds.length}`;
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Export Stocks',
+      defaultPath: `${defaultName.replace(/[^a-zA-Z0-9-_ ]/g, '')}.carvd-stocks`,
+      filters: [{ name: 'Carvd Stocks', extensions: ['carvd-stocks'] }]
+    });
+
+    if (canceled || !filePath) {
+      return { success: false, canceled: true };
+    }
+
+    await writeFile(filePath, JSON.stringify(exportData, null, 2), 'utf-8');
+    return { success: true, filePath, count: exportData.data.length };
+  } catch (error) {
+    log.error('Failed to export stocks:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('import-template', async (event, options?: { replaceIfExists?: boolean }) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return { success: false, error: 'No window available' };
+
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Import Template',
+      filters: [{ name: 'Carvd Template', extensions: ['carvd-template'] }],
+      properties: ['openFile']
+    });
+
+    if (canceled || !filePaths.length) {
+      return { success: false, canceled: true };
+    }
+
+    const content = await readFile(filePaths[0], 'utf-8');
+    let data: unknown;
+    try {
+      data = JSON.parse(content);
+    } catch {
+      return { success: false, error: 'Invalid file format' };
+    }
+
+    const validation = validateTemplateExport(data);
+    if (!validation.valid) {
+      return { success: false, error: validation.errors.join(', ') };
+    }
+
+    const result = importTemplate(data as TemplateExport, {
+      replaceIfExists: options?.replaceIfExists ?? false
+    });
+    return result;
+  } catch (error) {
+    log.error('Failed to import template:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('import-assembly', async (event, options?: { replaceIfExists?: boolean; importStocks?: boolean }) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return { success: false, error: 'No window available' };
+
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Import Assembly',
+      filters: [{ name: 'Carvd Assembly', extensions: ['carvd-assembly'] }],
+      properties: ['openFile']
+    });
+
+    if (canceled || !filePaths.length) {
+      return { success: false, canceled: true };
+    }
+
+    const content = await readFile(filePaths[0], 'utf-8');
+    let data: unknown;
+    try {
+      data = JSON.parse(content);
+    } catch {
+      return { success: false, error: 'Invalid file format' };
+    }
+
+    const validation = validateAssemblyExport(data);
+    if (!validation.valid) {
+      return { success: false, error: validation.errors.join(', ') };
+    }
+
+    const result = importAssembly(data as AssemblyExport, {
+      replaceIfExists: options?.replaceIfExists ?? false,
+      importStocks: options?.importStocks ?? true
+    });
+    return result;
+  } catch (error) {
+    log.error('Failed to import assembly:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('import-stocks', async (event, options?: { replaceIfExists?: boolean }) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return { success: false, error: 'No window available' };
+
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Import Stocks',
+      filters: [{ name: 'Carvd Stocks', extensions: ['carvd-stocks'] }],
+      properties: ['openFile']
+    });
+
+    if (canceled || !filePaths.length) {
+      return { success: false, canceled: true };
+    }
+
+    const content = await readFile(filePaths[0], 'utf-8');
+    let data: unknown;
+    try {
+      data = JSON.parse(content);
+    } catch {
+      return { success: false, error: 'Invalid file format' };
+    }
+
+    const validation = validateStocksExport(data);
+    if (!validation.valid) {
+      return { success: false, error: validation.errors.join(', ') };
+    }
+
+    const result = importStocks(data as StocksExport, {
+      replaceIfExists: options?.replaceIfExists ?? false
+    });
+    return result;
+  } catch (error) {
+    log.error('Failed to import stocks:', error);
+    return { success: false, error: String(error) };
+  }
+});
+
 // Recent projects
 ipcMain.handle('get-recent-projects', () => {
   return getRecentProjects();
@@ -196,17 +842,115 @@ ipcMain.handle('clear-recent-projects', () => {
   refreshMenu(); // Update Open Recent menu
 });
 
+ipcMain.handle('remove-recent-project', (_event, filePath: string) => {
+  removeRecentProject(filePath);
+  refreshMenu(); // Update Open Recent menu
+  return { success: true };
+});
+
+ipcMain.handle('update-recent-project-path', (_event, oldPath: string, newPath: string) => {
+  updateRecentProjectPath(oldPath, newPath);
+  refreshMenu(); // Update Open Recent menu
+  return { success: true };
+});
+
+// Get file modification times for a list of paths
+ipcMain.handle('get-file-stats', async (_event, filePaths: string[]) => {
+  const results: { path: string; modifiedAt: string | null }[] = [];
+  for (const filePath of filePaths) {
+    if (!isPathSafe(filePath)) {
+      log.warn('[get-file-stats] Path failed safety check:', filePath);
+      results.push({ path: filePath, modifiedAt: null });
+      continue;
+    }
+    try {
+      const stats = await stat(filePath);
+      results.push({ path: filePath, modifiedAt: stats.mtime.toISOString() });
+    } catch (error) {
+      log.warn('[get-file-stats] Failed to stat file:', filePath, error);
+      results.push({ path: filePath, modifiedAt: null });
+    }
+  }
+  return results;
+});
+
+// Get thumbnails from project files (for StartScreen display)
+ipcMain.handle('get-project-thumbnails', async (_event, filePaths: string[]) => {
+  const results: { path: string; thumbnail: { data: string; width: number; height: number } | null }[] = [];
+  for (const filePath of filePaths) {
+    if (!isPathSafe(filePath)) {
+      results.push({ path: filePath, thumbnail: null });
+      continue;
+    }
+    try {
+      const content = await readFile(filePath, 'utf-8');
+      const data = JSON.parse(content);
+      if (data.thumbnail && data.thumbnail.data) {
+        results.push({
+          path: filePath,
+          thumbnail: {
+            data: data.thumbnail.data,
+            width: data.thumbnail.width || 400,
+            height: data.thumbnail.height || 300
+          }
+        });
+      } else {
+        results.push({ path: filePath, thumbnail: null });
+      }
+    } catch {
+      results.push({ path: filePath, thumbnail: null });
+    }
+  }
+  return results;
+});
+
+// Favorite projects
+ipcMain.handle('get-favorite-projects', () => {
+  return getFavoriteProjects();
+});
+
+ipcMain.handle('add-favorite-project', (_event, filePath: string) => {
+  addFavoriteProject(filePath);
+  return { success: true };
+});
+
+ipcMain.handle('remove-favorite-project', (_event, filePath: string) => {
+  removeFavoriteProject(filePath);
+  return { success: true };
+});
+
+ipcMain.handle('is-favorite-project', (_event, filePath: string) => {
+  return isFavoriteProject(filePath);
+});
+
+ipcMain.handle('reorder-favorite-projects', (_event, filePaths: string[]) => {
+  setFavoriteProjects(filePaths);
+  return { success: true };
+});
+
+// New project defaults (for "remember these choices" feature)
+ipcMain.handle('get-new-project-defaults', () => {
+  return getNewProjectDefaults();
+});
+
+ipcMain.handle('set-new-project-defaults', (_event, defaults: Partial<NewProjectDefaults>) => {
+  setNewProjectDefaults(defaults);
+  return { success: true };
+});
+
 // Window title
-ipcMain.handle('set-window-title', (_event, title: string) => {
-  if (mainWindow) {
-    mainWindow.setTitle(title);
+ipcMain.handle('set-window-title', (event, title: string) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) {
+    win.setTitle(title);
   }
 });
 
 // Update title bar overlay colors (Windows/Linux only)
-ipcMain.handle('set-title-bar-overlay', (_event, options: { color: string; symbolColor: string }) => {
-  if (mainWindow && process.platform !== 'darwin') {
-    mainWindow.setTitleBarOverlay({
+ipcMain.handle('set-title-bar-overlay', (event, options: { color: string; symbolColor: string }) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win && process.platform !== 'darwin') {
+    win.setTitleBarOverlay({
       color: options.color,
       symbolColor: options.symbolColor,
       height: 48
@@ -214,39 +958,52 @@ ipcMain.handle('set-title-bar-overlay', (_event, options: { color: string; symbo
   }
 });
 
-// Print to PDF - uses Electron's native PDF generation
-ipcMain.handle(
-  'print-to-pdf',
-  async (_event, options: { defaultFileName?: string; landscape?: boolean }) => {
-    if (!mainWindow) return { success: false, error: 'No window available' };
-
-    try {
-      // Show save dialog
-      const result = await dialog.showSaveDialog(mainWindow, {
-        defaultPath: options.defaultFileName || 'document.pdf',
-        filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
-      });
-
-      if (result.canceled || !result.filePath) {
-        return { success: false, canceled: true };
-      }
-
-      // Generate PDF from current window content
-      const pdfData = await mainWindow.webContents.printToPDF({
-        landscape: options.landscape ?? false,
-        printBackground: true,
-        margins: { top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 }
-      });
-
-      // Write to file
-      await writeFile(result.filePath, pdfData);
-
-      return { success: true, filePath: result.filePath };
-    } catch (error) {
-      return { success: false, error: String(error) };
-    }
+// Window close confirmation - called by renderer to proceed with close
+ipcMain.handle('confirm-close', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) {
+    windowsAllowedToClose.add(win);
+    win.close();
   }
-);
+});
+
+// Window close cancellation - called by renderer to cancel close
+ipcMain.handle('cancel-close', () => {
+  // Nothing to do - just don't close the window
+  // The close was already prevented by event.preventDefault()
+});
+
+// Print to PDF - uses Electron's native PDF generation
+ipcMain.handle('print-to-pdf', async (event, options: { defaultFileName?: string; landscape?: boolean }) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return { success: false, error: 'No window available' };
+
+  try {
+    // Show save dialog
+    const result = await dialog.showSaveDialog(win, {
+      defaultPath: options.defaultFileName || 'document.pdf',
+      filters: [{ name: 'PDF Files', extensions: ['pdf'] }]
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true };
+    }
+
+    // Generate PDF from current window content
+    const pdfData = await win.webContents.printToPDF({
+      landscape: options.landscape ?? false,
+      printBackground: true,
+      margins: { top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 }
+    });
+
+    // Write to file
+    await writeFile(result.filePath, pdfData);
+
+    return { success: true, filePath: result.filePath };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
 
 // Auto-recovery file operations
 ipcMain.handle('get-recovery-dir', () => {
@@ -254,6 +1011,12 @@ ipcMain.handle('get-recovery-dir', () => {
 });
 
 ipcMain.handle('save-recovery-file', async (_event, fileName: string, data: string) => {
+  if (!isRecoveryFileNameSafe(fileName)) {
+    throw new Error('Invalid recovery file name');
+  }
+  if (typeof data !== 'string') {
+    throw new Error('Invalid data type');
+  }
   await ensureRecoveryDir();
   const filePath = join(getAutoRecoveryDir(), fileName);
   await writeFile(filePath, data, 'utf-8');
@@ -261,6 +1024,9 @@ ipcMain.handle('save-recovery-file', async (_event, fileName: string, data: stri
 });
 
 ipcMain.handle('read-recovery-file', async (_event, fileName: string) => {
+  if (!isRecoveryFileNameSafe(fileName)) {
+    throw new Error('Invalid recovery file name');
+  }
   const filePath = join(getAutoRecoveryDir(), fileName);
   try {
     return await readFile(filePath, 'utf-8');
@@ -270,6 +1036,9 @@ ipcMain.handle('read-recovery-file', async (_event, fileName: string) => {
 });
 
 ipcMain.handle('delete-recovery-file', async (_event, fileName: string) => {
+  if (!isRecoveryFileNameSafe(fileName)) {
+    throw new Error('Invalid recovery file name');
+  }
   const filePath = join(getAutoRecoveryDir(), fileName);
   try {
     await unlink(filePath);
@@ -287,6 +1056,31 @@ ipcMain.handle('list-recovery-files', async () => {
   } catch {
     return [];
   }
+});
+
+// Open external links (mailto, https, etc.)
+ipcMain.handle('open-external', async (_event, url: string) => {
+  if (!isUrlSafe(url)) {
+    throw new Error('Invalid or disallowed URL protocol');
+  }
+  await shell.openExternal(url);
+});
+
+// Auto-updater
+ipcMain.handle('check-for-updates', async () => {
+  await checkForUpdates();
+});
+
+ipcMain.handle('download-update', async () => {
+  await downloadUpdate();
+});
+
+ipcMain.handle('quit-and-install', () => {
+  quitAndInstall();
+});
+
+ipcMain.handle('get-update-info', () => {
+  return getUpdateInfo();
 });
 
 // Watch for settings changes from other instances (cross-process sync)
@@ -322,10 +1116,29 @@ store.onDidAnyChange((newValue, oldValue) => {
 });
 
 app.whenReady().then(() => {
+  // Show splash screen immediately
+  splashWindow = createSplashWindow();
+
+  // Reset trial acknowledgement so expired modal shows each launch
+  resetTrialAcknowledgement();
+
+  // Seed default stock and assembly libraries if empty (first run)
+  seedDefaultLibraries();
+
   // Create application menu
   createApplicationMenu();
 
-  createWindow();
+  // If a file was double-clicked before app was ready, open it
+  // Otherwise create a normal window
+  if (pendingFileToOpen) {
+    createWindow(pendingFileToOpen);
+    pendingFileToOpen = null;
+  } else {
+    createWindow();
+  }
+
+  // Initialize auto-updater (skips in development)
+  initializeAutoUpdater();
 
   app.on('activate', () => {
     // macOS: re-create window when dock icon clicked

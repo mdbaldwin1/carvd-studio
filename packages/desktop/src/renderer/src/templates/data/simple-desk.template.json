@@ -1,0 +1,165 @@
+{
+  "id": "simple-desk",
+  "name": "Simple Writing Desk",
+  "description": "A clean, straightforward desk with four legs and cross stretchers. Perfect for a home office.",
+  "category": "furniture",
+  "thumbnail": "🪑",
+  "dimensions": { "width": 48, "depth": 24, "height": 30 },
+  "projectSettings": {
+    "units": "imperial",
+    "gridSize": 0.0625,
+    "kerfWidth": 0.125,
+    "overageFactor": 0.1,
+    "projectNotes": "Simple Writing Desk\n\nDimensions: 48\"W x 24\"D x 30\"H\n\nA clean, straightforward desk design perfect for a home office or workshop.\n\nMaterials:\n- 3/4\" Baltic Birch Plywood for desktop and stretchers\n- 8/4 Hard Maple for legs\n\nFeatures:\n- Solid plywood top\n- Four sturdy maple legs\n- Cross stretchers for stability\n- Open front for legroom",
+    "stockConstraints": {
+      "constrainDimensions": true,
+      "constrainGrain": true,
+      "constrainColor": true,
+      "preventOverlap": false
+    }
+  },
+  "stocks": [
+    {
+      "_refId": "stock-plywood",
+      "name": "3/4\" Baltic Birch Plywood",
+      "length": 96,
+      "width": 48,
+      "thickness": 0.75,
+      "grainDirection": "length",
+      "pricingUnit": "per_item",
+      "pricePerUnit": 65,
+      "color": "#c4a574"
+    },
+    {
+      "_refId": "stock-maple",
+      "name": "8/4 Hard Maple",
+      "length": 96,
+      "width": 6,
+      "thickness": 1.75,
+      "grainDirection": "length",
+      "pricingUnit": "board_foot",
+      "pricePerUnit": 8,
+      "color": "#f5deb3"
+    }
+  ],
+  "parts": [
+    {
+      "_refId": "part-desktop",
+      "name": "Desktop",
+      "length": 48,
+      "width": 24,
+      "thickness": 0.75,
+      "position": { "x": 0, "y": 29.625, "z": 0 },
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "stockRefId": "stock-plywood",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#c4a574",
+      "notes": "Main work surface"
+    },
+    {
+      "_refId": "part-leg-fl",
+      "name": "Front Left Leg",
+      "length": 29.25,
+      "width": 1.75,
+      "thickness": 1.75,
+      "position": { "x": -21.125, "y": 14.625, "z": 9.125 },
+      "rotation": { "x": 0, "y": 0, "z": 90 },
+      "stockRefId": "stock-maple",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#f5deb3"
+    },
+    {
+      "_refId": "part-leg-fr",
+      "name": "Front Right Leg",
+      "length": 29.25,
+      "width": 1.75,
+      "thickness": 1.75,
+      "position": { "x": 21.125, "y": 14.625, "z": 9.125 },
+      "rotation": { "x": 0, "y": 0, "z": 90 },
+      "stockRefId": "stock-maple",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#f5deb3"
+    },
+    {
+      "_refId": "part-leg-bl",
+      "name": "Back Left Leg",
+      "length": 29.25,
+      "width": 1.75,
+      "thickness": 1.75,
+      "position": { "x": -21.125, "y": 14.625, "z": -9.125 },
+      "rotation": { "x": 0, "y": 0, "z": 90 },
+      "stockRefId": "stock-maple",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#f5deb3"
+    },
+    {
+      "_refId": "part-leg-br",
+      "name": "Back Right Leg",
+      "length": 29.25,
+      "width": 1.75,
+      "thickness": 1.75,
+      "position": { "x": 21.125, "y": 14.625, "z": -9.125 },
+      "rotation": { "x": 0, "y": 0, "z": 90 },
+      "stockRefId": "stock-maple",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#f5deb3"
+    },
+    {
+      "_refId": "part-stretcher-back",
+      "name": "Back Stretcher",
+      "length": 42.25,
+      "width": 3,
+      "thickness": 0.75,
+      "position": { "x": 0, "y": 6, "z": -9.125 },
+      "rotation": { "x": 90, "y": 0, "z": 0 },
+      "stockRefId": "stock-plywood",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#c4a574"
+    },
+    {
+      "_refId": "part-stretcher-left",
+      "name": "Left Stretcher",
+      "length": 18.25,
+      "width": 3,
+      "thickness": 0.75,
+      "position": { "x": -21.125, "y": 6, "z": 0 },
+      "rotation": { "x": 90, "y": 0, "z": 90 },
+      "stockRefId": "stock-plywood",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#c4a574"
+    },
+    {
+      "_refId": "part-stretcher-right",
+      "name": "Right Stretcher",
+      "length": 18.25,
+      "width": 3,
+      "thickness": 0.75,
+      "position": { "x": 21.125, "y": 6, "z": 0 },
+      "rotation": { "x": 90, "y": 0, "z": 90 },
+      "stockRefId": "stock-plywood",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#c4a574"
+    }
+  ],
+  "groups": [
+    { "_refId": "group-legs", "name": "Legs" },
+    { "_refId": "group-stretchers", "name": "Stretchers" }
+  ],
+  "groupMembers": [
+    { "groupRefId": "group-legs", "memberType": "part", "memberRefId": "part-leg-fl" },
+    { "groupRefId": "group-legs", "memberType": "part", "memberRefId": "part-leg-fr" },
+    { "groupRefId": "group-legs", "memberType": "part", "memberRefId": "part-leg-bl" },
+    { "groupRefId": "group-legs", "memberType": "part", "memberRefId": "part-leg-br" },
+    { "groupRefId": "group-stretchers", "memberType": "part", "memberRefId": "part-stretcher-back" },
+    { "groupRefId": "group-stretchers", "memberType": "part", "memberRefId": "part-stretcher-left" },
+    { "groupRefId": "group-stretchers", "memberType": "part", "memberRefId": "part-stretcher-right" }
+  ]
+}

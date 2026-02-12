@@ -7,7 +7,7 @@
   "main": "./out/main/index.js",
   "repository": {
     "type": "git",
-    "url": "git@github.com:mbaldwintech/carvd-studio.git"
+    "url": "git@github.com:mdbaldwin1/carvd-studio.git"
   },
   "license": "ISC",
   "author": "Michael Baldwin",
@@ -21,6 +21,9 @@
     "package:win": "electron-builder --win",
     "generate-keys": "node scripts/generate-license-keys.cjs",
     "generate-test-license": "node scripts/generate-test-license.cjs",
+    "test:license": "node scripts/test-license-flow.cjs",
+    "version:bump": "node scripts/version-bump.cjs",
+    "generate:thumbnails": "node scripts/generate-template-thumbnails.cjs",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
@@ -38,7 +41,9 @@
   "dependencies": {
     "@react-three/drei": "^9.115.0",
     "@react-three/fiber": "^8.17.10",
+    "electron-log": "^5.4.3",
     "electron-store": "^8.2.0",
+    "electron-updater": "^6.7.3",
     "jspdf": "^4.0.0",
     "lucide-react": "^0.563.0",
     "react": "^18.3.1",
@@ -66,7 +71,7 @@
     "@vitejs/plugin-react": "^4.3.3",
     "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
-    "electron": "^28.3.3",
+    "electron": "28.3.3",
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
     "eslint": "^9.14.0",
@@ -92,11 +97,37 @@
     "files": [
       "out/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "resources/THIRD_PARTY_LICENSES.txt",
+        "to": "THIRD_PARTY_LICENSES.txt"
+      }
+    ],
     "afterSign": "scripts/notarize.cjs",
+    "publish": {
+      "provider": "github",
+      "owner": "mdbaldwin1",
+      "repo": "carvd-studio",
+      "releaseType": "release",
+      "publishAutoUpdate": true
+    },
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ],
       "hardenedRuntime": true,
       "gatekeeperAssess": false,

@@ -29,18 +29,6 @@ updates:
       - "dependencies"
       - "desktop"
 
-  # Webhook dependencies
-  - package-ecosystem: "npm"
-    directory: "/packages/webhook"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-    open-pull-requests-limit: 3
-    labels:
-      - "dependencies"
-      - "webhook"
-
   # Root workspace dependencies
   - package-ecosystem: "npm"
     directory: "/"

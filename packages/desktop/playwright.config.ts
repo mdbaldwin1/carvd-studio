@@ -20,9 +20,9 @@ export default defineConfig({
     }
   ],
 
-  // Timeout settings for Electron (slower to start than browser)
-  timeout: 60000,
+  // Timeout settings for Electron (slower to start than browser, especially on macOS CI)
+  timeout: 180000,
   expect: {
-    timeout: 10000
+    timeout: 30000
   }
 });

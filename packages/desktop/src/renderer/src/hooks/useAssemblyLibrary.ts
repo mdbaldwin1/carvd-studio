@@ -1,5 +1,8 @@
-import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
+import { useState, useEffect, useCallback, useMemo, useSyncExternalStore } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { Assembly } from '../types';
+import { logger } from '../utils/logger';
+import { getBuiltInAssemblies, isBuiltInAssembly } from '../templates/builtInAssemblies';
 
 // Singleton state for assembly library (shared across all hook instances)
 let assemblyLibraryState: Assembly[] = [];
@@ -30,16 +33,19 @@ function initAssemblyLibrarySingleton() {
   assemblyLibraryInitialized = true;
 
   // Load initial data
-  window.electronAPI.getPreference('assemblyLibrary').then((library) => {
-    assemblyLibraryState = (library as Assembly[]) || [];
-    assemblyLibraryLoading = false;
-    notifyAssemblySubscribers();
-  }).catch((error) => {
-    console.error('Failed to load assembly library:', error);
-    assemblyLibraryState = [];
-    assemblyLibraryLoading = false;
-    notifyAssemblySubscribers();
-  });
+  window.electronAPI
+    .getPreference('assemblyLibrary')
+    .then((library) => {
+      assemblyLibraryState = (library as Assembly[]) || [];
+      assemblyLibraryLoading = false;
+      notifyAssemblySubscribers();
+    })
+    .catch((error) => {
+      logger.error('Failed to load assembly library:', error);
+      assemblyLibraryState = [];
+      assemblyLibraryLoading = false;
+      notifyAssemblySubscribers();
+    });
 
   // Set up singleton listener for cross-instance changes
   window.electronAPI.onSettingsChanged((changes) => {
@@ -62,9 +68,16 @@ export function useAssemblyLibrary() {
     initAssemblyLibrarySingleton();
   }, []);
 
-  // Subscribe to the singleton state
-  const assemblies = useSyncExternalStore(subscribeToAssemblyLibrary, getAssemblyLibrarySnapshot);
+  // Subscribe to the singleton state (user assemblies only)
+  const userAssemblies = useSyncExternalStore(subscribeToAssemblyLibrary, getAssemblyLibrarySnapshot);
   const [isLoading, setIsLoading] = useState(assemblyLibraryLoading);
+
+  // Combine built-in assemblies with user assemblies
+  // Built-in assemblies appear first
+  const assemblies = useMemo(() => {
+    const builtIn = getBuiltInAssemblies();
+    return [...builtIn, ...userAssemblies];
+  }, [userAssemblies]);
 
   // Update loading state when singleton changes
   useEffect(() => {
@@ -76,15 +89,15 @@ export function useAssemblyLibrary() {
 
   // Save assembly library whenever it changes
   const saveLibrary = useCallback(async (newAssemblies: Assembly[]) => {
-    console.log('[saveLibrary] Saving assemblies:', newAssemblies.length, 'items');
+    logger.debug('[saveLibrary] Saving assemblies:', newAssemblies.length, 'items');
     try {
       await window.electronAPI.setPreference('assemblyLibrary', newAssemblies);
-      console.log('[saveLibrary] setPreference completed');
+      logger.debug('[saveLibrary] setPreference completed');
       // Update singleton state immediately for responsive UI
       assemblyLibraryState = newAssemblies;
       notifyAssemblySubscribers();
     } catch (error) {
-      console.error('Failed to save assembly library:', error);
+      logger.error('Failed to save assembly library:', error);
       throw error; // Re-throw so caller can handle
     }
   }, []);
@@ -92,23 +105,33 @@ export function useAssemblyLibrary() {
   const addAssembly = useCallback(
     async (assembly: Assembly) => {
       // Read current assemblies directly from storage to avoid stale closure issues
-      const currentAssemblies = (await window.electronAPI.getPreference('assemblyLibrary') as Assembly[]) || [];
-      console.log('[addAssembly] Current assemblies from storage:', currentAssemblies.length, 'Adding:', assembly.name);
+      const currentAssemblies = ((await window.electronAPI.getPreference('assemblyLibrary')) as Assembly[]) || [];
+      logger.debug(
+        '[addAssembly] Current assemblies from storage:',
+        currentAssemblies.length,
+        'Adding:',
+        assembly.name
+      );
       const newAssemblies = [...currentAssemblies, assembly];
       await saveLibrary(newAssemblies);
-      console.log('[addAssembly] Save completed, new count:', newAssemblies.length);
+      logger.debug('[addAssembly] Save completed, new count:', newAssemblies.length);
     },
     [saveLibrary]
   );
 
   const updateAssembly = useCallback(
     async (id: string, updates: Partial<Assembly>) => {
+      // Prevent modifying built-in assemblies
+      if (isBuiltInAssembly(id)) {
+        logger.warn('[updateAssembly] Cannot modify built-in assembly:', id);
+        return;
+      }
       // Read current assemblies directly from storage to avoid stale closure issues
       // This is important when editing an assembly, as the closure might capture old data
-      const currentAssemblies = (await window.electronAPI.getPreference('assemblyLibrary') as Assembly[]) || [];
-      console.log('[updateAssembly] Current assemblies from storage:', currentAssemblies.length, 'items');
+      const currentAssemblies = ((await window.electronAPI.getPreference('assemblyLibrary')) as Assembly[]) || [];
+      logger.debug('[updateAssembly] Current assemblies from storage:', currentAssemblies.length, 'items');
       const newAssemblies = currentAssemblies.map((c) => (c.id === id ? { ...c, ...updates } : c));
-      console.log('[updateAssembly] Updated assembly id:', id, 'parts count:', updates.parts?.length);
+      logger.debug('[updateAssembly] Updated assembly id:', id, 'parts count:', updates.parts?.length);
       await saveLibrary(newAssemblies);
     },
     [saveLibrary]
@@ -116,12 +139,48 @@ export function useAssemblyLibrary() {
 
   const deleteAssembly = useCallback(
     async (id: string) => {
+      // Prevent deleting built-in assemblies
+      if (isBuiltInAssembly(id)) {
+        logger.warn('[deleteAssembly] Cannot delete built-in assembly:', id);
+        return;
+      }
       // Read current assemblies directly from storage to avoid stale closure issues
-      const currentAssemblies = (await window.electronAPI.getPreference('assemblyLibrary') as Assembly[]) || [];
+      const currentAssemblies = ((await window.electronAPI.getPreference('assemblyLibrary')) as Assembly[]) || [];
       const newAssemblies = currentAssemblies.filter((c) => c.id !== id);
       await saveLibrary(newAssemblies);
     },
     [saveLibrary]
+  );
+
+  const duplicateAssembly = useCallback(
+    async (assembly: Assembly): Promise<Assembly> => {
+      const now = new Date().toISOString();
+      // Create a copy with new ID and updated name
+      const duplicated: Assembly = {
+        ...assembly,
+        id: uuidv4(),
+        name: `${assembly.name} (Copy)`,
+        createdAt: now,
+        modifiedAt: now,
+        // Generate new IDs for parts to avoid conflicts
+        parts: assembly.parts.map((part) => ({
+          ...part,
+          id: uuidv4()
+        })),
+        // Generate new IDs for groups
+        groups: assembly.groups.map((group) => ({
+          ...group,
+          id: uuidv4()
+        })),
+        // Update group members with new part/group IDs
+        groupMembers: [] // Will be empty since IDs changed - user can re-group
+      };
+
+      await addAssembly(duplicated);
+      logger.debug('[duplicateAssembly] Duplicated assembly:', assembly.name, '->', duplicated.name);
+      return duplicated;
+    },
+    [addAssembly]
   );
 
   const findAssembly = useCallback(
@@ -137,6 +196,7 @@ export function useAssemblyLibrary() {
     addAssembly,
     updateAssembly,
     deleteAssembly,
+    duplicateAssembly,
     findAssembly
   };
 }

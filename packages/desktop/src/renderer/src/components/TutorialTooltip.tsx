@@ -37,11 +37,7 @@ export function TutorialTooltip({
         <div className="tutorial-tooltip-header">
           <div className="tutorial-tooltip-header-row">
             <h3 className="tutorial-tooltip-title">{title}</h3>
-            <button
-              className="tutorial-tooltip-close"
-              onClick={onSkip}
-              title="Skip tutorial (Esc)"
-            >
+            <button className="tutorial-tooltip-close" onClick={onSkip} title="Skip tutorial (Esc)">
               ×
             </button>
           </div>
@@ -57,9 +53,22 @@ export function TutorialTooltip({
 
         {/* Footer with navigation */}
         <div className="tutorial-tooltip-footer">
-          <button className="tutorial-tooltip-skip" onClick={onSkip}>
-            Skip Tutorial
-          </button>
+          {isLastStep ? (
+            <a
+              href="#"
+              className="tutorial-tooltip-docs-link"
+              onClick={(e) => {
+                e.preventDefault();
+                window.electronAPI?.openExternal?.('https://carvd-studio.com/docs#quick-start');
+              }}
+            >
+              View full documentation
+            </a>
+          ) : (
+            <button className="tutorial-tooltip-skip" onClick={onSkip}>
+              Skip Tutorial
+            </button>
+          )}
 
           <div className="tutorial-tooltip-nav">
             {!isFirstStep && (

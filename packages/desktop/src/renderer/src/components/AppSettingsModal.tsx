@@ -1,20 +1,25 @@
-import { useEffect, useState } from 'react';
-import { CheckCircle, Key } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { CheckCircle, Key, Download, Upload } from 'lucide-react';
 import { useBackdropClose } from '../hooks/useBackdropClose';
-import { AppSettings } from '../types';
+import { HelpTooltip } from './HelpTooltip';
+import { AppSettings, LightingMode, SnapSensitivity } from '../types';
 import { mmToInches } from '../utils/fractions';
+import { useProjectStore } from '../store/projectStore';
 
 interface AppSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: AppSettings;
   onUpdateSettings: (updates: Partial<AppSettings>) => void;
+  licenseMode?: 'trial' | 'licensed' | 'free';
   licenseData?: {
     licenseEmail: string | null;
     licenseOrderId: string | null;
     licenseActivatedAt: string | null;
   };
   onDeactivateLicense?: () => void;
+  onShowLicenseModal?: () => void;
+  onShowImportModal?: () => void;
 }
 
 // Imperial grid size options (values in inches)
@@ -36,10 +41,7 @@ const METRIC_GRID_OPTIONS = [
 ];
 
 // Find the closest matching grid size option for a value
-const findClosestGridValue = (
-  currentValue: number,
-  options: { value: number; label: string }[]
-): number => {
+const findClosestGridValue = (currentValue: number, options: { value: number; label: string }[]): number => {
   let closest = options[0].value;
   let minDiff = Math.abs(currentValue - closest);
   for (const opt of options) {
@@ -52,12 +54,41 @@ const findClosestGridValue = (
   return closest;
 };
 
-export function AppSettingsModal({ isOpen, onClose, settings, onUpdateSettings, licenseData, onDeactivateLicense }: AppSettingsModalProps) {
+export function AppSettingsModal({
+  isOpen,
+  onClose,
+  settings,
+  onUpdateSettings,
+  licenseMode,
+  licenseData,
+  onDeactivateLicense,
+  onShowLicenseModal,
+  onShowImportModal
+}: AppSettingsModalProps) {
   // Handle backdrop click (only close if mousedown AND mouseup both on backdrop)
   const { handleMouseDown, handleClick } = useBackdropClose(onClose);
 
   // Local form state
   const [formData, setFormData] = useState<AppSettings>(settings);
+  const [isExporting, setIsExporting] = useState(false);
+  const showToast = useProjectStore((s) => s.showToast);
+
+  // Handle export app state
+  const handleExportAppState = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const result = await window.electronAPI.exportAppState();
+      if (result.success && result.filePath) {
+        showToast(`Backup saved to ${result.filePath.split('/').pop()}`, 'success');
+      } else if (!result.canceled) {
+        showToast(result.error || 'Failed to export backup', 'error');
+      }
+    } catch (error) {
+      showToast('Failed to export backup', 'error');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [showToast]);
 
   // Sync form data when settings change
   useEffect(() => {
@@ -98,12 +129,29 @@ export function AppSettingsModal({ isOpen, onClose, settings, onUpdateSettings, 
 
   return (
     <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
-      <div className="modal app-settings-modal">
+      <div
+        className="modal app-settings-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="app-settings-modal-title"
+      >
         <div className="modal-header">
-          <h2>App Settings</h2>
-          <button className="btn btn-icon-sm btn-ghost btn-secondary" onClick={onClose}>
-            &times;
-          </button>
+          <h2 id="app-settings-modal-title">App Settings</h2>
+          <div className="modal-header-actions">
+            <a
+              href="#"
+              className="modal-help-link"
+              onClick={(e) => {
+                e.preventDefault();
+                window.electronAPI.openExternal('https://carvd-studio.com/docs#settings');
+              }}
+            >
+              View documentation
+            </a>
+            <button className="btn btn-icon-sm btn-ghost btn-secondary" onClick={onClose} aria-label="Close">
+              &times;
+            </button>
+          </div>
         </div>
 
         <div className="settings-content">
@@ -129,6 +177,24 @@ export function AppSettingsModal({ isOpen, onClose, settings, onUpdateSettings, 
                 onChange={(e) => handleChange('showHotkeyHints', e.target.checked)}
               />
             </div>
+            <div className="settings-row">
+              <div className="label-with-help">
+                <label>Lighting Mode</label>
+                <HelpTooltip
+                  text='Adjust 3D workspace lighting. "Bright" is recommended for dark-colored materials.'
+                  docsSection="app-settings"
+                />
+              </div>
+              <select
+                value={formData.lightingMode ?? 'default'}
+                onChange={(e) => handleChange('lightingMode', e.target.value as LightingMode)}
+              >
+                <option value="default">Default</option>
+                <option value="bright">Bright</option>
+                <option value="studio">Studio</option>
+                <option value="dramatic">Dramatic</option>
+              </select>
+            </div>
           </div>
 
           {/* License Information */}
@@ -137,34 +203,34 @@ export function AppSettingsModal({ isOpen, onClose, settings, onUpdateSettings, 
               <h3>License</h3>
               {licenseData.licenseEmail ? (
                 <>
-                  <div style={{
-                    padding: '16px',
-                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                    border: '1px solid var(--color-success)',
-                    borderRadius: '8px',
-                    marginBottom: '16px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                      <CheckCircle size={20} color="var(--color-success)" />
-                      <span style={{ color: 'var(--color-success)', fontSize: '14px', fontWeight: 600 }}>
-                        License Active
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: '1.6' }}>
-                      <div><strong>Email:</strong> {licenseData.licenseEmail}</div>
-                      <div><strong>Order ID:</strong> {licenseData.licenseOrderId}</div>
-                      {licenseData.licenseActivatedAt && (
+                  <div className="alert alert-success" style={{ marginBottom: '16px' }}>
+                    <CheckCircle size={20} className="alert-icon" />
+                    <div className="alert-content">
+                      <div className="alert-title">License Active</div>
+                      <div className="alert-message">
                         <div>
-                          <strong>Activated:</strong> {new Date(licenseData.licenseActivatedAt).toLocaleDateString()}
+                          <strong>Email:</strong> {licenseData.licenseEmail}
                         </div>
-                      )}
+                        <div>
+                          <strong>Order ID:</strong> {licenseData.licenseOrderId}
+                        </div>
+                        {licenseData.licenseActivatedAt && (
+                          <div>
+                            <strong>Activated:</strong> {new Date(licenseData.licenseActivatedAt).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {onDeactivateLicense && (
                     <button
                       className="btn btn-sm btn-outlined btn-danger"
                       onClick={() => {
-                        if (confirm('Are you sure you want to deactivate this license? You will need to enter it again to use the app.')) {
+                        if (
+                          confirm(
+                            'Are you sure you want to deactivate this license? You will need to enter it again to use the app.'
+                          )
+                        ) {
                           onDeactivateLicense();
                         }
                       }}
@@ -173,20 +239,38 @@ export function AppSettingsModal({ isOpen, onClose, settings, onUpdateSettings, 
                     </button>
                   )}
                 </>
+              ) : licenseMode === 'free' ? (
+                <div className="upgrade-section">
+                  <p className="upgrade-text">
+                    You're using the free version of Carvd Studio. Upgrade to unlock all features including assemblies,
+                    custom templates, and the cut list optimizer.
+                  </p>
+                  <div className="upgrade-actions">
+                    <a
+                      href="https://carvd-studio.com/pricing"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-sm btn-filled btn-primary"
+                    >
+                      Purchase License
+                    </a>
+                    {onShowLicenseModal && (
+                      <button
+                        className="btn btn-sm btn-outlined btn-secondary"
+                        onClick={() => {
+                          onClose();
+                          onShowLicenseModal();
+                        }}
+                      >
+                        Enter License Key
+                      </button>
+                    )}
+                  </div>
+                </div>
               ) : (
-                <div style={{
-                  padding: '16px',
-                  backgroundColor: 'rgba(196, 84, 84, 0.1)',
-                  border: '1px solid var(--color-danger)',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}>
-                  <Key size={20} color="var(--color-danger)" />
-                  <span style={{ color: 'var(--color-text-secondary)', fontSize: '13px' }}>
-                    No active license
-                  </span>
+                <div className="alert alert-info">
+                  <Key size={20} className="alert-icon" />
+                  <span className="alert-message">Trial mode active</span>
                 </div>
               )}
             </div>
@@ -194,13 +278,20 @@ export function AppSettingsModal({ isOpen, onClose, settings, onUpdateSettings, 
 
           {/* Defaults for New Projects */}
           <div className="settings-section">
-            <h3>Defaults for New Projects</h3>
-            <p className="settings-hint">
-              These settings are used when creating a new project. Each project stores its own settings.
-            </p>
+            <h3>
+              Defaults for New Projects
+              <HelpTooltip
+                text="These settings are used when creating a new project. Each project stores its own settings that can be changed later."
+                docsSection="app-settings"
+                inline
+              />
+            </h3>
             <div className="settings-row">
               <label>Units</label>
-              <select value={formData.defaultUnits} onChange={(e) => handleUnitsChange(e.target.value as 'imperial' | 'metric')}>
+              <select
+                value={formData.defaultUnits}
+                onChange={(e) => handleUnitsChange(e.target.value as 'imperial' | 'metric')}
+              >
                 <option value="imperial">Imperial (inches)</option>
                 <option value="metric">Metric (mm)</option>
               </select>
@@ -224,21 +315,48 @@ export function AppSettingsModal({ isOpen, onClose, settings, onUpdateSettings, 
           <div className="settings-section">
             <h3>Behavior</h3>
             <div className="settings-row">
-              <label>Confirm Before Delete</label>
+              <div className="label-with-help">
+                <label>Auto-Save</label>
+                <HelpTooltip
+                  text="Automatically save your project 30 seconds after changes. If the project hasn't been saved yet, you'll be prompted to choose a location."
+                  docsSection="app-settings"
+                />
+              </div>
+              <input
+                type="checkbox"
+                checked={formData.autoSave ?? false}
+                onChange={(e) => handleChange('autoSave', e.target.checked)}
+              />
+            </div>
+            <div className="settings-row">
+              <div className="label-with-help">
+                <label>Confirm Before Delete</label>
+                <HelpTooltip
+                  text="Show a confirmation dialog when deleting parts or stocks."
+                  docsSection="app-settings"
+                />
+              </div>
               <input
                 type="checkbox"
                 checked={formData.confirmBeforeDelete}
                 onChange={(e) => handleChange('confirmBeforeDelete', e.target.checked)}
               />
             </div>
-            <p className="settings-hint">Show a confirmation dialog when deleting parts or stocks.</p>
 
             <div className="settings-row" style={{ marginTop: '16px' }}>
-              <label>Welcome Tutorial</label>
+              <div className="label-with-help">
+                <label>Welcome Tutorial</label>
+                <HelpTooltip
+                  text="Reset the welcome tutorial to show it again on next launch."
+                  docsSection="quick-start"
+                />
+              </div>
               <button
                 className="btn btn-sm btn-outlined btn-secondary"
                 onClick={async () => {
-                  if (confirm('Reset the welcome tutorial? The tutorial will show again next time you launch the app.')) {
+                  if (
+                    confirm('Reset the welcome tutorial? The tutorial will show again next time you launch the app.')
+                  ) {
                     await window.electronAPI.resetWelcomeTutorial();
                     alert('Tutorial reset! The welcome tutorial will show on your next launch.');
                   }
@@ -247,63 +365,195 @@ export function AppSettingsModal({ isOpen, onClose, settings, onUpdateSettings, 
                 Reset Tutorial
               </button>
             </div>
-            <p className="settings-hint">Reset the welcome tutorial to show it again on next launch.</p>
+          </div>
+
+          {/* Snapping */}
+          <div className="settings-section">
+            <h3>
+              Snapping
+              <HelpTooltip
+                text="Configure how parts snap to other parts, guides, and the grid. Hold Alt/Option while dragging to temporarily bypass snapping."
+                docsSection="snapping"
+                inline
+              />
+            </h3>
+            <div className="settings-row">
+              <div className="label-with-help">
+                <label>Snap Sensitivity</label>
+                <HelpTooltip
+                  text="How close parts need to be before snapping. Tight requires closer proximity."
+                  docsSection="snapping"
+                />
+              </div>
+              <select
+                value={formData.snapSensitivity ?? 'normal'}
+                onChange={(e) => handleChange('snapSensitivity', e.target.value as SnapSensitivity)}
+              >
+                <option value="tight">Tight (precise)</option>
+                <option value="normal">Normal</option>
+                <option value="loose">Loose (easier)</option>
+              </select>
+            </div>
+            <div className="settings-row">
+              <div className="label-with-help">
+                <label>Live Grid Snapping</label>
+                <HelpTooltip
+                  text="Snap to grid continuously while dragging (instead of only when releasing)."
+                  docsSection="snapping"
+                />
+              </div>
+              <input
+                type="checkbox"
+                checked={formData.liveGridSnap ?? false}
+                onChange={(e) => handleChange('liveGridSnap', e.target.checked)}
+              />
+            </div>
+            <div className="settings-row">
+              <div className="label-with-help">
+                <label>Snap to Origin</label>
+                <HelpTooltip text="Snap parts to workspace origin planes (X=0, Y=0, Z=0)." docsSection="snapping" />
+              </div>
+              <input
+                type="checkbox"
+                checked={formData.snapToOrigin ?? true}
+                onChange={(e) => handleChange('snapToOrigin', e.target.checked)}
+              />
+            </div>
+            <div className="settings-row">
+              <div className="label-with-help">
+                <label>Match Same Dimensions Only</label>
+                <HelpTooltip
+                  text="During resize, only match same dimension types (length to length, width to width)."
+                  docsSection="snapping"
+                />
+              </div>
+              <input
+                type="checkbox"
+                checked={formData.dimensionSnapSameTypeOnly ?? false}
+                onChange={(e) => handleChange('dimensionSnapSameTypeOnly', e.target.checked)}
+              />
+            </div>
           </div>
 
           {/* Stock Constraints */}
           <div className="settings-section">
-            <h3>Stock Constraints (Defaults)</h3>
-            <p className="settings-hint">
-              These settings are applied when creating a new project. Each project has its own settings that can be changed in Project Settings.
-            </p>
+            <h3>
+              Stock Constraints (Defaults)
+              <HelpTooltip
+                text="These settings are applied when creating a new project. Each project has its own settings that can be changed in Project Settings."
+                docsSection="app-settings"
+                inline
+              />
+            </h3>
             <div className="settings-row">
-              <label>Constrain Dimensions</label>
+              <div className="label-with-help">
+                <label>Constrain Dimensions</label>
+                <HelpTooltip
+                  text="Show warning when part dimensions (including joinery adjustments) exceed stock dimensions."
+                  docsSection="stock"
+                />
+              </div>
               <input
                 type="checkbox"
                 checked={formData.stockConstraints?.constrainDimensions ?? true}
-                onChange={(e) => handleChange('stockConstraints', {
-                  ...formData.stockConstraints,
-                  constrainDimensions: e.target.checked
-                })}
+                onChange={(e) =>
+                  handleChange('stockConstraints', {
+                    ...formData.stockConstraints,
+                    constrainDimensions: e.target.checked
+                  })
+                }
               />
             </div>
-            <p className="settings-hint">Show warning when part dimensions (including joinery adjustments) exceed stock dimensions.</p>
             <div className="settings-row">
-              <label>Constrain Grain Direction</label>
+              <div className="label-with-help">
+                <label>Constrain Grain Direction</label>
+                <HelpTooltip
+                  text="Show warning when part grain direction doesn't match stock grain direction."
+                  docsSection="stock"
+                />
+              </div>
               <input
                 type="checkbox"
                 checked={formData.stockConstraints?.constrainGrain ?? true}
-                onChange={(e) => handleChange('stockConstraints', {
-                  ...formData.stockConstraints,
-                  constrainGrain: e.target.checked
-                })}
+                onChange={(e) =>
+                  handleChange('stockConstraints', {
+                    ...formData.stockConstraints,
+                    constrainGrain: e.target.checked
+                  })
+                }
               />
             </div>
-            <p className="settings-hint">Show warning when part grain direction doesn't match stock grain direction.</p>
             <div className="settings-row">
-              <label>Auto-sync Color</label>
+              <div className="label-with-help">
+                <label>Auto-sync Color</label>
+                <HelpTooltip text="Automatically update part color when stock is assigned." docsSection="stock" />
+              </div>
               <input
                 type="checkbox"
                 checked={formData.stockConstraints?.constrainColor ?? true}
-                onChange={(e) => handleChange('stockConstraints', {
-                  ...formData.stockConstraints,
-                  constrainColor: e.target.checked
-                })}
+                onChange={(e) =>
+                  handleChange('stockConstraints', {
+                    ...formData.stockConstraints,
+                    constrainColor: e.target.checked
+                  })
+                }
               />
             </div>
-            <p className="settings-hint">Automatically update part color when stock is assigned.</p>
             <div className="settings-row">
-              <label>Prevent Overlap</label>
+              <div className="label-with-help">
+                <label>Prevent Overlap</label>
+                <HelpTooltip
+                  text="Prevent parts from occupying the same space. Shows warnings when parts overlap."
+                  docsSection="parts"
+                />
+              </div>
               <input
                 type="checkbox"
                 checked={formData.stockConstraints?.preventOverlap ?? true}
-                onChange={(e) => handleChange('stockConstraints', {
-                  ...formData.stockConstraints,
-                  preventOverlap: e.target.checked
-                })}
+                onChange={(e) =>
+                  handleChange('stockConstraints', {
+                    ...formData.stockConstraints,
+                    preventOverlap: e.target.checked
+                  })
+                }
               />
             </div>
-            <p className="settings-hint">Prevent parts from occupying the same space.</p>
+          </div>
+
+          {/* Data Management */}
+          <div className="settings-section">
+            <h3>Data Management</h3>
+            <div className="settings-row settings-row-data-management">
+              <div className="settings-label-block">
+                <div className="label-with-help">
+                  <label>Backup & Sync</label>
+                  <HelpTooltip
+                    text="Export your templates, assemblies, and stock library to sync with another machine or create a backup."
+                    docsSection="backup-sync"
+                  />
+                </div>
+              </div>
+              <div className="settings-actions">
+                <button
+                  className="btn btn-sm btn-outlined btn-secondary"
+                  onClick={handleExportAppState}
+                  disabled={isExporting}
+                >
+                  <Download size={14} />
+                  {isExporting ? 'Exporting...' : 'Export'}
+                </button>
+                <button
+                  className="btn btn-sm btn-outlined btn-secondary"
+                  onClick={() => {
+                    onClose();
+                    onShowImportModal?.();
+                  }}
+                >
+                  <Upload size={14} />
+                  Import
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -45,10 +45,10 @@ export function ConfirmDialog({
 
   return (
     <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
-      <div className="modal confirm-dialog">
+      <div className="modal confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
         <div className="modal-header">
-          <h2>{title}</h2>
-          <button className="modal-close" onClick={onCancel}>
+          <h2 id="confirm-dialog-title">{title}</h2>
+          <button className="modal-close" onClick={onCancel} aria-label="Close">
             &times;
           </button>
         </div>
@@ -59,11 +59,7 @@ export function ConfirmDialog({
         </div>
 
         <div className="modal-footer">
-          <button
-            className="btn btn-sm btn-outlined btn-secondary"
-            onClick={onCancel}
-            title="Press Escape to cancel"
-          >
+          <button className="btn btn-sm btn-outlined btn-secondary" onClick={onCancel} title="Press Escape to cancel">
             {cancelLabel}
           </button>
           <button

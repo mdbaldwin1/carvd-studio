@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
 import { Stock } from '../types';
+import { logger } from '../utils/logger';
 
 // Singleton state for stock library (shared across all hook instances)
 let stockLibraryState: Stock[] = [];
@@ -30,16 +31,19 @@ function initStockLibrarySingleton() {
   stockLibraryInitialized = true;
 
   // Load initial data
-  window.electronAPI.getPreference('stockLibrary').then((library) => {
-    stockLibraryState = (library as Stock[]) || [];
-    stockLibraryLoading = false;
-    notifyStockSubscribers();
-  }).catch((error) => {
-    console.error('Failed to load stock library:', error);
-    stockLibraryState = [];
-    stockLibraryLoading = false;
-    notifyStockSubscribers();
-  });
+  window.electronAPI
+    .getPreference('stockLibrary')
+    .then((library) => {
+      stockLibraryState = (library as Stock[]) || [];
+      stockLibraryLoading = false;
+      notifyStockSubscribers();
+    })
+    .catch((error) => {
+      logger.error('Failed to load stock library:', error);
+      stockLibraryState = [];
+      stockLibraryLoading = false;
+      notifyStockSubscribers();
+    });
 
   // Set up singleton listener for cross-instance changes
   window.electronAPI.onSettingsChanged((changes) => {
@@ -82,14 +86,14 @@ export function useStockLibrary() {
       stockLibraryState = newStocks;
       notifyStockSubscribers();
     } catch (error) {
-      console.error('Failed to save stock library:', error);
+      logger.error('Failed to save stock library:', error);
     }
   }, []);
 
   const addStock = useCallback(
     async (stock: Stock) => {
       // Read current stocks directly from storage to avoid stale closure issues
-      const currentStocks = (await window.electronAPI.getPreference('stockLibrary') as Stock[]) || [];
+      const currentStocks = ((await window.electronAPI.getPreference('stockLibrary')) as Stock[]) || [];
       const newStocks = [...currentStocks, stock];
       await saveLibrary(newStocks);
     },
@@ -99,7 +103,7 @@ export function useStockLibrary() {
   const updateStock = useCallback(
     async (id: string, updates: Partial<Stock>) => {
       // Read current stocks directly from storage to avoid stale closure issues
-      const currentStocks = (await window.electronAPI.getPreference('stockLibrary') as Stock[]) || [];
+      const currentStocks = ((await window.electronAPI.getPreference('stockLibrary')) as Stock[]) || [];
       const newStocks = currentStocks.map((s) => (s.id === id ? { ...s, ...updates } : s));
       await saveLibrary(newStocks);
     },
@@ -109,7 +113,7 @@ export function useStockLibrary() {
   const deleteStock = useCallback(
     async (id: string) => {
       // Read current stocks directly from storage to avoid stale closure issues
-      const currentStocks = (await window.electronAPI.getPreference('stockLibrary') as Stock[]) || [];
+      const currentStocks = ((await window.electronAPI.getPreference('stockLibrary')) as Stock[]) || [];
       const newStocks = currentStocks.filter((s) => s.id !== id);
       await saveLibrary(newStocks);
     },

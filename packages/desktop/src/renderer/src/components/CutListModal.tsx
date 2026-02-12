@@ -1,11 +1,22 @@
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import React, { useState, useCallback, useMemo } from 'react';
 import { useBackdropClose } from '../hooks/useBackdropClose';
-import { useProjectStore, validatePartsForCutList } from '../store/projectStore';
+import { useProjectStore, validatePartsForCutList, generateThumbnail } from '../store/projectStore';
 import { generateOptimizedCutList } from '../utils/cutListOptimizer';
+import { getFeatureLimits, getBlockedMessage } from '../utils/featureLimits';
 import { formatMeasurementWithUnit } from '../utils/fractions';
-import { exportDiagramsToPdf } from '../utils/pdfExport';
+import {
+  exportDiagramsToPdf,
+  exportCutListToPdf,
+  exportShoppingListToPdf,
+  exportProjectReportToPdf,
+  exportCutListToCsv,
+  exportShoppingListToCsv,
+  getCsvHeader
+} from '../utils/pdfExport';
+import { logger } from '../utils/logger';
 import { CutList, CutInstruction, StockBoard, StockSummary, PartValidationIssue, CustomShoppingItem } from '../types';
+import { DropdownButton, DropdownItem } from './DropdownButton';
 
 type CutListTab = 'parts' | 'diagrams' | 'shopping';
 
@@ -54,11 +65,6 @@ function groupCutInstructions(instructions: CutInstruction[]): GroupedCutInstruc
   return Array.from(groups.values());
 }
 
-// Helper to escape CSV values (double quotes become doubled)
-function csvEscape(value: string): string {
-  return `"${value.replace(/"/g, '""')}"`;
-}
-
 interface CutListModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -76,6 +82,14 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
   const modifiedAt = useProjectStore((s) => s.modifiedAt);
   const cutList = useProjectStore((s) => s.cutList);
   const setCutList = useProjectStore((s) => s.setCutList);
+  const licenseMode = useProjectStore((s) => s.licenseMode);
+  const showToast = useProjectStore((s) => s.showToast);
+  const projectName = useProjectStore((s) => s.projectName);
+  const projectNotes = useProjectStore((s) => s.notes);
+  const customShoppingItems = useProjectStore((s) => s.customShoppingItems);
+
+  // Get feature limits based on license mode
+  const limits = useMemo(() => getFeatureLimits(licenseMode), [licenseMode]);
 
   // Handle backdrop click (only close if mousedown AND mouseup both on backdrop)
   const { handleMouseDown, handleClick } = useBackdropClose(onClose);
@@ -93,6 +107,12 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
   // Generate cut list
   const handleGenerate = useCallback(() => {
+    // Check license limits for optimizer
+    if (!limits.canUseOptimizer) {
+      showToast(getBlockedMessage('useOptimizer'));
+      return;
+    }
+
     // Validate parts first
     const issues = validatePartsForCutList(parts, stocks);
     const blockingIssues = issues.filter((i) => i.severity === 'error' && !i.canBypass);
@@ -105,59 +125,44 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
     // Clear validation issues and generate
     setValidationIssues([]);
     const bypassedIssues = issues.filter((i) => i.canBypass);
-    const newCutList = generateOptimizedCutList(
-      parts,
-      stocks,
-      kerfWidth,
-      overageFactor,
-      modifiedAt,
-      bypassedIssues
-    );
+    const newCutList = generateOptimizedCutList(parts, stocks, kerfWidth, overageFactor, modifiedAt, bypassedIssues);
 
     setCutList(newCutList);
-  }, [parts, stocks, kerfWidth, overageFactor, modifiedAt, setCutList]);
+  }, [parts, stocks, kerfWidth, overageFactor, modifiedAt, setCutList, limits.canUseOptimizer, showToast]);
 
-  // Export to CSV (grouped by identical dimensions)
-  const handleExportCSV = useCallback(() => {
+  // Export project report PDF
+  const handleDownloadProjectReport = useCallback(async () => {
     if (!cutList) return;
 
-    const grouped = groupCutInstructions(cutList.instructions);
-    const unitLabel = units === 'imperial' ? 'inches' : 'mm';
-
-    const rows = [
-      'CUT LIST',
-      `Units: ${unitLabel}`,
-      '',
-      ['Qty', 'Cut Length', 'Cut Width', 'Thickness', 'Stock', 'Grain Sensitive', 'Glue-Up', 'Part Names'].join(',')
-    ];
-
-    for (const group of grouped) {
-      // List all part names for this group
-      const partNames = group.items.map((i) => i.partName).join('; ');
-      rows.push(
-        [
-          group.quantity.toString(),
-          csvEscape(formatMeasurementWithUnit(group.cutLength, units)),
-          csvEscape(formatMeasurementWithUnit(group.cutWidth, units)),
-          csvEscape(formatMeasurementWithUnit(group.thickness, units)),
-          csvEscape(group.stockName),
-          group.grainSensitive ? 'Yes' : 'No',
-          group.isGlueUp ? 'Yes' : 'No',
-          csvEscape(partNames)
-        ].join(',')
-      );
+    // Check license limits for PDF export
+    if (!limits.canExportPDF) {
+      showToast(getBlockedMessage('exportPDF'));
+      return;
     }
 
-    // Add UTF-8 BOM for Excel compatibility
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + rows.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'cut-list.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [cutList, units]);
+    try {
+      // Generate thumbnail for the report
+      const thumbnailData = await generateThumbnail();
+
+      const result = await exportProjectReportToPdf(cutList, {
+        projectName: projectName || 'Untitled Project',
+        projectNotes: projectNotes || undefined,
+        thumbnailData: thumbnailData || undefined,
+        units,
+        customShoppingItems: customShoppingItems || []
+      });
+
+      if (result.success) {
+        showToast('Project report saved to PDF');
+      } else if (result.error) {
+        showToast('Failed to save PDF');
+        logger.error('Project report PDF export error:', result.error);
+      }
+    } catch (error) {
+      logger.error('Project report PDF export error:', error);
+      showToast('Failed to export project report');
+    }
+  }, [cutList, projectName, projectNotes, units, customShoppingItems, limits.canExportPDF, showToast]);
 
   if (!isOpen) return null;
 
@@ -165,10 +170,10 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
   return (
     <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
-      <div className="modal cut-list-modal">
+      <div className="modal cut-list-modal" role="dialog" aria-modal="true" aria-labelledby="cut-list-modal-title">
         <div className="modal-header">
-          <h2>Cut List</h2>
-          <button className="modal-close" onClick={onClose}>
+          <h2 id="cut-list-modal-title">Cut List</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Close">
             &times;
           </button>
         </div>
@@ -177,14 +182,27 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
         {!cutList && (
           <div className="cut-list-generate">
             <p className="cut-list-intro">
-              Generate an optimized cut list from your design. All parts must be assigned to a stock material before generating.
+              Generate an optimized cut list from your design. All parts must be assigned to a stock material before
+              generating.{' '}
+              <a
+                href="#"
+                className="learn-more-link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.electronAPI.openExternal('https://carvd-studio.com/docs#cut-lists');
+                }}
+              >
+                Learn more
+              </a>
             </p>
 
             {parts.length === 0 ? (
               <div className="cut-list-empty">
                 <div className="text-5xl mb-3">📋</div>
                 <p className="font-semibold mb-2">No parts in your project yet</p>
-                <p className="text-sm text-gray-400">Add parts to your design to generate a cut list with optimized cutting diagrams and material costs.</p>
+                <p className="text-sm text-gray-400">
+                  Add parts to your design to generate a cut list with optimized cutting diagrams and material costs.
+                </p>
               </div>
             ) : (
               <>
@@ -206,10 +224,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
                     )}
                     <ul className="cut-list-issues-list">
                       {validationIssues.map((issue, index) => (
-                        <li
-                          key={index}
-                          className={`cut-list-issue ${issue.severity}`}
-                        >
+                        <li key={index} className={`cut-list-issue ${issue.severity}`}>
                           <strong>{issue.partName}:</strong> {issue.message}
                           {issue.canBypass && <span className="bypass-note"> (can proceed)</span>}
                         </li>
@@ -238,7 +253,8 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
             {/* Skipped parts warning */}
             {cutList.skippedParts.length > 0 && (
               <div className="cut-list-error-warning">
-                <strong>Warning:</strong> {cutList.skippedParts.length} part{cutList.skippedParts.length !== 1 ? 's' : ''} could not be placed (too large for stock):
+                <strong>Warning:</strong> {cutList.skippedParts.length} part
+                {cutList.skippedParts.length !== 1 ? 's' : ''} could not be placed (too large for stock):
                 <ul>
                   {cutList.skippedParts.map((name, i) => (
                     <li key={i}>{name}</li>
@@ -271,13 +287,23 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
             <div className="cut-list-content">
               {activeTab === 'parts' && (
-                <CutListPartsTab cutList={cutList} units={units} />
+                <CutListPartsTab
+                  cutList={cutList}
+                  units={units}
+                  projectName={projectName || 'Untitled Project'}
+                  canExportPDF={limits.canExportPDF}
+                />
               )}
               {activeTab === 'diagrams' && (
-                <CutListDiagramsTab cutList={cutList} units={units} />
+                <CutListDiagramsTab cutList={cutList} units={units} canExportPDF={limits.canExportPDF} />
               )}
               {activeTab === 'shopping' && (
-                <ShoppingListTab cutList={cutList} units={units} />
+                <ShoppingListTab
+                  cutList={cutList}
+                  units={units}
+                  projectName={projectName || 'Untitled Project'}
+                  canExportPDF={limits.canExportPDF}
+                />
               )}
             </div>
 
@@ -288,9 +314,18 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
         <div className="modal-footer">
           {cutList && (
-            <button className="btn btn-sm btn-outlined btn-secondary" onClick={handleExportCSV}>
-              Export CSV
-            </button>
+            <>
+              <button
+                className="btn btn-sm btn-filled btn-primary"
+                onClick={handleDownloadProjectReport}
+                disabled={!limits.canExportPDF}
+                title={!limits.canExportPDF ? 'Upgrade to export PDFs' : 'Download comprehensive project report'}
+              >
+                <Download size={14} />
+                Download Project Report
+              </button>
+              <div style={{ flex: 1 }} />
+            </>
           )}
           <button className="btn btn-sm btn-filled btn-secondary" onClick={onClose}>
             {cutList ? 'Done' : 'Cancel'}
@@ -302,13 +337,21 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 }
 
 // Parts list tab with grouped identical parts
-function CutListPartsTab({ cutList, units }: { cutList: CutList; units: 'imperial' | 'metric' }) {
+function CutListPartsTab({
+  cutList,
+  units,
+  projectName,
+  canExportPDF
+}: {
+  cutList: CutList;
+  units: 'imperial' | 'metric';
+  projectName: string;
+  canExportPDF: boolean;
+}) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const showToast = useProjectStore((s) => s.showToast);
 
-  const groupedInstructions = useMemo(
-    () => groupCutInstructions(cutList.instructions),
-    [cutList.instructions]
-  );
+  const groupedInstructions = useMemo(() => groupCutInstructions(cutList.instructions), [cutList.instructions]);
 
   const toggleGroup = (key: string) => {
     setExpandedGroups((prev) => {
@@ -322,83 +365,148 @@ function CutListPartsTab({ cutList, units }: { cutList: CutList; units: 'imperia
     });
   };
 
+  const handleDownloadPDF = useCallback(async () => {
+    if (!canExportPDF) {
+      showToast(getBlockedMessage('exportPDF'));
+      return;
+    }
+
+    try {
+      const result = await exportCutListToPdf(cutList, { projectName, units });
+      if (result.success) {
+        showToast('Parts list saved to PDF');
+      } else if (result.error) {
+        showToast('Failed to save PDF');
+        logger.error('Parts list PDF export error:', result.error);
+      }
+    } catch (error) {
+      logger.error('Parts list PDF export error:', error);
+      showToast('Failed to export PDF');
+    }
+  }, [cutList, projectName, units, canExportPDF, showToast]);
+
+  const handleDownloadCSV = useCallback(() => {
+    const csvContent = exportCutListToCsv(cutList, units);
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${projectName || 'cut-list'}-parts.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Parts list exported to CSV');
+  }, [cutList, units, projectName, showToast]);
+
+  const downloadItems: DropdownItem[] = useMemo(
+    () => [
+      {
+        label: 'Download PDF',
+        icon: <FileText size={14} />,
+        onClick: handleDownloadPDF,
+        disabled: !canExportPDF
+      },
+      {
+        label: 'Download CSV',
+        icon: <FileSpreadsheet size={14} />,
+        onClick: handleDownloadCSV
+      }
+    ],
+    [handleDownloadPDF, handleDownloadCSV, canExportPDF]
+  );
+
   return (
     <div className="cut-list-parts-tab">
-      <table className="cut-list-table">
-        <thead>
-          <tr>
-            <th className="col-expand"></th>
-            <th className="col-qty">Qty</th>
-            <th>Part Name</th>
-            <th>Cut Length</th>
-            <th>Cut Width</th>
-            <th>Thickness</th>
-            <th>Stock</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
-        <tbody>
-          {groupedInstructions.map((group) => {
-            const isExpanded = expandedGroups.has(group.key);
-            const hasMultiple = group.quantity > 1;
+      <div className="tab-content-header">
+        <span className="tab-header-info">
+          {groupedInstructions.length} unique dimension{groupedInstructions.length !== 1 ? 's' : ''} (
+          {cutList.instructions.length} parts total)
+        </span>
+        <DropdownButton label="Download" icon={<Download size={14} />} items={downloadItems} />
+      </div>
+      <div className="cut-list-table-wrapper">
+        <table className="cut-list-table">
+          <thead>
+            <tr>
+              <th className="col-expand"></th>
+              <th className="col-qty">Qty</th>
+              <th>Part Name</th>
+              <th>Cut Length</th>
+              <th>Cut Width</th>
+              <th>Thickness</th>
+              <th>Stock</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {groupedInstructions.map((group) => {
+              const isExpanded = expandedGroups.has(group.key);
+              const hasMultiple = group.quantity > 1;
 
-            return (
-              <React.Fragment key={group.key}>
-                {/* Group row */}
-                <tr
-                  className={`group-row ${group.isGlueUp ? 'glue-up-row' : ''} ${hasMultiple ? 'expandable' : ''}`}
-                  onClick={hasMultiple ? () => toggleGroup(group.key) : undefined}
-                >
-                  <td className="col-expand">
-                    {hasMultiple && (
-                      isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
-                    )}
-                  </td>
-                  <td className="col-qty">{group.quantity}</td>
-                  <td className="col-part-name">
-                    {hasMultiple ? (
-                      <span className="multiple-parts-hint">
-                        {isExpanded ? 'Click to collapse' : 'Click to expand'}
-                      </span>
-                    ) : (
-                      group.items[0].partName
-                    )}
-                  </td>
-                  <td>{formatMeasurementWithUnit(group.cutLength, units)}</td>
-                  <td>{formatMeasurementWithUnit(group.cutWidth, units)}</td>
-                  <td>{formatMeasurementWithUnit(group.thickness, units)}</td>
-                  <td>{group.stockName}</td>
-                  <td>
-                    {group.isGlueUp && <span className="glue-up-badge">Glue-up strip</span>}
-                    {group.grainSensitive && !group.isGlueUp && <span className="grain-badge">Grain</span>}
-                    {!hasMultiple && group.items[0].notes && (
-                      <span className="notes-text">{group.items[0].notes}</span>
-                    )}
-                  </td>
-                </tr>
+              return (
+                <React.Fragment key={group.key}>
+                  {/* Group row */}
+                  <tr
+                    className={`group-row ${group.isGlueUp ? 'glue-up-row' : ''} ${hasMultiple ? 'expandable' : ''}`}
+                    onClick={hasMultiple ? () => toggleGroup(group.key) : undefined}
+                  >
+                    <td className="col-expand">
+                      {hasMultiple && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+                    </td>
+                    <td className="col-qty">{group.quantity}</td>
+                    <td className="col-part-name">
+                      {hasMultiple ? (
+                        <span className="multiple-parts-hint">
+                          {isExpanded ? 'Click to collapse' : 'Click to expand'}
+                        </span>
+                      ) : (
+                        group.items[0].partName
+                      )}
+                    </td>
+                    <td>{formatMeasurementWithUnit(group.cutLength, units)}</td>
+                    <td>{formatMeasurementWithUnit(group.cutWidth, units)}</td>
+                    <td>{formatMeasurementWithUnit(group.thickness, units)}</td>
+                    <td>{group.stockName}</td>
+                    <td>
+                      {group.isGlueUp && <span className="glue-up-badge">Glue-up strip</span>}
+                      {group.grainSensitive && !group.isGlueUp && <span className="grain-badge">Grain</span>}
+                      {!hasMultiple && group.items[0].notes && (
+                        <span className="notes-text">{group.items[0].notes}</span>
+                      )}
+                    </td>
+                  </tr>
 
-                {/* Expanded item rows */}
-                {isExpanded &&
-                  group.items.map((item) => (
-                    <tr key={item.partId} className="item-row">
-                      <td className="col-expand"></td>
-                      <td className="col-qty"></td>
-                      <td className="col-part-name item-name">{item.partName}</td>
-                      <td colSpan={4}></td>
-                      <td>{item.notes && <span className="notes-text">{item.notes}</span>}</td>
-                    </tr>
-                  ))}
-              </React.Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+                  {/* Expanded item rows */}
+                  {isExpanded &&
+                    group.items.map((item) => (
+                      <tr key={item.partId} className="item-row">
+                        <td className="col-expand"></td>
+                        <td className="col-qty"></td>
+                        <td className="col-part-name item-name">{item.partName}</td>
+                        <td colSpan={4}></td>
+                        <td>{item.notes && <span className="notes-text">{item.notes}</span>}</td>
+                      </tr>
+                    ))}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
 // Cutting diagrams tab
-function CutListDiagramsTab({ cutList, units }: { cutList: CutList; units: 'imperial' | 'metric' }) {
+function CutListDiagramsTab({
+  cutList,
+  units,
+  canExportPDF
+}: {
+  cutList: CutList;
+  units: 'imperial' | 'metric';
+  canExportPDF: boolean;
+}) {
   const showToast = useProjectStore((s) => s.showToast);
   const projectName = useProjectStore((s) => s.projectName);
 
@@ -414,6 +522,12 @@ function CutListDiagramsTab({ cutList, units }: { cutList: CutList; units: 'impe
   }, [cutList.stockBoards]);
 
   const handleExportPdf = useCallback(async () => {
+    // Check license limits for PDF export
+    if (!canExportPDF) {
+      showToast(getBlockedMessage('exportPDF'));
+      return;
+    }
+
     try {
       const result = await exportDiagramsToPdf(cutList, {
         projectName: projectName || 'Untitled Project',
@@ -424,22 +538,34 @@ function CutListDiagramsTab({ cutList, units }: { cutList: CutList; units: 'impe
         showToast('Cutting diagrams saved to PDF');
       } else if (result.error) {
         showToast('Failed to save PDF');
-        console.error('PDF export error:', result.error);
+        logger.error('PDF export error:', result.error);
       }
       // If canceled, do nothing
     } catch (error) {
-      console.error('PDF export error:', error);
+      logger.error('PDF export error:', error);
       showToast('Failed to export PDF');
     }
-  }, [cutList, projectName, units, showToast]);
+  }, [cutList, projectName, units, showToast, canExportPDF]);
+
+  const downloadItems: DropdownItem[] = useMemo(
+    () => [
+      {
+        label: 'Download PDF',
+        icon: <FileText size={14} />,
+        onClick: handleExportPdf,
+        disabled: !canExportPDF
+      }
+    ],
+    [handleExportPdf, canExportPDF]
+  );
 
   return (
     <div className="cut-list-diagrams-tab">
-      <div className="diagrams-header">
-        <span className="diagrams-count">{cutList.stockBoards.length} board{cutList.stockBoards.length !== 1 ? 's' : ''} needed</span>
-        <button className="btn btn-sm btn-outlined btn-secondary" onClick={handleExportPdf}>
-          Save as PDF
-        </button>
+      <div className="tab-content-header">
+        <span className="tab-header-info">
+          {cutList.stockBoards.length} board{cutList.stockBoards.length !== 1 ? 's' : ''} needed
+        </span>
+        <DropdownButton label="Download" icon={<Download size={14} />} items={downloadItems} />
       </div>
 
       <div className="diagrams-content">
@@ -454,9 +580,7 @@ function CutListDiagramsTab({ cutList, units }: { cutList: CutList; units: 'impe
           </div>
         ))}
 
-        {cutList.stockBoards.length === 0 && (
-          <p className="no-diagrams">No cutting diagrams to display.</p>
-        )}
+        {cutList.stockBoards.length === 0 && <p className="no-diagrams">No cutting diagrams to display.</p>}
       </div>
     </div>
   );
@@ -479,12 +603,7 @@ function StockBoardDiagram({ board, units }: { board: StockBoard; units: 'imperi
         </span>
         <span className="board-utilization">{board.utilizationPercent.toFixed(1)}% used</span>
       </div>
-      <svg
-        width={svgWidth}
-        height={svgHeight}
-        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-        className="board-svg"
-      >
+      <svg width={svgWidth} height={svgHeight} viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="board-svg">
         {/* Board outline (waste area background) */}
         <rect x={0} y={0} width={svgWidth} height={svgHeight} fill="#ddd" stroke="#999" strokeWidth={1} />
 
@@ -511,9 +630,7 @@ function StockBoardDiagram({ board, units }: { board: StockBoard; units: 'imperi
                 fill="#333"
                 style={{ pointerEvents: 'none' }}
               >
-                {placement.partName.length > 15
-                  ? placement.partName.substring(0, 12) + '...'
-                  : placement.partName}
+                {placement.partName.length > 15 ? placement.partName.substring(0, 12) + '...' : placement.partName}
               </text>
             )}
             {/* Rotation indicator */}
@@ -568,16 +685,21 @@ function CutListStatistics({ cutList }: { cutList: CutList }) {
 // Shopping list tab
 function ShoppingListTab({
   cutList,
-  units
+  units,
+  projectName,
+  canExportPDF
 }: {
   cutList: CutList;
   units: 'imperial' | 'metric';
+  projectName: string;
+  canExportPDF: boolean;
 }) {
   // Custom shopping items from store
   const customShoppingItems = useProjectStore((s) => s.customShoppingItems);
   const addCustomShoppingItem = useProjectStore((s) => s.addCustomShoppingItem);
   const updateCustomShoppingItem = useProjectStore((s) => s.updateCustomShoppingItem);
   const deleteCustomShoppingItem = useProjectStore((s) => s.deleteCustomShoppingItem);
+  const showToast = useProjectStore((s) => s.showToast);
 
   // Local state for checkboxes (ephemeral, not saved with project)
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
@@ -622,64 +744,68 @@ function ShoppingListTab({
       }));
   }, [cutList]);
 
-  // Export shopping list to CSV
-  const handleExportShoppingList = useCallback(() => {
-    const unitLabel = units === 'imperial' ? 'inches' : 'mm';
-    const lines = [
-      'SHOPPING LIST',
-      `Generated: ${new Date().toLocaleDateString()}`,
-      `Units: ${unitLabel}`,
-      '',
-      'LUMBER & SHEET GOODS',
-      'Stock,Dimensions,Quantity,Unit Price,Total'
-    ];
-
-    for (const summary of cutList.statistics.byStock) {
-      // Use formatMeasurementWithUnit for proper unit display
-      const dims = `${formatMeasurementWithUnit(summary.stockLength, units)} x ${formatMeasurementWithUnit(summary.stockWidth, units)} x ${formatMeasurementWithUnit(summary.stockThickness, units)}`;
-      const unitPrice =
-        summary.pricingUnit === 'board_foot'
-          ? `$${summary.pricePerUnit.toFixed(2)}/bf`
-          : `$${summary.pricePerUnit.toFixed(2)}/ea`;
-      lines.push(
-        `${csvEscape(summary.stockName)},${csvEscape(dims)},${summary.boardsNeeded},${unitPrice},$${summary.cost.toFixed(2)}`
-      );
+  // Export shopping list to PDF
+  const handleDownloadPDF = useCallback(async () => {
+    if (!canExportPDF) {
+      showToast(getBlockedMessage('exportPDF'));
+      return;
     }
 
-    lines.push(`Lumber Subtotal,,,,$${cutList.statistics.estimatedCost.toFixed(2)}`);
-
-    // Add custom shopping items if any
-    if (customShoppingItems.length > 0) {
-      lines.push('');
-      lines.push('OTHER ITEMS');
-      lines.push('Item,Description,Quantity,Unit Price,Total');
-
-      for (const item of customShoppingItems) {
-        const itemTotal = item.quantity * item.unitPrice;
-        lines.push(
-          `${csvEscape(item.name)},${csvEscape(item.description || '')},${item.quantity},$${item.unitPrice.toFixed(2)},$${itemTotal.toFixed(2)}`
-        );
+    try {
+      const result = await exportShoppingListToPdf(cutList, customShoppingItems || [], { projectName, units });
+      if (result.success) {
+        showToast('Shopping list saved to PDF');
+      } else if (result.error) {
+        showToast('Failed to save PDF');
+        logger.error('Shopping list PDF export error:', result.error);
       }
-
-      lines.push(`Other Items Subtotal,,,,$${customItemsTotal.toFixed(2)}`);
+    } catch (error) {
+      logger.error('Shopping list PDF export error:', error);
+      showToast('Failed to export PDF');
     }
+  }, [cutList, customShoppingItems, projectName, units, canExportPDF, showToast]);
 
-    lines.push('');
-    lines.push(`GRAND TOTAL,,,,$${grandTotal.toFixed(2)}`);
-
-    // Add UTF-8 BOM for Excel compatibility
+  // Export shopping list to CSV
+  const handleDownloadCSV = useCallback(() => {
+    const csvContent = exportShoppingListToCsv(cutList, customShoppingItems || [], units);
     const BOM = '\uFEFF';
-    const blob = new Blob([BOM + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'shopping-list.csv';
+    a.download = `${projectName || 'shopping-list'}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [cutList, units, customShoppingItems, customItemsTotal, grandTotal]);
+    showToast('Shopping list exported to CSV');
+  }, [cutList, customShoppingItems, units, projectName, showToast]);
+
+  const downloadItems: DropdownItem[] = useMemo(
+    () => [
+      {
+        label: 'Download PDF',
+        icon: <FileText size={14} />,
+        onClick: handleDownloadPDF,
+        disabled: !canExportPDF
+      },
+      {
+        label: 'Download CSV',
+        icon: <FileSpreadsheet size={14} />,
+        onClick: handleDownloadCSV
+      }
+    ],
+    [handleDownloadPDF, handleDownloadCSV, canExportPDF]
+  );
 
   return (
     <div className="shopping-list-tab">
+      <div className="tab-content-header">
+        <span className="tab-header-info">
+          {cutList.statistics.byStock.length} stock type{cutList.statistics.byStock.length !== 1 ? 's' : ''}, Est. $
+          {grandTotal.toFixed(2)}
+        </span>
+        <DropdownButton label="Download" icon={<Download size={14} />} items={downloadItems} />
+      </div>
+
       {/* Stock items as checklist cards */}
       <div className="shopping-list-section">
         <div className="shopping-list-section-header">Lumber & Sheet Goods</div>
@@ -701,8 +827,8 @@ function ShoppingListTab({
         <div className="shopping-list-warnings">
           {overageWarnings.map((warning) => (
             <div key={warning.stockId} className="overage-warning">
-              "{warning.stockName}" boards are {warning.utilization.toFixed(0)}% utilized —
-              consider an extra board in case of defects or cutting mistakes
+              "{warning.stockName}" boards are {warning.utilization.toFixed(0)}% utilized — consider an extra board in
+              case of defects or cutting mistakes
             </div>
           ))}
         </div>
@@ -712,11 +838,7 @@ function ShoppingListTab({
       <div className="shopping-list-section custom-items-section">
         <div className="shopping-list-section-header">
           <span>Other Items</span>
-          <button
-            className="btn btn-xs btn-text"
-            onClick={() => setIsAddingItem(true)}
-            disabled={isAddingItem}
-          >
+          <button className="btn btn-xs btn-text" onClick={() => setIsAddingItem(true)} disabled={isAddingItem}>
             + Add Item
           </button>
         </div>
@@ -756,9 +878,7 @@ function ShoppingListTab({
           )}
 
           {customShoppingItems.length === 0 && !isAddingItem && (
-            <div className="custom-items-empty">
-              Add hardware, fasteners, glue, finish, and other supplies
-            </div>
+            <div className="custom-items-empty">Add hardware, fasteners, glue, finish, and other supplies</div>
           )}
         </div>
       </div>
@@ -784,16 +904,10 @@ function ShoppingListTab({
         <div className="total-row waste-info">
           <span>Waste value:</span>
           <span>
-            ${cutList.statistics.totalWasteCost.toFixed(2)} ({cutList.statistics.wastePercentage.toFixed(0)}% of material)
+            ${cutList.statistics.totalWasteCost.toFixed(2)} ({cutList.statistics.wastePercentage.toFixed(0)}% of
+            material)
           </span>
         </div>
-      </div>
-
-      {/* Export button */}
-      <div className="shopping-list-actions">
-        <button className="btn btn-sm btn-outlined btn-secondary" onClick={handleExportShoppingList}>
-          Export Shopping List
-        </button>
       </div>
     </div>
   );
@@ -842,7 +956,10 @@ function ShoppingListItem({
         <div className="item-quantity">
           Buy: {summary.boardsNeeded} {qtyLabel}
           {hasOverage && (
-            <span className="overage-note"> (uses {summary.actualBoardsUsed}, +{summary.boardsNeeded - summary.actualBoardsUsed} overage)</span>
+            <span className="overage-note">
+              {' '}
+              (uses {summary.actualBoardsUsed}, +{summary.boardsNeeded - summary.actualBoardsUsed} overage)
+            </span>
           )}
           {linearFeetDisplay}
         </div>

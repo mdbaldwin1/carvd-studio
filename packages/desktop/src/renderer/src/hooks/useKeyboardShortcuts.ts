@@ -38,6 +38,7 @@ export function useKeyboardShortcuts() {
   const createGroup = useProjectStore((s) => s.createGroup);
   const deleteGroup = useProjectStore((s) => s.deleteGroup);
   const exitGroup = useProjectStore((s) => s.exitGroup);
+  const addPart = useProjectStore((s) => s.addPart);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -103,7 +104,9 @@ export function useKeyboardShortcuts() {
 
         // For multiple parts (e.g., a group), rotate around the group center
         // Calculate the center of all selected parts
-        let centerX = 0, centerY = 0, centerZ = 0;
+        let centerX = 0,
+          centerY = 0,
+          centerZ = 0;
         for (const part of selectedParts) {
           centerX += part.position.x;
           centerY += part.position.y;
@@ -116,7 +119,13 @@ export function useKeyboardShortcuts() {
         const center = new THREE.Vector3(centerX, centerY, centerZ);
 
         // Calculate all updates first, then batch them
-        const updates: Array<{ id: string; changes: { position: { x: number; y: number; z: number }; rotation: { x: RotationAngle; y: RotationAngle; z: RotationAngle } } }> = [];
+        const updates: Array<{
+          id: string;
+          changes: {
+            position: { x: number; y: number; z: number };
+            rotation: { x: RotationAngle; y: RotationAngle; z: RotationAngle };
+          };
+        }> = [];
 
         for (const part of selectedParts) {
           // 1. Rotate position around the group center
@@ -249,9 +258,7 @@ export function useKeyboardShortcuts() {
             if (e.shiftKey && hasSelection) {
               e.preventDefault();
               // Find the containing group of selected parts
-              const selectedPartsGroupIds = selectedPartIds.map((id) =>
-                getContainingGroupId(id, groupMembers)
-              );
+              const selectedPartsGroupIds = selectedPartIds.map((id) => getContainingGroupId(id, groupMembers));
               const uniqueGroupIds = [...new Set(selectedPartsGroupIds.filter((id) => id !== null))];
               // Ungroup each containing group
               for (const groupId of uniqueGroupIds) {
@@ -304,9 +311,7 @@ export function useKeyboardShortcuts() {
           // G = Create group from selected items (parts and/or groups, requires 2+ items)
           {
             // Collect ungrouped parts (parts not already in a group)
-            const ungroupedPartIds = selectedPartIds.filter(
-              (id) => getContainingGroupId(id, groupMembers) === null
-            );
+            const ungroupedPartIds = selectedPartIds.filter((id) => getContainingGroupId(id, groupMembers) === null);
             // Build the members list: ungrouped parts + selected groups
             const members: Array<{ id: string; type: 'part' | 'group' }> = [
               ...ungroupedPartIds.map((id) => ({ id, type: 'part' as const })),
@@ -318,12 +323,24 @@ export function useKeyboardShortcuts() {
           }
           break;
 
+        case 'p':
+          // P = Add new part
+          addPart();
+          break;
+
         case 'delete':
         case 'backspace':
-          // Delete selected parts (with confirmation)
+          // Delete selected parts and groups
           if (hasSelection) {
             e.preventDefault();
-            requestDeleteParts(selectedPartIds);
+            // Delete selected groups first (recursive mode deletes group and all contents)
+            for (const groupId of selectedGroupIds) {
+              deleteGroup(groupId, 'recursive');
+            }
+            // Then delete any directly selected parts (that weren't in deleted groups)
+            if (selectedPartIds.length > 0) {
+              requestDeleteParts(selectedPartIds);
+            }
           }
           break;
 
@@ -419,6 +436,7 @@ export function useKeyboardShortcuts() {
     editingGroupId,
     createGroup,
     deleteGroup,
-    exitGroup
+    exitGroup,
+    addPart
   ]);
 }

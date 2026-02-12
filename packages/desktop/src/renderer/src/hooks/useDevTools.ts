@@ -49,7 +49,8 @@ export function useDevTools() {
 
           try {
             // Get current library via IPC and merge
-            const currentLibrary = (await window.electronAPI.getPreference('stockLibrary')) as Array<{ name: string }> || [];
+            const currentLibrary =
+              ((await window.electronAPI.getPreference('stockLibrary')) as Array<{ name: string }>) || [];
             const existingNames = new Set(currentLibrary.map((s) => s.name));
             const newStocks = stocks.filter((s) => !existingNames.has(s.name));
 

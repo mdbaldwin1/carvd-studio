@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { Assembly } from '../types';
+import { HelpTooltip } from './HelpTooltip';
 
 interface SaveAssemblyModalProps {
   isOpen: boolean;
@@ -74,10 +75,16 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
 
   return (
     <div className="modal-overlay" onClick={onClose} onKeyDown={handleKeyDown}>
-      <div className="modal save-assembly-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal save-assembly-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="save-assembly-modal-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
-          <h2>Save as Assembly</h2>
-          <button className="btn btn-icon-sm btn-ghost btn-secondary" onClick={onClose}>
+          <h2 id="save-assembly-modal-title">Save as Assembly</h2>
+          <button className="btn btn-icon-sm btn-ghost btn-secondary" onClick={onClose} aria-label="Close">
             ×
           </button>
         </div>
@@ -85,13 +92,11 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
             <p className="modal-description">
-              Save the current selection as a reusable assembly. You can place copies of this
-              assembly on the canvas later.
+              Save the current selection as a reusable assembly. You can place copies of this assembly on the canvas
+              later.
             </p>
 
-            {!hasSelection && (
-              <div className="modal-warning">No parts or groups selected.</div>
-            )}
+            {!hasSelection && <div className="modal-warning">No parts or groups selected.</div>}
 
             <div className="property-group">
               <label>Name *</label>
@@ -112,23 +117,21 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g., Standard drawer with 1/2&quot; bottom, pocket screw joinery"
+                placeholder='e.g., Standard drawer with 1/2" bottom, pocket screw joinery'
                 rows={3}
               />
             </div>
 
             <div className="property-group">
               <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={addToLibrary}
-                  onChange={(e) => setAddToLibrary(e.target.checked)}
-                />
+                <input type="checkbox" checked={addToLibrary} onChange={(e) => setAddToLibrary(e.target.checked)} />
                 Also add to my Assembly Library
+                <HelpTooltip
+                  text="If checked, this assembly will be available in all projects via the Stock/Assembly Library."
+                  docsSection="assemblies"
+                  inline
+                />
               </label>
-              <p className="hint">
-                If checked, this assembly will be available in all projects.
-              </p>
             </div>
 
             {error && <div className="modal-error">{error}</div>}
@@ -138,11 +141,7 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
             <button type="button" className="btn btn-sm btn-ghost btn-secondary" onClick={onClose}>
               Cancel
             </button>
-            <button
-              type="submit"
-              className="btn btn-sm btn-filled btn-primary"
-              disabled={!hasSelection}
-            >
+            <button type="submit" className="btn btn-sm btn-filled btn-primary" disabled={!hasSelection}>
               Save Assembly
             </button>
           </div>

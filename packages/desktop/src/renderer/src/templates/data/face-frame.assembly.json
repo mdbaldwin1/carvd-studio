@@ -1,0 +1,111 @@
+{
+  "id": "built-in-face-frame",
+  "name": "Face Frame",
+  "description": "Standard cabinet face frame with 1.5\" stiles and rails. 30\"W x 36\"H for a base cabinet.",
+  "thumbnail": "🚪",
+  "category": "storage",
+  "parts": [
+    {
+      "_refId": "part-left-stile",
+      "name": "Left Stile",
+      "length": 36,
+      "width": 1.5,
+      "thickness": 0.75,
+      "relativePosition": { "x": -14.25, "y": 18, "z": 0 },
+      "rotation": { "x": 0, "y": 0, "z": 90 },
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#a0522d",
+      "notes": "Vertical stile - pocket holes on back",
+      "embeddedStock": {
+        "name": "3/4\" Poplar",
+        "length": 96,
+        "width": 4,
+        "thickness": 0.75,
+        "grainDirection": "length",
+        "pricingUnit": "board_foot",
+        "pricePerUnit": 4,
+        "color": "#a0522d"
+      }
+    },
+    {
+      "_refId": "part-right-stile",
+      "name": "Right Stile",
+      "length": 36,
+      "width": 1.5,
+      "thickness": 0.75,
+      "relativePosition": { "x": 14.25, "y": 18, "z": 0 },
+      "rotation": { "x": 0, "y": 0, "z": 90 },
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#a0522d",
+      "notes": "Vertical stile - pocket holes on back",
+      "embeddedStock": {
+        "name": "3/4\" Poplar",
+        "length": 96,
+        "width": 4,
+        "thickness": 0.75,
+        "grainDirection": "length",
+        "pricingUnit": "board_foot",
+        "pricePerUnit": 4,
+        "color": "#a0522d"
+      }
+    },
+    {
+      "_refId": "part-top-rail",
+      "name": "Top Rail",
+      "length": 27,
+      "width": 1.5,
+      "thickness": 0.75,
+      "relativePosition": { "x": 0, "y": 35.25, "z": 0 },
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#a0522d",
+      "notes": "Horizontal rail between stiles",
+      "embeddedStock": {
+        "name": "3/4\" Poplar",
+        "length": 96,
+        "width": 4,
+        "thickness": 0.75,
+        "grainDirection": "length",
+        "pricingUnit": "board_foot",
+        "pricePerUnit": 4,
+        "color": "#a0522d"
+      }
+    },
+    {
+      "_refId": "part-bottom-rail",
+      "name": "Bottom Rail",
+      "length": 27,
+      "width": 1.5,
+      "thickness": 0.75,
+      "relativePosition": { "x": 0, "y": 0.75, "z": 0 },
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#a0522d",
+      "notes": "Horizontal rail between stiles",
+      "embeddedStock": {
+        "name": "3/4\" Poplar",
+        "length": 96,
+        "width": 4,
+        "thickness": 0.75,
+        "grainDirection": "length",
+        "pricingUnit": "board_foot",
+        "pricePerUnit": 4,
+        "color": "#a0522d"
+      }
+    }
+  ],
+  "groups": [
+    { "_refId": "group-stiles", "name": "Stiles" },
+    { "_refId": "group-rails", "name": "Rails" }
+  ],
+  "groupMembers": [
+    { "groupRefId": "group-stiles", "memberType": "part", "memberRefId": "part-left-stile" },
+    { "groupRefId": "group-stiles", "memberType": "part", "memberRefId": "part-right-stile" },
+    { "groupRefId": "group-rails", "memberType": "part", "memberRefId": "part-top-rail" },
+    { "groupRefId": "group-rails", "memberType": "part", "memberRefId": "part-bottom-rail" }
+  ]
+}

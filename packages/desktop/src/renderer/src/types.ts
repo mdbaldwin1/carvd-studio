@@ -59,11 +59,22 @@ export interface AssemblyGroupMember {
   memberIndex: number; // index into assembly parts or groups array
 }
 
+// Thumbnail data for assemblies (and projects)
+export interface AssemblyThumbnailData {
+  data: string; // Base64 encoded PNG
+  width: number;
+  height: number;
+  generatedAt: string;
+  manuallySet?: boolean; // If true, don't auto-override this thumbnail
+}
+
 // Assembly - a reusable multi-part template (e.g., drawer assembly, face frame)
 export interface Assembly {
   id: string;
   name: string;
   description?: string;
+  thumbnail?: string; // Emoji fallback
+  thumbnailData?: AssemblyThumbnailData; // Base64 image thumbnail (preferred)
   // Template parts with positions relative to assembly origin (0,0,0)
   parts: AssemblyPart[];
   // Optional group structure
@@ -100,6 +111,8 @@ export interface Part {
   extraWidth?: number; // additional width for cut list (e.g., dado insertion depth)
   // Glue-up panel flag - wide panels made by edge-gluing multiple boards
   glueUpPanel?: boolean;
+  // Ignore overlap flag - builder is aware of intentional overlap (e.g., shelf notched for legs)
+  ignoreOverlap?: boolean;
 }
 
 export interface Group {
@@ -113,6 +126,16 @@ export interface GroupMember {
   groupId: string; // the group this member belongs to
   memberType: 'part' | 'group';
   memberId: string; // id of the part or nested group
+}
+
+// Project thumbnail for visual preview
+export interface ProjectThumbnail {
+  data: string; // Base64 encoded PNG
+  width: number;
+  height: number;
+  generatedAt: string; // ISO timestamp
+  isCustom?: boolean; // Deprecated: use manuallySet instead
+  manuallySet?: boolean; // If true, don't auto-override this thumbnail
 }
 
 export interface Project {
@@ -139,6 +162,10 @@ export interface Project {
   customShoppingItems?: CustomShoppingItem[];
   // Generated cut list (if any)
   cutList?: CutList;
+  // Project thumbnail for visual preview in Start Screen
+  thumbnail?: ProjectThumbnail;
+  // Camera state (position and target) for restoring view on project load
+  cameraState?: CameraState;
   createdAt: string;
   modifiedAt: string;
 }
@@ -152,6 +179,9 @@ export interface StockConstraintSettings {
 }
 
 // App-level settings (persisted via electron-store)
+// Snap sensitivity presets
+export type SnapSensitivity = 'tight' | 'normal' | 'loose';
+
 export interface AppSettings {
   defaultUnits: 'imperial' | 'metric';
   defaultGridSize: number;
@@ -160,10 +190,29 @@ export interface AppSettings {
   showHotkeyHints: boolean;
   // Default stock constraint settings (used for new projects)
   stockConstraints: StockConstraintSettings;
+  // Snap settings
+  liveGridSnap: boolean; // Snap to grid during drag (not just on release)
+  snapSensitivity: SnapSensitivity; // How close parts need to be to snap
+  snapToOrigin: boolean; // Snap to workspace origin (X=0, Y=0, Z=0 planes)
+  dimensionSnapSameTypeOnly: boolean; // Only match same dimension types (length to length, etc.)
+  // Display settings
+  lightingMode?: LightingMode; // Lighting preset for 3D workspace (default | bright | studio | dramatic)
+  brightnessMultiplier?: number; // Brightness multiplier (0.25 to 2.0, default 1.0)
+  // Auto-save settings
+  autoSave?: boolean; // Automatically save project when changes are made
 }
 
 // Transient view state (not persisted)
 export type DisplayMode = 'solid' | 'wireframe' | 'translucent';
+
+// Lighting mode for 3D workspace
+export type LightingMode = 'default' | 'bright' | 'studio' | 'dramatic';
+
+// Camera state for persisting view angle across sessions
+export interface CameraState {
+  position: { x: number; y: number; z: number };
+  target: { x: number; y: number; z: number }; // OrbitControls target (where camera looks at)
+}
 
 // Persistent snap guide (like Illustrator guides)
 export interface SnapGuide {
@@ -202,6 +251,30 @@ export interface SnapLine {
   snapValue: number;
   // Optional distance indicators (e.g., showing distances from center to edges)
   distanceIndicators?: SnapDistanceIndicator[];
+  // Optional metadata for dimension-match snaps (enhanced labels)
+  dimensionMatchInfo?: {
+    isStandard: boolean; // True if snapping to a standard dimension (12", 24", etc.)
+    sourcePart?: string; // Name of the part being matched (if not standard)
+    sourceDimension?: 'length' | 'width' | 'thickness'; // Which dimension of source was matched
+  };
+  // Optional connector line to show connection to matched part
+  connectorLine?: {
+    start: { x: number; y: number; z: number };
+    end: { x: number; y: number; z: number };
+  };
+}
+
+// Reference distance indicator for showing distances to reference parts
+export interface ReferenceDistanceIndicator {
+  id: string;
+  axis: 'x' | 'y' | 'z';
+  type: 'edge-to-edge' | 'edge-offset'; // edge-to-edge = gap between parts, edge-offset = alignment offset
+  fromPartId: string;
+  toPartId: string; // reference part
+  start: { x: number; y: number; z: number };
+  end: { x: number; y: number; z: number };
+  distance: number;
+  labelPosition: { x: number; y: number; z: number };
 }
 
 // ============================================================
@@ -370,6 +443,12 @@ export interface CarvdFile {
 
   // Generated data (saved so users don't have to regenerate on every load)
   cutList?: CutList;
+
+  // Project thumbnail for visual preview in Start Screen
+  thumbnail?: ProjectThumbnail;
+
+  // Camera state for restoring view on project load
+  cameraState?: CameraState;
 }
 
 // Result of file validation

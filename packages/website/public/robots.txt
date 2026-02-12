@@ -1,0 +1,8 @@
+# Carvd Studio Website
+# https://carvd-studio.com
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://carvd-studio.com/sitemap.xml

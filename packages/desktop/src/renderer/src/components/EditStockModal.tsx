@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Stock } from '../types';
 import { FractionInput } from './FractionInput';
+import { ColorPicker } from './ColorPicker';
 import { STOCK_COLORS } from '../constants';
 import { useBackdropClose } from '../hooks/useBackdropClose';
 
@@ -11,6 +12,7 @@ interface EditStockModalProps {
   stock: Stock | null;
   onUpdateStock: (id: string, updates: Partial<Stock>) => void;
   createMode?: boolean;
+  defaultDimensions?: { length?: number; width?: number; thickness?: number };
 }
 
 const defaultFormData: Omit<Stock, 'id'> = {
@@ -24,7 +26,14 @@ const defaultFormData: Omit<Stock, 'id'> = {
   color: STOCK_COLORS[0]
 };
 
-export function EditStockModal({ isOpen, onClose, stock, onUpdateStock, createMode = false }: EditStockModalProps) {
+export function EditStockModal({
+  isOpen,
+  onClose,
+  stock,
+  onUpdateStock,
+  createMode = false,
+  defaultDimensions
+}: EditStockModalProps) {
   const [formData, setFormData] = useState<Omit<Stock, 'id'>>(defaultFormData);
 
   // Update form when stock changes or when opening in create mode
@@ -41,13 +50,16 @@ export function EditStockModal({ isOpen, onClose, stock, onUpdateStock, createMo
         color: stock.color
       });
     } else if (createMode && isOpen) {
-      // Reset to defaults for create mode
+      // Reset to defaults for create mode, using provided dimensions if available
       setFormData({
         ...defaultFormData,
+        length: defaultDimensions?.length ?? defaultFormData.length,
+        width: defaultDimensions?.width ?? defaultFormData.width,
+        thickness: defaultDimensions?.thickness ?? defaultFormData.thickness,
         color: STOCK_COLORS[Math.floor(Math.random() * STOCK_COLORS.length)]
       });
     }
-  }, [stock, createMode, isOpen]);
+  }, [stock, createMode, isOpen, defaultDimensions]);
 
   const handleSubmit = useCallback(() => {
     if (createMode) {
@@ -78,10 +90,10 @@ export function EditStockModal({ isOpen, onClose, stock, onUpdateStock, createMo
 
   return (
     <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
-      <div className="modal edit-stock-modal">
+      <div className="modal edit-stock-modal" role="dialog" aria-modal="true" aria-labelledby="edit-stock-modal-title">
         <div className="modal-header">
-          <h2>{createMode ? 'Create New Stock' : 'Edit Stock'}</h2>
-          <button className="modal-close" onClick={onClose}>
+          <h2 id="edit-stock-modal-title">{createMode ? 'Create New Stock' : 'Edit Stock'}</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Close">
             &times;
           </button>
         </div>
@@ -105,11 +117,7 @@ export function EditStockModal({ isOpen, onClose, stock, onUpdateStock, createMo
                 min={1}
               />
               <span>×</span>
-              <FractionInput
-                value={formData.width}
-                onChange={(width) => setFormData({ ...formData, width })}
-                min={1}
-              />
+              <FractionInput value={formData.width} onChange={(width) => setFormData({ ...formData, width })} min={1} />
               <span>×</span>
               <FractionInput
                 value={formData.thickness}
@@ -158,9 +166,7 @@ export function EditStockModal({ isOpen, onClose, stock, onUpdateStock, createMo
               <input
                 type="number"
                 value={formData.pricePerUnit}
-                onChange={(e) =>
-                  setFormData({ ...formData, pricePerUnit: parseFloat(e.target.value) || 0 })
-                }
+                onChange={(e) => setFormData({ ...formData, pricePerUnit: parseFloat(e.target.value) || 0 })}
                 min={0}
                 step={0.01}
               />
@@ -169,24 +175,7 @@ export function EditStockModal({ isOpen, onClose, stock, onUpdateStock, createMo
 
           <div className="form-group">
             <label>Display Color</label>
-            <div className="color-picker-row">
-              <input
-                type="color"
-                value={formData.color}
-                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-              />
-              <div className="color-presets">
-                {STOCK_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    className={`color-preset ${formData.color === color ? 'selected' : ''}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setFormData({ ...formData, color })}
-                    title={color}
-                  />
-                ))}
-              </div>
-            </div>
+            <ColorPicker value={formData.color} onChange={(color) => setFormData({ ...formData, color })} />
           </div>
         </div>
 

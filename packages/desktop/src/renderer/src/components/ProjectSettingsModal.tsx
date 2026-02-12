@@ -1,12 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Star } from 'lucide-react';
 import { useBackdropClose } from '../hooks/useBackdropClose';
 import { useProjectStore } from '../store/projectStore';
 import { mmToInches } from '../utils/fractions';
 import { FractionInput } from './FractionInput';
+import { HelpTooltip } from './HelpTooltip';
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  isEditingTemplate?: boolean;
 }
 
 // Imperial grid size options (values in inches)
@@ -27,7 +30,7 @@ const METRIC_GRID_OPTIONS = [
   { value: mmToInches(25), label: '25mm' }
 ];
 
-export function ProjectSettingsModal({ isOpen, onClose }: ProjectSettingsModalProps) {
+export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = false }: ProjectSettingsModalProps) {
   const { handleMouseDown, handleClick } = useBackdropClose(onClose);
 
   const projectName = useProjectStore((s) => s.projectName);
@@ -37,6 +40,8 @@ export function ProjectSettingsModal({ isOpen, onClose }: ProjectSettingsModalPr
   const overageFactor = useProjectStore((s) => s.overageFactor);
   const projectNotes = useProjectStore((s) => s.projectNotes);
   const stockConstraints = useProjectStore((s) => s.stockConstraints);
+  const filePath = useProjectStore((s) => s.filePath);
+  const showToast = useProjectStore((s) => s.showToast);
   const setProjectUnits = useProjectStore((s) => s.setProjectUnits);
   const setProjectGridSize = useProjectStore((s) => s.setProjectGridSize);
   const setKerfWidth = useProjectStore((s) => s.setKerfWidth);
@@ -44,6 +49,33 @@ export function ProjectSettingsModal({ isOpen, onClose }: ProjectSettingsModalPr
   const setProjectName = useProjectStore((s) => s.setProjectName);
   const setProjectNotes = useProjectStore((s) => s.setProjectNotes);
   const setStockConstraints = useProjectStore((s) => s.setStockConstraints);
+
+  // Favorite state
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // Check if current project is a favorite when modal opens
+  useEffect(() => {
+    if (isOpen && filePath) {
+      window.electronAPI.isFavoriteProject(filePath).then(setIsFavorite);
+    }
+  }, [isOpen, filePath]);
+
+  const handleToggleFavorite = async () => {
+    if (!filePath) {
+      showToast('Save project first to add to favorites');
+      return;
+    }
+
+    if (isFavorite) {
+      await window.electronAPI.removeFavoriteProject(filePath);
+      setIsFavorite(false);
+      showToast('Removed from favorites');
+    } else {
+      await window.electronAPI.addFavoriteProject(filePath);
+      setIsFavorite(true);
+      showToast('Added to favorites');
+    }
+  };
 
   const gridOptions = units === 'metric' ? METRIC_GRID_OPTIONS : IMPERIAL_GRID_OPTIONS;
 
@@ -87,30 +119,92 @@ export function ProjectSettingsModal({ isOpen, onClose }: ProjectSettingsModalPr
 
   return (
     <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
-      <div className="modal project-settings-modal">
+      <div
+        className="modal project-settings-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="project-settings-modal-title"
+      >
         <div className="modal-header">
-          <h2>Project Settings</h2>
-          <button className="btn btn-icon-sm btn-ghost btn-secondary" onClick={onClose}>
-            &times;
-          </button>
+          <h2 id="project-settings-modal-title">{isEditingTemplate ? 'Template Settings' : 'Project Settings'}</h2>
+          <div className="modal-header-actions">
+            <a
+              href="#"
+              className="modal-help-link"
+              onClick={(e) => {
+                e.preventDefault();
+                window.electronAPI.openExternal('https://carvd-studio.com/docs#settings');
+              }}
+            >
+              View documentation
+            </a>
+            <button className="btn btn-icon-sm btn-ghost btn-secondary" onClick={onClose} aria-label="Close">
+              &times;
+            </button>
+          </div>
         </div>
 
         <div className="settings-content">
           <div className="settings-section">
-            <h3>Project Name</h3>
+            <h3>{isEditingTemplate ? 'Template Name' : 'Project Name'}</h3>
             <div className="settings-row">
               <input
                 type="text"
-                value={projectName}
+                value={projectName ?? ''}
                 onChange={(e) => setProjectName(e.target.value)}
-                placeholder="Project name"
+                placeholder={isEditingTemplate ? 'Template name' : 'Project name'}
                 className="project-name-input"
               />
             </div>
-            <p className="settings-hint">
-              These settings are saved with this project file and will be used when the project is opened on any
-              computer.
-            </p>
+            {!isEditingTemplate && (
+              <>
+                <div className="settings-row favorite-row">
+                  <div className="label-with-help">
+                    <label>Favorite</label>
+                    {!filePath && (
+                      <HelpTooltip text="Save this project to add it to favorites." docsSection="project-settings" />
+                    )}
+                  </div>
+                  <button
+                    className={`favorite-toggle ${isFavorite ? 'active' : ''}`}
+                    onClick={handleToggleFavorite}
+                    title={
+                      filePath ? (isFavorite ? 'Remove from favorites' : 'Add to favorites') : 'Save project first'
+                    }
+                    disabled={!filePath}
+                  >
+                    <Star size={18} fill={isFavorite ? 'currentColor' : 'none'} />
+                    {isFavorite ? 'Favorited' : 'Add to favorites'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="settings-section">
+            <h3>
+              {isEditingTemplate ? 'Template Description' : 'Project Notes'}
+              <HelpTooltip
+                text={
+                  isEditingTemplate
+                    ? 'This description will be shown when browsing templates.'
+                    : 'These settings are saved with this project file and will be used when the project is opened on any computer.'
+                }
+                docsSection={isEditingTemplate ? 'templates' : 'project-settings'}
+                inline
+              />
+            </h3>
+            <textarea
+              className="project-notes-textarea"
+              value={projectNotes ?? ''}
+              onChange={(e) => setProjectNotes(e.target.value)}
+              placeholder={
+                isEditingTemplate
+                  ? 'Brief description of this template'
+                  : 'Add notes about this project (client info, special instructions, etc.)'
+              }
+              rows={4}
+            />
           </div>
 
           <div className="settings-section">
@@ -123,7 +217,13 @@ export function ProjectSettingsModal({ isOpen, onClose }: ProjectSettingsModalPr
               </select>
             </div>
             <div className="settings-row">
-              <label>Grid Snap Size</label>
+              <div className="label-with-help">
+                <label>Grid Snap Size</label>
+                <HelpTooltip
+                  text="Grid snap determines how parts align when moved or resized."
+                  docsSection="project-settings"
+                />
+              </div>
               <select value={displayValue} onChange={(e) => setProjectGridSize(parseFloat(e.target.value))}>
                 {gridOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -132,24 +232,28 @@ export function ProjectSettingsModal({ isOpen, onClose }: ProjectSettingsModalPr
                 ))}
               </select>
             </div>
-            <p className="settings-hint">Grid snap determines how parts align when moved or resized.</p>
           </div>
 
           <div className="settings-section">
             <h3>Cut List Settings</h3>
             <div className="settings-row">
-              <label>Blade Kerf</label>
-              <FractionInput
-                value={kerfWidth}
-                onChange={(val) => setKerfWidth(Math.max(0, val))}
-                min={0}
-              />
+              <div className="label-with-help">
+                <label>Blade Kerf</label>
+                <HelpTooltip
+                  text='Width of your saw blade cut. Common values: 1/8" (table saw), 1/16" (track saw).'
+                  docsSection="project-settings"
+                />
+              </div>
+              <FractionInput value={kerfWidth} onChange={(val) => setKerfWidth(Math.max(0, val))} min={0} />
             </div>
-            <p className="settings-hint">
-              Width of your saw blade cut. Common values: 1/8" (table saw), 1/16" (track saw).
-            </p>
             <div className="settings-row">
-              <label>Material Overage</label>
+              <div className="label-with-help">
+                <label>Material Overage</label>
+                <HelpTooltip
+                  text="Extra boards to buy beyond what's calculated, to account for mistakes. 10-15% is typical, max 50%."
+                  docsSection="project-settings"
+                />
+              </div>
               <div className="input-with-suffix">
                 <input
                   type="number"
@@ -162,71 +266,70 @@ export function ProjectSettingsModal({ isOpen, onClose }: ProjectSettingsModalPr
                 <span className="input-suffix">%</span>
               </div>
             </div>
-            <p className="settings-hint">
-              Extra boards to buy beyond what's calculated, to account for mistakes. 10-15% is typical, max 50%.
-            </p>
           </div>
 
           <div className="settings-section">
-            <h3>Project Notes</h3>
-            <textarea
-              className="project-notes-textarea"
-              value={projectNotes}
-              onChange={(e) => setProjectNotes(e.target.value)}
-              placeholder="Add notes about this project (client info, special instructions, etc.)"
-              rows={4}
-            />
-          </div>
-
-          <div className="settings-section">
-            <h3>Stock Constraints</h3>
-            <p className="settings-hint">
-              Control how parts relate to their assigned stock material.
-            </p>
+            <h3>
+              Stock Constraints
+              <HelpTooltip
+                text="Control how parts relate to their assigned stock material."
+                docsSection="project-settings"
+                inline
+              />
+            </h3>
             <div className="settings-row">
-              <label>Constrain Dimensions</label>
+              <div className="label-with-help">
+                <label>Constrain Dimensions</label>
+                <HelpTooltip
+                  text="Show warning when part dimensions (including joinery adjustments) exceed stock dimensions."
+                  docsSection="project-settings"
+                />
+              </div>
               <input
                 type="checkbox"
                 checked={stockConstraints.constrainDimensions}
                 onChange={(e) => setStockConstraints({ ...stockConstraints, constrainDimensions: e.target.checked })}
               />
             </div>
-            <p className="settings-hint">
-              Show warning when part dimensions (including joinery adjustments) exceed stock dimensions.
-            </p>
             <div className="settings-row">
-              <label>Constrain Grain</label>
+              <div className="label-with-help">
+                <label>Constrain Grain</label>
+                <HelpTooltip
+                  text="Show warning when part grain direction doesn't match stock grain direction."
+                  docsSection="project-settings"
+                />
+              </div>
               <input
                 type="checkbox"
                 checked={stockConstraints.constrainGrain}
                 onChange={(e) => setStockConstraints({ ...stockConstraints, constrainGrain: e.target.checked })}
               />
             </div>
-            <p className="settings-hint">
-              Show warning when part grain direction doesn't match stock grain direction.
-            </p>
             <div className="settings-row">
-              <label>Sync Part Color</label>
+              <div className="label-with-help">
+                <label>Sync Part Color</label>
+                <HelpTooltip
+                  text="Automatically update part color when stock is assigned."
+                  docsSection="project-settings"
+                />
+              </div>
               <input
                 type="checkbox"
                 checked={stockConstraints.constrainColor}
                 onChange={(e) => setStockConstraints({ ...stockConstraints, constrainColor: e.target.checked })}
               />
             </div>
-            <p className="settings-hint">
-              Automatically update part color when stock is assigned.
-            </p>
             <div className="settings-row">
-              <label>Prevent Overlap</label>
+              <div className="label-with-help">
+                <label>Prevent Overlap</label>
+                <HelpTooltip text="Prevent parts from occupying the same space." docsSection="project-settings" />
+              </div>
               <input
                 type="checkbox"
                 checked={stockConstraints.preventOverlap}
                 onChange={(e) => setStockConstraints({ ...stockConstraints, preventOverlap: e.target.checked })}
               />
             </div>
-            <p className="settings-hint">
-              Prevent parts from occupying the same space.
-            </p>
           </div>
         </div>
 

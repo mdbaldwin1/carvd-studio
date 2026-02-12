@@ -4,8 +4,8 @@
  * This script creates a test JWT license key for development.
  * Run with: node scripts/generate-test-license.cjs
  *
- * IMPORTANT: This is for testing only. Real license keys should be generated
- * by your Lemon Squeezy webhook service in production.
+ * IMPORTANT: This is for testing only. Real license keys are generated
+ * automatically by Lemon Squeezy when customers make a purchase.
  */
 
 const jwt = require('jsonwebtoken');

@@ -138,6 +138,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
+# Test artifacts
+playwright-report/
+test-results/
+
 # License private key (never commit!)
 license-private-key.pem
 
