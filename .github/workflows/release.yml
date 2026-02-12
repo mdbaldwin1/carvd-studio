@@ -96,17 +96,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Resolve the absolute path to app-builder binary and ensure it's usable.
-      # npm workspaces hoist app-builder-bin to root, but electron-builder run
-      # from packages/desktop may fail to resolve it. Setting CUSTOM_APP_BUILDER_PATH
-      # forces the correct path.
-      - name: Resolve app-builder-bin path
+      # Resolve and verify the app-builder binary. npm workspaces can cause
+      # the binary to be missing or unexecutable after npm ci.
+      - name: Verify app-builder-bin
         id: app-builder
         shell: bash
         run: |
           BINARY=$(node -p "require('app-builder-bin').appBuilderPath")
           echo "path=$BINARY" >> $GITHUB_OUTPUT
+          echo "Expected binary: $BINARY"
 
+          # Reinstall if binary is missing
           if [ ! -f "$BINARY" ]; then
             echo "Binary missing - reinstalling..."
             VERSION=$(node -p "require('./node_modules/app-builder-bin/package.json').version")
@@ -114,13 +114,32 @@ jobs:
             npm install "app-builder-bin@${VERSION}" --no-save --install-links
           fi
 
+          # Fix permissions and macOS quarantine
           chmod +x "$BINARY"
           if command -v xattr &>/dev/null; then
             xattr -cr node_modules/app-builder-bin/ 2>/dev/null || true
           fi
 
+          # Debug: show file details
           ls -la "$BINARY"
           file "$BINARY" 2>/dev/null || true
+
+          # CRITICAL: verify the binary actually executes
+          echo "Testing binary execution..."
+          "$BINARY" --help > /dev/null 2>&1 && echo "Binary executes OK" || {
+            echo "ERROR: Binary exists but cannot execute!"
+            echo "Attempting to diagnose..."
+            # Check dynamic library dependencies
+            if command -v otool &>/dev/null; then
+              otool -L "$BINARY" 2>&1 || true
+            fi
+            if command -v ldd &>/dev/null; then
+              ldd "$BINARY" 2>&1 || true
+            fi
+            # Try running with explicit output
+            "$BINARY" --help 2>&1 || true
+            exit 1
+          }
 
       - name: Setup license key
         run: echo "${{ secrets.LICENSE_PRIVATE_KEY }}" > license-private-key.pem
