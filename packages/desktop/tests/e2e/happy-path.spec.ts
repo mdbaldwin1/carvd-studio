@@ -19,9 +19,15 @@ async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {
     for (const win of windows) {
       const hasApp = await win
         .locator('.app')
-        .isVisible({ timeout: 500 })
+        .isVisible({ timeout: 2000 })
         .catch(() => false);
-      if (hasApp) return win;
+      if (hasApp) {
+        // Wait for the page to fully load before interacting
+        await win.waitForFunction(() => document.readyState === 'complete', null, {
+          timeout: 30000
+        });
+        return win;
+      }
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -33,26 +39,26 @@ async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {
  * Handles: tutorial (skip), trial expired modal (dismiss), then waits for
  * start screen or editor to appear.
  *
- * Uses evaluate-based JS clicks throughout to avoid issues with:
- * - CSS transitions causing Playwright stability check timeouts
- * - React re-renders detaching DOM elements mid-click
+ * Uses force: true clicks to bypass Playwright stability checks that hang when:
+ * - CSS transitions are animating
+ * - React re-renders are detaching/reattaching DOM elements
  */
 async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'> {
   for (let i = 0; i < 60; i++) {
     // Skip tutorial if showing
     const skipBtn = window.locator('.tutorial-tooltip-skip');
-    if (await skipBtn.isVisible({ timeout: 500 }).catch(() => false)) {
-      await skipBtn.evaluate((el) => (el as HTMLElement).click());
+    if (await skipBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await skipBtn.click({ force: true });
       await window.waitForTimeout(500);
       continue;
     }
 
     // Dismiss trial expired modal if showing
     const trialModal = window.locator('.trial-expired-modal');
-    if (await trialModal.isVisible({ timeout: 500 }).catch(() => false)) {
+    if (await trialModal.isVisible({ timeout: 2000 }).catch(() => false)) {
       const lastBtn = window.locator('.trial-expired-modal button').last();
       if (await lastBtn.isVisible().catch(() => false)) {
-        await lastBtn.evaluate((el) => (el as HTMLElement).click());
+        await lastBtn.click({ force: true });
         await window.waitForTimeout(500);
       }
       continue;
@@ -61,7 +67,7 @@ async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'>
     if (
       await window
         .locator('.start-screen')
-        .isVisible({ timeout: 500 })
+        .isVisible({ timeout: 2000 })
         .catch(() => false)
     ) {
       return 'start-screen';
@@ -69,7 +75,7 @@ async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'>
     if (
       await window
         .locator('.app-header')
-        .isVisible({ timeout: 500 })
+        .isVisible({ timeout: 2000 })
         .catch(() => false)
     ) {
       return 'editor';
