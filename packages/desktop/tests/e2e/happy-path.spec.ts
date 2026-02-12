@@ -233,4 +233,169 @@ test.describe('Happy Path Workflow', () => {
     await expect(window.locator('.sidebar')).toBeVisible();
     await expect(window.locator('canvas')).toBeVisible();
   });
+
+  test('adds a part via sidebar', async () => {
+    // Verify the empty-state overlay is showing (no parts yet)
+    const hasEmptyState = await window.evaluate(() => {
+      const el = document.querySelector('.empty-state-overlay');
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    expect(hasEmptyState).toBe(true);
+
+    // Click the "Add Part" button in the sidebar's Parts section
+    await window.evaluate(() => {
+      const btn = document.querySelector('button[title="Add Part"]') as HTMLElement;
+      if (btn) btn.click();
+    });
+
+    // Wait for React to re-render with the new part
+    await window.waitForTimeout(1000);
+
+    // Verify a part appeared in the sidebar list
+    const partInfo = await window.evaluate(() => {
+      const partNames = document.querySelectorAll('.part-item .part-name');
+      return {
+        count: partNames.length,
+        firstName: partNames.length > 0 ? (partNames[0] as HTMLElement).textContent?.trim() || '' : ''
+      };
+    });
+    expect(partInfo.count).toBe(1);
+    expect(partInfo.firstName).toBe('Part 1');
+
+    // Verify the empty-state overlay is gone
+    const emptyStateGone = await window.evaluate(() => {
+      const el = document.querySelector('.empty-state-overlay');
+      if (!el) return true;
+      const rect = el.getBoundingClientRect();
+      return rect.width === 0 || rect.height === 0;
+    });
+    expect(emptyStateGone).toBe(true);
+  });
+
+  test('modifies part dimensions', async () => {
+    // Part 1 should be auto-selected — verify dimension inputs are visible
+    const dimInputs = window.locator('.dimension-inputs input');
+    await expect(dimInputs.first()).toBeVisible({ timeout: 5000 });
+
+    // Read the initial length value (default 24 inches)
+    const initialValue = await dimInputs.first().inputValue();
+    expect(initialValue).toBe('24');
+
+    // Change length to 36: click, clear, type, then Tab to commit
+    await dimInputs.first().click();
+    await dimInputs.first().fill('36');
+    await window.keyboard.press('Tab');
+    await window.waitForTimeout(500);
+
+    // Re-select the part to ensure properties panel refreshes
+    await window.evaluate(() => {
+      const partItem = document.querySelector('.part-item') as HTMLElement;
+      if (partItem) partItem.click();
+    });
+    await window.waitForTimeout(500);
+
+    // Verify the dimension updated
+    const updatedValue = await dimInputs.first().inputValue();
+    expect(updatedValue).toBe('36');
+  });
+
+  test('opens cut list modal', async () => {
+    // Click the "Generate Cut List" button at the bottom of the sidebar
+    await window.evaluate(() => {
+      const btn = document.querySelector('.sidebar-section-bottom .btn-filled.btn-primary') as HTMLElement;
+      if (btn) btn.click();
+    });
+
+    // Wait for the cut list modal to appear
+    await expect(window.locator('.cut-list-modal')).toBeVisible({ timeout: 10000 });
+
+    // The modal should show meaningful content — either a generate button,
+    // validation issues (part has no stock), or tabs (if auto-generated)
+    const modalContent = await window.evaluate(() => {
+      const modal = document.querySelector('.cut-list-modal');
+      if (!modal) return { hasGenerate: false, hasIssues: false, hasTabs: false };
+      return {
+        hasGenerate: !!modal.querySelector('.cut-list-generate'),
+        hasIssues: !!modal.querySelector('.cut-list-issues'),
+        hasTabs: !!modal.querySelector('.cut-list-tabs')
+      };
+    });
+    expect(modalContent.hasGenerate || modalContent.hasIssues || modalContent.hasTabs).toBe(true);
+
+    // Close the modal
+    await window.evaluate(() => {
+      const closeBtn = document.querySelector('.cut-list-modal .modal-close') as HTMLElement;
+      if (closeBtn) closeBtn.click();
+    });
+    await window.waitForTimeout(500);
+
+    // Verify modal is closed
+    const modalGone = await window.evaluate(() => {
+      const modal = document.querySelector('.cut-list-modal');
+      if (!modal) return true;
+      const rect = modal.getBoundingClientRect();
+      return rect.width === 0 || rect.height === 0;
+    });
+    expect(modalGone).toBe(true);
+  });
+
+  test('undo removes part, redo restores it', async () => {
+    // Verify we start with 1 part
+    const partCountBefore = await window.evaluate(() => {
+      return document.querySelectorAll('.part-item').length;
+    });
+    expect(partCountBefore).toBe(1);
+
+    const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+    // Undo in a loop until the part is gone (resilient to varying undo stack depth)
+    for (let i = 0; i < 10; i++) {
+      const count = await window.evaluate(() => {
+        return document.querySelectorAll('.part-item').length;
+      });
+      if (count === 0) break;
+      await window.keyboard.press(`${modifier}+z`);
+      await window.waitForTimeout(300);
+    }
+
+    // Verify part is removed
+    const partCountAfterUndo = await window.evaluate(() => {
+      return document.querySelectorAll('.part-item').length;
+    });
+    expect(partCountAfterUndo).toBe(0);
+
+    // Verify empty-state overlay returned
+    const hasEmptyState = await window.evaluate(() => {
+      const el = document.querySelector('.empty-state-overlay');
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+    expect(hasEmptyState).toBe(true);
+
+    // Redo in a loop until the part returns
+    for (let i = 0; i < 10; i++) {
+      const count = await window.evaluate(() => {
+        return document.querySelectorAll('.part-item').length;
+      });
+      if (count > 0) break;
+      await window.keyboard.press(`${modifier}+Shift+z`);
+      await window.waitForTimeout(300);
+    }
+
+    // Verify part is restored
+    const partCountAfterRedo = await window.evaluate(() => {
+      return document.querySelectorAll('.part-item').length;
+    });
+    expect(partCountAfterRedo).toBe(1);
+
+    // Verify it's still "Part 1"
+    const partName = await window.evaluate(() => {
+      const name = document.querySelector('.part-item .part-name');
+      return name?.textContent?.trim() || '';
+    });
+    expect(partName).toBe('Part 1');
+  });
 });
