@@ -243,14 +243,15 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     // bug (electron/electron#42409) where the combination of titleBarStyle
     // 'hidden' + titleBarOverlay + show:false prevents ready-to-show from
     // ever firing on Windows, which hangs Playwright's electron.launch().
-    titleBarStyle: isMac ? 'hiddenInset' : (isTest ? undefined : 'hidden'),
-    titleBarOverlay: (!isMac && !isTest)
-      ? {
-          color: '#1e1e1e',
-          symbolColor: '#ffffff',
-          height: 48
-        }
-      : undefined,
+    titleBarStyle: isMac ? 'hiddenInset' : isTest ? undefined : 'hidden',
+    titleBarOverlay:
+      !isMac && !isTest
+        ? {
+            color: '#1e1e1e',
+            symbolColor: '#ffffff',
+            height: 48
+          }
+        : undefined,
     trafficLightPosition: isMac ? { x: 16, y: 14 } : undefined,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
