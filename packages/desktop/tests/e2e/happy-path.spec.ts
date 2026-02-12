@@ -154,11 +154,13 @@ test.describe('Happy Path Workflow', () => {
   test.beforeAll(async () => {
     const appPath = path.join(__dirname, '../../');
 
-    // Do NOT use executablePath — Playwright must inject its loader script
-    // so it controls the app.ready event timing. Without the loader,
-    // Playwright never sees the "DevTools listening on ws://..." line on
-    // Windows and electron.launch() hangs (microsoft/playwright#9351).
-    const args = [appPath, '--test-mode'];
+    // Use cwd instead of passing appPath in args. On Windows, Playwright
+    // launches via cmd.exe (shell: true) and a path with trailing backslash
+    // creates an escaped quote sequence (desktop\") that corrupts the
+    // --remote-debugging-port flag, preventing "DevTools listening on ws://..."
+    // from ever appearing on stderr (Playwright hangs waiting for it).
+    // With cwd, Electron finds package.json in the current directory.
+    const args = ['--test-mode'];
     if (process.env.CI) {
       // CI needs --no-sandbox to avoid sandbox permission issues.
       // Do NOT use --disable-gpu — it kills WebGL, crashing Three.js / R3F.
@@ -167,6 +169,7 @@ test.describe('Happy Path Workflow', () => {
 
     electronApp = await electron.launch({
       args,
+      cwd: appPath,
       env: {
         ...process.env,
         NODE_ENV: 'test'
