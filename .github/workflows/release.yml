@@ -96,10 +96,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Workaround: npm workspaces can hoist app-builder-bin without
-      # properly extracting platform binaries. Rebuild ensures they exist.
-      - name: Rebuild app-builder-bin
-        run: npm rebuild app-builder-bin
+      # Workaround: npm workspaces + npm cache can cause app-builder-bin
+      # platform binaries to be missing. Force a fresh install of the package.
+      - name: Fix app-builder-bin binaries
+        shell: bash
+        run: |
+          EXPECTED=$(node -p "require('app-builder-bin').appBuilderPath")
+          echo "Expected binary: $EXPECTED"
+
+          if [ ! -f "$EXPECTED" ]; then
+            echo "Binary missing after npm ci - force reinstalling..."
+            VERSION=$(node -p "require('./node_modules/app-builder-bin/package.json').version")
+            rm -rf node_modules/app-builder-bin
+            npm install "app-builder-bin@${VERSION}" --no-save --install-links
+          fi
+
+          ls -la "$EXPECTED" || { echo "FATAL: Binary still missing after reinstall"; exit 1; }
+          echo "app-builder-bin binary verified"
 
       - name: Setup license key
         run: echo "${{ secrets.LICENSE_PRIVATE_KEY }}" > license-private-key.pem
