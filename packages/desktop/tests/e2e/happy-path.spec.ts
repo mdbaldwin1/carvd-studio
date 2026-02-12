@@ -163,14 +163,12 @@ test.describe('Happy Path Workflow', () => {
       if (process.platform === 'linux') {
         args.unshift('--no-sandbox');
       }
-      // Windows CI may lack GPU drivers. Use ANGLE with SwiftShader for
-      // software-based WebGL rendering (required by Three.js / R3F).
-      // Do NOT use --disable-gpu — it kills WebGL entirely.
-      if (process.platform === 'win32') {
-        args.unshift('--use-gl=angle', '--use-angle=swiftshader');
-      }
+      // All CI platforms: enable Chromium logging for debugging launch issues.
+      // Do NOT use --disable-gpu — it kills WebGL, crashing Three.js / R3F.
+      args.unshift('--enable-logging', '--v=1');
     }
 
+    console.log(`[E2E] Launching Electron: ${args.join(' ')}`);
     electronApp = await electron.launch({
       executablePath: electronPath,
       args,
@@ -179,6 +177,7 @@ test.describe('Happy Path Workflow', () => {
         NODE_ENV: 'test'
       }
     });
+    console.log('[E2E] electron.launch() resolved successfully');
 
     window = await getMainWindow(electronApp);
 
