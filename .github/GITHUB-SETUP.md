@@ -162,7 +162,8 @@ Feature branches → develop → main
 - [x] `VERCEL_TOKEN` ✅ - Vercel API token
 - [x] `VERCEL_PROJECT_ID` ✅ - Vercel website project ID
 
-- [x] `VERCEL_ORG_ID` ✅ - Vercel organization/team ID
+### Still Needed:
+- [ ] `VERCEL_ORG_ID` - Vercel organization/team ID (required alongside VERCEL_PROJECT_ID)
 
 ### Optional (Not Configured):
 - [ ] `WINDOWS_CERTIFICATE` - Windows code signing certificate
@@ -325,13 +326,13 @@ The repository is public to allow users to download releases from GitHub. The li
 - [x] ✅ Make repository public
 - [x] ✅ Configure Actions workflow permissions
 - [x] ✅ Add Apple code signing secrets
-- [x] ✅ Add Vercel secrets (TOKEN + PROJECT_ID + ORG_ID)
+- [x] ✅ Add Vercel secrets (TOKEN + PROJECT_ID)
 - [x] ✅ Create `.github/dependabot.yml` for automated updates
 - [x] ✅ Release workflow tested and working (v0.1.0 released)
 - [x] ✅ CI test workflow working on all platforms
-- [x] ✅ Claude Code Vercel MCP access configured
 
 ### Still Needed:
+- [ ] Add `VERCEL_ORG_ID` secret (Vercel version update fails without it)
 - [ ] Enable macOS notarization (currently code-signed but not notarized)
 - [ ] (Optional) Add Windows code signing certificate
 - [ ] Set up Lemon Squeezy product and configure checkout URL
