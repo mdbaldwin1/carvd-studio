@@ -138,9 +138,11 @@ async function forceCloseApp(electronApp: ElectronApplication): Promise<void> {
       new Promise<void>((_, reject) => setTimeout(() => reject(new Error('close timeout')), 5000))
     ]);
   } catch {
-    // Graceful close failed or timed out - force kill the process
+    // Graceful close failed or timed out — force kill the process.
+    // Use SIGKILL on Unix, kill() (SIGTERM) on Windows where SIGKILL doesn't exist.
     try {
-      electronApp.process().kill('SIGKILL');
+      const signal = process.platform === 'win32' ? undefined : 'SIGKILL';
+      electronApp.process().kill(signal);
     } catch {
       /* process may already be gone */
     }
