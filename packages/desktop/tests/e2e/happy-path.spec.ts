@@ -159,8 +159,10 @@ test.describe('Happy Path Workflow', () => {
 
     const args = [appPath];
     if (process.env.CI) {
-      // Disable GPU acceleration in CI (no real GPU available)
-      args.unshift('--disable-gpu', '--disable-software-rasterizer');
+      // Linux CI needs --no-sandbox for xvfb to work properly.
+      // Do NOT use --disable-gpu or --disable-software-rasterizer — they
+      // prevent WebGL context creation, which crashes Three.js / R3F.
+      // Linux CI uses xvfb for software rendering; macOS CI has Metal GPU.
       if (process.platform === 'linux') {
         args.unshift('--no-sandbox');
       }

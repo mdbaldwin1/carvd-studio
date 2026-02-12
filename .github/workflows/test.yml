@@ -44,8 +44,6 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ${{ matrix.os }}
-    # macOS E2E is a canary — flaky due to slow CI runners, not a real signal difference from Ubuntu
-    continue-on-error: ${{ matrix.os == 'macos-latest' }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
