@@ -114,13 +114,14 @@ test.describe('Happy Path Workflow', () => {
     const state = await waitForAppReady(window);
 
     if (state === 'start-screen') {
-      // Click "New Blank Project"
-      await window.locator('.blank-template').click();
+      // Click "New Blank Project" - use force:true to bypass stability checks
+      // (CSS transitions can cause Playwright to wait indefinitely for stability)
+      await window.locator('.blank-template').click({ force: true });
 
       // NewProjectDialog appears - click "Create Project"
       const createBtn = window.locator('.new-project-dialog .btn-accent');
       await expect(createBtn).toBeVisible({ timeout: 5000 });
-      await createBtn.click();
+      await createBtn.click({ force: true });
     }
 
     // Verify editor is fully loaded
