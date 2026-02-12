@@ -6,7 +6,7 @@
  */
 
 const GITHUB_REPO = import.meta.env.VITE_GITHUB_REPO || 'mdbaldwin1/carvd-studio';
-const APP_VERSION = import.meta.env.VITE_APP_VERSION || '1.0.0';
+const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.1.0';
 
 export interface DownloadInfo {
   url: string;
@@ -20,14 +20,14 @@ export interface DownloadInfo {
  * Get download URL for macOS installer (.dmg)
  */
 export function getMacDownloadUrl(): string {
-  return `https://github.com/${GITHUB_REPO}/releases/latest/download/Carvd-Studio-${APP_VERSION}.dmg`;
+  return `https://github.com/${GITHUB_REPO}/releases/latest/download/Carvd.Studio-${APP_VERSION}.dmg`;
 }
 
 /**
  * Get download URL for Windows installer (.exe)
  */
 export function getWindowsDownloadUrl(): string {
-  return `https://github.com/${GITHUB_REPO}/releases/latest/download/Carvd-Studio-Setup-${APP_VERSION}.exe`;
+  return `https://github.com/${GITHUB_REPO}/releases/latest/download/Carvd.Studio.Setup.${APP_VERSION}.exe`;
 }
 
 /**
@@ -37,7 +37,7 @@ export function getMacDownloadInfo(): DownloadInfo {
   return {
     url: getMacDownloadUrl(),
     platform: 'macos',
-    fileName: `Carvd-Studio-${APP_VERSION}.dmg`,
+    fileName: `Carvd.Studio-${APP_VERSION}.dmg`,
     fileExtension: '.dmg',
     minOsVersion: 'macOS 10.15+',
   };
@@ -50,7 +50,7 @@ export function getWindowsDownloadInfo(): DownloadInfo {
   return {
     url: getWindowsDownloadUrl(),
     platform: 'windows',
-    fileName: `Carvd-Studio-Setup-${APP_VERSION}.exe`,
+    fileName: `Carvd.Studio.Setup.${APP_VERSION}.exe`,
     fileExtension: '.exe',
     minOsVersion: 'Windows 10+',
   };
