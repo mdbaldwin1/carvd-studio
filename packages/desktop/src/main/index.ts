@@ -1116,8 +1116,12 @@ store.onDidAnyChange((newValue, oldValue) => {
 });
 
 app.whenReady().then(() => {
-  // Show splash screen immediately
-  splashWindow = createSplashWindow();
+  const isTest = process.env.NODE_ENV === 'test';
+
+  // Show splash screen (skip in test mode for faster startup)
+  if (!isTest) {
+    splashWindow = createSplashWindow();
+  }
 
   // Reset trial acknowledgement so expired modal shows each launch
   resetTrialAcknowledgement();
@@ -1137,8 +1141,10 @@ app.whenReady().then(() => {
     createWindow();
   }
 
-  // Initialize auto-updater (skips in development)
-  initializeAutoUpdater();
+  // Initialize auto-updater (skip in development and test)
+  if (!isTest) {
+    initializeAutoUpdater();
+  }
 
   app.on('activate', () => {
     // macOS: re-create window when dock icon clicked
