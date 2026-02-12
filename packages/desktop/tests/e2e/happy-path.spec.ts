@@ -11,11 +11,9 @@ const require = createRequire(import.meta.url);
 /**
  * Wait for the main application window (not the splash screen).
  * The app creates a splash BrowserWindow first, then the main window.
- * We need the main window which contains the React app.
+ * We need the main window which contains the React app (.app container).
  */
 async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {
-  // Give the app time to create both windows (splash shows for >=1.5s)
-  // Check existing windows first, then wait for new ones if needed
   const checkForMainWindow = async (): Promise<Page | null> => {
     const windows = electronApp.windows();
     for (const win of windows) {
@@ -32,28 +30,52 @@ async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {
   const existing = await checkForMainWindow();
   if (existing) return existing;
 
-  // Wait for the main window to appear (splash closes, main opens)
-  // Poll for up to 30 seconds
+  // Poll for up to 30 seconds for the main window to appear
   for (let i = 0; i < 30; i++) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     const found = await checkForMainWindow();
     if (found) return found;
-
-    // Also check if a new window was created
-    const windows = electronApp.windows();
-    for (const win of windows) {
-      await win.waitForLoadState('domcontentloaded').catch(() => {});
-      const hasApp = await win
-        .locator('.app')
-        .isVisible({ timeout: 1000 })
-        .catch(() => false);
-      if (hasApp) return win;
-    }
   }
 
   // Fallback: return the last window
   const windows = electronApp.windows();
   return windows[windows.length - 1];
+}
+
+/**
+ * Navigate through the startup flow to reach the start screen.
+ * Handles: splash → app mount → tutorial (skip) → start screen
+ */
+async function navigateToStartScreen(window: Page): Promise<void> {
+  // Wait for the React app to mount
+  await expect(window.locator('.app')).toBeVisible({ timeout: 30000 });
+
+  // Handle welcome tutorial if it appears - skip it
+  const skipTutorialBtn = window.locator('.tutorial-tooltip-skip');
+  if (await skipTutorialBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await skipTutorialBtn.click();
+    await window.waitForTimeout(500);
+  }
+
+  // Wait for start screen to appear
+  await expect(window.locator('.start-screen')).toBeVisible({ timeout: 15000 });
+}
+
+/**
+ * Create a new project from the start screen.
+ * Clicks "New Blank Project" → fills out NewProjectDialog → "Create Project"
+ */
+async function createNewProject(window: Page): Promise<void> {
+  // Click "New Blank Project" on start screen
+  await window.locator('.blank-template').click();
+
+  // NewProjectDialog appears - click "Create Project" to confirm
+  const createBtn = window.locator('.new-project-dialog .btn-accent');
+  await expect(createBtn).toBeVisible({ timeout: 5000 });
+  await createBtn.click();
+
+  // Wait for editor to load
+  await expect(window.locator('.app-header')).toBeVisible({ timeout: 10000 });
 }
 
 test.describe('Happy Path Workflow', () => {
@@ -89,78 +111,31 @@ test.describe('Happy Path Workflow', () => {
     }
   });
 
-  test('app launches and reaches a usable state', async () => {
-    // The app shows screens in this order on first launch:
-    // 1. Splash screen (separate BrowserWindow, auto-closes after ~1.5s)
-    // 2. Main window loads React app
-    // 3. Either: Welcome Tutorial (new user) → Start Screen, or Start Screen directly
+  test('app launches and shows start screen', async () => {
+    await navigateToStartScreen(window);
 
-    // Wait for the React app to mount
-    await expect(window.locator('.app')).toBeVisible({ timeout: 30000 });
-
-    // Handle welcome tutorial if it appears - skip it
-    const skipTutorialBtn = window.locator('.tutorial-tooltip-skip');
-    if (await skipTutorialBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await skipTutorialBtn.click();
-      await window.waitForTimeout(500);
-    }
-
-    // After tutorial skip (or if no tutorial), we should see the start screen
-    // or the main editor. Either state means the app loaded successfully.
-    const startScreen = window.locator('.start-screen');
-    const appHeader = window.locator('.app-header');
-
-    // Wait for one of: start screen or app header (editor mode)
-    await expect(startScreen.or(appHeader)).toBeVisible({ timeout: 15000 });
-
-    // If we're on the start screen, verify key elements
-    if (await startScreen.isVisible().catch(() => false)) {
-      const blankTemplate = window.locator('.blank-template');
-      await expect(blankTemplate).toBeVisible();
-    }
+    // Verify key start screen elements
+    const blankTemplate = window.locator('.blank-template');
+    await expect(blankTemplate).toBeVisible();
   });
 
   test('can create a new project from start screen', async () => {
+    // Ensure we're on start screen
     const startScreen = window.locator('.start-screen');
-
     if (!(await startScreen.isVisible().catch(() => false))) {
-      // Skip tutorial if showing
-      const skipTutorialBtn = window.locator('.tutorial-tooltip-skip');
-      if (await skipTutorialBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await skipTutorialBtn.click();
-        await window.waitForTimeout(500);
-      }
+      await navigateToStartScreen(window);
     }
 
-    // Wait for start screen
-    await expect(startScreen).toBeVisible({ timeout: 10000 });
+    await createNewProject(window);
 
-    // Click "New Blank Project" button
-    const blankTemplate = window.locator('.blank-template');
-    await blankTemplate.click();
-    await window.waitForTimeout(500);
-
-    // After creating a new project, the editor should be visible
-    const appHeader = window.locator('.app-header');
-    await expect(appHeader).toBeVisible({ timeout: 10000 });
-
-    // Verify 3D canvas exists
+    // Verify editor is visible with canvas
     const canvas = window.locator('canvas');
     await expect(canvas).toBeVisible();
   });
 
   test('editor UI elements are present after project creation', async () => {
+    // Should already be in editor from previous test
     const appHeader = window.locator('.app-header');
-
-    if (!(await appHeader.isVisible().catch(() => false))) {
-      // Navigate to editor if not there
-      const startScreen = window.locator('.start-screen');
-      if (await startScreen.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await window.locator('.blank-template').click();
-        await window.waitForTimeout(500);
-      }
-    }
-
     await expect(appHeader).toBeVisible({ timeout: 10000 });
 
     // Verify sidebar exists
