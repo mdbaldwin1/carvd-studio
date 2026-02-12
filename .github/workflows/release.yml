@@ -178,12 +178,11 @@ jobs:
       - name: Package app (macOS)
         if: matrix.platform == 'mac'
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # Use our keychain directly (has cert + intermediate chain) instead
-          # of CSC_LINK which creates a separate keychain without intermediates
+          # Notarization env vars - uncomment when certificate chain is resolved
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_KEYCHAIN: ${{ steps.keychain.outputs.path }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
