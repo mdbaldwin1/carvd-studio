@@ -93,35 +93,31 @@ export function UpdateNotificationBanner() {
     return null;
   }
 
-  // Show just-updated banner only when no active update flow
-  if (justUpdated && !updateInfo && !error) {
+  // Show just-updated toast only when no active update flow
+  const showJustUpdatedToast = justUpdated && !updateInfo && !error;
+
+  // If only the toast is showing (no banner content), render just the toast
+  if (showJustUpdatedToast && !updateInfo && !error) {
     return (
-      <div className="update-notification-banner update-banner-success">
-        <div className="update-notification-content">
-          <div className="update-notification-icon update-notification-success">
-            <CheckCircle className="icon-sm" />
-          </div>
-          <div className="update-notification-text">
-            <div className="update-notification-title">
-              Updated to v{justUpdated.currentVersion}
-            </div>
-            <div className="update-notification-message">
-              <a
-                className="update-changelog-link"
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  window.electronAPI?.openExternal?.('https://carvd-studio.com/changelog');
-                }}
-              >
-                See what&apos;s new
-              </a>
-            </div>
-          </div>
-          <button className="btn btn-ghost" onClick={handleDismiss}>
-            <X className="icon-sm" />
-          </button>
+      <div className="update-toast update-toast-success">
+        <CheckCircle className="icon-sm update-toast-icon" />
+        <div className="update-toast-text">
+          <span className="update-toast-title">Updated to v{justUpdated.currentVersion}</span>
+          {' · '}
+          <a
+            className="update-changelog-link"
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              window.electronAPI?.openExternal?.('https://carvd-studio.com/changelog');
+            }}
+          >
+            See what&apos;s new
+          </a>
         </div>
+        <button className="update-toast-dismiss" onClick={handleDismiss}>
+          <X className="icon-sm" />
+        </button>
       </div>
     );
   }

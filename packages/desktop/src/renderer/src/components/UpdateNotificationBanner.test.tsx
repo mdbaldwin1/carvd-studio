@@ -274,7 +274,7 @@ describe('UpdateNotificationBanner', () => {
   });
 
   describe('just updated', () => {
-    it('shows just-updated banner with version', () => {
+    it('shows just-updated toast with version', () => {
       render(<UpdateNotificationBanner />);
 
       act(() => {
@@ -327,7 +327,7 @@ describe('UpdateNotificationBanner', () => {
         });
       });
 
-      const dismissButton = container.querySelector('.btn-ghost');
+      const dismissButton = container.querySelector('.update-toast-dismiss');
       fireEvent.click(dismissButton!);
 
       expect(screen.queryByText('Updated to v2.0.0')).not.toBeInTheDocument();
