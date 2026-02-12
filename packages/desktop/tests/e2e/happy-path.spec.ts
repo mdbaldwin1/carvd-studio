@@ -2,11 +2,9 @@ import { test, expect, _electron as electron } from '@playwright/test';
 import { ElectronApplication, Page } from 'playwright';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const require = createRequire(import.meta.url);
 
 /** Collected console messages for debugging failures */
 const consoleMessages: string[] = [];
@@ -154,23 +152,20 @@ test.describe('Happy Path Workflow', () => {
   let window: Page;
 
   test.beforeAll(async () => {
-    const electronPath = require('electron') as unknown as string;
     const appPath = path.join(__dirname, '../../');
 
+    // Do NOT use executablePath — Playwright must inject its loader script
+    // so it controls the app.ready event timing. Without the loader,
+    // Playwright never sees the "DevTools listening on ws://..." line on
+    // Windows and electron.launch() hangs (microsoft/playwright#9351).
     const args = [appPath, '--test-mode'];
     if (process.env.CI) {
       // CI needs --no-sandbox to avoid sandbox permission issues.
       // Do NOT use --disable-gpu — it kills WebGL, crashing Three.js / R3F.
       args.unshift('--no-sandbox');
-      if (process.platform === 'win32') {
-        // Windows CI: run GPU compositing in the main process to avoid
-        // GPU process initialization hanging without a GPU driver.
-        args.unshift('--in-process-gpu');
-      }
     }
 
     electronApp = await electron.launch({
-      executablePath: electronPath,
       args,
       env: {
         ...process.env,
