@@ -75,8 +75,11 @@ import {
 
 process.on('uncaughtException', (error) => {
   log.error('[Main] Uncaught exception:', error);
-  // In production, we might want to show a dialog and restart
-  if (process.env.NODE_ENV !== 'development') {
+  // Show error dialog in production only (not dev or test mode).
+  // dialog.showErrorBox() is synchronous and blocks the main thread,
+  // which would hang E2E tests and prevent BrowserWindow creation.
+  const isTestMode = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
+  if (process.env.NODE_ENV !== 'development' && !isTestMode) {
     dialog.showErrorBox(
       'Unexpected Error',
       'An unexpected error occurred. The application may be unstable. Please save your work and restart.'
@@ -1116,7 +1119,10 @@ store.onDidAnyChange((newValue, oldValue) => {
 });
 
 app.whenReady().then(() => {
-  const isTest = process.env.NODE_ENV === 'test';
+  const isTest = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
+  if (isTest) {
+    log.info('[Main] Test mode detected — skipping splash screen and auto-updater');
+  }
 
   // Show splash screen (skip in test mode for faster startup)
   if (!isTest) {

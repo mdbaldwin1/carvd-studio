@@ -157,14 +157,17 @@ test.describe('Happy Path Workflow', () => {
     const electronPath = require('electron') as unknown as string;
     const appPath = path.join(__dirname, '../../');
 
-    const args = [appPath];
+    const args = [appPath, '--test-mode'];
     if (process.env.CI) {
       // Linux CI needs --no-sandbox for xvfb to work properly.
-      // Do NOT use --disable-gpu or --disable-software-rasterizer — they
-      // prevent WebGL context creation, which crashes Three.js / R3F.
-      // Linux CI uses xvfb for software rendering; macOS CI has Metal GPU.
       if (process.platform === 'linux') {
         args.unshift('--no-sandbox');
+      }
+      // Windows CI may lack GPU drivers. Use ANGLE with SwiftShader for
+      // software-based WebGL rendering (required by Three.js / R3F).
+      // Do NOT use --disable-gpu — it kills WebGL entirely.
+      if (process.platform === 'win32') {
+        args.unshift('--use-gl=angle', '--use-angle=swiftshader');
       }
     }
 
