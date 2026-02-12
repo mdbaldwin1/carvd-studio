@@ -96,23 +96,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Workaround: npm workspaces + npm cache can cause app-builder-bin
-      # platform binaries to be missing. Force a fresh install of the package.
-      - name: Fix app-builder-bin binaries
+      # Resolve the absolute path to app-builder binary and ensure it's usable.
+      # npm workspaces hoist app-builder-bin to root, but electron-builder run
+      # from packages/desktop may fail to resolve it. Setting CUSTOM_APP_BUILDER_PATH
+      # forces the correct path.
+      - name: Resolve app-builder-bin path
+        id: app-builder
         shell: bash
         run: |
-          EXPECTED=$(node -p "require('app-builder-bin').appBuilderPath")
-          echo "Expected binary: $EXPECTED"
+          BINARY=$(node -p "require('app-builder-bin').appBuilderPath")
+          echo "path=$BINARY" >> $GITHUB_OUTPUT
 
-          if [ ! -f "$EXPECTED" ]; then
-            echo "Binary missing after npm ci - force reinstalling..."
+          if [ ! -f "$BINARY" ]; then
+            echo "Binary missing - reinstalling..."
             VERSION=$(node -p "require('./node_modules/app-builder-bin/package.json').version")
             rm -rf node_modules/app-builder-bin
             npm install "app-builder-bin@${VERSION}" --no-save --install-links
           fi
 
-          ls -la "$EXPECTED" || { echo "FATAL: Binary still missing after reinstall"; exit 1; }
-          echo "app-builder-bin binary verified"
+          chmod +x "$BINARY"
+          if command -v xattr &>/dev/null; then
+            xattr -cr node_modules/app-builder-bin/ 2>/dev/null || true
+          fi
+
+          ls -la "$BINARY"
+          file "$BINARY" 2>/dev/null || true
 
       - name: Setup license key
         run: echo "${{ secrets.LICENSE_PRIVATE_KEY }}" > license-private-key.pem
@@ -151,6 +159,7 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.path }}
         run: |
           cd packages/desktop
           npx electron-builder --mac --publish never
@@ -159,6 +168,7 @@ jobs:
         if: matrix.platform == 'win'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.path }}
         run: |
           cd packages/desktop
           npx electron-builder --win --publish never
