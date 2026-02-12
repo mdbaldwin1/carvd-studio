@@ -236,13 +236,13 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     y: (bounds.y ?? 100) + offset,
     minWidth: 900,
     minHeight: 600,
-    show: false,
+    // In test mode, show immediately — on Windows CI, show:false combined
+    // with titleBarOverlay prevents Chromium's DevTools server from fully
+    // initializing, causing Playwright's electron.launch() to hang.
+    show: isTest,
     title: 'Carvd Studio',
-    // Custom title bar configuration
-    // NOTE: titleBarOverlay is disabled in test mode because of an Electron
-    // bug (electron/electron#42409) where the combination of titleBarStyle
-    // 'hidden' + titleBarOverlay + show:false prevents ready-to-show from
-    // ever firing on Windows, which hangs Playwright's electron.launch().
+    // Custom title bar configuration disabled in test mode to avoid
+    // Electron bug electron/electron#42409 on Windows.
     titleBarStyle: isMac ? 'hiddenInset' : isTest ? undefined : 'hidden',
     titleBarOverlay:
       !isMac && !isTest
