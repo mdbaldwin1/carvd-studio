@@ -212,13 +212,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('update-error', handler);
     return () => ipcRenderer.removeListener('update-error', handler);
   },
-  onUpdateJustInstalled: (
-    callback: (info: { previousVersion: string; currentVersion: string }) => void
-  ) => {
-    const handler = (
-      _event: Electron.IpcRendererEvent,
-      info: { previousVersion: string; currentVersion: string }
-    ) => callback(info);
+  onUpdateJustInstalled: (callback: (info: { previousVersion: string; currentVersion: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, info: { previousVersion: string; currentVersion: string }) =>
+      callback(info);
     ipcRenderer.on('update-just-installed', handler);
     return () => ipcRenderer.removeListener('update-just-installed', handler);
   }
@@ -519,9 +515,7 @@ export interface ElectronAPI {
   ) => () => void;
   onUpdateDownloaded: (callback: (info: { version: string }) => void) => () => void;
   onUpdateError: (callback: (error: { message: string }) => void) => () => void;
-  onUpdateJustInstalled: (
-    callback: (info: { previousVersion: string; currentVersion: string }) => void
-  ) => () => void;
+  onUpdateJustInstalled: (callback: (info: { previousVersion: string; currentVersion: string }) => void) => () => void;
 }
 
 declare global {

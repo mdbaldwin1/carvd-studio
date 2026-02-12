@@ -62,9 +62,7 @@ export interface ElectronAPI {
   ) => () => void;
   onUpdateDownloaded: (callback: (info: { version: string }) => void) => () => void;
   onUpdateError: (callback: (error: { message: string }) => void) => () => void;
-  onUpdateJustInstalled?: (
-    callback: (info: { previousVersion: string; currentVersion: string }) => void
-  ) => () => void;
+  onUpdateJustInstalled?: (callback: (info: { previousVersion: string; currentVersion: string }) => void) => () => void;
 }
 
 declare global {

@@ -9,9 +9,8 @@ describe('UpdateNotificationBanner', () => {
     | null = null;
   let onUpdateDownloadedCallback: ((info: { version: string }) => void) | null = null;
   let onUpdateErrorCallback: ((err: { message: string }) => void) | null = null;
-  let onUpdateJustInstalledCallback:
-    | ((info: { previousVersion: string; currentVersion: string }) => void)
-    | null = null;
+  let onUpdateJustInstalledCallback: ((info: { previousVersion: string; currentVersion: string }) => void) | null =
+    null;
 
   beforeAll(() => {
     window.electronAPI = {
@@ -267,9 +266,7 @@ describe('UpdateNotificationBanner', () => {
 
       fireEvent.click(screen.getByText("What's new"));
 
-      expect(window.electronAPI.openExternal).toHaveBeenCalledWith(
-        'https://carvd-studio.com/changelog'
-      );
+      expect(window.electronAPI.openExternal).toHaveBeenCalledWith('https://carvd-studio.com/changelog');
     });
   });
 
@@ -312,9 +309,7 @@ describe('UpdateNotificationBanner', () => {
 
       fireEvent.click(screen.getByText("See what's new"));
 
-      expect(window.electronAPI.openExternal).toHaveBeenCalledWith(
-        'https://carvd-studio.com/changelog'
-      );
+      expect(window.electronAPI.openExternal).toHaveBeenCalledWith('https://carvd-studio.com/changelog');
     });
 
     it('can be dismissed', () => {
