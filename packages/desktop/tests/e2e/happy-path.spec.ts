@@ -11,54 +11,48 @@ const require = createRequire(import.meta.url);
 /**
  * Wait for the main application window (not the splash screen).
  * Polls all open windows looking for one with the React root (.app).
+ * Waits up to 60 seconds for the app to initialize (macOS CI can be slow).
  */
 async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 60; i++) {
     const windows = electronApp.windows();
     for (const win of windows) {
       const hasApp = await win
         .locator('.app')
-        .isVisible({ timeout: 1000 })
+        .isVisible({ timeout: 500 })
         .catch(() => false);
       if (hasApp) return win;
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  const windows = electronApp.windows();
-  return windows[windows.length - 1];
+  throw new Error('Main application window with .app root not found after 60s');
 }
 
 /**
  * Navigate through the startup flow until the app is ready for interaction.
  * Handles: tutorial (skip), trial expired modal (dismiss), then waits for
  * start screen or editor to appear.
+ *
+ * Uses evaluate-based JS clicks throughout to avoid issues with:
+ * - CSS transitions causing Playwright stability check timeouts
+ * - React re-renders detaching DOM elements mid-click
  */
 async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'> {
-  await expect(window.locator('.app')).toBeVisible({ timeout: 30000 });
-
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 60; i++) {
     // Skip tutorial if showing
-    if (
-      await window
-        .locator('.tutorial-tooltip-skip')
-        .isVisible({ timeout: 500 })
-        .catch(() => false)
-    ) {
-      await window.locator('.tutorial-tooltip-skip').click();
+    const skipBtn = window.locator('.tutorial-tooltip-skip');
+    if (await skipBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+      await skipBtn.evaluate((el) => (el as HTMLElement).click());
       await window.waitForTimeout(500);
       continue;
     }
 
     // Dismiss trial expired modal if showing
-    if (
-      await window
-        .locator('.trial-expired-modal')
-        .isVisible({ timeout: 500 })
-        .catch(() => false)
-    ) {
-      const dismissBtn = window.locator('.trial-expired-modal button').last();
-      if (await dismissBtn.isVisible().catch(() => false)) {
-        await dismissBtn.click();
+    const trialModal = window.locator('.trial-expired-modal');
+    if (await trialModal.isVisible({ timeout: 500 }).catch(() => false)) {
+      const lastBtn = window.locator('.trial-expired-modal button').last();
+      if (await lastBtn.isVisible().catch(() => false)) {
+        await lastBtn.evaluate((el) => (el as HTMLElement).click());
         await window.waitForTimeout(500);
       }
       continue;
@@ -85,7 +79,7 @@ async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'>
   }
 
   const bodyHTML = await window.evaluate(() => document.body.innerHTML.substring(0, 500));
-  throw new Error(`App did not reach a usable state after 30s. Page content: ${bodyHTML}`);
+  throw new Error(`App did not reach a usable state after 60s. Page content: ${bodyHTML}`);
 }
 
 test.describe('Happy Path Workflow', () => {
@@ -115,7 +109,11 @@ test.describe('Happy Path Workflow', () => {
 
   test.afterAll(async () => {
     if (electronApp) {
-      await electronApp.close();
+      // Force-close with a timeout to prevent afterAll from hanging
+      await Promise.race([
+        electronApp.close(),
+        new Promise((resolve) => setTimeout(resolve, 10000))
+      ]);
     }
   });
 
