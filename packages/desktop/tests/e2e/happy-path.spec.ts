@@ -20,13 +20,16 @@ async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {
   for (let i = 0; i < 90; i++) {
     const windows = electronApp.windows();
     for (const win of windows) {
-      // Use page.evaluate() (not locator) to atomically check DOM state
-      // This avoids the race condition where React re-renders between
-      // isVisible() and subsequent interaction, detaching the element
+      // Use page.evaluate() (not locator) to atomically check DOM state.
+      // Check element exists and has a non-zero bounding rect (similar to
+      // Playwright's isVisible). Don't use offsetParent — it returns null
+      // for position:fixed elements, which breaks start-screen detection.
       const hasApp = await win
         .evaluate(() => {
           const el = document.querySelector('.app');
-          return el !== null && (el as HTMLElement).offsetParent !== null;
+          if (!el) return false;
+          const rect = el.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
         })
         .catch(() => false);
 
@@ -56,14 +59,19 @@ async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'>
     // Use a single evaluate() call per iteration to atomically check state
     // and interact with the UI. This prevents the race condition where
     // React re-renders detach an element between isVisible() and click().
+    // Helper to check visibility via bounding rect (works for position:fixed)
     const state = await window.evaluate(() => {
+      function isVisible(el: Element | null): boolean {
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }
+
       // Check for error boundary first
       const errorBoundary = document.querySelector('.error-boundary');
-      if (errorBoundary) {
-        // Try to extract the error message for debugging
+      if (isVisible(errorBoundary)) {
         const details = document.querySelector('.error-boundary-details pre');
         const errorMsg = details?.textContent || 'unknown error';
-        // Click "Try Again" to attempt recovery
         const tryAgainBtn = document.querySelector(
           '.error-boundary-actions .btn-secondary'
         ) as HTMLElement;
@@ -73,28 +81,25 @@ async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'>
 
       // Skip tutorial if showing
       const skipBtn = document.querySelector('.tutorial-tooltip-skip') as HTMLElement;
-      if (skipBtn && skipBtn.offsetParent !== null) {
+      if (isVisible(skipBtn)) {
         skipBtn.click();
         return { type: 'skipped-tutorial' as const };
       }
 
       // Dismiss trial expired modal if showing
       const trialModal = document.querySelector('.trial-expired-modal');
-      if (trialModal && (trialModal as HTMLElement).offsetParent !== null) {
-        const buttons = trialModal.querySelectorAll('button');
+      if (isVisible(trialModal)) {
+        const buttons = trialModal!.querySelectorAll('button');
         const lastBtn = buttons[buttons.length - 1] as HTMLElement;
         if (lastBtn) lastBtn.click();
         return { type: 'dismissed-trial' as const };
       }
 
       // Check if we've reached a usable state
-      const startScreen = document.querySelector('.start-screen');
-      if (startScreen && (startScreen as HTMLElement).offsetParent !== null) {
+      if (isVisible(document.querySelector('.start-screen'))) {
         return { type: 'start-screen' as const };
       }
-
-      const appHeader = document.querySelector('.app-header');
-      if (appHeader && (appHeader as HTMLElement).offsetParent !== null) {
+      if (isVisible(document.querySelector('.app-header'))) {
         return { type: 'editor' as const };
       }
 
