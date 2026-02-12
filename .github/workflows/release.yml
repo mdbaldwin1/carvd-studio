@@ -174,7 +174,8 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
-        run: npx electron-builder --mac --publish never --project packages/desktop
+        working-directory: packages/desktop
+        run: npx electron-builder --mac --publish never
 
       - name: Package app (Windows)
         if: matrix.platform == 'win'
@@ -182,7 +183,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
-        run: npx electron-builder --win --publish never --project packages/desktop
+        working-directory: packages/desktop
+        run: npx electron-builder --win --publish never
 
       - name: Upload artifacts (macOS)
         if: matrix.platform == 'mac'
