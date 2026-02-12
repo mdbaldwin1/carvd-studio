@@ -11,10 +11,10 @@ const require = createRequire(import.meta.url);
 /**
  * Wait for the main application window (not the splash screen).
  * Polls all open windows looking for one with the React root (.app).
- * Waits up to 60 seconds for the app to initialize (macOS CI can be slow).
+ * Waits up to 90 seconds for the app to initialize (macOS CI can be slow).
  */
 async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 90; i++) {
     const windows = electronApp.windows();
     for (const win of windows) {
       const hasApp = await win
@@ -25,7 +25,7 @@ async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  throw new Error('Main application window with .app root not found after 60s');
+  throw new Error('Main application window with .app root not found after 90s');
 }
 
 /**
@@ -82,6 +82,26 @@ async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'>
   throw new Error(`App did not reach a usable state after 60s. Page content: ${bodyHTML}`);
 }
 
+/**
+ * Force-close the Electron app, falling back to SIGKILL if graceful close hangs.
+ * This prevents worker teardown timeouts in CI.
+ */
+async function forceCloseApp(electronApp: ElectronApplication): Promise<void> {
+  try {
+    await Promise.race([
+      electronApp.close(),
+      new Promise<void>((_, reject) => setTimeout(() => reject(new Error('close timeout')), 5000))
+    ]);
+  } catch {
+    // Graceful close failed or timed out - force kill the process
+    try {
+      electronApp.process().kill('SIGKILL');
+    } catch {
+      /* process may already be gone */
+    }
+  }
+}
+
 test.describe('Happy Path Workflow', () => {
   let electronApp: ElectronApplication;
   let window: Page;
@@ -91,8 +111,12 @@ test.describe('Happy Path Workflow', () => {
     const appPath = path.join(__dirname, '../../');
 
     const args = [appPath];
-    if (process.env.CI && process.platform === 'linux') {
-      args.unshift('--no-sandbox');
+    if (process.env.CI) {
+      // Disable GPU acceleration in CI (no real GPU available)
+      args.unshift('--disable-gpu', '--disable-software-rasterizer');
+      if (process.platform === 'linux') {
+        args.unshift('--no-sandbox');
+      }
     }
 
     electronApp = await electron.launch({
@@ -109,11 +133,7 @@ test.describe('Happy Path Workflow', () => {
 
   test.afterAll(async () => {
     if (electronApp) {
-      // Force-close with a timeout to prevent afterAll from hanging
-      await Promise.race([
-        electronApp.close(),
-        new Promise((resolve) => setTimeout(resolve, 10000))
-      ]);
+      await forceCloseApp(electronApp);
     }
   });
 
