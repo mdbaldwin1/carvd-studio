@@ -224,6 +224,7 @@ let pendingFileToOpen: string | null = null;
 function createWindow(fileToOpen?: string): BrowserWindow {
   const bounds = getWindowBounds();
   const isMac = process.platform === 'darwin';
+  const isTest = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
 
   // Offset new windows slightly from existing ones
   const offset = windows.size * 30;
@@ -238,8 +239,12 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     show: false,
     title: 'Carvd Studio',
     // Custom title bar configuration
-    titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
-    titleBarOverlay: !isMac
+    // NOTE: titleBarOverlay is disabled in test mode because of an Electron
+    // bug (electron/electron#42409) where the combination of titleBarStyle
+    // 'hidden' + titleBarOverlay + show:false prevents ready-to-show from
+    // ever firing on Windows, which hangs Playwright's electron.launch().
+    titleBarStyle: isMac ? 'hiddenInset' : (isTest ? undefined : 'hidden'),
+    titleBarOverlay: (!isMac && !isTest)
       ? {
           color: '#1e1e1e',
           symbolColor: '#ffffff',
@@ -290,6 +295,18 @@ function createWindow(fileToOpen?: string): BrowserWindow {
       showMainWindow();
     }
   });
+
+  // Fallback: force-show after 5s if ready-to-show never fires.
+  // Works around Electron bug on Windows where titleBarOverlay + show:false
+  // can prevent the event from firing (electron/electron#42409).
+  if (isTest) {
+    setTimeout(() => {
+      if (!newWindow.isDestroyed() && !newWindow.isVisible()) {
+        log.warn('[Main] ready-to-show did not fire in time, force-showing window');
+        newWindow.show();
+      }
+    }, 5000);
+  }
 
   // Intercept close to check for unsaved changes
   newWindow.on('close', (event) => {
