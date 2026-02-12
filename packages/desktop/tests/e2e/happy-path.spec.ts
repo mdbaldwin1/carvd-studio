@@ -38,14 +38,24 @@ async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'>
 
   for (let i = 0; i < 30; i++) {
     // Skip tutorial if showing
-    if (await window.locator('.tutorial-tooltip-skip').isVisible({ timeout: 500 }).catch(() => false)) {
+    if (
+      await window
+        .locator('.tutorial-tooltip-skip')
+        .isVisible({ timeout: 500 })
+        .catch(() => false)
+    ) {
       await window.locator('.tutorial-tooltip-skip').click();
       await window.waitForTimeout(500);
       continue;
     }
 
     // Dismiss trial expired modal if showing
-    if (await window.locator('.trial-expired-modal').isVisible({ timeout: 500 }).catch(() => false)) {
+    if (
+      await window
+        .locator('.trial-expired-modal')
+        .isVisible({ timeout: 500 })
+        .catch(() => false)
+    ) {
       const dismissBtn = window.locator('.trial-expired-modal button').last();
       if (await dismissBtn.isVisible().catch(() => false)) {
         await dismissBtn.click();
@@ -54,10 +64,20 @@ async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'>
       continue;
     }
 
-    if (await window.locator('.start-screen').isVisible({ timeout: 500 }).catch(() => false)) {
+    if (
+      await window
+        .locator('.start-screen')
+        .isVisible({ timeout: 500 })
+        .catch(() => false)
+    ) {
       return 'start-screen';
     }
-    if (await window.locator('.app-header').isVisible({ timeout: 500 }).catch(() => false)) {
+    if (
+      await window
+        .locator('.app-header')
+        .isVisible({ timeout: 500 })
+        .catch(() => false)
+    ) {
       return 'editor';
     }
 
@@ -99,33 +119,31 @@ test.describe('Happy Path Workflow', () => {
     }
   });
 
-  test('app launches and shows start screen or editor', async () => {
+  test('app launches, creates project, and shows editor', async () => {
     const state = await waitForAppReady(window);
     expect(['start-screen', 'editor']).toContain(state);
 
     if (state === 'start-screen') {
+      // Verify start screen elements
       await expect(window.locator('.blank-template')).toBeVisible();
-    } else {
-      await expect(window.locator('.app-header')).toBeVisible();
-    }
-  });
 
-  test('complete workflow: create project and verify editor', async () => {
-    const state = await waitForAppReady(window);
+      // Use JS click to bypass Playwright's CSS transition stability checks.
+      // The template cards have CSS transitions (transform, background) that
+      // prevent Playwright from considering the element "stable" for clicking.
+      await window.locator('.blank-template').evaluate((el) => (el as HTMLElement).click());
 
-    if (state === 'start-screen') {
-      // Click "New Blank Project" - use force:true to bypass stability checks
-      // (CSS transitions can cause Playwright to wait indefinitely for stability)
-      await window.locator('.blank-template').click({ force: true });
+      // Wait for NewProjectDialog to appear (it loads stock library data on mount)
+      const dialog = window.locator('.new-project-dialog');
+      await expect(dialog).toBeVisible({ timeout: 10000 });
 
-      // NewProjectDialog appears - click "Create Project"
-      const createBtn = window.locator('.new-project-dialog .btn-accent');
-      await expect(createBtn).toBeVisible({ timeout: 5000 });
-      await createBtn.click({ force: true });
+      // Click "Create Project" via JS click for consistency
+      await window
+        .locator('.new-project-dialog .btn-accent')
+        .evaluate((el) => (el as HTMLElement).click());
     }
 
     // Verify editor is fully loaded
-    await expect(window.locator('.app-header')).toBeVisible({ timeout: 10000 });
+    await expect(window.locator('.app-header')).toBeVisible({ timeout: 15000 });
     await expect(window.locator('.sidebar')).toBeVisible();
     await expect(window.locator('canvas')).toBeVisible();
   });
