@@ -78,7 +78,15 @@ jobs:
       - name: Build desktop app
         run: npm run build:desktop
 
-      - name: Run E2E tests
+      - name: Run E2E tests (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run test:e2e --workspace=@carvd/desktop
+        env:
+          CI: true
+          NODE_ENV: 'test'
+
+      - name: Run E2E tests (macOS)
+        if: runner.os == 'macOS'
         run: npm run test:e2e --workspace=@carvd/desktop
         env:
           CI: true
