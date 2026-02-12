@@ -159,16 +159,16 @@ test.describe('Happy Path Workflow', () => {
 
     const args = [appPath, '--test-mode'];
     if (process.env.CI) {
-      // Linux CI needs --no-sandbox for xvfb to work properly.
-      if (process.platform === 'linux') {
-        args.unshift('--no-sandbox');
-      }
-      // All CI platforms: enable Chromium logging for debugging launch issues.
+      // CI needs --no-sandbox to avoid sandbox permission issues.
       // Do NOT use --disable-gpu — it kills WebGL, crashing Three.js / R3F.
-      args.unshift('--enable-logging', '--v=1');
+      args.unshift('--no-sandbox');
+      if (process.platform === 'win32') {
+        // Windows CI: run GPU compositing in the main process to avoid
+        // GPU process initialization hanging without a GPU driver.
+        args.unshift('--in-process-gpu');
+      }
     }
 
-    console.log(`[E2E] Launching Electron: ${args.join(' ')}`);
     electronApp = await electron.launch({
       executablePath: electronPath,
       args,
@@ -177,7 +177,6 @@ test.describe('Happy Path Workflow', () => {
         NODE_ENV: 'test'
       }
     });
-    console.log('[E2E] electron.launch() resolved successfully');
 
     window = await getMainWindow(electronApp);
 
