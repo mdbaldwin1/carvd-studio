@@ -13,6 +13,7 @@ import {
   StockSummary,
   PartValidationIssue
 } from '../types';
+import { logger } from './logger';
 
 // Internal types for the algorithm
 interface Rectangle {
@@ -131,19 +132,21 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
 
   if (!isGlueUp) {
     // Regular part: single instruction
-    return [{
-      partId: part.id,
-      partName: part.name,
-      cutLength,
-      cutWidth,
-      thickness: part.thickness,
-      stockId: stock.id,
-      stockName: stock.name,
-      grainSensitive: part.grainSensitive,
-      canRotate: !part.grainSensitive,
-      isGlueUp: false,
-      notes: part.notes
-    }];
+    return [
+      {
+        partId: part.id,
+        partName: part.name,
+        cutLength,
+        cutWidth,
+        thickness: part.thickness,
+        stockId: stock.id,
+        stockName: stock.name,
+        grainSensitive: part.grainSensitive,
+        canRotate: !part.grainSensitive,
+        isGlueUp: false,
+        notes: part.notes
+      }
+    ];
   }
 
   // Glue-up panel: create individual strip instructions
@@ -167,9 +170,10 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
       canRotate: false, // Glue-up strips should not rotate (need consistent grain)
       isGlueUp: true,
       boardsNeeded: numStrips,
-      notes: i === 0
-        ? `Glue-up panel: ${numStrips} strips × ${stripWidth.toFixed(2)}" = ${cutWidth}" final width${part.notes ? '. ' + part.notes : ''}`
-        : undefined
+      notes:
+        i === 0
+          ? `Glue-up panel: ${numStrips} strips × ${stripWidth.toFixed(2)}" = ${cutWidth}" final width${part.notes ? '. ' + part.notes : ''}`
+          : undefined
     });
   }
 
@@ -238,20 +242,14 @@ interface PackingResult {
  * Main bin packing algorithm: pack parts onto stock boards
  * Uses guillotine cuts (straight cuts that go completely across the board)
  */
-function packPartsOntoStock(
-  parts: PartToPlace[],
-  stock: Stock,
-  kerfWidth: number
-): PackingResult {
+function packPartsOntoStock(parts: PartToPlace[], stock: Stock, kerfWidth: number): PackingResult {
   // Sort by area, largest first (Best Fit Decreasing)
   const sorted = [...parts].sort((a, b) => b.width * b.height - a.width * a.height);
 
   const boards: StockBoard[] = [];
   const skippedParts: string[] = [];
   let currentPlacements: CutPlacement[] = [];
-  let freeRects: Rectangle[] = [
-    { x: 0, y: 0, width: stock.length, height: stock.width }
-  ];
+  let freeRects: Rectangle[] = [{ x: 0, y: 0, width: stock.length, height: stock.width }];
   let boardIndex = 1;
 
   for (const part of sorted) {
@@ -270,14 +268,8 @@ function packPartsOntoStock(
       // Kerf only if part doesn't use full width of the rect
       const widthKerf = partWidth < result.rect.width ? kerfWidth : 0;
       // For glue-up strips, never add kerf to height; otherwise only if not using full height
-      const heightKerf = part.isGlueUp ? 0 : (partHeight < result.rect.height ? kerfWidth : 0);
-      freeRects = splitRectangle(
-        freeRects,
-        result.index,
-        result.rect,
-        partWidth + widthKerf,
-        partHeight + heightKerf
-      );
+      const heightKerf = part.isGlueUp ? 0 : partHeight < result.rect.height ? kerfWidth : 0;
+      freeRects = splitRectangle(freeRects, result.index, result.rect, partWidth + widthKerf, partHeight + heightKerf);
     } else {
       // Part doesn't fit - save current board and start new one
       if (currentPlacements.length > 0) {
@@ -299,7 +291,7 @@ function packPartsOntoStock(
         const partWidth = newResult.rotated ? part.height : part.width;
         const partHeight = newResult.rotated ? part.width : part.height;
         const widthKerf = partWidth < newResult.rect.width ? kerfWidth : 0;
-        const heightKerf = part.isGlueUp ? 0 : (partHeight < newResult.rect.height ? kerfWidth : 0);
+        const heightKerf = part.isGlueUp ? 0 : partHeight < newResult.rect.height ? kerfWidth : 0;
         freeRects = splitRectangle(
           freeRects,
           newResult.index,
@@ -309,7 +301,9 @@ function packPartsOntoStock(
         );
       } else {
         // Part is too big for stock - track as skipped
-        console.warn(`Part "${part.partName}" (${part.width}" × ${part.height}") doesn't fit on stock "${stock.name}" (${stock.length}" × ${stock.width}")`);
+        logger.warn(
+          `Part "${part.partName}" (${part.width}" × ${part.height}") doesn't fit on stock "${stock.name}" (${stock.length}" × ${stock.width}")`
+        );
         skippedParts.push(part.partName);
       }
     }
@@ -353,7 +347,7 @@ function findBestFit(
     // If part exactly matches rect dimension, no cut needed, no kerf
     const widthKerf = width < rect.width ? kerfWidth : 0;
     // For glue-up strips, never add kerf to height (they span edge-to-edge)
-    const heightKerf = isGlueUpStrip ? 0 : (height < rect.height ? kerfWidth : 0);
+    const heightKerf = isGlueUpStrip ? 0 : height < rect.height ? kerfWidth : 0;
 
     if (rect.width >= width + widthKerf && rect.height >= height + heightKerf) {
       // Score by leftover short side (prefer tighter fits)
@@ -373,7 +367,7 @@ function findBestFit(
     if (canRotate) {
       // Recalculate kerf for rotated orientation
       const rotatedWidthKerf = height < rect.width ? kerfWidth : 0;
-      const rotatedHeightKerf = isGlueUpStrip ? 0 : (width < rect.height ? kerfWidth : 0);
+      const rotatedHeightKerf = isGlueUpStrip ? 0 : width < rect.height ? kerfWidth : 0;
 
       if (rect.width >= height + rotatedWidthKerf && rect.height >= width + rotatedHeightKerf) {
         const leftoverX = rect.width - height - rotatedWidthKerf;
@@ -396,11 +390,7 @@ function findBestFit(
 /**
  * Create a placement object from a part and rectangle
  */
-function createPlacement(
-  part: PartToPlace,
-  rect: Rectangle,
-  rotated: boolean
-): CutPlacement {
+function createPlacement(part: PartToPlace, rect: Rectangle, rotated: boolean): CutPlacement {
   return {
     partId: part.partId,
     partName: part.partName,
@@ -463,11 +453,7 @@ function mergeRectangles(rects: Rectangle[]): Rectangle[] {
 /**
  * Create a StockBoard from placements
  */
-function createStockBoard(
-  stock: Stock,
-  boardIndex: number,
-  placements: CutPlacement[]
-): StockBoard {
+function createStockBoard(stock: Stock, boardIndex: number, placements: CutPlacement[]): StockBoard {
   const stockArea = stock.length * stock.width;
   const usedArea = placements.reduce((sum, p) => sum + p.width * p.height, 0);
   const wasteArea = stockArea - usedArea;
@@ -529,9 +515,8 @@ function calculateStatistics(
 
     const stockWaste = boards.reduce((sum, b) => sum + b.wasteArea, 0);
     const stockUsed = boards.reduce((sum, b) => sum + b.usedArea, 0);
-    const avgUtilization = boards.length > 0
-      ? boards.reduce((sum, b) => sum + b.utilizationPercent, 0) / boards.length
-      : 0;
+    const avgUtilization =
+      boards.length > 0 ? boards.reduce((sum, b) => sum + b.utilizationPercent, 0) / boards.length : 0;
 
     // Calculate waste cost for this stock type
     let stockWasteCost = 0;
@@ -572,9 +557,7 @@ function calculateStatistics(
     totalWasteCost += stockWasteCost;
   }
 
-  const wastePercentage = totalUsed + totalWaste > 0
-    ? (totalWaste / (totalUsed + totalWaste)) * 100
-    : 0;
+  const wastePercentage = totalUsed + totalWaste > 0 ? (totalWaste / (totalUsed + totalWaste)) * 100 : 0;
 
   return {
     totalParts,

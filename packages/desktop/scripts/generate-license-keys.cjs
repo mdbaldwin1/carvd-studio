@@ -67,6 +67,5 @@ try {
 
 console.log('📝 Next steps:');
 console.log('1. Copy the PUBLIC KEY above and update LICENSE_PUBLIC_KEY in src/main/keys.ts');
-console.log('2. Keep the private key file secure (use it to generate license keys)');
-console.log('3. Use the private key in your license generation webhook service');
+console.log('2. Keep the private key file secure (use it to generate test license keys)');
 console.log('\n🎉 Done!');

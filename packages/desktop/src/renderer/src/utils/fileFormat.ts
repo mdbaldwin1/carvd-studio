@@ -5,6 +5,7 @@
 
 import {
   Assembly,
+  CameraState,
   CARVD_FILE_VERSION,
   CarvdFile,
   CutList,
@@ -14,6 +15,7 @@ import {
   GroupMember,
   Part,
   Project,
+  ProjectThumbnail,
   SnapGuide,
   Stock,
   StockConstraintSettings
@@ -48,6 +50,8 @@ export function serializeProject(state: {
   snapGuides: SnapGuide[];
   customShoppingItems: CustomShoppingItem[];
   cutList: CutList | null;
+  thumbnail?: ProjectThumbnail | null;
+  cameraState?: CameraState | null;
 }): CarvdFile {
   return {
     version: CARVD_FILE_VERSION,
@@ -69,7 +73,9 @@ export function serializeProject(state: {
     assemblies: state.assemblies.length > 0 ? state.assemblies : undefined,
     snapGuides: state.snapGuides.length > 0 ? state.snapGuides : undefined,
     customShoppingItems: state.customShoppingItems?.length > 0 ? state.customShoppingItems : undefined,
-    cutList: state.cutList || undefined
+    cutList: state.cutList || undefined,
+    thumbnail: state.thumbnail || undefined,
+    cameraState: state.cameraState || undefined
   };
 }
 
@@ -95,7 +101,9 @@ export function deserializeToProject(file: CarvdFile): Project {
     assemblies: file.assemblies,
     snapGuides: file.snapGuides,
     customShoppingItems: file.customShoppingItems,
-    cutList: file.cutList
+    cutList: file.cutList,
+    thumbnail: file.thumbnail,
+    cameraState: file.cameraState
   };
 }
 
@@ -272,6 +280,139 @@ export function parseCarvdFile(jsonString: string): FileValidationResult {
   }
 
   return validateCarvdFile(parsed);
+}
+
+/**
+ * Result of file repair attempt
+ */
+export interface FileRepairResult {
+  success: boolean;
+  repairedData?: CarvdFile;
+  repairActions: string[];
+  remainingErrors: string[];
+  warnings: string[];
+}
+
+/**
+ * Attempt to repair a corrupted CarvdFile by fixing referential integrity issues
+ */
+export function repairCarvdFile(jsonString: string): FileRepairResult {
+  const repairActions: string[] = [];
+  const remainingErrors: string[] = [];
+  const warnings: string[] = [];
+
+  // First, try to parse the JSON
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonString);
+  } catch (e) {
+    return {
+      success: false,
+      repairActions: [],
+      remainingErrors: [`Invalid JSON: ${e instanceof Error ? e.message : 'Parse error'}`],
+      warnings: []
+    };
+  }
+
+  // Basic structure check
+  if (!parsed || typeof parsed !== 'object') {
+    return {
+      success: false,
+      repairActions: [],
+      remainingErrors: ['Invalid file: not a JSON object'],
+      warnings: []
+    };
+  }
+
+  const obj = parsed as Record<string, unknown>;
+
+  // Check for required fields
+  if (!obj.project || typeof obj.project !== 'object') {
+    return {
+      success: false,
+      repairActions: [],
+      remainingErrors: ['Missing project metadata - cannot repair'],
+      warnings: []
+    };
+  }
+
+  // Ensure arrays exist
+  if (!Array.isArray(obj.parts)) obj.parts = [];
+  if (!Array.isArray(obj.stocks)) obj.stocks = [];
+  if (!Array.isArray(obj.groups)) obj.groups = [];
+  if (!Array.isArray(obj.groupMembers)) obj.groupMembers = [];
+
+  // Build ID sets for repair
+  const partIds = new Set((obj.parts as Array<{ id: string }>).map((p) => p.id));
+  const stockIds = new Set((obj.stocks as Array<{ id: string }>).map((s) => s.id));
+  const groupIds = new Set((obj.groups as Array<{ id: string }>).map((g) => g.id));
+
+  // Repair: Remove orphaned groupMembers
+  const originalGroupMemberCount = (obj.groupMembers as unknown[]).length;
+  obj.groupMembers = (obj.groupMembers as Array<{ groupId: string; memberType: string; memberId: string }>).filter(
+    (gm) => {
+      // Check if the parent group exists
+      if (!groupIds.has(gm.groupId)) {
+        repairActions.push(`Removed orphaned membership to non-existent group "${gm.groupId}"`);
+        return false;
+      }
+      // Check if the member exists
+      if (gm.memberType === 'part' && !partIds.has(gm.memberId)) {
+        repairActions.push(`Removed membership referencing non-existent part "${gm.memberId}"`);
+        return false;
+      }
+      if (gm.memberType === 'group' && !groupIds.has(gm.memberId)) {
+        repairActions.push(`Removed membership referencing non-existent group "${gm.memberId}"`);
+        return false;
+      }
+      return true;
+    }
+  );
+
+  if ((obj.groupMembers as unknown[]).length < originalGroupMemberCount) {
+    const removed = originalGroupMemberCount - (obj.groupMembers as unknown[]).length;
+    repairActions.push(`Removed ${removed} orphaned group membership(s)`);
+  }
+
+  // Repair: Clear invalid stock references on parts (set to null, don't remove part)
+  for (const part of obj.parts as Array<{ id: string; name: string; stockId: string | null }>) {
+    if (part.stockId && !stockIds.has(part.stockId)) {
+      warnings.push(`Part "${part.name}" had invalid stock reference - stock unassigned`);
+      part.stockId = null;
+    }
+  }
+
+  // Try to validate the repaired file
+  const migratedData = migrateFile(obj as CarvdFile);
+  const integrityResult = validateReferentialIntegrity(migratedData);
+
+  if (integrityResult.errors.length > 0) {
+    return {
+      success: false,
+      repairActions,
+      remainingErrors: integrityResult.errors,
+      warnings: [...warnings, ...integrityResult.warnings]
+    };
+  }
+
+  return {
+    success: true,
+    repairedData: migratedData,
+    repairActions,
+    remainingErrors: [],
+    warnings: [...warnings, ...integrityResult.warnings]
+  };
+}
+
+/**
+ * Get summary statistics for a CarvdFile
+ */
+export function getFileSummary(file: CarvdFile): { parts: number; stocks: number; groups: number } {
+  return {
+    parts: file.parts.length,
+    stocks: file.stocks.length,
+    groups: file.groups.length
+  };
 }
 
 /**

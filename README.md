@@ -2,18 +2,20 @@
 
 Professional furniture and cabinetry design software with 3D visualization and optimized cut lists.
 
+**[Download](https://github.com/mdbaldwin1/carvd-studio/releases/latest)** | **[Website](https://carvd-studio.com)**
+
+> Free 14-day trial with full features. Purchase a license key to unlock permanently.
+
 ## Monorepo Structure
 
-This repository contains three packages:
+This repository contains two packages:
 
 ```
 carvd-studio/
 ├── packages/
 │   ├── desktop/        → Electron desktop application (macOS/Windows)
-│   ├── webhook/        → Lemon Squeezy webhook for license generation (Vercel)
 │   └── website/        → Marketing and documentation website (Vercel)
 ├── package.json        → Root workspace configuration
-├── license-private-key.pem  → RSA private key (gitignored, shared)
 └── README.md           → This file
 ```
 
@@ -34,9 +36,6 @@ npm run dev:desktop
 
 # Run website locally
 npm run dev:website
-
-# Test webhook locally
-npm run dev:webhook
 ```
 
 ### Building
@@ -56,9 +55,6 @@ npm run build:website
 ### Deployment
 
 ```bash
-# Deploy webhook service
-npm run deploy:webhook
-
 # Deploy website
 npm run deploy:website
 ```
@@ -77,25 +73,11 @@ Electron-based desktop application for designing custom furniture.
 - Stock material management and assignment
 - Optimized cut list generation
 - PDF export with cut diagrams
-- Offline license verification (JWT)
+- License verification via Lemon Squeezy (with offline caching)
 - Dark/Light/System themes
 - Full undo/redo support
 
 [See desktop README for details](packages/desktop/README.md)
-
-### 🔗 Webhook Service ([packages/webhook](packages/webhook/))
-
-Vercel serverless function that generates license keys when customers purchase through Lemon Squeezy.
-
-**Tech Stack**: Node.js, Vercel Serverless Functions, JWT
-
-**Features**:
-- Receives Lemon Squeezy purchase webhooks
-- Generates signed JWT license keys
-- Webhook signature verification
-- Automatic email delivery via Lemon Squeezy
-
-[See webhook README for details](packages/webhook/README.md)
 
 ### 🌐 Website ([packages/website](packages/website/))
 
@@ -113,22 +95,20 @@ Marketing and documentation website.
 
 ## License Key System
 
-This project uses asymmetric cryptography (RSA-2048) for offline license verification:
+This project uses a freemium model with Lemon Squeezy for payments:
 
-1. **Private Key** (`license-private-key.pem`) - Generates license keys (webhook service)
-2. **Public Key** (`packages/desktop/src/main/keys.ts`) - Verifies licenses (desktop app)
+- **Free Download**: Anyone can download and install the app from [GitHub Releases](https://github.com/mdbaldwin1/carvd-studio/releases)
+- **14-Day Trial**: Full features for 14 days, no credit card required
+- **License Key**: Purchase unlocks full features permanently
 
-### Generate Keys
+When customers purchase through Lemon Squeezy, license keys are automatically generated and delivered. The desktop app validates licenses via the Lemon Squeezy API (with offline caching for 7 days).
+
+### Development Testing
 
 ```bash
-# Generate RSA keypair (first time setup)
-npm run generate-keys
-
 # Generate test license for development
 npm run generate-test-license
 ```
-
-**Security**: Never commit `license-private-key.pem` to git (already gitignored).
 
 ## Scripts
 
@@ -143,7 +123,6 @@ npm run generate-test-license
 | `npm run build:website` | Build website for production |
 | `npm run package:mac` | Create macOS DMG installer |
 | `npm run package:win` | Create Windows installer |
-| `npm run deploy:webhook` | Deploy webhook to Vercel |
 | `npm run deploy:website` | Deploy website to Vercel |
 | `npm run lint` | Lint all packages |
 | `npm run format` | Format all packages |
@@ -196,19 +175,6 @@ npm run dev:desktop
    # Output: packages/desktop/dist/Carvd Studio Setup 0.1.0.exe
    ```
 
-### Webhook Service
-
-```bash
-cd packages/webhook
-vercel --prod
-```
-
-Configure environment variables in Vercel dashboard:
-- `LICENSE_PRIVATE_KEY` - Your RSA private key
-- `LEMON_SQUEEZY_WEBHOOK_SECRET` - From Lemon Squeezy settings
-
-[See webhook deployment guide](packages/webhook/QUICKSTART.md)
-
 ### Website
 
 ```bash
@@ -224,7 +190,6 @@ vercel --prod
 # Add to specific package
 npm install <package> --workspace=@carvd/desktop
 npm install <package> --workspace=@carvd/website
-npm install <package> --workspace=@carvd/webhook
 
 # Add to root (shared dev tools)
 npm install <package> -D -w
@@ -246,10 +211,6 @@ npm install <package> -D -w
 - **Zustand** - State management
 - **electron-store** - Persistent storage
 
-### Webhook
-- **Vercel** - Serverless hosting
-- **jsonwebtoken** - JWT signing
-
 ### Website
 - **Vite** - Build tool
 - **React Router** - Routing
@@ -261,4 +222,4 @@ ISC License - Copyright (c) 2026 Michael Baldwin
 
 ## Author
 
-Michael Baldwin ([@mbaldwintech](https://github.com/mbaldwintech))
+Michael Baldwin ([@mdbaldwin1](https://github.com/mdbaldwin1))

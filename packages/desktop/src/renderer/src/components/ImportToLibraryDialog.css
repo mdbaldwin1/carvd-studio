@@ -57,7 +57,7 @@
   background: var(--color-bg-hover);
 }
 
-.import-item input[type="checkbox"] {
+.import-item input[type='checkbox'] {
   flex-shrink: 0;
 }
 

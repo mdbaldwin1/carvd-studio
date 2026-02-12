@@ -1,53 +1,110 @@
-import React, { useState, useEffect } from 'react';
-import { Assembly } from '../types';
+import { Plus, Search, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useBackdropClose } from '../hooks/useBackdropClose';
 import { useProjectStore } from '../store/projectStore';
+import { Assembly } from '../types';
 import { formatMeasurementWithUnit } from '../utils/fractions';
+import { getFeatureLimits } from '../utils/featureLimits';
 
 interface AddAssemblyModalProps {
   isOpen: boolean;
   onClose: () => void;
   assemblyLibrary: Assembly[];
   onAddToProject: (assembly: Assembly) => void;
+  onCreateNew?: () => void;
 }
 
 export function AddAssemblyModal({
   isOpen,
   onClose,
   assemblyLibrary,
-  onAddToProject
+  onAddToProject,
+  onCreateNew
 }: AddAssemblyModalProps) {
   const units = useProjectStore((s) => s.units);
   const assemblies = useProjectStore((s) => s.assemblies);
+  const licenseMode = useProjectStore((s) => s.licenseMode);
+  const limits = getFeatureLimits(licenseMode);
+  const canCreateAssemblies = limits.canUseAssemblies;
 
-  const [selectedAssemblyId, setSelectedAssemblyId] = useState<string | null>(null);
-  const [editedName, setEditedName] = useState('');
-  const [editedDescription, setEditedDescription] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [displayedAssemblyId, setDisplayedAssemblyId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Filter out assemblies already in project
-  const availableAssemblies = assemblyLibrary.filter(
-    (c) => !assemblies.some((pc) => pc.id === c.id)
+  const availableAssemblies = useMemo(
+    () => assemblyLibrary.filter((c) => !assemblies.some((pc) => pc.id === c.id)),
+    [assemblyLibrary, assemblies]
+  );
+
+  // Filter by search term
+  const filteredAssemblies = useMemo(
+    () =>
+      searchTerm
+        ? availableAssemblies.filter((a) => a.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        : availableAssemblies,
+    [availableAssemblies, searchTerm]
   );
 
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
-      setSelectedAssemblyId(null);
-      setEditedName('');
-      setEditedDescription('');
+      setSelectedIds(new Set());
+      setDisplayedAssemblyId(null);
+      setSearchTerm('');
     }
   }, [isOpen]);
 
-  // Update form when selecting an assembly
-  useEffect(() => {
-    if (selectedAssemblyId) {
-      const assembly = assemblyLibrary.find((c) => c.id === selectedAssemblyId);
-      if (assembly) {
-        setEditedName(assembly.name);
-        setEditedDescription(assembly.description || '');
+  // Get the currently displayed assembly
+  const displayedAssembly = displayedAssemblyId ? assemblyLibrary.find((a) => a.id === displayedAssemblyId) : null;
+
+  const handleItemClick = useCallback(
+    (assembly: Assembly) => {
+      setSelectedIds((prev) => {
+        const newSet = new Set(prev);
+        if (newSet.has(assembly.id)) {
+          // Clicking a selected item deselects it
+          newSet.delete(assembly.id);
+          // If we're deselecting the displayed item, clear the display or show another selected item
+          if (displayedAssemblyId === assembly.id) {
+            const remaining = Array.from(newSet);
+            setDisplayedAssemblyId(remaining.length > 0 ? remaining[remaining.length - 1] : null);
+          }
+        } else {
+          // Select the item and display it
+          newSet.add(assembly.id);
+          setDisplayedAssemblyId(assembly.id);
+        }
+        return newSet;
+      });
+    },
+    [displayedAssemblyId]
+  );
+
+  const handleSelectAll = useCallback(() => {
+    const filteredIds = filteredAssemblies.map((a) => a.id);
+    const allFilteredSelected = filteredIds.every((id) => selectedIds.has(id));
+    if (allFilteredSelected) {
+      // Deselect all filtered items
+      setSelectedIds((prev) => {
+        const newSet = new Set(prev);
+        filteredIds.forEach((id) => newSet.delete(id));
+        return newSet;
+      });
+      setDisplayedAssemblyId(null);
+    } else {
+      // Select all filtered items
+      setSelectedIds((prev) => {
+        const newSet = new Set(prev);
+        filteredIds.forEach((id) => newSet.add(id));
+        return newSet;
+      });
+      // Display the last item in the filtered list
+      if (filteredAssemblies.length > 0) {
+        setDisplayedAssemblyId(filteredAssemblies[filteredAssemblies.length - 1].id);
       }
     }
-  }, [selectedAssemblyId, assemblyLibrary]);
+  }, [filteredAssemblies, selectedIds]);
 
   const { handleMouseDown, handleClick } = useBackdropClose(onClose);
 
@@ -62,36 +119,34 @@ export function AddAssemblyModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  const handleAdd = () => {
-    if (!selectedAssemblyId) return;
-
-    const original = assemblyLibrary.find((c) => c.id === selectedAssemblyId);
-    if (!original) return;
-
-    // Create a copy with potentially edited metadata
-    const assemblyToAdd: Assembly = {
-      ...original,
-      name: editedName || original.name,
-      description: editedDescription || original.description,
-      modifiedAt: new Date().toISOString()
-    };
-
-    onAddToProject(assemblyToAdd);
+  const handleAdd = useCallback(() => {
+    // Add all selected assemblies to the project
+    for (const assemblyId of selectedIds) {
+      const assembly = assemblyLibrary.find((a) => a.id === assemblyId);
+      if (assembly) {
+        const assemblyToAdd: Assembly = {
+          ...assembly,
+          modifiedAt: new Date().toISOString()
+        };
+        onAddToProject(assemblyToAdd);
+      }
+    }
     onClose();
-  };
+  }, [selectedIds, assemblyLibrary, onAddToProject, onClose]);
 
   if (!isOpen) return null;
 
-  const selectedAssembly = selectedAssemblyId
-    ? assemblyLibrary.find((c) => c.id === selectedAssemblyId)
-    : null;
-
   return (
     <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
-      <div className="modal add-assembly-modal">
+      <div
+        className="modal add-assembly-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-assembly-modal-title"
+      >
         <div className="modal-header">
-          <h2>Add Assembly to Project</h2>
-          <button className="modal-close" onClick={onClose}>
+          <h2 id="add-assembly-modal-title">Add Assembly to Project</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Close">
             &times;
           </button>
         </div>
@@ -101,25 +156,77 @@ export function AddAssemblyModal({
           <div className="add-assembly-list-panel">
             <div className="add-assembly-list-header">
               <span>{availableAssemblies.length} available</span>
+              <div className="add-assembly-list-actions">
+                {availableAssemblies.length > 0 && (
+                  <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleSelectAll}>
+                    {filteredAssemblies.every((a) => selectedIds.has(a.id)) && filteredAssemblies.length > 0
+                      ? 'Deselect All'
+                      : 'Select All'}
+                  </button>
+                )}
+                {onCreateNew && canCreateAssemblies && (
+                  <button
+                    className="btn btn-icon-xs btn-ghost btn-secondary"
+                    onClick={() => {
+                      onClose();
+                      onCreateNew();
+                    }}
+                    title="Create new assembly"
+                    aria-label="Create new assembly"
+                  >
+                    <Plus size={14} />
+                  </button>
+                )}
+              </div>
             </div>
+            {availableAssemblies.length > 0 && (
+              <div className="modal-search">
+                <Search size={14} className="modal-search-icon" />
+                <input
+                  type="text"
+                  placeholder="Search assemblies..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {searchTerm && (
+                  <button className="modal-search-clear" onClick={() => setSearchTerm('')} aria-label="Clear search">
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            )}
             {availableAssemblies.length === 0 ? (
               <div className="placeholder-text">
                 <p>No assemblies available</p>
                 <p className="hint">
                   {assemblyLibrary.length === 0
-                    ? 'Save a selection as an assembly from the canvas'
+                    ? onCreateNew
+                      ? 'Click "+" above or save a selection as an assembly from the canvas'
+                      : 'Save a selection as an assembly from the canvas'
                     : 'All library assemblies are already in this project'}
                 </p>
               </div>
+            ) : filteredAssemblies.length === 0 ? (
+              <div className="placeholder-text">
+                <p>No assemblies match "{searchTerm}"</p>
+              </div>
             ) : (
               <ul className="add-assembly-list">
-                {availableAssemblies.map((assembly) => (
+                {filteredAssemblies.map((assembly) => (
                   <li
                     key={assembly.id}
-                    className={`add-assembly-item ${selectedAssemblyId === assembly.id ? 'selected' : ''}`}
-                    onClick={() => setSelectedAssemblyId(assembly.id)}
+                    className={`add-assembly-item ${selectedIds.has(assembly.id) ? 'selected' : ''} ${displayedAssemblyId === assembly.id ? 'displayed' : ''}`}
+                    onClick={() => handleItemClick(assembly)}
                   >
-                    <span className="assembly-icon">📦</span>
+                    {assembly.thumbnailData ? (
+                      <img
+                        src={`data:image/png;base64,${assembly.thumbnailData.data}`}
+                        alt={assembly.name}
+                        className="assembly-thumbnail"
+                      />
+                    ) : (
+                      <span className="assembly-icon">{assembly.thumbnail || '📦'}</span>
+                    )}
                     <div className="assembly-info">
                       <span className="assembly-name">{assembly.name}</span>
                       <span className="assembly-dims">
@@ -130,42 +237,56 @@ export function AddAssemblyModal({
                 ))}
               </ul>
             )}
+            {selectedIds.size > 0 && (
+              <div className="add-assembly-selection-bar">
+                <span>{selectedIds.size} selected</span>
+              </div>
+            )}
           </div>
 
           {/* Detail/edit panel */}
           <div className="add-assembly-detail-panel">
-            {!selectedAssembly ? (
+            {!displayedAssembly ? (
               <div className="add-assembly-empty">
-                <p>Select an assembly from the library</p>
-                <p className="hint">You can customize its name and description for this project</p>
+                <p className="mb-2">Select an assembly from the library to view details</p>
+                <p className="hint text-xs">or click "+" to create one</p>
+                <a
+                  href="#"
+                  className="learn-more-link text-xs"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
+                  }}
+                >
+                  Learn more about assemblies
+                </a>
               </div>
             ) : (
               <>
-                <div className="form-group">
-                  <label>Name</label>
-                  <input
-                    type="text"
-                    value={editedName}
-                    onChange={(e) => setEditedName(e.target.value)}
-                    placeholder={selectedAssembly.name}
-                  />
+                <div className="assembly-details-header">
+                  {displayedAssembly.thumbnailData ? (
+                    <img
+                      src={`data:image/png;base64,${displayedAssembly.thumbnailData.data}`}
+                      alt={displayedAssembly.name}
+                      className="assembly-thumbnail-large"
+                    />
+                  ) : (
+                    <span className="assembly-icon-large">{displayedAssembly.thumbnail || '📦'}</span>
+                  )}
+                  <h3>{displayedAssembly.name}</h3>
                 </div>
 
-                <div className="form-group">
-                  <label>Description</label>
-                  <textarea
-                    value={editedDescription}
-                    onChange={(e) => setEditedDescription(e.target.value)}
-                    placeholder="Optional description for this project"
-                    rows={3}
-                  />
-                </div>
+                {displayedAssembly.description && (
+                  <div className="assembly-description">
+                    <p>{displayedAssembly.description}</p>
+                  </div>
+                )}
 
                 {/* Parts preview */}
                 <div className="assembly-preview">
-                  <label className="detail-label">Parts ({selectedAssembly.parts.length})</label>
+                  <label className="detail-label">Parts ({displayedAssembly.parts.length})</label>
                   <ul className="assembly-parts-preview">
-                    {selectedAssembly.parts.slice(0, 5).map((part, index) => (
+                    {displayedAssembly.parts.slice(0, 5).map((part, index) => (
                       <li key={index} className="assembly-part-preview-item">
                         <span className="part-name">{part.name}</span>
                         <span className="part-dims">
@@ -175,19 +296,10 @@ export function AddAssemblyModal({
                         </span>
                       </li>
                     ))}
-                    {selectedAssembly.parts.length > 5 && (
-                      <li className="assembly-part-preview-more">
-                        +{selectedAssembly.parts.length - 5} more parts
-                      </li>
+                    {displayedAssembly.parts.length > 5 && (
+                      <li className="assembly-part-preview-more">+{displayedAssembly.parts.length - 5} more parts</li>
                     )}
                   </ul>
-                </div>
-
-                {/* Hint */}
-                <div className="add-assembly-hint">
-                  <p className="hint">
-                    Want to create a new assembly? Save a selection as an assembly from the canvas context menu.
-                  </p>
                 </div>
               </>
             )}
@@ -198,12 +310,8 @@ export function AddAssemblyModal({
           <button className="btn btn-sm btn-outlined btn-secondary" onClick={onClose}>
             Cancel
           </button>
-          <button
-            className="btn btn-sm btn-filled btn-primary"
-            onClick={handleAdd}
-            disabled={!selectedAssemblyId}
-          >
-            Add to Project
+          <button className="btn btn-sm btn-filled btn-primary" onClick={handleAdd} disabled={selectedIds.size === 0}>
+            Add to Project{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
           </button>
         </div>
       </div>

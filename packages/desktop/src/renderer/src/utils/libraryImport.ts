@@ -23,18 +23,19 @@ export interface LibraryImportCheck {
  */
 function isStockInLibrary(stock: Stock, libraryStocks: Stock[]): boolean {
   // First check exact ID match
-  if (libraryStocks.some(ls => ls.id === stock.id)) {
+  if (libraryStocks.some((ls) => ls.id === stock.id)) {
     return true;
   }
 
   // Check for a stock with identical properties (name + dimensions + grain)
   // This catches stocks that were copied to a project but have different IDs
-  return libraryStocks.some(ls =>
-    ls.name === stock.name &&
-    ls.length === stock.length &&
-    ls.width === stock.width &&
-    ls.thickness === stock.thickness &&
-    ls.grainDirection === stock.grainDirection
+  return libraryStocks.some(
+    (ls) =>
+      ls.name === stock.name &&
+      ls.length === stock.length &&
+      ls.width === stock.width &&
+      ls.thickness === stock.thickness &&
+      ls.grainDirection === stock.grainDirection
   );
 }
 
@@ -44,16 +45,13 @@ function isStockInLibrary(stock: Stock, libraryStocks: Stock[]): boolean {
  */
 function isAssemblyInLibrary(assembly: Assembly, libraryAssemblies: Assembly[]): boolean {
   // First check exact ID match
-  if (libraryAssemblies.some(la => la.id === assembly.id)) {
+  if (libraryAssemblies.some((la) => la.id === assembly.id)) {
     return true;
   }
 
   // Check for an assembly with same name and same number of parts
   // This is a reasonable heuristic for "same assembly"
-  return libraryAssemblies.some(la =>
-    la.name === assembly.name &&
-    la.parts.length === assembly.parts.length
-  );
+  return libraryAssemblies.some((la) => la.name === assembly.name && la.parts.length === assembly.parts.length);
 }
 
 /**
@@ -71,13 +69,9 @@ export function detectMissingLibraryItems(
   libraryStocks: Stock[],
   libraryAssemblies: Assembly[]
 ): LibraryImportCheck {
-  const missingStocks = projectStocks.filter(
-    stock => !isStockInLibrary(stock, libraryStocks)
-  );
+  const missingStocks = projectStocks.filter((stock) => !isStockInLibrary(stock, libraryStocks));
 
-  const missingAssemblies = projectAssemblies.filter(
-    assembly => !isAssemblyInLibrary(assembly, libraryAssemblies)
-  );
+  const missingAssemblies = projectAssemblies.filter((assembly) => !isAssemblyInLibrary(assembly, libraryAssemblies));
 
   return {
     missingStocks,

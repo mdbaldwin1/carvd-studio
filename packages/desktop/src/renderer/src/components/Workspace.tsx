@@ -1,17 +1,82 @@
 import { Grid, Html, Line, OrbitControls } from '@react-three/drei';
 import { ThreeEvent, useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { GRID_SIZE } from '../constants';
-import { useProjectStore, getAllDescendantPartIds } from '../store/projectStore';
-import { SnapLine } from '../types';
+import {
+  useProjectStore,
+  getAllDescendantPartIds,
+  registerCanvasCaptureHandler,
+  unregisterCanvasCaptureHandler,
+  registerThumbnailGenerator,
+  unregisterThumbnailGenerator
+} from '../store/projectStore';
+import { useAppSettingsStore } from '../store/appSettingsStore';
+import { CameraState, LightingMode, SnapLine } from '../types';
 import { formatMeasurementWithUnit } from '../utils/fractions';
 import { Part } from './Part';
+import { ReferenceDistanceIndicators } from './ReferenceDistanceIndicators';
+
+// Lighting presets for different viewing conditions
+const LIGHTING_PRESETS: Record<
+  LightingMode,
+  {
+    ambient: number;
+    mainLight: { position: [number, number, number]; intensity: number };
+    fillLight: { position: [number, number, number]; intensity: number };
+    description: string;
+  }
+> = {
+  default: {
+    ambient: 0.5,
+    mainLight: { position: [10, 20, 10], intensity: 1 },
+    fillLight: { position: [-10, 10, -10], intensity: 0.3 },
+    description: 'Balanced lighting for general use'
+  },
+  bright: {
+    ambient: 1.0,
+    mainLight: { position: [10, 20, 10], intensity: 1.5 },
+    fillLight: { position: [-10, 15, -10], intensity: 0.8 },
+    description: 'Brighter lighting for dark materials'
+  },
+  studio: {
+    ambient: 0.6,
+    mainLight: { position: [15, 25, 15], intensity: 0.8 },
+    fillLight: { position: [-15, 15, -15], intensity: 0.5 },
+    description: 'Soft, even lighting like a photography studio'
+  },
+  dramatic: {
+    ambient: 0.3,
+    mainLight: { position: [5, 30, 5], intensity: 1.5 },
+    fillLight: { position: [-8, 5, -8], intensity: 0.15 },
+    description: 'High contrast lighting with strong shadows'
+  }
+};
 
 // Type guard to check if controls is OrbitControls
 function isOrbitControls(controls: THREE.EventDispatcher<object> | null): controls is OrbitControlsImpl {
   return controls !== null && 'enabled' in controls;
+}
+
+// Module-level tracking for right-click context menu
+// Shared between Workspace and SnapGuides
+let globalRightClickTarget: {
+  type: 'background' | 'part' | 'guide';
+  worldPosition?: { x: number; y: number; z: number };
+  guideId?: string;
+} | null = null;
+
+export function setRightClickTarget(target: typeof globalRightClickTarget) {
+  globalRightClickTarget = target;
+}
+
+export function getRightClickTarget() {
+  return globalRightClickTarget;
+}
+
+export function clearRightClickTarget() {
+  globalRightClickTarget = null;
 }
 
 // Component that handles camera centering and view vector tracking
@@ -19,6 +84,8 @@ function CameraController() {
   const { camera, controls } = useThree();
   const parts = useProjectStore((s) => s.parts);
   const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
+  const selectedGroupIds = useProjectStore((s) => s.selectedGroupIds);
+  const groupMembers = useProjectStore((s) => s.groupMembers);
   const centerCameraRequested = useProjectStore((s) => s.centerCameraRequested);
   const centerCameraAtOriginRequested = useProjectStore((s) => s.centerCameraAtOriginRequested);
   const centerCameraAtPosition = useProjectStore((s) => s.centerCameraAtPosition);
@@ -102,10 +169,19 @@ function CameraController() {
 
   // Handle center on selection
   useEffect(() => {
-    if (!centerCameraRequested || selectedPartIds.length === 0) return;
+    // Get all part IDs to center on (directly selected parts + parts within selected groups)
+    const allPartIds = new Set(selectedPartIds);
+    for (const groupId of selectedGroupIds) {
+      const descendantPartIds = getAllDescendantPartIds(groupId, groupMembers);
+      for (const partId of descendantPartIds) {
+        allPartIds.add(partId);
+      }
+    }
+
+    if (!centerCameraRequested || allPartIds.size === 0) return;
 
     // Calculate center of all selected parts
-    const selectedParts = parts.filter((p) => selectedPartIds.includes(p.id));
+    const selectedParts = parts.filter((p) => allPartIds.has(p.id));
     if (selectedParts.length === 0) {
       clearCenterCameraRequest();
       return;
@@ -166,7 +242,117 @@ function CameraController() {
     }
 
     clearCenterCameraRequest();
-  }, [centerCameraRequested, selectedPartIds, parts, controls, clearCenterCameraRequest]);
+  }, [
+    centerCameraRequested,
+    selectedPartIds,
+    selectedGroupIds,
+    groupMembers,
+    parts,
+    controls,
+    clearCenterCameraRequest
+  ]);
+
+  return null;
+}
+
+// Component that handles canvas capture/export
+function CanvasCaptureHandler() {
+  const { gl, scene, camera } = useThree();
+  const projectName = useProjectStore((s) => s.projectName);
+
+  const captureCanvas = useCallback(async () => {
+    // Render the scene to ensure we capture current state
+    gl.render(scene, camera);
+
+    // Show save dialog first to get the file path and determine format
+    const sanitizedName = (projectName || 'project').replace(/[^a-zA-Z0-9-_]/g, '-');
+    const result = await window.electronAPI.showSaveDialog({
+      defaultPath: `${sanitizedName}.png`,
+      filters: [
+        { name: 'PNG Images', extensions: ['png'] },
+        { name: 'JPEG Images', extensions: ['jpg', 'jpeg'] }
+      ]
+    });
+
+    if (result.canceled || !result.filePath) {
+      return;
+    }
+
+    // Determine format based on file extension
+    const isJpeg = result.filePath.toLowerCase().endsWith('.jpg') || result.filePath.toLowerCase().endsWith('.jpeg');
+    const mimeType = isJpeg ? 'image/jpeg' : 'image/png';
+
+    // Get the canvas data as a data URL
+    const dataUrl = gl.domElement.toDataURL(mimeType, isJpeg ? 0.95 : undefined);
+
+    // Convert data URL to Uint8Array without using fetch (CSP compliant)
+    const base64Data = dataUrl.split(',')[1];
+    const binaryString = atob(base64Data);
+    const uint8Array = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      uint8Array[i] = binaryString.charCodeAt(i);
+    }
+
+    // Write the image file
+    await window.electronAPI.writeBinaryFile(result.filePath, Array.from(uint8Array));
+    useProjectStore.getState().showToast(`Exported to ${result.filePath.split('/').pop()}`);
+  }, [gl, scene, camera, projectName]);
+
+  // Register the capture handler on mount
+  useEffect(() => {
+    registerCanvasCaptureHandler(captureCanvas);
+    return () => unregisterCanvasCaptureHandler();
+  }, [captureCanvas]);
+
+  return null;
+}
+
+// Thumbnail dimensions for project preview
+const THUMBNAIL_WIDTH = 400;
+const THUMBNAIL_HEIGHT = 300;
+
+// Component that handles thumbnail generation for project saves
+function ThumbnailCaptureHandler() {
+  const { gl, scene, camera } = useThree();
+
+  const generateThumbnail = useCallback(async (): Promise<string | null> => {
+    try {
+      // Store original canvas size
+      const originalWidth = gl.domElement.width;
+      const originalHeight = gl.domElement.height;
+
+      // Create an off-screen canvas for thumbnail
+      const offscreenCanvas = document.createElement('canvas');
+      offscreenCanvas.width = THUMBNAIL_WIDTH;
+      offscreenCanvas.height = THUMBNAIL_HEIGHT;
+      const ctx = offscreenCanvas.getContext('2d');
+
+      if (!ctx) {
+        return null;
+      }
+
+      // Render the scene at current size
+      gl.render(scene, camera);
+
+      // Draw the WebGL canvas onto the offscreen canvas, scaling it down
+      ctx.drawImage(gl.domElement, 0, 0, originalWidth, originalHeight, 0, 0, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
+
+      // Convert to base64 PNG (without the data:image/png;base64, prefix)
+      const dataUrl = offscreenCanvas.toDataURL('image/png', 0.8);
+      const base64Data = dataUrl.split(',')[1];
+
+      return base64Data;
+    } catch (error) {
+      console.error('Failed to generate thumbnail:', error);
+      return null;
+    }
+  }, [gl, scene, camera]);
+
+  // Register the thumbnail generator on mount
+  useEffect(() => {
+    registerThumbnailGenerator(generateThumbnail);
+    return () => unregisterThumbnailGenerator();
+  }, [generateThumbnail]);
 
   return null;
 }
@@ -367,13 +553,14 @@ function MultiSelectionDimensions() {
     return [...partIds];
   }, [selectedPartIds, selectedGroupIds, groupMembers]);
 
-  // Only show when 2+ parts are effectively selected
+  // Only show when 2+ parts are effectively selected, and not while dragging
   if (effectiveSelectedPartIds.length < 2) return null;
+  if (activeDragDelta) return null; // Hide dimension labels while dragging
 
   const selectedParts = parts.filter((p) => effectiveSelectedPartIds.includes(p.id));
   if (selectedParts.length < 2) return null;
 
-  // Calculate bounding boxes for each part, applying drag delta if active
+  // Calculate bounding boxes for each part
   const partAABBs = selectedParts.map((part) => {
     // Apply drag delta to position if dragging
     const adjustedPart = activeDragDelta
@@ -559,7 +746,11 @@ function SnapAlignmentLines() {
   // Colors for different snap types
   const getLineColor = (line: SnapLine) => {
     if (line.type === 'dimension-match') {
-      return '#ffa94d'; // Orange for dimension matching
+      // Different colors for standard vs part-matched dimensions
+      if (line.dimensionMatchInfo?.isStandard) {
+        return '#40c057'; // Green for standard dimensions
+      }
+      return '#ffa94d'; // Orange for part-matched dimensions
     }
     if (line.type === 'equal-spacing') {
       return '#da77f2'; // Magenta/purple for equal spacing
@@ -582,6 +773,38 @@ function SnapAlignmentLines() {
 
   // Distance indicator color (cyan/teal for visibility)
   const distanceColor = '#00d9ff';
+  const connectorColor = '#888888'; // Gray for connector lines
+
+  // Format the source info for dimension match labels
+  const formatDimensionMatchLabel = (line: SnapLine, distance: number) => {
+    const value = formatMeasurementWithUnit(distance, units);
+
+    if (!line.dimensionMatchInfo) {
+      return value;
+    }
+
+    if (line.dimensionMatchInfo.isStandard) {
+      return `${value} (standard)`;
+    }
+
+    if (line.dimensionMatchInfo.sourcePart && line.dimensionMatchInfo.sourceDimension) {
+      // Abbreviate dimension names
+      const dimAbbrev = {
+        length: 'L',
+        width: 'W',
+        thickness: 'T'
+      };
+      const abbrev = dimAbbrev[line.dimensionMatchInfo.sourceDimension];
+      // Truncate part name if too long
+      const partName =
+        line.dimensionMatchInfo.sourcePart.length > 12
+          ? line.dimensionMatchInfo.sourcePart.substring(0, 12) + '...'
+          : line.dimensionMatchInfo.sourcePart;
+      return `${value} = ${partName} (${abbrev})`;
+    }
+
+    return value;
+  };
 
   return (
     <group>
@@ -600,77 +823,100 @@ function SnapAlignmentLines() {
             gapSize={0.25}
           />
 
+          {/* Connector line to matched part (for dimension-match only) */}
+          {line.connectorLine && (
+            <Line
+              points={[
+                [line.connectorLine.start.x, line.connectorLine.start.y, line.connectorLine.start.z],
+                [line.connectorLine.end.x, line.connectorLine.end.y, line.connectorLine.end.z]
+              ]}
+              color={connectorColor}
+              lineWidth={1}
+              dashed
+              dashSize={0.3}
+              gapSize={0.2}
+            />
+          )}
+
           {/* Distance indicator lines and labels */}
-          {line.distanceIndicators?.map((indicator, distIndex) => (
-            <group key={`distance-${index}-${distIndex}`}>
-              {/* Distance line */}
-              <Line
-                points={[
-                  [indicator.start.x, indicator.start.y, indicator.start.z],
-                  [indicator.end.x, indicator.end.y, indicator.end.z]
-                ]}
-                color={distanceColor}
-                lineWidth={1.5}
-              />
-              {/* End caps (short perpendicular lines) */}
-              <Line
-                points={[
-                  [
-                    indicator.start.x + (indicator.end.x === indicator.start.x ? 0.2 : 0),
-                    indicator.start.y + (indicator.end.y === indicator.start.y ? 0.2 : 0),
-                    indicator.start.z + (indicator.end.z === indicator.start.z ? 0.2 : 0)
-                  ],
-                  [
-                    indicator.start.x - (indicator.end.x === indicator.start.x ? 0.2 : 0),
-                    indicator.start.y - (indicator.end.y === indicator.start.y ? 0.2 : 0),
-                    indicator.start.z - (indicator.end.z === indicator.start.z ? 0.2 : 0)
-                  ]
-                ]}
-                color={distanceColor}
-                lineWidth={1.5}
-              />
-              <Line
-                points={[
-                  [
-                    indicator.end.x + (indicator.end.x === indicator.start.x ? 0.2 : 0),
-                    indicator.end.y + (indicator.end.y === indicator.start.y ? 0.2 : 0),
-                    indicator.end.z + (indicator.end.z === indicator.start.z ? 0.2 : 0)
-                  ],
-                  [
-                    indicator.end.x - (indicator.end.x === indicator.start.x ? 0.2 : 0),
-                    indicator.end.y - (indicator.end.y === indicator.start.y ? 0.2 : 0),
-                    indicator.end.z - (indicator.end.z === indicator.start.z ? 0.2 : 0)
-                  ]
-                ]}
-                color={distanceColor}
-                lineWidth={1.5}
-              />
-              {/* Distance label */}
-              <Html
-                position={[indicator.labelPosition.x, indicator.labelPosition.y, indicator.labelPosition.z]}
-                center
-                zIndexRange={[0, 50]}
-                style={{ pointerEvents: 'none' }}
-              >
-                <div
-                  style={{
-                    color: distanceColor,
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    fontFamily: 'monospace',
-                    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-                    padding: '2px 5px',
-                    borderRadius: '3px',
-                    whiteSpace: 'nowrap',
-                    userSelect: 'none',
-                    border: `1px solid ${distanceColor}`
-                  }}
+          {line.distanceIndicators?.map((indicator, distIndex) => {
+            const isDimensionMatch = line.type === 'dimension-match';
+            const labelColor = isDimensionMatch ? getLineColor(line) : distanceColor;
+
+            return (
+              <group key={`distance-${index}-${distIndex}`}>
+                {/* Distance line */}
+                <Line
+                  points={[
+                    [indicator.start.x, indicator.start.y, indicator.start.z],
+                    [indicator.end.x, indicator.end.y, indicator.end.z]
+                  ]}
+                  color={isDimensionMatch ? getLineColor(line) : distanceColor}
+                  lineWidth={1.5}
+                />
+                {/* End caps (short perpendicular lines) */}
+                <Line
+                  points={[
+                    [
+                      indicator.start.x + (indicator.end.x === indicator.start.x ? 0.2 : 0),
+                      indicator.start.y + (indicator.end.y === indicator.start.y ? 0.2 : 0),
+                      indicator.start.z + (indicator.end.z === indicator.start.z ? 0.2 : 0)
+                    ],
+                    [
+                      indicator.start.x - (indicator.end.x === indicator.start.x ? 0.2 : 0),
+                      indicator.start.y - (indicator.end.y === indicator.start.y ? 0.2 : 0),
+                      indicator.start.z - (indicator.end.z === indicator.start.z ? 0.2 : 0)
+                    ]
+                  ]}
+                  color={isDimensionMatch ? getLineColor(line) : distanceColor}
+                  lineWidth={1.5}
+                />
+                <Line
+                  points={[
+                    [
+                      indicator.end.x + (indicator.end.x === indicator.start.x ? 0.2 : 0),
+                      indicator.end.y + (indicator.end.y === indicator.start.y ? 0.2 : 0),
+                      indicator.end.z + (indicator.end.z === indicator.start.z ? 0.2 : 0)
+                    ],
+                    [
+                      indicator.end.x - (indicator.end.x === indicator.start.x ? 0.2 : 0),
+                      indicator.end.y - (indicator.end.y === indicator.start.y ? 0.2 : 0),
+                      indicator.end.z - (indicator.end.z === indicator.start.z ? 0.2 : 0)
+                    ]
+                  ]}
+                  color={isDimensionMatch ? getLineColor(line) : distanceColor}
+                  lineWidth={1.5}
+                />
+                {/* Distance label (enhanced for dimension matching) */}
+                <Html
+                  position={[indicator.labelPosition.x, indicator.labelPosition.y, indicator.labelPosition.z]}
+                  center
+                  zIndexRange={[0, 50]}
+                  style={{ pointerEvents: 'none' }}
                 >
-                  {formatMeasurementWithUnit(indicator.distance, units)}
-                </div>
-              </Html>
-            </group>
-          ))}
+                  <div
+                    style={{
+                      color: labelColor,
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      fontFamily: 'monospace',
+                      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                      padding: isDimensionMatch ? '3px 8px' : '2px 5px',
+                      borderRadius: '3px',
+                      whiteSpace: 'nowrap',
+                      userSelect: 'none',
+                      border: `1px solid ${labelColor}`,
+                      boxShadow: isDimensionMatch ? '0 2px 4px rgba(0,0,0,0.3)' : 'none'
+                    }}
+                  >
+                    {isDimensionMatch
+                      ? formatDimensionMatchLabel(line, indicator.distance)
+                      : formatMeasurementWithUnit(indicator.distance, units)}
+                  </div>
+                </Html>
+              </group>
+            );
+          })}
         </group>
       ))}
     </group>
@@ -766,6 +1012,15 @@ export function Workspace() {
   const openContextMenu = useProjectStore((s) => s.openContextMenu);
   const setSelectionBox = useProjectStore((s) => s.setSelectionBox);
   const showGrid = useProjectStore((s) => s.showGrid);
+  const cameraState = useProjectStore((s) => s.cameraState);
+  const setCameraState = useProjectStore((s) => s.setCameraState);
+  const pendingCameraRestore = useProjectStore((s) => s.pendingCameraRestore);
+  const clearPendingCameraRestore = useProjectStore((s) => s.clearPendingCameraRestore);
+  const editingGroupId = useProjectStore((s) => s.editingGroupId);
+  const exitGroup = useProjectStore((s) => s.exitGroup);
+  const lightingMode = useAppSettingsStore((s) => s.settings.lightingMode) || 'default';
+  const brightnessMultiplier = useAppSettingsStore((s) => s.settings.brightnessMultiplier) ?? 1.0;
+  const lightingPreset = LIGHTING_PRESETS[lightingMode];
 
   const { camera, gl, controls } = useThree();
 
@@ -774,8 +1029,138 @@ export function Workspace() {
   const boxStartRef = useRef<{ x: number; y: number } | null>(null);
   const boxEndRef = useRef<{ x: number; y: number } | null>(null);
 
+  // Camera state persistence
+  const cameraSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Restore camera state when pendingCameraRestore flag is set
+  // This happens when loading a project or restoring from edit mode
+  useEffect(() => {
+    if (pendingCameraRestore && cameraState && isOrbitControls(controls)) {
+      // Restore camera position
+      camera.position.set(cameraState.position.x, cameraState.position.y, cameraState.position.z);
+      // Restore orbit target
+      controls.target.set(cameraState.target.x, cameraState.target.y, cameraState.target.z);
+      controls.update();
+      // Clear the flag to prevent re-restoration
+      clearPendingCameraRestore();
+    }
+  }, [pendingCameraRestore, cameraState, camera, controls, clearPendingCameraRestore]);
+
+  // Reset camera to default when cameraState is null (new project or assembly edit mode)
+  useEffect(() => {
+    if (cameraState === null) {
+      // Reset OrbitControls target to origin so camera orbits correctly
+      if (isOrbitControls(controls)) {
+        controls.target.set(0, 0, 0);
+        controls.update();
+      }
+    }
+  }, [cameraState, controls]);
+
+  // Save camera state on camera changes (debounced)
+  useEffect(() => {
+    if (!isOrbitControls(controls)) return;
+
+    const handleCameraChange = () => {
+      // Clear any pending save
+      if (cameraSaveTimeoutRef.current) {
+        clearTimeout(cameraSaveTimeoutRef.current);
+      }
+      // Debounce the save to avoid excessive updates
+      cameraSaveTimeoutRef.current = setTimeout(() => {
+        const newCameraState: CameraState = {
+          position: {
+            x: camera.position.x,
+            y: camera.position.y,
+            z: camera.position.z
+          },
+          target: {
+            x: controls.target.x,
+            y: controls.target.y,
+            z: controls.target.z
+          }
+        };
+        setCameraState(newCameraState);
+      }, 500); // 500ms debounce
+    };
+
+    controls.addEventListener('change', handleCameraChange);
+    return () => {
+      controls.removeEventListener('change', handleCameraChange);
+      if (cameraSaveTimeoutRef.current) {
+        clearTimeout(cameraSaveTimeoutRef.current);
+      }
+    };
+  }, [controls, camera, setCameraState]);
+
   // Track mouse position to distinguish click vs drag (for camera orbit)
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
+  // Track right-click position and time to distinguish right-click vs right-drag (for pan)
+  const rightClickDownPos = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  // Prevent native context menu on canvas - we'll show our own on mouseup
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const preventContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    canvas.addEventListener('contextmenu', preventContextMenu);
+    return () => canvas.removeEventListener('contextmenu', preventContextMenu);
+  }, [gl]);
+
+  // Track right-click for our custom context menu (fires on mouseup, not mousedown)
+  useEffect(() => {
+    const canvas = gl.domElement;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 2) {
+        rightClickDownPos.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+      }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 2 && rightClickDownPos.current) {
+        const dx = e.clientX - rightClickDownPos.current.x;
+        const dy = e.clientY - rightClickDownPos.current.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const elapsed = Date.now() - rightClickDownPos.current.time;
+
+        // Only show context menu if it was a quick click (not a pan)
+        if (distance <= 5 && elapsed <= 500) {
+          // Show context menu based on what was targeted on mousedown
+          const target = getRightClickTarget();
+          if (target) {
+            if (target.type === 'guide' && target.guideId) {
+              openContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                type: 'guide',
+                guideId: target.guideId
+              });
+            } else if (target.type === 'part') {
+              openContextMenu({ x: e.clientX, y: e.clientY, type: 'part' });
+            } else {
+              openContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                type: 'background',
+                worldPosition: target.worldPosition
+              });
+            }
+          }
+        }
+        rightClickDownPos.current = null;
+        clearRightClickTarget();
+      }
+    };
+
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      canvas.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [gl, openContextMenu]);
 
   // Click on empty space to deselect (only if not box selecting and not after drag)
   const handleBackgroundClick = (e: ThreeEvent<MouseEvent>) => {
@@ -803,42 +1188,58 @@ export function Workspace() {
     clearSelection();
   };
 
-  // Right-click on ground to show context menu
-  const handleGroundContextMenu = (e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation(); // Prevent event from also triggering on sky sphere
-    e.nativeEvent.preventDefault();
-
-    // Use intersection point with Y=0 for ground clicks
-    const worldPosition = e.point ? { x: e.point.x, y: 0, z: e.point.z } : { x: 0, y: 0, z: 0 };
-
-    openContextMenu({
-      x: e.nativeEvent.clientX,
-      y: e.nativeEvent.clientY,
-      type: 'background',
-      worldPosition
-    });
+  // Track what was right-clicked on pointer down (for context menu on mouseup)
+  const handleGroundRightClick = (e: ThreeEvent<PointerEvent>) => {
+    if (e.nativeEvent.button === 2) {
+      e.stopPropagation();
+      const worldPosition = e.point ? { x: e.point.x, y: 0, z: e.point.z } : { x: 0, y: 0, z: 0 };
+      setRightClickTarget({ type: 'background', worldPosition });
+    }
   };
 
-  // Right-click on sky (when nothing else is hit) to show context menu
-  const handleSkyContextMenu = (e: ThreeEvent<MouseEvent>) => {
-    e.nativeEvent.preventDefault();
+  const handleSkyRightClick = (e: ThreeEvent<PointerEvent>) => {
+    if (e.nativeEvent.button === 2) {
+      const worldPosition = e.point ? { x: e.point.x, y: e.point.y, z: e.point.z } : { x: 0, y: 0, z: 0 };
+      setRightClickTarget({ type: 'background', worldPosition });
+    }
+  };
 
-    // Use the intersection point on the sky sphere
-    // This gives a 3D position that can be used for Y guides at any height
-    const worldPosition = e.point ? { x: e.point.x, y: e.point.y, z: e.point.z } : { x: 0, y: 0, z: 0 };
+  // Click on sky to deselect (similar to ground click)
+  const handleSkyClick = (e: ThreeEvent<MouseEvent>) => {
+    if (!e.object.userData.isSky || isBoxSelecting) return;
 
-    openContextMenu({
-      x: e.nativeEvent.clientX,
-      y: e.nativeEvent.clientY,
-      type: 'background',
-      worldPosition
-    });
+    // Only clear selection if we tracked a pointer-down on the sky
+    if (!pointerDownPos.current) {
+      return;
+    }
+
+    // Check if this was a drag (camera orbit) vs a click
+    const dx = e.nativeEvent.clientX - pointerDownPos.current.x;
+    const dy = e.nativeEvent.clientY - pointerDownPos.current.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // If mouse moved more than 5 pixels, it was a drag - don't clear selection
+    if (distance > 5) {
+      pointerDownPos.current = null;
+      return;
+    }
+
+    pointerDownPos.current = null;
+    clearSelection();
   };
 
   // Track pointer down position to detect click vs drag
   const handleBackgroundPointerDownForClick = (e: ThreeEvent<PointerEvent>) => {
-    if (e.object.userData.isGround) {
+    if (e.object.userData.isGround || e.object.userData.isSky) {
       pointerDownPos.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+    }
+  };
+
+  // Double-click on background exits group editing mode (one level at a time)
+  const handleBackgroundDoubleClick = (e: ThreeEvent<MouseEvent>) => {
+    if (!e.object.userData.isGround && !e.object.userData.isSky) return;
+    if (editingGroupId !== null) {
+      exitGroup();
     }
   };
 
@@ -846,6 +1247,12 @@ export function Workspace() {
   const handleBackgroundPointerDown = (e: ThreeEvent<PointerEvent>) => {
     // Always track pointer position for click detection
     handleBackgroundPointerDownForClick(e);
+
+    // Track right-click target for context menu
+    if (e.nativeEvent.button === 2) {
+      handleGroundRightClick(e);
+      return;
+    }
 
     if (!e.object.userData.isGround) return;
 
@@ -993,13 +1400,17 @@ export function Workspace() {
     <>
       {/* Camera controller for centering on selection */}
       <CameraController />
+      {/* Canvas capture handler for export */}
+      <CanvasCaptureHandler />
+      {/* Thumbnail generator for project saves */}
+      <ThumbnailCaptureHandler />
 
       {/* Ground plane (invisible but clickable) */}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.001, 0]}
         onClick={handleBackgroundClick}
-        onContextMenu={handleGroundContextMenu}
+        onDoubleClick={handleBackgroundDoubleClick}
         onPointerDown={handleBackgroundPointerDown}
         userData={{ isGround: true }}
       >
@@ -1008,7 +1419,18 @@ export function Workspace() {
       </mesh>
 
       {/* Sky sphere (catches clicks that miss everything else) */}
-      <mesh onContextMenu={handleSkyContextMenu} userData={{ isSky: true }} renderOrder={-1}>
+      <mesh
+        onPointerDown={(e) => {
+          handleBackgroundPointerDownForClick(e);
+          if (e.nativeEvent.button === 2) {
+            handleSkyRightClick(e);
+          }
+        }}
+        onClick={handleSkyClick}
+        onDoubleClick={handleBackgroundDoubleClick}
+        userData={{ isSky: true }}
+        renderOrder={-1}
+      >
         <sphereGeometry args={[500, 32, 32]} />
         <meshBasicMaterial visible={false} side={1} /> {/* BackSide = 1 */}
       </mesh>
@@ -1033,49 +1455,40 @@ export function Workspace() {
       {/* Origin axis indicators (only show when grid is visible) */}
       {showGrid && <AxisIndicator />}
 
-      {/* Lighting */}
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 20, 10]} intensity={1} castShadow />
-      <directionalLight position={[-10, 10, -10]} intensity={0.3} />
+      {/* Lighting - uses preset from app settings with brightness multiplier */}
+      {/* Keys force recreation when lighting mode changes, ensuring Three.js updates properly */}
+      <ambientLight
+        key={`ambient-${lightingMode}-${brightnessMultiplier}`}
+        intensity={lightingPreset.ambient * brightnessMultiplier}
+      />
+      <directionalLight
+        key={`main-${lightingMode}-${brightnessMultiplier}`}
+        position={lightingPreset.mainLight.position}
+        intensity={lightingPreset.mainLight.intensity * brightnessMultiplier}
+        castShadow
+      />
+      <directionalLight
+        key={`fill-${lightingMode}-${brightnessMultiplier}`}
+        position={lightingPreset.fillLight.position}
+        intensity={lightingPreset.fillLight.intensity * brightnessMultiplier}
+      />
 
       {/* Camera controls */}
-      <OrbitControls makeDefault enableDamping dampingFactor={0.05} minDistance={5} maxDistance={600} />
+      <OrbitControls makeDefault enableDamping dampingFactor={0.05} minDistance={1} maxDistance={600} zoomSpeed={0.5} />
 
       {/* All parts */}
       {parts.map((part) => (
         <Part key={part.id} part={part} />
       ))}
 
-      {/* Empty state message when no parts exist */}
-      {parts.length === 0 && (
-        <Html center zIndexRange={[0, 0]}>
-          <div className="text-center pointer-events-none select-none">
-            <div className="bg-gray-800 bg-opacity-95 rounded-xl p-10 shadow-2xl backdrop-blur-sm border-2 border-gray-700" style={{ minWidth: '480px', maxWidth: '560px' }}>
-              <div className="text-7xl mb-5">🛠️</div>
-              <h2 className="text-3xl font-bold text-white mb-4">Start Building</h2>
-              <p className="text-gray-300 text-lg mb-8 leading-relaxed">
-                Add parts to your design to get started. You can create parts from the sidebar or drag stock materials onto the canvas.
-              </p>
-              <div className="text-base text-gray-400 space-y-3">
-                <div className="flex items-center justify-center gap-3">
-                  <kbd className="px-3 py-2 bg-gray-700 rounded-md text-sm font-semibold text-yellow-400 border border-gray-600 shadow-sm">P</kbd>
-                  <span>Add new part</span>
-                </div>
-                <div className="flex items-center justify-center gap-3">
-                  <span className="text-gray-500 font-medium">Drag stock →</span>
-                  <span>Create part from stock</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Html>
-      )}
-
       {/* Multi-selection bounding box dimensions */}
       <MultiSelectionDimensions />
 
       {/* Snap alignment lines */}
       <SnapAlignmentLines />
+
+      {/* Reference distance indicators */}
+      <ReferenceDistanceIndicators />
 
       {/* Persistent snap guides */}
       <SnapGuides />
@@ -1086,7 +1499,6 @@ export function Workspace() {
 // Component that renders persistent snap guides
 function SnapGuides() {
   const snapGuides = useProjectStore((s) => s.snapGuides);
-  const openContextMenu = useProjectStore((s) => s.openContextMenu);
 
   if (snapGuides.length === 0) return null;
 
@@ -1101,16 +1513,12 @@ function SnapGuides() {
     z: '#4dabf7'
   };
 
-  const handleGuideContextMenu = (e: ThreeEvent<MouseEvent>, guideId: string) => {
-    e.stopPropagation();
-    e.nativeEvent.preventDefault();
-
-    openContextMenu({
-      x: e.nativeEvent.clientX,
-      y: e.nativeEvent.clientY,
-      type: 'guide',
-      guideId
-    });
+  // Track right-click on guide for context menu (shown on mouseup by Workspace)
+  const handleGuidePointerDown = (e: ThreeEvent<PointerEvent>, guideId: string) => {
+    if (e.nativeEvent.button === 2) {
+      e.stopPropagation();
+      setRightClickTarget({ type: 'guide', guideId });
+    }
   };
 
   return (
@@ -1141,7 +1549,7 @@ function SnapGuides() {
         return (
           <group key={guide.id}>
             {/* Semi-transparent plane - interactive for context menu */}
-            <mesh position={position} rotation={rotation} onContextMenu={(e) => handleGuideContextMenu(e, guide.id)}>
+            <mesh position={position} rotation={rotation} onPointerDown={(e) => handleGuidePointerDown(e, guide.id)}>
               <planeGeometry args={[GUIDE_SIZE, GUIDE_SIZE]} />
               <meshBasicMaterial
                 color={axisColors[guide.axis]}

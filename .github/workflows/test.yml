@@ -117,3 +117,69 @@ jobs:
 
       - name: Check formatting
         run: npm run format:check --workspace=@carvd/desktop
+
+  website-tests:
+    name: Website Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run website unit tests
+        run: npm run test:run --workspace=@carvd/website
+        env:
+          NODE_ENV: 'test'
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./packages/website/coverage/lcov.info
+          flags: website
+          fail_ci_if_error: false
+
+  website-e2e:
+    name: Website E2E Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: packages/website
+
+      - name: Build website
+        run: npm run build --workspace=@carvd/website
+
+      - name: Run E2E tests
+        run: npm run test:e2e --workspace=@carvd/website -- --project=chromium
+        env:
+          CI: true
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-playwright-report
+          path: packages/website/playwright-report/
+          retention-days: 7

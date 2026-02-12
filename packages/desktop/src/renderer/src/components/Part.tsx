@@ -4,10 +4,31 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { GRID_SIZE } from '../constants';
-import { useProjectStore, getContainingGroupId, getAllDescendantPartIds, getAncestorGroupIds } from '../store/projectStore';
+import {
+  useProjectStore,
+  getContainingGroupId,
+  getAllDescendantPartIds,
+  getAncestorGroupIds
+} from '../store/projectStore';
+import { useAppSettingsStore } from '../store/appSettingsStore';
 import { Part as PartType, RotationAngle } from '../types';
 import { formatMeasurementWithUnit } from '../utils/fractions';
-import { detectSnaps, calculateSnapThreshold, detectDimensionSnaps, createDimensionMatchSnapLine, detectGuideSnaps, createGuideSnapLine, getPartBoundsAtPosition } from '../utils/snapToPartsUtil';
+import {
+  detectSnaps,
+  calculateSnapThreshold,
+  detectDimensionSnaps,
+  createDimensionMatchSnapLine,
+  detectGuideSnaps,
+  createGuideSnapLine,
+  getPartBoundsAtPosition,
+  detectOriginSnaps,
+  createOriginSnapLine,
+  detectFaceSnaps,
+  calculateReferenceDistances,
+  calculateGroupReferenceDistances,
+  getCombinedBounds
+} from '../utils/snapToPartsUtil';
+import { setRightClickTarget } from './Workspace';
 
 // Type guard to check if controls is OrbitControls
 function isOrbitControls(controls: THREE.EventDispatcher<object> | null): controls is OrbitControlsImpl {
@@ -279,7 +300,14 @@ const HANDLE_POSITIONS: HandlePosition[] = [
   { x: 1, y: 1, z: 0, type: 'edge-z' }
 ];
 
-const HANDLE_SIZE = 0.4;
+const HANDLE_SIZE = 0.45; // Slightly larger for better visibility
+
+// Bolder resize handle colors for better visibility
+const RESIZE_COLORS = {
+  corner: '#ffcc44', // Bright gold for corners
+  edge: '#44aaff', // Bright blue for edges
+  hover: '#ffffff' // White on hover
+};
 
 interface LiveDimensions {
   x: number;
@@ -304,16 +332,17 @@ function ResizeHandle({
   const [hovered, setHovered] = useState(false);
 
   // Calculate handle position relative to part center (0,0,0 in local space)
-  // For each axis: if handlePos value is 0, position at center; otherwise at edge + offset
+  // For each axis: if handlePos value is 0, position at center; otherwise at edge
+  // Handles are centered on the part edge so they overlap the part by half their size,
+  // making them easier to grab when parts are flush against each other
   const halfLength = liveDims.length / 2;
   const halfThickness = liveDims.thickness / 2;
   const halfWidth = liveDims.width / 2;
-  const offset = HANDLE_SIZE / 2;
 
   // Positions relative to center (group position handles world offset)
-  const handleX = handlePos.x === 0 ? 0 : handlePos.x * (halfLength + offset);
-  const handleY = handlePos.y === 0 ? 0 : handlePos.y * (halfThickness + offset);
-  const handleZ = handlePos.z === 0 ? 0 : handlePos.z * (halfWidth + offset);
+  const handleX = handlePos.x === 0 ? 0 : handlePos.x * halfLength;
+  const handleY = handlePos.y === 0 ? 0 : handlePos.y * halfThickness;
+  const handleZ = handlePos.z === 0 ? 0 : handlePos.z * halfWidth;
 
   // Determine cursor based on handle type
   let cursor = 'pointer';
@@ -330,38 +359,55 @@ function ResizeHandle({
     cursor = 'nesw-resize';
   }
 
-  // Different colors for different handle types
-  const baseColor = handlePos.type === 'corner' ? '#c4a574' : '#7499c4';
+  // Bolder colors for different handle types
+  const baseColor = handlePos.type === 'corner' ? RESIZE_COLORS.corner : RESIZE_COLORS.edge;
+  const isActive = hovered || isResizing;
 
   return (
-    <mesh
-      position={[handleX, handleY, handleZ]}
-      onPointerDown={(e) => {
-        e.stopPropagation();
-        onResizeStart(handlePos, e);
-      }}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        setHovered(true);
-        document.body.style.cursor = cursor;
-      }}
-      onPointerOut={() => {
-        setHovered(false);
-        if (!isResizing) document.body.style.cursor = 'auto';
-      }}
-    >
-      <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
-      <meshStandardMaterial
-        color={hovered || isResizing ? '#ffffff' : baseColor}
-        transparent
-        opacity={hovered || isResizing ? 1 : 0.8}
-      />
-    </mesh>
+    <group position={[handleX, handleY, handleZ]}>
+      {/* Dark outline for contrast on any background */}
+      <mesh scale={1.15}>
+        <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.5} />
+      </mesh>
+      {/* Main handle */}
+      <mesh
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onResizeStart(handlePos, e);
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+          document.body.style.cursor = cursor;
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          if (!isResizing) document.body.style.cursor = 'auto';
+        }}
+      >
+        <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
+        <meshStandardMaterial
+          color={isActive ? RESIZE_COLORS.hover : baseColor}
+          emissive={isActive ? baseColor : '#000000'}
+          emissiveIntensity={isActive ? 0.3 : 0}
+        />
+      </mesh>
+    </group>
   );
 }
 
 // Rotation handle - flat ring with arrow on each face
-const ROTATION_HANDLE_SIZE = 0.5;
+const ROTATION_HANDLE_SIZE = 0.55; // Slightly larger
+const ROTATION_RING_THICKNESS = 0.12; // Thicker ring (was 0.08)
+
+// Bolder, more saturated rotation colors
+const ROTATION_COLORS = {
+  x: '#ff4444', // Bright red for X
+  y: '#44ff44', // Bright green for Y
+  z: '#4499ff', // Bright blue for Z
+  hover: '#ffffff'
+};
 
 function RotationHandle({
   liveDims,
@@ -400,76 +446,87 @@ function RotationHandle({
     rotation = [0, 0, 0];
   }
 
-  // Colors for each axis
-  const axisColors = {
-    x: '#e74c3c', // Red for X
-    y: '#2ecc71', // Green for Y
-    z: '#3498db' // Blue for Z
-  };
-
-  const color = hovered ? '#ffffff' : axisColors[axis];
+  const baseColor = ROTATION_COLORS[axis];
+  const color = hovered ? ROTATION_COLORS.hover : baseColor;
 
   // Arrow triangle vertices (flat, pointing tangent to the ring)
   // Small Z offset to sit on top of the ring and avoid z-fighting
-  const arrowSize = 0.35;
+  const arrowSize = 0.4; // Slightly larger arrow
   const zOffset = 0.02; // Z offset applied to mesh position
-  const arrowPosX = ROTATION_HANDLE_SIZE - 0.13; // Position slightly inside the ring center
+  const arrowPosX = ROTATION_HANDLE_SIZE - 0.1; // Position on the ring
   const arrowVertices = new Float32Array([
     0,
-    -arrowSize * 0.6,
-    0, // back left
+    -arrowSize * 0.7,
+    0, // back left (wider)
     0,
-    arrowSize * 0.6,
-    0, // back right
-    arrowSize,
+    arrowSize * 0.7,
+    0, // back right (wider)
+    arrowSize * 1.1,
     0,
-    0 // tip
+    0 // tip (longer)
   ]);
+
+  // Shared event handlers
+  const handleClick = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    onRotate(axis);
+  };
+
+  const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    setHovered(true);
+    document.body.style.cursor = 'pointer';
+  };
+
+  const handlePointerOut = () => {
+    setHovered(false);
+    document.body.style.cursor = 'auto';
+  };
 
   return (
     <group position={position} rotation={rotation}>
-      {/* Flat ring using ringGeometry */}
-      <mesh
-        onClick={(e) => {
-          e.stopPropagation();
-          onRotate(axis);
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          setHovered(true);
-          document.body.style.cursor = 'pointer';
-        }}
-        onPointerOut={() => {
-          setHovered(false);
-          document.body.style.cursor = 'auto';
-        }}
-      >
-        <ringGeometry args={[ROTATION_HANDLE_SIZE - 0.08, ROTATION_HANDLE_SIZE + 0.08, 24]} />
-        <meshStandardMaterial color={color} side={THREE.DoubleSide} transparent opacity={0.9} />
+      {/* Invisible hit area - covers entire circular region for easier clicking */}
+      <mesh onClick={handleClick} onPointerOver={handlePointerOver} onPointerOut={handlePointerOut}>
+        <circleGeometry args={[ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS, 24]} />
+        <meshBasicMaterial visible={false} side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* Dark outline ring for contrast */}
+      <mesh>
+        <ringGeometry
+          args={[
+            ROTATION_HANDLE_SIZE - ROTATION_RING_THICKNESS - 0.02,
+            ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS + 0.02,
+            24
+          ]}
+        />
+        <meshBasicMaterial color="#000000" side={THREE.DoubleSide} transparent opacity={0.4} />
+      </mesh>
+
+      {/* Main visible ring - thicker and bolder */}
+      <mesh>
+        <ringGeometry
+          args={[ROTATION_HANDLE_SIZE - ROTATION_RING_THICKNESS, ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS, 24]}
+        />
+        <meshStandardMaterial
+          color={color}
+          side={THREE.DoubleSide}
+          emissive={hovered ? baseColor : '#000000'}
+          emissiveIntensity={hovered ? 0.4 : 0}
+        />
       </mesh>
 
       {/* Flat arrow indicator showing rotation direction - positioned on the ring */}
-      <mesh
-        position={[arrowPosX, 0, zOffset]}
-        rotation={[0, 0, -Math.PI / 6]}
-        onClick={(e) => {
-          e.stopPropagation();
-          onRotate(axis);
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          setHovered(true);
-          document.body.style.cursor = 'pointer';
-        }}
-        onPointerOut={() => {
-          setHovered(false);
-          document.body.style.cursor = 'auto';
-        }}
-      >
+      <mesh position={[arrowPosX, 0, zOffset]} rotation={[0, 0, -Math.PI / 6]}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={3} array={arrowVertices} itemSize={3} />
         </bufferGeometry>
-        <meshStandardMaterial color={color} side={THREE.DoubleSide} transparent opacity={0.9} />
+        <meshStandardMaterial
+          color={color}
+          side={THREE.DoubleSide}
+          emissive={hovered ? baseColor : '#000000'}
+          emissiveIntensity={hovered ? 0.4 : 0}
+        />
       </mesh>
     </group>
   );
@@ -488,10 +545,10 @@ export function Part({ part }: PartProps) {
   const setHoveredPart = useProjectStore((s) => s.setHoveredPart);
   const updatePart = useProjectStore((s) => s.updatePart);
   const moveSelectedParts = useProjectStore((s) => s.moveSelectedParts);
-  const openContextMenu = useProjectStore((s) => s.openContextMenu);
   const showGrainDirection = useProjectStore((s) => s.showGrainDirection);
   const displayMode = useProjectStore((s) => s.displayMode);
   const referencePartIds = useProjectStore((s) => s.referencePartIds);
+  const clearSelection = useProjectStore((s) => s.clearSelection);
   // Group-related state
   const groupMembers = useProjectStore((s) => s.groupMembers);
   const selectedGroupIds = useProjectStore((s) => s.selectedGroupIds);
@@ -513,6 +570,8 @@ export function Part({ part }: PartProps) {
   // - If inside a group: select the immediate child group of editingGroupId (if part is nested deeper)
   //   or null if part is direct child of editingGroupId
   let groupToSelectOnClick: string | null = null;
+  // Track if this part is outside the current editing context
+  let isOutsideEditingContext = false;
   if (editingGroupId === null) {
     // Not inside any group - select the top-level ancestor
     groupToSelectOnClick = topLevelGroupId;
@@ -522,9 +581,11 @@ export function Part({ part }: PartProps) {
     if (editingGroupIndex > 0) {
       // Part is in a nested group - select the group that's a direct child of editingGroupId
       groupToSelectOnClick = ancestorGroupIds[editingGroupIndex - 1];
+    } else if (editingGroupIndex === -1) {
+      // Part is NOT inside the current editing group - clicking should be treated as background click
+      isOutsideEditingContext = true;
     }
     // If editingGroupIndex === 0, part is direct child of editing group - select the part itself (null)
-    // If editingGroupIndex === -1, editingGroupId is not an ancestor - shouldn't happen but handle gracefully
   }
 
   // Selection state - include both direct selection AND group selection (check ALL ancestors)
@@ -596,10 +657,16 @@ export function Part({ part }: PartProps) {
 
   // Drag state for moving
   const [isDragging, setIsDragging] = useState(false);
-  const dragStart = useRef<{ point: THREE.Vector3; partPos: THREE.Vector3 } | null>(null);
+  // partPos = anchor point (group center for groups, part position for single part)
+  // partOriginalPos = original position of the clicked part (for visual feedback)
+  const dragStart = useRef<{ point: THREE.Vector3; partPos: THREE.Vector3; partOriginalPos: THREE.Vector3 } | null>(
+    null
+  );
   const justFinishedDragging = useRef(false); // Prevent click from firing after drag
   // Track latest drag position in a ref to avoid stale closure issues
   const lastDragPosition = useRef<{ x: number; y: number; z: number } | null>(null);
+  // Track which axes were snapped by snap-to-parts (to avoid grid-snapping over precise alignments)
+  const wasSnappedByParts = useRef<{ x: boolean; y: boolean; z: boolean }>({ x: false, y: false, z: false });
 
   // Resize state
   const [isResizing, setIsResizing] = useState(false);
@@ -654,9 +721,12 @@ export function Part({ part }: PartProps) {
   const aabbsOverlap = (a: ReturnType<typeof getPartAABB>, b: ReturnType<typeof getPartAABB>) => {
     const epsilon = 0.001;
     return (
-      a.minX < b.maxX - epsilon && a.maxX > b.minX + epsilon &&
-      a.minY < b.maxY - epsilon && a.maxY > b.minY + epsilon &&
-      a.minZ < b.maxZ - epsilon && a.maxZ > b.minZ + epsilon
+      a.minX < b.maxX - epsilon &&
+      a.maxX > b.minX + epsilon &&
+      a.minY < b.maxY - epsilon &&
+      a.maxY > b.minY + epsilon &&
+      a.minZ < b.maxZ - epsilon &&
+      a.maxZ > b.minZ + epsilon
     );
   };
 
@@ -667,6 +737,11 @@ export function Part({ part }: PartProps) {
     selectedIds: string[],
     delta?: { x: number; y: number; z: number }
   ): boolean => {
+    // If this part has "Allow Overlap" enabled, skip overlap prevention entirely
+    if (part.ignoreOverlap) {
+      return false;
+    }
+
     // Get the set of parts being moved (this part + any co-selected parts)
     const movingPartIds = new Set(selectedIds.includes(part.id) ? selectedIds : [part.id]);
 
@@ -674,6 +749,8 @@ export function Part({ part }: PartProps) {
     const thisPartAABB = getPartAABB(part, newPosition);
     for (const other of allParts) {
       if (movingPartIds.has(other.id)) continue;
+      // Skip parts that have "Allow Overlap" enabled
+      if (other.ignoreOverlap) continue;
       const otherAABB = getPartAABB(other, other.position);
       if (aabbsOverlap(thisPartAABB, otherAABB)) {
         return true;
@@ -684,8 +761,10 @@ export function Part({ part }: PartProps) {
     if (delta && selectedIds.includes(part.id)) {
       for (const selectedId of selectedIds) {
         if (selectedId === part.id) continue;
-        const selectedPart = allParts.find(p => p.id === selectedId);
+        const selectedPart = allParts.find((p) => p.id === selectedId);
         if (!selectedPart) continue;
+        // Skip selected parts that have "Allow Overlap" enabled
+        if (selectedPart.ignoreOverlap) continue;
 
         const movedPosition = {
           x: selectedPart.position.x + delta.x,
@@ -696,6 +775,8 @@ export function Part({ part }: PartProps) {
 
         for (const other of allParts) {
           if (movingPartIds.has(other.id)) continue;
+          // Skip parts that have "Allow Overlap" enabled
+          if (other.ignoreOverlap) continue;
           const otherAABB = getPartAABB(other, other.position);
           if (aabbsOverlap(movedAABB, otherAABB)) {
             return true;
@@ -791,29 +872,41 @@ export function Part({ part }: PartProps) {
             Math.abs(localZ.dot(upVector)) * (liveDims.width / 2);
           newY = Math.max(worldHalfHeight, newY);
 
-          // Apply snap-to-parts if enabled
-          const isSnapEnabled = useProjectStore.getState().snapToPartsEnabled;
+          // Apply snap-to-parts if enabled (Alt key temporarily bypasses snapping)
+          const isSnapEnabled = useProjectStore.getState().snapToPartsEnabled && !e.altKey;
           const allParts = useProjectStore.getState().parts;
           const currentSelectedIds = useProjectStore.getState().selectedPartIds;
           const currentSelectedGroupIds = useProjectStore.getState().selectedGroupIds;
           const currentReferenceIds = useProjectStore.getState().referencePartIds;
           const snapGuides = useProjectStore.getState().snapGuides;
 
+          // Get snap settings from app settings
+          const appSettings = useAppSettingsStore.getState().settings;
+          const { liveGridSnap, snapSensitivity, snapToOrigin } = appSettings;
+
+          // Apply live grid snapping if enabled
+          if (liveGridSnap) {
+            newX = snapToGrid(newX);
+            newZ = snapToGrid(newZ);
+            // Also apply to Y but respect ground constraint
+            const snappedY = snapToGrid(newY);
+            if (snappedY >= worldHalfHeight) {
+              newY = snappedY;
+            }
+          }
+
           // Determine which parts to snap to:
           // - If references exist, only snap to reference parts
           // - Otherwise, snap to all parts
-          const snapTargetParts = currentReferenceIds.length > 0
-            ? allParts.filter(p => currentReferenceIds.includes(p.id))
-            : allParts;
+          const snapTargetParts =
+            currentReferenceIds.length > 0 ? allParts.filter((p) => currentReferenceIds.includes(p.id)) : allParts;
 
           const snapLines: import('../types').SnapLine[] = [];
 
           if (isSnapEnabled) {
-            // Calculate snap threshold based on camera distance
-            const cameraDistance = camera.position.distanceTo(
-              new THREE.Vector3(newX, newY, newZ)
-            );
-            const snapThreshold = calculateSnapThreshold(cameraDistance);
+            // Calculate snap threshold based on camera distance and sensitivity setting
+            const cameraDistance = camera.position.distanceTo(new THREE.Vector3(newX, newY, newZ));
+            const snapThreshold = calculateSnapThreshold(cameraDistance, snapSensitivity);
 
             // Get bounds for guide snap detection
             const draggingBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
@@ -824,7 +917,7 @@ export function Part({ part }: PartProps) {
 
               if (guideSnaps.x && planeInfo.axes.x) {
                 newX += guideSnaps.x.delta;
-                const guide = snapGuides.find(g => g.id === guideSnaps.x!.guideId);
+                const guide = snapGuides.find((g) => g.id === guideSnaps.x!.guideId);
                 if (guide) {
                   const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
                   snapLines.push(createGuideSnapLine(guide, updatedBounds));
@@ -834,7 +927,7 @@ export function Part({ part }: PartProps) {
                 const snappedY = newY + guideSnaps.y.delta;
                 if (snappedY >= worldHalfHeight) {
                   newY = snappedY;
-                  const guide = snapGuides.find(g => g.id === guideSnaps.y!.guideId);
+                  const guide = snapGuides.find((g) => g.id === guideSnaps.y!.guideId);
                   if (guide) {
                     const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
                     snapLines.push(createGuideSnapLine(guide, updatedBounds));
@@ -843,7 +936,7 @@ export function Part({ part }: PartProps) {
               }
               if (guideSnaps.z && planeInfo.axes.z) {
                 newZ += guideSnaps.z.delta;
-                const guide = snapGuides.find(g => g.id === guideSnaps.z!.guideId);
+                const guide = snapGuides.find((g) => g.id === guideSnaps.z!.guideId);
                 if (guide) {
                   const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
                   snapLines.push(createGuideSnapLine(guide, updatedBounds));
@@ -851,8 +944,60 @@ export function Part({ part }: PartProps) {
               }
             }
 
-            // Then check part snaps (only if not already snapped to guides)
+            // Check origin snaps if enabled (snap to X=0, Y=0, Z=0 planes)
+            if (snapToOrigin) {
+              const currentBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
+              const originSnaps = detectOriginSnaps(currentBounds, snapThreshold);
+
+              if (originSnaps.x && planeInfo.axes.x && snapLines.filter((l) => l.axis === 'x').length === 0) {
+                newX += originSnaps.x.delta;
+                const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
+                snapLines.push(createOriginSnapLine('x', originSnaps.x.snapType, updatedBounds));
+              }
+              if (originSnaps.y && planeInfo.axes.y && snapLines.filter((l) => l.axis === 'y').length === 0) {
+                const snappedY = newY + originSnaps.y.delta;
+                if (snappedY >= worldHalfHeight) {
+                  newY = snappedY;
+                  const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
+                  snapLines.push(createOriginSnapLine('y', originSnaps.y.snapType, updatedBounds));
+                }
+              }
+              if (originSnaps.z && planeInfo.axes.z && snapLines.filter((l) => l.axis === 'z').length === 0) {
+                newZ += originSnaps.z.delta;
+                const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
+                snapLines.push(createOriginSnapLine('z', originSnaps.z.snapType, updatedBounds));
+              }
+            }
+
+            // Then check part snaps (only if not already snapped to guides or origin)
             if (snapTargetParts.length > 0 && allParts.length > 1) {
+              // First check for face-to-face snaps (flush alignment)
+              const faceSnapResult = detectFaceSnaps(
+                part,
+                { x: newX, y: newY, z: newZ },
+                snapTargetParts,
+                currentSelectedIds,
+                snapThreshold
+              );
+
+              // Apply face snaps if found (and not already snapped on that axis)
+              if (faceSnapResult.snappedX && planeInfo.axes.x && snapLines.filter((l) => l.axis === 'x').length === 0) {
+                newX = faceSnapResult.adjustedPosition.x;
+                snapLines.push(...faceSnapResult.snapLines.filter((l) => l.axis === 'x'));
+              }
+              if (faceSnapResult.snappedY && planeInfo.axes.y && snapLines.filter((l) => l.axis === 'y').length === 0) {
+                const snappedY = faceSnapResult.adjustedPosition.y;
+                if (snappedY >= worldHalfHeight) {
+                  newY = snappedY;
+                  snapLines.push(...faceSnapResult.snapLines.filter((l) => l.axis === 'y'));
+                }
+              }
+              if (faceSnapResult.snappedZ && planeInfo.axes.z && snapLines.filter((l) => l.axis === 'z').length === 0) {
+                newZ = faceSnapResult.adjustedPosition.z;
+                snapLines.push(...faceSnapResult.snapLines.filter((l) => l.axis === 'z'));
+              }
+
+              // Then check regular edge/center snaps
               const snapResult = detectSnaps(
                 part,
                 { x: newX, y: newY, z: newZ },
@@ -862,29 +1007,84 @@ export function Part({ part }: PartProps) {
               );
 
               // Apply snap adjustments (but keep ground constraint)
-              // Only apply if we didn't already snap to a guide on that axis
-              if (planeInfo.axes.x && snapResult.snappedX && snapLines.filter(l => l.axis === 'x').length === 0) {
+              // Only apply if we didn't already snap to a guide, origin, or face on that axis
+              if (planeInfo.axes.x && snapResult.snappedX && snapLines.filter((l) => l.axis === 'x').length === 0) {
                 newX = snapResult.adjustedPosition.x;
               }
-              if (planeInfo.axes.y && snapResult.snappedY && snapLines.filter(l => l.axis === 'y').length === 0) {
+              if (planeInfo.axes.y && snapResult.snappedY && snapLines.filter((l) => l.axis === 'y').length === 0) {
                 const snappedY = snapResult.adjustedPosition.y;
                 if (snappedY >= worldHalfHeight) {
                   newY = snappedY;
                 }
               }
-              if (planeInfo.axes.z && snapResult.snappedZ && snapLines.filter(l => l.axis === 'z').length === 0) {
+              if (planeInfo.axes.z && snapResult.snappedZ && snapLines.filter((l) => l.axis === 'z').length === 0) {
                 newZ = snapResult.adjustedPosition.z;
               }
 
-              // Add part snap lines
-              snapLines.push(...snapResult.snapLines);
+              // Add part snap lines (only for axes not already snapped)
+              for (const line of snapResult.snapLines) {
+                if (snapLines.filter((l) => l.axis === line.axis).length === 0) {
+                  snapLines.push(line);
+                }
+              }
             }
 
             // Update snap lines for visualization
             useProjectStore.getState().setActiveSnapLines(snapLines);
+
+            // Track which axes were snapped (to skip grid-snapping on pointer up)
+            wasSnappedByParts.current = {
+              x: snapLines.some((l) => l.axis === 'x'),
+              y: snapLines.some((l) => l.axis === 'y'),
+              z: snapLines.some((l) => l.axis === 'z')
+            };
+
+            // Calculate reference distances if there are reference parts and we're not a reference
+            if (currentReferenceIds.length > 0 && !currentReferenceIds.includes(part.id)) {
+              const referenceParts = allParts.filter((p) => currentReferenceIds.includes(p.id));
+              const currentGroupMembers = useProjectStore.getState().groupMembers;
+
+              // Get all effective part IDs being dragged (including group member parts)
+              const effectiveDragPartIds = new Set(currentSelectedIds);
+              for (const groupId of currentSelectedGroupIds) {
+                const groupPartIds = getAllDescendantPartIds(groupId, currentGroupMembers);
+                groupPartIds.forEach((id) => effectiveDragPartIds.add(id));
+              }
+
+              // Check if we're dragging multiple parts or a group
+              const hasGroupSelected = currentSelectedGroupIds.length > 0;
+              const hasMultiplePartsSelected = effectiveDragPartIds.size > 1;
+
+              // Remove reference parts from dragging parts (can't measure distance to self)
+              const draggingPartIds = [...effectiveDragPartIds].filter((id) => !currentReferenceIds.includes(id));
+
+              if ((hasGroupSelected || hasMultiplePartsSelected) && draggingPartIds.length > 0) {
+                // Use group reference distances for multiple parts
+                const draggingParts = allParts.filter((p) => draggingPartIds.includes(p.id));
+                const dragDelta = {
+                  x: newX - dragStart.current.partPos.x,
+                  y: newY - dragStart.current.partPos.y,
+                  z: newZ - dragStart.current.partPos.z
+                };
+                const referenceDistances = calculateGroupReferenceDistances(draggingParts, dragDelta, referenceParts);
+                useProjectStore.getState().setActiveReferenceDistances(referenceDistances);
+              } else {
+                // Single part - use original function
+                const referenceDistances = calculateReferenceDistances(
+                  part,
+                  { x: newX, y: newY, z: newZ },
+                  referenceParts
+                );
+                useProjectStore.getState().setActiveReferenceDistances(referenceDistances);
+              }
+            } else {
+              useProjectStore.getState().setActiveReferenceDistances([]);
+            }
           } else {
             // Clear snap lines if snapping disabled
             useProjectStore.getState().setActiveSnapLines([]);
+            useProjectStore.getState().setActiveReferenceDistances([]);
+            wasSnappedByParts.current = { x: false, y: false, z: false };
           }
 
           // Check overlap prevention
@@ -909,9 +1109,15 @@ export function Part({ part }: PartProps) {
             }
           }
 
-          // Store in ref for pointer up handler (avoids stale closure)
+          // Store anchor position in ref for pointer up handler (avoids stale closure)
           lastDragPosition.current = { x: newX, y: newY, z: newZ };
-          setLiveDims((prev) => ({ ...prev, x: newX, y: newY, z: newZ }));
+
+          // For liveDims (visual position of clicked part), apply delta to part's original position
+          // This ensures consistent visual behavior regardless of which part in a group is clicked
+          const partLiveX = dragStart.current.partOriginalPos.x + proposedDelta.x;
+          const partLiveY = dragStart.current.partOriginalPos.y + proposedDelta.y;
+          const partLiveZ = dragStart.current.partOriginalPos.z + proposedDelta.z;
+          setLiveDims((prev) => ({ ...prev, x: partLiveX, y: partLiveY, z: partLiveZ }));
 
           // Update global drag delta for other selected parts to follow
           // This applies when: multiple parts selected OR a group is selected
@@ -934,9 +1140,11 @@ export function Part({ part }: PartProps) {
     const handleWindowPointerUp = () => {
       if (isDragging && dragStart.current && lastDragPosition.current) {
         // Use ref to get latest position (avoids stale closure issue)
-        const newX = snapToGrid(lastDragPosition.current.x);
-        let newY = snapToGrid(lastDragPosition.current.y);
-        const newZ = snapToGrid(lastDragPosition.current.z);
+        // Only apply grid snap to axes that weren't snapped by snap-to-parts
+        // This preserves precise edge alignments from snap-to-parts
+        const newX = wasSnappedByParts.current.x ? lastDragPosition.current.x : snapToGrid(lastDragPosition.current.x);
+        let newY = wasSnappedByParts.current.y ? lastDragPosition.current.y : snapToGrid(lastDragPosition.current.y);
+        const newZ = wasSnappedByParts.current.z ? lastDragPosition.current.z : snapToGrid(lastDragPosition.current.z);
 
         // Get current selection from store (avoid stale closure)
         const currentSelectedIds = useProjectStore.getState().selectedPartIds;
@@ -974,7 +1182,7 @@ export function Part({ part }: PartProps) {
           let maxYAdjustment = 0;
 
           for (const selectedId of effectivePartIds) {
-            const selectedPart = allParts.find(p => p.id === selectedId);
+            const selectedPart = allParts.find((p) => p.id === selectedId);
             if (!selectedPart) continue;
 
             // Calculate the part's rotation quaternion
@@ -1020,8 +1228,10 @@ export function Part({ part }: PartProps) {
             let hasOverlap = false;
 
             for (const movingId of effectivePartIds) {
-              const movingPart = allParts.find(p => p.id === movingId);
+              const movingPart = allParts.find((p) => p.id === movingId);
               if (!movingPart) continue;
+              // Skip parts that have "Allow Overlap" enabled
+              if (movingPart.ignoreOverlap) continue;
 
               const movedPosition = {
                 x: movingPart.position.x + adjustedDelta.x,
@@ -1032,6 +1242,8 @@ export function Part({ part }: PartProps) {
 
               for (const other of allParts) {
                 if (movingPartIds.has(other.id)) continue;
+                // Skip parts that have "Allow Overlap" enabled
+                if (other.ignoreOverlap) continue;
                 const otherAABB = getPartAABB(other, other.position);
                 if (aabbsOverlap(movedAABB, otherAABB)) {
                   hasOverlap = true;
@@ -1057,6 +1269,7 @@ export function Part({ part }: PartProps) {
               useProjectStore.getState().setActiveDragDelta(null);
               if (isOrbitControls(controls)) controls.enabled = true;
               useProjectStore.getState().setActiveSnapLines([]);
+              useProjectStore.getState().updateReferenceDistances();
               return;
             }
           }
@@ -1079,11 +1292,7 @@ export function Part({ part }: PartProps) {
           // Check overlap prevention for final snapped position
           const stockConstraints = useProjectStore.getState().stockConstraints;
           if (stockConstraints.preventOverlap) {
-            const wouldOverlap = wouldCauseOverlap(
-              { x: newX, y: newY, z: newZ },
-              allParts,
-              currentSelectedIds
-            );
+            const wouldOverlap = wouldCauseOverlap({ x: newX, y: newY, z: newZ }, allParts, currentSelectedIds);
             if (wouldOverlap) {
               // Revert to original position if final position would overlap
               setLiveDims({
@@ -1097,8 +1306,10 @@ export function Part({ part }: PartProps) {
               setIsDragging(false);
               dragStart.current = null;
               lastDragPosition.current = null;
+              wasSnappedByParts.current = { x: false, y: false, z: false };
               if (isOrbitControls(controls)) controls.enabled = true;
               useProjectStore.getState().setActiveSnapLines([]);
+              useProjectStore.getState().updateReferenceDistances();
               return;
             }
           }
@@ -1111,10 +1322,12 @@ export function Part({ part }: PartProps) {
         setIsDragging(false);
         dragStart.current = null;
         lastDragPosition.current = null;
+        wasSnappedByParts.current = { x: false, y: false, z: false };
         justFinishedDragging.current = true; // Prevent click handler from clearing selection
         if (isOrbitControls(controls)) controls.enabled = true;
-        // Clear snap lines when drag ends
+        // Clear snap lines and update reference distances when drag ends
         useProjectStore.getState().setActiveSnapLines([]);
+        useProjectStore.getState().updateReferenceDistances();
       }
 
       if (isResizing && resizeStart.current) {
@@ -1134,6 +1347,27 @@ export function Part({ part }: PartProps) {
   // === MOVE HANDLERS ===
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
+
+    // If clicking on a part outside the current editing context, treat it like background click
+    // (just deselect, don't change context or select this part)
+    if (isOutsideEditingContext) {
+      clearSelection();
+      return;
+    }
+
+    // Track right-click for context menu (shown on mouseup by Workspace)
+    if (e.nativeEvent.button === 2) {
+      // Select the part/group if not already selected
+      if (!isSelected) {
+        if (groupToSelectOnClick) {
+          selectGroup(groupToSelectOnClick);
+        } else {
+          selectPart(part.id);
+        }
+      }
+      setRightClickTarget({ type: 'part' });
+      return; // Don't start drag on right-click
+    }
 
     // Handle shift+click for multi-select
     if (e.nativeEvent.shiftKey) {
@@ -1159,19 +1393,65 @@ export function Part({ part }: PartProps) {
       selectPart(part.id);
     }
 
-    const partPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
-    // Set up the drag plane based on camera angle
-    getDragPlaneInfo(partPos);
+    // Get current state after potential selection change
+    const currentState = useProjectStore.getState();
+    const currentSelectedPartIds = currentState.selectedPartIds;
+    const currentSelectedGroupIds = currentState.selectedGroupIds;
+    const currentGroupMembers = currentState.groupMembers;
+
+    // Determine anchor point for drag:
+    // - Single part: use that part's position
+    // - Multiple parts or group: use combined bounding box center
+    let anchorPos: THREE.Vector3;
+
+    const hasGroupSelected = currentSelectedGroupIds.length > 0;
+    const hasMultipleParts = currentSelectedPartIds.length > 1;
+
+    if (hasGroupSelected || hasMultipleParts) {
+      // Calculate combined bounds of all parts to be dragged
+      const partIdsToInclude = new Set(currentSelectedPartIds);
+
+      // Add parts from selected groups
+      for (const groupId of currentSelectedGroupIds) {
+        const collectGroupParts = (gId: string) => {
+          for (const member of currentGroupMembers) {
+            if (member.groupId === gId) {
+              if (member.type === 'part') {
+                partIdsToInclude.add(member.memberId);
+              } else if (member.type === 'group') {
+                collectGroupParts(member.memberId);
+              }
+            }
+          }
+        };
+        collectGroupParts(groupId);
+      }
+
+      const partsToMeasure = currentState.parts.filter((p) => partIdsToInclude.has(p.id));
+      if (partsToMeasure.length > 0) {
+        const combinedBounds = getCombinedBounds(partsToMeasure);
+        anchorPos = new THREE.Vector3(combinedBounds.centerX, combinedBounds.centerY, combinedBounds.centerZ);
+      } else {
+        anchorPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
+      }
+    } else {
+      anchorPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
+    }
+
+    // Set up the drag plane based on camera angle, centered on the anchor point
+    getDragPlaneInfo(anchorPos);
 
     const startPoint = getWorldPoint(e.nativeEvent);
+    const partOriginalPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
     if (startPoint) {
       setIsDragging(true);
       dragStart.current = {
         point: startPoint.clone(),
-        partPos: partPos
+        partPos: anchorPos,
+        partOriginalPos: partOriginalPos
       };
-      // Initialize with current position
-      lastDragPosition.current = { x: partPos.x, y: partPos.y, z: partPos.z };
+      // Initialize with part's original position (not anchor)
+      lastDragPosition.current = { x: partOriginalPos.x, y: partOriginalPos.y, z: partOriginalPos.z };
       if (isOrbitControls(controls)) controls.enabled = false;
     }
   };
@@ -1262,24 +1542,29 @@ export function Part({ part }: PartProps) {
     const isSnapEnabled = useProjectStore.getState().snapToPartsEnabled;
     const allParts = useProjectStore.getState().parts;
     const currentReferenceIds = useProjectStore.getState().referencePartIds;
+    const units = useProjectStore.getState().units;
+
+    // Get snap settings from app settings
+    const appSettings = useAppSettingsStore.getState().settings;
+    const { snapSensitivity, dimensionSnapSameTypeOnly } = appSettings;
 
     // Determine which parts to snap to (references or all)
-    const snapTargetParts = currentReferenceIds.length > 0
-      ? allParts.filter(p => currentReferenceIds.includes(p.id))
-      : allParts;
+    const snapTargetParts =
+      currentReferenceIds.length > 0 ? allParts.filter((p) => currentReferenceIds.includes(p.id)) : allParts;
 
-    if (isSnapEnabled && snapTargetParts.length > 0) {
-      const cameraDistance = camera.position.distanceTo(
-        new THREE.Vector3(partPos.x, partPos.y, partPos.z)
-      );
-      const snapThreshold = calculateSnapThreshold(cameraDistance);
+    if (isSnapEnabled) {
+      const cameraDistance = camera.position.distanceTo(new THREE.Vector3(partPos.x, partPos.y, partPos.z));
+      const snapThreshold = calculateSnapThreshold(cameraDistance, snapSensitivity);
 
       const dimensionSnaps = detectDimensionSnaps(
         { length: newLength, width: newWidth, thickness: newThickness },
         resizingDimensions,
         snapTargetParts,
         part.id,
-        snapThreshold
+        snapThreshold,
+        dimensionSnapSameTypeOnly,
+        units,
+        true // Enable standard dimension snapping
       );
 
       // Apply dimension snaps and create visual feedback
@@ -1304,8 +1589,30 @@ export function Part({ part }: PartProps) {
         };
         const resizingBounds = getPartBoundsAtPosition(tempPart, partPos);
 
-        // Create visual feedback using rotation-aware bounds
-        snapLines.push(createDimensionMatchSnapLine(snap, resizingBounds));
+        // Create enhanced visual feedback with source info
+        const snapLine = createDimensionMatchSnapLine(snap, resizingBounds);
+
+        // Add dimension match metadata for enhanced labels
+        snapLine.dimensionMatchInfo = {
+          isStandard: snap.isStandardDimension,
+          sourcePart: snap.matchedPartName ?? undefined,
+          sourceDimension: snap.matchedDimension ?? undefined
+        };
+
+        // Add connector line to matched part (if not a standard dimension)
+        if (snap.matchedPartBounds && !snap.isStandardDimension) {
+          const labelPos = snapLine.distanceIndicators![0].labelPosition;
+          snapLine.connectorLine = {
+            start: labelPos,
+            end: {
+              x: snap.matchedPartBounds.centerX,
+              y: snap.matchedPartBounds.maxY + 0.5,
+              z: snap.matchedPartBounds.centerZ
+            }
+          };
+        }
+
+        snapLines.push(snapLine);
       }
 
       // Update snap lines for visualization
@@ -1314,6 +1621,8 @@ export function Part({ part }: PartProps) {
       // Clear snap lines if snapping disabled
       useProjectStore.getState().setActiveSnapLines([]);
     }
+    // Clear reference distances during resize (not relevant for resizing)
+    useProjectStore.getState().setActiveReferenceDistances([]);
 
     // Calculate the world-space center offset to keep the fixed corner/edge in place
     // The center moves by half the dimension change, in the direction of the handle
@@ -1411,12 +1720,19 @@ export function Part({ part }: PartProps) {
     resizeStart.current = null;
     if (isOrbitControls(controls)) controls.enabled = true;
     document.body.style.cursor = 'auto';
-    // Clear snap lines when resize ends
+    // Clear snap lines and update reference distances when resize ends
     useProjectStore.getState().setActiveSnapLines([]);
+    useProjectStore.getState().updateReferenceDistances();
   };
 
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
+
+    // If clicking on a part outside the current editing context, treat as background click
+    // (pointerDown already handled the deselect, just return here)
+    if (isOutsideEditingContext) {
+      return;
+    }
 
     // Skip selection if we just finished dragging (prevents clearing multi-selection)
     if (justFinishedDragging.current) {
@@ -1439,6 +1755,12 @@ export function Part({ part }: PartProps) {
   // Double-click to enter a group (Figma-style)
   const handleDoubleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
+
+    // If double-clicking on a part outside the current editing context, ignore
+    // (user should double-click background to exit group first)
+    if (isOutsideEditingContext) {
+      return;
+    }
 
     // If there's a group that would be selected on click, enter that group instead
     // This allows drilling down one level at a time in nested structures
@@ -1466,29 +1788,49 @@ export function Part({ part }: PartProps) {
     }
   };
 
-  // Right-click context menu handler
-  const handleContextMenu = (e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation();
-    e.nativeEvent.preventDefault();
+  // Handle rotation around an axis (LOCAL rotation - rotates around the part's current axis)
+  // Uses quaternion math to properly compose rotations
+  const handleRotate = (axis: 'x' | 'y' | 'z') => {
+    // Convert current rotation to quaternion
+    const currentEuler = new THREE.Euler(
+      (part.rotation.x * Math.PI) / 180,
+      (part.rotation.y * Math.PI) / 180,
+      (part.rotation.z * Math.PI) / 180,
+      'XYZ'
+    );
+    const currentQuat = new THREE.Quaternion().setFromEuler(currentEuler);
 
-    // If this part is not selected, select it (or its group) using the same logic as click
-    if (!isSelected) {
-      if (groupToSelectOnClick) {
-        selectGroup(groupToSelectOnClick);
-      } else {
-        selectPart(part.id);
-      }
+    // Create local rotation quaternion (90 degrees around the specified local axis)
+    const localRotationQuat = new THREE.Quaternion();
+    if (axis === 'x') {
+      localRotationQuat.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+    } else if (axis === 'y') {
+      localRotationQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+    } else {
+      localRotationQuat.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
     }
 
-    // Open context menu at mouse position
-    openContextMenu({ x: e.nativeEvent.clientX, y: e.nativeEvent.clientY, type: 'part' });
-  };
+    // Apply LOCAL rotation: newQuat = currentQuat * localRotation
+    // This rotates around the part's current orientation, not world axes
+    const newQuat = currentQuat.clone().multiply(localRotationQuat);
 
-  // Handle rotation around an axis
-  const handleRotate = (axis: 'x' | 'y' | 'z') => {
-    const newAngle = ((part.rotation[axis] + 90) % 360) as RotationAngle;
+    // Convert back to Euler
+    const newEuler = new THREE.Euler().setFromQuaternion(newQuat, 'XYZ');
+
+    // Normalize to 90-degree increments
+    const normalizeAngle = (rad: number): RotationAngle => {
+      let deg = (rad * 180) / Math.PI;
+      deg = ((deg % 360) + 360) % 360;
+      const rounded = Math.round(deg / 90) * 90;
+      return (rounded === 360 ? 0 : rounded) as RotationAngle;
+    };
+
     updatePart(part.id, {
-      rotation: { ...part.rotation, [axis]: newAngle }
+      rotation: {
+        x: normalizeAngle(newEuler.x),
+        y: normalizeAngle(newEuler.y),
+        z: normalizeAngle(newEuler.z)
+      }
     });
   };
 
@@ -1519,29 +1861,23 @@ export function Part({ part }: PartProps) {
           ref={meshRef}
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}
-          onContextMenu={handleContextMenu}
           onPointerDown={handlePointerDown}
           onPointerOver={handlePointerOver}
           onPointerOut={handlePointerOut}
         >
           <boxGeometry args={dims} />
           {displayMode === 'solid' && <meshStandardMaterial color={part.color} />}
-          {displayMode === 'wireframe' && (
-            <meshBasicMaterial color={part.color} wireframe />
-          )}
+          {displayMode === 'wireframe' && <meshBasicMaterial color={part.color} wireframe />}
           {displayMode === 'translucent' && (
-            <meshStandardMaterial
-              color="#888888"
-              transparent
-              opacity={0.3}
-              depthWrite={false}
-            />
+            <meshStandardMaterial color="#888888" transparent opacity={0.3} depthWrite={false} />
           )}
           <Edges
             visible={isSelected || isHovered || isReference || displayMode === 'wireframe'}
             scale={1.002}
             threshold={15}
-            color={isSelected ? '#ffffff' : isReference ? '#00ffff' : displayMode === 'wireframe' ? part.color : '#888888'}
+            color={
+              isSelected ? '#ffffff' : isReference ? '#00ffff' : displayMode === 'wireframe' ? part.color : '#888888'
+            }
           />
         </mesh>
 
@@ -1577,8 +1913,8 @@ export function Part({ part }: PartProps) {
           </>
         )}
 
-        {/* Blueprint-style dimension labels - show for all selected parts */}
-        {isSelected && (
+        {/* Blueprint-style dimension labels - show for all selected parts, but hide while dragging */}
+        {isSelected && !isDragging && !activeDragDelta && (
           <>
             {/* Length dimension (along X axis) - shown on front edge, offset toward -Z */}
             <DimensionLabel

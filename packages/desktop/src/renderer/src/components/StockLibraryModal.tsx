@@ -1,11 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { Copy, Plus, Search, X, Download, Upload } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Stock, Assembly } from '../types';
-import { FractionInput } from './FractionInput';
 import { STOCK_COLORS } from '../constants';
-import { formatMeasurementWithUnit } from '../utils/fractions';
-import { useProjectStore } from '../store/projectStore';
 import { useBackdropClose } from '../hooks/useBackdropClose';
+import { useProjectStore } from '../store/projectStore';
+import { isBuiltInAssembly } from '../templates/builtInAssemblies';
+import { Assembly, Stock } from '../types';
+import { formatMeasurementWithUnit } from '../utils/fractions';
+import { getFeatureLimits } from '../utils/featureLimits';
+import { ColorPicker } from './ColorPicker';
+import { FractionInput } from './FractionInput';
+import { HelpTooltip } from './HelpTooltip';
 
 type LibraryTab = 'stocks' | 'assemblies';
 
@@ -19,6 +24,7 @@ interface StockLibraryModalProps {
   assemblies: Assembly[];
   onUpdateAssembly: (id: string, updates: Partial<Assembly>) => void;
   onDeleteAssembly: (id: string) => void;
+  onDuplicateAssembly?: (assembly: Assembly) => Promise<void>;
   onEditAssemblyIn3D?: (assembly: Assembly) => Promise<boolean>;
   onCreateNewAssembly?: () => Promise<boolean>;
 }
@@ -44,10 +50,14 @@ export function StockLibraryModal({
   assemblies,
   onUpdateAssembly,
   onDeleteAssembly,
+  onDuplicateAssembly,
   onEditAssemblyIn3D,
   onCreateNewAssembly
 }: StockLibraryModalProps) {
   const units = useProjectStore((s) => s.units);
+  const licenseMode = useProjectStore((s) => s.licenseMode);
+  const limits = getFeatureLimits(licenseMode);
+  const canCreateAssemblies = limits.canUseAssemblies;
   const [activeTab, setActiveTab] = useState<LibraryTab>('stocks');
   const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
   const [selectedAssemblyId, setSelectedAssemblyId] = useState<string | null>(null);
@@ -57,6 +67,24 @@ export function StockLibraryModal({
   // Assembly editing state
   const [isEditingAssembly, setIsEditingAssembly] = useState(false);
   const [assemblyFormData, setAssemblyFormData] = useState({ name: '', description: '' });
+  // Search state
+  const [stockSearchTerm, setStockSearchTerm] = useState('');
+  const [assemblySearchTerm, setAssemblySearchTerm] = useState('');
+
+  // Filtered lists based on search
+  const filteredStocks = useMemo(
+    () =>
+      stockSearchTerm ? stocks.filter((s) => s.name.toLowerCase().includes(stockSearchTerm.toLowerCase())) : stocks,
+    [stocks, stockSearchTerm]
+  );
+
+  const filteredAssemblies = useMemo(
+    () =>
+      assemblySearchTerm
+        ? assemblies.filter((a) => a.name.toLowerCase().includes(assemblySearchTerm.toLowerCase()))
+        : assemblies,
+    [assemblies, assemblySearchTerm]
+  );
 
   // Reset state when modal opens
   useEffect(() => {
@@ -68,6 +96,8 @@ export function StockLibraryModal({
       setFormData(defaultStock);
       setIsEditingAssembly(false);
       setAssemblyFormData({ name: '', description: '' });
+      setStockSearchTerm('');
+      setAssemblySearchTerm('');
     }
   }, [isOpen]);
 
@@ -80,6 +110,8 @@ export function StockLibraryModal({
     setFormData(defaultStock);
     setIsEditingAssembly(false);
     setAssemblyFormData({ name: '', description: '' });
+    setStockSearchTerm('');
+    setAssemblySearchTerm('');
   }, [activeTab]);
 
   const handleSelectStock = useCallback((stock: Stock) => {
@@ -190,6 +222,76 @@ export function StockLibraryModal({
     }
   }, [selectedAssemblyId, onDeleteAssembly]);
 
+  // Export/Import handlers
+  const showToast = useProjectStore((s) => s.showToast);
+
+  const handleExportStock = useCallback(async () => {
+    if (!selectedStockId) return;
+    try {
+      const result = await window.electronAPI.exportStocks([selectedStockId]);
+      if (result.success && result.filePath) {
+        showToast(`Stock exported to ${result.filePath.split('/').pop()}`, 'success');
+      } else if (!result.canceled && result.error) {
+        showToast(result.error, 'error');
+      }
+    } catch (error) {
+      console.error('Failed to export stock:', error);
+      showToast('Failed to export stock', 'error');
+    }
+  }, [selectedStockId, showToast]);
+
+  const handleExportAssembly = useCallback(async () => {
+    if (!selectedAssemblyId) return;
+    try {
+      const result = await window.electronAPI.exportAssembly(selectedAssemblyId);
+      if (result.success && result.filePath) {
+        const message = result.stocksIncluded
+          ? `Assembly exported with ${result.stocksIncluded} stock${result.stocksIncluded === 1 ? '' : 's'}`
+          : 'Assembly exported successfully';
+        showToast(message, 'success');
+      } else if (!result.canceled && result.error) {
+        showToast(result.error, 'error');
+      }
+    } catch (error) {
+      console.error('Failed to export assembly:', error);
+      showToast('Failed to export assembly', 'error');
+    }
+  }, [selectedAssemblyId, showToast]);
+
+  const handleImportStocks = useCallback(async () => {
+    try {
+      const result = await window.electronAPI.importStocks();
+      if (result.success) {
+        const message = result.skipped
+          ? `Imported ${result.imported} stock${result.imported === 1 ? '' : 's'}, ${result.skipped} skipped`
+          : `Imported ${result.imported} stock${result.imported === 1 ? '' : 's'}`;
+        showToast(message, 'success');
+      } else if (!result.canceled && result.error) {
+        showToast(result.error, 'error');
+      }
+    } catch (error) {
+      console.error('Failed to import stocks:', error);
+      showToast('Failed to import stocks', 'error');
+    }
+  }, [showToast]);
+
+  const handleImportAssembly = useCallback(async () => {
+    try {
+      const result = await window.electronAPI.importAssembly({ importStocks: true });
+      if (result.success && result.assemblyId) {
+        const message = result.stocksImported
+          ? `Assembly imported with ${result.stocksImported} stock${result.stocksImported === 1 ? '' : 's'}`
+          : 'Assembly imported successfully';
+        showToast(message, 'success');
+      } else if (!result.canceled && result.error) {
+        showToast(result.error, 'error');
+      }
+    } catch (error) {
+      console.error('Failed to import assembly:', error);
+      showToast('Failed to import assembly', 'error');
+    }
+  }, [showToast]);
+
   const { handleMouseDown, handleClick } = useBackdropClose(onClose);
 
   // Handle escape key
@@ -217,10 +319,10 @@ export function StockLibraryModal({
 
   return (
     <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
-      <div className="modal stock-library-modal">
+      <div className="modal stock-library-modal" role="dialog" aria-modal="true" aria-labelledby="library-modal-title">
         <div className="modal-header">
-          <h2>Library</h2>
-          <button className="modal-close" onClick={onClose}>
+          <h2 id="library-modal-title">Library</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Close">
             &times;
           </button>
         </div>
@@ -241,25 +343,83 @@ export function StockLibraryModal({
           </button>
         </div>
 
+        {/* Upgrade banner for free mode users - shown above assemblies tab content */}
+        {activeTab === 'assemblies' && !canCreateAssemblies && (
+          <div className="upgrade-banner">
+            <span>Upgrade to create and edit assemblies</span>
+          </div>
+        )}
+
         <div className="stock-library-content">
           {activeTab === 'stocks' ? (
             <>
               {/* Stock list sidebar */}
               <div className="stock-library-list-panel">
                 <div className="stock-library-list-header">
-                  <span>{stocks.length} stock type{stocks.length !== 1 ? 's' : ''}</span>
-                  <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleStartCreate}>
-                    + Add
-                  </button>
+                  <span>{stocks.length} available</span>
+                  <div className="stock-library-header-actions">
+                    <button
+                      className="btn btn-icon-xs btn-ghost btn-secondary"
+                      onClick={handleImportStocks}
+                      title="Import stocks from file"
+                      aria-label="Import stocks"
+                    >
+                      <Upload size={14} />
+                    </button>
+                    <button
+                      className="btn btn-icon-xs btn-ghost btn-secondary"
+                      onClick={handleStartCreate}
+                      title="Create new stock"
+                      aria-label="Create new stock"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
                 </div>
+                {stocks.length > 0 && (
+                  <div className="modal-search">
+                    <Search size={14} className="modal-search-icon" />
+                    <input
+                      type="text"
+                      placeholder="Search stocks..."
+                      value={stockSearchTerm}
+                      onChange={(e) => setStockSearchTerm(e.target.value)}
+                    />
+                    {stockSearchTerm && (
+                      <button
+                        className="modal-search-clear"
+                        onClick={() => setStockSearchTerm('')}
+                        aria-label="Clear search"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                )}
                 {stocks.length === 0 ? (
                   <div className="placeholder-text">
                     <p className="mb-2">📦 No stocks in library yet</p>
-                    <p className="hint text-xs">Click "+ Add" above to create your first stock material</p>
+                    <p className="hint text-xs">
+                      Click "+" above to create your first stock material.{' '}
+                      <a
+                        href="#"
+                        className="learn-more-link"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          window.electronAPI.openExternal('https://carvd-studio.com/docs#stock');
+                        }}
+                      >
+                        Learn more
+                      </a>
+                    </p>
+                  </div>
+                ) : filteredStocks.length === 0 ? (
+                  <div className="placeholder-text">
+                    <p>No stocks match "{stockSearchTerm}"</p>
                   </div>
                 ) : (
                   <ul className="stock-library-list">
-                    {stocks.map((stock) => (
+                    {filteredStocks.map((stock) => (
                       <li
                         key={stock.id}
                         className={`stock-library-item ${selectedStockId === stock.id ? 'selected' : ''}`}
@@ -269,7 +429,8 @@ export function StockLibraryModal({
                         <div className="stock-info">
                           <span className="stock-name">{stock.name}</span>
                           <span className="stock-dims">
-                            {formatMeasurementWithUnit(stock.length, units)} × {formatMeasurementWithUnit(stock.width, units)} ×{' '}
+                            {formatMeasurementWithUnit(stock.length, units)} ×{' '}
+                            {formatMeasurementWithUnit(stock.width, units)} ×{' '}
                             {formatMeasurementWithUnit(stock.thickness, units)}
                           </span>
                         </div>
@@ -283,9 +444,18 @@ export function StockLibraryModal({
               <div className="stock-library-detail-panel">
                 {!selectedStock && !isCreating ? (
                   <div className="stock-library-empty">
-                    <div className="text-4xl mb-4">📐</div>
                     <p className="mb-2">Select a stock to view details</p>
-                    <p className="hint text-xs">or click "+ Add" to create a new stock material</p>
+                    <p className="hint text-xs">or click "+" to create a new stock material</p>
+                    <a
+                      href="#"
+                      className="learn-more-link text-xs"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        window.electronAPI.openExternal('https://carvd-studio.com/docs#stock');
+                      }}
+                    >
+                      Learn more about stock materials
+                    </a>
                   </div>
                 ) : (
                   <>
@@ -295,6 +465,14 @@ export function StockLibraryModal({
                         <div className="stock-detail-actions">
                           <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleStartEdit}>
                             Edit
+                          </button>
+                          <button
+                            className="btn btn-xs btn-ghost btn-secondary"
+                            onClick={handleExportStock}
+                            title="Export stock to file"
+                          >
+                            <Download size={12} />
+                            Export
                           </button>
                           <button className="btn btn-xs btn-outlined btn-danger" onClick={handleDeleteStock}>
                             Delete
@@ -388,24 +566,10 @@ export function StockLibraryModal({
 
                         <div className="form-group">
                           <label>Display Color</label>
-                          <div className="color-picker-row">
-                            <input
-                              type="color"
-                              value={formData.color}
-                              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                            />
-                            <div className="color-presets">
-                              {STOCK_COLORS.map((color) => (
-                                <button
-                                  key={color}
-                                  className={`color-preset ${formData.color === color ? 'selected' : ''}`}
-                                  style={{ backgroundColor: color }}
-                                  onClick={() => setFormData({ ...formData, color })}
-                                  title={color}
-                                />
-                              ))}
-                            </div>
-                          </div>
+                          <ColorPicker
+                            value={formData.color}
+                            onChange={(color) => setFormData({ ...formData, color })}
+                          />
                         </div>
 
                         <div className="form-actions">
@@ -423,16 +587,15 @@ export function StockLibraryModal({
                         <div className="detail-row">
                           <span className="detail-label">Dimensions</span>
                           <span className="detail-value">
-                            {formatMeasurementWithUnit(formData.length, units)} × {formatMeasurementWithUnit(formData.width, units)} ×{' '}
+                            {formatMeasurementWithUnit(formData.length, units)} ×{' '}
+                            {formatMeasurementWithUnit(formData.width, units)} ×{' '}
                             {formatMeasurementWithUnit(formData.thickness, units)}
                           </span>
                         </div>
                         <div className="detail-row">
                           <span className="detail-label">Grain</span>
                           <span className="detail-value">
-                            {formData.grainDirection === 'none'
-                              ? 'None'
-                              : `Along ${formData.grainDirection}`}
+                            {formData.grainDirection === 'none' ? 'None' : `Along ${formData.grainDirection}`}
                           </span>
                         </div>
                         <div className="detail-row">
@@ -444,10 +607,7 @@ export function StockLibraryModal({
                         </div>
                         <div className="detail-row">
                           <span className="detail-label">Color</span>
-                          <span
-                            className="detail-color-swatch"
-                            style={{ backgroundColor: formData.color }}
-                          />
+                          <span className="detail-color-swatch" style={{ backgroundColor: formData.color }} />
                         </div>
                       </div>
                     )}
@@ -460,39 +620,121 @@ export function StockLibraryModal({
               {/* Assemblies list sidebar */}
               <div className="stock-library-list-panel">
                 <div className="stock-library-list-header">
-                  <span>{assemblies.length} assembl{assemblies.length !== 1 ? 'ies' : 'y'}</span>
-                  {onCreateNewAssembly && (
-                    <button
-                      className="btn btn-xs btn-ghost btn-secondary"
-                      onClick={async () => {
-                        const success = await onCreateNewAssembly();
-                        if (success) {
-                          onClose();
-                        }
-                      }}
-                      title="Create new assembly"
-                    >
-                      + New
-                    </button>
-                  )}
+                  <span>{assemblies.length} available</span>
+                  <div className="stock-library-header-actions">
+                    {canCreateAssemblies && (
+                      <button
+                        className="btn btn-icon-xs btn-ghost btn-secondary"
+                        onClick={handleImportAssembly}
+                        title="Import assembly from file"
+                        aria-label="Import assembly"
+                      >
+                        <Upload size={14} />
+                      </button>
+                    )}
+                    {onCreateNewAssembly && canCreateAssemblies && (
+                      <button
+                        className="btn btn-icon-xs btn-ghost btn-secondary"
+                        onClick={async () => {
+                          const success = await onCreateNewAssembly();
+                          if (success) {
+                            onClose();
+                          }
+                        }}
+                        title="Create new assembly"
+                        aria-label="Create new assembly"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
+                {assemblies.length > 0 && (
+                  <div className="modal-search">
+                    <Search size={14} className="modal-search-icon" />
+                    <input
+                      type="text"
+                      placeholder="Search assemblies..."
+                      value={assemblySearchTerm}
+                      onChange={(e) => setAssemblySearchTerm(e.target.value)}
+                    />
+                    {assemblySearchTerm && (
+                      <button
+                        className="modal-search-clear"
+                        onClick={() => setAssemblySearchTerm('')}
+                        aria-label="Clear search"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                )}
                 {assemblies.length === 0 ? (
                   <div className="placeholder-text">
-                    <p>No assemblies in library yet</p>
-                    <p className="hint">
-                      {onCreateNewAssembly ? (
-                        <>Click "+ New" above or save a selection as an assembly from the canvas</>
-                      ) : (
-                        <>Save a selection as an assembly from the canvas</>
-                      )}
-                    </p>
+                    {!canCreateAssemblies ? (
+                      <>
+                        <p>Assemblies require a license</p>
+                        <p className="hint">
+                          Upgrade to create and use assemblies.{' '}
+                          <a
+                            href="#"
+                            className="learn-more-link"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
+                            }}
+                          >
+                            Learn more
+                          </a>
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p>No assemblies in library yet</p>
+                        <p className="hint">
+                          {onCreateNewAssembly ? (
+                            <>
+                              Click "+" above or save a selection as an assembly from the canvas.{' '}
+                              <a
+                                href="#"
+                                className="learn-more-link"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
+                                }}
+                              >
+                                Learn more
+                              </a>
+                            </>
+                          ) : (
+                            <>
+                              Save a selection as an assembly from the canvas.{' '}
+                              <a
+                                href="#"
+                                className="learn-more-link"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
+                                }}
+                              >
+                                Learn more
+                              </a>
+                            </>
+                          )}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                ) : filteredAssemblies.length === 0 ? (
+                  <div className="placeholder-text">
+                    <p>No assemblies match "{assemblySearchTerm}"</p>
                   </div>
                 ) : (
                   <ul className="stock-library-list">
-                    {assemblies.map((assembly) => (
+                    {filteredAssemblies.map((assembly) => (
                       <li
                         key={assembly.id}
-                        className={`stock-library-item ${selectedAssemblyId === assembly.id ? 'selected' : ''}`}
+                        className={`stock-library-item ${selectedAssemblyId === assembly.id ? 'selected' : ''} ${isBuiltInAssembly(assembly.id) ? 'built-in' : ''}`}
                         onClick={() => handleSelectAssembly(assembly)}
                         draggable
                         onDragStart={(e) => {
@@ -501,12 +743,20 @@ export function StockLibraryModal({
                           e.dataTransfer.effectAllowed = 'copy';
                         }}
                       >
-                        <span className="assembly-icon">📦</span>
+                        {assembly.thumbnailData?.data ? (
+                          <img src={assembly.thumbnailData.data} alt={assembly.name} className="assembly-thumbnail" />
+                        ) : (
+                          <span className="assembly-icon">📦</span>
+                        )}
                         <div className="stock-info">
-                          <span className="stock-name">{assembly.name}</span>
+                          <span className="stock-name">
+                            {assembly.name}
+                            {isBuiltInAssembly(assembly.id) && <span className="built-in-badge">Built-in</span>}
+                          </span>
                           <span className="stock-dims">
                             {assembly.parts.length} part{assembly.parts.length !== 1 ? 's' : ''}
-                            {assembly.groups.length > 0 && `, ${assembly.groups.length} group${assembly.groups.length !== 1 ? 's' : ''}`}
+                            {assembly.groups.length > 0 &&
+                              `, ${assembly.groups.length} group${assembly.groups.length !== 1 ? 's' : ''}`}
                           </span>
                         </div>
                       </li>
@@ -520,33 +770,80 @@ export function StockLibraryModal({
                 {!selectedAssembly ? (
                   <div className="stock-library-empty">
                     <p>Select an assembly to view details</p>
-                    <p className="hint">Drag assemblies onto the canvas to place them</p>
+                    <p className="hint">or click "+" to create a new assembly</p>
+                    <a
+                      href="#"
+                      className="learn-more-link text-xs"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
+                      }}
+                    >
+                      Learn more about assemblies
+                    </a>
                   </div>
                 ) : (
                   <>
                     <div className="stock-detail-header">
-                      <h3>{isEditingAssembly ? 'Edit Assembly' : selectedAssembly.name}</h3>
+                      <h3>
+                        {isEditingAssembly ? 'Edit Assembly' : selectedAssembly.name}
+                        {!isEditingAssembly && isBuiltInAssembly(selectedAssembly.id) && (
+                          <span className="built-in-badge">Built-in</span>
+                        )}
+                      </h3>
                       {!isEditingAssembly && (
                         <div className="stock-detail-actions">
-                          <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleStartEditAssembly}>
-                            Edit
-                          </button>
-                          {onEditAssemblyIn3D && (
+                          {/* Edit buttons only for non-built-in assemblies and licensed users */}
+                          {!isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
+                            <>
+                              <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleStartEditAssembly}>
+                                Edit
+                              </button>
+                              {onEditAssemblyIn3D && (
+                                <button
+                                  className="btn btn-xs btn-ghost btn-secondary"
+                                  onClick={async () => {
+                                    const success = await onEditAssemblyIn3D(selectedAssembly);
+                                    if (success) {
+                                      onClose();
+                                    }
+                                  }}
+                                >
+                                  Edit in 3D
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {/* Duplicate button - always available for licensed users */}
+                          {onDuplicateAssembly && canCreateAssemblies && (
                             <button
                               className="btn btn-xs btn-ghost btn-secondary"
                               onClick={async () => {
-                                const success = await onEditAssemblyIn3D(selectedAssembly);
-                                if (success) {
-                                  onClose();
-                                }
+                                await onDuplicateAssembly(selectedAssembly);
                               }}
+                              title="Create a copy of this assembly"
                             >
-                              Edit in 3D
+                              <Copy size={12} />
+                              Duplicate
                             </button>
                           )}
-                          <button className="btn btn-xs btn-outlined btn-danger" onClick={handleDeleteAssembly}>
-                            Delete
-                          </button>
+                          {/* Export button - available for non-built-in assemblies */}
+                          {!isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
+                            <button
+                              className="btn btn-xs btn-ghost btn-secondary"
+                              onClick={handleExportAssembly}
+                              title="Export assembly to file"
+                            >
+                              <Download size={12} />
+                              Export
+                            </button>
+                          )}
+                          {/* Delete only for non-built-in assemblies */}
+                          {!isBuiltInAssembly(selectedAssembly.id) && (
+                            <button className="btn btn-xs btn-outlined btn-danger" onClick={handleDeleteAssembly}>
+                              Delete
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -573,7 +870,7 @@ export function StockLibraryModal({
                           />
                         </div>
 
-                        {onEditAssemblyIn3D && (
+                        {onEditAssemblyIn3D && !isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
                           <div className="form-group">
                             <button
                               className="btn btn-sm btn-outlined btn-secondary edit-3d-btn"
@@ -585,8 +882,12 @@ export function StockLibraryModal({
                               }}
                             >
                               Edit Layout in 3D
+                              <HelpTooltip
+                                text="Opens this assembly in the 3D workspace for editing parts and positions."
+                                docsSection="assemblies"
+                                inline
+                              />
                             </button>
-                            <p className="hint">Opens this assembly in the 3D workspace for editing parts and positions.</p>
                           </div>
                         )}
 
@@ -639,7 +940,9 @@ export function StockLibraryModal({
                               <li key={index} className="assembly-part-item">
                                 <span className="assembly-part-name">{part.name}</span>
                                 <span className="assembly-part-dims">
-                                  {formatMeasurementWithUnit(part.length, units)} × {formatMeasurementWithUnit(part.width, units)} × {formatMeasurementWithUnit(part.thickness, units)}
+                                  {formatMeasurementWithUnit(part.length, units)} ×{' '}
+                                  {formatMeasurementWithUnit(part.width, units)} ×{' '}
+                                  {formatMeasurementWithUnit(part.thickness, units)}
                                 </span>
                               </li>
                             ))}

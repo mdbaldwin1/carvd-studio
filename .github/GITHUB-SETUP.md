@@ -157,13 +157,6 @@ Feature branches → develop → main
 
 ### Required for Release Workflow:
 
-**Lemon Squeezy:**
-- [ ] `LEMON_SQUEEZY_API_KEY`
-- [ ] `LEMON_SQUEEZY_STORE_ID`
-- [ ] `LEMON_SQUEEZY_PRODUCT_ID`
-- [ ] `LEMON_SQUEEZY_VARIANT_ID_MACOS`
-- [ ] `LEMON_SQUEEZY_VARIANT_ID_WINDOWS`
-
 **Apple (macOS Code Signing):**
 - [ ] `APPLE_ID`
 - [ ] `APPLE_ID_PASSWORD`
@@ -220,14 +213,7 @@ updates:
           - "*playwright*"
           - "*testing-library*"
 
-  # Webhook dependencies
-  - package-ecosystem: "npm"
-    directory: "/packages/webhook"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 3
-
-  # Website dependencies (if applicable)
+  # Website dependencies
   - package-ecosystem: "npm"
     directory: "/packages/website"
     schedule:
@@ -277,14 +263,13 @@ This creates: `.github/workflows/codeql.yml`
 ```
 # .github/CODEOWNERS
 # Default owner for everything
-* @mbaldwintech
+* @mdbaldwin1
 
 # Desktop app
-/packages/desktop/ @mbaldwintech
+/packages/desktop/ @mdbaldwin1
 
-# Webhook & infrastructure
-/packages/webhook/ @mbaldwintech
-/.github/ @mbaldwintech
+# Infrastructure
+/.github/ @mdbaldwin1
 ```
 
 ---
@@ -347,13 +332,15 @@ Create environment: `production`
 
 **Location:** `Settings → General → Danger Zone → Change repository visibility`
 
-**Current:** Check in GitHub settings
+**Current:** ✅ **Public**
 
-**Recommendation:**
-- **Private:** ✅ For commercial software (keeps code proprietary)
-- **Public:** If you want to showcase code (but license system remains proprietary)
+The repository is public to allow users to download releases from GitHub. The license key system protects revenue - users can download the app freely but need to purchase a license for full features after the trial period.
 
-**Note:** Public repos get unlimited free GitHub Actions minutes!
+**Benefits of public:**
+- Users can download releases without authentication
+- Unlimited free GitHub Actions minutes
+- Community can report issues and contribute
+- Transparent development builds trust
 
 ---
 
@@ -361,11 +348,12 @@ Create environment: `production`
 
 ### Immediate (Now):
 - [x] ✅ Create `develop` branch
-- [ ] Configure branch protection for `main`
-- [ ] Configure branch protection for `develop`
-- [ ] Enable Dependabot alerts
-- [ ] Enable Dependabot security updates
-- [ ] Enable secret scanning
+- [x] ✅ Configure branch protection for `main`
+- [x] ✅ Configure branch protection for `develop`
+- [x] ✅ Enable Dependabot alerts
+- [x] ✅ Enable Dependabot security updates
+- [x] ✅ Enable secret scanning
+- [x] ✅ Make repository public
 - [ ] Configure Actions workflow permissions
 
 ### Before First Release:
@@ -376,7 +364,7 @@ Create environment: `production`
 - [ ] Verify required status checks
 
 ### Optional Enhancements:
-- [ ] Create `.github/dependabot.yml` for automated updates
+- [x] ✅ Create `.github/dependabot.yml` for automated updates
 - [ ] Enable CodeQL scanning
 - [ ] Create CODEOWNERS file
 - [ ] Set up production environment with approvals
@@ -455,5 +443,5 @@ git push origin develop
 
 ---
 
-**Last Updated:** 2026-02-02
-**Status:** Configuration in progress
+**Last Updated:** 2026-02-10
+**Status:** Core configuration complete

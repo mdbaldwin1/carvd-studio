@@ -1,0 +1,200 @@
+{
+  "id": "end-table",
+  "name": "End Table",
+  "description": "A classic Shaker-style end table with four legs and a lower shelf. Perfect beside a sofa or bed.",
+  "category": "furniture",
+  "thumbnail": "🪑",
+  "dimensions": { "width": 20, "depth": 20, "height": 24 },
+  "projectSettings": {
+    "units": "imperial",
+    "gridSize": 0.0625,
+    "kerfWidth": 0.125,
+    "overageFactor": 0.1,
+    "projectNotes": "End Table\n\nDimensions: 20\"W x 20\"D x 24\"H\n\nA classic Shaker-style end table with lower shelf.\n\nMaterials:\n- 4/4 Cherry for top, aprons, and shelf\n- 8/4 Cherry for legs\n\nFeatures:\n- Solid cherry construction\n- Lower shelf for storage\n- Traditional mortise and tenon joinery (adjust dimensions as needed)\n\nBuild Notes:\n- Consider tapering the legs\n- Add edge profile to top\n- Shelf can rest on cleats or in dadoes",
+    "stockConstraints": {
+      "constrainDimensions": true,
+      "constrainGrain": true,
+      "constrainColor": true,
+      "preventOverlap": false
+    }
+  },
+  "stocks": [
+    {
+      "_refId": "stock-cherry-board",
+      "name": "4/4 Cherry Board",
+      "length": 72,
+      "width": 8,
+      "thickness": 0.75,
+      "grainDirection": "length",
+      "pricingUnit": "board_foot",
+      "pricePerUnit": 10,
+      "color": "#a0522d"
+    },
+    {
+      "_refId": "stock-cherry-thick",
+      "name": "8/4 Cherry (Legs)",
+      "length": 48,
+      "width": 4,
+      "thickness": 1.75,
+      "grainDirection": "length",
+      "pricingUnit": "board_foot",
+      "pricePerUnit": 14,
+      "color": "#8b4513"
+    }
+  ],
+  "parts": [
+    {
+      "_refId": "part-top",
+      "name": "Table Top",
+      "length": 20,
+      "width": 20,
+      "thickness": 0.75,
+      "position": { "x": 0, "y": 23.625, "z": 0 },
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "stockRefId": "stock-cherry-board",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#a0522d",
+      "notes": "Solid cherry top - consider edge profile",
+      "glueUpPanel": true
+    },
+    {
+      "_refId": "part-leg-fl",
+      "name": "Front Left Leg",
+      "length": 23.25,
+      "width": 1.75,
+      "thickness": 1.75,
+      "position": { "x": -8.125, "y": 11.625, "z": 8.125 },
+      "rotation": { "x": 0, "y": 0, "z": 90 },
+      "stockRefId": "stock-cherry-thick",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#8b4513",
+      "notes": "Consider tapering legs"
+    },
+    {
+      "_refId": "part-leg-fr",
+      "name": "Front Right Leg",
+      "length": 23.25,
+      "width": 1.75,
+      "thickness": 1.75,
+      "position": { "x": 8.125, "y": 11.625, "z": 8.125 },
+      "rotation": { "x": 0, "y": 0, "z": 90 },
+      "stockRefId": "stock-cherry-thick",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#8b4513",
+      "notes": "Consider tapering legs"
+    },
+    {
+      "_refId": "part-leg-bl",
+      "name": "Back Left Leg",
+      "length": 23.25,
+      "width": 1.75,
+      "thickness": 1.75,
+      "position": { "x": -8.125, "y": 11.625, "z": -8.125 },
+      "rotation": { "x": 0, "y": 0, "z": 90 },
+      "stockRefId": "stock-cherry-thick",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#8b4513",
+      "notes": "Consider tapering legs"
+    },
+    {
+      "_refId": "part-leg-br",
+      "name": "Back Right Leg",
+      "length": 23.25,
+      "width": 1.75,
+      "thickness": 1.75,
+      "position": { "x": 8.125, "y": 11.625, "z": -8.125 },
+      "rotation": { "x": 0, "y": 0, "z": 90 },
+      "stockRefId": "stock-cherry-thick",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#8b4513",
+      "notes": "Consider tapering legs"
+    },
+    {
+      "_refId": "part-apron-front",
+      "name": "Front Apron",
+      "length": 16.25,
+      "width": 4,
+      "thickness": 0.75,
+      "position": { "x": 0, "y": 21.25, "z": 8.125 },
+      "rotation": { "x": 90, "y": 0, "z": 0 },
+      "stockRefId": "stock-cherry-board",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#a0522d"
+    },
+    {
+      "_refId": "part-apron-back",
+      "name": "Back Apron",
+      "length": 16.25,
+      "width": 4,
+      "thickness": 0.75,
+      "position": { "x": 0, "y": 21.25, "z": -8.125 },
+      "rotation": { "x": 90, "y": 0, "z": 0 },
+      "stockRefId": "stock-cherry-board",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#a0522d"
+    },
+    {
+      "_refId": "part-apron-left",
+      "name": "Left Apron",
+      "length": 16.25,
+      "width": 4,
+      "thickness": 0.75,
+      "position": { "x": -8.125, "y": 21.25, "z": 0 },
+      "rotation": { "x": 90, "y": 0, "z": 90 },
+      "stockRefId": "stock-cherry-board",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#a0522d"
+    },
+    {
+      "_refId": "part-apron-right",
+      "name": "Right Apron",
+      "length": 16.25,
+      "width": 4,
+      "thickness": 0.75,
+      "position": { "x": 8.125, "y": 21.25, "z": 0 },
+      "rotation": { "x": 90, "y": 0, "z": 90 },
+      "stockRefId": "stock-cherry-board",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#a0522d"
+    },
+    {
+      "_refId": "part-lower-shelf",
+      "name": "Lower Shelf",
+      "length": 17.25,
+      "width": 17.25,
+      "thickness": 0.75,
+      "position": { "x": 0, "y": 6, "z": 0 },
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "stockRefId": "stock-cherry-board",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#a0522d",
+      "notes": "Rests on cleats or in dadoes - notched for legs",
+      "glueUpPanel": true,
+      "ignoreOverlap": true
+    }
+  ],
+  "groups": [
+    { "_refId": "group-legs", "name": "Legs" },
+    { "_refId": "group-aprons", "name": "Aprons" }
+  ],
+  "groupMembers": [
+    { "groupRefId": "group-legs", "memberType": "part", "memberRefId": "part-leg-fl" },
+    { "groupRefId": "group-legs", "memberType": "part", "memberRefId": "part-leg-fr" },
+    { "groupRefId": "group-legs", "memberType": "part", "memberRefId": "part-leg-bl" },
+    { "groupRefId": "group-legs", "memberType": "part", "memberRefId": "part-leg-br" },
+    { "groupRefId": "group-aprons", "memberType": "part", "memberRefId": "part-apron-front" },
+    { "groupRefId": "group-aprons", "memberType": "part", "memberRefId": "part-apron-back" },
+    { "groupRefId": "group-aprons", "memberType": "part", "memberRefId": "part-apron-left" },
+    { "groupRefId": "group-aprons", "memberType": "part", "memberRefId": "part-apron-right" }
+  ]
+}

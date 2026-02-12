@@ -5,7 +5,8 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useProjectStore } from '../store/projectStore';
-import { serializeProject, parseCarvdFile, deserializeToProject, stringifyCarvdFile } from '../utils/fileFormat';
+import { serializeProject, parseCarvdFile, deserializeToProject } from '../utils/fileFormat';
+import { logger } from '../utils/logger';
 
 // Auto-save interval in milliseconds (2 minutes)
 const AUTO_SAVE_INTERVAL = 2 * 60 * 1000;
@@ -25,6 +26,7 @@ interface RecoveryInfo {
   projectName: string;
   modifiedAt: string;
   fileName: string;
+  originalFilePath: string | null; // The file path the project was loaded from
 }
 
 interface UseAutoRecoveryResult {
@@ -40,6 +42,7 @@ interface UseAutoRecoveryResult {
 
 export function useAutoRecovery(): UseAutoRecoveryResult {
   const isDirty = useProjectStore((s) => s.isDirty);
+  const filePath = useProjectStore((s) => s.filePath);
   const projectName = useProjectStore((s) => s.projectName);
   const createdAt = useProjectStore((s) => s.createdAt);
   const modifiedAt = useProjectStore((s) => s.modifiedAt);
@@ -55,6 +58,7 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
   const groupMembers = useProjectStore((s) => s.groupMembers);
   const assemblies = useProjectStore((s) => s.assemblies);
   const snapGuides = useProjectStore((s) => s.snapGuides);
+  const cameraState = useProjectStore((s) => s.cameraState);
   const customShoppingItems = useProjectStore((s) => s.customShoppingItems);
   const cutList = useProjectStore((s) => s.cutList);
   const loadProject = useProjectStore((s) => s.loadProject);
@@ -88,31 +92,56 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
         groupMembers,
         assemblies,
         snapGuides,
+        cameraState,
         customShoppingItems,
         cutList
       });
 
-      const json = stringifyCarvdFile(fileData);
+      // Wrap project data with recovery metadata (includes original file path)
+      const recoveryData = {
+        recovery: {
+          filePath: filePath // Store the original file path so we can save back to it
+        },
+        projectData: fileData
+      };
+
+      const json = JSON.stringify(recoveryData);
       await window.electronAPI.saveRecoveryFile(recoveryFileName.current, json);
       setLastAutoSave(new Date());
-      console.log('[AutoRecovery] Saved recovery file');
+      logger.info('[AutoRecovery] Saved recovery file');
     } catch (error) {
-      console.error('[AutoRecovery] Failed to save recovery file:', error);
+      logger.error('[AutoRecovery] Failed to save recovery file:', error);
     }
   }, [
-    isDirty, projectName, createdAt, modifiedAt, units, gridSize,
-    kerfWidth, overageFactor, projectNotes, stockConstraints,
-    parts, stocks, groups, groupMembers, assemblies, snapGuides,
-    customShoppingItems, cutList
+    isDirty,
+    filePath,
+    projectName,
+    createdAt,
+    modifiedAt,
+    units,
+    gridSize,
+    kerfWidth,
+    overageFactor,
+    projectNotes,
+    stockConstraints,
+    parts,
+    stocks,
+    groups,
+    groupMembers,
+    assemblies,
+    snapGuides,
+    cameraState,
+    customShoppingItems,
+    cutList
   ]);
 
   // Clear recovery file (called after successful save)
   const clearRecovery = useCallback(async () => {
     try {
       await window.electronAPI.deleteRecoveryFile(recoveryFileName.current);
-      console.log('[AutoRecovery] Cleared recovery file');
+      logger.info('[AutoRecovery] Cleared recovery file');
     } catch (error) {
-      console.error('[AutoRecovery] Failed to clear recovery file:', error);
+      logger.error('[AutoRecovery] Failed to clear recovery file:', error);
     }
   }, []);
 
@@ -127,19 +156,40 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
           // Read the first recovery file to get info
           const content = await window.electronAPI.readRecoveryFile(files[0]);
           if (content) {
-            const validation = parseCarvdFile(content);
+            // Try parsing as new wrapper format first
+            let parsed: { recovery?: { filePath: string | null }; projectData?: unknown } | null = null;
+            let projectData: unknown = null;
+            let originalFilePath: string | null = null;
+
+            try {
+              parsed = JSON.parse(content);
+              if (parsed && 'recovery' in parsed && 'projectData' in parsed) {
+                // New format with wrapper
+                projectData = parsed.projectData;
+                originalFilePath = parsed.recovery?.filePath ?? null;
+              } else {
+                // Old format - content is the project data directly
+                projectData = parsed;
+              }
+            } catch {
+              // If JSON parse fails, it's not valid
+              return;
+            }
+
+            const validation = parseCarvdFile(JSON.stringify(projectData));
             if (validation.valid && validation.data) {
               setHasRecovery(true);
               setRecoveryInfo({
                 projectName: validation.data.project.name,
                 modifiedAt: validation.data.project.modifiedAt,
-                fileName: files[0]
+                fileName: files[0],
+                originalFilePath
               });
             }
           }
         }
       } catch (error) {
-        console.error('[AutoRecovery] Failed to check for recovery files:', error);
+        logger.error('[AutoRecovery] Failed to check for recovery files:', error);
       }
     };
 
@@ -179,14 +229,34 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
         return false;
       }
 
-      const validation = parseCarvdFile(content);
+      // Parse the recovery file - handle both new wrapper format and old format
+      let projectData: unknown = null;
+      let originalFilePath: string | null = recoveryInfo.originalFilePath;
+
+      try {
+        const parsed = JSON.parse(content);
+        if (parsed && 'recovery' in parsed && 'projectData' in parsed) {
+          // New format with wrapper
+          projectData = parsed.projectData;
+          // Use recoveryInfo.originalFilePath which was set during check
+        } else {
+          // Old format - content is the project data directly
+          projectData = parsed;
+        }
+      } catch {
+        showToast('Recovery file is corrupted');
+        return false;
+      }
+
+      const validation = parseCarvdFile(JSON.stringify(projectData));
       if (!validation.valid || !validation.data) {
         showToast('Recovery file is corrupted');
         return false;
       }
 
       const project = deserializeToProject(validation.data);
-      loadProject(project);
+      // Pass the original file path so Save works without prompting for location
+      loadProject(project, originalFilePath ?? undefined);
 
       // Mark as dirty since this is a recovered unsaved state
       useProjectStore.getState().markDirty();
@@ -203,7 +273,7 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
 
       return true;
     } catch (error) {
-      console.error('[AutoRecovery] Failed to restore:', error);
+      logger.error('[AutoRecovery] Failed to restore:', error);
       showToast('Failed to restore project');
       return false;
     }
@@ -222,9 +292,9 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
 
       setHasRecovery(false);
       setRecoveryInfo(null);
-      console.log('[AutoRecovery] Discarded recovery files');
+      logger.info('[AutoRecovery] Discarded recovery files');
     } catch (error) {
-      console.error('[AutoRecovery] Failed to discard recovery:', error);
+      logger.error('[AutoRecovery] Failed to discard recovery:', error);
     }
   }, [recoveryInfo]);
 

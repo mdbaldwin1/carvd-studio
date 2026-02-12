@@ -1,0 +1,187 @@
+{
+  "id": "basic-bookshelf",
+  "name": "Basic Bookshelf",
+  "description": "A classic bookshelf with four adjustable shelves. Great for books, display items, or storage.",
+  "category": "storage",
+  "thumbnail": "📚",
+  "dimensions": { "width": 36, "depth": 12, "height": 72 },
+  "projectSettings": {
+    "units": "imperial",
+    "gridSize": 0.0625,
+    "kerfWidth": 0.125,
+    "overageFactor": 0.1,
+    "projectNotes": "Basic Bookshelf\n\nDimensions: 36\"W x 12\"D x 72\"H\n\nA classic bookshelf design with adjustable shelves.\n\nMaterials:\n- 4/4 Walnut for sides, top, bottom, and shelves\n- 1/4\" Plywood for back panel\n\nFeatures:\n- 4 adjustable shelves\n- Solid wood construction\n- Plywood back for stability",
+    "stockConstraints": {
+      "constrainDimensions": true,
+      "constrainGrain": true,
+      "constrainColor": true,
+      "preventOverlap": false
+    }
+  },
+  "stocks": [
+    {
+      "_refId": "stock-walnut",
+      "name": "4/4 Walnut Board",
+      "length": 96,
+      "width": 12,
+      "thickness": 0.75,
+      "grainDirection": "length",
+      "pricingUnit": "board_foot",
+      "pricePerUnit": 12,
+      "color": "#6b4423"
+    },
+    {
+      "_refId": "stock-plywood-back",
+      "name": "1/4\" Plywood 6x8 (Back)",
+      "length": 96,
+      "width": 72,
+      "thickness": 0.25,
+      "grainDirection": "length",
+      "pricingUnit": "per_item",
+      "pricePerUnit": 45,
+      "color": "#c4a574"
+    }
+  ],
+  "parts": [
+    {
+      "_refId": "part-left-side",
+      "name": "Left Side",
+      "length": 72,
+      "width": 12,
+      "thickness": 0.75,
+      "position": { "x": -17.625, "y": 36, "z": 0 },
+      "rotation": { "x": 0, "y": 0, "z": 90 },
+      "stockRefId": "stock-walnut",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#6b4423",
+      "notes": "Vertical side panel"
+    },
+    {
+      "_refId": "part-right-side",
+      "name": "Right Side",
+      "length": 72,
+      "width": 12,
+      "thickness": 0.75,
+      "position": { "x": 17.625, "y": 36, "z": 0 },
+      "rotation": { "x": 0, "y": 0, "z": 90 },
+      "stockRefId": "stock-walnut",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#6b4423",
+      "notes": "Vertical side panel"
+    },
+    {
+      "_refId": "part-top",
+      "name": "Top",
+      "length": 34.5,
+      "width": 12,
+      "thickness": 0.75,
+      "position": { "x": 0, "y": 71.625, "z": 0 },
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "stockRefId": "stock-walnut",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#6b4423",
+      "notes": "Top panel"
+    },
+    {
+      "_refId": "part-bottom",
+      "name": "Bottom",
+      "length": 34.5,
+      "width": 12,
+      "thickness": 0.75,
+      "position": { "x": 0, "y": 0.375, "z": 0 },
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "stockRefId": "stock-walnut",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#6b4423",
+      "notes": "Bottom panel"
+    },
+    {
+      "_refId": "part-shelf-1",
+      "name": "Shelf 1",
+      "length": 34.5,
+      "width": 11.5,
+      "thickness": 0.75,
+      "position": { "x": 0, "y": 14.85, "z": 0.25 },
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "stockRefId": "stock-walnut",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#6b4423",
+      "notes": "Adjustable shelf"
+    },
+    {
+      "_refId": "part-shelf-2",
+      "name": "Shelf 2",
+      "length": 34.5,
+      "width": 11.5,
+      "thickness": 0.75,
+      "position": { "x": 0, "y": 28.95, "z": 0.25 },
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "stockRefId": "stock-walnut",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#6b4423",
+      "notes": "Adjustable shelf"
+    },
+    {
+      "_refId": "part-shelf-3",
+      "name": "Shelf 3",
+      "length": 34.5,
+      "width": 11.5,
+      "thickness": 0.75,
+      "position": { "x": 0, "y": 43.05, "z": 0.25 },
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "stockRefId": "stock-walnut",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#6b4423",
+      "notes": "Adjustable shelf"
+    },
+    {
+      "_refId": "part-shelf-4",
+      "name": "Shelf 4",
+      "length": 34.5,
+      "width": 11.5,
+      "thickness": 0.75,
+      "position": { "x": 0, "y": 57.15, "z": 0.25 },
+      "rotation": { "x": 0, "y": 0, "z": 0 },
+      "stockRefId": "stock-walnut",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#6b4423",
+      "notes": "Adjustable shelf"
+    },
+    {
+      "_refId": "part-back-panel",
+      "name": "Back Panel",
+      "length": 35.5,
+      "width": 71.5,
+      "thickness": 0.25,
+      "position": { "x": 0, "y": 36, "z": -6.125 },
+      "rotation": { "x": 90, "y": 0, "z": 0 },
+      "stockRefId": "stock-plywood-back",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#c4a574",
+      "notes": "1/4\" plywood back"
+    }
+  ],
+  "groups": [
+    { "_refId": "group-shelves", "name": "Shelves" },
+    { "_refId": "group-case", "name": "Case" }
+  ],
+  "groupMembers": [
+    { "groupRefId": "group-shelves", "memberType": "part", "memberRefId": "part-shelf-1" },
+    { "groupRefId": "group-shelves", "memberType": "part", "memberRefId": "part-shelf-2" },
+    { "groupRefId": "group-shelves", "memberType": "part", "memberRefId": "part-shelf-3" },
+    { "groupRefId": "group-shelves", "memberType": "part", "memberRefId": "part-shelf-4" },
+    { "groupRefId": "group-case", "memberType": "part", "memberRefId": "part-left-side" },
+    { "groupRefId": "group-case", "memberType": "part", "memberRefId": "part-right-side" },
+    { "groupRefId": "group-case", "memberType": "part", "memberRefId": "part-top" },
+    { "groupRefId": "group-case", "memberType": "part", "memberRefId": "part-bottom" }
+  ]
+}

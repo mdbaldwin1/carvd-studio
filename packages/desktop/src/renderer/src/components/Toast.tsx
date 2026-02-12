@@ -5,9 +5,5 @@ export function Toast() {
 
   if (!toast) return null;
 
-  return (
-    <div className="toast">
-      {toast.message}
-    </div>
-  );
+  return <div className="toast">{toast.message}</div>;
 }

@@ -7,62 +7,31 @@ interface WelcomeTutorialProps {
   onComplete: () => void;
 }
 
-// Define the 8 tutorial steps
+// Define the 3 tutorial steps (condensed from 8 for a quicker onboarding)
 const tutorialSteps: TutorialStep[] = [
   {
     id: 'welcome',
     title: '👋 Welcome to Carvd Studio!',
-    content: "Let's take a quick tour of this sample desk project. We've preloaded it so you can see what's possible. Click Next or press Enter to continue.",
-    position: 'center'
-  },
-  {
-    id: 'canvas',
-    title: '🎨 3D Workspace',
-    content: 'This is your 3D canvas where you design furniture. Orbit by dragging, pan with right-click, and zoom with your mouse wheel. Press F to focus on selection, Home to reset the view.',
+    content:
+      'This is your 3D workspace with a sample desk project. Drag to orbit, right-drag to pan, scroll to zoom. Press F to focus on selections. Click Next to continue.',
     targetSelector: '.canvas-container',
     position: 'bottom',
     offset: { x: 0, y: -100 }
   },
   {
-    id: 'parts',
-    title: '📦 Parts List',
-    content: 'All parts in your design are listed here. Click to select parts, use Shift/Ctrl for multi-select, or drag to reorder. Parts can be organized into groups for better organization.',
+    id: 'design',
+    title: '🛠️ Design & Materials',
+    content:
+      'Parts and stock materials are in the left sidebar. Click parts to select them, then edit dimensions, colors, and stock assignments in the Properties panel on the right. Drag stocks onto the canvas to create new parts.',
     targetSelector: '.sidebar',
     position: 'right',
     offset: { x: 20, y: 0 }
   },
   {
-    id: 'stocks',
-    title: '📐 Stock Materials',
-    content: 'Stock materials define the dimensions and pricing for your project. Assign stocks to parts in the properties panel, or drag a stock onto the canvas to create a new part.',
-    targetSelector: '.sidebar',
-    position: 'right',
-    offset: { x: 20, y: 50 }
-  },
-  {
-    id: 'properties',
-    title: '⚙️ Properties Panel',
-    content: 'Change dimensions, assign stock materials, add notes, and adjust settings for selected parts here. You can edit multiple parts at once by selecting them together.',
-    targetSelector: '.properties-panel',
-    position: 'left',
-    offset: { x: -20, y: 0 }
-  },
-  {
-    id: 'cutlist',
-    title: '📋 Generate Cut List',
-    content: 'Click the "Cut List" button in the header to generate optimized cutting diagrams and a shopping list with material costs. The cut list automatically updates when you modify your design.',
-    position: 'center'
-  },
-  {
-    id: 'shortcuts',
-    title: '⌨️ Keyboard Shortcuts',
-    content: 'Master these shortcuts to work faster: P (add part), G (group), X/Y/Z (rotate), Delete (remove), Cmd+Z/Cmd+Shift+Z (undo/redo), Cmd+D (duplicate). Press H anytime to see all shortcuts.',
-    position: 'center'
-  },
-  {
     id: 'get-started',
-    title: '🚀 You\'re Ready!',
-    content: 'Start designing by creating a new project (File > New) or continue exploring this sample. Need help? Check the documentation or hover over buttons for tooltips. Happy building!',
+    title: "🚀 You're Ready!",
+    content:
+      'Click "Generate Cut List" for optimized cutting diagrams. Use keyboard shortcuts for speed: G (group), Shift+D (duplicate), X/Y/Z (rotate), Delete (remove). Check Help > Shortcuts for more. Happy building!',
     position: 'center'
   }
 ];

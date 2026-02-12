@@ -34,9 +34,13 @@ export function AssemblyEditingExitDialog({
         <div className="modal-body">
           <p>
             {isCreatingNew ? (
-              <>You have unsaved changes to your new assembly <strong>{assemblyName}</strong>.</>
+              <>
+                You have unsaved changes to your new assembly <strong>{assemblyName}</strong>.
+              </>
             ) : (
-              <>You have unsaved changes to <strong>{assemblyName}</strong>.</>
+              <>
+                You have unsaved changes to <strong>{assemblyName}</strong>.
+              </>
             )}
           </p>
           <p className="exit-question">

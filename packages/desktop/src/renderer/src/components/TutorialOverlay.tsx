@@ -30,6 +30,12 @@ export function TutorialOverlay({
 
   // Find target element and calculate spotlight position
   useEffect(() => {
+    // Tooltip dimensions (matching CSS)
+    const tooltipWidth = 420;
+    const tooltipHeight = 350; // Generous estimate for content
+    const padding = 20;
+    const margin = 20; // Minimum distance from viewport edges
+
     if (step.targetSelector) {
       const element = document.querySelector(step.targetSelector);
       if (element) {
@@ -37,31 +43,30 @@ export function TutorialOverlay({
         setTargetRect(rect);
 
         // Calculate tooltip position based on step position preference
-        const padding = 20;
         let x = 0;
         let y = 0;
 
         switch (step.position) {
           case 'top':
-            x = rect.left + rect.width / 2 - 200; // Center horizontally (assuming 400px width)
-            y = rect.top - 280; // Above target
+            x = rect.left + rect.width / 2 - tooltipWidth / 2;
+            y = rect.top - tooltipHeight - padding;
             break;
           case 'bottom':
-            x = rect.left + rect.width / 2 - 200;
+            x = rect.left + rect.width / 2 - tooltipWidth / 2;
             y = rect.bottom + padding;
             break;
           case 'left':
-            x = rect.left - 420; // To the left
-            y = rect.top + rect.height / 2 - 140;
+            x = rect.left - tooltipWidth - padding;
+            y = rect.top + rect.height / 2 - tooltipHeight / 2;
             break;
           case 'right':
             x = rect.right + padding;
-            y = rect.top + rect.height / 2 - 140;
+            y = rect.top + rect.height / 2 - tooltipHeight / 2;
             break;
           case 'center':
           default:
-            x = window.innerWidth / 2 - 200;
-            y = window.innerHeight / 2 - 140;
+            x = window.innerWidth / 2 - tooltipWidth / 2;
+            y = window.innerHeight / 2 - tooltipHeight / 2;
         }
 
         // Apply custom offset if provided
@@ -71,24 +76,24 @@ export function TutorialOverlay({
         }
 
         // Keep tooltip within viewport bounds
-        x = Math.max(20, Math.min(x, window.innerWidth - 420));
-        y = Math.max(20, Math.min(y, window.innerHeight - 300));
+        x = Math.max(margin, Math.min(x, window.innerWidth - tooltipWidth - margin));
+        y = Math.max(margin, Math.min(y, window.innerHeight - tooltipHeight - margin));
 
         setTooltipPosition({ x, y });
       } else {
         // No target found, center the tooltip
         setTargetRect(null);
         setTooltipPosition({
-          x: window.innerWidth / 2 - 200,
-          y: window.innerHeight / 2 - 140
+          x: window.innerWidth / 2 - tooltipWidth / 2,
+          y: window.innerHeight / 2 - tooltipHeight / 2
         });
       }
     } else {
       // No target selector, center the tooltip
       setTargetRect(null);
       setTooltipPosition({
-        x: window.innerWidth / 2 - 200,
-        y: window.innerHeight / 2 - 140
+        x: window.innerWidth / 2 - tooltipWidth / 2,
+        y: window.innerHeight / 2 - tooltipHeight / 2
       });
     }
   }, [step]);

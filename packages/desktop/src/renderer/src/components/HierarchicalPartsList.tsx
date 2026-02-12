@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { ChevronRight, ChevronDown, Layers, AlertTriangle } from 'lucide-react';
-import { Part, Group, GroupMember } from '../types';
+import { Part, Group, GroupMember, Stock } from '../types';
 import { useProjectStore, getAllDescendantPartIds, validatePartsForCutList } from '../store/projectStore';
 import { useStockLibrary } from '../hooks/useStockLibrary';
 import { formatMeasurementWithUnit } from '../utils/fractions';
@@ -20,11 +20,7 @@ interface GroupNode {
 type TreeNode = PartNode | GroupNode;
 
 // Build the hierarchical tree from flat data
-function buildTree(
-  parts: Part[],
-  groups: Group[],
-  groupMembers: GroupMember[]
-): TreeNode[] {
+function buildTree(parts: Part[], groups: Group[], groupMembers: GroupMember[]): TreeNode[] {
   // Create lookup maps
   const membersByGroup = new Map<string, GroupMember[]>();
   const partIdToGroupId = new Map<string, string>();
@@ -107,9 +103,10 @@ function PartItem({ part, level, onPartClick, onDuplicate, onDelete }: PartItemP
   const hasNoStock = !part.stockId;
   const hasError = hasNoStock || validationIssues.some((i) => i.severity === 'error');
   const hasWarning = !hasError && validationIssues.some((i) => i.severity === 'warning');
-  const issueMessages = hasNoStock && validationIssues.length === 0
-    ? 'No stock assigned'
-    : validationIssues.map((i) => i.message).join('\n');
+  const issueMessages =
+    hasNoStock && validationIssues.length === 0
+      ? 'No stock assigned'
+      : validationIssues.map((i) => i.message).join('\n');
 
   return (
     <li
@@ -120,15 +117,11 @@ function PartItem({ part, level, onPartClick, onDuplicate, onDelete }: PartItemP
     >
       <span className="part-color" style={{ backgroundColor: part.color }} />
       {(hasError || hasWarning) && (
-        <span
-          className={`part-warning-icon ${hasError ? 'error' : 'warning'}`}
-          title={issueMessages}
-        >
+        <span className={`part-warning-icon ${hasError ? 'error' : 'warning'}`} title={issueMessages}>
           <AlertTriangle size={12} />
         </span>
       )}
       <span className="part-name">{part.name}</span>
-      <span className="part-dims">{dimsText}</span>
       <div className="part-actions">
         <button
           className="btn btn-icon-sm btn-ghost btn-secondary"
@@ -137,6 +130,7 @@ function PartItem({ part, level, onPartClick, onDuplicate, onDelete }: PartItemP
             onDuplicate(part.id);
           }}
           title="Duplicate"
+          aria-label={`Duplicate ${part.name}`}
         >
           ⧉
         </button>
@@ -147,6 +141,7 @@ function PartItem({ part, level, onPartClick, onDuplicate, onDelete }: PartItemP
             onDelete(part.id);
           }}
           title="Delete"
+          aria-label={`Delete ${part.name}`}
         >
           ×
         </button>
@@ -164,21 +159,64 @@ interface GroupItemProps {
   onDelete: (partId: string) => void;
 }
 
+// Helper function to recursively check for validation issues in a tree node
+function hasDescendantIssues(
+  node: TreeNode,
+  stocks: Stock[],
+  parts: Part[]
+): { hasError: boolean; hasWarning: boolean } {
+  if (node.type === 'part') {
+    const validationIssues = validatePartsForCutList([node.data], stocks);
+    const hasNoStock = !node.data.stockId;
+    const hasError = hasNoStock || validationIssues.some((i) => i.severity === 'error');
+    const hasWarning = !hasError && validationIssues.some((i) => i.severity === 'warning');
+    return { hasError, hasWarning };
+  }
+
+  // For groups, check all children recursively
+  let hasError = false;
+  let hasWarning = false;
+  for (const child of node.children) {
+    const childResult = hasDescendantIssues(child, stocks, parts);
+    if (childResult.hasError) hasError = true;
+    if (childResult.hasWarning) hasWarning = true;
+  }
+  return { hasError, hasWarning };
+}
+
 function GroupItem({ group, children, level, onPartClick, onDuplicate, onDelete }: GroupItemProps) {
   const selectedGroupIds = useProjectStore((s) => s.selectedGroupIds);
   const expandedGroupIds = useProjectStore((s) => s.expandedGroupIds);
   const editingGroupId = useProjectStore((s) => s.editingGroupId);
   const groupMembers = useProjectStore((s) => s.groupMembers);
+  const projectStocks = useProjectStore((s) => s.stocks);
+  const allParts = useProjectStore((s) => s.parts);
+  const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
   const toggleGroupExpanded = useProjectStore((s) => s.toggleGroupExpanded);
   const selectGroup = useProjectStore((s) => s.selectGroup);
   const toggleGroupSelection = useProjectStore((s) => s.toggleGroupSelection);
   const enterGroup = useProjectStore((s) => s.enterGroup);
   const openContextMenu = useProjectStore((s) => s.openContextMenu);
 
+  // Use library stocks when editing assembly, project stocks otherwise
+  const { stocks: libraryStocks } = useStockLibrary();
+  const stocks = isEditingAssembly ? libraryStocks : projectStocks;
+
   const isSelected = selectedGroupIds.includes(group.id);
   const isExpanded = expandedGroupIds.includes(group.id);
   const isEditing = editingGroupId === group.id;
   const partCount = getAllDescendantPartIds(group.id, groupMembers).length;
+
+  // Check for descendant validation issues (only when collapsed)
+  const descendantIssues = useMemo(() => {
+    if (isExpanded) return { hasError: false, hasWarning: false };
+    // Create a temporary group node to check children
+    const groupNode: GroupNode = { type: 'group', data: group, children };
+    return hasDescendantIssues(groupNode, stocks, allParts);
+  }, [isExpanded, group, children, stocks, allParts]);
+
+  const hasChildError = descendantIssues.hasError;
+  const hasChildWarning = !hasChildError && descendantIssues.hasWarning;
 
   const handleGroupClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -219,11 +257,24 @@ function GroupItem({ group, children, level, onPartClick, onDuplicate, onDelete 
         onClick={handleGroupClick}
         onDoubleClick={handleGroupDoubleClick}
         onContextMenu={handleGroupContextMenu}
-        title={`${group.name} (${partCount} part${partCount === 1 ? '' : 's'})`}
+        title={`${group.name} (${partCount} part${partCount === 1 ? '' : 's'})${hasChildError || hasChildWarning ? '\n\n⚠ Contains parts with validation issues' : ''}`}
       >
-        <button className="group-expand-btn" onClick={handleExpandToggle}>
+        <button
+          className="group-expand-btn"
+          onClick={handleExpandToggle}
+          aria-label={isExpanded ? `Collapse ${group.name}` : `Expand ${group.name}`}
+          aria-expanded={isExpanded}
+        >
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
+        {(hasChildError || hasChildWarning) && (
+          <span
+            className={`group-warning-icon ${hasChildError ? 'error' : 'warning'}`}
+            title="Contains parts with validation issues"
+          >
+            <AlertTriangle size={12} />
+          </span>
+        )}
         <Layers size={14} className="group-icon" />
         <span className="group-name">{group.name}</span>
         <span className="group-count">{partCount}</span>
@@ -262,26 +313,60 @@ interface HierarchicalPartsListProps {
   onPartClick: (partId: string, e: React.MouseEvent) => void;
   onDuplicate: (partId: string) => void;
   onDelete: (partId: string) => void;
+  searchFilter?: string;
 }
 
-export function HierarchicalPartsList({ onPartClick, onDuplicate, onDelete }: HierarchicalPartsListProps) {
+// Helper function to filter tree nodes based on search term
+function filterTree(nodes: TreeNode[], searchTerm: string): TreeNode[] {
+  const lowerSearch = searchTerm.toLowerCase();
+
+  return nodes.reduce<TreeNode[]>((acc, node) => {
+    if (node.type === 'part') {
+      if (node.data.name.toLowerCase().includes(lowerSearch)) {
+        acc.push(node);
+      }
+    } else {
+      // For groups, filter children first
+      const filteredChildren = filterTree(node.children, searchTerm);
+      // Include group if it has matching children or its name matches
+      if (filteredChildren.length > 0 || node.data.name.toLowerCase().includes(lowerSearch)) {
+        acc.push({
+          ...node,
+          children: filteredChildren.length > 0 ? filteredChildren : node.children
+        });
+      }
+    }
+    return acc;
+  }, []);
+}
+
+export function HierarchicalPartsList({
+  onPartClick,
+  onDuplicate,
+  onDelete,
+  searchFilter
+}: HierarchicalPartsListProps) {
   const parts = useProjectStore((s) => s.parts);
   const groups = useProjectStore((s) => s.groups);
   const groupMembers = useProjectStore((s) => s.groupMembers);
 
   // Memoize tree building for performance
-  const tree = useMemo(
-    () => buildTree(parts, groups, groupMembers),
-    [parts, groups, groupMembers]
-  );
+  const tree = useMemo(() => buildTree(parts, groups, groupMembers), [parts, groups, groupMembers]);
+
+  // Filter tree based on search
+  const filteredTree = useMemo(() => (searchFilter ? filterTree(tree, searchFilter) : tree), [tree, searchFilter]);
 
   if (parts.length === 0 && groups.length === 0) {
     return <p className="placeholder-text">No parts yet. Click + to add one.</p>;
   }
 
+  if (searchFilter && filteredTree.length === 0) {
+    return <p className="placeholder-text">No parts match "{searchFilter}"</p>;
+  }
+
   return (
     <ul className="parts-list hierarchical">
-      {tree.map((node) =>
+      {filteredTree.map((node) =>
         node.type === 'part' ? (
           <PartItem
             key={node.data.id}

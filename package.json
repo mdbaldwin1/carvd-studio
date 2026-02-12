@@ -9,13 +9,11 @@
   "scripts": {
     "dev:desktop": "npm run dev --workspace=@carvd/desktop",
     "dev:website": "npm run dev --workspace=@carvd/website",
-    "dev:webhook": "npm run test --workspace=@carvd/webhook",
     "build:desktop": "npm run build --workspace=@carvd/desktop",
     "build:website": "npm run build --workspace=@carvd/website",
     "package:desktop": "npm run package --workspace=@carvd/desktop",
     "package:mac": "npm run package:mac --workspace=@carvd/desktop",
     "package:win": "npm run package:win --workspace=@carvd/desktop",
-    "deploy:webhook": "cd packages/webhook && vercel --prod",
     "deploy:website": "cd packages/website && vercel --prod",
     "lint": "npm run lint --workspaces --if-present",
     "format": "npm run format --workspaces --if-present",
@@ -26,7 +24,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:mbaldwintech/carvd-studio.git"
+    "url": "git@github.com:mdbaldwin1/carvd-studio.git"
   },
   "author": "Michael Baldwin",
   "license": "ISC",

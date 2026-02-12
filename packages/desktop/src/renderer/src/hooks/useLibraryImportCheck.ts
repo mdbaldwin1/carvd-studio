@@ -13,6 +13,7 @@ import {
   createLibraryStockFromProject,
   createLibraryAssemblyFromProject
 } from '../utils/libraryImport';
+import { logger } from '../utils/logger';
 
 interface UseLibraryImportCheckResult {
   // Dialog state
@@ -31,7 +32,11 @@ export function useLibraryImportCheck(): UseLibraryImportCheckResult {
   const showToast = useProjectStore((s) => s.showToast);
 
   const { stocks: libraryStocks, addStock: addStockToLibrary, isLoading: stocksLoading } = useStockLibrary();
-  const { assemblies: libraryAssemblies, addAssembly: addAssemblyToLibrary, isLoading: assembliesLoading } = useAssemblyLibrary();
+  const {
+    assemblies: libraryAssemblies,
+    addAssembly: addAssemblyToLibrary,
+    isLoading: assembliesLoading
+  } = useAssemblyLibrary();
 
   // Dialog state
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -61,12 +66,7 @@ export function useLibraryImportCheck(): UseLibraryImportCheckResult {
     // Wait a tick to ensure project state is fully loaded
     const timeoutId = setTimeout(() => {
       // Check for missing items
-      const result = detectMissingLibraryItems(
-        projectStocks,
-        projectAssemblies,
-        libraryStocks,
-        libraryAssemblies
-      );
+      const result = detectMissingLibraryItems(projectStocks, projectAssemblies, libraryStocks, libraryAssemblies);
 
       if (result.hasItems) {
         setMissingStocks(result.missingStocks);
@@ -79,40 +79,43 @@ export function useLibraryImportCheck(): UseLibraryImportCheckResult {
   }, [filePath, projectStocks, projectAssemblies, libraryStocks, libraryAssemblies, stocksLoading, assembliesLoading]);
 
   // Handle import
-  const handleImport = useCallback(async (stocks: Stock[], assemblies: Assembly[]) => {
-    let importedCount = 0;
+  const handleImport = useCallback(
+    async (stocks: Stock[], assemblies: Assembly[]) => {
+      let importedCount = 0;
 
-    // Import selected stocks
-    for (const stock of stocks) {
-      try {
-        const libraryStock = createLibraryStockFromProject(stock);
-        await addStockToLibrary(libraryStock);
-        importedCount++;
-      } catch (error) {
-        console.error('Failed to import stock to library:', error);
+      // Import selected stocks
+      for (const stock of stocks) {
+        try {
+          const libraryStock = createLibraryStockFromProject(stock);
+          await addStockToLibrary(libraryStock);
+          importedCount++;
+        } catch (error) {
+          logger.error('Failed to import stock to library:', error);
+        }
       }
-    }
 
-    // Import selected assemblies
-    for (const assembly of assemblies) {
-      try {
-        const libraryAssembly = createLibraryAssemblyFromProject(assembly);
-        await addAssemblyToLibrary(libraryAssembly);
-        importedCount++;
-      } catch (error) {
-        console.error('Failed to import assembly to library:', error);
+      // Import selected assemblies
+      for (const assembly of assemblies) {
+        try {
+          const libraryAssembly = createLibraryAssemblyFromProject(assembly);
+          await addAssemblyToLibrary(libraryAssembly);
+          importedCount++;
+        } catch (error) {
+          logger.error('Failed to import assembly to library:', error);
+        }
       }
-    }
 
-    // Close dialog and show feedback
-    setShowImportDialog(false);
-    setMissingStocks([]);
-    setMissingAssemblies([]);
+      // Close dialog and show feedback
+      setShowImportDialog(false);
+      setMissingStocks([]);
+      setMissingAssemblies([]);
 
-    if (importedCount > 0) {
-      showToast(`Added ${importedCount} item${importedCount !== 1 ? 's' : ''} to library`);
-    }
-  }, [addStockToLibrary, addAssemblyToLibrary, showToast]);
+      if (importedCount > 0) {
+        showToast(`Added ${importedCount} item${importedCount !== 1 ? 's' : ''} to library`);
+      }
+    },
+    [addStockToLibrary, addAssemblyToLibrary, showToast]
+  );
 
   // Handle skip
   const handleSkip = useCallback(() => {

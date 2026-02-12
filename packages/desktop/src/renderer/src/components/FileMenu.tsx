@@ -17,14 +17,7 @@ interface FileMenuProps {
   onRefreshRecent: () => void;
 }
 
-export function FileMenu({
-  onNew,
-  onOpen,
-  onSave,
-  onSaveAs,
-  recentProjects,
-  onRefreshRecent
-}: FileMenuProps) {
+export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRefreshRecent }: FileMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -119,12 +112,7 @@ export function FileMenu({
                   </div>
                 ) : (
                   recentProjects.map((path) => (
-                    <button
-                      key={path}
-                      className="file-menu-item"
-                      onClick={() => handleOpenRecent(path)}
-                      title={path}
-                    >
+                    <button key={path} className="file-menu-item" onClick={() => handleOpenRecent(path)} title={path}>
                       <span className="recent-name">{getFileName(path)}</span>
                     </button>
                   ))
