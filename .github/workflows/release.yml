@@ -150,6 +150,20 @@ jobs:
           security list-keychain -d user -s "$KEYCHAIN_PATH"
           rm certificate.p12
 
+      # electron-builder internally runs "npm install --production" in the
+      # app directory. In an npm workspace, this detects the root workspace
+      # config and wipes devDependencies from the hoisted node_modules.
+      # Temporarily strip the workspaces field so npm treats it as standalone.
+      - name: Disable workspace detection for packaging
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+            delete pkg.workspaces;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
       - name: Package app (macOS)
         if: matrix.platform == 'mac'
         env:
@@ -160,9 +174,6 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
-          # Prevent npm install --production from detecting the workspace
-          # and wiping devDependencies from the hoisted root node_modules
-          npm_config_workspaces: "false"
         run: npx electron-builder --mac --publish never --project packages/desktop
 
       - name: Package app (Windows)
@@ -171,7 +182,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
-          npm_config_workspaces: "false"
         run: npx electron-builder --win --publish never --project packages/desktop
 
       - name: Upload artifacts (macOS)
