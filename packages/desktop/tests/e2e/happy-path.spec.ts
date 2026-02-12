@@ -8,20 +8,38 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 
+/** Collected console messages for debugging failures */
+const consoleMessages: string[] = [];
+
 /**
  * Wait for the main application window (not the splash screen).
  * Polls all open windows looking for one with the React root (.app).
- * Waits up to 90 seconds for the app to initialize (macOS CI can be slow).
+ * Uses page.evaluate() for DOM checks to avoid Playwright locator race conditions.
  */
 async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {
   for (let i = 0; i < 90; i++) {
     const windows = electronApp.windows();
     for (const win of windows) {
+      // Use page.evaluate() (not locator) to atomically check DOM state.
+      // Check element exists and has a non-zero bounding rect (similar to
+      // Playwright's isVisible). Don't use offsetParent — it returns null
+      // for position:fixed elements, which breaks start-screen detection.
       const hasApp = await win
-        .locator('.app')
-        .isVisible({ timeout: 500 })
+        .evaluate(() => {
+          const el = document.querySelector('.app');
+          if (!el) return false;
+          const rect = el.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        })
         .catch(() => false);
-      if (hasApp) return win;
+
+      if (hasApp) {
+        // Ensure the page is fully loaded before interacting
+        await win.waitForFunction(() => document.readyState === 'complete', null, {
+          timeout: 30000
+        });
+        return win;
+      }
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -30,55 +48,84 @@ async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {
 
 /**
  * Navigate through the startup flow until the app is ready for interaction.
- * Handles: tutorial (skip), trial expired modal (dismiss), then waits for
- * start screen or editor to appear.
+ * Handles: tutorial (skip), trial expired modal (dismiss), error boundary
+ * (recover), then waits for start screen or editor to appear.
  *
- * Uses evaluate-based JS clicks throughout to avoid issues with:
- * - CSS transitions causing Playwright stability check timeouts
- * - React re-renders detaching DOM elements mid-click
+ * All DOM checks and clicks use page.evaluate() to avoid race conditions
+ * with React re-renders that detach elements between Playwright locator calls.
  */
 async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'> {
   for (let i = 0; i < 60; i++) {
-    // Skip tutorial if showing
-    const skipBtn = window.locator('.tutorial-tooltip-skip');
-    if (await skipBtn.isVisible({ timeout: 500 }).catch(() => false)) {
-      await skipBtn.evaluate((el) => (el as HTMLElement).click());
+    // Use a single evaluate() call per iteration to atomically check state
+    // and interact with the UI. This prevents the race condition where
+    // React re-renders detach an element between isVisible() and click().
+    // Helper to check visibility via bounding rect (works for position:fixed)
+    const state = await window.evaluate(() => {
+      function isVisible(el: Element | null): boolean {
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }
+
+      // Check for error boundary first
+      const errorBoundary = document.querySelector('.error-boundary');
+      if (isVisible(errorBoundary)) {
+        const details = document.querySelector('.error-boundary-details pre');
+        const errorMsg = details?.textContent || 'unknown error';
+        const tryAgainBtn = document.querySelector(
+          '.error-boundary-actions .btn-secondary'
+        ) as HTMLElement;
+        if (tryAgainBtn) tryAgainBtn.click();
+        return { type: 'error-boundary' as const, error: errorMsg };
+      }
+
+      // Skip tutorial if showing
+      const skipBtn = document.querySelector('.tutorial-tooltip-skip') as HTMLElement;
+      if (isVisible(skipBtn)) {
+        skipBtn.click();
+        return { type: 'skipped-tutorial' as const };
+      }
+
+      // Dismiss trial expired modal if showing
+      const trialModal = document.querySelector('.trial-expired-modal');
+      if (isVisible(trialModal)) {
+        const buttons = trialModal!.querySelectorAll('button');
+        const lastBtn = buttons[buttons.length - 1] as HTMLElement;
+        if (lastBtn) lastBtn.click();
+        return { type: 'dismissed-trial' as const };
+      }
+
+      // Check if we've reached a usable state
+      if (isVisible(document.querySelector('.start-screen'))) {
+        return { type: 'start-screen' as const };
+      }
+      if (isVisible(document.querySelector('.app-header'))) {
+        return { type: 'editor' as const };
+      }
+
+      return { type: 'waiting' as const };
+    });
+
+    if (state.type === 'start-screen') return 'start-screen';
+    if (state.type === 'editor') return 'editor';
+
+    if (state.type === 'error-boundary') {
+      console.log(`[E2E] Error boundary detected: ${(state as { error: string }).error}`);
+      // Give the app time to recover after clicking "Try Again"
+      await window.waitForTimeout(2000);
+      continue;
+    }
+
+    if (state.type === 'skipped-tutorial' || state.type === 'dismissed-trial') {
       await window.waitForTimeout(500);
       continue;
     }
 
-    // Dismiss trial expired modal if showing
-    const trialModal = window.locator('.trial-expired-modal');
-    if (await trialModal.isVisible({ timeout: 500 }).catch(() => false)) {
-      const lastBtn = window.locator('.trial-expired-modal button').last();
-      if (await lastBtn.isVisible().catch(() => false)) {
-        await lastBtn.evaluate((el) => (el as HTMLElement).click());
-        await window.waitForTimeout(500);
-      }
-      continue;
-    }
-
-    if (
-      await window
-        .locator('.start-screen')
-        .isVisible({ timeout: 500 })
-        .catch(() => false)
-    ) {
-      return 'start-screen';
-    }
-    if (
-      await window
-        .locator('.app-header')
-        .isVisible({ timeout: 500 })
-        .catch(() => false)
-    ) {
-      return 'editor';
-    }
-
+    // Still waiting for the app to load
     await window.waitForTimeout(1000);
   }
 
-  const bodyHTML = await window.evaluate(() => document.body.innerHTML.substring(0, 500));
+  const bodyHTML = await window.evaluate(() => document.body.innerHTML.substring(0, 1000));
   throw new Error(`App did not reach a usable state after 60s. Page content: ${bodyHTML}`);
 }
 
@@ -112,8 +159,10 @@ test.describe('Happy Path Workflow', () => {
 
     const args = [appPath];
     if (process.env.CI) {
-      // Disable GPU acceleration in CI (no real GPU available)
-      args.unshift('--disable-gpu', '--disable-software-rasterizer');
+      // Linux CI needs --no-sandbox for xvfb to work properly.
+      // Do NOT use --disable-gpu or --disable-software-rasterizer — they
+      // prevent WebGL context creation, which crashes Three.js / R3F.
+      // Linux CI uses xvfb for software rendering; macOS CI has Metal GPU.
       if (process.platform === 'linux') {
         args.unshift('--no-sandbox');
       }
@@ -129,6 +178,21 @@ test.describe('Happy Path Workflow', () => {
     });
 
     window = await getMainWindow(electronApp);
+
+    // Capture console output for debugging failures
+    consoleMessages.length = 0;
+    window.on('console', (msg) => {
+      const text = `[${msg.type()}] ${msg.text()}`;
+      consoleMessages.push(text);
+      if (msg.type() === 'error') {
+        console.log(`[E2E Console] ${text}`);
+      }
+    });
+    window.on('pageerror', (error) => {
+      const text = `[pageerror] ${error.message}`;
+      consoleMessages.push(text);
+      console.log(`[E2E] ${text}`);
+    });
   });
 
   test.afterAll(async () => {
@@ -145,19 +209,23 @@ test.describe('Happy Path Workflow', () => {
       // Verify start screen elements
       await expect(window.locator('.blank-template')).toBeVisible();
 
-      // Use JS click to bypass Playwright's CSS transition stability checks.
-      // The template cards have CSS transitions (transform, background) that
-      // prevent Playwright from considering the element "stable" for clicking.
-      await window.locator('.blank-template').evaluate((el) => (el as HTMLElement).click());
+      // Use page.evaluate() for clicks to bypass Playwright's CSS transition
+      // stability checks. The template cards have CSS transitions (transform,
+      // background) that prevent Playwright from considering them "stable".
+      await window.evaluate(() => {
+        const el = document.querySelector('.blank-template') as HTMLElement;
+        if (el) el.click();
+      });
 
       // Wait for NewProjectDialog to appear (it loads stock library data on mount)
       const dialog = window.locator('.new-project-dialog');
       await expect(dialog).toBeVisible({ timeout: 10000 });
 
-      // Click "Create Project" via JS click for consistency
-      await window
-        .locator('.new-project-dialog .btn-accent')
-        .evaluate((el) => (el as HTMLElement).click());
+      // Click "Create Project" via page.evaluate() for consistency
+      await window.evaluate(() => {
+        const el = document.querySelector('.new-project-dialog .btn-accent') as HTMLElement;
+        if (el) el.click();
+      });
     }
 
     // Verify editor is fully loaded
