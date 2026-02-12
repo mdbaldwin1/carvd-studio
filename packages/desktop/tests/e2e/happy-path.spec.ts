@@ -1,8 +1,6 @@
 import { test, expect, _electron as electron } from '@playwright/test';
 import { ElectronApplication, Page } from 'playwright';
 import path from 'path';
-import fs from 'fs';
-import os from 'os';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 
@@ -149,19 +147,12 @@ async function forceCloseApp(electronApp: ElectronApplication): Promise<void> {
 test.describe('Happy Path Workflow', () => {
   let electronApp: ElectronApplication;
   let window: Page;
-  let userDataDir: string;
 
   test.beforeAll(async () => {
     const electronPath = require('electron') as unknown as string;
     const appPath = path.join(__dirname, '../../');
 
-    // Create an isolated user data directory for this test run.
-    // This ensures electron-store starts with a clean slate — no persisted
-    // trial dates, welcome flags, or other state from previous runs that
-    // could cause the app to hit a different (potentially broken) code path.
-    userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'carvd-e2e-'));
-
-    const args = [`--user-data-dir=${userDataDir}`, appPath];
+    const args = [appPath];
     if (process.env.CI) {
       // Disable GPU acceleration in CI (no real GPU available)
       args.unshift('--disable-gpu', '--disable-software-rasterizer');
@@ -200,14 +191,6 @@ test.describe('Happy Path Workflow', () => {
   test.afterAll(async () => {
     if (electronApp) {
       await forceCloseApp(electronApp);
-    }
-    // Clean up the temporary user data directory
-    if (userDataDir) {
-      try {
-        fs.rmSync(userDataDir, { recursive: true, force: true });
-      } catch {
-        /* best effort cleanup */
-      }
     }
   });
 
