@@ -131,6 +131,7 @@ jobs:
 
       - name: Import Apple certificate (macOS only)
         if: matrix.platform == 'mac'
+        id: keychain
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
@@ -146,15 +147,19 @@ jobs:
 
           security import certificate.p12 -k "$KEYCHAIN_PATH" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign
 
-          # Install Apple Developer ID intermediate certificates (required for valid signature chain)
+          # Install Apple Developer ID intermediate certificates (required for valid chain)
           curl -sL https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer -o DeveloperIDG2CA.cer
+          curl -sL https://www.apple.com/certificateauthority/DeveloperIDCA.cer -o DeveloperIDCA.cer
           security import DeveloperIDG2CA.cer -k "$KEYCHAIN_PATH"
-          rm DeveloperIDG2CA.cer
+          security import DeveloperIDCA.cer -k "$KEYCHAIN_PATH"
+          rm DeveloperIDG2CA.cer DeveloperIDCA.cer
 
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
           security list-keychain -d user -s "$KEYCHAIN_PATH"
           rm certificate.p12
+
+          # Output keychain path for the packaging step
+          echo "path=$KEYCHAIN_PATH" >> $GITHUB_OUTPUT
 
       # electron-builder internally runs "npm install --production" in the
       # app directory. In an npm workspace, this detects the root workspace
@@ -177,8 +182,9 @@ jobs:
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Use our keychain directly (has cert + intermediate chain) instead
+          # of CSC_LINK which creates a separate keychain without intermediates
+          CSC_KEYCHAIN: ${{ steps.keychain.outputs.path }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
         working-directory: packages/desktop
