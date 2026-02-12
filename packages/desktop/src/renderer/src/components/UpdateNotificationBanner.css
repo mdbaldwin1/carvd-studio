@@ -108,3 +108,23 @@
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+.update-banner-success {
+  background: var(--color-success, #22c55e);
+}
+
+.update-notification-success {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.update-changelog-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  opacity: 0.9;
+  cursor: pointer;
+}
+
+.update-changelog-link:hover {
+  opacity: 1;
+}

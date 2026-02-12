@@ -9,6 +9,9 @@ describe('UpdateNotificationBanner', () => {
     | null = null;
   let onUpdateDownloadedCallback: ((info: { version: string }) => void) | null = null;
   let onUpdateErrorCallback: ((err: { message: string }) => void) | null = null;
+  let onUpdateJustInstalledCallback:
+    | ((info: { previousVersion: string; currentVersion: string }) => void)
+    | null = null;
 
   beforeAll(() => {
     window.electronAPI = {
@@ -36,8 +39,15 @@ describe('UpdateNotificationBanner', () => {
           onUpdateErrorCallback = null;
         };
       }),
+      onUpdateJustInstalled: vi.fn((cb) => {
+        onUpdateJustInstalledCallback = cb;
+        return () => {
+          onUpdateJustInstalledCallback = null;
+        };
+      }),
       downloadUpdate: vi.fn(),
       quitAndInstall: vi.fn(),
+      openExternal: vi.fn(),
       getPreference: vi.fn(),
       setPreference: vi.fn(),
       onMenuCommand: vi.fn(),
@@ -51,6 +61,7 @@ describe('UpdateNotificationBanner', () => {
     onUpdateDownloadProgressCallback = null;
     onUpdateDownloadedCallback = null;
     onUpdateErrorCallback = null;
+    onUpdateJustInstalledCallback = null;
     vi.mocked(window.electronAPI.downloadUpdate).mockResolvedValue(undefined);
     vi.mocked(window.electronAPI.quitAndInstall).mockResolvedValue(undefined);
   });
@@ -219,6 +230,115 @@ describe('UpdateNotificationBanner', () => {
       fireEvent.click(dismissButton!);
 
       expect(screen.queryByText('Update Available')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('changelog link', () => {
+    it('shows "What\'s new" link when update is available', () => {
+      render(<UpdateNotificationBanner />);
+
+      act(() => {
+        onUpdateAvailableCallback?.({ version: '2.0.0' });
+      });
+
+      expect(screen.getByText("What's new")).toBeInTheDocument();
+    });
+
+    it('shows "What\'s new" link when update is ready', () => {
+      render(<UpdateNotificationBanner />);
+
+      act(() => {
+        onUpdateAvailableCallback?.({ version: '2.0.0' });
+      });
+
+      act(() => {
+        onUpdateDownloadedCallback?.({ version: '2.0.0' });
+      });
+
+      expect(screen.getByText("What's new")).toBeInTheDocument();
+    });
+
+    it('opens changelog URL when "What\'s new" is clicked', () => {
+      render(<UpdateNotificationBanner />);
+
+      act(() => {
+        onUpdateAvailableCallback?.({ version: '2.0.0' });
+      });
+
+      fireEvent.click(screen.getByText("What's new"));
+
+      expect(window.electronAPI.openExternal).toHaveBeenCalledWith(
+        'https://carvd-studio.com/changelog'
+      );
+    });
+  });
+
+  describe('just updated', () => {
+    it('shows just-updated banner with version', () => {
+      render(<UpdateNotificationBanner />);
+
+      act(() => {
+        onUpdateJustInstalledCallback?.({
+          previousVersion: '1.0.0',
+          currentVersion: '2.0.0'
+        });
+      });
+
+      expect(screen.getByText('Updated to v2.0.0')).toBeInTheDocument();
+    });
+
+    it('shows "See what\'s new" changelog link', () => {
+      render(<UpdateNotificationBanner />);
+
+      act(() => {
+        onUpdateJustInstalledCallback?.({
+          previousVersion: '1.0.0',
+          currentVersion: '2.0.0'
+        });
+      });
+
+      expect(screen.getByText("See what's new")).toBeInTheDocument();
+    });
+
+    it('opens changelog URL when link is clicked', () => {
+      render(<UpdateNotificationBanner />);
+
+      act(() => {
+        onUpdateJustInstalledCallback?.({
+          previousVersion: '1.0.0',
+          currentVersion: '2.0.0'
+        });
+      });
+
+      fireEvent.click(screen.getByText("See what's new"));
+
+      expect(window.electronAPI.openExternal).toHaveBeenCalledWith(
+        'https://carvd-studio.com/changelog'
+      );
+    });
+
+    it('can be dismissed', () => {
+      const { container } = render(<UpdateNotificationBanner />);
+
+      act(() => {
+        onUpdateJustInstalledCallback?.({
+          previousVersion: '1.0.0',
+          currentVersion: '2.0.0'
+        });
+      });
+
+      const dismissButton = container.querySelector('.btn-ghost');
+      fireEvent.click(dismissButton!);
+
+      expect(screen.queryByText('Updated to v2.0.0')).not.toBeInTheDocument();
+    });
+
+    it('cleans up listener on unmount', () => {
+      const { unmount } = render(<UpdateNotificationBanner />);
+
+      unmount();
+
+      expect(onUpdateJustInstalledCallback).toBeNull();
     });
   });
 

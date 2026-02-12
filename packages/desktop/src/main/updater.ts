@@ -2,6 +2,7 @@ import pkg from 'electron-updater';
 const { autoUpdater } = pkg;
 import { BrowserWindow, dialog, app } from 'electron';
 import log from 'electron-log';
+import { getLastKnownVersion, setLastKnownVersion } from './store';
 
 // Configure logging
 log.transports.file.level = 'info';
@@ -191,4 +192,32 @@ export function quitAndInstall(): void {
  */
 export function getUpdateInfo(): UpdateInfo | null {
   return updateInfo;
+}
+
+/**
+ * Check if the app was just updated by comparing the current version
+ * against the last known version stored in preferences.
+ * If versions differ (and a previous version existed), sends an IPC event
+ * to all windows so the renderer can show a "just updated" notification.
+ * Always updates the stored version to the current one.
+ */
+export function checkIfJustUpdated(): void {
+  const currentVersion = app.getVersion();
+  const previousVersion = getLastKnownVersion();
+
+  if (previousVersion && previousVersion !== currentVersion) {
+    log.info(`[Updater] App updated from ${previousVersion} to ${currentVersion}`);
+
+    // Notify all renderer windows
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach((win) => {
+      win.webContents.send('update-just-installed', {
+        previousVersion,
+        currentVersion
+      });
+    });
+  }
+
+  // Always update the stored version
+  setLastKnownVersion(currentVersion);
 }
