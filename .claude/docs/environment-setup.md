@@ -40,10 +40,14 @@ This document lists all environment variables and secrets needed for each deploy
 | Secret | Description | How to Get | Status |
 |--------|-------------|------------|--------|
 | `VERCEL_TOKEN` | Vercel API token | vercel.com → Settings → Tokens → Create | ✅ Configured |
-| `VERCEL_ORG_ID` | Your Vercel organization/team ID | Vercel Dashboard → Settings → General → Team ID, or `.vercel/project.json` | **Needs to be added** |
+| `VERCEL_ORG_ID` | Your Vercel organization/team ID | Vercel Dashboard → Settings → General → Team ID, or `.vercel/project.json` | ✅ Configured |
 | `VERCEL_PROJECT_ID` | Your website project ID | Vercel Dashboard → Project → Settings → General → Project ID | ✅ Configured |
 
 When all three are configured, the release workflow automatically updates `VITE_APP_VERSION` in Vercel after creating a release.
+
+### Claude Code Vercel Access
+
+Claude Code has Vercel MCP (Model Context Protocol) integration configured, giving it access to manage the website project — including environment variables, deployments, and project settings — directly from the CLI.
 
 ---
 
@@ -106,7 +110,7 @@ npm run generate-keys
 - [x] `CSC_LINK` + `CSC_KEY_PASSWORD` in GitHub Secrets (macOS code signing)
 - [x] `APPLE_ID` + `APPLE_ID_PASSWORD` + `APPLE_TEAM_ID` in GitHub Secrets (for notarization, currently disabled)
 - [x] `VERCEL_TOKEN` + `VERCEL_PROJECT_ID` in GitHub Secrets
-- [ ] `VERCEL_ORG_ID` in GitHub Secrets (required for Vercel version update)
+- [x] `VERCEL_ORG_ID` in GitHub Secrets (required for Vercel version update)
 - [ ] All Vercel env vars above
 - [ ] Lemon Squeezy product configured with license keys enabled
 - [ ] (Optional) Windows code signing certificate
