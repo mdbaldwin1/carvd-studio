@@ -49,7 +49,6 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ${{ matrix.os }}
-    continue-on-error: true # Desktop E2E tests need stabilization for CI
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
