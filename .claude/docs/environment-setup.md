@@ -43,11 +43,14 @@ This document lists all environment variables and secrets needed for each deploy
 | `VERCEL_ORG_ID` | Your Vercel organization/team ID | Vercel Dashboard → Settings → General → Team ID, or `.vercel/project.json` | ✅ Configured |
 | `VERCEL_PROJECT_ID` | Your website project ID | Vercel Dashboard → Project → Settings → General → Project ID | ✅ Configured |
 
-When all three are configured, the release workflow automatically updates `VITE_APP_VERSION` in Vercel after creating a release.
+When all three are configured, the release workflow automatically updates `VITE_APP_VERSION` in Vercel after creating a release, then triggers a production redeploy via the Vercel API so the website immediately reflects the new version.
 
-### Claude Code Vercel Access
+### Vercel Build Behavior
 
-Claude Code has Vercel MCP (Model Context Protocol) integration configured, giving it access to manage the website project — including environment variables, deployments, and project settings — directly from the CLI.
+The website's `vercel.json` has an `ignoreCommand` that only allows builds from `main` (non-main pushes are skipped). This means:
+- PR preview deploys are skipped (Vercel shows "Canceled by Ignored Build Step")
+- Only merges/pushes to `main` trigger production builds
+- The release workflow's redeploy step handles the case where the env var is updated after the main-branch build
 
 ---
 
