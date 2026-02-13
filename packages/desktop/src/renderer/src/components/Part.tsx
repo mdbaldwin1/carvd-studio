@@ -548,7 +548,7 @@ export const Part = memo(function Part({ part }: PartProps) {
     referencePartIds,
     groupMembers,
     selectedGroupIds,
-    editingGroupId,
+    editingGroupId
   } = useProjectStore(
     useShallow((s) => ({
       selectedPartIds: s.selectedPartIds,
@@ -560,7 +560,7 @@ export const Part = memo(function Part({ part }: PartProps) {
       referencePartIds: s.referencePartIds,
       groupMembers: s.groupMembers,
       selectedGroupIds: s.selectedGroupIds,
-      editingGroupId: s.editingGroupId,
+      editingGroupId: s.editingGroupId
     }))
   );
 

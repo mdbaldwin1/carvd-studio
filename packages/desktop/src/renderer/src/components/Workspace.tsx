@@ -597,9 +597,12 @@ function MultiSelectionDimensions() {
       aabb: getPartAABB(part)
     }));
 
-    let minX = Infinity, maxX = -Infinity;
-    let minY = Infinity, maxY = -Infinity;
-    let minZ = Infinity, maxZ = -Infinity;
+    let minX = Infinity,
+      maxX = -Infinity;
+    let minY = Infinity,
+      maxY = -Infinity;
+    let minZ = Infinity,
+      maxZ = -Infinity;
 
     for (const { aabb } of partAABBs) {
       minX = Math.min(minX, aabb.minX);
@@ -626,7 +629,12 @@ function MultiSelectionDimensions() {
       if (gap > 0.01) {
         const avgY = (Math.max(current.aabb.minY, next.aabb.minY) + Math.min(current.aabb.maxY, next.aabb.maxY)) / 2;
         const avgZ = (Math.max(current.aabb.minZ, next.aabb.minZ) + Math.min(current.aabb.maxZ, next.aabb.maxZ)) / 2;
-        gaps.push({ axis: 'x', start: [current.aabb.maxX, avgY, avgZ], end: [next.aabb.minX, avgY, avgZ], distance: gap });
+        gaps.push({
+          axis: 'x',
+          start: [current.aabb.maxX, avgY, avgZ],
+          end: [next.aabb.minX, avgY, avgZ],
+          distance: gap
+        });
       }
     }
 
@@ -638,7 +646,12 @@ function MultiSelectionDimensions() {
       if (gap > 0.01) {
         const avgX = (Math.max(current.aabb.minX, next.aabb.minX) + Math.min(current.aabb.maxX, next.aabb.maxX)) / 2;
         const avgY = (Math.max(current.aabb.minY, next.aabb.minY) + Math.min(current.aabb.maxY, next.aabb.maxY)) / 2;
-        gaps.push({ axis: 'z', start: [avgX, avgY, current.aabb.maxZ], end: [avgX, avgY, next.aabb.minZ], distance: gap });
+        gaps.push({
+          axis: 'z',
+          start: [avgX, avgY, current.aabb.maxZ],
+          end: [avgX, avgY, next.aabb.minZ],
+          distance: gap
+        });
       }
     }
 
@@ -650,7 +663,12 @@ function MultiSelectionDimensions() {
       if (gap > 0.01) {
         const avgX = (Math.max(current.aabb.minX, next.aabb.minX) + Math.min(current.aabb.maxX, next.aabb.maxX)) / 2;
         const avgZ = (Math.max(current.aabb.minZ, next.aabb.minZ) + Math.min(current.aabb.maxZ, next.aabb.maxZ)) / 2;
-        gaps.push({ axis: 'y', start: [avgX, current.aabb.maxY, avgZ], end: [avgX, next.aabb.minY, avgZ], distance: gap });
+        gaps.push({
+          axis: 'y',
+          start: [avgX, current.aabb.maxY, avgZ],
+          end: [avgX, next.aabb.minY, avgZ],
+          distance: gap
+        });
       }
     }
 
