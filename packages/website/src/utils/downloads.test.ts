@@ -1,51 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  getMacDownloadUrl,
+  getWindowsDownloadUrl,
+  getMacDownloadInfo,
+  getWindowsDownloadInfo,
+  fetchLatestVersion,
+  _resetCache,
+} from './downloads';
+
+beforeEach(() => {
+  _resetCache();
+  vi.restoreAllMocks();
+});
 
 describe('downloads', () => {
-  beforeEach(() => {
-    vi.resetModules();
-    vi.unstubAllEnvs();
-  });
-
   describe('getMacDownloadUrl', () => {
-    it('returns correct URL with default values', async () => {
-      const { getMacDownloadUrl } = await import('./downloads');
-      expect(getMacDownloadUrl()).toBe(
-        'https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg'
-      );
-    });
-
-    it('uses custom repo from env', async () => {
-      vi.stubEnv('VITE_GITHUB_REPO', 'customuser/custom-repo');
-      vi.stubEnv('VITE_APP_VERSION', '2.0.0');
-      const { getMacDownloadUrl } = await import('./downloads');
-      expect(getMacDownloadUrl()).toBe(
-        'https://github.com/customuser/custom-repo/releases/download/v2.0.0/Carvd.Studio-2.0.0-arm64.dmg'
+    it('returns correct URL for a given version', () => {
+      expect(getMacDownloadUrl('1.2.3')).toBe(
+        'https://github.com/mdbaldwin1/carvd-studio/releases/download/v1.2.3/Carvd.Studio-1.2.3-arm64.dmg'
       );
     });
   });
 
   describe('getWindowsDownloadUrl', () => {
-    it('returns correct URL with default values', async () => {
-      const { getWindowsDownloadUrl } = await import('./downloads');
-      expect(getWindowsDownloadUrl()).toBe(
-        'https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio.Setup.0.1.0.exe'
-      );
-    });
-
-    it('uses custom repo from env', async () => {
-      vi.stubEnv('VITE_GITHUB_REPO', 'customuser/custom-repo');
-      vi.stubEnv('VITE_APP_VERSION', '2.0.0');
-      const { getWindowsDownloadUrl } = await import('./downloads');
-      expect(getWindowsDownloadUrl()).toBe(
-        'https://github.com/customuser/custom-repo/releases/download/v2.0.0/Carvd.Studio.Setup.2.0.0.exe'
+    it('returns correct URL for a given version', () => {
+      expect(getWindowsDownloadUrl('1.2.3')).toBe(
+        'https://github.com/mdbaldwin1/carvd-studio/releases/download/v1.2.3/Carvd.Studio.Setup.1.2.3.exe'
       );
     });
   });
 
   describe('getMacDownloadInfo', () => {
-    it('returns complete download info', async () => {
-      const { getMacDownloadInfo } = await import('./downloads');
-      const info = getMacDownloadInfo();
+    it('returns complete download info', () => {
+      const info = getMacDownloadInfo('0.1.0');
       expect(info).toEqual({
         url: 'https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg',
         platform: 'macos',
@@ -57,9 +44,8 @@ describe('downloads', () => {
   });
 
   describe('getWindowsDownloadInfo', () => {
-    it('returns complete download info', async () => {
-      const { getWindowsDownloadInfo } = await import('./downloads');
-      const info = getWindowsDownloadInfo();
+    it('returns complete download info', () => {
+      const info = getWindowsDownloadInfo('0.1.0');
       expect(info).toEqual({
         url: 'https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio.Setup.0.1.0.exe',
         platform: 'windows',
@@ -70,16 +56,69 @@ describe('downloads', () => {
     });
   });
 
-  describe('getAppVersion', () => {
-    it('returns default version', async () => {
-      const { getAppVersion } = await import('./downloads');
-      expect(getAppVersion()).toBe('0.1.0');
+  describe('fetchLatestVersion', () => {
+    it('fetches version from GitHub API', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ tag_name: 'v2.0.0' }),
+      } as Response);
+
+      const version = await fetchLatestVersion();
+      expect(version).toBe('2.0.0');
+      expect(fetch).toHaveBeenCalledWith(
+        'https://api.github.com/repos/mdbaldwin1/carvd-studio/releases/latest'
+      );
     });
 
-    it('returns custom version from env', async () => {
-      vi.stubEnv('VITE_APP_VERSION', '3.2.1');
-      const { getAppVersion } = await import('./downloads');
-      expect(getAppVersion()).toBe('3.2.1');
+    it('strips v prefix from tag name', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ tag_name: 'v3.1.4' }),
+      } as Response);
+
+      expect(await fetchLatestVersion()).toBe('3.1.4');
+    });
+
+    it('returns fallback version on network error', async () => {
+      vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'));
+
+      const version = await fetchLatestVersion();
+      expect(version).toBe('0.1.0');
+    });
+
+    it('returns fallback version on non-OK response', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      } as Response);
+
+      const version = await fetchLatestVersion();
+      expect(version).toBe('0.1.0');
+    });
+
+    it('caches the result after first successful fetch', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ tag_name: 'v1.0.0' }),
+      } as Response);
+
+      await fetchLatestVersion();
+      await fetchLatestVersion();
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-fetches after cache reset', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        json: async () => ({ tag_name: 'v1.0.0' }),
+      } as Response);
+
+      await fetchLatestVersion();
+      _resetCache();
+      await fetchLatestVersion();
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
   });
 });

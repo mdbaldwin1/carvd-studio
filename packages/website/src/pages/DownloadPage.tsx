@@ -1,13 +1,7 @@
-import {
-  getAppVersion,
-  getMacDownloadInfo,
-  getWindowsDownloadInfo,
-} from "../utils/downloads";
+import { useDownloadInfo } from "../utils/downloads";
 
 export default function DownloadPage() {
-    const macDownload = getMacDownloadInfo();
-    const windowsDownload = getWindowsDownloadInfo();
-    const appVersion = getAppVersion();
+    const { version: appVersion, macDownload, windowsDownload } = useDownloadInfo();
 
     return (
         <div className="page bg-gradient-radial">

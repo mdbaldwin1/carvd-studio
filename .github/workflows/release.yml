@@ -276,63 +276,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ── Step 4: Update Vercel environment variable ──────────────────────────────
-  update-vercel:
-    name: Update Vercel Version
-    needs: [prepare, create-release]
-    if: needs.prepare.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Update VITE_APP_VERSION in Vercel
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          VERSION="${{ needs.prepare.outputs.version }}"
-
-          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_PROJECT_ID" ] || [ -z "$VERCEL_ORG_ID" ]; then
-            echo "⚠️  Vercel secrets not fully configured - skipping"
-            exit 0
-          fi
-
-          echo "Updating VITE_APP_VERSION to $VERSION..."
-
-          npm install -g vercel
-
-          # Remove existing env var (ignore error if doesn't exist)
-          vercel env rm VITE_APP_VERSION production --yes --token "$VERCEL_TOKEN" || true
-
-          # Add new version
-          echo "$VERSION" | vercel env add VITE_APP_VERSION production --token "$VERCEL_TOKEN"
-
-          echo "✅ Updated VITE_APP_VERSION to $VERSION in Vercel"
-
-      - name: Checkout code for Vercel CLI deploy
-        uses: actions/checkout@v6
-
-      - name: Trigger Vercel production redeploy
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          if [ -z "$VERCEL_TOKEN" ]; then exit 0; fi
-
-          echo "Triggering production redeploy to pick up new VITE_APP_VERSION..."
-
-          # Link the project from the repo root — the Vercel project already
-          # has rootDirectory set to packages/website, so we must NOT cd into
-          # that directory or the path gets doubled.
-          vercel link --yes --project "$VERCEL_PROJECT_ID" --scope "$VERCEL_ORG_ID" --token "$VERCEL_TOKEN"
-
-          # Deploy to production (picks up the updated env var)
-          vercel deploy --prod --yes --token "$VERCEL_TOKEN"
-
-          echo "✅ Vercel production redeploy triggered"
-
-  # ── Step 5: Sync main back to develop ──────────────────────────────────────
+  # ── Step 4: Sync main back to develop ───────────────────────────────────────
   sync-develop:
     name: Sync Main to Develop
     needs: [prepare, create-release]
@@ -356,7 +300,7 @@ jobs:
           git merge origin/main --no-edit -m "chore: sync main back to develop after ${{ needs.prepare.outputs.tag }} release"
           git push origin develop
 
-  # ── Step 6: Bump patch version on develop for next release ──────────────────
+  # ── Step 5: Bump patch version on develop for next release ──────────────────
   bump-develop:
     name: Bump Version on Develop
     needs: [prepare, create-release, sync-develop]
@@ -416,7 +360,7 @@ jobs:
   # ── Summary ─────────────────────────────────────────────────────────────────
   summary:
     name: Release Summary
-    needs: [prepare, build, create-release, update-vercel, sync-develop, bump-develop]
+    needs: [prepare, build, create-release, sync-develop, bump-develop]
     if: always() && needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
 
@@ -430,6 +374,5 @@ jobs:
           echo "| Version | **${{ needs.prepare.outputs.tag }}** |" >> $GITHUB_STEP_SUMMARY
           echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| GitHub Release | ${{ needs.create-release.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Vercel Update | ${{ needs.update-vercel.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Sync Develop | ${{ needs.sync-develop.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Develop Bump | ${{ needs.bump-develop.result }} |" >> $GITHUB_STEP_SUMMARY

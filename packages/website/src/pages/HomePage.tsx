@@ -1,12 +1,10 @@
 import React from 'react';
 import ScreenshotPlaceholder from '../components/ScreenshotPlaceholder';
 import BuyButton from '../components/BuyButton';
-import { getMacDownloadInfo, getWindowsDownloadInfo, getAppVersion } from '../utils/downloads';
+import { useDownloadInfo } from '../utils/downloads';
 
 export default function HomePage() {
-  const macDownload = getMacDownloadInfo();
-  const windowsDownload = getWindowsDownloadInfo();
-  const appVersion = getAppVersion();
+  const { version: appVersion, macDownload, windowsDownload } = useDownloadInfo();
 
   return (
     <div className="page bg-gradient-radial">
