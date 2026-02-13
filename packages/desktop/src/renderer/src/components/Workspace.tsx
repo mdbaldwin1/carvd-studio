@@ -102,20 +102,23 @@ function CameraController() {
     rightZ: 0
   });
 
+  // Reusable Vector3 objects to avoid GC pressure in the render loop
+  const reusableRight = useMemo(() => new THREE.Vector3(), []);
+  const reusableUp = useMemo(() => new THREE.Vector3(), []);
+
   // Track camera view vectors for view-relative movement (screen-aligned)
   useFrame(() => {
     // Get the camera's world matrix to extract view-aligned vectors
     camera.updateMatrixWorld();
 
     // Camera's right vector (points to the right of the screen)
-    const right = new THREE.Vector3();
-    right.setFromMatrixColumn(camera.matrixWorld, 0); // First column is right vector
-    right.normalize();
+    reusableRight.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
 
     // Camera's up vector (points to the top of the screen)
-    const up = new THREE.Vector3();
-    up.setFromMatrixColumn(camera.matrixWorld, 1); // Second column is up vector
-    up.normalize();
+    reusableUp.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+
+    const right = reusableRight;
+    const up = reusableUp;
 
     // Only update store if vectors have changed significantly (threshold: 0.001)
     const prev = prevVectorsRef.current;
@@ -1487,7 +1490,6 @@ export function Workspace() {
         key={`main-${lightingMode}-${brightnessMultiplier}`}
         position={lightingPreset.mainLight.position}
         intensity={lightingPreset.mainLight.intensity * brightnessMultiplier}
-        castShadow
       />
       <directionalLight
         key={`fill-${lightingMode}-${brightnessMultiplier}`}
