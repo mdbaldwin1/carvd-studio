@@ -1,6 +1,5 @@
 {
   "name": "carvd-studio-monorepo",
-  "version": "1.0.0",
   "description": "Carvd Studio - Professional furniture and cabinetry design software (monorepo)",
   "private": true,
   "workspaces": [
