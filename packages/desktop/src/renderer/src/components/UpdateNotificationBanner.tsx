@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, RefreshCw, X } from 'lucide-react';
+import { CheckCircle, Download, RefreshCw, X } from 'lucide-react';
 import './UpdateNotificationBanner.css';
 
 interface UpdateInfo {
@@ -21,6 +21,10 @@ export function UpdateNotificationBanner() {
   const [updateReady, setUpdateReady] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [justUpdated, setJustUpdated] = useState<{
+    previousVersion: string;
+    currentVersion: string;
+  } | null>(null);
 
   useEffect(() => {
     // Listen for update available
@@ -50,11 +54,18 @@ export function UpdateNotificationBanner() {
       setDownloadProgress(null);
     });
 
+    // Listen for post-update notification (app was just updated)
+    const cleanupJustInstalled = window.electronAPI.onUpdateJustInstalled?.((info) => {
+      setJustUpdated(info);
+      setDismissed(false);
+    });
+
     return () => {
       cleanupAvailable();
       cleanupProgress();
       cleanupDownloaded();
       cleanupError();
+      cleanupJustInstalled?.();
     };
   }, []);
 
@@ -77,9 +88,38 @@ export function UpdateNotificationBanner() {
     setDismissed(true);
   };
 
-  // Don't show banner if dismissed or no update info
-  if (dismissed || (!updateInfo && !error)) {
+  // Don't show banner if dismissed or nothing to show
+  if (dismissed || (!updateInfo && !error && !justUpdated)) {
     return null;
+  }
+
+  // Show just-updated toast only when no active update flow
+  const showJustUpdatedToast = justUpdated && !updateInfo && !error;
+
+  // If only the toast is showing (no banner content), render just the toast
+  if (showJustUpdatedToast && !updateInfo && !error) {
+    return (
+      <div className="update-toast update-toast-success">
+        <CheckCircle className="icon-sm update-toast-icon" />
+        <div className="update-toast-text">
+          <span className="update-toast-title">Updated to v{justUpdated.currentVersion}</span>
+          {' · '}
+          <a
+            className="update-changelog-link"
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              window.electronAPI?.openExternal?.('https://carvd-studio.com/changelog');
+            }}
+          >
+            See what&apos;s new
+          </a>
+        </div>
+        <button className="update-toast-dismiss" onClick={handleDismiss}>
+          <X className="icon-sm" />
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -102,7 +142,20 @@ export function UpdateNotificationBanner() {
             </div>
             <div className="update-notification-text">
               <div className="update-notification-title">Update Ready</div>
-              <div className="update-notification-message">Version {updateInfo?.version} is ready to install</div>
+              <div className="update-notification-message">
+                Version {updateInfo?.version} is ready to install
+                {' · '}
+                <a
+                  className="update-changelog-link"
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.electronAPI?.openExternal?.('https://carvd-studio.com/changelog');
+                  }}
+                >
+                  What&apos;s new
+                </a>
+              </div>
             </div>
             <button className="btn btn-primary" onClick={handleInstall}>
               Restart & Update
@@ -128,7 +181,20 @@ export function UpdateNotificationBanner() {
             </div>
             <div className="update-notification-text">
               <div className="update-notification-title">Update Available</div>
-              <div className="update-notification-message">Version {updateInfo?.version} is available</div>
+              <div className="update-notification-message">
+                Version {updateInfo?.version} is available
+                {' · '}
+                <a
+                  className="update-changelog-link"
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.electronAPI?.openExternal?.('https://carvd-studio.com/changelog');
+                  }}
+                >
+                  What&apos;s new
+                </a>
+              </div>
             </div>
             <button className="btn btn-primary" onClick={handleDownload}>
               Download

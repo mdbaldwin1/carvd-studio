@@ -7,6 +7,7 @@ import PricingPage from '../src/pages/PricingPage';
 import DocsPage from '../src/pages/DocsPage';
 import PrivacyPolicyPage from '../src/pages/PrivacyPolicyPage';
 import TermsPage from '../src/pages/TermsPage';
+import ChangelogPage from '../src/pages/ChangelogPage';
 import NotFoundPage from '../src/pages/NotFoundPage';
 
 // Create a test router that mimics the app's routing structure
@@ -21,6 +22,7 @@ const TestRouter = ({ initialRoute }: { initialRoute: string }) => {
         <Route path="/docs" element={<DocsPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/changelog" element={<ChangelogPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </MemoryRouter>
@@ -78,6 +80,13 @@ describe('Routing', () => {
       render(<TestRouter initialRoute="/terms" />);
       const main = screen.getByRole('main');
       expect(main).toBeInTheDocument();
+    });
+  });
+
+  describe('ChangelogPage route', () => {
+    it('renders ChangelogPage at /changelog', () => {
+      render(<TestRouter initialRoute="/changelog" />);
+      expect(screen.getByRole('heading', { level: 1, name: /changelog/i })).toBeInTheDocument();
     });
   });
 

@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import HomePage from '../src/pages/HomePage';
 import FeaturesPage from '../src/pages/FeaturesPage';
 import PricingPage from '../src/pages/PricingPage';
+import ChangelogPage from '../src/pages/ChangelogPage';
 import NotFoundPage from '../src/pages/NotFoundPage';
 
 // Helper to render with router
@@ -60,6 +61,17 @@ describe('Accessibility', () => {
       'has no accessibility violations',
       async () => {
         const { container } = renderWithRouter(<PricingPage />);
+        await expectNoViolations(container);
+      },
+      axeTimeout
+    );
+  });
+
+  describe('ChangelogPage', () => {
+    it(
+      'has no accessibility violations',
+      async () => {
+        const { container } = renderWithRouter(<ChangelogPage />);
         await expectNoViolations(container);
       },
       axeTimeout

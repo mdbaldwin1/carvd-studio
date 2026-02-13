@@ -1,8 +1,31 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import fs from 'fs';
+import path from 'path';
+
+function changelogPlugin() {
+  const virtualModuleId = 'virtual:changelog';
+  const resolvedId = '\0' + virtualModuleId;
+
+  return {
+    name: 'changelog',
+    resolveId(id: string) {
+      if (id === virtualModuleId) return resolvedId;
+    },
+    load(id: string) {
+      if (id === resolvedId) {
+        const content = fs.readFileSync(
+          path.resolve(__dirname, '../../CHANGELOG.md'),
+          'utf-8'
+        );
+        return `export default ${JSON.stringify(content)};`;
+      }
+    }
+  };
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), changelogPlugin()],
   test: {
     globals: true,
     environment: 'jsdom',
