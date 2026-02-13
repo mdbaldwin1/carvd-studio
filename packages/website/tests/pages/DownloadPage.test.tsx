@@ -6,14 +6,14 @@ import DownloadPage from '../../src/pages/DownloadPage';
 // Mock the downloads utility
 vi.mock('../../src/utils/downloads', () => ({
   getMacDownloadInfo: () => ({
-    url: 'https://github.com/test/repo/releases/latest/download/Carvd.Studio-0.1.0.dmg',
+    url: 'https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0.dmg',
     platform: 'macos',
     fileName: 'Carvd.Studio-0.1.0.dmg',
     fileExtension: '.dmg',
     minOsVersion: 'macOS 10.15+',
   }),
   getWindowsDownloadInfo: () => ({
-    url: 'https://github.com/test/repo/releases/latest/download/Carvd.Studio.Setup.0.1.0.exe',
+    url: 'https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio.Setup.0.1.0.exe',
     platform: 'windows',
     fileName: 'Carvd.Studio.Setup.0.1.0.exe',
     fileExtension: '.exe',
