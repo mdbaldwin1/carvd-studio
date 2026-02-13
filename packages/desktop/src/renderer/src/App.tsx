@@ -1780,7 +1780,15 @@ function CanvasWithDrop() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <Canvas camera={{ position: [60, 50, 60], fov: 50 }} gl={{ antialias: true, preserveDrawingBuffer: true }}>
+      <Canvas
+        camera={{ position: [60, 50, 60], fov: 50 }}
+        gl={{
+          antialias: true,
+          powerPreference: 'high-performance',
+          alpha: false,
+          stencil: false,
+        }}
+      >
         <Workspace />
       </Canvas>
       <DisplayToolbar />
