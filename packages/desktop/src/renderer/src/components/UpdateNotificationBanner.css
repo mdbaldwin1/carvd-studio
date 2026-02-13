@@ -12,7 +12,7 @@
   border-radius: var(--radius-md, 8px);
   font-size: 0.8125rem;
   box-shadow: 0 4px 16px var(--color-overlay, rgba(0, 0, 0, 0.3));
-  z-index: 1000;
+  z-index: 1100; /* Above start-screen (1000) and templates-screen (1000) */
   animation: update-toast-in 0.3s ease-out;
   white-space: nowrap;
 }
