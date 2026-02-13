@@ -1787,7 +1787,7 @@ function CanvasWithDrop() {
           antialias: true,
           powerPreference: 'high-performance',
           alpha: false,
-          stencil: false,
+          stencil: false
         }}
       >
         <Workspace />
