@@ -307,8 +307,9 @@ jobs:
 
           echo "Triggering production redeploy to pick up new VITE_APP_VERSION..."
 
-          # Link the project so the CLI knows which project to deploy
-          cd packages/website
+          # Link the project from the repo root — the Vercel project already
+          # has rootDirectory set to packages/website, so we must NOT cd into
+          # that directory or the path gets doubled.
           vercel link --yes --project "$VERCEL_PROJECT_ID" --scope "$VERCEL_ORG_ID" --token "$VERCEL_TOKEN"
 
           # Deploy to production (picks up the updated env var)
