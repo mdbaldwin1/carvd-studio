@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle, Download, RefreshCw, X } from 'lucide-react';
+import { AlertCircle, CheckCircle, Download, RefreshCw, X } from 'lucide-react';
 import './UpdateNotificationBanner.css';
 
 interface UpdateInfo {
@@ -88,22 +88,19 @@ export function UpdateNotificationBanner() {
     setDismissed(true);
   };
 
-  // Don't show banner if dismissed or nothing to show
+  // Don't show if dismissed or nothing to show
   if (dismissed || (!updateInfo && !error && !justUpdated)) {
     return null;
   }
 
-  // Show just-updated toast only when no active update flow
-  const showJustUpdatedToast = justUpdated && !updateInfo && !error;
-
-  // If only the toast is showing (no banner content), render just the toast
-  if (showJustUpdatedToast && !updateInfo && !error) {
+  // Post-update toast
+  if (justUpdated && !updateInfo && !error) {
     return (
       <div className="update-toast update-toast-success">
         <CheckCircle className="icon-sm update-toast-icon" />
         <div className="update-toast-text">
           <span className="update-toast-title">Updated to v{justUpdated.currentVersion}</span>
-          {' · '}
+          {' \u00b7 '}
           <a
             className="update-changelog-link"
             href="#"
@@ -122,89 +119,89 @@ export function UpdateNotificationBanner() {
     );
   }
 
-  return (
-    <div className="update-notification-banner">
-      <div className="update-notification-content">
-        {error ? (
-          <>
-            <div className="update-notification-icon update-notification-error">
-              <X className="icon-sm" />
-            </div>
-            <div className="update-notification-text">
-              <div className="update-notification-title">Update Error</div>
-              <div className="update-notification-message">{error}</div>
-            </div>
-          </>
-        ) : updateReady ? (
-          <>
-            <div className="update-notification-icon update-notification-ready">
-              <RefreshCw className="icon-sm" />
-            </div>
-            <div className="update-notification-text">
-              <div className="update-notification-title">Update Ready</div>
-              <div className="update-notification-message">
-                Version {updateInfo?.version} is ready to install
-                {' · '}
-                <a
-                  className="update-changelog-link"
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    window.electronAPI?.openExternal?.('https://carvd-studio.com/changelog');
-                  }}
-                >
-                  What&apos;s new
-                </a>
-              </div>
-            </div>
-            <button className="btn btn-primary" onClick={handleInstall}>
-              Restart & Update
-            </button>
-          </>
-        ) : downloading && downloadProgress ? (
-          <>
-            <div className="update-notification-icon update-notification-downloading">
-              <Download className="icon-sm animate-pulse" />
-            </div>
-            <div className="update-notification-text">
-              <div className="update-notification-title">Downloading Update...</div>
-              <div className="update-notification-progress">
-                <div className="update-notification-progress-bar" style={{ width: `${downloadProgress.percent}%` }} />
-              </div>
-              <div className="update-notification-message">{downloadProgress.percent.toFixed(0)}% complete</div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="update-notification-icon update-notification-available">
-              <Download className="icon-sm" />
-            </div>
-            <div className="update-notification-text">
-              <div className="update-notification-title">Update Available</div>
-              <div className="update-notification-message">
-                Version {updateInfo?.version} is available
-                {' · '}
-                <a
-                  className="update-changelog-link"
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    window.electronAPI?.openExternal?.('https://carvd-studio.com/changelog');
-                  }}
-                >
-                  What&apos;s new
-                </a>
-              </div>
-            </div>
-            <button className="btn btn-primary" onClick={handleDownload}>
-              Download
-            </button>
-            <button className="btn btn-ghost" onClick={handleDismiss}>
-              <X className="icon-sm" />
-            </button>
-          </>
-        )}
+  // Error toast
+  if (error) {
+    return (
+      <div className="update-toast update-toast-error">
+        <AlertCircle className="icon-sm update-toast-icon" />
+        <div className="update-toast-text">
+          <span className="update-toast-title">Update Error</span>
+          {' \u00b7 '}
+          <span className="update-toast-message">{error}</span>
+        </div>
+        <button className="update-toast-dismiss" onClick={handleDismiss}>
+          <X className="icon-sm" />
+        </button>
       </div>
+    );
+  }
+
+  // Update ready toast
+  if (updateReady) {
+    return (
+      <div className="update-toast update-toast-ready">
+        <RefreshCw className="icon-sm update-toast-icon" />
+        <div className="update-toast-text">
+          <span className="update-toast-title">v{updateInfo?.version} ready</span>
+          {' \u00b7 '}
+          <a
+            className="update-changelog-link"
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              window.electronAPI?.openExternal?.('https://carvd-studio.com/changelog');
+            }}
+          >
+            What&apos;s new
+          </a>
+        </div>
+        <button className="update-toast-action" onClick={handleInstall}>
+          Restart & Update
+        </button>
+      </div>
+    );
+  }
+
+  // Downloading toast
+  if (downloading && downloadProgress) {
+    return (
+      <div className="update-toast update-toast-downloading">
+        <Download className="icon-sm update-toast-icon animate-pulse" />
+        <div className="update-toast-text">
+          <span className="update-toast-title">Downloading update...</span>
+          <span className="update-toast-percent">{downloadProgress.percent.toFixed(0)}%</span>
+        </div>
+        <div className="update-toast-progress">
+          <div className="update-toast-progress-bar" style={{ width: `${downloadProgress.percent}%` }} />
+        </div>
+      </div>
+    );
+  }
+
+  // Update available toast
+  return (
+    <div className="update-toast update-toast-available">
+      <Download className="icon-sm update-toast-icon" />
+      <div className="update-toast-text">
+        <span className="update-toast-title">v{updateInfo?.version} available</span>
+        {' \u00b7 '}
+        <a
+          className="update-changelog-link"
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            window.electronAPI?.openExternal?.('https://carvd-studio.com/changelog');
+          }}
+        >
+          What&apos;s new
+        </a>
+      </div>
+      <button className="update-toast-action" onClick={handleDownload}>
+        Download
+      </button>
+      <button className="update-toast-dismiss" onClick={handleDismiss}>
+        <X className="icon-sm" />
+      </button>
     </div>
   );
 }

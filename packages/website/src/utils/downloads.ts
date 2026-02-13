@@ -20,7 +20,7 @@ export interface DownloadInfo {
  * Get download URL for macOS installer (.dmg)
  */
 export function getMacDownloadUrl(): string {
-  return `https://github.com/${GITHUB_REPO}/releases/download/v${APP_VERSION}/Carvd.Studio-${APP_VERSION}.dmg`;
+  return `https://github.com/${GITHUB_REPO}/releases/download/v${APP_VERSION}/Carvd.Studio-${APP_VERSION}-arm64.dmg`;
 }
 
 /**
@@ -37,7 +37,7 @@ export function getMacDownloadInfo(): DownloadInfo {
   return {
     url: getMacDownloadUrl(),
     platform: 'macos',
-    fileName: `Carvd.Studio-${APP_VERSION}.dmg`,
+    fileName: `Carvd.Studio-${APP_VERSION}-arm64.dmg`,
     fileExtension: '.dmg',
     minOsVersion: 'macOS 10.15+',
   };

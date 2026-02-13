@@ -74,15 +74,14 @@ describe('UpdateNotificationBanner', () => {
   });
 
   describe('update available', () => {
-    it('shows banner when update is available', () => {
+    it('shows toast when update is available', () => {
       render(<UpdateNotificationBanner />);
 
       act(() => {
         onUpdateAvailableCallback?.({ version: '2.0.0' });
       });
 
-      expect(screen.getByText('Update Available')).toBeInTheDocument();
-      expect(screen.getByText(/Version 2.0.0 is available/)).toBeInTheDocument();
+      expect(screen.getByText('v2.0.0 available')).toBeInTheDocument();
     });
 
     it('shows Download button when update is available', () => {
@@ -126,8 +125,8 @@ describe('UpdateNotificationBanner', () => {
         onUpdateDownloadProgressCallback?.({ percent: 50, transferred: 5000, total: 10000 });
       });
 
-      expect(screen.getByText('Downloading Update...')).toBeInTheDocument();
-      expect(screen.getByText('50% complete')).toBeInTheDocument();
+      expect(screen.getByText('Downloading update...')).toBeInTheDocument();
+      expect(screen.getByText('50%')).toBeInTheDocument();
     });
 
     it('shows progress bar with correct width', async () => {
@@ -145,13 +144,13 @@ describe('UpdateNotificationBanner', () => {
         onUpdateDownloadProgressCallback?.({ percent: 75, transferred: 7500, total: 10000 });
       });
 
-      const progressBar = container.querySelector('.update-notification-progress-bar') as HTMLElement;
+      const progressBar = container.querySelector('.update-toast-progress-bar') as HTMLElement;
       expect(progressBar?.style.width).toBe('75%');
     });
   });
 
   describe('update ready', () => {
-    it('shows "Update Ready" when download completes', () => {
+    it('shows ready toast when download completes', () => {
       render(<UpdateNotificationBanner />);
 
       act(() => {
@@ -162,8 +161,7 @@ describe('UpdateNotificationBanner', () => {
         onUpdateDownloadedCallback?.({ version: '2.0.0' });
       });
 
-      expect(screen.getByText('Update Ready')).toBeInTheDocument();
-      expect(screen.getByText(/Version 2.0.0 is ready to install/)).toBeInTheDocument();
+      expect(screen.getByText('v2.0.0 ready')).toBeInTheDocument();
     });
 
     it('shows "Restart & Update" button when ready', () => {
@@ -217,18 +215,17 @@ describe('UpdateNotificationBanner', () => {
   });
 
   describe('dismissing', () => {
-    it('hides banner when dismiss button is clicked', () => {
+    it('hides toast when dismiss button is clicked', () => {
       const { container } = render(<UpdateNotificationBanner />);
 
       act(() => {
         onUpdateAvailableCallback?.({ version: '2.0.0' });
       });
 
-      // Find the dismiss X button (inside btn-ghost)
-      const dismissButton = container.querySelector('.btn-ghost');
+      const dismissButton = container.querySelector('.update-toast-dismiss');
       fireEvent.click(dismissButton!);
 
-      expect(screen.queryByText('Update Available')).not.toBeInTheDocument();
+      expect(screen.queryByText('v2.0.0 available')).not.toBeInTheDocument();
     });
   });
 
