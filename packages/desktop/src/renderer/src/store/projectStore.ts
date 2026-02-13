@@ -402,7 +402,20 @@ export const getContainingGroupId = (partId: string, groupMembers: GroupMember[]
 };
 
 // Helper function: Get all descendant part IDs from a group (recursively includes nested groups)
+// Memoized: caches results per groupMembers array reference to avoid repeated recursive traversals
+let _descendantCache: WeakRef<GroupMember[]> | null = null;
+let _descendantResults: Map<string, string[]> = new Map();
+
 export const getAllDescendantPartIds = (groupId: string, groupMembers: GroupMember[]): string[] => {
+  // Invalidate cache if groupMembers array changed
+  if (!_descendantCache || _descendantCache.deref() !== groupMembers) {
+    _descendantCache = new WeakRef(groupMembers);
+    _descendantResults = new Map();
+  }
+
+  const cached = _descendantResults.get(groupId);
+  if (cached) return cached;
+
   const partIds: string[] = [];
   const members = groupMembers.filter((gm) => gm.groupId === groupId);
 
@@ -414,6 +427,8 @@ export const getAllDescendantPartIds = (groupId: string, groupMembers: GroupMemb
       partIds.push(...getAllDescendantPartIds(member.memberId, groupMembers));
     }
   }
+
+  _descendantResults.set(groupId, partIds);
   return partIds;
 };
 

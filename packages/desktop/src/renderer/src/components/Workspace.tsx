@@ -360,21 +360,30 @@ function ThumbnailCaptureHandler() {
   return null;
 }
 
-// Log GPU renderer info once on mount so we can compare dev vs production
+// Log GPU renderer info on mount - uses a short delay so logs are visible
+// even if DevTools is opened after the app loads in production
 function GpuTelemetry() {
   const { gl } = useThree();
 
   useEffect(() => {
-    const glCtx = gl.getContext();
-    const dbg = glCtx.getExtension('WEBGL_debug_renderer_info');
-    if (dbg) {
-      const vendor = glCtx.getParameter(dbg.UNMASKED_VENDOR_WEBGL);
-      const renderer = glCtx.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
-      console.info(`[GPU] Vendor: ${vendor}  Renderer: ${renderer}`);
-    }
-    console.info(
-      `[GPU] Drawing buffer: ${gl.domElement.width}x${gl.domElement.height}  Pixel ratio: ${gl.getPixelRatio()}`
-    );
+    const logGpuInfo = () => {
+      const glCtx = gl.getContext();
+      const dbg = glCtx.getExtension('WEBGL_debug_renderer_info');
+      if (dbg) {
+        const vendor = glCtx.getParameter(dbg.UNMASKED_VENDOR_WEBGL);
+        const renderer = glCtx.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+        console.info(`[GPU] Vendor: ${vendor}  Renderer: ${renderer}`);
+      }
+      console.info(
+        `[GPU] Drawing buffer: ${gl.domElement.width}x${gl.domElement.height}  Pixel ratio: ${gl.getPixelRatio()}`
+      );
+    };
+
+    // Log immediately
+    logGpuInfo();
+    // Also log after a short delay in case DevTools is opened late
+    const timer = setTimeout(logGpuInfo, 3000);
+    return () => clearTimeout(timer);
   }, [gl]);
 
   return null;
@@ -576,124 +585,90 @@ function MultiSelectionDimensions() {
     return [...partIds];
   }, [selectedPartIds, selectedGroupIds, groupMembers]);
 
-  // Only show when 2+ parts are effectively selected, and not while dragging
-  if (effectiveSelectedPartIds.length < 2) return null;
+  // Memoize the heavy AABB + gap calculations
+  const boundsData = useMemo(() => {
+    if (effectiveSelectedPartIds.length < 2) return null;
+
+    const selectedParts = parts.filter((p) => effectiveSelectedPartIds.includes(p.id));
+    if (selectedParts.length < 2) return null;
+
+    const partAABBs = selectedParts.map((part) => ({
+      part,
+      aabb: getPartAABB(part)
+    }));
+
+    let minX = Infinity, maxX = -Infinity;
+    let minY = Infinity, maxY = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+
+    for (const { aabb } of partAABBs) {
+      minX = Math.min(minX, aabb.minX);
+      maxX = Math.max(maxX, aabb.maxX);
+      minY = Math.min(minY, aabb.minY);
+      maxY = Math.max(maxY, aabb.maxY);
+      minZ = Math.min(minZ, aabb.minZ);
+      maxZ = Math.max(maxZ, aabb.maxZ);
+    }
+
+    // Calculate gaps between parts along each axis
+    const gaps: {
+      axis: 'x' | 'y' | 'z';
+      start: [number, number, number];
+      end: [number, number, number];
+      distance: number;
+    }[] = [];
+
+    const sortedByX = [...partAABBs].sort((a, b) => a.aabb.minX - b.aabb.minX);
+    for (let i = 0; i < sortedByX.length - 1; i++) {
+      const current = sortedByX[i];
+      const next = sortedByX[i + 1];
+      const gap = next.aabb.minX - current.aabb.maxX;
+      if (gap > 0.01) {
+        const avgY = (Math.max(current.aabb.minY, next.aabb.minY) + Math.min(current.aabb.maxY, next.aabb.maxY)) / 2;
+        const avgZ = (Math.max(current.aabb.minZ, next.aabb.minZ) + Math.min(current.aabb.maxZ, next.aabb.maxZ)) / 2;
+        gaps.push({ axis: 'x', start: [current.aabb.maxX, avgY, avgZ], end: [next.aabb.minX, avgY, avgZ], distance: gap });
+      }
+    }
+
+    const sortedByZ = [...partAABBs].sort((a, b) => a.aabb.minZ - b.aabb.minZ);
+    for (let i = 0; i < sortedByZ.length - 1; i++) {
+      const current = sortedByZ[i];
+      const next = sortedByZ[i + 1];
+      const gap = next.aabb.minZ - current.aabb.maxZ;
+      if (gap > 0.01) {
+        const avgX = (Math.max(current.aabb.minX, next.aabb.minX) + Math.min(current.aabb.maxX, next.aabb.maxX)) / 2;
+        const avgY = (Math.max(current.aabb.minY, next.aabb.minY) + Math.min(current.aabb.maxY, next.aabb.maxY)) / 2;
+        gaps.push({ axis: 'z', start: [avgX, avgY, current.aabb.maxZ], end: [avgX, avgY, next.aabb.minZ], distance: gap });
+      }
+    }
+
+    const sortedByY = [...partAABBs].sort((a, b) => a.aabb.minY - b.aabb.minY);
+    for (let i = 0; i < sortedByY.length - 1; i++) {
+      const current = sortedByY[i];
+      const next = sortedByY[i + 1];
+      const gap = next.aabb.minY - current.aabb.maxY;
+      if (gap > 0.01) {
+        const avgX = (Math.max(current.aabb.minX, next.aabb.minX) + Math.min(current.aabb.maxX, next.aabb.maxX)) / 2;
+        const avgZ = (Math.max(current.aabb.minZ, next.aabb.minZ) + Math.min(current.aabb.maxZ, next.aabb.maxZ)) / 2;
+        gaps.push({ axis: 'y', start: [avgX, current.aabb.maxY, avgZ], end: [avgX, next.aabb.minY, avgZ], distance: gap });
+      }
+    }
+
+    return { minX, maxX, minY, maxY, minZ, maxZ, gaps };
+  }, [effectiveSelectedPartIds, parts]);
+
+  if (!boundsData) return null;
   if (activeDragDelta) return null; // Hide dimension labels while dragging
 
-  const selectedParts = parts.filter((p) => effectiveSelectedPartIds.includes(p.id));
-  if (selectedParts.length < 2) return null;
-
-  // Calculate bounding boxes for each part
-  const partAABBs = selectedParts.map((part) => {
-    // Apply drag delta to position if dragging
-    const adjustedPart = activeDragDelta
-      ? {
-          ...part,
-          position: {
-            x: part.position.x + activeDragDelta.x,
-            y: part.position.y + activeDragDelta.y,
-            z: part.position.z + activeDragDelta.z
-          }
-        }
-      : part;
-    return {
-      part: adjustedPart,
-      aabb: getPartAABB(adjustedPart)
-    };
-  });
-
-  // Calculate overall bounding box
-  let minX = Infinity,
-    maxX = -Infinity;
-  let minY = Infinity,
-    maxY = -Infinity;
-  let minZ = Infinity,
-    maxZ = -Infinity;
-
-  for (const { aabb } of partAABBs) {
-    minX = Math.min(minX, aabb.minX);
-    maxX = Math.max(maxX, aabb.maxX);
-    minY = Math.min(minY, aabb.minY);
-    maxY = Math.max(maxY, aabb.maxY);
-    minZ = Math.min(minZ, aabb.minZ);
-    maxZ = Math.max(maxZ, aabb.maxZ);
-  }
-
+  const { minX, maxX, minY, maxY, minZ, maxZ, gaps } = boundsData;
   const sizeX = maxX - minX;
   const sizeY = maxY - minY;
   const sizeZ = maxZ - minZ;
 
-  // Define bounding box corners for dimension lines
   const bottomFrontLeft: [number, number, number] = [minX, minY, minZ];
   const bottomFrontRight: [number, number, number] = [maxX, minY, minZ];
   const bottomBackRight: [number, number, number] = [maxX, minY, maxZ];
   const topFrontRight: [number, number, number] = [maxX, maxY, minZ];
-
-  // Calculate gaps between parts (for showing spacing)
-  // Find gaps along each axis by looking at part separations
-  const gaps: {
-    axis: 'x' | 'y' | 'z';
-    start: [number, number, number];
-    end: [number, number, number];
-    distance: number;
-  }[] = [];
-
-  // Sort parts by position along each axis and find gaps
-  // X-axis gaps
-  const sortedByX = [...partAABBs].sort((a, b) => a.aabb.minX - b.aabb.minX);
-  for (let i = 0; i < sortedByX.length - 1; i++) {
-    const current = sortedByX[i];
-    const next = sortedByX[i + 1];
-    const gap = next.aabb.minX - current.aabb.maxX;
-    if (gap > 0.01) {
-      // Only show gaps > 0.01" (avoid floating point noise)
-      // Position the gap line at the overlap region between parts
-      const avgY = (Math.max(current.aabb.minY, next.aabb.minY) + Math.min(current.aabb.maxY, next.aabb.maxY)) / 2;
-      const avgZ = (Math.max(current.aabb.minZ, next.aabb.minZ) + Math.min(current.aabb.maxZ, next.aabb.maxZ)) / 2;
-      gaps.push({
-        axis: 'x',
-        start: [current.aabb.maxX, avgY, avgZ],
-        end: [next.aabb.minX, avgY, avgZ],
-        distance: gap
-      });
-    }
-  }
-
-  // Z-axis gaps
-  const sortedByZ = [...partAABBs].sort((a, b) => a.aabb.minZ - b.aabb.minZ);
-  for (let i = 0; i < sortedByZ.length - 1; i++) {
-    const current = sortedByZ[i];
-    const next = sortedByZ[i + 1];
-    const gap = next.aabb.minZ - current.aabb.maxZ;
-    if (gap > 0.01) {
-      const avgX = (Math.max(current.aabb.minX, next.aabb.minX) + Math.min(current.aabb.maxX, next.aabb.maxX)) / 2;
-      const avgY = (Math.max(current.aabb.minY, next.aabb.minY) + Math.min(current.aabb.maxY, next.aabb.maxY)) / 2;
-      gaps.push({
-        axis: 'z',
-        start: [avgX, avgY, current.aabb.maxZ],
-        end: [avgX, avgY, next.aabb.minZ],
-        distance: gap
-      });
-    }
-  }
-
-  // Y-axis gaps
-  const sortedByY = [...partAABBs].sort((a, b) => a.aabb.minY - b.aabb.minY);
-  for (let i = 0; i < sortedByY.length - 1; i++) {
-    const current = sortedByY[i];
-    const next = sortedByY[i + 1];
-    const gap = next.aabb.minY - current.aabb.maxY;
-    if (gap > 0.01) {
-      const avgX = (Math.max(current.aabb.minX, next.aabb.minX) + Math.min(current.aabb.maxX, next.aabb.maxX)) / 2;
-      const avgZ = (Math.max(current.aabb.minZ, next.aabb.minZ) + Math.min(current.aabb.maxZ, next.aabb.maxZ)) / 2;
-      gaps.push({
-        axis: 'y',
-        start: [avgX, current.aabb.maxY, avgZ],
-        end: [avgX, next.aabb.minY, avgZ],
-        distance: gap
-      });
-    }
-  }
 
   return (
     <group>
