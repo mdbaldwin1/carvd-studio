@@ -5,21 +5,24 @@ import DownloadPage from '../../src/pages/DownloadPage';
 
 // Mock the downloads utility
 vi.mock('../../src/utils/downloads', () => ({
-  getMacDownloadInfo: () => ({
-    url: 'https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg',
-    platform: 'macos',
-    fileName: 'Carvd.Studio-0.1.0-arm64.dmg',
-    fileExtension: '.dmg',
-    minOsVersion: 'macOS 10.15+',
+  useDownloadInfo: () => ({
+    loading: false,
+    version: '0.1.0',
+    macDownload: {
+      url: 'https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg',
+      platform: 'macos',
+      fileName: 'Carvd.Studio-0.1.0-arm64.dmg',
+      fileExtension: '.dmg',
+      minOsVersion: 'macOS 10.15+',
+    },
+    windowsDownload: {
+      url: 'https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio.Setup.0.1.0.exe',
+      platform: 'windows',
+      fileName: 'Carvd.Studio.Setup.0.1.0.exe',
+      fileExtension: '.exe',
+      minOsVersion: 'Windows 10+',
+    },
   }),
-  getWindowsDownloadInfo: () => ({
-    url: 'https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio.Setup.0.1.0.exe',
-    platform: 'windows',
-    fileName: 'Carvd.Studio.Setup.0.1.0.exe',
-    fileExtension: '.exe',
-    minOsVersion: 'Windows 10+',
-  }),
-  getAppVersion: () => '0.1.0',
 }));
 
 const renderDownloadPage = () => {

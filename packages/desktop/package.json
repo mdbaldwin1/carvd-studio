@@ -138,6 +138,8 @@
     "dmg": {
       "artifactName": "Carvd.Studio-${version}-${arch}.${ext}",
       "title": "${productName} ${version}",
+      "iconSize": 100,
+      "backgroundColor": "#f5f5f7",
       "contents": [
         {
           "x": 130,

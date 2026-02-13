@@ -1,0 +1,94 @@
+name: Website Version Bump
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/website/**'
+
+jobs:
+  bump:
+    name: Bump Website Version on Develop
+    # Skip version-bump commits to prevent infinite loops
+    if: "!contains(github.event.head_commit.message, 'chore(website):')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Check if website version changed
+        id: check
+        run: |
+          CURRENT=$(node -p "require('./packages/website/package.json').version")
+          PREV=$(node -e "
+            const cp = require('child_process');
+            try {
+              const json = cp.execSync('git show HEAD~1:packages/website/package.json', {encoding: 'utf-8'});
+              const v = JSON.parse(json).version;
+              console.log(v || '');
+            } catch { console.log(''); }
+          ")
+
+          echo "Current: $CURRENT"
+          echo "Previous: $PREV"
+
+          if [ -z "$PREV" ] || [ "$CURRENT" = "$PREV" ]; then
+            echo "should_bump=false" >> $GITHUB_OUTPUT
+          else
+            echo "should_bump=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Compute next patch version
+        if: steps.check.outputs.should_bump == 'true'
+        id: next
+        run: |
+          CURRENT="${{ steps.check.outputs.version }}"
+          IFS='.' read -ra PARTS <<< "$CURRENT"
+          NEXT="${PARTS[0]}.${PARTS[1]}.$((PARTS[2] + 1))"
+          echo "version=$NEXT" >> $GITHUB_OUTPUT
+          echo "📦 Next website version: $NEXT"
+
+      - name: Checkout develop branch
+        if: steps.check.outputs.should_bump == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Create version bump branch and PR
+        if: steps.check.outputs.should_bump == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NEXT="${{ steps.next.outputs.version }}"
+          BRANCH="chore/bump-website-version-to-${NEXT}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('packages/website/package.json', 'utf-8'));
+            pkg.version = '${NEXT}';
+            fs.writeFileSync('packages/website/package.json', JSON.stringify(pkg, null, 4) + '\n');
+          "
+
+          git add packages/website/package.json
+          git commit -m "chore(website): bump website version to ${NEXT}"
+
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --base develop \
+            --head "$BRANCH" \
+            --title "chore: bump website version to ${NEXT}" \
+            --body "Automated website version bump after deployment of v${{ steps.check.outputs.version }}. Merge when ready to start the next development cycle."

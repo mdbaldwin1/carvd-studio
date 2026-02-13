@@ -1,7 +1,29 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import HomePage from '../../src/pages/HomePage';
+
+// Mock the downloads utility
+vi.mock('../../src/utils/downloads', () => ({
+  useDownloadInfo: () => ({
+    loading: false,
+    version: '0.1.0',
+    macDownload: {
+      url: 'https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg',
+      platform: 'macos',
+      fileName: 'Carvd.Studio-0.1.0-arm64.dmg',
+      fileExtension: '.dmg',
+      minOsVersion: 'macOS 10.15+',
+    },
+    windowsDownload: {
+      url: 'https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio.Setup.0.1.0.exe',
+      platform: 'windows',
+      fileName: 'Carvd.Studio.Setup.0.1.0.exe',
+      fileExtension: '.exe',
+      minOsVersion: 'Windows 10+',
+    },
+  }),
+}));
 
 const renderHomePage = () => {
   return render(
