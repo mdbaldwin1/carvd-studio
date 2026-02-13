@@ -1782,6 +1782,7 @@ function CanvasWithDrop() {
     >
       <Canvas
         camera={{ position: [60, 50, 60], fov: 50 }}
+        dpr={[1, 1.5]}
         gl={{
           antialias: true,
           powerPreference: 'high-performance',
