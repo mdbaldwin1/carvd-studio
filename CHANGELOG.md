@@ -5,6 +5,28 @@ All notable changes to Carvd Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-02-13
+
+### Added
+
+- **Changelog Page** — New page on the website showing release history
+- **Post-Update Notification** — Desktop app shows what's new after an update
+- **Windows E2E Tests** — Playwright end-to-end tests now run on Windows in CI
+
+### Changed
+
+- **React 19** — Upgraded from React 18 to React 19
+- **Three.js Ecosystem** — Upgraded to @react-three/fiber v9, drei v10, three.js v0.182
+- **CI Pipeline** — Streamlined test matrix; cross-platform E2E on Ubuntu, macOS, and Windows
+
+### Fixed
+
+- **macOS Notarization** — App is now signed with a Developer ID Application certificate and notarized by Apple, so macOS no longer blocks it on first launch
+- **electron-builder v26 Compatibility** — Removed deprecated `publisherName` config
+- **Flaky E2E Tests** — Resolved timing issues in macOS Playwright tests
+- **Website Download Links** — URLs now match actual GitHub Release filenames
+- **Security Vulnerabilities** — Resolved 14 Dependabot alerts
+
 ## [0.1.0] - 2025-02-12
 
 ### Added
@@ -31,4 +53,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-Platform** - macOS and Windows desktop application
 - **Marketing Website** - Product website with features, pricing, documentation, and download pages
 
+[0.1.1]: https://github.com/mdbaldwin1/carvd-studio/releases/tag/v0.1.1
 [0.1.0]: https://github.com/mdbaldwin1/carvd-studio/releases/tag/v0.1.0
