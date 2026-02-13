@@ -55,19 +55,26 @@ describe('ChangelogPage', () => {
   });
 
   describe('Version Entries', () => {
+    it('renders version badge for v0.1.1', () => {
+      renderChangelogPage();
+      expect(screen.getByText('v0.1.1')).toBeInTheDocument();
+    });
+
     it('renders version badge for v0.1.0', () => {
       renderChangelogPage();
       expect(screen.getByText('v0.1.0')).toBeInTheDocument();
     });
 
-    it('renders formatted date', () => {
+    it('renders formatted dates', () => {
       renderChangelogPage();
+      expect(screen.getByText('February 13, 2026')).toBeInTheDocument();
       expect(screen.getByText('February 12, 2025')).toBeInTheDocument();
     });
 
     it('renders Added category badge', () => {
       renderChangelogPage();
-      expect(screen.getByText('Added')).toBeInTheDocument();
+      const badges = screen.getAllByText('Added');
+      expect(badges.length).toBeGreaterThanOrEqual(1);
     });
 
     it('renders changelog entries', () => {
