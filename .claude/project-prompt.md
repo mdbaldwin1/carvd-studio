@@ -141,6 +141,35 @@ interface Stock {
 - **Activation limits** - Enforced by Lemon Squeezy
 - **Purchase flow** - Opens browser to Lemon Squeezy checkout
 
+## Multi-Session Workflow (Git Worktrees)
+
+When multiple Claude Code sessions work on this repo simultaneously, **each session MUST use its own git worktree** to avoid branch-switching conflicts that discard uncommitted changes.
+
+### Setup
+```bash
+# From the main repo directory, create a worktree for your branch:
+git worktree add ../carvd-studio-<short-name> <branch-name>
+
+# Examples:
+git worktree add ../carvd-studio-downloads fix/website-download-links
+git worktree add ../carvd-studio-security fix/security-vulnerabilities
+```
+
+### Rules
+1. **Never run `git checkout` in a shared worktree** — it wipes other sessions' uncommitted work
+2. **Create a worktree before starting work** if other sessions may be active
+3. **Commit early and often** — uncommitted changes only exist in the working directory
+4. **Clean up when done:** `git worktree remove ../carvd-studio-<short-name>`
+5. **A branch can only be checked out in one worktree at a time** — git enforces this
+
+### Directory Layout
+```
+/Users/mbaldwin/Carvd/
+├── carvd-studio/                  # Main repo (keep on develop)
+├── carvd-studio-<feature>/        # Worktree for feature work
+└── carvd-studio-<fix>/            # Worktree for bug fixes
+```
+
 ## CI/CD
 
 - **test.yml** - Runs on all PRs (unit, E2E, lint)

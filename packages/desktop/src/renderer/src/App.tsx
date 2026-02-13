@@ -2507,6 +2507,8 @@ function App() {
 
   return (
     <div className="app">
+      {/* Update notifications — banner for updates, toast for post-update */}
+      <UpdateNotificationBanner />
       {/* Only show header and main content when not on start screen */}
       {showMainEditor && (
         <>
@@ -2569,8 +2571,6 @@ function App() {
               )}
             </div>
           </header>
-          {/* Update Notification Banner */}
-          <UpdateNotificationBanner />
           {/* Trial Banner (shown days 7-14 of trial) */}
           {shouldShowTrialBanner && trialStatus && (
             <TrialBanner

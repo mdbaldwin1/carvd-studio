@@ -1817,3 +1817,29 @@ code {
     grid-template-columns: 1fr;
   }
 }
+
+/* Changelog Page
+   ========================================================================== */
+.changelog-version {
+  border-left: 3px solid var(--color-accent);
+  padding-left: var(--space-lg);
+}
+
+.changelog-entries {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.changelog-entry {
+  padding: var(--space-xs) 0;
+  line-height: var(--line-height-relaxed);
+  font-size: var(--font-size-sm);
+}
+
+.changelog-entry strong {
+  color: var(--color-text);
+}

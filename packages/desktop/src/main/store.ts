@@ -114,6 +114,8 @@ export interface AppPreferences {
   // Trial system
   trialFirstLaunchDate: number | null; // Timestamp of first app launch
   trialAcknowledgedExpired: boolean; // User dismissed expired modal this session
+  // Update tracking
+  lastKnownVersion: string | null;
   // Onboarding
   hasCompletedWelcome: boolean;
   // Other app data
@@ -149,6 +151,7 @@ const defaults: AppPreferences = {
   licenseActivatedAt: null,
   trialFirstLaunchDate: null,
   trialAcknowledgedExpired: false,
+  lastKnownVersion: null,
   hasCompletedWelcome: false,
   recentProjects: [],
   favoriteProjects: [],
@@ -398,6 +401,15 @@ export function clearLicenseData(): void {
   store.set('licenseEmail', null);
   store.set('licenseOrderId', null);
   store.set('licenseActivatedAt', null);
+}
+
+// Version tracking functions
+export function getLastKnownVersion(): string | null {
+  return store.get('lastKnownVersion');
+}
+
+export function setLastKnownVersion(version: string): void {
+  store.set('lastKnownVersion', version);
 }
 
 // Welcome/onboarding functions

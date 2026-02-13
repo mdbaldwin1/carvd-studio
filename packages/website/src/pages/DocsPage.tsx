@@ -66,6 +66,7 @@ export default function DocsPage() {
                     <li><a href="#requirements" className="docs-nav-link">System Requirements</a></li>
                     <li><a href="#troubleshooting" className="docs-nav-link">Troubleshooting</a></li>
                     <li><a href="#faq" className="docs-nav-link">FAQ</a></li>
+                    <li><a href="/changelog" className="docs-nav-link">Changelog</a></li>
                   </ul>
                 </div>
               </nav>
@@ -110,6 +111,7 @@ export default function DocsPage() {
                       <li><a href="#settings" className="nav-link">Settings & Preferences</a></li>
                       <li><a href="#troubleshooting" className="nav-link">Troubleshooting</a></li>
                       <li><a href="#faq" className="nav-link">FAQ</a></li>
+                      <li><a href="/changelog" className="nav-link">Changelog</a></li>
                     </ul>
                   </div>
                 </div>

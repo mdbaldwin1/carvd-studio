@@ -75,8 +75,11 @@ import {
 
 process.on('uncaughtException', (error) => {
   log.error('[Main] Uncaught exception:', error);
-  // In production, we might want to show a dialog and restart
-  if (process.env.NODE_ENV !== 'development') {
+  // Show error dialog in production only (not dev or test mode).
+  // dialog.showErrorBox() is synchronous and blocks the main thread,
+  // which would hang E2E tests and prevent BrowserWindow creation.
+  const isTestMode = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
+  if (process.env.NODE_ENV !== 'development' && !isTestMode) {
     dialog.showErrorBox(
       'Unexpected Error',
       'An unexpected error occurred. The application may be unstable. Please save your work and restart.'
@@ -221,6 +224,7 @@ let pendingFileToOpen: string | null = null;
 function createWindow(fileToOpen?: string): BrowserWindow {
   const bounds = getWindowBounds();
   const isMac = process.platform === 'darwin';
+  const isTest = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
 
   // Offset new windows slightly from existing ones
   const offset = windows.size * 30;
@@ -232,17 +236,22 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     y: (bounds.y ?? 100) + offset,
     minWidth: 900,
     minHeight: 600,
-    show: false,
+    // In test mode, show immediately — on Windows CI, show:false combined
+    // with titleBarOverlay prevents Chromium's DevTools server from fully
+    // initializing, causing Playwright's electron.launch() to hang.
+    show: isTest,
     title: 'Carvd Studio',
-    // Custom title bar configuration
-    titleBarStyle: isMac ? 'hiddenInset' : 'hidden',
-    titleBarOverlay: !isMac
-      ? {
-          color: '#1e1e1e',
-          symbolColor: '#ffffff',
-          height: 48
-        }
-      : undefined,
+    // Custom title bar configuration disabled in test mode to avoid
+    // Electron bug electron/electron#42409 on Windows.
+    titleBarStyle: isMac ? 'hiddenInset' : isTest ? undefined : 'hidden',
+    titleBarOverlay:
+      !isMac && !isTest
+        ? {
+            color: '#1e1e1e',
+            symbolColor: '#ffffff',
+            height: 48
+          }
+        : undefined,
     trafficLightPosition: isMac ? { x: 16, y: 14 } : undefined,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
@@ -288,11 +297,26 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     }
   });
 
+  // Fallback: force-show after 5s if ready-to-show never fires.
+  // Works around Electron bug on Windows where titleBarOverlay + show:false
+  // can prevent the event from firing (electron/electron#42409).
+  if (isTest) {
+    setTimeout(() => {
+      if (!newWindow.isDestroyed() && !newWindow.isVisible()) {
+        log.warn('[Main] ready-to-show did not fire in time, force-showing window');
+        newWindow.show();
+      }
+    }, 5000);
+  }
+
   // Intercept close to check for unsaved changes
   newWindow.on('close', (event) => {
     // Save window bounds
     const currentBounds = newWindow.getBounds();
     setWindowBounds(currentBounds);
+
+    // In test mode, always allow close (prevents teardown timeout)
+    if (isTest) return;
 
     // If this window is allowed to close, proceed
     if (windowsAllowedToClose.has(newWindow)) {
@@ -1116,8 +1140,15 @@ store.onDidAnyChange((newValue, oldValue) => {
 });
 
 app.whenReady().then(() => {
-  // Show splash screen immediately
-  splashWindow = createSplashWindow();
+  const isTest = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
+  if (isTest) {
+    log.info('[Main] Test mode detected — skipping splash screen and auto-updater');
+  }
+
+  // Show splash screen (skip in test mode for faster startup)
+  if (!isTest) {
+    splashWindow = createSplashWindow();
+  }
 
   // Reset trial acknowledgement so expired modal shows each launch
   resetTrialAcknowledgement();
@@ -1137,8 +1168,10 @@ app.whenReady().then(() => {
     createWindow();
   }
 
-  // Initialize auto-updater (skips in development)
-  initializeAutoUpdater();
+  // Initialize auto-updater (skip in development and test)
+  if (!isTest) {
+    initializeAutoUpdater();
+  }
 
   app.on('activate', () => {
     // macOS: re-create window when dock icon clicked

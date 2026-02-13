@@ -6,20 +6,20 @@ import DownloadPage from '../../src/pages/DownloadPage';
 // Mock the downloads utility
 vi.mock('../../src/utils/downloads', () => ({
   getMacDownloadInfo: () => ({
-    url: 'https://github.com/test/repo/releases/latest/download/Carvd-Studio-1.0.0.dmg',
+    url: 'https://github.com/test/repo/releases/latest/download/Carvd.Studio-0.1.0.dmg',
     platform: 'macos',
-    fileName: 'Carvd-Studio-1.0.0.dmg',
+    fileName: 'Carvd.Studio-0.1.0.dmg',
     fileExtension: '.dmg',
     minOsVersion: 'macOS 10.15+',
   }),
   getWindowsDownloadInfo: () => ({
-    url: 'https://github.com/test/repo/releases/latest/download/Carvd-Studio-Setup-1.0.0.exe',
+    url: 'https://github.com/test/repo/releases/latest/download/Carvd.Studio.Setup.0.1.0.exe',
     platform: 'windows',
-    fileName: 'Carvd-Studio-Setup-1.0.0.exe',
+    fileName: 'Carvd.Studio.Setup.0.1.0.exe',
     fileExtension: '.exe',
     minOsVersion: 'Windows 10+',
   }),
-  getAppVersion: () => '1.0.0',
+  getAppVersion: () => '0.1.0',
 }));
 
 const renderDownloadPage = () => {
@@ -48,7 +48,7 @@ describe('DownloadPage', () => {
 
     it('renders version badge', () => {
       renderDownloadPage();
-      expect(screen.getByText(/Version 1.0.0/i)).toBeInTheDocument();
+      expect(screen.getByText(/Version 0.1.0/i)).toBeInTheDocument();
     });
   });
 
@@ -114,7 +114,7 @@ describe('DownloadPage', () => {
 
     it('renders current version entry', () => {
       renderDownloadPage();
-      expect(screen.getByText(/v1.0.0/)).toBeInTheDocument();
+      expect(screen.getByText(/v0.1.0/)).toBeInTheDocument();
       expect(screen.getByText(/Initial Release/i)).toBeInTheDocument();
     });
   });

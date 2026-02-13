@@ -310,6 +310,7 @@ export default function FeaturesPage() {
           <div className="flex justify-center gap-xl text-sm text-muted">
             <a href="/privacy" className="nav-link">Privacy Policy</a>
             <a href="/terms" className="nav-link">Terms of Service</a>
+            <a href="/changelog" className="nav-link">Changelog</a>
           </div>
         </div>
         <p>&copy; 2026 Carvd Studio. All rights reserved.</p>

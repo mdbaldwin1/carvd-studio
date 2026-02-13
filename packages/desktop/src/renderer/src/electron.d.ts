@@ -49,6 +49,20 @@ export interface ElectronAPI {
   deleteRecoveryFile: (fileName: string) => Promise<boolean>;
   listRecoveryFiles: () => Promise<string[]>;
   openExternal?: (url: string) => Promise<void>;
+  // Auto-updater
+  checkForUpdates: () => Promise<void>;
+  downloadUpdate: () => Promise<void>;
+  quitAndInstall: () => Promise<void>;
+  getUpdateInfo: () => Promise<{ version: string; releaseNotes?: string; releaseDate?: string } | null>;
+  onUpdateAvailable: (
+    callback: (info: { version: string; releaseNotes?: string; releaseDate?: string }) => void
+  ) => () => void;
+  onUpdateDownloadProgress: (
+    callback: (progress: { percent: number; transferred: number; total: number }) => void
+  ) => () => void;
+  onUpdateDownloaded: (callback: (info: { version: string }) => void) => () => void;
+  onUpdateError: (callback: (error: { message: string }) => void) => () => void;
+  onUpdateJustInstalled?: (callback: (info: { previousVersion: string; currentVersion: string }) => void) => () => void;
 }
 
 declare global {

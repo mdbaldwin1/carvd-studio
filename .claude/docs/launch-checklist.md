@@ -1,16 +1,19 @@
 # Carvd Studio Launch Checklist
 
-Last updated: 2026-02-10
+Last updated: 2026-02-12
 
 ## Priority Order
 
-1. **Create GitHub Release** (required for downloads to work)
-2. **Set up Lemon Squeezy** (required for purchases)
+1. ~~**Create GitHub Release**~~ ✅ Automated via release workflow (v0.1.0 released)
+2. **Get app icon/logo** (from designer)
 3. **Add screenshots** (high visual impact)
-4. **Create og-image.png** (for social sharing)
-5. **Set up professional email** (for support)
-6. **Add analytics** (nice to have)
-7. **Run testing checklist** (before announcing)
+4. **Create video demo** (walkthrough)
+5. **Set up Lemon Squeezy** (required for purchases)
+6. **Enable macOS notarization** (last step before go-live)
+7. **Create og-image.png** (for social sharing)
+8. **Set up professional email** (for support)
+9. **Add analytics** (nice to have)
+10. **Run testing checklist** (before announcing)
 
 ---
 
@@ -246,31 +249,32 @@ Edit `packages/website/index.html`, add before `</head>`:
 
 ---
 
-## 6. Create GitHub Release
+## 6. GitHub Releases (Automated) ✅
 
-**What:** Publish your first release so the download links work.
+**Status:** Automated via `.github/workflows/release.yml`.
 
-### Steps:
-1. Ensure version in `packages/desktop/package.json` is `1.0.0`
-2. Build the app:
-   ```bash
-   cd packages/desktop
-   npm run build:mac    # For macOS
-   npm run build:win    # For Windows
-   ```
-3. Go to GitHub repo → Releases → "Create a new release"
-4. Tag: `v1.0.0`
-5. Title: `Carvd Studio v1.0.0`
-6. Upload artifacts:
-   - `Carvd-Studio-1.0.0.dmg` (macOS)
-   - `Carvd-Studio-Setup-1.0.0.exe` (Windows)
-7. Publish release
+When code is merged to `main`, the release workflow:
+1. Reads the version from `packages/desktop/package.json`
+2. Checks if a release already exists for that version (skips if so)
+3. Creates a git tag
+4. Builds for macOS (x64 + arm64) and Windows
+5. Creates a GitHub Release with DMG, ZIP, and EXE artifacts
+6. Updates `VITE_APP_VERSION` in Vercel (if secrets configured)
+7. Creates a version bump PR targeting `develop`
 
-**Note:** The download links in HomePage.tsx point to:
-- `https://github.com/mdbaldwin1/carvd-studio/releases/latest/download/Carvd-Studio-1.0.0.dmg`
-- `https://github.com/mdbaldwin1/carvd-studio/releases/latest/download/Carvd-Studio-Setup-1.0.0.exe`
+**To make a new release:**
+```bash
+# On develop, bump the version
+cd packages/desktop
+node scripts/version-bump.cjs patch  # or minor, major
 
-Make sure filenames match exactly.
+# Or merge a PR that bumps the version, then merge develop → main
+```
+
+**Current state (v0.1.0):**
+- macOS: Code signing + notarization enabled
+- Windows: Build works, no code signing yet (shows SmartScreen warning)
+- Vercel update: All secrets configured (TOKEN + ORG_ID + PROJECT_ID), Claude Code has MCP access
 
 ---
 
@@ -342,3 +346,10 @@ These have already been done:
 - [x] Keyboard shortcut conflicts resolved
 - [x] Table of contents added to DocsPage for navigation
 - [x] Feature limits documented accurately (free vs trial vs licensed)
+- [x] Release workflow automated (macOS + Windows builds, GitHub Release creation)
+- [x] v0.1.0 released with artifacts on both platforms
+- [x] Website SPA routing fixed (vercel.json rewrite rules)
+- [x] Dependabot configured to target develop branch
+- [x] Version bump automation (PR created after each release)
+- [x] macOS code signing working (Developer ID Application certificate)
+- [x] E2E tests (Playwright happy path for Electron app)

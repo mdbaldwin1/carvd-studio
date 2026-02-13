@@ -110,7 +110,7 @@ describe('HomePage', () => {
 
     it('displays version badge', () => {
       renderHomePage();
-      expect(screen.getByText(/Version 1\.0\.0/i)).toBeInTheDocument();
+      expect(screen.getByText(/Version 0\.1\.0/i)).toBeInTheDocument();
     });
   });
 
