@@ -39,7 +39,7 @@
     "test:e2e:debug": "playwright test --debug"
   },
   "dependencies": {
-    "@react-three/drei": "^9.115.0",
+    "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^8.17.10",
     "electron-log": "^5.4.3",
     "electron-store": "^8.2.0",
