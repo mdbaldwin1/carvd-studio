@@ -28,6 +28,10 @@
   },
   "author": "Michael Baldwin",
   "license": "ISC",
+  "overrides": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
   "devDependencies": {
     "prettier": "^3.8.1"
   }
