@@ -294,6 +294,9 @@ jobs:
 
           echo "✅ Updated VITE_APP_VERSION to $VERSION in Vercel"
 
+      - name: Checkout code for Vercel CLI deploy
+        uses: actions/checkout@v6
+
       - name: Trigger Vercel production redeploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -302,26 +305,16 @@ jobs:
         run: |
           if [ -z "$VERCEL_TOKEN" ]; then exit 0; fi
 
-          # Get the latest production deployment
-          DEPLOYMENT=$(curl -sf -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_ORG_ID&target=production&limit=1" \
-            | jq -r '.deployments[0].uid')
+          echo "Triggering production redeploy to pick up new VITE_APP_VERSION..."
 
-          if [ -z "$DEPLOYMENT" ] || [ "$DEPLOYMENT" = "null" ]; then
-            echo "⚠️  No production deployment found - skipping redeploy"
-            exit 0
-          fi
+          # Link the project so the CLI knows which project to deploy
+          cd packages/website
+          vercel link --yes --project "$VERCEL_PROJECT_ID" --scope "$VERCEL_ORG_ID" --token "$VERCEL_TOKEN"
 
-          echo "Redeploying $DEPLOYMENT to pick up new env var..."
+          # Deploy to production (picks up the updated env var)
+          vercel deploy --prod --yes --token "$VERCEL_TOKEN"
 
-          # Create a new deployment from the existing one
-          RESULT=$(curl -sf -X POST -H "Authorization: Bearer $VERCEL_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d "{\"deploymentId\":\"$DEPLOYMENT\",\"target\":\"production\"}" \
-            "https://api.vercel.com/v13/deployments?teamId=$VERCEL_ORG_ID")
-
-          NEW_URL=$(echo "$RESULT" | jq -r '.url // empty')
-          echo "✅ Triggered redeploy: ${NEW_URL:-see Vercel dashboard}"
+          echo "✅ Vercel production redeploy triggered"
 
   # ── Step 5: Bump patch version on develop for next release ──────────────────
   bump-develop:

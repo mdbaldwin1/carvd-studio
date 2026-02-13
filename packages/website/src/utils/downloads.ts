@@ -20,14 +20,14 @@ export interface DownloadInfo {
  * Get download URL for macOS installer (.dmg)
  */
 export function getMacDownloadUrl(): string {
-  return `https://github.com/${GITHUB_REPO}/releases/latest/download/Carvd.Studio-${APP_VERSION}.dmg`;
+  return `https://github.com/${GITHUB_REPO}/releases/download/v${APP_VERSION}/Carvd.Studio-${APP_VERSION}.dmg`;
 }
 
 /**
  * Get download URL for Windows installer (.exe)
  */
 export function getWindowsDownloadUrl(): string {
-  return `https://github.com/${GITHUB_REPO}/releases/latest/download/Carvd.Studio.Setup.${APP_VERSION}.exe`;
+  return `https://github.com/${GITHUB_REPO}/releases/download/v${APP_VERSION}/Carvd.Studio.Setup.${APP_VERSION}.exe`;
 }
 
 /**
