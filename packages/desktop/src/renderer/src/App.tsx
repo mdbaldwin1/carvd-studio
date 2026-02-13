@@ -1,4 +1,5 @@
-import { Canvas } from '@react-three/fiber';
+import { Canvas, extend } from '@react-three/fiber';
+import * as THREE from 'three';
 import { ChevronDown, ChevronRight, Library, Redo2, Save, Search, Settings, Sun, Undo2, X } from 'lucide-react';
 import { ColorPicker } from './components/ColorPicker';
 import React, { useEffect, useRef, useState } from 'react';
@@ -57,6 +58,11 @@ import { Assembly, LightingMode, Project, Stock } from './types';
 import { formatMeasurementWithUnit } from './utils/fractions';
 import { getPartBounds } from './utils/snapToPartsUtil';
 import { generateSeedProject } from './utils/seedData';
+
+// R3F v9 requires explicit registration of Three.js objects for JSX usage.
+// The Canvas component also does this internally, but calling it at module level
+// ensures the catalogue is populated before any component mounts.
+extend(THREE);
 
 // Selection box overlay (rendered outside Canvas for correct positioning)
 function SelectionBox() {
