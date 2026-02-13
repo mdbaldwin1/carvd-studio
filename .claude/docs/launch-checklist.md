@@ -1,19 +1,20 @@
 # Carvd Studio Launch Checklist
 
-Last updated: 2026-02-12
+Last updated: 2026-02-13
 
 ## Priority Order
 
-1. ~~**Create GitHub Release**~~ ✅ Automated via release workflow (v0.1.0 released)
+1. ~~**Create GitHub Release**~~ ✅ Automated via release workflow (v0.1.1 released)
 2. **Get app icon/logo** (from designer)
 3. **Add screenshots** (high visual impact)
 4. **Create video demo** (walkthrough)
 5. **Set up Lemon Squeezy** (required for purchases)
-6. **Enable macOS notarization** (last step before go-live)
+6. ~~**Enable macOS notarization**~~ ✅ Working (Developer ID Application cert + Apple notarytool)
 7. **Create og-image.png** (for social sharing)
 8. **Set up professional email** (for support)
 9. **Add analytics** (nice to have)
 10. **Run testing checklist** (before announcing)
+11. **Investigate production build performance** (Three.js sluggish in packaged app vs dev)
 
 ---
 
@@ -257,9 +258,9 @@ When code is merged to `main`, the release workflow:
 1. Reads the version from `packages/desktop/package.json`
 2. Checks if a release already exists for that version (skips if so)
 3. Creates a git tag
-4. Builds for macOS (x64 + arm64) and Windows
+4. Builds for macOS (x64 + arm64, code-signed + notarized) and Windows
 5. Creates a GitHub Release with DMG, ZIP, and EXE artifacts
-6. Updates `VITE_APP_VERSION` in Vercel (if secrets configured)
+6. Updates `VITE_APP_VERSION` in Vercel and triggers a production redeploy
 7. Creates a version bump PR targeting `develop`
 
 **To make a new release:**
@@ -271,10 +272,11 @@ node scripts/version-bump.cjs patch  # or minor, major
 # Or merge a PR that bumps the version, then merge develop → main
 ```
 
-**Current state (v0.1.0):**
-- macOS: Code signing + notarization enabled
+**Current state (v0.1.1):**
+- macOS: Code-signed (Developer ID Application) + notarized by Apple — Gatekeeper allows the app
 - Windows: Build works, no code signing yet (shows SmartScreen warning)
-- Vercel update: All secrets configured (TOKEN + ORG_ID + PROJECT_ID), Claude Code has MCP access
+- Vercel update: All secrets configured (TOKEN + ORG_ID + PROJECT_ID); workflow updates env var + triggers redeploy
+- Version on develop: `0.1.2` (bumped automatically after v0.1.1 release)
 
 ---
 
@@ -352,4 +354,14 @@ These have already been done:
 - [x] Dependabot configured to target develop branch
 - [x] Version bump automation (PR created after each release)
 - [x] macOS code signing working (Developer ID Application certificate)
+- [x] macOS notarization working (Apple notarytool via @electron/notarize afterSign hook)
+- [x] v0.1.1 released with code-signed, notarized macOS builds
 - [x] E2E tests (Playwright happy path for Electron app)
+- [x] Windows E2E tests added to CI (Playwright on windows-latest)
+- [x] Changelog page on website (auto-generated from CHANGELOG.md via Vite virtual module)
+- [x] Vercel ignoreCommand fixed (was skipping all builds including main)
+- [x] Vercel auto-redeploy after release (workflow triggers redeploy via API after updating env var)
+- [x] Website download URLs verified working (correct filenames match GitHub Release assets)
+- [x] React 19 upgrade (from React 18)
+- [x] Three.js ecosystem upgrade (@react-three/fiber v9, drei v10, three.js v0.182)
+- [x] Security vulnerabilities resolved (14 Dependabot alerts)

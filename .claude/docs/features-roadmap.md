@@ -44,14 +44,27 @@ Core features complete. UX polish in progress for 1.0 release.
 - **Grace mode** - Can open projects over limits, edit existing, but not add new
 - **License activation** - Lemon Squeezy API integration
 
+### Website
+- Changelog page (auto-generated from `CHANGELOG.md` via Vite virtual module)
+- Download page with platform-specific installers (version auto-updated from Vercel env var)
+- Documentation, pricing, features, and support pages
+
 ### Infrastructure
 - License system (Lemon Squeezy API + 7-day offline cache)
 - Auto-updater (electron-updater + GitHub Releases)
-- CI/CD: `test.yml` (unit + e2e on all platforms) + `release.yml` (automated builds & GitHub Releases)
-- Release pipeline: macOS (code-signed, notarization tabled) + Windows (unsigned)
-- Website: SPA routing via `vercel.json`, deployed from main via Vercel
+- Post-update notification (shows what's new after an update)
+- CI/CD: `test.yml` (unit + e2e on Ubuntu, macOS, Windows) + `release.yml` (automated builds & GitHub Releases)
+- Release pipeline: macOS (code-signed + notarized via Developer ID Application cert) + Windows (unsigned)
+- Website: SPA routing via `vercel.json`, deployed from main via Vercel (ignoreCommand skips non-main branches)
+- Vercel version sync: Release workflow updates `VITE_APP_VERSION` env var and triggers production redeploy
 - Dependabot: Weekly dependency updates targeting develop branch
 - Welcome tutorial (3 steps)
+
+### Recent Upgrades (v0.1.1)
+- React 19 (from React 18)
+- @react-three/fiber v9, @react-three/drei v10, three.js v0.182
+- electron-builder v26
+- Electron 35
 
 ## Keyboard Shortcuts
 
@@ -87,6 +100,10 @@ Core features complete. UX polish in progress for 1.0 release.
 | Trial components | 90%+ |
 | Components | 85-97% |
 | projectStore.ts | 76% |
+
+## Known Issues
+
+1. **Production build performance** - Three.js rendering is noticeably slower in the packaged app compared to dev mode. Needs investigation (GPU context, Vite bundling, or Electron hardened runtime).
 
 ## Known Limitations (By Design)
 
