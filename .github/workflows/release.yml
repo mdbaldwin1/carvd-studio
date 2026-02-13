@@ -40,13 +40,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.version.outputs.tag }}"
+          VERSION="${{ steps.version.outputs.version }}"
 
-          # Check if this tag already exists
-          if gh release view "$TAG" &>/dev/null; then
+          # Check if the version actually changed compared to the previous commit
+          PREV_VERSION=$(node -e "
+            const cp = require('child_process');
+            try {
+              const json = cp.execSync('git show HEAD~1:packages/desktop/package.json', {encoding: 'utf-8'});
+              console.log(JSON.parse(json).version);
+            } catch { console.log(''); }
+          ")
+
+          echo "Current version: $VERSION"
+          echo "Previous version: $PREV_VERSION"
+
+          if [ "$VERSION" = "$PREV_VERSION" ]; then
+            echo "⏭️  Version $VERSION unchanged from previous commit - skipping release"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          elif gh release view "$TAG" &>/dev/null; then
             echo "⚠️  Release $TAG already exists - skipping"
             echo "should_release=false" >> $GITHUB_OUTPUT
           else
-            echo "✅ New version $TAG - proceeding with release"
+            echo "✅ New version $TAG (was $PREV_VERSION) - proceeding with release"
             echo "should_release=true" >> $GITHUB_OUTPUT
           fi
 
@@ -317,10 +332,34 @@ jobs:
 
           echo "✅ Vercel production redeploy triggered"
 
-  # ── Step 5: Bump patch version on develop for next release ──────────────────
+  # ── Step 5: Sync main back to develop ──────────────────────────────────────
+  sync-develop:
+    name: Sync Main to Develop
+    needs: [prepare, create-release]
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout develop branch
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Merge main into develop
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge origin/main --no-edit -m "chore: sync main back to develop after ${{ needs.prepare.outputs.tag }} release"
+          git push origin develop
+
+  # ── Step 6: Bump patch version on develop for next release ──────────────────
   bump-develop:
     name: Bump Version on Develop
-    needs: [prepare, create-release]
+    needs: [prepare, create-release, sync-develop]
     if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -377,7 +416,7 @@ jobs:
   # ── Summary ─────────────────────────────────────────────────────────────────
   summary:
     name: Release Summary
-    needs: [prepare, build, create-release, update-vercel, bump-develop]
+    needs: [prepare, build, create-release, update-vercel, sync-develop, bump-develop]
     if: always() && needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
 
@@ -392,4 +431,5 @@ jobs:
           echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| GitHub Release | ${{ needs.create-release.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Vercel Update | ${{ needs.update-vercel.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sync Develop | ${{ needs.sync-develop.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Develop Bump | ${{ needs.bump-develop.result }} |" >> $GITHUB_STEP_SUMMARY
