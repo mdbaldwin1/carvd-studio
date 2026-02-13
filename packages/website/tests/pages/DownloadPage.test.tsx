@@ -6,9 +6,9 @@ import DownloadPage from '../../src/pages/DownloadPage';
 // Mock the downloads utility
 vi.mock('../../src/utils/downloads', () => ({
   getMacDownloadInfo: () => ({
-    url: 'https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0.dmg',
+    url: 'https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg',
     platform: 'macos',
-    fileName: 'Carvd.Studio-0.1.0.dmg',
+    fileName: 'Carvd.Studio-0.1.0-arm64.dmg',
     fileExtension: '.dmg',
     minOsVersion: 'macOS 10.15+',
   }),

@@ -112,6 +112,7 @@
       "publishAutoUpdate": true
     },
     "mac": {
+      "artifactName": "Carvd.Studio-${version}-${arch}-mac.${ext}",
       "category": "public.app-category.productivity",
       "target": [
         {
@@ -135,6 +136,7 @@
       "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "dmg": {
+      "artifactName": "Carvd.Studio-${version}-${arch}.${ext}",
       "title": "${productName} ${version}",
       "contents": [
         {
@@ -160,6 +162,7 @@
       ]
     },
     "nsis": {
+      "artifactName": "Carvd.Studio.Setup.${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
