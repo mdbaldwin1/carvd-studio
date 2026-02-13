@@ -272,7 +272,7 @@ node scripts/version-bump.cjs patch  # or minor, major
 ```
 
 **Current state (v0.1.0):**
-- macOS: Code signing works, notarization tabled for later
+- macOS: Code signing + notarization enabled
 - Windows: Build works, no code signing yet (shows SmartScreen warning)
 - Vercel update: All secrets configured (TOKEN + ORG_ID + PROJECT_ID), Claude Code has MCP access
 

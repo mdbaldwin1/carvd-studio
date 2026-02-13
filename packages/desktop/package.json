@@ -157,8 +157,7 @@
     "win": {
       "target": [
         "nsis"
-      ],
-      "publisherName": "Michael Baldwin"
+      ]
     },
     "nsis": {
       "oneClick": false,
