@@ -10,7 +10,7 @@ describe('downloads', () => {
     it('returns correct URL with default values', async () => {
       const { getMacDownloadUrl } = await import('./downloads');
       expect(getMacDownloadUrl()).toBe(
-        'https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio-0.1.0.dmg'
+        'https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg'
       );
     });
 
@@ -19,7 +19,7 @@ describe('downloads', () => {
       vi.stubEnv('VITE_APP_VERSION', '2.0.0');
       const { getMacDownloadUrl } = await import('./downloads');
       expect(getMacDownloadUrl()).toBe(
-        'https://github.com/customuser/custom-repo/releases/download/v2.0.0/Carvd.Studio-2.0.0.dmg'
+        'https://github.com/customuser/custom-repo/releases/download/v2.0.0/Carvd.Studio-2.0.0-arm64.dmg'
       );
     });
   });
@@ -47,9 +47,9 @@ describe('downloads', () => {
       const { getMacDownloadInfo } = await import('./downloads');
       const info = getMacDownloadInfo();
       expect(info).toEqual({
-        url: 'https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio-0.1.0.dmg',
+        url: 'https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg',
         platform: 'macos',
-        fileName: 'Carvd.Studio-0.1.0.dmg',
+        fileName: 'Carvd.Studio-0.1.0-arm64.dmg',
         fileExtension: '.dmg',
         minOsVersion: 'macOS 10.15+',
       });
