@@ -357,6 +357,26 @@ function ThumbnailCaptureHandler() {
   return null;
 }
 
+// Log GPU renderer info once on mount so we can compare dev vs production
+function GpuTelemetry() {
+  const { gl } = useThree();
+
+  useEffect(() => {
+    const glCtx = gl.getContext();
+    const dbg = glCtx.getExtension('WEBGL_debug_renderer_info');
+    if (dbg) {
+      const vendor = glCtx.getParameter(dbg.UNMASKED_VENDOR_WEBGL);
+      const renderer = glCtx.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+      console.info(`[GPU] Vendor: ${vendor}  Renderer: ${renderer}`);
+    }
+    console.info(
+      `[GPU] Drawing buffer: ${gl.domElement.width}x${gl.domElement.height}  Pixel ratio: ${gl.getPixelRatio()}`
+    );
+  }, [gl]);
+
+  return null;
+}
+
 // Blueprint-style dimension label for multi-selection bounding box
 function BoundingBoxDimensionLabel({
   start,
@@ -1404,6 +1424,8 @@ export function Workspace() {
       <CanvasCaptureHandler />
       {/* Thumbnail generator for project saves */}
       <ThumbnailCaptureHandler />
+      {/* GPU telemetry for debugging production performance */}
+      <GpuTelemetry />
 
       {/* Ground plane (invisible but clickable) */}
       <mesh

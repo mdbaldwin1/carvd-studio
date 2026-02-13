@@ -70,6 +70,17 @@ import {
 } from './trial';
 
 // =============================================================================
+// GPU Acceleration — ensure hardware-accelerated rendering in production
+// =============================================================================
+
+// Override Chromium's GPU blocklist so WebGL uses the discrete GPU even when
+// the driver/device appears on the blocklist (common with macOS hardened runtime).
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+
+// Enable GPU-accelerated rasterization for composited layers.
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+
+// =============================================================================
 // Global Error Handlers
 // =============================================================================
 
