@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-02-14
+
 ### Added
 
 - **Group Bounding Box Dimensions** — When a group is selected, only the group's overall dimensions are shown instead of cluttering the view with every child part's individual measurements
@@ -30,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Release Version Comparison** — Replaced fragile `HEAD~1` version comparisons with durable artifact checks (GitHub Releases for desktop, `website-v*` git tags for website) to prevent skipped releases on squash merges
+- **Website Deployment Gate** — Website version tagging now waits for Vercel deployment to succeed before creating the `website-v*` tag
 - **Vercel Deployment Failure** — Fixed `ignoreCommand` exceeding Vercel's 256-character schema limit, which caused all deployments to fail
 
 ## [0.1.8] - 2026-02-13
