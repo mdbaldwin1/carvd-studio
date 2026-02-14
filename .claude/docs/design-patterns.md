@@ -40,9 +40,15 @@ All styles in `packages/desktop/src/renderer/src/index.css`.
 
 ```typescript
 STOCK_COLORS = [
-  '#d4a574', '#8b5a2b', '#deb887', '#f5deb3',
-  '#8b4513', '#a0522d', '#cd853f', '#daa520'
-]
+  "#d4a574",
+  "#8b5a2b",
+  "#deb887",
+  "#f5deb3",
+  "#8b4513",
+  "#a0522d",
+  "#cd853f",
+  "#daa520",
+];
 ```
 
 ## Button System
@@ -69,6 +75,7 @@ btn-danger    // Red - destructive actions
 ## Styling Rules
 
 **Do:**
+
 ```css
 .my-component {
   background: var(--color-surface);
@@ -78,6 +85,7 @@ btn-danger    // Red - destructive actions
 ```
 
 **Don't:**
+
 ```tsx
 // No Tailwind
 <div className="flex p-4 bg-gray-800">
@@ -92,17 +100,20 @@ btn-danger    // Red - destructive actions
 ## React Patterns
 
 ### Component Structure
-```tsx
-import { useState } from 'react';
-import { useProjectStore } from '../store/projectStore';
 
-interface Props { title: string; }
+```tsx
+import { useState } from "react";
+import { useProjectStore } from "../store/projectStore";
+
+interface Props {
+  title: string;
+}
 
 export function MyComponent({ title }: Props) {
   const [isOpen, setIsOpen] = useState(false);
-  const parts = useProjectStore(s => s.parts);
+  const parts = useProjectStore((s) => s.parts);
 
-  const handleClick = () => { };
+  const handleClick = () => {};
 
   return <div className="my-component">{title}</div>;
 }
@@ -112,7 +123,7 @@ export function MyComponent({ title }: Props) {
 
 ```tsx
 // Good - selective subscription
-const parts = useProjectStore(s => s.parts);
+const parts = useProjectStore((s) => s.parts);
 
 // Bad - re-renders on any change
 const store = useProjectStore();
@@ -146,6 +157,16 @@ types.ts      → All interfaces
 index.css     → ALL styles
 ```
 
+## Website Patterns
+
+### Icons
+
+The website uses **lucide-react** for UI icons and custom SVG components in `BrandIcons.tsx` for brand logos (Apple, Windows, GitHub). No emojis in the website — all visual indicators use proper icons.
+
+### Styling
+
+The website uses **Tailwind CSS** (unlike the desktop app which uses `index.css` only).
+
 ## Commit Messages
 
 ```
@@ -154,6 +175,19 @@ fix: kerf not applied correctly
 refactor: extract snap detection
 style: update button classes
 ```
+
+## Code Quality
+
+### Pre-commit Hooks
+
+husky + lint-staged runs `prettier --check` on all staged `.ts`, `.tsx`, `.json`, `.css`, and `.md` files. Fix formatting issues with `npx prettier --write <file>`.
+
+### Format Checking
+
+Both packages have `format:check` scripts for CI:
+
+- Desktop: `npm run format:check --workspace=@carvd/desktop`
+- Website: `npm run format:check --workspace=@carvd/website`
 
 ## Testing
 
@@ -205,7 +239,7 @@ createNestedGroupStructure()
 ### Zustand Store Testing
 
 ```typescript
-import { useProjectStore } from '../store/projectStore';
+import { useProjectStore } from "../store/projectStore";
 
 beforeEach(() => {
   useProjectStore.setState({
@@ -215,7 +249,7 @@ beforeEach(() => {
   });
 });
 
-it('adds a part', () => {
+it("adds a part", () => {
   const addPart = vi.fn();
   useProjectStore.setState({ addPart });
   // test...
@@ -250,10 +284,12 @@ beforeAll(() => {
 ### Hook Testing
 
 ```typescript
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act } from "@testing-library/react";
 
 const { result, rerender } = renderHook(() => useMyHook());
-act(() => { result.current.doSomething(); });
+act(() => {
+  result.current.doSomething();
+});
 ```
 
 ### Known Gotchas
@@ -279,20 +315,20 @@ beforeAll(() => {
       daysRemaining: 14,
       shouldShowBanner: false,
       trialStartDate: Date.now(),
-      trialEndDate: Date.now() + 14 * 24 * 60 * 60 * 1000
+      trialEndDate: Date.now() + 14 * 24 * 60 * 60 * 1000,
     }),
     getLicenseData: vi.fn().mockResolvedValue(null),
     acknowledgeTrialExpired: vi.fn(),
-    openExternal: vi.fn()
+    openExternal: vi.fn(),
   } as unknown as typeof window.electronAPI;
 });
 
 // Test license mode in projectStore
 beforeEach(() => {
   useProjectStore.setState({
-    licenseMode: 'trial', // or 'free' to test limits
+    licenseMode: "trial", // or 'free' to test limits
     parts: [],
-    stocks: []
+    stocks: [],
   });
 });
 ```
