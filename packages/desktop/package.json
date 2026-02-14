@@ -45,7 +45,7 @@
     "electron-store": "^11.0.2",
     "electron-updater": "^6.7.3",
     "jspdf": "^4.1.0",
-    "lucide-react": "^0.563.0",
+    "lucide-react": "^0.564.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.182.0",
