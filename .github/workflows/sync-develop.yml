@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout develop branch
@@ -20,10 +21,28 @@ jobs:
           ref: develop
           fetch-depth: 0
 
-      - name: Merge main into develop
+      - name: Merge main into develop and create PR
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin main
+
+          BRANCH="chore/sync-main-to-develop-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH"
           git merge origin/main --no-edit -m "chore: sync main back to develop"
-          git push origin develop
+
+          # Check if there are any differences to push
+          if git diff --quiet origin/develop; then
+            echo "⏭️  develop is already up to date with main — nothing to do"
+            exit 0
+          fi
+
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --base develop \
+            --head "$BRANCH" \
+            --title "chore: sync main back to develop" \
+            --body "Automated sync of main back to develop after merge. This PR should be a fast-forward merge if merge commits are used for develop→main PRs."
