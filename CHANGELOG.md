@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-02-14
+
+### Changed
+
+- **Standalone Sync-Develop Workflow** — Separated main-to-develop sync into its own workflow that runs on every push to main, decoupled from the release pipeline
+- **Merge Strategy Convention** — Documented merge commit (not squash) for develop-to-main PRs to preserve shared ancestry and prevent sync conflicts
+
+### Fixed
+
+- **Vercel Build Failure** — Fixed `husky` command not found (exit 127) during `npm ci` in Vercel's build environment by making the prepare script resilient (`husky || true`)
+
 ## [0.1.10] - 2026-02-14
 
 ### Added
