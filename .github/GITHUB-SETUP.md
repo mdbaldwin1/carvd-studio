@@ -5,10 +5,12 @@ This document contains the complete configuration for the carvd-studio repositor
 ## Branch Structure ✅
 
 **Created:**
+
 - ✅ `main` - Production-ready code only
 - ✅ `develop` - Integration branch for development
 
 **Workflow:**
+
 ```
 Feature branches → develop → main
                      ↓         ↓
@@ -23,12 +25,14 @@ Feature branches → develop → main
 **Location:** `Settings → General`
 
 ### Features
+
 - [x] Issues: ✅ Enabled
 - [x] Projects: ✅ Enabled (optional)
 - [x] Wiki: ❌ Disabled (use README/docs instead)
 - [x] Discussions: ❌ Disabled (use Issues)
 
 ### Pull Requests
+
 - [x] **Allow merge commits:** ✅ Enabled
 - [x] **Allow squash merging:** ✅ Enabled (recommended)
   - Default to: "Pull request title"
@@ -50,46 +54,58 @@ Feature branches → develop → main
 #### Protect matching branches:
 
 **✅ Require a pull request before merging**
+
 - [x] Require approvals: `0` (for solo work) or `1` (if team)
 - [x] Dismiss stale pull request approvals when new commits are pushed
 - [x] Require review from Code Owners: ❌ Disabled (unless you add CODEOWNERS file)
 - [x] Require approval of the most recent reviewable push
 
 **✅ Require status checks to pass before merging**
+
 - [x] Require branches to be up to date before merging
-- **Required status checks** (add these after first workflow run):
-  - `unit-tests (ubuntu-latest, 20)` ✅
-  - `unit-tests (macos-latest, 20)` ✅
-  - `unit-tests (windows-latest, 20)` ✅
-  - `e2e-tests (ubuntu-latest, 20)` ✅
-  - `e2e-tests (macos-latest, 20)` ✅
-  - `lint` ✅
+- **Required status checks:**
+  - `Unit & Integration Tests` ✅
+  - `E2E Tests (ubuntu-latest)` ✅
+  - `E2E Tests (macos-latest)` ✅
+  - `E2E Tests (windows-latest)` ✅
+  - `Lint & Type Check` ✅
+  - `Website Unit Tests` ✅
+  - `Website E2E Tests` ✅
 
 **✅ Require conversation resolution before merging**
+
 - Ensures all PR comments are resolved
 
 **✅ Require signed commits** (optional but recommended)
+
 - Ensures commit authenticity
 
 **❌ Require linear history**
+
 - Disabled (allows merge commits)
 
 **✅ Require deployments to succeed before merging** (optional)
+
 - Enable if you add staging deployment
 
 **✅ Lock branch**
+
 - ❌ Disabled (you need to push releases)
 
 **✅ Do not allow bypassing the above settings**
+
 - ✅ Enabled (even admins must follow rules)
 
 **✅ Restrict who can push to matching branches** (optional)
+
 - ❌ Disabled for now (enable if team grows)
 
 **✅ Allow force pushes**
+
 - ❌ Disabled
 
 **✅ Allow deletions**
+
 - ❌ Disabled
 
 ---
@@ -103,23 +119,28 @@ Feature branches → develop → main
 #### Protect matching branches:
 
 **✅ Require a pull request before merging** (optional for solo dev)
+
 - [x] Require approvals: `0` (solo) or `1` (team)
 - [x] Dismiss stale pull request approvals when new commits are pushed
 
 **✅ Require status checks to pass before merging**
+
 - [x] Require branches to be up to date before merging
 - **Required status checks** (same as main):
-  - All unit-tests, e2e-tests, lint checks
+  - Unit & Integration Tests, E2E Tests (3 platforms), Lint & Type Check, Website Unit Tests, Website E2E Tests
 
 **✅ Require conversation resolution before merging**
 
-**❌ Do not allow bypassing the above settings**
-- ❌ Disabled (you can push directly for quick fixes)
+**✅ Do not allow bypassing the above settings**
+
+- ✅ Enabled (even admins must follow rules)
 
 **✅ Allow force pushes**
+
 - ❌ Disabled
 
 **✅ Allow deletions**
+
 - ❌ Disabled
 
 ---
@@ -129,9 +150,11 @@ Feature branches → develop → main
 **Location:** `Settings → Actions → General`
 
 ### Actions permissions
+
 - **Policy:** "Allow all actions and reusable workflows"
 
 ### Workflow permissions
+
 - [x] **Read and write permissions** ✅
   - Allows workflows to:
     - Create releases
@@ -143,6 +166,7 @@ Feature branches → develop → main
   - Needed for automated dependency updates
 
 ### Fork pull request workflows
+
 - **Policy:** "Require approval for first-time contributors"
   - Prevents malicious workflow runs
 
@@ -153,6 +177,7 @@ Feature branches → develop → main
 **Location:** `Settings → Secrets and variables → Actions → Secrets`
 
 ### Currently Configured:
+
 - [x] `LICENSE_PRIVATE_KEY` ✅ - RSA private key for test license generation
 - [x] `CSC_LINK` ✅ - Base64-encoded .p12 certificate (macOS code signing)
 - [x] `CSC_KEY_PASSWORD` ✅ - Password for the .p12 file
@@ -165,6 +190,7 @@ Feature branches → develop → main
 - [x] `VERCEL_ORG_ID` ✅ - Vercel organization/team ID
 
 ### Optional (Not Configured):
+
 - [ ] `WINDOWS_CERTIFICATE` - Windows code signing certificate
 - [ ] `WINDOWS_CERTIFICATE_PASSWORD` - Password for the certificate
 
@@ -173,6 +199,7 @@ Feature branches → develop → main
 **Location:** `Settings → Secrets and variables → Actions → Variables`
 
 These are non-sensitive values visible in logs:
+
 - `PRODUCT_NAME`: "Carvd Studio"
 - `BUNDLE_ID`: "com.carvd.studio"
 
@@ -183,9 +210,11 @@ These are non-sensitive values visible in logs:
 **Location:** `Settings → Security → Code security and analysis`
 
 ### Dependency Graph
+
 - [x] **Dependency graph:** ✅ Enabled (automatic for public/private repos)
 
 ### Dependabot
+
 - [x] **Dependabot alerts:** ✅ Enabled
   - Get notified of vulnerable dependencies
 - [x] **Dependabot security updates:** ✅ Enabled
@@ -197,6 +226,7 @@ These are non-sensitive values visible in logs:
   - Groups: electron, testing, threejs dependencies
 
 ### Code Scanning (CodeQL)
+
 - [x] **Code scanning:** ✅ Enable CodeQL
   - Automatic analysis of JavaScript/TypeScript code
   - Finds security vulnerabilities and code quality issues
@@ -206,6 +236,7 @@ These are non-sensitive values visible in logs:
 This creates: `.github/workflows/codeql.yml`
 
 ### Secret Scanning
+
 - [x] **Secret scanning:** ✅ Enabled (automatic for public repos)
   - GitHub alerts you if secrets are committed
   - Supports 200+ token types (AWS, GCP, Azure, etc.)
@@ -221,6 +252,7 @@ This creates: `.github/workflows/codeql.yml`
 **Current:** Solo developer
 
 **When adding team members:**
+
 1. Add as collaborators with appropriate permissions:
    - **Admin:** Full access (you)
    - **Maintain:** Manage repository without sensitive settings
@@ -229,6 +261,7 @@ This creates: `.github/workflows/codeql.yml`
    - **Read:** View and clone only
 
 2. Create CODEOWNERS file:
+
 ```
 # .github/CODEOWNERS
 # Default owner for everything
@@ -250,12 +283,14 @@ This creates: `.github/workflows/codeql.yml`
 **For production releases (optional):**
 
 Create environment: `production`
+
 - **Deployment branches:** Only `main` branch
 - **Environment secrets:** (same as repository secrets)
 - **Reviewers:** Add yourself or team members
   - Requires manual approval before release
 
 **Benefits:**
+
 - Manual gate before production releases
 - Separate secrets per environment
 - Deployment history and logs
@@ -269,6 +304,7 @@ Create environment: `production`
 **Current:** None needed (GitHub Actions handles everything)
 
 **Future possibilities:**
+
 - Slack/Discord notifications on releases
 - External CI/CD systems
 - Custom deployment triggers
@@ -282,16 +318,19 @@ Create environment: `production`
 **Recommended settings for this repository:**
 
 **Actions:**
+
 - [x] **Notify on workflow failures:** ✅
 - [x] **Notify on workflow success:** ❌ (too noisy)
 
 **Pull Requests:**
+
 - [x] **You're assigned:** ✅
 - [x] **Review requested:** ✅
 - [x] **Someone comments:** ✅
 - [x] **PR state changes:** ✅
 
 **Issues:**
+
 - [x] **You're assigned:** ✅
 - [x] **Someone mentions you:** ✅
 
@@ -306,6 +345,7 @@ Create environment: `production`
 The repository is public to allow users to download releases from GitHub. The license key system protects revenue - users can download the app freely but need to purchase a license for full features after the trial period.
 
 **Benefits of public:**
+
 - Users can download releases without authentication
 - Unlimited free GitHub Actions minutes
 - Community can report issues and contribute
@@ -316,6 +356,7 @@ The repository is public to allow users to download releases from GitHub. The li
 ## Setup Checklist
 
 ### Completed:
+
 - [x] ✅ Create `develop` branch
 - [x] ✅ Configure branch protection for `main`
 - [x] ✅ Configure branch protection for `develop`
@@ -330,13 +371,22 @@ The repository is public to allow users to download releases from GitHub. The li
 - [x] ✅ Release workflow tested and working (v0.1.0 released)
 - [x] ✅ CI test workflow working on all platforms
 - [x] ✅ Claude Code Vercel MCP access configured
+- [x] ✅ macOS notarization working (Developer ID Application + Apple notarytool)
+- [x] ✅ Pre-commit hooks (husky + lint-staged + prettier)
+- [x] ✅ `.nvmrc` for Node version pinning (Node 22)
+- [x] ✅ `.editorconfig` for editor consistency
+- [x] ✅ GitHub Issue Templates (bug report + feature request)
+- [x] ✅ PR template with checklist
+- [x] ✅ Changelog CI check (PRs to main require CHANGELOG.md changes)
+- [x] ✅ Website CI checks (typecheck + format)
 
 ### Still Needed:
-- [ ] Enable macOS notarization (currently code-signed but not notarized)
+
 - [ ] (Optional) Add Windows code signing certificate
 - [ ] Set up Lemon Squeezy product and configure checkout URL
 
 ### Optional Enhancements:
+
 - [ ] Enable CodeQL scanning
 - [ ] Create CODEOWNERS file
 - [ ] Set up production environment with approvals
@@ -347,6 +397,7 @@ The repository is public to allow users to download releases from GitHub. The li
 ## Workflow Summary
 
 ### Daily Development:
+
 ```bash
 # Create feature branch from develop
 git checkout develop
@@ -365,6 +416,7 @@ git push -u origin feature/my-feature
 ```
 
 ### Preparing a Release:
+
 ```bash
 # On develop, bump the version
 cd packages/desktop
@@ -387,34 +439,29 @@ git push origin develop
 ```
 
 ### Hotfix Process:
+
 ```bash
 # Create hotfix branch from main
 git checkout main
 git checkout -b hotfix/critical-bug
 
-# Fix the bug
+# Fix the bug, bump version in packages/desktop/package.json
 git add .
 git commit -m "fix(desktop): resolve critical bug"
 
 # Create PR to main (skip develop for urgent fixes)
 git push -u origin hotfix/critical-bug
 # Go to GitHub → Create PR → target: main
-# Tests run
-# Merge when tests pass
+# Tests run, merge when tests pass (squash merge)
 
-# Create hotfix release
-git checkout main
-git pull
-git tag v1.2.1
-git push origin v1.2.1
-
-# Merge back to develop to keep in sync
-git checkout develop
-git merge main
-git push origin develop
+# After merge to main, the release workflow triggers automatically:
+# 1. Builds macOS + Windows
+# 2. Creates GitHub Release
+# 3. Updates Vercel version + triggers redeploy
+# 4. Creates a version bump PR targeting develop (keeps develop in sync)
 ```
 
 ---
 
-**Last Updated:** 2026-02-12
+**Last Updated:** 2026-02-14
 **Status:** Core configuration complete, release pipeline operational
