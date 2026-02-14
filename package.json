@@ -20,7 +20,7 @@
     "generate-test-license": "npm run generate-test-license --workspace=@carvd/desktop",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/out packages/desktop/dist packages/desktop/out",
     "fresh-install": "npm run clean && npm install",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "repository": {
     "type": "git",
