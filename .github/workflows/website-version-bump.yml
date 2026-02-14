@@ -15,34 +15,88 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      statuses: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Check if website version changed
         id: check
         run: |
           CURRENT=$(node -p "require('./packages/website/package.json').version")
-          PREV=$(node -e "
-            const cp = require('child_process');
-            try {
-              const json = cp.execSync('git show HEAD~1:packages/website/package.json', {encoding: 'utf-8'});
-              const v = JSON.parse(json).version;
-              console.log(v || '');
-            } catch { console.log(''); }
-          ")
+
+          # Compare against the latest website-v* tag instead of HEAD~1
+          # This is squash-merge safe since tags are durable artifacts
+          LATEST_TAG=$(git tag --list 'website-v*' --sort=-version:refname | head -n 1)
+          PREV="${LATEST_TAG#website-v}"
 
           echo "Current: $CURRENT"
-          echo "Previous: $PREV"
+          echo "Latest website tag: ${LATEST_TAG:-<none>} (version: ${PREV:-<none>})"
 
-          if [ -z "$PREV" ] || [ "$CURRENT" = "$PREV" ]; then
-            echo "should_bump=false" >> $GITHUB_OUTPUT
-          else
+          if [ -z "$PREV" ]; then
+            echo "✅ No previous website tag found - proceeding with bump"
             echo "should_bump=true" >> $GITHUB_OUTPUT
             echo "version=$CURRENT" >> $GITHUB_OUTPUT
+          elif [ "$CURRENT" = "$PREV" ]; then
+            echo "⏭️  Website version $CURRENT matches latest tag - skipping"
+            echo "should_bump=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Website version changed: $PREV -> $CURRENT"
+            echo "should_bump=true" >> $GITHUB_OUTPUT
+            echo "version=$CURRENT" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wait for Vercel deployment
+        if: steps.check.outputs.should_bump == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ github.sha }}"
+          echo "Waiting for Vercel deployment to complete for $SHA..."
+
+          MAX_ATTEMPTS=60  # 10 minutes (60 * 10s)
+          ATTEMPT=0
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            STATE=$(gh api "repos/${{ github.repository }}/commits/$SHA/status" \
+              --jq '.statuses[] | select(.context == "Vercel") | .state' 2>/dev/null || echo "")
+
+            if [ "$STATE" = "success" ]; then
+              echo "✅ Vercel deployment succeeded"
+              break
+            elif [ "$STATE" = "failure" ] || [ "$STATE" = "error" ]; then
+              echo "❌ Vercel deployment failed (state: $STATE)"
+              exit 1
+            fi
+
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "⏳ Vercel status: ${STATE:-pending} (attempt $ATTEMPT/$MAX_ATTEMPTS)"
+            sleep 10
+          done
+
+          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+            echo "⏰ Timed out waiting for Vercel deployment"
+            exit 1
+          fi
+
+      - name: Create website version tag
+        if: steps.check.outputs.should_bump == 'true'
+        run: |
+          VERSION="${{ steps.check.outputs.version }}"
+          TAG="website-v${VERSION}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git rev-parse "$TAG" &>/dev/null; then
+            echo "Tag $TAG already exists - reusing"
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+            echo "✅ Created tag $TAG"
           fi
 
       - name: Compute next patch version
