@@ -6,14 +6,14 @@
  * so the website never needs redeploying for new desktop releases.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
-const GITHUB_REPO = 'mdbaldwin1/carvd-studio';
-const FALLBACK_VERSION = '0.1.0';
+const GITHUB_REPO = "mdbaldwin1/carvd-studio";
+const FALLBACK_VERSION = "0.1.0";
 
 export interface DownloadInfo {
   url: string;
-  platform: 'macos' | 'windows';
+  platform: "macos" | "windows";
   fileName: string;
   fileExtension: string;
   minOsVersion: string;
@@ -31,11 +31,11 @@ export async function fetchLatestVersion(): Promise<string> {
 
   try {
     const res = await fetch(
-      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    cachedVersion = (data.tag_name as string).replace(/^v/, '');
+    cachedVersion = (data.tag_name as string).replace(/^v/, "");
     return cachedVersion;
   } catch {
     return FALLBACK_VERSION;
@@ -62,10 +62,10 @@ export function getWindowsDownloadUrl(version: string): string {
 export function getMacDownloadInfo(version: string): DownloadInfo {
   return {
     url: getMacDownloadUrl(version),
-    platform: 'macos',
+    platform: "macos",
     fileName: `Carvd.Studio-${version}-arm64.dmg`,
-    fileExtension: '.dmg',
-    minOsVersion: 'macOS 10.15+',
+    fileExtension: ".dmg",
+    minOsVersion: "macOS 10.15+",
   };
 }
 
@@ -75,10 +75,10 @@ export function getMacDownloadInfo(version: string): DownloadInfo {
 export function getWindowsDownloadInfo(version: string): DownloadInfo {
   return {
     url: getWindowsDownloadUrl(version),
-    platform: 'windows',
+    platform: "windows",
     fileName: `Carvd.Studio.Setup.${version}.exe`,
-    fileExtension: '.exe',
-    minOsVersion: 'Windows 10+',
+    fileExtension: ".exe",
+    minOsVersion: "Windows 10+",
   };
 }
 
@@ -105,7 +105,9 @@ export function useDownloadInfo(): UseDownloadInfoResult {
         setLoading(false);
       }
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return {

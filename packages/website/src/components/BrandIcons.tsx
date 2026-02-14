@@ -1,11 +1,9 @@
-import React from 'react';
-
 interface IconProps {
   size?: number;
   className?: string;
 }
 
-export function AppleIcon({ size = 24, className = '' }: IconProps) {
+export function AppleIcon({ size = 24, className = "" }: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -21,7 +19,7 @@ export function AppleIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
-export function WindowsIcon({ size = 24, className = '' }: IconProps) {
+export function WindowsIcon({ size = 24, className = "" }: IconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

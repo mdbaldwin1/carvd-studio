@@ -30,6 +30,32 @@ updates:
       - "dependencies"
       - "desktop"
 
+  # Website dependencies
+  - package-ecosystem: "npm"
+    directory: "/packages/website"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "react-router-dom"
+      testing:
+        patterns:
+          - "*vitest*"
+          - "*playwright*"
+          - "*testing-library*"
+    labels:
+      - "dependencies"
+      - "website"
+
   # Root workspace dependencies
   - package-ecosystem: "npm"
     directory: "/"

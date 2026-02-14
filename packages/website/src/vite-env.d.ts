@@ -1,11 +1,11 @@
 /// <reference types="vite/client" />
 
-declare module '*.md?raw' {
+declare module "*.md?raw" {
   const content: string;
   export default content;
 }
 
-declare module 'virtual:changelog' {
+declare module "virtual:changelog" {
   const content: string;
   export default content;
 }

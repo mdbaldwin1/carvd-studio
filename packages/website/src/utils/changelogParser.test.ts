@@ -1,12 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { parseChangelog } from './changelogParser';
+import { describe, it, expect } from "vitest";
+import { parseChangelog } from "./changelogParser";
 
-describe('parseChangelog', () => {
-  it('returns empty array for empty input', () => {
-    expect(parseChangelog('')).toEqual([]);
+describe("parseChangelog", () => {
+  it("returns empty array for empty input", () => {
+    expect(parseChangelog("")).toEqual([]);
   });
 
-  it('returns empty array for header-only input', () => {
+  it("returns empty array for header-only input", () => {
     const input = `# Changelog
 
 All notable changes to Carvd Studio will be documented in this file.
@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     expect(parseChangelog(input)).toEqual([]);
   });
 
-  it('parses a single version with one category', () => {
+  it("parses a single version with one category", () => {
     const input = `## [1.0.0] - 2025-06-15
 
 ### Added
@@ -27,18 +27,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     const result = parseChangelog(input);
     expect(result).toHaveLength(1);
-    expect(result[0].version).toBe('1.0.0');
-    expect(result[0].date).toBe('2025-06-15');
+    expect(result[0].version).toBe("1.0.0");
+    expect(result[0].date).toBe("2025-06-15");
     expect(result[0].categories).toHaveLength(1);
-    expect(result[0].categories[0].name).toBe('Added');
+    expect(result[0].categories[0].name).toBe("Added");
     expect(result[0].categories[0].entries).toHaveLength(2);
     expect(result[0].categories[0].entries[0]).toEqual({
-      text: 'Feature A',
-      description: 'Description of feature A'
+      text: "Feature A",
+      description: "Description of feature A",
     });
   });
 
-  it('parses multiple categories within a version', () => {
+  it("parses multiple categories within a version", () => {
     const input = `## [1.1.0] - 2025-07-01
 
 ### Added
@@ -56,13 +56,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     const result = parseChangelog(input);
     expect(result).toHaveLength(1);
     expect(result[0].categories).toHaveLength(3);
-    expect(result[0].categories[0].name).toBe('Added');
-    expect(result[0].categories[1].name).toBe('Changed');
-    expect(result[0].categories[2].name).toBe('Fixed');
-    expect(result[0].categories[2].entries[0].text).toBe('Bug fix');
+    expect(result[0].categories[0].name).toBe("Added");
+    expect(result[0].categories[1].name).toBe("Changed");
+    expect(result[0].categories[2].name).toBe("Fixed");
+    expect(result[0].categories[2].entries[0].text).toBe("Bug fix");
   });
 
-  it('parses multiple versions', () => {
+  it("parses multiple versions", () => {
     const input = `## [2.0.0] - 2025-08-01
 
 ### Added
@@ -77,11 +77,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     const result = parseChangelog(input);
     expect(result).toHaveLength(2);
-    expect(result[0].version).toBe('2.0.0');
-    expect(result[1].version).toBe('1.0.0');
+    expect(result[0].version).toBe("2.0.0");
+    expect(result[1].version).toBe("1.0.0");
   });
 
-  it('parses plain entries without bold labels', () => {
+  it("parses plain entries without bold labels", () => {
     const input = `## [1.0.0] - 2025-06-15
 
 ### Fixed
@@ -92,16 +92,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     const result = parseChangelog(input);
     expect(result[0].categories[0].entries).toHaveLength(2);
     expect(result[0].categories[0].entries[0]).toEqual({
-      text: 'Fixed a minor display issue',
-      description: ''
+      text: "Fixed a minor display issue",
+      description: "",
     });
     expect(result[0].categories[0].entries[1]).toEqual({
-      text: 'Corrected tooltip positioning',
-      description: ''
+      text: "Corrected tooltip positioning",
+      description: "",
     });
   });
 
-  it('handles entries with em dash separator', () => {
+  it("handles entries with em dash separator", () => {
     const input = `## [1.0.0] - 2025-06-15
 
 ### Added
@@ -110,12 +110,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     const result = parseChangelog(input);
     expect(result[0].categories[0].entries[0]).toEqual({
-      text: 'Feature',
-      description: 'Description with em dash'
+      text: "Feature",
+      description: "Description with em dash",
     });
   });
 
-  it('handles entries with en dash separator', () => {
+  it("handles entries with en dash separator", () => {
     const input = `## [1.0.0] - 2025-06-15
 
 ### Added
@@ -124,12 +124,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     const result = parseChangelog(input);
     expect(result[0].categories[0].entries[0]).toEqual({
-      text: 'Feature',
-      description: 'Description with en dash'
+      text: "Feature",
+      description: "Description with en dash",
     });
   });
 
-  it('ignores link references at the bottom', () => {
+  it("ignores link references at the bottom", () => {
     const input = `## [1.0.0] - 2025-06-15
 
 ### Added
@@ -143,7 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     expect(result[0].categories[0].entries).toHaveLength(1);
   });
 
-  it('handles pre-release version tags', () => {
+  it("handles pre-release version tags", () => {
     const input = `## [1.0.0-beta.1] - 2025-06-15
 
 ### Added
@@ -152,10 +152,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     const result = parseChangelog(input);
     expect(result).toHaveLength(1);
-    expect(result[0].version).toBe('1.0.0-beta.1');
+    expect(result[0].version).toBe("1.0.0-beta.1");
   });
 
-  it('parses the actual CHANGELOG.md format', () => {
+  it("parses the actual CHANGELOG.md format", () => {
     const input = `# Changelog
 
 All notable changes to Carvd Studio will be documented in this file.
@@ -175,13 +175,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
     const result = parseChangelog(input);
     expect(result).toHaveLength(1);
-    expect(result[0].version).toBe('0.1.0');
-    expect(result[0].date).toBe('2025-02-12');
-    expect(result[0].categories[0].name).toBe('Added');
+    expect(result[0].version).toBe("0.1.0");
+    expect(result[0].date).toBe("2025-02-12");
+    expect(result[0].categories[0].name).toBe("Added");
     expect(result[0].categories[0].entries).toHaveLength(3);
-    expect(result[0].categories[0].entries[0].text).toBe('3D Furniture Design Editor');
+    expect(result[0].categories[0].entries[0].text).toBe(
+      "3D Furniture Design Editor",
+    );
     expect(result[0].categories[0].entries[0].description).toBe(
-      'Interactive workspace with real-time 3D visualization using Three.js'
+      "Interactive workspace with real-time 3D visualization using Three.js",
     );
   });
 });

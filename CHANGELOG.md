@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PR Template** — Added `.github/pull_request_template.md` with checklist and Claude instructions for consistent PR quality
 - **Changelog CI Check** — PRs to main now fail if CHANGELOG.md hasn't been updated
 - **CLAUDE.md** — Added project-level development guidelines covering git workflow, branch naming, commit conventions, and testing
+- **Pre-commit Hooks** — Added husky + lint-staged to auto-check formatting on commit
+- **Issue Templates** — Added GitHub issue templates for bug reports and feature requests
+- **Dependabot Config** — Configured Dependabot for automated dependency update PRs with grouped packages
 
 ### Changed
 
@@ -21,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Branch Protection** — Both `develop` and `main` are now fully protected; all 7 CI checks must pass, no direct pushes even for admins
 - **Website Auto-Versioning** — Website version bumps are automated via GitHub Actions after each deployment
 - **Website Icons** — Replaced all emojis across the website with proper SVG icons (Apple logo, Windows logo) and lucide-react icons for a more professional appearance
+- **CI Checks** — Added website lint, typecheck, and format checks to CI; all workflows now use `.nvmrc` for consistent Node.js version
+- **Website Code Quality** — Removed unused React imports (React 19), added `typecheck` and `format:check` scripts, excluded test files from typecheck, auto-formatted all source files
+- **Versioning Standards** — Documented semver conventions and version management in CLAUDE.md
 
 ### Fixed
 
