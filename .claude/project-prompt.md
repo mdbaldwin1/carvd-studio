@@ -24,6 +24,7 @@ carvd-studio/
 ```
 
 **Key Commands:**
+
 ```bash
 npm run dev:desktop      # Run Electron app
 npm run build:desktop    # Build production
@@ -84,11 +85,11 @@ packages/desktop/src/
 interface Part {
   id: string;
   name: string;
-  length: number;        // inches
+  length: number; // inches
   width: number;
   thickness: number;
-  position: { x, y, z };
-  rotation: Rotation3D;  // 90° increments
+  position: { x; y; z };
+  rotation: Rotation3D; // 90° increments
   stockId: string | null;
   color: string;
   notes?: string;
@@ -100,7 +101,7 @@ interface Stock {
   length: number;
   width: number;
   thickness: number;
-  grainDirection: 'length' | 'width' | 'none';
+  grainDirection: "length" | "width" | "none";
   pricePerUnit: number;
   color: string;
 }
@@ -115,28 +116,33 @@ interface Stock {
 ## Trial & License System
 
 ### License Modes
+
 - **trial** - 14-day full features (default for new users)
 - **licensed** - Full features with valid license key
 - **free** - Feature-limited mode after trial expires
 
 ### Trial Flow
+
 1. First launch starts 14-day trial
 2. Days 1-7: No banner, full features
 3. Days 8-14: Trial banner shows days remaining
 4. Day 15+: Trial expired modal, then free mode
 
 ### Free Mode Limits
+
 - 10 parts max (grace mode: can open larger projects, can't add new)
 - 5 stock items max
 - No PDF export, optimizer, groups, assemblies, or custom templates
 
 ### Key Files
+
 - `src/main/trial.ts` - Trial logic (main process)
 - `src/renderer/src/utils/featureLimits.ts` - Limit definitions
 - `src/renderer/src/hooks/useLicenseStatus.ts` - Combined hook
 - `src/renderer/src/store/projectStore.ts` - Stores `licenseMode`, enforces limits
 
 ### Lemon Squeezy Integration
+
 - **Lemon Squeezy API** - Online validation + 7-day offline cache
 - **Activation limits** - Enforced by Lemon Squeezy
 - **Purchase flow** - Opens browser to Lemon Squeezy checkout
@@ -146,6 +152,7 @@ interface Stock {
 When multiple Claude Code sessions work on this repo simultaneously, **each session MUST use its own git worktree** to avoid branch-switching conflicts that discard uncommitted changes.
 
 ### Setup
+
 ```bash
 # From the main repo directory, create a worktree for your branch:
 git worktree add ../carvd-studio-<short-name> <branch-name>
@@ -156,6 +163,7 @@ git worktree add ../carvd-studio-security fix/security-vulnerabilities
 ```
 
 ### Rules
+
 1. **Never run `git checkout` in a shared worktree** — it wipes other sessions' uncommitted work
 2. **Create a worktree before starting work** if other sessions may be active
 3. **Commit early and often** — uncommitted changes only exist in the working directory
@@ -163,6 +171,7 @@ git worktree add ../carvd-studio-security fix/security-vulnerabilities
 5. **A branch can only be checked out in one worktree at a time** — git enforces this
 
 ### Directory Layout
+
 ```
 /Users/mbaldwin/Carvd/
 ├── carvd-studio/                  # Main repo (keep on develop)
@@ -172,17 +181,36 @@ git worktree add ../carvd-studio-security fix/security-vulnerabilities
 
 ## CI/CD
 
-- **test.yml** - Runs on all PRs (unit, E2E, lint)
-- **release.yml** - Triggered by version tags (v*)
-- **Auto-updater** - electron-updater via GitHub Releases
+- **test.yml** — Runs on all PRs to `main`/`develop`: unit tests, E2E tests (3 platforms), lint/typecheck/format (desktop + website), website unit tests, website E2E tests
+- **release.yml** — Triggered by push to `main`: builds macOS (code-signed + notarized) + Windows, creates GitHub Release, syncs develop, bumps version
+- **changelog-check.yml** — Fails PRs to `main` if CHANGELOG.md wasn't modified
+- **Auto-updater** — electron-updater via GitHub Releases
+- **Pre-commit hooks** — husky + lint-staged runs `prettier --check` on staged files
+- **Node version** — Pinned in `.nvmrc` (Node 22), all CI workflows use `node-version-file`
+
+## Branch Protection
+
+Both `develop` and `main` are protected:
+
+- No direct pushes (even for admins — `enforce_admins: true`)
+- All changes must go through pull requests
+- All CI checks must pass before merging
+- PRs to `main` use squash merge
 
 ## Documentation
 
 See `.claude/docs/` for:
-- `design-patterns.md` - CSS variables, button system, React patterns, testing
-- `features-roadmap.md` - What's built, keyboard shortcuts, test coverage
-- `launch-checklist.md` - Pre-launch tasks (screenshots, Lemon Squeezy, etc.)
-- `environment-setup.md` - Environment variables and secrets for CI/CD
+
+- `design-patterns.md` — CSS variables, button system, React patterns, testing
+- `features-roadmap.md` — What's built, keyboard shortcuts, test coverage
+- `launch-checklist.md` — Pre-launch tasks (screenshots, Lemon Squeezy, etc.)
+- `environment-setup.md` — Environment variables and secrets for CI/CD
+
+See also:
+
+- `CLAUDE.md` — Git workflow, versioning, commit conventions, changelog format
+- `.github/pull_request_template.md` — PR checklist
+- `.github/ISSUE_TEMPLATE/` — Bug report and feature request forms
 
 ---
 
