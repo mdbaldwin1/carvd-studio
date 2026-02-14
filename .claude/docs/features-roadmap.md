@@ -7,6 +7,7 @@ Core features complete. UX polish in progress for 1.0 release.
 ## What's Built
 
 ### Core Features
+
 - 3D workspace with parts, groups, and assemblies
 - Multi-select, copy/paste, undo/redo (100 history)
 - Stock library (app-level + project-level)
@@ -15,23 +16,27 @@ Core features complete. UX polish in progress for 1.0 release.
 - Reference parts for precision alignment
 
 ### Cut List System
+
 - Guillotine bin-packing optimization
 - Cutting diagrams (SVG visualization)
 - Shopping list with cost estimates
 - Export to CSV and PDF
 
 ### File Management
+
 - `.carvd` file format (JSON)
 - Auto-recovery (2 min interval)
 - Recent projects + favorites
 
 ### Start Screen & Templates
+
 - Templates section (built-in + user templates)
 - Template edit mode with save/discard
 - Project thumbnails (auto-generated on save)
 - Recents/Favorites tabs
 
 ### Trial & License System
+
 - **14-day full-feature trial** - Starts on first launch
 - **Trial banner** - Shows days remaining (appears after day 7)
 - **Trial expired modal** - Options: Buy, Enter License, Continue Free
@@ -45,26 +50,40 @@ Core features complete. UX polish in progress for 1.0 release.
 - **License activation** - Lemon Squeezy API integration
 
 ### Website
+
 - Changelog page (auto-generated from `CHANGELOG.md` via Vite virtual module)
 - Download page with platform-specific installers (version auto-updated from Vercel env var)
 - Documentation, pricing, features, and support pages
 
 ### Infrastructure
+
 - License system (Lemon Squeezy API + 7-day offline cache)
 - Auto-updater (electron-updater + GitHub Releases)
 - Post-update notification (shows what's new after an update)
-- CI/CD: `test.yml` (unit + e2e on Ubuntu, macOS, Windows) + `release.yml` (automated builds & GitHub Releases)
+- CI/CD: `test.yml` (desktop unit + e2e, website unit + e2e, lint/typecheck/format) + `release.yml` (automated builds & GitHub Releases) + `changelog-check.yml` (enforces CHANGELOG.md updates on PRs to main)
 - Release pipeline: macOS (code-signed + notarized via Developer ID Application cert) + Windows (unsigned)
+- Branch protection: Both `develop` and `main` protected — no direct pushes (even admins), all CI must pass
+- Pre-commit hooks: husky + lint-staged runs `prettier --check` on staged files
+- Node version pinning: `.nvmrc` (Node 22), all CI workflows use `node-version-file`
+- `.editorconfig` for consistent editor settings
+- GitHub Issue Templates: Bug report and feature request (YAML form-based)
+- PR template with checklist (tests, lint, typecheck, format, changelog)
 - Website: SPA routing via `vercel.json`, deployed from main via Vercel (ignoreCommand skips non-main branches)
+- Website uses lucide-react icons and custom brand SVGs (no emojis)
 - Vercel version sync: Release workflow updates `VITE_APP_VERSION` env var and triggers production redeploy
-- Dependabot: Weekly dependency updates targeting develop branch
+- Dependabot: Weekly dependency updates for desktop and website, targeting develop branch
 - Welcome tutorial (3 steps)
 
-### Recent Upgrades (v0.1.1)
+### Recent Upgrades (through v0.1.9)
+
 - React 19 (from React 18)
 - @react-three/fiber v9, @react-three/drei v10, three.js v0.182
 - electron-builder v26
 - Electron 35
+- macOS notarization (Developer ID Application cert + Apple notarytool)
+- Website emoji replacement with lucide-react icons + custom brand SVGs
+- Pre-commit hooks, issue templates, PR template, changelog CI check
+- Website CI integration (typecheck + format checks)
 
 ## Keyboard Shortcuts
 
@@ -88,22 +107,26 @@ Core features complete. UX polish in progress for 1.0 release.
 
 **Status:** ~85% statement coverage, ~76% branch coverage (1625 tests)
 
-| Module | Coverage |
-|--------|----------|
-| Hooks | 100% |
-| fileFormat.ts | 100% |
-| logger.ts | 100% |
-| fractions.ts | 99% |
-| cutListOptimizer.ts | 98% |
-| featureLimits.ts | 100% |
-| templates/loader.ts | 90% |
-| Trial components | 90%+ |
-| Components | 85-97% |
-| projectStore.ts | 76% |
+| Module              | Coverage |
+| ------------------- | -------- |
+| Hooks               | 100%     |
+| fileFormat.ts       | 100%     |
+| logger.ts           | 100%     |
+| fractions.ts        | 99%      |
+| cutListOptimizer.ts | 98%      |
+| featureLimits.ts    | 100%     |
+| templates/loader.ts | 90%      |
+| Trial components    | 90%+     |
+| Components          | 85-97%   |
+| projectStore.ts     | 76%      |
 
 ## Known Issues
 
-1. **Production build performance** - Three.js rendering is noticeably slower in the packaged app compared to dev mode. Needs investigation (GPU context, Vite bundling, or Electron hardened runtime).
+None currently.
+
+## Resolved Issues
+
+1. ~~**Production build performance**~~ — Three.js rendering was sluggish in the packaged app. Resolved through optimization work.
 
 ## Known Limitations (By Design)
 
