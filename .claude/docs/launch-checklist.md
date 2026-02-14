@@ -1,20 +1,20 @@
 # Carvd Studio Launch Checklist
 
-Last updated: 2026-02-13
+Last updated: 2026-02-14
 
 ## Priority Order
 
-1. ~~**Create GitHub Release**~~ ✅ Automated via release workflow (v0.1.1 released)
+1. ~~**Create GitHub Release**~~ ✅ Automated via release workflow (v0.1.9 released)
 2. **Get app icon/logo** (from designer)
 3. **Add screenshots** (high visual impact)
 4. **Create video demo** (walkthrough)
 5. **Set up Lemon Squeezy** (required for purchases)
 6. ~~**Enable macOS notarization**~~ ✅ Working (Developer ID Application cert + Apple notarytool)
 7. **Create og-image.png** (for social sharing)
-8. **Set up professional email** (for support)
-9. **Add analytics** (nice to have)
+8. ~~**Set up professional email**~~ ✅ Cloudflare email routing → support@carvd-studio.com (code refs already updated)
+9. ~~**Add analytics**~~ — Deferred (no 3rd-party analytics service for now)
 10. **Run testing checklist** (before announcing)
-11. **Investigate production build performance** (Three.js sluggish in packaged app vs dev)
+11. ~~**Investigate production build performance**~~ ✅ Resolved (Three.js performance improved)
 
 ---
 
@@ -24,33 +24,33 @@ Last updated: 2026-02-13
 
 ### Screenshots for HomePage.tsx
 
-| # | Description | Aspect Ratio | Notes |
-|---|-------------|--------------|-------|
-| 1 | **Hero: Main 3D workspace** | 16:9 | Full app window with a realistic project (8-12 parts). Show sidebar, 3D view, and properties panel. |
-| 2 | **Cut list modal - Diagrams tab** | 4:3 | Show optimized board layouts with color-coded parts labeled |
-| 3 | **Shopping list / Cost view** | 4:3 | Show Shopping tab with material quantities, costs, utilization % |
+| #   | Description                       | Aspect Ratio | Notes                                                                                               |
+| --- | --------------------------------- | ------------ | --------------------------------------------------------------------------------------------------- |
+| 1   | **Hero: Main 3D workspace**       | 16:9         | Full app window with a realistic project (8-12 parts). Show sidebar, 3D view, and properties panel. |
+| 2   | **Cut list modal - Diagrams tab** | 4:3          | Show optimized board layouts with color-coded parts labeled                                         |
+| 3   | **Shopping list / Cost view**     | 4:3          | Show Shopping tab with material quantities, costs, utilization %                                    |
 
 ### Screenshots for FeaturesPage.tsx
 
-| # | Description | Aspect Ratio | Notes |
-|---|-------------|--------------|-------|
-| 4 | **3D workspace with dimensions** | 16:9 | Show parts with dimension labels visible, maybe a part selected |
-| 5 | **Cut list - Board layouts** | 16:9 | Diagrams tab showing multiple boards with parts arranged |
-| 6 | **Stock library / Cost tracking** | 16:9 | Stock library modal OR properties panel showing cost |
+| #   | Description                       | Aspect Ratio | Notes                                                           |
+| --- | --------------------------------- | ------------ | --------------------------------------------------------------- |
+| 4   | **3D workspace with dimensions**  | 16:9         | Show parts with dimension labels visible, maybe a part selected |
+| 5   | **Cut list - Board layouts**      | 16:9         | Diagrams tab showing multiple boards with parts arranged        |
+| 6   | **Stock library / Cost tracking** | 16:9         | Stock library modal OR properties panel showing cost            |
 
 ### Screenshots for DocsPage.tsx (Optional but helpful)
 
-| # | Description | Aspect Ratio | Notes |
-|---|-------------|--------------|-------|
-| 7 | **Interface overview - annotated** | 16:9 | Main workspace with labels pointing to: sidebar, 3D view, properties panel, toolbar |
-| 8 | **Part properties panel** | 4:3 | Close-up of properties panel with fields visible |
-| 9 | **Cut list Parts tab** | 4:3 | Show parts grouped by dimensions with quantities |
-| 10 | **Stock library modal** | 4:3 | Show list of stock materials with prices |
-| 11 | **Group hierarchy in sidebar** | 4:3 | Show nested groups in the sidebar tree view |
-| 12 | **Assembly library** | 4:3 | Show assembly browser with thumbnails |
-| 13 | **Snapping alignment lines** | 4:3 | Mid-drag showing snap lines between parts |
-| 14 | **App settings modal** | 4:3 | Show settings options |
-| 15 | **New project dialog** | 4:3 | Show the new project creation dialog |
+| #   | Description                        | Aspect Ratio | Notes                                                                               |
+| --- | ---------------------------------- | ------------ | ----------------------------------------------------------------------------------- |
+| 7   | **Interface overview - annotated** | 16:9         | Main workspace with labels pointing to: sidebar, 3D view, properties panel, toolbar |
+| 8   | **Part properties panel**          | 4:3          | Close-up of properties panel with fields visible                                    |
+| 9   | **Cut list Parts tab**             | 4:3          | Show parts grouped by dimensions with quantities                                    |
+| 10  | **Stock library modal**            | 4:3          | Show list of stock materials with prices                                            |
+| 11  | **Group hierarchy in sidebar**     | 4:3          | Show nested groups in the sidebar tree view                                         |
+| 12  | **Assembly library**               | 4:3          | Show assembly browser with thumbnails                                               |
+| 13  | **Snapping alignment lines**       | 4:3          | Mid-drag showing snap lines between parts                                           |
+| 14  | **App settings modal**             | 4:3          | Show settings options                                                               |
+| 15  | **New project dialog**             | 4:3          | Show the new project creation dialog                                                |
 
 ### How to Capture
 
@@ -72,10 +72,10 @@ Last updated: 2026-02-13
    ./packages/desktop/scripts/resize-for-screenshots.sh small
    ```
 
-   | Size | Dimensions | Use For |
-   |------|------------|---------|
-   | `large` | 1400×900 | Hero shots, full workspace, feature highlights |
-   | `small` | 800×600 | Modals, panels, sidebar details |
+   | Size    | Dimensions | Use For                                        |
+   | ------- | ---------- | ---------------------------------------------- |
+   | `large` | 1400×900   | Hero shots, full workspace, feature highlights |
+   | `small` | 800×600    | Modals, panels, sidebar details                |
 
 5. **Capture the screenshot:**
    - macOS: `Cmd+Shift+4` then `Space` then click the window
@@ -84,6 +84,7 @@ Last updated: 2026-02-13
 ### Project Setup for Screenshots
 
 For best results, create/load a project with:
+
 - [ ] Multiple stock types (plywood + hardwood)
 - [ ] Groups visible in sidebar (e.g., "Drawer Assembly")
 - [ ] At least one part selected to show properties
@@ -130,17 +131,20 @@ Add images between sections to illustrate concepts
 **What:** Create an image that appears when the website is shared on social media (Facebook, Twitter, LinkedIn, etc.)
 
 **Specs:**
+
 - Size: **1200 x 630 pixels** (optimal for all platforms)
 - Format: PNG or JPG
 - File location: `packages/website/public/og-image.png`
 
 **Content suggestions:**
+
 - App logo/name "Carvd Studio"
 - Tagline: "Design furniture in 3D. Optimize your cuts."
 - A small screenshot or mockup of the app
 - Dark background matching site theme (#1a1a1a)
 
 **Tools to create:**
+
 - Figma (free): figma.com
 - Canva (free): canva.com
 - Or any image editor
@@ -152,15 +156,18 @@ Add images between sections to illustrate concepts
 **What:** Create your product in Lemon Squeezy to accept payments and deliver license keys.
 
 ### 3a. Create Lemon Squeezy Account
+
 1. Go to https://lemonsqueezy.com
 2. Sign up for an account
 3. Complete business verification (required for payouts)
 
 ### 3b. Create Store
+
 1. Dashboard → Settings → Store
 2. Note your **Store ID** (shown in URL or settings)
 
 ### 3c. Create Product
+
 1. Dashboard → Products → Create Product
 2. Fill in:
    - **Name:** Carvd Studio License
@@ -172,16 +179,20 @@ Add images between sections to illustrate concepts
 4. Save product
 
 ### 3d. Get Checkout URL
+
 1. Go to your product → Share
 2. Copy the **Checkout Link** (looks like: `https://yourstore.lemonsqueezy.com/checkout/buy/abc123`)
 
 ### 3e. Configure Website
+
 1. Create `packages/website/.env` file:
+
 ```bash
 VITE_LEMON_SQUEEZY_CHECKOUT_URL=https://yourstore.lemonsqueezy.com/checkout/buy/abc123
 ```
 
 ### 3f. Test Purchase Flow
+
 1. Enable **Test Mode** in Lemon Squeezy dashboard
 2. Make a test purchase using test card: `4242 4242 4242 4242`
 3. Verify you receive email with license key
@@ -190,63 +201,20 @@ VITE_LEMON_SQUEEZY_CHECKOUT_URL=https://yourstore.lemonsqueezy.com/checkout/buy/
 
 ---
 
-## 4. Set Up Professional Email
+## 4. Set Up Professional Email ✅
 
-**What:** Create support@carvd-studio.com (or similar) for customer support.
+**Status:** Done. Cloudflare email routing forwards `support@carvd-studio.com` to personal email.
 
-### Option A: Cloudflare Email Routing (FREE - Recommended)
+Code references already updated:
 
-If your domain is on Cloudflare:
-1. Cloudflare Dashboard → Email → Email Routing
-2. Click "Enable Email Routing"
-3. Add routing rule:
-   - Custom address: `support@carvd-studio.com`
-   - Forward to: your personal email
-4. Verify your personal email address
-5. Done! Emails to support@ forward to your inbox
-
-### Option B: Google Workspace (~$6/month)
-1. Go to https://workspace.google.com
-2. Sign up with your domain
-3. Follow DNS verification steps
-4. Create support@carvd-studio.com mailbox
-
-### Option C: Zoho Mail (Free tier)
-1. Go to https://www.zoho.com/mail/
-2. Sign up for free plan
-3. Verify domain ownership
-4. Create mailbox
-
-**After setup, update these files:**
-- `packages/website/src/pages/HomePage.tsx` - Footer support link
-- `packages/desktop/src/renderer/src/components/AboutModal.tsx` - Contact email
+- `packages/website/src/pages/SupportPage.tsx` — contact section
+- `packages/desktop/src/renderer/src/components/AboutModal.tsx` — contact email
 
 ---
 
-## 5. Set Up Analytics
+## 5. ~~Set Up Analytics~~ — Deferred
 
-**What:** Track website visitors to understand traffic sources and popular pages.
-
-### Recommended: Plausible Analytics (~$9/month, privacy-friendly)
-
-#### 5a. Sign Up
-1. Go to https://plausible.io
-2. Create account and add your site: `carvd-studio.com`
-
-#### 5b. Add Script to Website
-Edit `packages/website/index.html`, add before `</head>`:
-```html
-<script defer data-domain="carvd-studio.com" src="https://plausible.io/js/script.js"></script>
-```
-
-#### 5c. Verify
-1. Deploy website
-2. Visit your site
-3. Check Plausible dashboard for the visit
-
-### Alternative: Fathom Analytics
-- Similar setup, also privacy-friendly
-- https://usefathom.com
+No 3rd-party analytics service for now. Can revisit later if needed.
 
 ---
 
@@ -255,6 +223,7 @@ Edit `packages/website/index.html`, add before `</head>`:
 **Status:** Automated via `.github/workflows/release.yml`.
 
 When code is merged to `main`, the release workflow:
+
 1. Reads the version from `packages/desktop/package.json`
 2. Checks if a release already exists for that version (skips if so)
 3. Creates a git tag
@@ -264,6 +233,7 @@ When code is merged to `main`, the release workflow:
 7. Creates a version bump PR targeting `develop`
 
 **To make a new release:**
+
 ```bash
 # On develop, bump the version
 cd packages/desktop
@@ -272,17 +242,18 @@ node scripts/version-bump.cjs patch  # or minor, major
 # Or merge a PR that bumps the version, then merge develop → main
 ```
 
-**Current state (v0.1.1):**
+**Current state (v0.1.9):**
+
 - macOS: Code-signed (Developer ID Application) + notarized by Apple — Gatekeeper allows the app
 - Windows: Build works, no code signing yet (shows SmartScreen warning)
 - Vercel update: All secrets configured (TOKEN + ORG_ID + PROJECT_ID); workflow updates env var + triggers redeploy
-- Version on develop: `0.1.2` (bumped automatically after v0.1.1 release)
 
 ---
 
 ## 7. Pre-Launch Testing Checklist
 
 ### Desktop App Testing
+
 - [ ] Fresh install on macOS - app launches, no errors
 - [ ] Fresh install on Windows - app launches, no errors
 - [ ] License activation with test key works
@@ -297,6 +268,7 @@ node scripts/version-bump.cjs patch  # or minor, major
 - [ ] Auto-update notification appears (if applicable)
 
 ### Website Testing
+
 - [ ] All pages load without errors
 - [ ] Download buttons link to correct files
 - [ ] Download files actually download
@@ -306,6 +278,7 @@ node scripts/version-bump.cjs patch  # or minor, major
 - [ ] Social share preview works (paste URL in Twitter/Facebook)
 
 ### Accessibility Testing
+
 - [ ] Tab through entire app - focus visible
 - [ ] All buttons reachable via keyboard
 - [ ] Test with VoiceOver (macOS) or NVDA (Windows)
@@ -314,14 +287,14 @@ node scripts/version-bump.cjs patch  # or minor, major
 
 ## Quick Reference: File Locations
 
-| Item | Location |
-|------|----------|
-| Website homepage | `packages/website/src/pages/HomePage.tsx` |
-| Website styles | `packages/website/src/index.css` |
-| Website env vars | `packages/website/.env` |
-| Website public files | `packages/website/public/` |
-| Desktop app version | `packages/desktop/package.json` |
-| Desktop About modal | `packages/desktop/src/renderer/src/components/AboutModal.tsx` |
+| Item                 | Location                                                      |
+| -------------------- | ------------------------------------------------------------- |
+| Website homepage     | `packages/website/src/pages/HomePage.tsx`                     |
+| Website styles       | `packages/website/src/index.css`                              |
+| Website env vars     | `packages/website/.env`                                       |
+| Website public files | `packages/website/public/`                                    |
+| Desktop app version  | `packages/desktop/package.json`                               |
+| Desktop About modal  | `packages/desktop/src/renderer/src/components/AboutModal.tsx` |
 
 ---
 
@@ -365,3 +338,15 @@ These have already been done:
 - [x] React 19 upgrade (from React 18)
 - [x] Three.js ecosystem upgrade (@react-three/fiber v9, drei v10, three.js v0.182)
 - [x] Security vulnerabilities resolved (14 Dependabot alerts)
+- [x] Website emojis replaced with lucide-react icons + custom brand SVGs
+- [x] Pre-commit hooks (husky + lint-staged + prettier)
+- [x] GitHub Issue Templates (bug report + feature request YAML forms)
+- [x] PR template with checklist
+- [x] Changelog CI check (PRs to main require CHANGELOG.md changes)
+- [x] `.nvmrc` for Node version pinning (Node 22)
+- [x] `.editorconfig` for consistent editor settings
+- [x] Website CI checks (typecheck + format) added to test workflow
+- [x] Dependabot configured for website package
+- [x] Branch protection enforced for admins on both develop and main
+- [x] Professional email setup (Cloudflare routing → support@carvd-studio.com)
+- [x] Production build performance improved (Three.js rendering)
