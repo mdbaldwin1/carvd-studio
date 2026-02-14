@@ -11,6 +11,7 @@
 - **develop** — Integration branch. All feature work targets here via PRs.
 - **main** — Production branch. Protected. Only receives PRs from develop. Squash-merged.
 - **Feature branches** — Created from develop. Named with prefixes: `feat/`, `fix/`, `chore/`, `docs/`, `test/`, `refactor/`.
+- **Hotfix branches** — Created from **main** (not develop). Named `hotfix/description`. Used for urgent production fixes.
 
 ### Branch Protection
 Both `develop` and `main` are protected:
@@ -35,6 +36,14 @@ Use conventional commit prefixes:
 5. Run lint: `npm run lint` and typecheck: `npm run typecheck`
 6. Push the branch and create a PR targeting `develop`
 7. Ensure all CI checks pass before requesting merge
+
+### Hotfix Workflow
+Hotfixes bypass `develop` to get urgent fixes into production quickly:
+1. Create a `hotfix/` branch from **main**
+2. Make the fix and commit
+3. Update CHANGELOG.md
+4. PR into **main** (squash merge) — deploys the fix to production
+5. PR into **develop** (or merge main back into develop) — keeps develop in sync
 
 ### Changelog Format
 ```markdown
