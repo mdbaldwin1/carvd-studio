@@ -11,6 +11,7 @@
 - [ ] CHANGELOG.md has been updated with all user-facing changes
 - [ ] All tests pass locally (`npm test` in packages/desktop)
 - [ ] Website tests pass if website was modified (`npm test` in packages/website)
+- [ ] Code is formatted (`npm run format`)
 - [ ] No new lint or type errors introduced
 - [ ] Commit messages follow conventions (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`)
 
