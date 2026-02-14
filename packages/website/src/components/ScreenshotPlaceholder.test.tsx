@@ -10,7 +10,7 @@ describe('ScreenshotPlaceholder', () => {
 
   it('renders camera icon', () => {
     render(<ScreenshotPlaceholder tooltip="Test" />);
-    expect(screen.getByText('📷')).toBeInTheDocument();
+    expect(screen.getByLabelText('Camera')).toBeInTheDocument();
   });
 
   it('has title attribute for hover tooltip', () => {

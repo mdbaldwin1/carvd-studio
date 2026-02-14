@@ -1,6 +1,18 @@
 import React from 'react';
 import ScreenshotPlaceholder from '../components/ScreenshotPlaceholder';
 import BuyButton from '../components/BuyButton';
+import {
+  Palette,
+  Ruler,
+  DollarSign,
+  Lock,
+  Zap,
+  Wrench,
+  Target,
+  Upload,
+  RefreshCw,
+  Shield,
+} from 'lucide-react';
 
 export default function FeaturesPage() {
   return (
@@ -36,7 +48,7 @@ export default function FeaturesPage() {
               {/* 3D Design */}
               <div className="accent-box">
                 <div className="flex items-center gap-md mb-lg">
-                  <span className="text-6xl">🎨</span>
+                  <span className="text-6xl"><Palette size={48} /></span>
                   <div>
                     <h2 className="text-3xl font-bold mb-sm">3D Design That Makes Sense</h2>
                     <p className="text-lg text-muted">Design furniture the way you think about it</p>
@@ -78,7 +90,7 @@ export default function FeaturesPage() {
               {/* Cut List Optimization */}
               <div className="accent-box">
                 <div className="flex items-center gap-md mb-lg">
-                  <span className="text-6xl">📐</span>
+                  <span className="text-6xl"><Ruler size={48} /></span>
                   <div>
                     <h2 className="text-3xl font-bold mb-sm">Smart Cut List Generation</h2>
                     <p className="text-lg text-muted">Stop wasting materials and money</p>
@@ -121,7 +133,7 @@ export default function FeaturesPage() {
               {/* Cost Tracking */}
               <div className="accent-box">
                 <div className="flex items-center gap-md mb-lg">
-                  <span className="text-6xl">💰</span>
+                  <span className="text-6xl"><DollarSign size={48} /></span>
                   <div>
                     <h2 className="text-3xl font-bold mb-sm">Real-Time Cost Tracking</h2>
                     <p className="text-lg text-muted">Quote with confidence, bid to win</p>
@@ -164,7 +176,7 @@ export default function FeaturesPage() {
               {/* Privacy & Offline */}
               <div className="accent-box-highlight">
                 <div className="flex items-center gap-md mb-lg">
-                  <span className="text-6xl">🔒</span>
+                  <span className="text-6xl"><Lock size={48} /></span>
                   <div>
                     <h2 className="text-3xl font-bold mb-sm">Your Work Stays Private</h2>
                     <p className="text-lg text-muted">No cloud. No tracking. No BS.</p>
@@ -205,7 +217,7 @@ export default function FeaturesPage() {
             </h2>
             <div className="features-grid mb-3xl">
               <div className="card">
-                <span className="feature-icon">⚡</span>
+                <span className="feature-icon"><Zap size={28} /></span>
                 <h3 className="card-title">Lightning Fast Performance</h3>
                 <p className="card-description">
                   Launch in seconds, not minutes. Smooth interaction even with complex projects.
@@ -215,7 +227,7 @@ export default function FeaturesPage() {
               </div>
 
               <div className="card">
-                <span className="feature-icon">🛠️</span>
+                <span className="feature-icon"><Wrench size={28} /></span>
                 <h3 className="card-title">Reusable Assemblies</h3>
                 <p className="card-description">
                   Save groups of parts as reusable assemblies. Design a drawer box once, save it
@@ -224,7 +236,7 @@ export default function FeaturesPage() {
               </div>
 
               <div className="card">
-                <span className="feature-icon">📏</span>
+                <span className="feature-icon"><Ruler size={28} /></span>
                 <h3 className="card-title">Precision Measurements</h3>
                 <p className="card-description">
                   Work in imperial or metric. Fractional inches or decimal. Dimensions accurate to
@@ -233,7 +245,7 @@ export default function FeaturesPage() {
               </div>
 
               <div className="card">
-                <span className="feature-icon">🎯</span>
+                <span className="feature-icon"><Target size={28} /></span>
                 <h3 className="card-title">Joinery Allowances</h3>
                 <p className="card-description">
                   Add extra material for joinery like tenons, dados, or rabbets. Set the extra
@@ -243,7 +255,7 @@ export default function FeaturesPage() {
               </div>
 
               <div className="card">
-                <span className="feature-icon">📤</span>
+                <span className="feature-icon"><Upload size={28} /></span>
                 <h3 className="card-title">Export Options</h3>
                 <p className="card-description">
                   Export cut lists as PDF or print directly. Save 3D views as images for client
@@ -252,7 +264,7 @@ export default function FeaturesPage() {
               </div>
 
               <div className="card">
-                <span className="feature-icon">🔄</span>
+                <span className="feature-icon"><RefreshCw size={28} /></span>
                 <h3 className="card-title">Free Updates Forever</h3>
                 <p className="card-description">
                   Buy once, get all future features and improvements free. No upgrade fees, no
@@ -261,7 +273,7 @@ export default function FeaturesPage() {
               </div>
 
               <div className="card">
-                <span className="feature-icon">🛡️</span>
+                <span className="feature-icon"><Shield size={28} /></span>
                 <h3 className="card-title">Your Work, Protected</h3>
                 <p className="card-description">
                   Auto-recovery saves your work even if the app crashes. Corrupted files? Automatic

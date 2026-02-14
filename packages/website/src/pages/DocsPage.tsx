@@ -1,5 +1,10 @@
 import React from 'react';
 import BuyButton from '../components/BuyButton';
+import {
+  Package, RefreshCw, Layers, Lock, FolderOpen, Pencil, MousePointer,
+  Ruler, Settings, BarChart3, ShoppingCart, AlertTriangle, Upload,
+  Save, Download, ClipboardList, Move, MapPin, Wrench,
+} from 'lucide-react';
 
 export default function DocsPage() {
   return (
@@ -130,7 +135,7 @@ export default function DocsPage() {
               <div className="grid gap-2xl">
                 <div className="card">
                   <div className="flex items-center gap-md mb-md">
-                    <div className="text-4xl">1️⃣</div>
+                    <div className="text-4xl font-bold text-primary">1</div>
                     <h3 className="card-title mb-0">Download & Install</h3>
                   </div>
                   <p className="card-description mb-md">
@@ -155,7 +160,7 @@ export default function DocsPage() {
 
                 <div className="card">
                   <div className="flex items-center gap-md mb-md">
-                    <div className="text-4xl">2️⃣</div>
+                    <div className="text-4xl font-bold text-primary">2</div>
                     <h3 className="card-title mb-0">Start Your Free Trial</h3>
                   </div>
                   <p className="card-description mb-md">
@@ -170,7 +175,7 @@ export default function DocsPage() {
 
                 <div className="card">
                   <div className="flex items-center gap-md mb-md">
-                    <div className="text-4xl">3️⃣</div>
+                    <div className="text-4xl font-bold text-primary">3</div>
                     <h3 className="card-title mb-0">Create Your First Project</h3>
                   </div>
                   <p className="card-description mb-md">
@@ -321,7 +326,7 @@ export default function DocsPage() {
               <div className="grid gap-2xl">
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>📦</span> Part Properties
+                    <Package size={24} /> Part Properties
                   </h3>
                   <div className="grid gap-md">
                     <div>
@@ -372,7 +377,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>🔄</span> Part Operations
+                    <RefreshCw size={24} /> Part Operations
                   </h3>
                   <div className="grid grid-cols-2 gap-md text-sm">
                     <div>
@@ -404,7 +409,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>🪵</span> Glue-Up Panels
+                    <Layers size={24} /> Glue-Up Panels
                   </h3>
                   <p className="text-muted mb-md">
                     Need a wide panel from narrow boards? Enable <strong>"Glue-Up Panel"</strong> in part properties.
@@ -426,7 +431,7 @@ export default function DocsPage() {
               <div className="grid gap-2xl">
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>🪵</span> Managing Your Stock Library
+                    <Layers size={24} /> Managing Your Stock Library
                   </h3>
                   <p className="text-muted mb-md">
                     The stock library stores all your lumber and sheet goods. Set up your materials once,
@@ -454,7 +459,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>🔒</span> Stock Constraints
+                    <Lock size={24} /> Stock Constraints
                   </h3>
                   <p className="text-muted mb-md">
                     Stock constraints help prevent mistakes by enforcing rules about how parts relate to their assigned stock.
@@ -488,7 +493,7 @@ export default function DocsPage() {
               <div className="grid gap-2xl">
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>📁</span> Creating Groups
+                    <FolderOpen size={24} /> Creating Groups
                   </h3>
                   <p className="text-muted mb-md">
                     Groups help organize complex projects. Select two or more parts and press <code>G</code> to group them.
@@ -503,7 +508,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>✏️</span> Editing Groups
+                    <Pencil size={24} /> Editing Groups
                   </h3>
                   <div className="grid gap-md text-sm">
                     <div>
@@ -541,7 +546,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>🖱️</span> 3D Editor Selection
+                    <MousePointer size={24} /> 3D Editor Selection
                   </h3>
                   <div className="grid gap-md text-sm">
                     <div>
@@ -591,7 +596,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>📐</span> Generating a Cut List
+                    <Ruler size={24} /> Generating a Cut List
                   </h3>
                   <ol className="text-muted text-sm grid gap-sm">
                     <li><strong>1. Assign stock to all parts</strong> — Parts without stock are excluded from the cut list.</li>
@@ -610,7 +615,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>⚙️</span> Cut List Settings
+                    <Settings size={24} /> Cut List Settings
                   </h3>
                   <div className="grid gap-md text-sm">
                     <div>
@@ -632,7 +637,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>📊</span> Understanding the Results
+                    <BarChart3 size={24} /> Understanding the Results
                   </h3>
                   <div className="grid gap-md text-sm">
                     <div>
@@ -661,7 +666,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>🛒</span> Custom Shopping Items
+                    <ShoppingCart size={24} /> Custom Shopping Items
                   </h3>
                   <p className="text-muted mb-md">
                     Add non-lumber items to your shopping list: hardware, screws, glue, finish, etc.
@@ -677,7 +682,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>⚠️</span> Validation Warnings
+                    <AlertTriangle size={24} /> Validation Warnings
                   </h3>
                   <p className="text-muted mb-md">
                     The optimizer validates your design before generating cut lists. Here's what each warning means:
@@ -704,7 +709,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>📤</span> Exporting Your Work
+                    <Upload size={24} /> Exporting Your Work
                   </h3>
                   <p className="text-muted mb-md">
                     Each tab has a Download dropdown with export options. Plus, use the "Download Project Report" button
@@ -764,7 +769,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>💾</span> Creating an Assembly
+                    <Save size={24} /> Creating an Assembly
                   </h3>
                   <ol className="text-muted text-sm grid gap-sm">
                     <li><strong>1.</strong> Create and arrange the parts you want in your assembly</li>
@@ -780,7 +785,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>📥</span> Using an Assembly
+                    <Download size={24} /> Using an Assembly
                   </h3>
                   <ol className="text-muted text-sm grid gap-sm">
                     <li><strong>1.</strong> Click "Add Assembly" in the toolbar</li>
@@ -796,7 +801,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>✏️</span> Editing an Assembly
+                    <Pencil size={24} /> Editing an Assembly
                   </h3>
                   <p className="text-muted mb-md">
                     You can edit assemblies directly in a 3D editing mode:
@@ -819,7 +824,7 @@ export default function DocsPage() {
               <div className="grid gap-2xl">
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>📋</span> Built-in Templates
+                    <ClipboardList size={24} /> Built-in Templates
                   </h3>
                   <p className="text-muted mb-md">
                     Carvd Studio includes starter templates to help you learn and get started quickly:
@@ -837,7 +842,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>💾</span> Custom Templates</h3>
+                    <Save size={24} /> Custom Templates</h3>
                   <p className="text-muted mb-md">
                     Save your own projects as templates for future reuse. Great for standardized products or common starting points.
                   </p>
@@ -858,7 +863,7 @@ export default function DocsPage() {
               <div className="grid gap-2xl">
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>🧲</span> Smart Snapping</h3>
+                    <Move size={24} /> Smart Snapping</h3>
                   <p className="text-muted mb-md">
                     Parts automatically snap to helpful positions as you drag them:
                   </p>
@@ -892,7 +897,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>📍</span> Reference Parts</h3>
+                    <MapPin size={24} /> Reference Parts</h3>
                   <p className="text-muted mb-md">
                     Mark specific parts as snap targets for precision alignment:
                   </p>
@@ -918,7 +923,7 @@ export default function DocsPage() {
 
                 <div className="accent-box">
                   <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                    <span>📏</span> Snap Guides</h3>
+                    <Ruler size={24} /> Snap Guides</h3>
                   <p className="text-muted mb-md">
                     Create persistent guide planes for complex alignments:
                   </p>
@@ -939,7 +944,7 @@ export default function DocsPage() {
 
               <div className="accent-box">
                 <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
-                  <span>🔧</span> Extra Material for Joinery</h3>
+                  <Wrench size={24} /> Extra Material for Joinery</h3>
                 <p className="text-muted mb-md">
                   When building with traditional joinery (tenons, dados, rabbets), you often need parts cut slightly
                   larger than their final assembled dimensions. Carvd Studio handles this with joinery allowances.

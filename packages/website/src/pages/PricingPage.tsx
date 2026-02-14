@@ -1,4 +1,5 @@
 import React from 'react';
+import { Coins, Rocket, Lightbulb, TreePine, Clock, Scissors } from 'lucide-react';
 import BuyButton from '../components/BuyButton';
 
 export default function PricingPage() {
@@ -22,7 +23,7 @@ export default function PricingPage() {
         <div className="py-3xl">
           <div className="max-w-4xl mx-auto text-center">
             <div className="badge badge-highlight mb-lg">
-              <span>💸</span> Less Than 6 Months of Subscription Software
+              <Coins size={16} /> Less Than 6 Months of Subscription Software
             </div>
             <h1 className="text-6xl font-bold mb-lg">
               Pay Once.<br />
@@ -38,7 +39,7 @@ export default function PricingPage() {
               <div className="card p-3xl" style={{borderColor: 'var(--color-primary)', borderWidth: '2px'}}>
                 <div className="text-center mb-xl">
                   <div className="badge badge-warning mb-md mx-auto">
-                    <span>🚀</span> Launch Special — Price increases to $99 soon
+                    <Rocket size={16} /> Launch Special — Price increases to $99 soon
                   </div>
                   <h2 className="text-4xl font-bold mb-md">Carvd Studio</h2>
                   <div className="flex items-center justify-center gap-md mb-md">
@@ -52,7 +53,7 @@ export default function PricingPage() {
                     <span className="line-through">$99</span> — Early adopter pricing
                   </div>
                   <p className="text-sm text-success mb-md">
-                    💡 The cut list optimizer alone typically saves more than $59 in wasted lumber on a single project
+                    <Lightbulb size={16} /> The cut list optimizer alone typically saves more than $59 in wasted lumber on a single project
                   </p>
                   <div className="accent-box-highlight mb-xl">
                     <p className="text-lg font-semibold text-center">
@@ -140,12 +141,12 @@ export default function PricingPage() {
                     <div className="text-sm text-muted">pay every month</div>
                   </div>
                   <ul className="grid gap-sm text-muted text-sm">
-                    <li>❌ 6 months: $60</li>
-                    <li>❌ 1 year: $120</li>
-                    <li>❌ 2 years: $240</li>
-                    <li>❌ 5 years: $600</li>
-                    <li>❌ Stop paying = lose access</li>
-                    <li>❌ Your projects locked behind paywall</li>
+                    <li>6 months: $60</li>
+                    <li>1 year: $120</li>
+                    <li>2 years: $240</li>
+                    <li>5 years: $600</li>
+                    <li>Stop paying = lose access</li>
+                    <li>Your projects locked behind paywall</li>
                   </ul>
                 </div>
                 <div className="card" style={{borderColor: 'var(--color-primary)', borderWidth: '2px'}}>
@@ -184,21 +185,21 @@ export default function PricingPage() {
               </p>
               <div className="grid grid-cols-3 gap-lg">
                 <div className="text-center">
-                  <div className="text-5xl mb-md">🪵</div>
+                  <div className="text-5xl mb-md"><TreePine size={48} /></div>
                   <div className="text-3xl font-bold text-highlight mb-sm">$80</div>
                   <div className="text-sm text-muted">
                     Potential material savings from optimized cuts
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-5xl mb-md">⏱️</div>
+                  <div className="text-5xl mb-md"><Clock size={48} /></div>
                   <div className="text-3xl font-bold text-highlight mb-sm">$125</div>
                   <div className="text-sm text-muted">
                     Potential time savings (5 hrs at $25/hr)
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-5xl mb-md">✂️</div>
+                  <div className="text-5xl mb-md"><Scissors size={48} /></div>
                   <div className="text-3xl font-bold text-highlight mb-sm">$200</div>
                   <div className="text-sm text-muted">
                     Avoided cost of one mis-cut premium sheet
@@ -240,14 +241,14 @@ export default function PricingPage() {
                       <td className="font-bold">SketchUp Pro</td>
                       <td className="text-center text-muted">$399/year</td>
                       <td className="text-center text-muted">Limited</td>
-                      <td className="text-center text-muted">❌ No</td>
+                      <td className="text-center text-muted">No</td>
                       <td className="text-center text-muted">Moderate</td>
                     </tr>
                     <tr>
                       <td className="font-bold">Fusion 360</td>
                       <td className="text-center text-muted">$680/year</td>
                       <td className="text-center text-muted">Limited</td>
-                      <td className="text-center text-muted">❌ No</td>
+                      <td className="text-center text-muted">No</td>
                       <td className="text-center text-muted">Moderate</td>
                     </tr>
                     <tr>
@@ -267,7 +268,7 @@ export default function PricingPage() {
                     <tr>
                       <td className="font-bold">Flatma</td>
                       <td className="text-center text-muted">$10/month</td>
-                      <td className="text-center text-muted">❌ No</td>
+                      <td className="text-center text-muted">No</td>
                       <td className="text-center text-muted">✓ Yes</td>
                       <td className="text-center text-muted">✓ Yes</td>
                     </tr>

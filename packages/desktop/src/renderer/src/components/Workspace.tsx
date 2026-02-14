@@ -587,10 +587,13 @@ function MultiSelectionDimensions() {
 
   // Memoize the heavy AABB + gap calculations
   const boundsData = useMemo(() => {
-    if (effectiveSelectedPartIds.length < 2) return null;
+    // Show bounding box for 2+ selected parts, or for group selections (even single-part groups)
+    const hasGroupSelection = selectedGroupIds.length > 0;
+    const minParts = hasGroupSelection ? 1 : 2;
+    if (effectiveSelectedPartIds.length < minParts) return null;
 
     const selectedParts = parts.filter((p) => effectiveSelectedPartIds.includes(p.id));
-    if (selectedParts.length < 2) return null;
+    if (selectedParts.length < minParts) return null;
 
     const partAABBs = selectedParts.map((part) => ({
       part,
@@ -673,7 +676,7 @@ function MultiSelectionDimensions() {
     }
 
     return { minX, maxX, minY, maxY, minZ, maxZ, gaps };
-  }, [effectiveSelectedPartIds, parts]);
+  }, [effectiveSelectedPartIds, parts, selectedGroupIds]);
 
   if (!boundsData) return null;
   if (activeDragDelta) return null; // Hide dimension labels while dragging

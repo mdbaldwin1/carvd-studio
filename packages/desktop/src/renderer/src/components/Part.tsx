@@ -1931,8 +1931,8 @@ export const Part = memo(function Part({ part }: PartProps) {
           </>
         )}
 
-        {/* Blueprint-style dimension labels - show for all selected parts, but hide while dragging */}
-        {isSelected && !isDragging && !activeDragDelta && (
+        {/* Blueprint-style dimension labels - show for directly selected parts only (not group-selected) */}
+        {isDirectlySelected && !isDragging && !activeDragDelta && (
           <>
             {/* Length dimension (along X axis) - shown on front edge, offset toward -Z */}
             <DimensionLabel

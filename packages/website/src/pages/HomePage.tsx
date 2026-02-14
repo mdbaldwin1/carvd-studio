@@ -2,6 +2,19 @@ import React from 'react';
 import ScreenshotPlaceholder from '../components/ScreenshotPlaceholder';
 import BuyButton from '../components/BuyButton';
 import { useDownloadInfo } from '../utils/downloads';
+import { AppleIcon, WindowsIcon } from '../components/BrandIcons';
+import {
+  Sparkles,
+  Palette,
+  Ruler,
+  DollarSign,
+  Lock,
+  Zap,
+  Wrench,
+  Building2,
+  Armchair,
+  Home,
+} from 'lucide-react';
 
 export default function HomePage() {
   const { version: appVersion, macDownload, windowsDownload } = useDownloadInfo();
@@ -27,7 +40,7 @@ export default function HomePage() {
         <section className="hero container">
           <div className="max-w-4xl mx-auto">
             <div className="badge badge-highlight mb-lg mx-auto">
-              <span>🎉</span> Now Available for macOS & Windows
+              <Sparkles size={16} /> Now Available for macOS & Windows
             </div>
             <h1 className="hero-title">
               Stop Wasting Wood.<br />
@@ -118,7 +131,7 @@ export default function HomePage() {
         <section className="container mt-3xl">
           <div className="features-grid">
             <div className="feature-card">
-              <span className="feature-icon">🎨</span>
+              <span className="feature-icon"><Palette size={28} /></span>
               <h3 className="feature-title">See It Before You Build It</h3>
               <p className="feature-description">
                 Design in real-time 3D with tools that actually make sense. No engineering degree required.
@@ -127,7 +140,7 @@ export default function HomePage() {
               </p>
             </div>
             <div className="feature-card">
-              <span className="feature-icon">📐</span>
+              <span className="feature-icon"><Ruler size={28} /></span>
               <h3 className="feature-title">Cut Lists That Save You Money</h3>
               <p className="feature-description">
                 Our optimization engine finds the most efficient way to cut your materials. Stop buying
@@ -136,7 +149,7 @@ export default function HomePage() {
               </p>
             </div>
             <div className="feature-card">
-              <span className="feature-icon">💰</span>
+              <span className="feature-icon"><DollarSign size={28} /></span>
               <h3 className="feature-title">Know Your Costs Before You Quote</h3>
               <p className="feature-description">
                 Set your material prices once, then watch costs update in real-time as you design.
@@ -145,7 +158,7 @@ export default function HomePage() {
               </p>
             </div>
             <div className="feature-card">
-              <span className="feature-icon">🔒</span>
+              <span className="feature-icon"><Lock size={28} /></span>
               <h3 className="feature-title">Your Designs Stay Yours</h3>
               <p className="feature-description">
                 No cloud. No subscriptions. No data mining. Everything stays on your computer where it belongs.
@@ -153,7 +166,7 @@ export default function HomePage() {
               </p>
             </div>
             <div className="feature-card">
-              <span className="feature-icon">⚡</span>
+              <span className="feature-icon"><Zap size={28} /></span>
               <h3 className="feature-title">Lightning Fast, Zero Bloat</h3>
               <p className="feature-description">
                 Built for speed by woodworkers, for woodworkers. Launch instantly, design smoothly, save quickly.
@@ -162,7 +175,7 @@ export default function HomePage() {
               </p>
             </div>
             <div className="feature-card">
-              <span className="feature-icon">🛠️</span>
+              <span className="feature-icon"><Wrench size={28} /></span>
               <h3 className="feature-title">Professional-Grade Tools</h3>
               <p className="feature-description">
                 Custom materials library, reusable assemblies, precise measurements, grain direction
@@ -180,7 +193,7 @@ export default function HomePage() {
           </h2>
           <div className="grid grid-cols-3 gap-xl">
             <div className="use-case-card">
-              <div className="use-case-icon">🏢</div>
+              <div className="use-case-icon"><Building2 size={36} /></div>
               <h3 className="use-case-title">Custom Cabinet Shops</h3>
               <p className="use-case-description">
                 Quote faster, cut smarter, profit more. Design custom cabinets with precision,
@@ -188,7 +201,7 @@ export default function HomePage() {
               </p>
             </div>
             <div className="use-case-card">
-              <div className="use-case-icon">🪑</div>
+              <div className="use-case-icon"><Armchair size={36} /></div>
               <h3 className="use-case-title">Furniture Makers</h3>
               <p className="use-case-description">
                 From tables to chairs to built-ins. Design complex pieces with confidence,
@@ -196,7 +209,7 @@ export default function HomePage() {
               </p>
             </div>
             <div className="use-case-card">
-              <div className="use-case-icon">🏡</div>
+              <div className="use-case-icon"><Home size={36} /></div>
               <h3 className="use-case-title">DIY Enthusiasts</h3>
               <p className="use-case-description">
                 Turn your weekend project dreams into reality. Get professional results without
@@ -248,7 +261,7 @@ export default function HomePage() {
                   </tr>
                   <tr>
                     <td className="font-bold">If you stop paying</td>
-                    <td>❌ Lose access</td>
+                    <td>Lose access</td>
                     <td className="font-bold text-success">✓ Keep it forever</td>
                   </tr>
                 </tbody>
@@ -282,7 +295,7 @@ export default function HomePage() {
                 href={macDownload.url}
                 className="download-card"
               >
-                <span className="download-icon">🍎</span>
+                <span className="download-icon"><AppleIcon size={32} /></span>
                 <span className="download-platform">macOS</span>
                 <span className="download-file">{macDownload.fileExtension} installer</span>
                 <span className="download-req">{macDownload.minOsVersion}</span>
@@ -291,7 +304,7 @@ export default function HomePage() {
                 href={windowsDownload.url}
                 className="download-card"
               >
-                <span className="download-icon">🪟</span>
+                <span className="download-icon"><WindowsIcon size={32} /></span>
                 <span className="download-platform">Windows</span>
                 <span className="download-file">{windowsDownload.fileExtension} installer</span>
                 <span className="download-req">{windowsDownload.minOsVersion}</span>

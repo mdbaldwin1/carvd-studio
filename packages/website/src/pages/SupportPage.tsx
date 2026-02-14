@@ -1,3 +1,5 @@
+import { Wrench, HelpCircle, Mail, Monitor, Key, Settings, BookOpen } from 'lucide-react';
+
 export default function SupportPage() {
   const supportEmail = 'support@carvd-studio.com';
 
@@ -30,17 +32,17 @@ export default function SupportPage() {
             {/* Quick Links */}
             <div className="grid grid-cols-3 gap-lg mb-3xl">
               <a href="#troubleshooting" className="support-card">
-                <span className="support-card-icon">🔧</span>
+                <span className="support-card-icon"><Wrench size={24} /></span>
                 <span className="support-card-title">Troubleshooting</span>
                 <span className="support-card-desc">Fix common issues</span>
               </a>
               <a href="#faq" className="support-card">
-                <span className="support-card-icon">❓</span>
+                <span className="support-card-icon"><HelpCircle size={24} /></span>
                 <span className="support-card-title">FAQ</span>
                 <span className="support-card-desc">Quick answers</span>
               </a>
               <a href="#contact" className="support-card">
-                <span className="support-card-icon">✉️</span>
+                <span className="support-card-icon"><Mail size={24} /></span>
                 <span className="support-card-title">Contact Us</span>
                 <span className="support-card-desc">Get personal help</span>
               </a>
@@ -53,7 +55,7 @@ export default function SupportPage() {
               {/* Installation Issues */}
               <div className="mb-xl">
                 <h3 className="text-xl font-bold mb-md flex items-center gap-sm">
-                  <span>💻</span> Installation Issues
+                  <Monitor size={20} /> Installation Issues
                 </h3>
 
                 <div className="troubleshoot-item">
@@ -104,7 +106,7 @@ export default function SupportPage() {
               {/* License Issues */}
               <div className="mb-xl">
                 <h3 className="text-xl font-bold mb-md flex items-center gap-sm">
-                  <span>🔑</span> License & Activation
+                  <Key size={20} /> License & Activation
                 </h3>
 
                 <div className="troubleshoot-item">
@@ -150,7 +152,7 @@ export default function SupportPage() {
               {/* App Issues */}
               <div className="mb-xl">
                 <h3 className="text-xl font-bold mb-md flex items-center gap-sm">
-                  <span>🛠️</span> App Issues
+                  <Settings size={20} /> App Issues
                 </h3>
 
                 <div className="troubleshoot-item">
@@ -355,7 +357,7 @@ export default function SupportPage() {
               <div className="grid grid-cols-2 gap-xl">
                 <div className="card">
                   <h3 className="text-xl font-bold mb-md flex items-center gap-sm">
-                    <span>✉️</span> Email Support
+                    <Mail size={20} /> Email Support
                   </h3>
                   <p className="text-muted mb-lg">
                     For technical issues, license questions, or general inquiries, email us at:
@@ -370,7 +372,7 @@ export default function SupportPage() {
 
                 <div className="card">
                   <h3 className="text-xl font-bold mb-md flex items-center gap-sm">
-                    <span>📚</span> Documentation
+                    <BookOpen size={20} /> Documentation
                   </h3>
                   <p className="text-muted mb-lg">
                     Learn how to use Carvd Studio with our comprehensive documentation and tutorials.

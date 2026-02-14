@@ -1,4 +1,5 @@
 import { useDownloadInfo } from "../utils/downloads";
+import { AppleIcon, WindowsIcon } from "../components/BrandIcons";
 
 export default function DownloadPage() {
     const { version: appVersion, macDownload, windowsDownload } = useDownloadInfo();
@@ -44,7 +45,7 @@ export default function DownloadPage() {
                         </p>
                         <div className="download-buttons">
                             <a href={macDownload.url} className="download-card">
-                                <span className="download-icon">🍎</span>
+                                <span className="download-icon"><AppleIcon size={32} /></span>
                                 <span className="download-platform">macOS</span>
                                 <span className="download-file">
                                     {macDownload.fileExtension} installer
@@ -57,7 +58,7 @@ export default function DownloadPage() {
                                 href={windowsDownload.url}
                                 className="download-card"
                             >
-                                <span className="download-icon">🪟</span>
+                                <span className="download-icon"><WindowsIcon size={32} /></span>
                                 <span className="download-platform">
                                     Windows
                                 </span>
@@ -82,7 +83,7 @@ export default function DownloadPage() {
                         {/* macOS Instructions */}
                         <div className="card">
                             <h3 className="text-2xl font-bold mb-lg flex items-center gap-sm">
-                                <span>🍎</span> macOS Installation
+                                <AppleIcon size={24} /> macOS Installation
                             </h3>
                             <ol className="install-steps">
                                 <li className="install-step">
@@ -140,7 +141,7 @@ export default function DownloadPage() {
                         {/* Windows Instructions */}
                         <div className="card">
                             <h3 className="text-2xl font-bold mb-lg flex items-center gap-sm">
-                                <span>🪟</span> Windows Installation
+                                <WindowsIcon size={24} /> Windows Installation
                             </h3>
                             <ol className="install-steps">
                                 <li className="install-step">
@@ -252,22 +253,6 @@ export default function DownloadPage() {
                                 </ul>
                             </div>
                         </div>
-
-                        {/* Placeholder for future versions */}
-                        {/*
-            <div className="version-entry">
-              <div className="version-header">
-                <span className="version-number">v0.9.0</span>
-                <span className="version-date">January 2024</span>
-              </div>
-              <div className="version-content">
-                <h4 className="font-bold mb-sm">Beta Release</h4>
-                <ul className="version-changes">
-                  <li>Feature description here</li>
-                </ul>
-              </div>
-            </div>
-            */}
                     </div>
                 </section>
 
@@ -279,8 +264,8 @@ export default function DownloadPage() {
 
                     <div className="grid grid-cols-2 gap-xl max-w-4xl mx-auto">
                         <div className="card">
-                            <h3 className="text-xl font-bold mb-md">
-                                🍎 macOS
+                            <h3 className="text-xl font-bold mb-md flex items-center gap-sm">
+                                <AppleIcon size={20} /> macOS
                             </h3>
                             <ul className="requirements-list">
                                 <li>
@@ -305,8 +290,8 @@ export default function DownloadPage() {
                             </ul>
                         </div>
                         <div className="card">
-                            <h3 className="text-xl font-bold mb-md">
-                                🪟 Windows
+                            <h3 className="text-xl font-bold mb-md flex items-center gap-sm">
+                                <WindowsIcon size={20} /> Windows
                             </h3>
                             <ul className="requirements-list">
                                 <li>
