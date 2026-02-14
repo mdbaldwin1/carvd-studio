@@ -22,11 +22,14 @@ if [ -z "$CURR" ]; then
   exit 1
 fi
 
-# Try to read previous version from git history
-PREV=$(git show HEAD~1:packages/website/package.json 2>/dev/null | node -p "try{JSON.parse(require('fs').readFileSync('/dev/stdin','utf-8')).version}catch{''}" 2>/dev/null || echo "")
+# Compare against the latest website-v* tag instead of HEAD~1
+# This is squash-merge safe since tags are durable artifacts
+git fetch --tags --quiet 2>/dev/null
+LATEST_TAG=$(git tag --list 'website-v*' --sort=-version:refname | head -n 1)
+PREV="${LATEST_TAG#website-v}"
 
-if [ "$CURR" = "$PREV" ]; then
-  echo "Skip: website v$CURR unchanged"
+if [ -n "$PREV" ] && [ "$CURR" = "$PREV" ]; then
+  echo "Skip: website v$CURR matches latest tag ($LATEST_TAG)"
   exit 0
 fi
 

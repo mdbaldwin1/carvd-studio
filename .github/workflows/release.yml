@@ -42,26 +42,25 @@ jobs:
           TAG="${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
 
-          # Check if the version actually changed compared to the previous commit
-          PREV_VERSION=$(node -e "
-            const cp = require('child_process');
-            try {
-              const json = cp.execSync('git show HEAD~1:packages/desktop/package.json', {encoding: 'utf-8'});
-              console.log(JSON.parse(json).version);
-            } catch { console.log(''); }
-          ")
+          # Compare against the latest GitHub Release instead of HEAD~1
+          # This is squash-merge safe since releases are durable artifacts
+          LATEST_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""')
+          LATEST_VERSION="${LATEST_TAG#v}"
 
           echo "Current version: $VERSION"
-          echo "Previous version: $PREV_VERSION"
+          echo "Latest release: ${LATEST_TAG:-<none>} (version: ${LATEST_VERSION:-<none>})"
 
-          if [ "$VERSION" = "$PREV_VERSION" ]; then
-            echo "⏭️  Version $VERSION unchanged from previous commit - skipping release"
+          if [ -z "$LATEST_VERSION" ]; then
+            echo "✅ No existing releases found - proceeding with first release $TAG"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          elif [ "$VERSION" = "$LATEST_VERSION" ]; then
+            echo "⏭️  Version $VERSION matches latest release - skipping"
             echo "should_release=false" >> $GITHUB_OUTPUT
           elif gh release view "$TAG" &>/dev/null; then
             echo "⚠️  Release $TAG already exists - skipping"
             echo "should_release=false" >> $GITHUB_OUTPUT
           else
-            echo "✅ New version $TAG (was $PREV_VERSION) - proceeding with release"
+            echo "✅ New version $TAG (latest release: v$LATEST_VERSION) - proceeding with release"
             echo "should_release=true" >> $GITHUB_OUTPUT
           fi
 
