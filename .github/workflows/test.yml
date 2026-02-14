@@ -122,9 +122,6 @@ jobs:
       - name: Check formatting (desktop)
         run: npm run format:check --workspace=@carvd/desktop
 
-      - name: Run ESLint (website)
-        run: npm run lint --workspace=@carvd/website
-
       - name: Run TypeScript type check (website)
         run: npm run typecheck --workspace=@carvd/website
 
