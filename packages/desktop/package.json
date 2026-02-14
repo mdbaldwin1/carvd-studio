@@ -1,6 +1,6 @@
 {
   "name": "@carvd/desktop",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "An offline-only desktop app for designing and planning custom furniture and cabinetry.",
   "private": true,
   "type": "module",
