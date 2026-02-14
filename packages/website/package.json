@@ -1,6 +1,6 @@
 {
   "name": "@carvd/website",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Carvd Studio marketing and documentation website",
   "private": true,
   "type": "module",
