@@ -1,0 +1,53 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please describe what you'd like and why it would be useful.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the problem or limitation you're experiencing
+      placeholder: "I'm frustrated when..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Describe your ideal solution
+      description: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Any alternative solutions or workarounds you've tried?
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area of the app does this relate to?
+      options:
+        - 3D Workspace
+        - Cut List / Optimizer
+        - Parts / Materials
+        - Groups / Assemblies
+        - Templates
+        - Import / Export
+        - UI / UX
+        - Performance
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Any mockups, examples, or references that help illustrate the idea
+    validations:
+      required: false

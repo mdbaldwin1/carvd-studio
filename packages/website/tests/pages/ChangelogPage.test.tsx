@@ -67,7 +67,8 @@ describe('ChangelogPage', () => {
 
     it('renders formatted dates', () => {
       renderChangelogPage();
-      expect(screen.getByText('February 13, 2026')).toBeInTheDocument();
+      // Multiple versions share the same date (February 13, 2026)
+      expect(screen.getAllByText('February 13, 2026').length).toBeGreaterThan(0);
       expect(screen.getByText('February 12, 2025')).toBeInTheDocument();
     });
 

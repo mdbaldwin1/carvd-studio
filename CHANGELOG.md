@@ -5,6 +5,60 @@ All notable changes to Carvd Studio will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Group Bounding Box Dimensions** — When a group is selected, only the group's overall dimensions are shown instead of cluttering the view with every child part's individual measurements
+- **PR Template** — Added `.github/pull_request_template.md` with checklist and Claude instructions for consistent PR quality
+- **Changelog CI Check** — PRs to main now fail if CHANGELOG.md hasn't been updated
+- **CLAUDE.md** — Added project-level development guidelines covering git workflow, branch naming, commit conventions, and testing
+- **Pre-commit Hooks** — Added husky + lint-staged to auto-check formatting on commit
+- **Issue Templates** — Added GitHub issue templates for bug reports and feature requests
+- **Dependabot Config** — Configured Dependabot for automated dependency update PRs with grouped packages
+
+### Changed
+
+- **Decoupled Website & Desktop Deployments** — Website and desktop app now have independent versioning and deployment pipelines; website fetches the latest version dynamically from GitHub Releases API
+- **Vercel Ignore Script** — Moved ignoreCommand logic to a shell script to stay within Vercel's 256-character limit
+- **Branch Protection** — Both `develop` and `main` are now fully protected; all 7 CI checks must pass, no direct pushes even for admins
+- **Website Auto-Versioning** — Website version bumps are automated via GitHub Actions after each deployment
+- **Website Icons** — Replaced all emojis across the website with proper SVG icons (Apple logo, Windows logo) and lucide-react icons for a more professional appearance
+- **CI Checks** — Added website lint, typecheck, and format checks to CI; all workflows now use `.nvmrc` for consistent Node.js version
+- **Website Code Quality** — Removed unused React imports (React 19), added `typecheck` and `format:check` scripts, excluded test files from typecheck, auto-formatted all source files
+- **Versioning Standards** — Documented semver conventions and version management in CLAUDE.md
+
+### Fixed
+
+- **Vercel Deployment Failure** — Fixed `ignoreCommand` exceeding Vercel's 256-character schema limit, which caused all deployments to fail
+
+## [0.1.8] - 2026-02-13
+
+### Fixed
+
+- **Update Toast Z-Index** — Update notification toast was hidden behind the StartScreen overlay due to z-index conflict
+- **Release Workflow** — Improved version comparison to skip releases when the desktop version is unchanged; fixed sync-develop step
+
+## [0.1.6] - 2026-02-13
+
+### Fixed
+
+- **Auto-Update 404** — Resolved issue where the auto-updater returned 404 errors when checking for updates
+- **Update Notification UX** — Converted update notification from a banner to a toast for less intrusive presentation
+
+## [0.1.4] - 2026-02-13
+
+### Changed
+
+- **React Rendering Performance** — Added React.memo to Part component, memoized Zustand selectors and AABB calculations, implemented code splitting for modals
+- **GPU Performance** — Capped device pixel ratio, reused Vector3 objects, removed unused shadow maps
+- **Production GPU Optimization** — Optimized Three.js rendering pipeline for production builds
+
+### Fixed
+
+- **Download URLs** — Fixed website download links to match actual GitHub Release filenames
+- **Vercel Deployment** — Fixed ignoreCommand and redeploy triggering for the marketing website
+
 ## [0.1.1] - 2026-02-13
 
 ### Added
@@ -53,5 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-Platform** - macOS and Windows desktop application
 - **Marketing Website** - Product website with features, pricing, documentation, and download pages
 
+[Unreleased]: https://github.com/mdbaldwin1/carvd-studio/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/mdbaldwin1/carvd-studio/compare/v0.1.6...v0.1.8
+[0.1.6]: https://github.com/mdbaldwin1/carvd-studio/compare/v0.1.4...v0.1.6
+[0.1.4]: https://github.com/mdbaldwin1/carvd-studio/compare/v0.1.1...v0.1.4
 [0.1.1]: https://github.com/mdbaldwin1/carvd-studio/releases/tag/v0.1.1
 [0.1.0]: https://github.com/mdbaldwin1/carvd-studio/releases/tag/v0.1.0

@@ -19,7 +19,8 @@
     "generate-keys": "npm run generate-keys --workspace=@carvd/desktop",
     "generate-test-license": "npm run generate-test-license --workspace=@carvd/desktop",
     "clean": "rm -rf node_modules packages/*/node_modules packages/*/dist packages/*/out packages/desktop/dist packages/desktop/out",
-    "fresh-install": "npm run clean && npm install"
+    "fresh-install": "npm run clean && npm install",
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
@@ -31,7 +32,17 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "prettier --check"
+    ],
+    "*.{json,css,md}": [
+      "prettier --check"
+    ]
+  },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.8.1"
   }
 }
