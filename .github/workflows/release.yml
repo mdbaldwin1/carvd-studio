@@ -276,9 +276,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ── Step 4: Bump patch version on develop for next release ──────────────────
-  # Note: main -> develop sync is handled by the sync-develop.yml workflow,
-  # which runs on every push to main. This job ensures develop is up-to-date
-  # before creating the version bump branch.
+  # Branches from main (which has the just-released version) so the bump
+  # doesn't depend on develop being synced first. The sync-develop.yml
+  # workflow handles syncing main back to develop separately via PR.
   bump-develop:
     name: Bump Version on Develop
     needs: [prepare, create-release]
@@ -289,19 +289,10 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout develop branch
+      - name: Checkout main branch
         uses: actions/checkout@v6
         with:
-          ref: develop
-          fetch-depth: 0
-
-      - name: Ensure develop is synced with main
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          git merge origin/main --no-edit -m "chore: sync main back to develop after ${{ needs.prepare.outputs.tag }} release"
-          git push origin develop
+          ref: main
 
       - name: Compute next patch version
         id: next
