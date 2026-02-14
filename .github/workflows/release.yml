@@ -275,34 +275,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ── Step 4: Sync main back to develop ───────────────────────────────────────
-  sync-develop:
-    name: Sync Main to Develop
-    needs: [prepare, create-release]
-    if: needs.prepare.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout develop branch
-        uses: actions/checkout@v6
-        with:
-          ref: develop
-          fetch-depth: 0
-
-      - name: Merge main into develop
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          git merge origin/main --no-edit -m "chore: sync main back to develop after ${{ needs.prepare.outputs.tag }} release"
-          git push origin develop
-
-  # ── Step 5: Bump patch version on develop for next release ──────────────────
+  # ── Step 4: Bump patch version on develop for next release ──────────────────
+  # Note: main -> develop sync is handled by the sync-develop.yml workflow,
+  # which runs on every push to main. This job ensures develop is up-to-date
+  # before creating the version bump branch.
   bump-develop:
     name: Bump Version on Develop
-    needs: [prepare, create-release, sync-develop]
+    needs: [prepare, create-release]
     if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -315,6 +294,14 @@ jobs:
         with:
           ref: develop
           fetch-depth: 0
+
+      - name: Ensure develop is synced with main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git merge origin/main --no-edit -m "chore: sync main back to develop after ${{ needs.prepare.outputs.tag }} release"
+          git push origin develop
 
       - name: Compute next patch version
         id: next
@@ -359,7 +346,7 @@ jobs:
   # ── Summary ─────────────────────────────────────────────────────────────────
   summary:
     name: Release Summary
-    needs: [prepare, build, create-release, sync-develop, bump-develop]
+    needs: [prepare, build, create-release, bump-develop]
     if: always() && needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
 
@@ -373,5 +360,4 @@ jobs:
           echo "| Version | **${{ needs.prepare.outputs.tag }}** |" >> $GITHUB_STEP_SUMMARY
           echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| GitHub Release | ${{ needs.create-release.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Sync Develop | ${{ needs.sync-develop.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Develop Bump | ${{ needs.bump-develop.result }} |" >> $GITHUB_STEP_SUMMARY
