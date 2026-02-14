@@ -122,7 +122,11 @@ Core features complete. UX polish in progress for 1.0 release.
 
 ## Known Issues
 
-1. **Production build performance** - Three.js rendering is noticeably slower in the packaged app compared to dev mode. Needs investigation (GPU context, Vite bundling, or Electron hardened runtime).
+None currently.
+
+## Resolved Issues
+
+1. ~~**Production build performance**~~ — Three.js rendering was sluggish in the packaged app. Resolved through optimization work.
 
 ## Known Limitations (By Design)
 

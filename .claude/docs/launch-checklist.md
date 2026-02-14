@@ -11,10 +11,10 @@ Last updated: 2026-02-14
 5. **Set up Lemon Squeezy** (required for purchases)
 6. ~~**Enable macOS notarization**~~ ✅ Working (Developer ID Application cert + Apple notarytool)
 7. **Create og-image.png** (for social sharing)
-8. **Set up professional email** (for support)
-9. **Add analytics** (nice to have)
+8. ~~**Set up professional email**~~ ✅ Cloudflare email routing → support@carvd-studio.com (code refs already updated)
+9. ~~**Add analytics**~~ — Deferred (no 3rd-party analytics service for now)
 10. **Run testing checklist** (before announcing)
-11. **Investigate production build performance** (Three.js sluggish in packaged app vs dev)
+11. ~~**Investigate production build performance**~~ ✅ Resolved (Three.js performance improved)
 
 ---
 
@@ -201,76 +201,20 @@ VITE_LEMON_SQUEEZY_CHECKOUT_URL=https://yourstore.lemonsqueezy.com/checkout/buy/
 
 ---
 
-## 4. Set Up Professional Email
+## 4. Set Up Professional Email ✅
 
-**What:** Create support@carvd-studio.com (or similar) for customer support.
+**Status:** Done. Cloudflare email routing forwards `support@carvd-studio.com` to personal email.
 
-### Option A: Cloudflare Email Routing (FREE - Recommended)
+Code references already updated:
 
-If your domain is on Cloudflare:
-
-1. Cloudflare Dashboard → Email → Email Routing
-2. Click "Enable Email Routing"
-3. Add routing rule:
-   - Custom address: `support@carvd-studio.com`
-   - Forward to: your personal email
-4. Verify your personal email address
-5. Done! Emails to support@ forward to your inbox
-
-### Option B: Google Workspace (~$6/month)
-
-1. Go to https://workspace.google.com
-2. Sign up with your domain
-3. Follow DNS verification steps
-4. Create support@carvd-studio.com mailbox
-
-### Option C: Zoho Mail (Free tier)
-
-1. Go to https://www.zoho.com/mail/
-2. Sign up for free plan
-3. Verify domain ownership
-4. Create mailbox
-
-**After setup, update these files:**
-
-- `packages/website/src/pages/HomePage.tsx` - Footer support link
-- `packages/desktop/src/renderer/src/components/AboutModal.tsx` - Contact email
+- `packages/website/src/pages/SupportPage.tsx` — contact section
+- `packages/desktop/src/renderer/src/components/AboutModal.tsx` — contact email
 
 ---
 
-## 5. Set Up Analytics
+## 5. ~~Set Up Analytics~~ — Deferred
 
-**What:** Track website visitors to understand traffic sources and popular pages.
-
-### Recommended: Plausible Analytics (~$9/month, privacy-friendly)
-
-#### 5a. Sign Up
-
-1. Go to https://plausible.io
-2. Create account and add your site: `carvd-studio.com`
-
-#### 5b. Add Script to Website
-
-Edit `packages/website/index.html`, add before `</head>`:
-
-```html
-<script
-  defer
-  data-domain="carvd-studio.com"
-  src="https://plausible.io/js/script.js"
-></script>
-```
-
-#### 5c. Verify
-
-1. Deploy website
-2. Visit your site
-3. Check Plausible dashboard for the visit
-
-### Alternative: Fathom Analytics
-
-- Similar setup, also privacy-friendly
-- https://usefathom.com
+No 3rd-party analytics service for now. Can revisit later if needed.
 
 ---
 
@@ -404,3 +348,5 @@ These have already been done:
 - [x] Website CI checks (typecheck + format) added to test workflow
 - [x] Dependabot configured for website package
 - [x] Branch protection enforced for admins on both develop and main
+- [x] Professional email setup (Cloudflare routing → support@carvd-studio.com)
+- [x] Production build performance improved (Three.js rendering)
