@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 
 /**
  * Component that scrolls to hash elements when navigating.
@@ -14,13 +14,13 @@ export default function ScrollToHash() {
       const timeoutId = setTimeout(() => {
         const element = document.querySelector(hash);
         if (element) {
-          element.scrollIntoView({ behavior: 'smooth' });
+          element.scrollIntoView({ behavior: "smooth" });
         }
       }, 100);
       return () => clearTimeout(timeoutId);
     } else {
       // Scroll to top when navigating to a new page without hash
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   }, [hash, pathname]);
 

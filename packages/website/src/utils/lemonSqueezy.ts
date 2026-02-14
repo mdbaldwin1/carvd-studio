@@ -10,17 +10,17 @@
 
 const CHECKOUT_URL = import.meta.env.VITE_LEMON_SQUEEZY_CHECKOUT_URL;
 
-export type Platform = 'macos' | 'windows';
+export type Platform = "macos" | "windows";
 
 /**
  * Detects the user's operating system (for download buttons)
  */
 export function detectPlatform(): Platform {
   const userAgent = navigator.userAgent.toLowerCase();
-  if (userAgent.includes('mac')) {
-    return 'macos';
+  if (userAgent.includes("mac")) {
+    return "macos";
   }
-  return 'windows';
+  return "windows";
 }
 
 /**
@@ -33,7 +33,7 @@ export function getCheckoutUrl(): string {
     return CHECKOUT_URL;
   }
   // Fallback to pricing page if not configured
-  return '/pricing';
+  return "/pricing";
 }
 
 /**

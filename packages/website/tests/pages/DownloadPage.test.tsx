@@ -58,14 +58,16 @@ describe('DownloadPage', () => {
   describe('download cards', () => {
     it('renders macOS download card', () => {
       renderDownloadPage();
-      expect(screen.getByText('macOS')).toBeInTheDocument();
+      // "macOS" appears in download card, installation section, and system requirements
+      expect(screen.getAllByText('macOS').length).toBeGreaterThan(0);
       expect(screen.getByText('.dmg installer')).toBeInTheDocument();
       expect(screen.getByText('macOS 10.15+')).toBeInTheDocument();
     });
 
     it('renders Windows download card', () => {
       renderDownloadPage();
-      expect(screen.getByText('Windows')).toBeInTheDocument();
+      // "Windows" appears in download card, installation section, and system requirements
+      expect(screen.getAllByText('Windows').length).toBeGreaterThan(0);
       expect(screen.getByText('.exe installer')).toBeInTheDocument();
       expect(screen.getByText('Windows 10+')).toBeInTheDocument();
     });
