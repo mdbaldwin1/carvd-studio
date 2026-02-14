@@ -10,7 +10,7 @@
 ### Branches
 
 - **develop** — Integration branch. All feature work targets here via PRs.
-- **main** — Production branch. Protected. Only receives PRs from develop. Squash-merged.
+- **main** — Production branch. Protected. Only receives PRs from develop. Merge commit (not squash).
 - **Feature branches** — Created from develop. Named with prefixes: `feat/`, `fix/`, `chore/`, `docs/`, `test/`, `refactor/`.
 - **Hotfix branches** — Created from **main** (not develop). Named `hotfix/description`. Used for urgent production fixes.
 
@@ -33,6 +33,12 @@ Use conventional commit prefixes:
 - `test:` — Test additions or modifications
 - `refactor:` — Code restructuring without behavior change
 
+### Merge Strategies
+
+- **Feature branches → develop**: Squash merge (clean history, one commit per feature)
+- **develop → main**: Merge commit (preserves shared ancestry so syncing main back to develop is conflict-free)
+- **Hotfix branches → main**: Squash merge
+
 ### Pull Request Workflow
 
 1. Create a feature branch from `develop`
@@ -51,7 +57,7 @@ Hotfixes bypass `develop` to get urgent fixes into production quickly:
 2. Make the fix and commit
 3. Update CHANGELOG.md
 4. PR into **main** (squash merge) — deploys the fix to production
-5. PR into **develop** (or merge main back into develop) — keeps develop in sync
+5. The `sync-develop` workflow automatically merges main back into develop
 
 ### Changelog Format
 
@@ -92,9 +98,11 @@ This project follows [Semantic Versioning](https://semver.org/). Desktop and web
 
 ### Version Management
 
-- **Desktop version** (`packages/desktop/package.json`) drives GitHub Releases, auto-update, and git tags (`v0.1.9` → tag `v0.1.9`)
-- **Website version** (`packages/website/package.json`) is independent and tracks website-specific changes
-- After a release, the CI automatically creates a PR to bump the desktop patch version on `develop`
+- **Desktop version** (`packages/desktop/package.json`) drives GitHub Releases, auto-update, and git tags (`v0.1.10` → tag `v0.1.10`)
+- **Website version** (`packages/website/package.json`) is independent and tracks website-specific changes with `website-v*` git tags
+- After a desktop release, CI creates a PR to bump the desktop patch version on `develop`
+- After a website deployment, CI waits for Vercel to succeed, creates a `website-v*` tag, then creates a PR to bump the website patch version on `develop`
+- After any push to main, the `sync-develop` workflow merges main back into develop automatically
 - Never manually edit version numbers on `main` — versions are bumped on `develop` and flow to `main` via PR
 
 ## Testing
