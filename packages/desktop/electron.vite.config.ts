@@ -1,6 +1,7 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { resolve } from 'path';
 import { copyFileSync, mkdirSync } from 'fs';
 
@@ -55,6 +56,12 @@ export default defineConfig({
         }
       }
     },
-    plugins: [tailwindcss(), react()]
-  }
+    plugins: [
+      tailwindcss(),
+      react(),
+      ...(process.env.ANALYZE === 'true'
+        ? [visualizer({ filename: 'bundle-analysis.html', open: true, gzipSize: true })]
+        : []),
+    ],
+  },
 });

@@ -16,6 +16,7 @@ import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { CameraState, LightingMode, SnapLine } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { Part } from './Part';
+import { PerfMonitor } from './PerfMonitor';
 import { ReferenceDistanceIndicators } from './ReferenceDistanceIndicators';
 
 // Lighting presets for different viewing conditions
@@ -1425,6 +1426,8 @@ export function Workspace() {
       <ThumbnailCaptureHandler />
       {/* GPU telemetry for debugging production performance */}
       <GpuTelemetry />
+      {/* Dev-only: FPS stats panel + renderer.info logging */}
+      <PerfMonitor />
 
       {/* Ground plane (invisible but clickable) */}
       <mesh
