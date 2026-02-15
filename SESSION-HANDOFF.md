@@ -85,8 +85,8 @@ bd children carvd-studio-1
 ### Epic Overview
 
 1. **Epic 1: Styling Architecture** (🔴 CRITICAL) - `carvd-studio-1`
-   - Blocked by decision (Tailwind vs CSS Modules)
-   - Must be resolved before other UI work
+   - Decision made: Tailwind CSS (ticket 1.1 closed)
+   - Start with ticket 1.2 (setup Tailwind + configure theme)
 
 2. **Epic 2: Component Refactoring** (🔴 CRITICAL) - `carvd-studio-2`
    - Monster components need breaking down
@@ -103,9 +103,11 @@ bd children carvd-studio-1
 5. **Epic 5: Testing Improvements** (🟢 LOW) - `carvd-studio-5`
    - Already at 85% coverage, nice-to-have improvements
 
-6. **Epic 6: Website Polish** (⏸️ BLOCKED) - `carvd-studio-6`
-   - Blocked on logo/screenshots
-   - Can work on DocsPage split, but screenshots are priority
+6. **Epic 6: Website Polish** (🟡 PARTIALLY UNBLOCKED) - `carvd-studio-6`
+   - 10 child tickets created, most are unblocked
+   - Start with 6.1 (DocsPage split) - **Highest impact!**
+   - Screenshots (6.2) partially blocked on logo
+   - Structure & content work can proceed now
 
 ---
 
@@ -554,6 +556,47 @@ Add notes here after each work session. Format:
 - Best use of time is code quality improvements
 - All review documents are in `review-notes/`
 - Beads issues are in `.beads/issues.jsonl`
+
+---
+
+### Session: 2026-02-15 (Epic 6 Planning)
+
+**Worked on:** Epic 6 - Website Polish planning and ticket creation
+**Completed:**
+
+- Reviewed website codebase structure (27 source files, 8,833 lines)
+- Deep analysis of DocsPage.tsx (2,314 lines, 11+ sections)
+- Created 10 child tickets for Epic 6:
+  - 6.1: Split DocsPage into route-based pages (P1, ~24hrs) - **Start here!**
+  - 6.2: Add product screenshots (P1, ~8hrs) - Partially blocked on logo
+  - 6.3: SEO audit and improvements (P2, ~12hrs)
+  - 6.4: Mobile responsiveness audit (P2, ~8hrs)
+  - 6.5: Content accuracy verification (P2, ~8hrs)
+  - 6.6: Performance optimization / Core Web Vitals (P2, ~12hrs)
+  - 6.7: Accessibility audit / WCAG compliance (P3, ~8hrs)
+  - 6.8: Refactor SupportPage.tsx 621 lines (P3, ~6hrs)
+  - 6.9: Refactor PricingPage.tsx 558 lines (P3, ~6hrs)
+  - 6.10: Extract reusable website components (P3, ~10hrs)
+- Updated Epic 6 status from BLOCKED to PARTIALLY UNBLOCKED
+- Updated Epic 1 status (decision made: Tailwind CSS)
+- Total estimated effort: ~104 hours
+
+**Next:**
+
+- Start with `carvd-studio-6.1` (DocsPage split) - highest impact, fully unblocked
+- Can parallel `carvd-studio-6.5` (content accuracy check)
+- After 6.1: do 6.3 (SEO) and 6.6 (performance) which benefit from route-based pages
+
+**Blockers:**
+
+- 6.2 (screenshots) partially blocked on logo — app screenshots can proceed, logo-dependent ones wait
+
+**Notes:**
+
+- Website tech stack: React 19 + React Router 7 + Vite 7 + plain CSS (2,092 lines)
+- Good existing test coverage: unit tests + E2E (Playwright) + accessibility (axe-core)
+- CSS is better organized than desktop (design tokens, 7 breakpoints, 35 media queries)
+- Most Epic 6 work is unblocked and can start immediately
 
 ---
 
