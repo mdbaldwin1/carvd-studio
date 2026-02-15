@@ -111,6 +111,17 @@ bd children carvd-studio-1
 
 ## 🔄 Workflow for Each Ticket
 
+**Important: Use Git Worktrees for Each Ticket**
+
+Each ticket should be worked on in a dedicated git worktree. This allows you to:
+
+- Work on multiple tickets in parallel without switching branches
+- Keep each ticket's changes isolated in its own directory
+- Avoid losing uncommitted work when switching contexts
+- Run tests/builds for different tickets simultaneously
+
+Example: If working on ticket `carvd-studio-2.1`, create a worktree at `../carvd-studio-2.1/`
+
 ### 1. Pick a Ticket
 
 **Recommended starting points:**
@@ -153,13 +164,24 @@ bd comments carvd-studio-2.1 --add "Plan: 1. Create directory structure, 2. Move
 
 ### 4. Implementation Phase
 
-**Create a branch:**
+**Create a branch using git worktree:**
+
+Git worktrees allow you to work on multiple tickets in parallel without switching branches.
 
 ```bash
+# Update develop branch
+cd /Users/mbaldwin/Carvd/carvd-studio
 git checkout develop
 git pull origin develop
-git checkout -b refactor/carvd-studio-2.1-reorganize-components
+
+# Create a worktree for this ticket
+git worktree add ../carvd-studio-2.1 -b refactor/carvd-studio-2.1-reorganize-components
+
+# Navigate to the worktree
+cd ../carvd-studio-2.1
 ```
+
+Now you have a dedicated directory for this ticket at `../carvd-studio-2.1/` with its own branch.
 
 **Make changes:**
 
@@ -181,6 +203,25 @@ git commit -m "refactor: reorganize components into feature directories
 - Tests passing
 
 Related to carvd-studio-2.1"
+```
+
+**After completing the ticket:**
+
+```bash
+# Push your branch
+git push origin refactor/carvd-studio-2.1-reorganize-components
+
+# Create PR (see step 6)
+# After PR is merged, clean up the worktree
+
+# Go back to main directory
+cd /Users/mbaldwin/Carvd/carvd-studio
+
+# Remove the worktree
+git worktree remove ../carvd-studio-2.1 --force
+
+# Delete the local branch (after it's merged to develop)
+git branch -D refactor/carvd-studio-2.1-reorganize-components
 ```
 
 ### 5. Testing Phase
@@ -214,6 +255,7 @@ bd comments carvd-studio-2.1 --add "✅ Complete! Reorganized 52 components into
 **Create PR:**
 
 ```bash
+# From your worktree directory (e.g., ../carvd-studio-2.1)
 git push origin refactor/carvd-studio-2.1-reorganize-components
 
 # Create PR (if ready to merge)
@@ -225,6 +267,23 @@ Reorganized components from flat structure into feature-based directories:
 - All tests passing
 
 See ticket carvd-studio-2.1 for details." --base develop
+```
+
+**Clean up worktree after PR merged:**
+
+```bash
+# Go back to main directory
+cd /Users/mbaldwin/Carvd/carvd-studio
+
+# Update develop with merged changes
+git checkout develop
+git pull origin develop
+
+# Remove the worktree
+git worktree remove ../carvd-studio-2.1 --force
+
+# Delete the local branch
+git branch -D refactor/carvd-studio-2.1-reorganize-components
 ```
 
 **Update this handoff doc:**
@@ -360,15 +419,21 @@ npm run dev          # Start dev server
 npm test             # Run tests
 npm run build        # Build for production
 
-# Git workflow
+# Git workflow with worktrees (recommended)
+cd /Users/mbaldwin/Carvd/carvd-studio
 git checkout develop
 git pull origin develop
-git checkout -b feature/branch-name
+git worktree add ../carvd-studio-ticket-name -b feature/branch-name
+cd ../carvd-studio-ticket-name
 # ... make changes ...
 git add .
 git commit -m "type: description"
 git push origin feature/branch-name
 gh pr create --base develop
+# After PR merged:
+cd /Users/mbaldwin/Carvd/carvd-studio
+git worktree remove ../carvd-studio-ticket-name --force
+git branch -D feature/branch-name
 ```
 
 ### Testing Requirements
@@ -429,6 +494,22 @@ As we make improvements, track these metrics:
 ### Q: Should I run the website or just the desktop app?
 
 **A:** Depends on the ticket. Desktop refactoring = desktop app. Website improvements = website.
+
+### Q: How do I list all my worktrees?
+
+**A:** Use `git worktree list` to see all active worktrees and their branches.
+
+### Q: What if I want to switch to a different worktree?
+
+**A:** Just `cd` to the worktree directory (e.g., `cd ../carvd-studio-2.1`). Each worktree is a separate directory.
+
+### Q: Can I delete a worktree if I change my mind about a ticket?
+
+**A:** Yes! Use `git worktree remove ../carvd-studio-ticket-name --force` and then `git branch -D branch-name`.
+
+### Q: What happens if my machine crashes with worktrees open?
+
+**A:** Worktrees are just directories. You can clean them up later with `git worktree prune` to remove stale references.
 
 ---
 
