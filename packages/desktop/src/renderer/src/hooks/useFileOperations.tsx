@@ -19,8 +19,8 @@ import {
   FileOperationResult
 } from '../utils/fileOperations';
 import { FileRepairResult, getProjectNameFromPath } from '../utils/fileFormat';
-import { UnsavedChangesDialog, UnsavedChangesAction } from '../components/UnsavedChangesDialog';
-import { FileRecoveryModal } from '../components/FileRecoveryModal';
+import { UnsavedChangesDialog, UnsavedChangesAction } from '../components/project/UnsavedChangesDialog';
+import { FileRecoveryModal } from '../components/project/FileRecoveryModal';
 
 interface UseFileOperationsOptions {
   // Template editing mode
