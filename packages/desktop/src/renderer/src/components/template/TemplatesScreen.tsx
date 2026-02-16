@@ -8,13 +8,18 @@
 
 import { ArrowLeft, Copy, Plus, Pencil, Trash2, Download, Upload } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
 import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import { getFeatureLimits } from '../../utils/featureLimits';
 import { Project } from '../../types';
-import './TemplatesScreen.css';
+
+const tileClass =
+  'group relative flex flex-col items-center gap-3 py-5 px-4 bg-bg-secondary border border-border rounded-[10px] cursor-pointer transition-all duration-150 text-center hover:bg-bg-tertiary hover:border-accent hover:-translate-y-0.5 focus:outline-2 focus:outline-primary focus:outline-offset-2';
+
+const tileActionClass =
+  'w-7 h-7 flex items-center justify-center bg-bg border border-border rounded text-text-muted cursor-pointer transition-all duration-100 hover:bg-bg-tertiary hover:text-text hover:border-accent';
 
 interface TemplatesScreenProps {
   onBack: () => void;
@@ -38,6 +43,7 @@ export function TemplatesScreen({
   const [userTemplates, setUserTemplates] = useState<UserTemplate[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const myTemplatesSectionRef = useRef<HTMLElement>(null);
 
   // Load user templates on mount
   useEffect(() => {
@@ -206,8 +212,7 @@ export function TemplatesScreen({
           // Small delay to allow state to update and DOM to render
           setTimeout(() => {
             // Scroll to the My Templates section
-            const myTemplatesSection = document.querySelector('.templates-screen-section:last-child');
-            myTemplatesSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            myTemplatesSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
             // Open in edit mode
             onEditTemplate(duplicatedTemplate);
@@ -239,30 +244,34 @@ export function TemplatesScreen({
   const displayBuiltInTemplates = builtInTemplates.filter((t) => t.id !== 'tutorial');
 
   return (
-    <div className="templates-screen">
+    <div className="fixed inset-0 flex flex-col bg-bg z-1000">
       {/* Draggable title bar area for window movement */}
-      <div className="templates-screen-titlebar" />
+      <div className="w-full h-[38px] shrink-0" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
 
-      <div className="templates-screen-content">
+      <div className="flex-1 max-w-[1200px] w-full mx-auto px-12 pb-12 flex flex-col gap-8 overflow-y-auto">
         {/* Header */}
-        <div className="templates-screen-header">
-          <button className="back-button" onClick={onBack} title="Back to Start">
+        <div className="flex items-center gap-4">
+          <button
+            className="flex items-center gap-1.5 py-2 px-3 bg-transparent border border-border rounded-md text-sm font-medium text-text cursor-pointer transition-all duration-150 hover:bg-bg-secondary hover:border-accent"
+            onClick={onBack}
+            title="Back to Start"
+          >
             <ArrowLeft size={20} />
             <span>Back</span>
           </button>
-          <h1>Templates</h1>
+          <h1 className="text-[28px] font-bold text-text m-0">Templates</h1>
         </div>
 
         {/* Built-in Templates Section */}
-        <section className="templates-screen-section">
-          <div className="templates-screen-section-header">
-            <h2 className="templates-screen-section-title">Built-in Templates</h2>
+        <section className="flex flex-col gap-4">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <h2 className="text-lg font-semibold text-text-secondary m-0">Built-in Templates</h2>
           </div>
-          <div className="templates-screen-grid">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
             {displayBuiltInTemplates.map((template) => (
               <div
                 key={template.id}
-                className="template-tile"
+                className={tileClass}
                 onClick={() => handleSelectTemplate(template)}
                 role="button"
                 tabIndex={0}
@@ -272,22 +281,24 @@ export function TemplatesScreen({
                   <img
                     src={`data:image/png;base64,${template.thumbnailData.data}`}
                     alt={template.name}
-                    className="template-tile-thumbnail-img"
+                    className="w-full max-w-40 h-30 object-cover rounded-lg bg-bg-tertiary"
                   />
                 ) : (
-                  <div className="template-tile-thumbnail">{template.thumbnail}</div>
+                  <div className="text-5xl leading-none">{template.thumbnail}</div>
                 )}
-                <div className="template-tile-info">
-                  <span className="template-tile-name">{template.name}</span>
-                  <span className="template-tile-meta">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[15px] font-medium text-text">{template.name}</span>
+                  <span className="text-xs text-text-muted">
                     {formatDimensions(template.dimensions)} • {template.partCount} parts
                   </span>
                 </div>
-                <span className="template-tile-badge built-in">Built-in</span>
+                <span className="absolute top-2.5 left-2.5 text-[10px] py-[3px] px-2 rounded font-medium bg-bg-tertiary text-text-muted border border-border">
+                  Built-in
+                </span>
                 {canUseCustomTemplates && (
-                  <div className="template-tile-actions">
+                  <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                     <button
-                      className="template-tile-action"
+                      className={tileActionClass}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDuplicateTemplate(template);
@@ -304,11 +315,11 @@ export function TemplatesScreen({
         </section>
 
         {/* My Templates Section */}
-        <section className="templates-screen-section">
-          <div className="templates-screen-section-header">
-            <h2 className="templates-screen-section-title">My Templates</h2>
+        <section className="flex flex-col gap-4" ref={myTemplatesSectionRef}>
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <h2 className="text-lg font-semibold text-text-secondary m-0">My Templates</h2>
             {canUseCustomTemplates && (
-              <div className="templates-screen-section-actions">
+              <div className="flex items-center gap-2">
                 <button
                   className="btn btn-sm btn-outlined btn-secondary"
                   onClick={handleImportTemplate}
@@ -317,7 +328,10 @@ export function TemplatesScreen({
                   <Upload size={14} />
                   Import
                 </button>
-                <button className="new-template-button" onClick={onNewTemplate}>
+                <button
+                  className="flex items-center gap-1.5 py-2 px-3.5 bg-primary border-none rounded-md text-[13px] font-medium text-white cursor-pointer transition-all duration-150 hover:bg-primary-hover"
+                  onClick={onNewTemplate}
+                >
                   <Plus size={16} />
                   New Template
                 </button>
@@ -325,14 +339,14 @@ export function TemplatesScreen({
             )}
           </div>
           {isLoading ? (
-            <div className="templates-screen-loading">Loading templates...</div>
+            <div className="text-center p-12 text-text-muted">Loading templates...</div>
           ) : userTemplates.length === 0 ? (
-            <div className="templates-screen-empty">
-              <p>No custom templates yet.</p>
-              <p className="templates-screen-empty-hint">Create a template to save your project layout for reuse.</p>
+            <div className="text-center p-12 text-text-muted">
+              <p className="m-0">No custom templates yet.</p>
+              <p className="text-[13px] mt-2 m-0">Create a template to save your project layout for reuse.</p>
               <a
                 href="#"
-                className="learn-more-link"
+                className="text-accent text-[13px] hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   window.electronAPI?.openExternal?.('https://carvd-studio.com/docs#templates');
@@ -342,11 +356,11 @@ export function TemplatesScreen({
               </a>
             </div>
           ) : (
-            <div className="templates-screen-grid">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
               {userTemplates.map((template) => (
                 <div
                   key={template.id}
-                  className="template-tile user-template"
+                  className={tileClass}
                   onClick={() => handleSelectTemplate(template)}
                   role="button"
                   tabIndex={0}
@@ -356,22 +370,22 @@ export function TemplatesScreen({
                     <img
                       src={`data:image/png;base64,${template.thumbnailData.data}`}
                       alt={template.name}
-                      className="template-tile-thumbnail-img"
+                      className="w-full max-w-40 h-30 object-cover rounded-lg bg-bg-tertiary"
                     />
                   ) : (
-                    <div className="template-tile-thumbnail">{template.thumbnail}</div>
+                    <div className="text-5xl leading-none">{template.thumbnail}</div>
                   )}
-                  <div className="template-tile-info">
-                    <span className="template-tile-name">{template.name}</span>
-                    <span className="template-tile-meta">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[15px] font-medium text-text">{template.name}</span>
+                    <span className="text-xs text-text-muted">
                       {formatDimensions(template.dimensions)} • {template.partCount} parts
                     </span>
                   </div>
-                  <div className="template-tile-actions">
+                  <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                     {canUseCustomTemplates && (
                       <>
                         <button
-                          className="template-tile-action"
+                          className={tileActionClass}
                           onClick={(e) => {
                             e.stopPropagation();
                             onEditTemplate(template);
@@ -382,7 +396,7 @@ export function TemplatesScreen({
                           <Pencil size={14} />
                         </button>
                         <button
-                          className="template-tile-action"
+                          className={tileActionClass}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDuplicateTemplate(template);
@@ -393,7 +407,7 @@ export function TemplatesScreen({
                           <Copy size={14} />
                         </button>
                         <button
-                          className="template-tile-action"
+                          className={tileActionClass}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleExportTemplate(template.id);
@@ -406,7 +420,7 @@ export function TemplatesScreen({
                       </>
                     )}
                     <button
-                      className="template-tile-action danger"
+                      className={`${tileActionClass} hover:!text-error hover:!border-error`}
                       onClick={(e) => {
                         e.stopPropagation();
                         setDeleteConfirmId(template.id);
@@ -426,11 +440,11 @@ export function TemplatesScreen({
 
       {/* Delete confirmation overlay */}
       {deleteConfirmId && (
-        <div className="template-delete-overlay">
-          <div className="template-delete-confirm">
-            <p>Delete this template?</p>
-            <p className="template-delete-warning">This action cannot be undone.</p>
-            <div className="template-delete-actions">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-1010">
+          <div className="bg-bg-secondary border border-border rounded-lg p-6 text-center max-w-80">
+            <p className="m-0 mb-2 text-text font-medium">Delete this template?</p>
+            <p className="text-text-muted text-[13px] mb-5">This action cannot be undone.</p>
+            <div className="flex gap-3 justify-center">
               <button className="btn btn-sm btn-outlined btn-secondary" onClick={() => setDeleteConfirmId(null)}>
                 Cancel
               </button>

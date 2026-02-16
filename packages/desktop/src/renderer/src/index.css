@@ -22,6 +22,7 @@
 
   /* Aliases for semantic naming */
   --color-bg-secondary: var(--color-bg-alt);
+  --color-bg-tertiary: #2e2e2e;
   --color-bg-sidebar: var(--color-surface);
 
   /* Text - cream tones */
@@ -112,6 +113,7 @@
 
   /* Aliases for semantic naming */
   --color-bg-secondary: var(--color-bg-alt);
+  --color-bg-tertiary: #e5d8b5;
   --color-bg-sidebar: var(--color-surface);
 
   /* Text - dark tones */

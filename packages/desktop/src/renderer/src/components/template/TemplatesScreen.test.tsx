@@ -216,7 +216,7 @@ describe('TemplatesScreen', () => {
       const onSelectTemplate = vi.fn();
       render(<TemplatesScreen {...defaultProps} onSelectTemplate={onSelectTemplate} />);
 
-      const tile = screen.getByText('Simple Desk').closest('.template-tile');
+      const tile = screen.getByText('Simple Desk').closest('[role="button"]');
       fireEvent.keyDown(tile!, { key: 'Enter' });
 
       await waitFor(() => {
