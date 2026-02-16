@@ -29,7 +29,7 @@ import {
   calculateGroupReferenceDistances,
   getCombinedBounds
 } from '../../utils/snapToPartsUtil';
-import { setRightClickTarget } from './Workspace';
+import { setRightClickTarget } from './workspaceUtils';
 
 // Type guard to check if controls is OrbitControls
 function isOrbitControls(controls: THREE.EventDispatcher<object> | null): controls is OrbitControlsImpl {
