@@ -4,6 +4,7 @@
  */
 
 import { useProjectStore, generateThumbnail } from '../store/projectStore';
+import { useCameraStore } from '../store/cameraStore';
 import { ProjectThumbnail } from '../types';
 import {
   serializeProject,
@@ -108,7 +109,7 @@ async function saveToPath(filePath: string): Promise<FileOperationResult> {
       customShoppingItems: state.customShoppingItems,
       cutList: state.cutList,
       thumbnail,
-      cameraState: state.cameraState
+      cameraState: useCameraStore.getState().cameraState
     });
 
     const json = stringifyCarvdFile(fileData);

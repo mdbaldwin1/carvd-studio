@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import * as THREE from 'three';
 import { useProjectStore, getContainingGroupId, getAllDescendantPartIds } from '../store/projectStore';
 import { useUIStore } from '../store/uiStore';
+import { useCameraStore } from '../store/cameraStore';
 import { RotationAngle } from '../types';
 
 // Helper to normalize angle to 0, 90, 180, or 270
@@ -26,9 +27,9 @@ export function useKeyboardShortcuts() {
   const copySelectedParts = useProjectStore((s) => s.copySelectedParts);
   const pasteClipboard = useProjectStore((s) => s.pasteClipboard);
   const moveSelectedParts = useProjectStore((s) => s.moveSelectedParts);
-  const requestCenterCamera = useProjectStore((s) => s.requestCenterCamera);
-  const requestCenterCameraAtOrigin = useProjectStore((s) => s.requestCenterCameraAtOrigin);
-  const cameraViewVectors = useProjectStore((s) => s.cameraViewVectors);
+  const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
+  const requestCenterCameraAtOrigin = useCameraStore((s) => s.requestCenterCameraAtOrigin);
+  const cameraViewVectors = useCameraStore((s) => s.cameraViewVectors);
   const toggleReference = useProjectStore((s) => s.toggleReference);
   const clearReferences = useProjectStore((s) => s.clearReferences);
   const referencePartIds = useProjectStore((s) => s.referencePartIds);

@@ -1173,49 +1173,10 @@ describe('projectStore', () => {
   });
 
   // ============================================================
-  // View State
+  // View State (display mode and grid tests moved to cameraStore.test.ts)
   // ============================================================
 
   describe('view state', () => {
-    describe('setDisplayMode', () => {
-      it('changes display mode to exploded', () => {
-        const store = useProjectStore.getState();
-
-        store.setDisplayMode('exploded');
-
-        expect(useProjectStore.getState().displayMode).toBe('exploded');
-      });
-
-      it('changes display mode to assembled', () => {
-        useProjectStore.setState({ displayMode: 'exploded' });
-        const store = useProjectStore.getState();
-
-        store.setDisplayMode('assembled');
-
-        expect(useProjectStore.getState().displayMode).toBe('assembled');
-      });
-    });
-
-    describe('setShowGrid', () => {
-      it('shows the grid', () => {
-        useProjectStore.setState({ showGrid: false });
-        const store = useProjectStore.getState();
-
-        store.setShowGrid(true);
-
-        expect(useProjectStore.getState().showGrid).toBe(true);
-      });
-
-      it('hides the grid', () => {
-        useProjectStore.setState({ showGrid: true });
-        const store = useProjectStore.getState();
-
-        store.setShowGrid(false);
-
-        expect(useProjectStore.getState().showGrid).toBe(false);
-      });
-    });
-
     describe('setSnapToPartsEnabled', () => {
       it('enables snap to parts', () => {
         useProjectStore.setState({ snapToPartsEnabled: false });
@@ -2397,108 +2358,9 @@ describe('projectStore', () => {
         expect(useProjectStore.getState().selectionBox).toBeNull();
       });
     });
-
-    describe('toggleGrainDirection', () => {
-      it('toggles showGrainDirection from false to true', () => {
-        useProjectStore.setState({ showGrainDirection: false });
-        const store = useProjectStore.getState();
-
-        store.toggleGrainDirection();
-
-        expect(useProjectStore.getState().showGrainDirection).toBe(true);
-      });
-
-      it('toggles showGrainDirection from true to false', () => {
-        useProjectStore.setState({ showGrainDirection: true });
-        const store = useProjectStore.getState();
-
-        store.toggleGrainDirection();
-
-        expect(useProjectStore.getState().showGrainDirection).toBe(false);
-      });
-    });
   });
 
-  // ============================================================
-  // Camera Actions
-  // ============================================================
-
-  describe('camera actions', () => {
-    describe('requestCenterCamera', () => {
-      it('sets centerCameraRequested to true', () => {
-        const store = useProjectStore.getState();
-        expect(store.centerCameraRequested).toBe(false);
-
-        store.requestCenterCamera();
-
-        expect(useProjectStore.getState().centerCameraRequested).toBe(true);
-      });
-    });
-
-    describe('requestCenterCameraAtOrigin', () => {
-      it('sets centerCameraAtOriginRequested to true', () => {
-        const store = useProjectStore.getState();
-        expect(store.centerCameraAtOriginRequested).toBe(false);
-
-        store.requestCenterCameraAtOrigin();
-
-        expect(useProjectStore.getState().centerCameraAtOriginRequested).toBe(true);
-      });
-    });
-
-    describe('requestCenterCameraAtPosition', () => {
-      it('sets the position to center camera at', () => {
-        const store = useProjectStore.getState();
-        const position = { x: 10, y: 5, z: 20 };
-
-        store.requestCenterCameraAtPosition(position);
-
-        expect(useProjectStore.getState().centerCameraAtPosition).toEqual(position);
-      });
-    });
-
-    describe('clearCenterCameraRequest', () => {
-      it('clears all camera request flags', () => {
-        const store = useProjectStore.getState();
-        store.requestCenterCamera();
-        store.requestCenterCameraAtOrigin();
-        store.requestCenterCameraAtPosition({ x: 10, y: 5, z: 20 });
-
-        store.clearCenterCameraRequest();
-
-        const state = useProjectStore.getState();
-        expect(state.centerCameraRequested).toBe(false);
-        expect(state.centerCameraAtOriginRequested).toBe(false);
-        expect(state.centerCameraAtPosition).toBeNull();
-      });
-    });
-
-    describe('setCameraViewVectors', () => {
-      it('sets camera view vectors', () => {
-        const store = useProjectStore.getState();
-        const vectors = {
-          position: { x: 10, y: 20, z: 30 },
-          target: { x: 0, y: 0, z: 0 }
-        };
-
-        store.setCameraViewVectors(vectors);
-
-        expect(useProjectStore.getState().cameraViewVectors).toEqual(vectors);
-      });
-
-      it('clears camera view vectors when set to null', () => {
-        const store = useProjectStore.getState();
-        store.setCameraViewVectors({
-          position: { x: 10, y: 20, z: 30 },
-          target: { x: 0, y: 0, z: 0 }
-        });
-
-        store.setCameraViewVectors(null);
-
-        expect(useProjectStore.getState().cameraViewVectors).toBeNull();
-      });
-    });
-  });
+  // Camera actions moved to cameraStore.test.ts
 
   // ============================================================
   // Toast Actions
