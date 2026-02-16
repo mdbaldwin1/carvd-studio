@@ -1,0 +1,165 @@
+import { Download, FileText } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
+import { useProjectStore } from '../../store/projectStore';
+import { getBlockedMessage } from '../../utils/featureLimits';
+import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { exportDiagramsToPdf } from '../../utils/pdfExport';
+import { logger } from '../../utils/logger';
+import { CutList, StockBoard } from '../../types';
+import { DropdownButton, DropdownItem } from '../common/DropdownButton';
+
+export function CutListDiagramsTab({
+  cutList,
+  units,
+  canExportPDF
+}: {
+  cutList: CutList;
+  units: 'imperial' | 'metric';
+  canExportPDF: boolean;
+}) {
+  const showToast = useProjectStore((s) => s.showToast);
+  const projectName = useProjectStore((s) => s.projectName);
+
+  // Group boards by stock
+  const boardsByStock = useMemo(() => {
+    const map = new Map<string, StockBoard[]>();
+    for (const board of cutList.stockBoards) {
+      const existing = map.get(board.stockId) || [];
+      existing.push(board);
+      map.set(board.stockId, existing);
+    }
+    return map;
+  }, [cutList.stockBoards]);
+
+  const handleExportPdf = useCallback(async () => {
+    // Check license limits for PDF export
+    if (!canExportPDF) {
+      showToast(getBlockedMessage('exportPDF'));
+      return;
+    }
+
+    try {
+      const result = await exportDiagramsToPdf(cutList, {
+        projectName: projectName || 'Untitled Project',
+        units
+      });
+
+      if (result.success) {
+        showToast('Cutting diagrams saved to PDF');
+      } else if (result.error) {
+        showToast('Failed to save PDF');
+        logger.error('PDF export error:', result.error);
+      }
+      // If canceled, do nothing
+    } catch (error) {
+      logger.error('PDF export error:', error);
+      showToast('Failed to export PDF');
+    }
+  }, [cutList, projectName, units, showToast, canExportPDF]);
+
+  const downloadItems: DropdownItem[] = useMemo(
+    () => [
+      {
+        label: 'Download PDF',
+        icon: <FileText size={14} />,
+        onClick: handleExportPdf,
+        disabled: !canExportPDF
+      }
+    ],
+    [handleExportPdf, canExportPDF]
+  );
+
+  return (
+    <div className="cut-list-diagrams-tab">
+      <div className="tab-content-header">
+        <span className="tab-header-info">
+          {cutList.stockBoards.length} board{cutList.stockBoards.length !== 1 ? 's' : ''} needed
+        </span>
+        <DropdownButton label="Download" icon={<Download size={14} />} items={downloadItems} />
+      </div>
+
+      <div className="diagrams-content">
+        {Array.from(boardsByStock.entries()).map(([stockId, boards]) => (
+          <div key={stockId} className="stock-group">
+            <h3 className="stock-group-title">{boards[0].stockName}</h3>
+            <div className="stock-boards">
+              {boards.map((board) => (
+                <StockBoardDiagram key={`${stockId}-${board.boardIndex}`} board={board} units={units} />
+              ))}
+            </div>
+          </div>
+        ))}
+
+        {cutList.stockBoards.length === 0 && <p className="no-diagrams">No cutting diagrams to display.</p>}
+      </div>
+    </div>
+  );
+}
+
+// Single stock board diagram
+function StockBoardDiagram({ board, units }: { board: StockBoard; units: 'imperial' | 'metric' }) {
+  // Scale to fit in a reasonable viewport (max 600px width)
+  const maxWidth = 600;
+  const scale = Math.min(maxWidth / board.stockLength, 4); // Max 4 pixels per inch
+  const svgWidth = board.stockLength * scale;
+  const svgHeight = board.stockWidth * scale;
+
+  return (
+    <div className="stock-board-diagram">
+      <div className="board-header">
+        <span className="board-title">Board #{board.boardIndex}</span>
+        <span className="board-dims">
+          {formatMeasurementWithUnit(board.stockLength, units)} × {formatMeasurementWithUnit(board.stockWidth, units)}
+        </span>
+        <span className="board-utilization">{board.utilizationPercent.toFixed(1)}% used</span>
+      </div>
+      <svg width={svgWidth} height={svgHeight} viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="board-svg">
+        {/* Board outline (waste area background) */}
+        <rect x={0} y={0} width={svgWidth} height={svgHeight} fill="#ddd" stroke="#999" strokeWidth={1} />
+
+        {/* Part placements */}
+        {board.placements.map((placement) => (
+          <g key={placement.partId}>
+            <rect
+              x={placement.x * scale}
+              y={placement.y * scale}
+              width={placement.width * scale}
+              height={placement.height * scale}
+              fill={placement.color}
+              stroke="#333"
+              strokeWidth={0.5}
+            />
+            {/* Part label */}
+            {placement.width * scale > 30 && placement.height * scale > 15 && (
+              <text
+                x={(placement.x + placement.width / 2) * scale}
+                y={(placement.y + placement.height / 2) * scale}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize={Math.min(10, placement.height * scale * 0.4)}
+                fill="#333"
+                style={{ pointerEvents: 'none' }}
+              >
+                {placement.partName.length > 15 ? placement.partName.substring(0, 12) + '...' : placement.partName}
+              </text>
+            )}
+            {/* Rotation indicator */}
+            {placement.rotated && placement.width * scale > 20 && (
+              <text
+                x={(placement.x + placement.width / 2) * scale}
+                y={(placement.y + placement.height / 2) * scale + 10}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize={8}
+                fill="#666"
+                style={{ pointerEvents: 'none' }}
+              >
+                (rotated)
+              </text>
+            )}
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
