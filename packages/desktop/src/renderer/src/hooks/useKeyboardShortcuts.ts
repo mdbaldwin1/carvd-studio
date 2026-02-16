@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import * as THREE from 'three';
 import { useProjectStore, getContainingGroupId, getAllDescendantPartIds } from '../store/projectStore';
+import { useUIStore } from '../store/uiStore';
 import { RotationAngle } from '../types';
 
 // Helper to normalize angle to 0, 90, 180, or 270
@@ -17,7 +18,7 @@ export function useKeyboardShortcuts() {
   const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
   const parts = useProjectStore((s) => s.parts);
   const gridSize = useProjectStore((s) => s.gridSize);
-  const requestDeleteParts = useProjectStore((s) => s.requestDeleteParts);
+  const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
   const duplicateSelectedParts = useProjectStore((s) => s.duplicateSelectedParts);
   const updatePart = useProjectStore((s) => s.updatePart);
   const batchUpdateParts = useProjectStore((s) => s.batchUpdateParts);

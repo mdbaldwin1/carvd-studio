@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useProjectStore } from '../store/projectStore';
+import { useUIStore } from '../store/uiStore';
 import { useStockLibrary } from './useStockLibrary';
 import { useAssemblyLibrary } from './useAssemblyLibrary';
 import { Stock, Assembly } from '../types';
@@ -29,7 +30,7 @@ export function useLibraryImportCheck(): UseLibraryImportCheckResult {
   const projectStocks = useProjectStore((s) => s.stocks);
   const projectAssemblies = useProjectStore((s) => s.assemblies);
   const filePath = useProjectStore((s) => s.filePath);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
 
   const { stocks: libraryStocks, addStock: addStockToLibrary, isLoading: stocksLoading } = useStockLibrary();
   const {

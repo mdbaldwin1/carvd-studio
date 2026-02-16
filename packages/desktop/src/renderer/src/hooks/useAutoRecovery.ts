@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useProjectStore } from '../store/projectStore';
+import { useUIStore } from '../store/uiStore';
 import { serializeProject, parseCarvdFile, deserializeToProject } from '../utils/fileFormat';
 import { logger } from '../utils/logger';
 
@@ -62,7 +63,7 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
   const customShoppingItems = useProjectStore((s) => s.customShoppingItems);
   const cutList = useProjectStore((s) => s.cutList);
   const loadProject = useProjectStore((s) => s.loadProject);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
 
   const [hasRecovery, setHasRecovery] = useState(false);
   const [recoveryInfo, setRecoveryInfo] = useState<RecoveryInfo | null>(null);

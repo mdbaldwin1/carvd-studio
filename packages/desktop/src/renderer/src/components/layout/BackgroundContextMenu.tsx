@@ -1,4 +1,5 @@
 import { useProjectStore, captureCanvas } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 
 interface BackgroundContextMenuProps {
   menuRef: React.RefObject<HTMLDivElement>;
@@ -16,7 +17,7 @@ export function BackgroundContextMenu({ menuRef, x, y, onClose, worldPosition }:
   const addSnapGuide = useProjectStore((s) => s.addSnapGuide);
   const snapGuides = useProjectStore((s) => s.snapGuides);
   const clearSnapGuides = useProjectStore((s) => s.clearSnapGuides);
-  const captureManualThumbnail = useProjectStore((s) => s.captureManualThumbnail);
+  const captureManualThumbnail = useUIStore((s) => s.captureManualThumbnail);
 
   const hasClipboard = clipboard.parts.length > 0;
   const hasGuides = snapGuides.length > 0;

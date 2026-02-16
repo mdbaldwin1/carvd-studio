@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { STOCK_COLORS } from '../../constants';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { Stock } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { ColorPicker } from '../common/ColorPicker';
@@ -30,7 +31,7 @@ interface StocksTabProps {
 
 export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, onClose }: StocksTabProps) {
   const units = useProjectStore((s) => s.units);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
 
   const [selectedStockId, setSelectedStockId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);

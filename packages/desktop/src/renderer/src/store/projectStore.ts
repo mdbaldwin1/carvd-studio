@@ -26,6 +26,7 @@ import {
 import { STOCK_COLORS } from '../constants';
 import { LicenseMode, canAddPart, canAddStock, getBlockedMessage, getFeatureLimits } from '../utils/featureLimits';
 import { getCombinedBounds, calculateDistancesFromBounds } from '../utils/snapToPartsUtil';
+import { useUIStore } from './uiStore';
 
 interface ProjectState {
   // Project data
@@ -57,13 +58,6 @@ interface ProjectState {
   transformMode: 'translate' | 'scale';
   clipboard: Clipboard;
   activeDragDelta: { x: number; y: number; z: number } | null; // Live drag offset for multi-select
-  contextMenu: {
-    x: number;
-    y: number;
-    type: 'part' | 'background' | 'guide';
-    worldPosition?: { x: number; y: number; z: number }; // For paste-at-location
-    guideId?: string; // For guide-specific context menu
-  } | null;
   centerCameraRequested: boolean; // Flag to trigger camera centering
   centerCameraAtOriginRequested: boolean; // Flag to trigger camera centering at origin
   centerCameraAtPosition: { x: number; y: number; z: number } | null; // Target position for camera centering
@@ -71,23 +65,12 @@ interface ProjectState {
     start: { x: number; y: number };
     end: { x: number; y: number };
   } | null;
-  toast: { message: string; id: string } | null;
-  // Manual thumbnail capture (for templates, assemblies, and projects)
-  manualThumbnail: {
-    data: string;
-    width: number;
-    height: number;
-    generatedAt: string;
-    manuallySet: boolean;
-  } | null;
   // Camera view vectors for view-relative movement (screen-aligned, normalized)
   cameraViewVectors: {
     up: { x: number; y: number; z: number }; // Direction pointing "up" on screen
     right: { x: number; y: number; z: number }; // Direction pointing "right" on screen
   };
   showGrainDirection: boolean; // Toggle for grain direction arrows on parts
-  pendingDeletePartIds: string[] | null; // Parts pending deletion confirmation
-  saveAssemblyModalOpen: boolean; // Flag to open the save assembly modal
   // Transient view state (not saved with project)
   displayMode: DisplayMode;
   showGrid: boolean;
@@ -112,7 +95,6 @@ interface ProjectState {
 
   // Cut list state
   cutList: CutList | null; // Generated cut list (persisted with project)
-  cutListModalOpen: boolean; // UI state for modal visibility
 
   // Assembly editing mode state
   isEditingAssembly: boolean; // Whether we're in assembly editing mode
@@ -153,9 +135,7 @@ interface ProjectState {
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
   deletePart: (id: string) => void;
   deleteSelectedParts: () => void;
-  requestDeleteParts: (ids: string[]) => void;
   confirmDeleteParts: () => void;
-  cancelDeleteParts: () => void;
   duplicatePart: (id: string) => string | null;
   duplicateSelectedParts: () => string[];
   resetSelectedPartsToStock: () => void;
@@ -168,23 +148,11 @@ interface ProjectState {
   setHoveredPart: (id: string | null) => void;
   setTransformMode: (mode: 'translate' | 'scale') => void;
   setActiveDragDelta: (delta: { x: number; y: number; z: number } | null) => void;
-  openContextMenu: (menu: {
-    x: number;
-    y: number;
-    type: 'part' | 'background' | 'guide';
-    worldPosition?: { x: number; y: number; z: number };
-    guideId?: string;
-  }) => void;
-  closeContextMenu: () => void;
   requestCenterCamera: () => void;
   requestCenterCameraAtOrigin: () => void;
   requestCenterCameraAtPosition: (position: { x: number; y: number; z: number }) => void;
   clearCenterCameraRequest: () => void;
   setSelectionBox: (box: { start: { x: number; y: number }; end: { x: number; y: number } } | null) => void;
-  showToast: (message: string) => void;
-  clearToast: () => void;
-  captureManualThumbnail: () => Promise<boolean>; // Returns true if capture was successful
-  clearManualThumbnail: () => void;
   setCameraViewVectors: (vectors: {
     up: { x: number; y: number; z: number };
     right: { x: number; y: number; z: number };
@@ -212,9 +180,6 @@ interface ProjectState {
     position: { x: number; y: number; z: number },
     libraryStocks?: Stock[]
   ) => string[];
-  openSaveAssemblyModal: () => void;
-  closeSaveAssemblyModal: () => void;
-
   // Actions - Project
   newProject: (defaults?: {
     units?: 'imperial' | 'metric';
@@ -278,8 +243,6 @@ interface ProjectState {
   collapseAllGroups: () => void;
 
   // Cut list actions
-  openCutListModal: () => void;
-  closeCutListModal: () => void;
   setCutList: (cutList: CutList | null) => void;
   markCutListStale: () => void;
   clearCutList: () => void;
@@ -355,9 +318,6 @@ const createDefaultStock = (overrides?: Partial<Stock>): Stock => ({
   color: STOCK_COLORS[Math.floor(Math.random() * STOCK_COLORS.length)],
   ...overrides
 });
-
-// Track toast timeout for cleanup (module-level, not in store state since it's not serializable)
-let toastTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 // Canvas capture callback (registered by Workspace, called by ContextMenu)
 let canvasCaptureHandler: (() => Promise<void>) | null = null;
@@ -584,21 +544,16 @@ export const useProjectStore = create<ProjectState>()(
       transformMode: 'translate',
       clipboard: { parts: [], groups: [], groupMembers: [] },
       activeDragDelta: null,
-      contextMenu: null,
       centerCameraRequested: false,
       centerCameraAtOriginRequested: false,
       centerCameraAtPosition: null,
       selectionBox: null,
-      toast: null,
-      manualThumbnail: null,
       // Default camera view vectors (screen-aligned for default isometric view)
       cameraViewVectors: {
         up: { x: 0, y: 1, z: 0 }, // Screen up direction
         right: { x: 0.707, y: 0, z: -0.707 } // Screen right direction
       },
       showGrainDirection: false,
-      pendingDeletePartIds: null,
-      saveAssemblyModalOpen: false,
       displayMode: 'solid',
       showGrid: true,
       snapToPartsEnabled: true, // Enabled by default
@@ -615,7 +570,6 @@ export const useProjectStore = create<ProjectState>()(
 
       // Cut list state
       cutList: null, // No cut list generated by default
-      cutListModalOpen: false, // Modal closed by default
 
       // Assembly editing mode state
       isEditingAssembly: false,
@@ -632,7 +586,7 @@ export const useProjectStore = create<ProjectState>()(
 
         // Check license limits
         if (!canAddPart(licenseMode, parts.length)) {
-          get().showToast(getBlockedMessage('addPart'));
+          useUIStore.getState().showToast(getBlockedMessage('addPart'));
           return null;
         }
 
@@ -761,13 +715,8 @@ export const useProjectStore = create<ProjectState>()(
         get().markCutListStale();
       },
 
-      requestDeleteParts: (ids) => {
-        if (ids.length === 0) return;
-        set({ pendingDeletePartIds: ids });
-      },
-
       confirmDeleteParts: () => {
-        const { pendingDeletePartIds } = get();
+        const { pendingDeletePartIds } = useUIStore.getState();
         if (!pendingDeletePartIds || pendingDeletePartIds.length === 0) return;
         set((state) => ({
           parts: state.parts.filter((p) => !pendingDeletePartIds.includes(p.id)),
@@ -777,14 +726,10 @@ export const useProjectStore = create<ProjectState>()(
           groupMembers: state.groupMembers.filter(
             (gm) => !(gm.memberType === 'part' && pendingDeletePartIds.includes(gm.memberId))
           ),
-          pendingDeletePartIds: null,
           isDirty: true
         }));
+        useUIStore.getState().cancelDeleteParts();
         get().markCutListStale();
-      },
-
-      cancelDeleteParts: () => {
-        set({ pendingDeletePartIds: null });
       },
 
       duplicatePart: (id) => {
@@ -792,7 +737,7 @@ export const useProjectStore = create<ProjectState>()(
 
         // Check license limits
         if (!canAddPart(licenseMode, parts.length)) {
-          get().showToast(getBlockedMessage('addPart'));
+          useUIStore.getState().showToast(getBlockedMessage('addPart'));
           return null;
         }
 
@@ -853,7 +798,7 @@ export const useProjectStore = create<ProjectState>()(
         // Check license limits before duplicating
         const partsToAdd = partIdsToDupe.size;
         if (!canAddPart(licenseMode, parts.length + partsToAdd - 1)) {
-          get().showToast(getBlockedMessage('addPart'));
+          useUIStore.getState().showToast(getBlockedMessage('addPart'));
           return [];
         }
 
@@ -994,51 +939,12 @@ export const useProjectStore = create<ProjectState>()(
       setHoveredPart: (id) => set({ hoveredPartId: id }),
       setTransformMode: (mode) => set({ transformMode: mode }),
       setActiveDragDelta: (delta) => set({ activeDragDelta: delta }),
-      openContextMenu: (menu) => set({ contextMenu: menu }),
-      closeContextMenu: () => set({ contextMenu: null }),
       requestCenterCamera: () => set({ centerCameraRequested: true }),
       requestCenterCameraAtOrigin: () => set({ centerCameraAtOriginRequested: true }),
       requestCenterCameraAtPosition: (position) => set({ centerCameraAtPosition: position }),
       clearCenterCameraRequest: () =>
         set({ centerCameraRequested: false, centerCameraAtOriginRequested: false, centerCameraAtPosition: null }),
       setSelectionBox: (box) => set({ selectionBox: box }),
-      showToast: (message) => {
-        // Clear any existing toast timer to prevent timer accumulation
-        if (toastTimeoutId !== null) {
-          clearTimeout(toastTimeoutId);
-          toastTimeoutId = null;
-        }
-        const id = uuidv4();
-        set({ toast: { message, id } });
-        // Auto-clear after 2 seconds
-        toastTimeoutId = setTimeout(() => {
-          const current = get().toast;
-          if (current?.id === id) {
-            set({ toast: null });
-          }
-          toastTimeoutId = null;
-        }, 2000);
-      },
-      clearToast: () => set({ toast: null }),
-      captureManualThumbnail: async () => {
-        const thumbnailData = await generateThumbnail();
-        if (thumbnailData) {
-          set({
-            manualThumbnail: {
-              data: thumbnailData,
-              width: 400,
-              height: 300,
-              generatedAt: new Date().toISOString(),
-              manuallySet: true
-            }
-          });
-          get().showToast('Thumbnail captured');
-          return true;
-        }
-        get().showToast('Failed to capture thumbnail');
-        return false;
-      },
-      clearManualThumbnail: () => set({ manualThumbnail: null }),
       setCameraViewVectors: (vectors) => set({ cameraViewVectors: vectors }),
       toggleGrainDirection: () => set((state) => ({ showGrainDirection: !state.showGrainDirection })),
 
@@ -1088,11 +994,13 @@ export const useProjectStore = create<ProjectState>()(
         const partCount = copiedParts.length;
         const groupCount = copiedGroups.length;
         if (groupCount > 0) {
-          get().showToast(
-            `Copied ${partCount} part${partCount === 1 ? '' : 's'} in ${groupCount} group${groupCount === 1 ? '' : 's'}`
-          );
+          useUIStore
+            .getState()
+            .showToast(
+              `Copied ${partCount} part${partCount === 1 ? '' : 's'} in ${groupCount} group${groupCount === 1 ? '' : 's'}`
+            );
         } else {
-          get().showToast(`Copied ${partCount} part${partCount === 1 ? '' : 's'}`);
+          useUIStore.getState().showToast(`Copied ${partCount} part${partCount === 1 ? '' : 's'}`);
         }
       },
 
@@ -1102,7 +1010,7 @@ export const useProjectStore = create<ProjectState>()(
 
         // Check license limits before pasting
         if (!canAddPart(licenseMode, parts.length + clipboard.parts.length - 1)) {
-          get().showToast(getBlockedMessage('addPart'));
+          useUIStore.getState().showToast(getBlockedMessage('addPart'));
           return [];
         }
 
@@ -1198,7 +1106,7 @@ export const useProjectStore = create<ProjectState>()(
 
         // Check license limits before pasting
         if (!canAddPart(licenseMode, parts.length + clipboard.parts.length - 1)) {
-          get().showToast(getBlockedMessage('addPart'));
+          useUIStore.getState().showToast(getBlockedMessage('addPart'));
           return [];
         }
 
@@ -1299,7 +1207,7 @@ export const useProjectStore = create<ProjectState>()(
 
         // Check license limits
         if (!canAddStock(licenseMode, stocks.length)) {
-          get().showToast(getBlockedMessage('addStock'));
+          useUIStore.getState().showToast(getBlockedMessage('addStock'));
           return null;
         }
 
@@ -1400,7 +1308,7 @@ export const useProjectStore = create<ProjectState>()(
         // Check license limits for assemblies
         const limits = getFeatureLimits(licenseMode);
         if (!limits.canUseAssemblies) {
-          get().showToast(getBlockedMessage('useAssemblies'));
+          useUIStore.getState().showToast(getBlockedMessage('useAssemblies'));
           return null;
         }
 
@@ -1700,20 +1608,6 @@ export const useProjectStore = create<ProjectState>()(
         return newPartIds;
       },
 
-      openSaveAssemblyModal: () => {
-        const { licenseMode } = get();
-        const limits = getFeatureLimits(licenseMode);
-        if (!limits.canUseAssemblies) {
-          get().showToast(getBlockedMessage('useAssemblies'));
-          return;
-        }
-        set({ saveAssemblyModalOpen: true });
-      },
-
-      closeSaveAssemblyModal: () => {
-        set({ saveAssemblyModalOpen: false });
-      },
-
       // Project actions
       newProject: (defaults) => {
         const now = new Date().toISOString();
@@ -1926,7 +1820,7 @@ export const useProjectStore = create<ProjectState>()(
         // Check license limits for groups
         const limits = getFeatureLimits(licenseMode);
         if (!limits.canUseGroups) {
-          get().showToast(getBlockedMessage('useGroups'));
+          useUIStore.getState().showToast(getBlockedMessage('useGroups'));
           return null;
         }
 
@@ -2138,7 +2032,7 @@ export const useProjectStore = create<ProjectState>()(
         // Check license limits for groups
         const limits = getFeatureLimits(licenseMode);
         if (!limits.canUseGroups) {
-          get().showToast(getBlockedMessage('useGroups'));
+          useUIStore.getState().showToast(getBlockedMessage('useGroups'));
           return null;
         }
 
@@ -2336,14 +2230,6 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       // Cut list actions
-      openCutListModal: () => {
-        set({ cutListModalOpen: true });
-      },
-
-      closeCutListModal: () => {
-        set({ cutListModalOpen: false });
-      },
-
       setCutList: (cutList) => {
         set({ cutList, isDirty: true });
       },

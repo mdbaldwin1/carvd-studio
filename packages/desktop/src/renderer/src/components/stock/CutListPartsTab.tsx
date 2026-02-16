@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import React, { useState, useCallback, useMemo } from 'react';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { getBlockedMessage } from '../../utils/featureLimits';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { exportCutListToPdf, exportCutListToCsv } from '../../utils/pdfExport';
@@ -65,7 +66,7 @@ export function CutListPartsTab({
   canExportPDF: boolean;
 }) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
 
   const groupedInstructions = useMemo(() => groupCutInstructions(cutList.instructions), [cutList.instructions]);
 

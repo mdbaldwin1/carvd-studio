@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vite
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { ProjectSettingsModal } from './ProjectSettingsModal';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 
 // Mock window.electronAPI
 beforeAll(() => {
@@ -35,7 +36,6 @@ describe('ProjectSettingsModal', () => {
         constrainColor: true,
         preventOverlap: false
       },
-      showToast: vi.fn(),
       setProjectUnits: vi.fn(),
       setProjectGridSize: vi.fn(),
       setKerfWidth: vi.fn(),
@@ -43,6 +43,9 @@ describe('ProjectSettingsModal', () => {
       setProjectName: vi.fn(),
       setProjectNotes: vi.fn(),
       setStockConstraints: vi.fn()
+    });
+    useUIStore.setState({
+      showToast: vi.fn()
     });
   });
 

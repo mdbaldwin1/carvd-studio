@@ -1,6 +1,7 @@
 import { Download, FileText } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { getBlockedMessage } from '../../utils/featureLimits';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { exportDiagramsToPdf } from '../../utils/pdfExport';
@@ -17,7 +18,7 @@ export function CutListDiagramsTab({
   units: 'imperial' | 'metric';
   canExportPDF: boolean;
 }) {
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
   const projectName = useProjectStore((s) => s.projectName);
 
   // Group boards by stock

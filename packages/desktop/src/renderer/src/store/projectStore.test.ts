@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useProjectStore, validatePartsForCutList } from './projectStore';
+import { useUIStore } from './uiStore';
 import {
   createTestPart,
   createTestStock,
@@ -16,6 +17,14 @@ import type { Assembly } from '../types';
 const resetStore = () => {
   const store = useProjectStore.getState();
   store.newProject();
+  useUIStore.setState({
+    contextMenu: null,
+    toast: null,
+    pendingDeletePartIds: null,
+    cutListModalOpen: false,
+    saveAssemblyModalOpen: false,
+    manualThumbnail: null
+  });
 };
 
 describe('projectStore', () => {
@@ -254,34 +263,13 @@ describe('projectStore', () => {
     });
 
     describe('delete confirmation flow', () => {
-      describe('requestDeleteParts', () => {
-        it('sets pending delete parts', () => {
-          const store = useProjectStore.getState();
-          const part1Id = store.addPart({ name: 'Part 1' });
-          const part2Id = store.addPart({ name: 'Part 2' });
-
-          store.requestDeleteParts([part1Id, part2Id]);
-
-          expect(useProjectStore.getState().pendingDeletePartIds).toEqual([part1Id, part2Id]);
-        });
-
-        it('does not delete parts immediately', () => {
-          const store = useProjectStore.getState();
-          const partId = store.addPart();
-
-          store.requestDeleteParts([partId]);
-
-          expect(useProjectStore.getState().parts).toHaveLength(1);
-        });
-      });
-
       describe('confirmDeleteParts', () => {
         it('deletes pending parts', () => {
           const store = useProjectStore.getState();
           const part1Id = store.addPart({ name: 'Part 1' });
           const part2Id = store.addPart({ name: 'Part 2' });
           store.addPart({ name: 'Part 3' });
-          store.requestDeleteParts([part1Id, part2Id]);
+          useUIStore.getState().requestDeleteParts([part1Id, part2Id]);
 
           store.confirmDeleteParts();
 
@@ -293,11 +281,11 @@ describe('projectStore', () => {
         it('clears pending delete list', () => {
           const store = useProjectStore.getState();
           const partId = store.addPart();
-          store.requestDeleteParts([partId]);
+          useUIStore.getState().requestDeleteParts([partId]);
 
           store.confirmDeleteParts();
 
-          expect(useProjectStore.getState().pendingDeletePartIds).toBeNull();
+          expect(useUIStore.getState().pendingDeletePartIds).toBeNull();
         });
 
         it('does nothing when no pending parts', () => {
@@ -307,20 +295,6 @@ describe('projectStore', () => {
           store.confirmDeleteParts();
 
           expect(useProjectStore.getState().parts).toHaveLength(1);
-        });
-      });
-
-      describe('cancelDeleteParts', () => {
-        it('clears pending delete list without deleting', () => {
-          const store = useProjectStore.getState();
-          const partId = store.addPart();
-          store.requestDeleteParts([partId]);
-
-          store.cancelDeleteParts();
-
-          const state = useProjectStore.getState();
-          expect(state.parts).toHaveLength(1);
-          expect(state.pendingDeletePartIds).toBeNull();
         });
       });
     });
@@ -1469,27 +1443,6 @@ describe('projectStore', () => {
         expect(useProjectStore.getState().cutList).toBeNull();
       });
     });
-
-    describe('openCutListModal', () => {
-      it('opens the cut list modal', () => {
-        const store = useProjectStore.getState();
-
-        store.openCutListModal();
-
-        expect(useProjectStore.getState().cutListModalOpen).toBe(true);
-      });
-    });
-
-    describe('closeCutListModal', () => {
-      it('closes the cut list modal', () => {
-        const store = useProjectStore.getState();
-        store.openCutListModal();
-
-        store.closeCutListModal();
-
-        expect(useProjectStore.getState().cutListModalOpen).toBe(false);
-      });
-    });
   });
 
   // ============================================================
@@ -1894,26 +1847,6 @@ describe('projectStore', () => {
         expect(state.parts.length).toBeGreaterThan(0);
         expect(state.groups.length).toBeGreaterThan(0);
         expect(state.groupMembers.length).toBeGreaterThan(0);
-      });
-    });
-
-    describe('save assembly modal', () => {
-      it('opens the save assembly modal', () => {
-        const store = useProjectStore.getState();
-        expect(store.saveAssemblyModalOpen).toBe(false);
-
-        store.openSaveAssemblyModal();
-
-        expect(useProjectStore.getState().saveAssemblyModalOpen).toBe(true);
-      });
-
-      it('closes the save assembly modal', () => {
-        const store = useProjectStore.getState();
-        store.openSaveAssemblyModal();
-
-        store.closeSaveAssemblyModal();
-
-        expect(useProjectStore.getState().saveAssemblyModalOpen).toBe(false);
       });
     });
   });
@@ -2487,58 +2420,6 @@ describe('projectStore', () => {
   });
 
   // ============================================================
-  // Context Menu Actions
-  // ============================================================
-
-  describe('context menu', () => {
-    describe('openContextMenu', () => {
-      it('opens context menu with part data', () => {
-        const store = useProjectStore.getState();
-        const menuData = {
-          type: 'part' as const,
-          x: 100,
-          y: 200,
-          partId: 'part-123'
-        };
-
-        store.openContextMenu(menuData);
-
-        expect(useProjectStore.getState().contextMenu).toEqual(menuData);
-      });
-
-      it('opens context menu with group data', () => {
-        const store = useProjectStore.getState();
-        const menuData = {
-          type: 'group' as const,
-          x: 150,
-          y: 250,
-          groupId: 'group-456'
-        };
-
-        store.openContextMenu(menuData);
-
-        expect(useProjectStore.getState().contextMenu).toEqual(menuData);
-      });
-    });
-
-    describe('closeContextMenu', () => {
-      it('closes the context menu', () => {
-        const store = useProjectStore.getState();
-        store.openContextMenu({
-          type: 'part',
-          x: 100,
-          y: 200,
-          partId: 'part-123'
-        });
-
-        store.closeContextMenu();
-
-        expect(useProjectStore.getState().contextMenu).toBeNull();
-      });
-    });
-  });
-
-  // ============================================================
   // Camera Actions
   // ============================================================
 
@@ -2622,68 +2503,6 @@ describe('projectStore', () => {
   // ============================================================
   // Toast Actions
   // ============================================================
-
-  describe('toast notifications', () => {
-    describe('showToast', () => {
-      it('sets toast message', () => {
-        const store = useProjectStore.getState();
-
-        store.showToast('Test notification');
-
-        const toast = useProjectStore.getState().toast;
-        expect(toast?.message).toBe('Test notification');
-        expect(toast?.id).toBeDefined();
-      });
-
-      it('replaces existing toast', () => {
-        const store = useProjectStore.getState();
-        store.showToast('First message');
-        const firstToastId = useProjectStore.getState().toast?.id;
-
-        store.showToast('Second message');
-
-        const toast = useProjectStore.getState().toast;
-        expect(toast?.message).toBe('Second message');
-        expect(toast?.id).not.toBe(firstToastId);
-      });
-    });
-
-    describe('clearToast', () => {
-      it('clears the toast', () => {
-        const store = useProjectStore.getState();
-        store.showToast('Test message');
-
-        store.clearToast();
-
-        expect(useProjectStore.getState().toast).toBeNull();
-      });
-    });
-  });
-
-  // ============================================================
-  // Thumbnail Actions
-  // ============================================================
-
-  describe('thumbnail actions', () => {
-    describe('clearManualThumbnail', () => {
-      it('clears the manual thumbnail', () => {
-        useProjectStore.setState({
-          manualThumbnail: {
-            data: 'base64data',
-            width: 400,
-            height: 300,
-            generatedAt: new Date().toISOString(),
-            manuallySet: true
-          }
-        });
-        const store = useProjectStore.getState();
-
-        store.clearManualThumbnail();
-
-        expect(useProjectStore.getState().manualThumbnail).toBeNull();
-      });
-    });
-  });
 });
 
 describe('validatePartsForCutList', () => {

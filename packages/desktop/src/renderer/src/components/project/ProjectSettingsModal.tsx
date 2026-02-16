@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { mmToInches } from '../../utils/fractions';
 import { FractionInput } from '../common/FractionInput';
 import { HelpTooltip } from '../common/HelpTooltip';
@@ -41,7 +42,7 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
   const projectNotes = useProjectStore((s) => s.projectNotes);
   const stockConstraints = useProjectStore((s) => s.stockConstraints);
   const filePath = useProjectStore((s) => s.filePath);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
   const setProjectUnits = useProjectStore((s) => s.setProjectUnits);
   const setProjectGridSize = useProjectStore((s) => s.setProjectGridSize);
   const setKerfWidth = useProjectStore((s) => s.setKerfWidth);

@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { BackgroundContextMenu } from './BackgroundContextMenu';
 import { GuideContextMenu } from './GuideContextMenu';
 import { PartContextMenu } from './PartContextMenu';
 
 export function ContextMenu() {
-  const contextMenu = useProjectStore((s) => s.contextMenu);
-  const closeContextMenu = useProjectStore((s) => s.closeContextMenu);
+  const contextMenu = useUIStore((s) => s.contextMenu);
+  const closeContextMenu = useUIStore((s) => s.closeContextMenu);
 
   const menuRef = useRef<HTMLDivElement>(null);
   const [adjustedPosition, setAdjustedPosition] = useState<{ x: number; y: number } | null>(null);

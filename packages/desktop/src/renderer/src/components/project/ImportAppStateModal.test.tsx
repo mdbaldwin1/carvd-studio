@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ImportAppStateModal } from './ImportAppStateModal';
-import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 
-// Mock the project store
-vi.mock('../../store/projectStore', () => ({
-  useProjectStore: vi.fn()
+// Mock the UI store
+vi.mock('../../store/uiStore', () => ({
+  useUIStore: vi.fn()
 }));
 
 describe('ImportAppStateModal', () => {
@@ -26,7 +26,7 @@ describe('ImportAppStateModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useProjectStore).mockReturnValue(mockShowToast);
+    vi.mocked(useUIStore).mockReturnValue(mockShowToast);
   });
 
   describe('initial state', () => {
