@@ -13,7 +13,7 @@ describe('TemplateEditingBanner', () => {
     it('renders the banner', () => {
       const { container } = render(<TemplateEditingBanner {...defaultProps} />);
 
-      expect(container.querySelector('.template-editing-banner')).toBeInTheDocument();
+      expect(container.querySelector('.bg-primary')).toBeInTheDocument();
     });
 
     it('displays template name when editing', () => {

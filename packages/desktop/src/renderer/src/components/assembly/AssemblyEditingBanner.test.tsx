@@ -13,7 +13,7 @@ describe('AssemblyEditingBanner', () => {
     it('renders the banner', () => {
       const { container } = render(<AssemblyEditingBanner {...defaultProps} />);
 
-      expect(container.querySelector('.assembly-editing-banner')).toBeInTheDocument();
+      expect(container.querySelector('.bg-accent')).toBeInTheDocument();
     });
 
     it('displays assembly name when editing', () => {

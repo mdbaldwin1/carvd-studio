@@ -4,7 +4,6 @@
  */
 
 import { Save, X } from 'lucide-react';
-import './AssemblyEditingBanner.css';
 
 interface AssemblyEditingBannerProps {
   assemblyName: string;
@@ -20,10 +19,10 @@ export function AssemblyEditingBanner({
   onCancel
 }: AssemblyEditingBannerProps) {
   return (
-    <div className="assembly-editing-banner">
-      <div className="banner-content">
-        <span className="banner-icon">📦</span>
-        <span className="banner-text">
+    <div className="flex items-center justify-between px-4 py-2 bg-accent text-bg-dark text-sm gap-4">
+      <div className="flex items-center gap-2">
+        <span className="text-base">📦</span>
+        <span>
           {isCreatingNew ? (
             <>
               Creating new assembly: <strong>{assemblyName}</strong>
@@ -35,12 +34,20 @@ export function AssemblyEditingBanner({
           )}
         </span>
       </div>
-      <div className="banner-actions">
-        <button className="btn btn-sm btn-ghost btn-secondary" onClick={onCancel} title="Cancel editing">
+      <div className="flex items-center gap-2">
+        <button
+          className="btn btn-sm btn-ghost btn-secondary text-bg-dark border-black/20 hover:bg-black/10 hover:border-black/30"
+          onClick={onCancel}
+          title="Cancel editing"
+        >
           <X size={16} />
           Cancel
         </button>
-        <button className="btn btn-sm btn-filled btn-primary" onClick={onSave} title="Save changes to library">
+        <button
+          className="btn btn-sm btn-filled btn-primary !bg-bg-dark !text-text hover:!bg-border"
+          onClick={onSave}
+          title="Save changes to library"
+        >
           <Save size={16} />
           Save to Library
         </button>

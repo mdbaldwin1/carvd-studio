@@ -51,9 +51,9 @@ describe('UpgradePrompt', () => {
     expect(onDismiss).toHaveBeenCalled();
   });
 
-  it('has upgrade-prompt class', () => {
+  it('has border-primary styling', () => {
     const { container } = render(<UpgradePrompt {...defaultProps} />);
-    expect(container.querySelector('.upgrade-prompt')).toBeInTheDocument();
+    expect(container.querySelector('.border-primary')).toBeInTheDocument();
   });
 
   it('displays custom messages correctly', () => {

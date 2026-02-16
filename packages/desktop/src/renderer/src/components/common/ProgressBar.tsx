@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface ProgressBarProps {
   progress: number; // 0-100
   message?: string;
@@ -8,6 +6,19 @@ interface ProgressBarProps {
   color?: 'blue' | 'green' | 'yellow' | 'red';
   className?: string;
 }
+
+const sizeStyles = {
+  small: 'h-1',
+  medium: 'h-2',
+  large: 'h-3'
+} as const;
+
+const colorStyles = {
+  blue: 'bg-primary',
+  green: 'bg-success',
+  yellow: 'bg-accent',
+  red: 'bg-danger'
+} as const;
 
 /**
  * Progress bar component for showing determinate progress
@@ -29,18 +40,15 @@ export function ProgressBar({
   // Clamp progress between 0 and 100
   const clampedProgress = Math.min(Math.max(progress, 0), 100);
 
-  const sizeClass = `progress-bar-${size}`;
-  const colorClass = `progress-bar-${color}`;
-
   return (
-    <div className={`progress-bar-container ${className}`}>
-      <div className="progress-bar-header">
-        {message && <span className="progress-bar-message">{message}</span>}
-        {showPercentage && <span className="progress-bar-percentage">{Math.round(clampedProgress)}%</span>}
+    <div className={`w-full ${className}`}>
+      <div className="flex items-center justify-between mb-1">
+        {message && <span className="text-sm text-text-muted">{message}</span>}
+        {showPercentage && <span className="text-sm font-medium text-text">{Math.round(clampedProgress)}%</span>}
       </div>
-      <div className="progress-bar-track">
+      <div className="w-full bg-bg rounded-full overflow-hidden">
         <div
-          className={`progress-bar-fill ${sizeClass} ${colorClass}`}
+          className={`rounded-full transition-[width] duration-300 ease-out ${sizeStyles[size]} ${colorStyles[color]}`}
           style={{ width: `${clampedProgress}%` }}
           role="progressbar"
           aria-valuenow={clampedProgress}
@@ -63,8 +71,8 @@ interface ProgressOverlayProps {
  */
 export function ProgressOverlay({ progress, message = 'Processing...' }: ProgressOverlayProps) {
   return (
-    <div className="progress-overlay">
-      <div className="progress-overlay-content">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[10000]">
+      <div className="bg-surface rounded-lg p-8 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] min-w-[320px]">
         <ProgressBar progress={progress} message={message} size="large" showPercentage={true} />
       </div>
     </div>

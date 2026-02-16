@@ -37,14 +37,21 @@ export function ColorPicker({ value, onChange, showCustomColors = true }: ColorP
   const canAddCurrentColor = isCurrentColorCustom && !hasColor(value);
 
   return (
-    <div className="color-picker-container">
+    <div className="flex flex-col gap-3">
       <div className="color-picker-row">
-        <input type="color" value={value} onChange={(e) => onChange(e.target.value)} />
-        <div className="color-presets">
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="hover:border-text-muted focus:outline-none focus:border-accent"
+        />
+        <div className="flex gap-1 flex-wrap">
           {STOCK_COLORS.map((color) => (
             <button
               key={color}
-              className={`color-preset ${value.toLowerCase() === color.toLowerCase() ? 'selected' : ''}`}
+              className={`w-6 h-6 border-2 rounded cursor-pointer transition-all duration-100 hover:scale-110 ${
+                value.toLowerCase() === color.toLowerCase() ? 'border-text' : 'border-transparent'
+              }`}
               style={{ backgroundColor: color }}
               onClick={() => onChange(color)}
               title={color}
@@ -54,12 +61,12 @@ export function ColorPicker({ value, onChange, showCustomColors = true }: ColorP
       </div>
 
       {showCustomColors && (customColors.length > 0 || canAddCurrentColor) && (
-        <div className="custom-colors-section">
-          <div className="custom-colors-header">
-            <span className="custom-colors-label">Custom Colors</span>
+        <div className="flex flex-col gap-2 pt-2 border-t border-border">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] text-text-muted uppercase tracking-wider">Custom Colors</span>
             {canAddCurrentColor && (
               <button
-                className="btn btn-xs btn-ghost btn-secondary add-custom-color-btn"
+                className="btn btn-xs btn-ghost btn-secondary flex items-center gap-1 text-[11px]"
                 onClick={() => setShowAddConfirm(true)}
                 title="Save current color"
               >
@@ -70,8 +77,8 @@ export function ColorPicker({ value, onChange, showCustomColors = true }: ColorP
           </div>
 
           {showAddConfirm && (
-            <div className="add-color-confirm">
-              <span className="color-preview-swatch" style={{ backgroundColor: value }} />
+            <div className="flex items-center gap-2 p-2 bg-bg rounded text-xs">
+              <span className="w-5 h-5 rounded border border-border shrink-0" style={{ backgroundColor: value }} />
               <span>Save this color?</span>
               <button className="btn btn-xs btn-filled btn-primary" onClick={handleAddCurrentColor}>
                 Save
@@ -83,17 +90,19 @@ export function ColorPicker({ value, onChange, showCustomColors = true }: ColorP
           )}
 
           {customColors.length > 0 && (
-            <div className="color-presets custom-color-presets">
+            <div className="flex gap-1 flex-wrap relative">
               {customColors.map((color) => (
-                <div key={color} className="custom-color-wrapper">
+                <div key={color} className="relative inline-block group">
                   <button
-                    className={`color-preset ${value.toLowerCase() === color ? 'selected' : ''}`}
+                    className={`w-5 h-5 border-2 rounded cursor-pointer transition-all duration-100 hover:scale-110 ${
+                      value.toLowerCase() === color ? 'border-text' : 'border-transparent'
+                    }`}
                     style={{ backgroundColor: color }}
                     onClick={() => onChange(color)}
                     title={color}
                   />
                   <button
-                    className="remove-custom-color"
+                    className="absolute -top-1 -right-1 w-3.5 h-3.5 p-0 border-none rounded-full bg-danger text-white cursor-pointer hidden group-hover:flex items-center justify-center text-[8px]"
                     onClick={(e) => handleRemoveColor(color, e)}
                     title="Remove color"
                     aria-label={`Remove color ${color}`}

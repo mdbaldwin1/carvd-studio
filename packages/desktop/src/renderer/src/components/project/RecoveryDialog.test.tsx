@@ -101,10 +101,10 @@ describe('RecoveryDialog', () => {
       expect(container.querySelector('.modal-overlay')).toBeInTheDocument();
     });
 
-    it('has recovery-dialog class on modal', () => {
+    it('has modal class on dialog', () => {
       const { container } = render(<RecoveryDialog {...defaultProps} />);
 
-      expect(container.querySelector('.recovery-dialog')).toBeInTheDocument();
+      expect(container.querySelector('.modal')).toBeInTheDocument();
     });
   });
 });

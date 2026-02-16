@@ -50,7 +50,7 @@ describe('Toast', () => {
     render(<Toast />);
 
     const toastElement = screen.getByText('Test message');
-    expect(toastElement).toHaveClass('toast');
+    expect(toastElement).toHaveClass('fixed');
   });
 
   it('hides when toast is cleared', () => {
