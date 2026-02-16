@@ -62,6 +62,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install lightningcss native binary
+        run: npm install lightningcss --no-save
+
       - name: Install Playwright system deps
         if: runner.os == 'Linux'
         run: npx playwright install-deps
