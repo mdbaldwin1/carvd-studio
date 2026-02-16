@@ -308,7 +308,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
             Cancel
           </button>
           <button
-            className="py-2.5 px-5 text-sm font-medium rounded-md cursor-pointer transition-all duration-100 bg-accent border border-accent text-accent-foreground hover:bg-accent-hover hover:border-accent-hover"
+            className="btn-accent py-2.5 px-5 text-sm font-medium rounded-md cursor-pointer transition-all duration-100 bg-accent border border-accent text-accent-foreground hover:bg-accent-hover hover:border-accent-hover"
             onClick={handleCreate}
           >
             Create Project
