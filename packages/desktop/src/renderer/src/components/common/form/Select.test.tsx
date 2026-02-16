@@ -51,8 +51,8 @@ describe('Select', () => {
       { value: 'b', label: 'Option B', disabled: true }
     ];
     render(<Select label="Choice" value="a" onChange={() => {}} options={opts} />);
-    const disabledOption = screen.getByText('Option B') as HTMLOptionElement;
-    expect(disabledOption.disabled).toBe(true);
+    const disabledOption = screen.getByText('Option B');
+    expect(disabledOption).toHaveAttribute('disabled');
   });
 
   it('sets aria-required when required', () => {
