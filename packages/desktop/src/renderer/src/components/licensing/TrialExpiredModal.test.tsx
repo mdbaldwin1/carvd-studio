@@ -80,8 +80,8 @@ describe('TrialExpiredModal', () => {
     expect(container.querySelector('.modal-backdrop')).toBeInTheDocument();
   });
 
-  it('has trial-expired-modal class', () => {
+  it('has modal class', () => {
     const { container } = render(<TrialExpiredModal {...defaultProps} />);
-    expect(container.querySelector('.trial-expired-modal')).toBeInTheDocument();
+    expect(container.querySelector('.modal')).toBeInTheDocument();
   });
 });

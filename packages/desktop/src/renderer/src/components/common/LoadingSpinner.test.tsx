@@ -16,21 +16,21 @@ describe('LoadingSpinner', () => {
       render(<LoadingSpinner size="small" />);
 
       const spinner = screen.getByRole('status');
-      expect(spinner).toHaveClass('loading-spinner-small');
+      expect(spinner).toHaveClass('w-4');
     });
 
     it('renders with medium size by default', () => {
       render(<LoadingSpinner />);
 
       const spinner = screen.getByRole('status');
-      expect(spinner).toHaveClass('loading-spinner-medium');
+      expect(spinner).toHaveClass('w-8');
     });
 
     it('renders with large size', () => {
       render(<LoadingSpinner size="large" />);
 
       const spinner = screen.getByRole('status');
-      expect(spinner).toHaveClass('loading-spinner-large');
+      expect(spinner).toHaveClass('w-12');
     });
 
     it('displays message when provided', () => {
@@ -71,12 +71,12 @@ describe('LoadingOverlay', () => {
     render(<LoadingOverlay />);
 
     const spinner = screen.getByRole('status');
-    expect(spinner).toHaveClass('loading-spinner-large');
+    expect(spinner).toHaveClass('w-12');
   });
 
   it('has overlay class for styling', () => {
     const { container } = render(<LoadingOverlay />);
 
-    expect(container.querySelector('.loading-overlay')).toBeInTheDocument();
+    expect(container.querySelector('.fixed')).toBeInTheDocument();
   });
 });

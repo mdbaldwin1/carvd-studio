@@ -176,14 +176,14 @@ describe('ErrorBoundary', () => {
   });
 
   describe('styling', () => {
-    it('has error-boundary class on container', () => {
+    it('has fixed overlay styling on container', () => {
       const { container } = render(
         <ErrorBoundary>
           <ThrowingComponent shouldThrow={true} />
         </ErrorBoundary>
       );
 
-      expect(container.querySelector('.error-boundary')).toBeInTheDocument();
+      expect(container.querySelector('.fixed')).toBeInTheDocument();
     });
   });
 });

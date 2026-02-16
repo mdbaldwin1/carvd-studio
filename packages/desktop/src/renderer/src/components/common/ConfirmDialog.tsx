@@ -41,7 +41,7 @@ export function ConfirmDialog({
       isOpen={isOpen}
       onClose={onCancel}
       title={title}
-      className="confirm-dialog"
+      className="w-[400px]"
       role="alertdialog"
       footer={
         <>
@@ -59,9 +59,9 @@ export function ConfirmDialog({
         </>
       }
     >
-      <div className="confirm-dialog-content">
-        {variant === 'danger' && <div className="confirm-dialog-icon">⚠️</div>}
-        <p>{message}</p>
+      <div className="p-5">
+        {variant === 'danger' && <div className="text-4xl mb-3">⚠️</div>}
+        <p className="m-0 leading-relaxed">{message}</p>
       </div>
     </Modal>
   );

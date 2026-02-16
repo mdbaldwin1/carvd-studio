@@ -4,7 +4,6 @@
  */
 
 import { Save, X } from 'lucide-react';
-import './TemplateEditingBanner.css';
 
 interface TemplateEditingBannerProps {
   templateName: string;
@@ -20,10 +19,10 @@ export function TemplateEditingBanner({
   onDiscard
 }: TemplateEditingBannerProps) {
   return (
-    <div className="template-editing-banner">
-      <div className="banner-content">
-        <span className="banner-icon">📐</span>
-        <span className="banner-text">
+    <div className="flex items-center justify-between px-4 py-2 bg-primary text-white text-sm gap-4">
+      <div className="flex items-center gap-2">
+        <span className="text-base">📐</span>
+        <span>
           {isCreatingNew ? (
             <>
               Creating new template: <strong>{templateName || 'Untitled'}</strong>
@@ -35,12 +34,20 @@ export function TemplateEditingBanner({
           )}
         </span>
       </div>
-      <div className="banner-actions">
-        <button className="btn btn-sm btn-ghost btn-secondary" onClick={onDiscard} title="Discard changes">
+      <div className="flex items-center gap-2">
+        <button
+          className="btn btn-sm btn-ghost btn-secondary text-white border-white/30 hover:bg-white/15 hover:border-white/50"
+          onClick={onDiscard}
+          title="Discard changes"
+        >
           <X size={16} />
           Discard
         </button>
-        <button className="btn btn-sm btn-filled btn-primary" onClick={onSave} title="Save template">
+        <button
+          className="btn btn-sm btn-filled btn-primary !bg-white !text-primary hover:!bg-white/90"
+          onClick={onSave}
+          title="Save template"
+        >
           <Save size={16} />
           Save Template
         </button>

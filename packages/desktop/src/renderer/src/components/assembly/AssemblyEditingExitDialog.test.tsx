@@ -125,10 +125,10 @@ describe('AssemblyEditingExitDialog', () => {
       expect(container.querySelector('.modal-overlay')).toBeInTheDocument();
     });
 
-    it('has assembly-exit-dialog class on modal', () => {
+    it('has modal class on dialog', () => {
       const { container } = render(<AssemblyEditingExitDialog {...defaultProps} />);
 
-      expect(container.querySelector('.assembly-exit-dialog')).toBeInTheDocument();
+      expect(container.querySelector('.modal')).toBeInTheDocument();
     });
   });
 });

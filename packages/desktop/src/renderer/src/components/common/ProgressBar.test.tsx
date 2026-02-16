@@ -32,7 +32,7 @@ describe('ProgressBar', () => {
     it('does not display message when not provided', () => {
       const { container } = render(<ProgressBar progress={50} />);
 
-      expect(container.querySelector('.progress-bar-message')).not.toBeInTheDocument();
+      expect(container.querySelector('.text-text-muted')).not.toBeInTheDocument();
     });
   });
 
@@ -72,21 +72,21 @@ describe('ProgressBar', () => {
       render(<ProgressBar progress={50} size="small" />);
 
       const progressbar = screen.getByRole('progressbar');
-      expect(progressbar).toHaveClass('progress-bar-small');
+      expect(progressbar).toHaveClass('h-1');
     });
 
     it('applies medium size class by default', () => {
       render(<ProgressBar progress={50} />);
 
       const progressbar = screen.getByRole('progressbar');
-      expect(progressbar).toHaveClass('progress-bar-medium');
+      expect(progressbar).toHaveClass('h-2');
     });
 
     it('applies large size class', () => {
       render(<ProgressBar progress={50} size="large" />);
 
       const progressbar = screen.getByRole('progressbar');
-      expect(progressbar).toHaveClass('progress-bar-large');
+      expect(progressbar).toHaveClass('h-3');
     });
   });
 
@@ -95,28 +95,28 @@ describe('ProgressBar', () => {
       render(<ProgressBar progress={50} />);
 
       const progressbar = screen.getByRole('progressbar');
-      expect(progressbar).toHaveClass('progress-bar-blue');
+      expect(progressbar).toHaveClass('bg-primary');
     });
 
     it('applies green color class', () => {
       render(<ProgressBar progress={50} color="green" />);
 
       const progressbar = screen.getByRole('progressbar');
-      expect(progressbar).toHaveClass('progress-bar-green');
+      expect(progressbar).toHaveClass('bg-success');
     });
 
     it('applies yellow color class', () => {
       render(<ProgressBar progress={50} color="yellow" />);
 
       const progressbar = screen.getByRole('progressbar');
-      expect(progressbar).toHaveClass('progress-bar-yellow');
+      expect(progressbar).toHaveClass('bg-accent');
     });
 
     it('applies red color class', () => {
       render(<ProgressBar progress={50} color="red" />);
 
       const progressbar = screen.getByRole('progressbar');
-      expect(progressbar).toHaveClass('progress-bar-red');
+      expect(progressbar).toHaveClass('bg-danger');
     });
   });
 
@@ -162,6 +162,6 @@ describe('ProgressOverlay', () => {
   it('has overlay class for styling', () => {
     const { container } = render(<ProgressOverlay progress={50} />);
 
-    expect(container.querySelector('.progress-overlay')).toBeInTheDocument();
+    expect(container.querySelector('.fixed')).toBeInTheDocument();
   });
 });
