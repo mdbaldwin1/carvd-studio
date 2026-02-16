@@ -18,14 +18,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   { label, size = 'sm', variant = 'ghost', color = 'secondary', active, className, title, children, ...props },
   ref
 ) {
-  const classes = [
-    'btn',
-    `btn-icon-${size}`,
-    `btn-${variant}`,
-    `btn-${color}`,
-    active ? 'active' : '',
-    className || ''
-  ]
+  const classes = ['btn', `btn-icon-${size}`, `btn-${variant}`, `btn-${color}`, active ? 'active' : '', className || '']
     .filter(Boolean)
     .join(' ');
 
