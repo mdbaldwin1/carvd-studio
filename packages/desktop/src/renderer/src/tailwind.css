@@ -93,3 +93,5 @@
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
 }
+
+@import './primitives.css';

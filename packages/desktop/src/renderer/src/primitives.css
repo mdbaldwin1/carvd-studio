@@ -1,0 +1,470 @@
+/*
+ * Shared UI Primitives — Tailwind component classes
+ *
+ * These preserve existing class names (.btn, .form-group, etc.) used across
+ * dozens of components, re-implemented with @apply for Tailwind integration.
+ * Individual components will migrate to inline utilities in later tickets.
+ */
+
+/* ===========================================
+   SCROLLBARS
+   Global scrollbar styles in @layer base
+   =========================================== */
+
+@layer base {
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    @apply rounded-sm;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: var(--color-bg);
+  }
+
+  /* Firefox scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) var(--color-bg);
+  }
+
+  /* Generic focus visible for all interactive elements */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    @apply outline-2 outline-accent outline-offset-2;
+  }
+}
+
+/* ===========================================
+   BUTTON SYSTEM
+   Composable classes: .btn + size + variant + color
+   Example: .btn.btn-sm.btn-outlined.btn-secondary
+   =========================================== */
+
+@layer components {
+  /* Base button — required on all buttons */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-sm font-medium
+      cursor-pointer border border-transparent bg-transparent text-text;
+    gap: 6px;
+    font-family: inherit;
+    transition: all 0.15s ease;
+  }
+
+  .btn:disabled {
+    @apply opacity-40 cursor-not-allowed;
+  }
+
+  /* ----- SIZES ----- */
+
+  .btn-xs {
+    @apply py-0.5 px-1.5;
+    font-size: 11px;
+    border-radius: 3px;
+  }
+
+  .btn-sm {
+    @apply py-1 px-2.5 text-xs;
+  }
+
+  .btn-md {
+    @apply py-2 px-4;
+    font-size: 13px;
+  }
+
+  .btn-lg {
+    @apply py-2.5 px-5 text-sm;
+  }
+
+  /* Icon buttons — square with centered icon */
+
+  .btn-icon-xs {
+    @apply w-5 h-5 p-0;
+    font-size: 14px;
+  }
+
+  .btn-icon-sm {
+    @apply w-6 h-6 p-0 font-bold;
+    font-size: 16px;
+  }
+
+  .btn-icon-md {
+    @apply w-8 h-8 p-0;
+    font-size: 18px;
+  }
+
+  /* ----- VARIANTS ----- */
+
+  .btn-filled {
+    @apply border-transparent;
+  }
+
+  .btn-filled:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+
+  .btn-outlined {
+    @apply bg-transparent;
+  }
+
+  .btn-outlined:hover:not(:disabled) {
+    @apply bg-surface-hover;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent border-transparent;
+  }
+
+  .btn-ghost:hover:not(:disabled) {
+    @apply bg-surface-hover;
+  }
+
+  /* ----- COLORS ----- */
+
+  /* Primary — accent color */
+  .btn-primary.btn-filled {
+    @apply bg-accent text-bg-dark;
+  }
+
+  .btn-primary.btn-filled:hover:not(:disabled) {
+    @apply bg-accent-hover;
+  }
+
+  .btn-primary.btn-outlined {
+    @apply border-accent text-accent;
+  }
+
+  .btn-primary.btn-outlined:hover:not(:disabled) {
+    @apply bg-accent text-bg-dark;
+  }
+
+  .btn-primary.btn-ghost {
+    @apply text-accent;
+  }
+
+  .btn-primary.btn-ghost:hover:not(:disabled) {
+    @apply bg-accent-bg;
+  }
+
+  /* Secondary — neutral */
+  .btn-secondary.btn-filled {
+    @apply bg-surface border-border text-text;
+  }
+
+  .btn-secondary.btn-filled:hover:not(:disabled) {
+    @apply bg-surface-hover;
+  }
+
+  .btn-secondary.btn-outlined {
+    @apply border-border text-text;
+  }
+
+  .btn-secondary.btn-outlined:hover:not(:disabled) {
+    @apply border-text-muted bg-surface-hover;
+  }
+
+  .btn-secondary.btn-ghost {
+    @apply text-text;
+  }
+
+  .btn-secondary.btn-ghost:hover:not(:disabled) {
+    @apply bg-surface-hover;
+  }
+
+  /* Danger — destructive actions */
+  .btn-danger.btn-filled {
+    @apply bg-danger text-white;
+  }
+
+  .btn-danger.btn-filled:hover:not(:disabled) {
+    @apply bg-danger-hover;
+  }
+
+  .btn-danger.btn-outlined {
+    @apply border-danger text-danger;
+  }
+
+  .btn-danger.btn-outlined:hover:not(:disabled) {
+    @apply bg-danger text-white;
+  }
+
+  .btn-danger.btn-ghost {
+    @apply text-danger;
+  }
+
+  .btn-danger.btn-ghost:hover:not(:disabled) {
+    @apply bg-danger-bg;
+  }
+
+  /* ----- MODIFIERS ----- */
+
+  .btn-block {
+    @apply w-full;
+  }
+
+  .btn.active {
+    @apply bg-accent text-bg-dark border-accent;
+  }
+
+  .btn-group {
+    @apply flex gap-1;
+  }
+
+  /* ----- FOCUS STATES ----- */
+
+  .btn:focus-visible {
+    @apply outline-2 outline-accent outline-offset-2;
+  }
+
+  .btn-danger:focus-visible {
+    @apply outline-danger;
+  }
+}
+
+/* ===========================================
+   FORM ELEMENTS
+   =========================================== */
+
+@layer components {
+  .form-group {
+    @apply mb-4;
+  }
+
+  .form-group > label {
+    @apply block text-xs text-text-muted mb-1.5;
+  }
+
+  .form-group input[type='text'],
+  .form-group input[type='number'],
+  .form-group select,
+  .form-group textarea {
+    @apply w-full bg-bg border border-border text-text rounded-sm;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+
+  .form-group textarea {
+    @apply resize-y;
+    min-height: 60px;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    @apply outline-none border-accent;
+  }
+
+  .form-group select {
+    @apply cursor-pointer;
+  }
+
+  .form-row {
+    @apply flex gap-4;
+  }
+
+  .form-row .form-group {
+    @apply flex-1;
+  }
+
+  .form-actions {
+    @apply flex justify-end gap-2 mt-5 pt-4 border-t border-border;
+  }
+
+  .checkbox-label {
+    @apply flex items-center gap-2 cursor-pointer;
+    font-size: 13px;
+  }
+
+  .checkbox-label input[type='checkbox'] {
+    @apply w-4 h-4;
+  }
+
+  .checkbox-group label {
+    @apply flex items-center gap-2 cursor-pointer;
+    font-size: 13px;
+  }
+
+  .input-with-suffix {
+    @apply flex items-center gap-1;
+  }
+
+  .input-with-suffix input {
+    @apply bg-bg border border-border text-text rounded-sm;
+    width: 80px;
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+
+  .input-with-suffix input:focus {
+    @apply outline-none border-accent;
+  }
+
+  .input-suffix {
+    @apply text-text-muted;
+    font-size: 13px;
+  }
+
+  .radio-group {
+    @apply flex flex-col gap-1.5;
+  }
+
+  .radio-group label {
+    @apply flex items-center gap-1.5 text-xs cursor-pointer;
+  }
+
+  .radio-group label.disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  input[type='color']:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  .color-picker-row {
+    @apply flex items-center gap-3;
+  }
+
+  .color-picker-row input[type='color'] {
+    @apply border border-border rounded-sm p-0 bg-transparent appearance-none;
+    width: 40px;
+    height: 32px;
+    cursor: pointer;
+  }
+
+  .color-picker-row input[type='color']::-webkit-color-swatch-wrapper {
+    padding: 3px;
+    background: var(--color-bg);
+    border-radius: 3px;
+  }
+
+  .color-picker-row input[type='color']::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px;
+  }
+
+  .color-picker-row input[type='color']::-moz-color-swatch {
+    border: none;
+    border-radius: 2px;
+  }
+}
+
+/* ===========================================
+   HELP TOOLTIP
+   =========================================== */
+
+@layer components {
+  .help-tooltip-wrapper {
+    @apply relative inline-flex items-center align-middle;
+  }
+
+  .help-tooltip-inline {
+    @apply ml-1;
+  }
+
+  .help-tooltip-trigger {
+    @apply bg-transparent border-none cursor-pointer text-text-muted
+      inline-flex items-center justify-center rounded-sm p-0.5;
+    opacity: 0.5;
+    transition:
+      color 0.15s ease,
+      background 0.15s ease,
+      opacity 0.15s ease;
+  }
+
+  .help-tooltip-trigger:hover {
+    @apply text-text bg-surface-hover opacity-100;
+  }
+
+  .help-tooltip-trigger:focus {
+    @apply outline-none;
+    box-shadow: 0 0 0 2px var(--color-accent-muted);
+  }
+
+  .help-tooltip-popover {
+    @apply fixed bg-surface border border-border rounded-md;
+    z-index: 10000;
+    padding: 10px 12px;
+    min-width: 200px;
+    max-width: 280px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: help-tooltip-fade-in 0.15s ease forwards;
+  }
+
+  .help-tooltip-text {
+    @apply text-xs text-text leading-relaxed m-0;
+  }
+
+  .help-tooltip-link {
+    @apply block mt-2 text-primary no-underline;
+    font-size: 11px;
+    transition: color 0.15s ease;
+  }
+
+  .help-tooltip-link:hover {
+    @apply text-primary-hover underline;
+  }
+}
+
+@keyframes help-tooltip-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ===========================================
+   HOTKEY HINTS
+   =========================================== */
+
+@layer components {
+  .hotkey-hints-container {
+    @apply absolute left-1/2 flex flex-col items-center gap-1.5;
+    bottom: 12px;
+    transform: translateX(-50%);
+    z-index: 50;
+  }
+
+  .hotkey-hints {
+    @apply flex gap-4 bg-surface border border-border rounded-md;
+    padding: 8px 16px;
+    opacity: 0.95;
+    backdrop-filter: blur(4px);
+  }
+
+  .hotkey-hints-camera {
+    @apply gap-3;
+    padding: 6px 12px;
+    opacity: 0.7;
+  }
+
+  .hotkey-hint {
+    @apply flex items-center gap-1.5 text-text-muted whitespace-nowrap;
+    font-size: 11px;
+  }
+
+  .hotkey-hint kbd {
+    @apply inline-block bg-bg border border-border text-text;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
+    font-size: 10px;
+  }
+}
