@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 
+/** A single item in a {@link DropdownButton} menu. */
 export interface DropdownItem {
   label: string;
   icon?: React.ReactNode;
@@ -8,6 +9,7 @@ export interface DropdownItem {
   disabled?: boolean;
 }
 
+/** Props for the {@link DropdownButton} component. */
 export interface DropdownButtonProps {
   label: string;
   items: DropdownItem[];
@@ -16,6 +18,12 @@ export interface DropdownButtonProps {
   icon?: React.ReactNode;
 }
 
+/**
+ * Button with a dropdown menu.
+ *
+ * Closes on click outside, Escape key, or item selection.
+ * Items can be individually disabled.
+ */
 export function DropdownButton({
   label,
   items,

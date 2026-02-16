@@ -14,6 +14,12 @@ interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> 
   active?: boolean;
 }
 
+/**
+ * Square icon-only button with composable size, variant, and color classes.
+ *
+ * Always requires a `label` prop for accessibility (sets both `aria-label` and `title`).
+ * Uses the `.btn-icon-{size}` classes from `primitives.css`.
+ */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
   { label, size = 'sm', variant = 'ghost', color = 'secondary', active, className, title, children, ...props },
   ref
