@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { useShallow } from 'zustand/shallow';
 import { useProjectStore, getAncestorGroupIds } from '../../store/projectStore';
+import { useCameraStore } from '../../store/cameraStore';
 import { Part as PartType, RotationAngle } from '../../types';
 import { LiveDimensions, HANDLE_POSITIONS } from './partTypes';
 import { DimensionLabel } from './DimensionLabel';
@@ -26,8 +27,6 @@ export const Part = memo(function Part({ part }: PartProps) {
     hoveredPartId,
     activeDragDelta,
     units,
-    showGrainDirection,
-    displayMode,
     referencePartIds,
     groupMembers,
     selectedGroupIds,
@@ -38,14 +37,16 @@ export const Part = memo(function Part({ part }: PartProps) {
       hoveredPartId: s.hoveredPartId,
       activeDragDelta: s.activeDragDelta,
       units: s.units,
-      showGrainDirection: s.showGrainDirection,
-      displayMode: s.displayMode,
       referencePartIds: s.referencePartIds,
       groupMembers: s.groupMembers,
       selectedGroupIds: s.selectedGroupIds,
       editingGroupId: s.editingGroupId
     }))
   );
+
+  // Camera store state
+  const showGrainDirection = useCameraStore((s) => s.showGrainDirection);
+  const displayMode = useCameraStore((s) => s.displayMode);
 
   // Actions are stable references - grab them once outside the render cycle
   const selectPart = useProjectStore((s) => s.selectPart);

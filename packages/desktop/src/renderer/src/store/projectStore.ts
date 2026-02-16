@@ -7,7 +7,6 @@ import {
   Group,
   GroupMember,
   Project,
-  DisplayMode,
   SnapLine,
   SnapGuide,
   Clipboard,
@@ -27,6 +26,7 @@ import { STOCK_COLORS } from '../constants';
 import { LicenseMode, canAddPart, canAddStock, getBlockedMessage, getFeatureLimits } from '../utils/featureLimits';
 import { getCombinedBounds, calculateDistancesFromBounds } from '../utils/snapToPartsUtil';
 import { useUIStore } from './uiStore';
+import { useCameraStore } from './cameraStore';
 
 interface ProjectState {
   // Project data
@@ -58,22 +58,10 @@ interface ProjectState {
   transformMode: 'translate' | 'scale';
   clipboard: Clipboard;
   activeDragDelta: { x: number; y: number; z: number } | null; // Live drag offset for multi-select
-  centerCameraRequested: boolean; // Flag to trigger camera centering
-  centerCameraAtOriginRequested: boolean; // Flag to trigger camera centering at origin
-  centerCameraAtPosition: { x: number; y: number; z: number } | null; // Target position for camera centering
   selectionBox: {
     start: { x: number; y: number };
     end: { x: number; y: number };
   } | null;
-  // Camera view vectors for view-relative movement (screen-aligned, normalized)
-  cameraViewVectors: {
-    up: { x: number; y: number; z: number }; // Direction pointing "up" on screen
-    right: { x: number; y: number; z: number }; // Direction pointing "right" on screen
-  };
-  showGrainDirection: boolean; // Toggle for grain direction arrows on parts
-  // Transient view state (not saved with project)
-  displayMode: DisplayMode;
-  showGrid: boolean;
   // Snap-to-parts feature
   snapToPartsEnabled: boolean;
   activeSnapLines: SnapLine[]; // Current alignment lines to display during drag
@@ -82,10 +70,6 @@ interface ProjectState {
   activeReferenceDistances: ReferenceDistanceIndicator[]; // Distance indicators to reference parts during drag
   // Persistent snap guides
   snapGuides: SnapGuide[]; // User-created guide planes for snapping
-  // Camera state (position and target) for restoring view on project load
-  cameraState: CameraState | null;
-  // Flag to trigger camera restoration (set when loading a project or restoring from edit mode)
-  pendingCameraRestore: boolean;
   // Custom shopping list items (hardware, fasteners, etc.)
   customShoppingItems: CustomShoppingItem[]; // User-added items that persist through cut list regeneration
   // Group UI state (transient)
@@ -148,16 +132,7 @@ interface ProjectState {
   setHoveredPart: (id: string | null) => void;
   setTransformMode: (mode: 'translate' | 'scale') => void;
   setActiveDragDelta: (delta: { x: number; y: number; z: number } | null) => void;
-  requestCenterCamera: () => void;
-  requestCenterCameraAtOrigin: () => void;
-  requestCenterCameraAtPosition: (position: { x: number; y: number; z: number }) => void;
-  clearCenterCameraRequest: () => void;
   setSelectionBox: (box: { start: { x: number; y: number }; end: { x: number; y: number } } | null) => void;
-  setCameraViewVectors: (vectors: {
-    up: { x: number; y: number; z: number };
-    right: { x: number; y: number; z: number };
-  }) => void;
-  toggleGrainDirection: () => void;
 
   // Actions - Clipboard
   copySelectedParts: () => void;
@@ -188,8 +163,6 @@ interface ProjectState {
   }) => void;
   loadProject: (project: Project, filePath?: string) => void;
   setFilePath: (path: string | null) => void;
-  setCameraState: (state: CameraState | null) => void;
-  clearPendingCameraRestore: () => void;
   markDirty: () => void;
   markClean: () => void;
 
@@ -202,9 +175,6 @@ interface ProjectState {
   setProjectNotes: (notes: string) => void;
   setStockConstraints: (constraints: StockConstraintSettings) => void;
 
-  // Actions - View State (transient, not saved)
-  setDisplayMode: (mode: DisplayMode) => void;
-  setShowGrid: (show: boolean) => void;
   // Snap-to-parts actions
   setSnapToPartsEnabled: (enabled: boolean) => void;
   setActiveSnapLines: (lines: SnapLine[]) => void;
@@ -544,25 +514,12 @@ export const useProjectStore = create<ProjectState>()(
       transformMode: 'translate',
       clipboard: { parts: [], groups: [], groupMembers: [] },
       activeDragDelta: null,
-      centerCameraRequested: false,
-      centerCameraAtOriginRequested: false,
-      centerCameraAtPosition: null,
       selectionBox: null,
-      // Default camera view vectors (screen-aligned for default isometric view)
-      cameraViewVectors: {
-        up: { x: 0, y: 1, z: 0 }, // Screen up direction
-        right: { x: 0.707, y: 0, z: -0.707 } // Screen right direction
-      },
-      showGrainDirection: false,
-      displayMode: 'solid',
-      showGrid: true,
       snapToPartsEnabled: true, // Enabled by default
       activeSnapLines: [],
       referencePartIds: [], // No reference parts by default
       activeReferenceDistances: [], // Distance indicators to references during drag
       snapGuides: [], // No guides by default
-      cameraState: null, // Will be set from loaded project or captured during use
-      pendingCameraRestore: false, // Set to true when camera should be restored
       customShoppingItems: [], // No custom shopping items by default
       selectedGroupIds: [], // No groups selected by default
       expandedGroupIds: [], // All groups collapsed by default
@@ -939,14 +896,7 @@ export const useProjectStore = create<ProjectState>()(
       setHoveredPart: (id) => set({ hoveredPartId: id }),
       setTransformMode: (mode) => set({ transformMode: mode }),
       setActiveDragDelta: (delta) => set({ activeDragDelta: delta }),
-      requestCenterCamera: () => set({ centerCameraRequested: true }),
-      requestCenterCameraAtOrigin: () => set({ centerCameraAtOriginRequested: true }),
-      requestCenterCameraAtPosition: (position) => set({ centerCameraAtPosition: position }),
-      clearCenterCameraRequest: () =>
-        set({ centerCameraRequested: false, centerCameraAtOriginRequested: false, centerCameraAtPosition: null }),
       setSelectionBox: (box) => set({ selectionBox: box }),
-      setCameraViewVectors: (vectors) => set({ cameraViewVectors: vectors }),
-      toggleGrainDirection: () => set((state) => ({ showGrainDirection: !state.showGrainDirection })),
 
       // Clipboard actions
       copySelectedParts: () => {
@@ -1638,14 +1588,15 @@ export const useProjectStore = create<ProjectState>()(
           clipboard: { parts: [], groups: [], groupMembers: [] },
           referencePartIds: [],
           snapGuides: [],
-          cameraState: null,
-          pendingCameraRestore: false, // No camera to restore for new project
           customShoppingItems: [],
           cutList: null,
           selectedGroupIds: [],
           expandedGroupIds: [],
           editingGroupId: null
         });
+        // Reset camera state for new project
+        useCameraStore.getState().setCameraState(null);
+        useCameraStore.getState().clearPendingCameraRestore();
         // Clear undo history after setting new project state
         setTimeout(() => useProjectStore.temporal.getState().clear(), 0);
       },
@@ -1682,21 +1633,24 @@ export const useProjectStore = create<ProjectState>()(
           clipboard: { parts: [], groups: [], groupMembers: [] },
           referencePartIds: [],
           snapGuides: project.snapGuides || [],
-          cameraState: project.cameraState || null,
-          pendingCameraRestore: !!project.cameraState, // Trigger camera restoration if project has saved camera state
           customShoppingItems: project.customShoppingItems || [],
           cutList: project.cutList || null,
           selectedGroupIds: [],
           expandedGroupIds: [],
           editingGroupId: null
         });
+        // Set camera state in cameraStore (cross-store)
+        const cameraState = project.cameraState || null;
+        useCameraStore.getState().setCameraState(cameraState);
+        if (cameraState) {
+          // pendingCameraRestore is set directly since there's no setter that sets it to true
+          useCameraStore.setState({ pendingCameraRestore: true });
+        }
         // Clear undo history after loading project state
         setTimeout(() => useProjectStore.temporal.getState().clear(), 0);
       },
 
       setFilePath: (path) => set({ filePath: path }),
-      setCameraState: (state) => set({ cameraState: state }),
-      clearPendingCameraRestore: () => set({ pendingCameraRestore: false }),
       markDirty: () => set({ isDirty: true, modifiedAt: new Date().toISOString() }),
       markClean: () => set({ isDirty: false }),
 
@@ -1715,9 +1669,6 @@ export const useProjectStore = create<ProjectState>()(
       setProjectNotes: (projectNotes) => set({ projectNotes, isDirty: true }),
       setStockConstraints: (stockConstraints) => set({ stockConstraints, isDirty: true }),
 
-      // View state actions (transient)
-      setDisplayMode: (displayMode) => set({ displayMode }),
-      setShowGrid: (showGrid) => set({ showGrid }),
       // Snap-to-parts actions
       setSnapToPartsEnabled: (snapToPartsEnabled) => set({ snapToPartsEnabled }),
       setActiveSnapLines: (activeSnapLines) => set({ activeSnapLines }),
@@ -2305,7 +2256,7 @@ export const useProjectStore = create<ProjectState>()(
           // UI state to restore
           expandedGroupIds: state.expandedGroupIds,
           referencePartIds: state.referencePartIds,
-          cameraState: state.cameraState
+          cameraState: useCameraStore.getState().cameraState
         };
 
         // Merge previous project stocks with embedded stocks from the assembly
@@ -2335,11 +2286,11 @@ export const useProjectStore = create<ProjectState>()(
           editingGroupId: null,
           cutList: null,
           referencePartIds: [],
-          snapGuides: [],
-          // Reset camera to default so it orbits correctly around the assembly
-          cameraState: null,
-          pendingCameraRestore: false // No camera to restore when entering edit mode
+          snapGuides: []
         });
+        // Reset camera to default so it orbits correctly around the assembly
+        useCameraStore.getState().setCameraState(null);
+        useCameraStore.getState().clearPendingCameraRestore();
 
         // Clear undo history
         setTimeout(() => useProjectStore.temporal.getState().clear(), 0);
@@ -2483,11 +2434,14 @@ export const useProjectStore = create<ProjectState>()(
           selectedGroupIds: [],
           expandedGroupIds: snapshot.expandedGroupIds,
           referencePartIds: snapshot.referencePartIds,
-          editingGroupId: null,
-          // Restore camera position
-          cameraState: snapshot.cameraState || null,
-          pendingCameraRestore: !!snapshot.cameraState // Trigger camera restoration if snapshot has camera state
+          editingGroupId: null
         });
+        // Restore camera position via cameraStore
+        const snapshotCameraState = snapshot.cameraState || null;
+        useCameraStore.getState().setCameraState(snapshotCameraState);
+        if (snapshotCameraState) {
+          useCameraStore.setState({ pendingCameraRestore: true });
+        }
 
         // Clear undo history
         setTimeout(() => useProjectStore.temporal.getState().clear(), 0);
