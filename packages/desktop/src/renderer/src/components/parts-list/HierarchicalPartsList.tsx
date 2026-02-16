@@ -4,6 +4,7 @@ import { Part, Group, GroupMember, Stock } from '../../types';
 import { useProjectStore, getAllDescendantPartIds, validatePartsForCutList } from '../../store/projectStore';
 import { useStockLibrary } from '../../hooks/useStockLibrary';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { IconButton } from '../common/IconButton';
 
 // Tree node types for rendering
 interface PartNode {
@@ -123,28 +124,27 @@ function PartItem({ part, level, onPartClick, onDuplicate, onDelete }: PartItemP
       )}
       <span className="part-name">{part.name}</span>
       <div className="part-actions">
-        <button
-          className="btn btn-icon-sm btn-ghost btn-secondary"
+        <IconButton
+          label={`Duplicate ${part.name}`}
+          title="Duplicate"
           onClick={(e) => {
             e.stopPropagation();
             onDuplicate(part.id);
           }}
-          title="Duplicate"
-          aria-label={`Duplicate ${part.name}`}
         >
           ⧉
-        </button>
-        <button
-          className="btn btn-icon-sm btn-ghost btn-danger"
+        </IconButton>
+        <IconButton
+          label={`Delete ${part.name}`}
+          title="Delete"
+          color="danger"
           onClick={(e) => {
             e.stopPropagation();
             onDelete(part.id);
           }}
-          title="Delete"
-          aria-label={`Delete ${part.name}`}
         >
           ×
-        </button>
+        </IconButton>
       </div>
     </li>
   );
