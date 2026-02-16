@@ -37,222 +37,249 @@ function isOrbitControls(controls: THREE.EventDispatcher<object> | null): contro
 }
 
 // Blueprint-style dimension label component
-function DimensionLabel({
-  start,
-  end,
-  value,
-  offsetDir,
-  offset = 1.5,
-  color = '#ffffff',
-  units
-}: {
-  start: [number, number, number];
-  end: [number, number, number];
-  value: number;
-  offsetDir: [number, number, number]; // Direction to offset the dimension line (should point away from part)
-  offset?: number;
-  color?: string;
-  units: 'imperial' | 'metric';
-}) {
-  // Calculate the midpoint for the label
-  const midX = (start[0] + end[0]) / 2;
-  const midY = (start[1] + end[1]) / 2;
-  const midZ = (start[2] + end[2]) / 2;
+const DimensionLabel = memo(
+  function DimensionLabel({
+    start,
+    end,
+    value,
+    offsetDir,
+    offset = 1.5,
+    color = '#ffffff',
+    units
+  }: {
+    start: [number, number, number];
+    end: [number, number, number];
+    value: number;
+    offsetDir: [number, number, number]; // Direction to offset the dimension line (should point away from part)
+    offset?: number;
+    color?: string;
+    units: 'imperial' | 'metric';
+  }) {
+    // Calculate the midpoint for the label
+    const midX = (start[0] + end[0]) / 2;
+    const midY = (start[1] + end[1]) / 2;
+    const midZ = (start[2] + end[2]) / 2;
 
-  // Normalize the offset direction and scale by offset amount
-  const dirLen = Math.sqrt(offsetDir[0] ** 2 + offsetDir[1] ** 2 + offsetDir[2] ** 2);
-  const offsetVec: [number, number, number] = [
-    (offsetDir[0] / dirLen) * offset,
-    (offsetDir[1] / dirLen) * offset,
-    (offsetDir[2] / dirLen) * offset
-  ];
+    // Normalize the offset direction and scale by offset amount
+    const dirLen = Math.sqrt(offsetDir[0] ** 2 + offsetDir[1] ** 2 + offsetDir[2] ** 2);
+    const offsetVec: [number, number, number] = [
+      (offsetDir[0] / dirLen) * offset,
+      (offsetDir[1] / dirLen) * offset,
+      (offsetDir[2] / dirLen) * offset
+    ];
 
-  // Offset positions for the dimension line
-  const offsetStart: [number, number, number] = [
-    start[0] + offsetVec[0],
-    start[1] + offsetVec[1],
-    start[2] + offsetVec[2]
-  ];
-  const offsetEnd: [number, number, number] = [end[0] + offsetVec[0], end[1] + offsetVec[1], end[2] + offsetVec[2]];
-  const labelPos: [number, number, number] = [midX + offsetVec[0], midY + offsetVec[1], midZ + offsetVec[2]];
+    // Offset positions for the dimension line
+    const offsetStart: [number, number, number] = [
+      start[0] + offsetVec[0],
+      start[1] + offsetVec[1],
+      start[2] + offsetVec[2]
+    ];
+    const offsetEnd: [number, number, number] = [end[0] + offsetVec[0], end[1] + offsetVec[1], end[2] + offsetVec[2]];
+    const labelPos: [number, number, number] = [midX + offsetVec[0], midY + offsetVec[1], midZ + offsetVec[2]];
 
-  // Calculate tick direction (perpendicular to both the line and offset direction)
-  const lineDir: [number, number, number] = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
-  // Cross product of line direction and offset direction gives tick direction
-  const tickDir: [number, number, number] = [
-    lineDir[1] * offsetVec[2] - lineDir[2] * offsetVec[1],
-    lineDir[2] * offsetVec[0] - lineDir[0] * offsetVec[2],
-    lineDir[0] * offsetVec[1] - lineDir[1] * offsetVec[0]
-  ];
-  const tickLen = Math.sqrt(tickDir[0] ** 2 + tickDir[1] ** 2 + tickDir[2] ** 2);
-  const tickLength = 0.3;
-  const normalizedTick: [number, number, number] =
-    tickLen > 0
-      ? [
-          ((tickDir[0] / tickLen) * tickLength) / 2,
-          ((tickDir[1] / tickLen) * tickLength) / 2,
-          ((tickDir[2] / tickLen) * tickLength) / 2
-        ]
-      : [0, tickLength / 2, 0]; // Fallback
-
-  return (
-    <group>
-      {/* Main dimension line */}
-      <Line points={[offsetStart, offsetEnd]} color={color} lineWidth={1.5} />
-
-      {/* Start extension line */}
-      <Line
-        points={[
-          [start[0] + offsetVec[0] * 0.2, start[1] + offsetVec[1] * 0.2, start[2] + offsetVec[2] * 0.2],
-          [
-            offsetStart[0] + offsetVec[0] * 0.15,
-            offsetStart[1] + offsetVec[1] * 0.15,
-            offsetStart[2] + offsetVec[2] * 0.15
+    // Calculate tick direction (perpendicular to both the line and offset direction)
+    const lineDir: [number, number, number] = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
+    // Cross product of line direction and offset direction gives tick direction
+    const tickDir: [number, number, number] = [
+      lineDir[1] * offsetVec[2] - lineDir[2] * offsetVec[1],
+      lineDir[2] * offsetVec[0] - lineDir[0] * offsetVec[2],
+      lineDir[0] * offsetVec[1] - lineDir[1] * offsetVec[0]
+    ];
+    const tickLen = Math.sqrt(tickDir[0] ** 2 + tickDir[1] ** 2 + tickDir[2] ** 2);
+    const tickLength = 0.3;
+    const normalizedTick: [number, number, number] =
+      tickLen > 0
+        ? [
+            ((tickDir[0] / tickLen) * tickLength) / 2,
+            ((tickDir[1] / tickLen) * tickLength) / 2,
+            ((tickDir[2] / tickLen) * tickLength) / 2
           ]
-        ]}
-        color={color}
-        lineWidth={1}
-      />
+        : [0, tickLength / 2, 0]; // Fallback
 
-      {/* End extension line */}
-      <Line
-        points={[
-          [end[0] + offsetVec[0] * 0.2, end[1] + offsetVec[1] * 0.2, end[2] + offsetVec[2] * 0.2],
-          [offsetEnd[0] + offsetVec[0] * 0.15, offsetEnd[1] + offsetVec[1] * 0.15, offsetEnd[2] + offsetVec[2] * 0.15]
-        ]}
-        color={color}
-        lineWidth={1}
-      />
+    return (
+      <group>
+        {/* Main dimension line */}
+        <Line points={[offsetStart, offsetEnd]} color={color} lineWidth={1.5} />
 
-      {/* Start tick mark (perpendicular to dimension line) */}
-      <Line
-        points={[
-          [offsetStart[0] - normalizedTick[0], offsetStart[1] - normalizedTick[1], offsetStart[2] - normalizedTick[2]],
-          [offsetStart[0] + normalizedTick[0], offsetStart[1] + normalizedTick[1], offsetStart[2] + normalizedTick[2]]
-        ]}
-        color={color}
-        lineWidth={1.5}
-      />
+        {/* Start extension line */}
+        <Line
+          points={[
+            [start[0] + offsetVec[0] * 0.2, start[1] + offsetVec[1] * 0.2, start[2] + offsetVec[2] * 0.2],
+            [
+              offsetStart[0] + offsetVec[0] * 0.15,
+              offsetStart[1] + offsetVec[1] * 0.15,
+              offsetStart[2] + offsetVec[2] * 0.15
+            ]
+          ]}
+          color={color}
+          lineWidth={1}
+        />
 
-      {/* End tick mark */}
-      <Line
-        points={[
-          [offsetEnd[0] - normalizedTick[0], offsetEnd[1] - normalizedTick[1], offsetEnd[2] - normalizedTick[2]],
-          [offsetEnd[0] + normalizedTick[0], offsetEnd[1] + normalizedTick[1], offsetEnd[2] + normalizedTick[2]]
-        ]}
-        color={color}
-        lineWidth={1.5}
-      />
+        {/* End extension line */}
+        <Line
+          points={[
+            [end[0] + offsetVec[0] * 0.2, end[1] + offsetVec[1] * 0.2, end[2] + offsetVec[2] * 0.2],
+            [offsetEnd[0] + offsetVec[0] * 0.15, offsetEnd[1] + offsetVec[1] * 0.15, offsetEnd[2] + offsetVec[2] * 0.15]
+          ]}
+          color={color}
+          lineWidth={1}
+        />
 
-      {/* Dimension text */}
-      <Html position={labelPos} center zIndexRange={[0, 50]} style={{ pointerEvents: 'none' }}>
-        <div
-          style={{
-            color: color,
-            fontSize: '13px',
-            fontWeight: 'bold',
-            fontFamily: 'monospace',
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            padding: '2px 6px',
-            borderRadius: '3px',
-            whiteSpace: 'nowrap',
-            userSelect: 'none'
-          }}
-        >
-          {formatMeasurementWithUnit(value, units)}
-        </div>
-      </Html>
-    </group>
-  );
-}
+        {/* Start tick mark (perpendicular to dimension line) */}
+        <Line
+          points={[
+            [
+              offsetStart[0] - normalizedTick[0],
+              offsetStart[1] - normalizedTick[1],
+              offsetStart[2] - normalizedTick[2]
+            ],
+            [offsetStart[0] + normalizedTick[0], offsetStart[1] + normalizedTick[1], offsetStart[2] + normalizedTick[2]]
+          ]}
+          color={color}
+          lineWidth={1.5}
+        />
+
+        {/* End tick mark */}
+        <Line
+          points={[
+            [offsetEnd[0] - normalizedTick[0], offsetEnd[1] - normalizedTick[1], offsetEnd[2] - normalizedTick[2]],
+            [offsetEnd[0] + normalizedTick[0], offsetEnd[1] + normalizedTick[1], offsetEnd[2] + normalizedTick[2]]
+          ]}
+          color={color}
+          lineWidth={1.5}
+        />
+
+        {/* Dimension text */}
+        <Html position={labelPos} center zIndexRange={[0, 50]} style={{ pointerEvents: 'none' }}>
+          <div
+            style={{
+              color: color,
+              fontSize: '13px',
+              fontWeight: 'bold',
+              fontFamily: 'monospace',
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              padding: '2px 6px',
+              borderRadius: '3px',
+              whiteSpace: 'nowrap',
+              userSelect: 'none'
+            }}
+          >
+            {formatMeasurementWithUnit(value, units)}
+          </div>
+        </Html>
+      </group>
+    );
+  },
+  (prev, next) =>
+    prev.value === next.value &&
+    prev.offset === next.offset &&
+    prev.color === next.color &&
+    prev.units === next.units &&
+    prev.start[0] === next.start[0] &&
+    prev.start[1] === next.start[1] &&
+    prev.start[2] === next.start[2] &&
+    prev.end[0] === next.end[0] &&
+    prev.end[1] === next.end[1] &&
+    prev.end[2] === next.end[2] &&
+    prev.offsetDir[0] === next.offsetDir[0] &&
+    prev.offsetDir[1] === next.offsetDir[1] &&
+    prev.offsetDir[2] === next.offsetDir[2]
+);
 
 // Double-headed arrow showing grain direction painted on the part surface
-function GrainDirectionArrow({
-  liveDims,
-  grainDirection
-}: {
-  liveDims: LiveDimensions;
-  grainDirection: 'length' | 'width';
-}) {
-  // Arrow sits just above top surface
-  const surfaceY = liveDims.thickness / 2 + 0.02;
+const GrainDirectionArrow = memo(
+  function GrainDirectionArrow({
+    liveDims,
+    grainDirection
+  }: {
+    liveDims: LiveDimensions;
+    grainDirection: 'length' | 'width';
+  }) {
+    // Arrow sits just above top surface
+    const surfaceY = liveDims.thickness / 2 + 0.02;
 
-  // Calculate arrow size based on grain direction (60% of that dimension, max 8 inches)
-  const alongDim = grainDirection === 'length' ? liveDims.length : liveDims.width;
-  const arrowLength = Math.min(alongDim * 0.6, 8);
-  const halfArrow = arrowLength / 2;
+    // Calculate arrow size based on grain direction (60% of that dimension, max 8 inches)
+    const alongDim = grainDirection === 'length' ? liveDims.length : liveDims.width;
+    const arrowLength = Math.min(alongDim * 0.6, 8);
+    const halfArrow = arrowLength / 2;
 
-  // Arrow head and shaft proportions
-  const headLength = Math.min(arrowLength * 0.25, 1.5);
-  const headWidth = Math.min(arrowLength * 0.15, 0.8);
-  const shaftWidth = headWidth * 0.4;
+    // Arrow head and shaft proportions
+    const headLength = Math.min(arrowLength * 0.25, 1.5);
+    const headWidth = Math.min(arrowLength * 0.15, 0.8);
+    const shaftWidth = headWidth * 0.4;
 
-  // Rotation for width direction (rotate 90 degrees around Y)
-  const rotation: [number, number, number] = grainDirection === 'length' ? [0, 0, 0] : [0, Math.PI / 2, 0];
+    // Rotation for width direction (rotate 90 degrees around Y)
+    const rotation: [number, number, number] = grainDirection === 'length' ? [0, 0, 0] : [0, Math.PI / 2, 0];
 
-  // Wood grain brown color
-  const arrowColor = '#8B4513';
+    // Wood grain brown color
+    const arrowColor = '#8B4513';
 
-  return (
-    <group position={[0, surfaceY, 0]} rotation={rotation}>
-      {/* Arrow shaft - flat rectangle */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[arrowLength - headLength * 2, shaftWidth]} />
-        <meshStandardMaterial color={arrowColor} side={THREE.DoubleSide} />
-      </mesh>
+    return (
+      <group position={[0, surfaceY, 0]} rotation={rotation}>
+        {/* Arrow shaft - flat rectangle */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[arrowLength - headLength * 2, shaftWidth]} />
+          <meshStandardMaterial color={arrowColor} side={THREE.DoubleSide} />
+        </mesh>
 
-      {/* Arrow head 1 (positive X direction) */}
-      <mesh position={[halfArrow - headLength / 2, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            count={3}
-            array={
-              new Float32Array([
-                -headLength / 2,
-                -headWidth,
-                0, // back left
-                -headLength / 2,
-                headWidth,
-                0, // back right
-                headLength / 2,
-                0,
-                0 // tip
-              ])
-            }
-            itemSize={3}
-          />
-        </bufferGeometry>
-        <meshStandardMaterial color={arrowColor} side={THREE.DoubleSide} />
-      </mesh>
+        {/* Arrow head 1 (positive X direction) */}
+        <mesh position={[halfArrow - headLength / 2, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <bufferGeometry>
+            <bufferAttribute
+              attach="attributes-position"
+              count={3}
+              array={
+                new Float32Array([
+                  -headLength / 2,
+                  -headWidth,
+                  0, // back left
+                  -headLength / 2,
+                  headWidth,
+                  0, // back right
+                  headLength / 2,
+                  0,
+                  0 // tip
+                ])
+              }
+              itemSize={3}
+            />
+          </bufferGeometry>
+          <meshStandardMaterial color={arrowColor} side={THREE.DoubleSide} />
+        </mesh>
 
-      {/* Arrow head 2 (negative X direction) */}
-      <mesh position={[-halfArrow + headLength / 2, 0, 0]} rotation={[-Math.PI / 2, 0, Math.PI]}>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            count={3}
-            array={
-              new Float32Array([
-                -headLength / 2,
-                -headWidth,
-                0, // back left
-                -headLength / 2,
-                headWidth,
-                0, // back right
-                headLength / 2,
-                0,
-                0 // tip
-              ])
-            }
-            itemSize={3}
-          />
-        </bufferGeometry>
-        <meshStandardMaterial color={arrowColor} side={THREE.DoubleSide} />
-      </mesh>
-    </group>
-  );
-}
+        {/* Arrow head 2 (negative X direction) */}
+        <mesh position={[-halfArrow + headLength / 2, 0, 0]} rotation={[-Math.PI / 2, 0, Math.PI]}>
+          <bufferGeometry>
+            <bufferAttribute
+              attach="attributes-position"
+              count={3}
+              array={
+                new Float32Array([
+                  -headLength / 2,
+                  -headWidth,
+                  0, // back left
+                  -headLength / 2,
+                  headWidth,
+                  0, // back right
+                  headLength / 2,
+                  0,
+                  0 // tip
+                ])
+              }
+              itemSize={3}
+            />
+          </bufferGeometry>
+          <meshStandardMaterial color={arrowColor} side={THREE.DoubleSide} />
+        </mesh>
+      </group>
+    );
+  },
+  (prev, next) =>
+    prev.liveDims.length === next.liveDims.length &&
+    prev.liveDims.width === next.liveDims.width &&
+    prev.liveDims.thickness === next.liveDims.thickness &&
+    prev.grainDirection === next.grainDirection
+);
 
 interface PartProps {
   part: PartType;
@@ -319,84 +346,93 @@ interface LiveDimensions {
   thickness: number;
 }
 
-function ResizeHandle({
-  liveDims,
-  handlePos,
-  onResizeStart,
-  isResizing
-}: {
-  liveDims: LiveDimensions;
-  handlePos: HandlePosition;
-  onResizeStart: (handlePos: HandlePosition, e: ThreeEvent<PointerEvent>) => void;
-  isResizing: boolean;
-}) {
-  const [hovered, setHovered] = useState(false);
+const ResizeHandle = memo(
+  function ResizeHandle({
+    liveDims,
+    handlePos,
+    onResizeStart,
+    isResizing
+  }: {
+    liveDims: LiveDimensions;
+    handlePos: HandlePosition;
+    onResizeStart: (handlePos: HandlePosition, e: ThreeEvent<PointerEvent>) => void;
+    isResizing: boolean;
+  }) {
+    const [hovered, setHovered] = useState(false);
 
-  // Calculate handle position relative to part center (0,0,0 in local space)
-  // For each axis: if handlePos value is 0, position at center; otherwise at edge
-  // Handles are centered on the part edge so they overlap the part by half their size,
-  // making them easier to grab when parts are flush against each other
-  const halfLength = liveDims.length / 2;
-  const halfThickness = liveDims.thickness / 2;
-  const halfWidth = liveDims.width / 2;
+    // Calculate handle position relative to part center (0,0,0 in local space)
+    // For each axis: if handlePos value is 0, position at center; otherwise at edge
+    // Handles are centered on the part edge so they overlap the part by half their size,
+    // making them easier to grab when parts are flush against each other
+    const halfLength = liveDims.length / 2;
+    const halfThickness = liveDims.thickness / 2;
+    const halfWidth = liveDims.width / 2;
 
-  // Positions relative to center (group position handles world offset)
-  const handleX = handlePos.x === 0 ? 0 : handlePos.x * halfLength;
-  const handleY = handlePos.y === 0 ? 0 : handlePos.y * halfThickness;
-  const handleZ = handlePos.z === 0 ? 0 : handlePos.z * halfWidth;
+    // Positions relative to center (group position handles world offset)
+    const handleX = handlePos.x === 0 ? 0 : handlePos.x * halfLength;
+    const handleY = handlePos.y === 0 ? 0 : handlePos.y * halfThickness;
+    const handleZ = handlePos.z === 0 ? 0 : handlePos.z * halfWidth;
 
-  // Determine cursor based on handle type
-  let cursor = 'pointer';
-  if (handlePos.type === 'corner') {
-    cursor = 'nwse-resize'; // Uniform scale
-  } else if (handlePos.type === 'edge-x') {
-    // Edge parallel to X, affects Y and Z
-    cursor = 'ns-resize';
-  } else if (handlePos.type === 'edge-y') {
-    // Edge parallel to Y (vertical), affects X and Z
-    cursor = 'ew-resize';
-  } else if (handlePos.type === 'edge-z') {
-    // Edge parallel to Z, affects X and Y
-    cursor = 'nesw-resize';
-  }
+    // Determine cursor based on handle type
+    let cursor = 'pointer';
+    if (handlePos.type === 'corner') {
+      cursor = 'nwse-resize'; // Uniform scale
+    } else if (handlePos.type === 'edge-x') {
+      // Edge parallel to X, affects Y and Z
+      cursor = 'ns-resize';
+    } else if (handlePos.type === 'edge-y') {
+      // Edge parallel to Y (vertical), affects X and Z
+      cursor = 'ew-resize';
+    } else if (handlePos.type === 'edge-z') {
+      // Edge parallel to Z, affects X and Y
+      cursor = 'nesw-resize';
+    }
 
-  // Bolder colors for different handle types
-  const baseColor = handlePos.type === 'corner' ? RESIZE_COLORS.corner : RESIZE_COLORS.edge;
-  const isActive = hovered || isResizing;
+    // Bolder colors for different handle types
+    const baseColor = handlePos.type === 'corner' ? RESIZE_COLORS.corner : RESIZE_COLORS.edge;
+    const isActive = hovered || isResizing;
 
-  return (
-    <group position={[handleX, handleY, handleZ]}>
-      {/* Dark outline for contrast on any background */}
-      <mesh scale={1.15}>
-        <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
-        <meshBasicMaterial color="#000000" transparent opacity={0.5} />
-      </mesh>
-      {/* Main handle */}
-      <mesh
-        onPointerDown={(e) => {
-          e.stopPropagation();
-          onResizeStart(handlePos, e);
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          setHovered(true);
-          document.body.style.cursor = cursor;
-        }}
-        onPointerOut={() => {
-          setHovered(false);
-          if (!isResizing) document.body.style.cursor = 'auto';
-        }}
-      >
-        <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
-        <meshStandardMaterial
-          color={isActive ? RESIZE_COLORS.hover : baseColor}
-          emissive={isActive ? baseColor : '#000000'}
-          emissiveIntensity={isActive ? 0.3 : 0}
-        />
-      </mesh>
-    </group>
-  );
-}
+    return (
+      <group position={[handleX, handleY, handleZ]}>
+        {/* Dark outline for contrast on any background */}
+        <mesh scale={1.15}>
+          <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
+          <meshBasicMaterial color="#000000" transparent opacity={0.5} />
+        </mesh>
+        {/* Main handle */}
+        <mesh
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onResizeStart(handlePos, e);
+          }}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            setHovered(true);
+            document.body.style.cursor = cursor;
+          }}
+          onPointerOut={() => {
+            setHovered(false);
+            if (!isResizing) document.body.style.cursor = 'auto';
+          }}
+        >
+          <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
+          <meshStandardMaterial
+            color={isActive ? RESIZE_COLORS.hover : baseColor}
+            emissive={isActive ? baseColor : '#000000'}
+            emissiveIntensity={isActive ? 0.3 : 0}
+          />
+        </mesh>
+      </group>
+    );
+  },
+  (prev, next) =>
+    prev.liveDims.length === next.liveDims.length &&
+    prev.liveDims.width === next.liveDims.width &&
+    prev.liveDims.thickness === next.liveDims.thickness &&
+    prev.handlePos === next.handlePos &&
+    prev.onResizeStart === next.onResizeStart &&
+    prev.isResizing === next.isResizing
+);
 
 // Rotation handle - flat ring with arrow on each face
 const ROTATION_HANDLE_SIZE = 0.55; // Slightly larger
@@ -410,128 +446,137 @@ const ROTATION_COLORS = {
   hover: '#ffffff'
 };
 
-function RotationHandle({
-  liveDims,
-  axis,
-  side,
-  onRotate
-}: {
-  liveDims: LiveDimensions;
-  axis: 'x' | 'y' | 'z';
-  side: 1 | -1; // Which side of the axis (+1 or -1)
-  onRotate: (axis: 'x' | 'y' | 'z') => void;
-}) {
-  const [hovered, setHovered] = useState(false);
+const RotationHandle = memo(
+  function RotationHandle({
+    liveDims,
+    axis,
+    side,
+    onRotate
+  }: {
+    liveDims: LiveDimensions;
+    axis: 'x' | 'y' | 'z';
+    side: 1 | -1; // Which side of the axis (+1 or -1)
+    onRotate: (axis: 'x' | 'y' | 'z') => void;
+  }) {
+    const [hovered, setHovered] = useState(false);
 
-  const halfLength = liveDims.length / 2;
-  const halfThickness = liveDims.thickness / 2;
-  const halfWidth = liveDims.width / 2;
-  const offset = 0.15; // Distance above the surface
+    const halfLength = liveDims.length / 2;
+    const halfThickness = liveDims.thickness / 2;
+    const halfWidth = liveDims.width / 2;
+    const offset = 0.15; // Distance above the surface
 
-  // Position the handle on the face perpendicular to the rotation axis
-  // Rotation orients the flat ring to be parallel to the face it's on
-  let position: [number, number, number];
-  let rotation: [number, number, number];
+    // Position the handle on the face perpendicular to the rotation axis
+    // Rotation orients the flat ring to be parallel to the face it's on
+    let position: [number, number, number];
+    let rotation: [number, number, number];
 
-  if (axis === 'y') {
-    // Top (+1) or bottom (-1) face - ring lies flat (parallel to XZ plane)
-    position = [0, side * (halfThickness + offset), 0];
-    rotation = [-Math.PI / 2, 0, 0];
-  } else if (axis === 'x') {
-    // +X or -X side face - ring parallel to YZ plane
-    position = [side * (halfLength + offset), 0, 0];
-    rotation = [0, Math.PI / 2, 0];
-  } else {
-    // +Z or -Z front/back face - ring parallel to XY plane
-    position = [0, 0, side * (halfWidth + offset)];
-    rotation = [0, 0, 0];
-  }
+    if (axis === 'y') {
+      // Top (+1) or bottom (-1) face - ring lies flat (parallel to XZ plane)
+      position = [0, side * (halfThickness + offset), 0];
+      rotation = [-Math.PI / 2, 0, 0];
+    } else if (axis === 'x') {
+      // +X or -X side face - ring parallel to YZ plane
+      position = [side * (halfLength + offset), 0, 0];
+      rotation = [0, Math.PI / 2, 0];
+    } else {
+      // +Z or -Z front/back face - ring parallel to XY plane
+      position = [0, 0, side * (halfWidth + offset)];
+      rotation = [0, 0, 0];
+    }
 
-  const baseColor = ROTATION_COLORS[axis];
-  const color = hovered ? ROTATION_COLORS.hover : baseColor;
+    const baseColor = ROTATION_COLORS[axis];
+    const color = hovered ? ROTATION_COLORS.hover : baseColor;
 
-  // Arrow triangle vertices (flat, pointing tangent to the ring)
-  // Small Z offset to sit on top of the ring and avoid z-fighting
-  const arrowSize = 0.4; // Slightly larger arrow
-  const zOffset = 0.02; // Z offset applied to mesh position
-  const arrowPosX = ROTATION_HANDLE_SIZE - 0.1; // Position on the ring
-  const arrowVertices = new Float32Array([
-    0,
-    -arrowSize * 0.7,
-    0, // back left (wider)
-    0,
-    arrowSize * 0.7,
-    0, // back right (wider)
-    arrowSize * 1.1,
-    0,
-    0 // tip (longer)
-  ]);
+    // Arrow triangle vertices (flat, pointing tangent to the ring)
+    // Small Z offset to sit on top of the ring and avoid z-fighting
+    const arrowSize = 0.4; // Slightly larger arrow
+    const zOffset = 0.02; // Z offset applied to mesh position
+    const arrowPosX = ROTATION_HANDLE_SIZE - 0.1; // Position on the ring
+    const arrowVertices = new Float32Array([
+      0,
+      -arrowSize * 0.7,
+      0, // back left (wider)
+      0,
+      arrowSize * 0.7,
+      0, // back right (wider)
+      arrowSize * 1.1,
+      0,
+      0 // tip (longer)
+    ]);
 
-  // Shared event handlers
-  const handleClick = (e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation();
-    onRotate(axis);
-  };
+    // Shared event handlers
+    const handleClick = (e: ThreeEvent<MouseEvent>) => {
+      e.stopPropagation();
+      onRotate(axis);
+    };
 
-  const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
-    e.stopPropagation();
-    setHovered(true);
-    document.body.style.cursor = 'pointer';
-  };
+    const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
+      e.stopPropagation();
+      setHovered(true);
+      document.body.style.cursor = 'pointer';
+    };
 
-  const handlePointerOut = () => {
-    setHovered(false);
-    document.body.style.cursor = 'auto';
-  };
+    const handlePointerOut = () => {
+      setHovered(false);
+      document.body.style.cursor = 'auto';
+    };
 
-  return (
-    <group position={position} rotation={rotation}>
-      {/* Invisible hit area - covers entire circular region for easier clicking */}
-      <mesh onClick={handleClick} onPointerOver={handlePointerOver} onPointerOut={handlePointerOut}>
-        <circleGeometry args={[ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS, 24]} />
-        <meshBasicMaterial visible={false} side={THREE.DoubleSide} />
-      </mesh>
+    return (
+      <group position={position} rotation={rotation}>
+        {/* Invisible hit area - covers entire circular region for easier clicking */}
+        <mesh onClick={handleClick} onPointerOver={handlePointerOver} onPointerOut={handlePointerOut}>
+          <circleGeometry args={[ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS, 24]} />
+          <meshBasicMaterial visible={false} side={THREE.DoubleSide} />
+        </mesh>
 
-      {/* Dark outline ring for contrast */}
-      <mesh>
-        <ringGeometry
-          args={[
-            ROTATION_HANDLE_SIZE - ROTATION_RING_THICKNESS - 0.02,
-            ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS + 0.02,
-            24
-          ]}
-        />
-        <meshBasicMaterial color="#000000" side={THREE.DoubleSide} transparent opacity={0.4} />
-      </mesh>
+        {/* Dark outline ring for contrast */}
+        <mesh>
+          <ringGeometry
+            args={[
+              ROTATION_HANDLE_SIZE - ROTATION_RING_THICKNESS - 0.02,
+              ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS + 0.02,
+              24
+            ]}
+          />
+          <meshBasicMaterial color="#000000" side={THREE.DoubleSide} transparent opacity={0.4} />
+        </mesh>
 
-      {/* Main visible ring - thicker and bolder */}
-      <mesh>
-        <ringGeometry
-          args={[ROTATION_HANDLE_SIZE - ROTATION_RING_THICKNESS, ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS, 24]}
-        />
-        <meshStandardMaterial
-          color={color}
-          side={THREE.DoubleSide}
-          emissive={hovered ? baseColor : '#000000'}
-          emissiveIntensity={hovered ? 0.4 : 0}
-        />
-      </mesh>
+        {/* Main visible ring - thicker and bolder */}
+        <mesh>
+          <ringGeometry
+            args={[ROTATION_HANDLE_SIZE - ROTATION_RING_THICKNESS, ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS, 24]}
+          />
+          <meshStandardMaterial
+            color={color}
+            side={THREE.DoubleSide}
+            emissive={hovered ? baseColor : '#000000'}
+            emissiveIntensity={hovered ? 0.4 : 0}
+          />
+        </mesh>
 
-      {/* Flat arrow indicator showing rotation direction - positioned on the ring */}
-      <mesh position={[arrowPosX, 0, zOffset]} rotation={[0, 0, -Math.PI / 6]}>
-        <bufferGeometry>
-          <bufferAttribute attach="attributes-position" count={3} array={arrowVertices} itemSize={3} />
-        </bufferGeometry>
-        <meshStandardMaterial
-          color={color}
-          side={THREE.DoubleSide}
-          emissive={hovered ? baseColor : '#000000'}
-          emissiveIntensity={hovered ? 0.4 : 0}
-        />
-      </mesh>
-    </group>
-  );
-}
+        {/* Flat arrow indicator showing rotation direction - positioned on the ring */}
+        <mesh position={[arrowPosX, 0, zOffset]} rotation={[0, 0, -Math.PI / 6]}>
+          <bufferGeometry>
+            <bufferAttribute attach="attributes-position" count={3} array={arrowVertices} itemSize={3} />
+          </bufferGeometry>
+          <meshStandardMaterial
+            color={color}
+            side={THREE.DoubleSide}
+            emissive={hovered ? baseColor : '#000000'}
+            emissiveIntensity={hovered ? 0.4 : 0}
+          />
+        </mesh>
+      </group>
+    );
+  },
+  (prev, next) =>
+    prev.liveDims.length === next.liveDims.length &&
+    prev.liveDims.width === next.liveDims.width &&
+    prev.liveDims.thickness === next.liveDims.thickness &&
+    prev.axis === next.axis &&
+    prev.side === next.side &&
+    prev.onRotate === next.onRotate
+);
 
 export const Part = memo(function Part({ part }: PartProps) {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -806,17 +851,20 @@ export const Part = memo(function Part({ part }: PartProps) {
     return false;
   };
 
-  const getWorldPoint = (e: PointerEvent | MouseEvent): THREE.Vector3 | null => {
-    const rect = gl.domElement.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.current.setFromCamera(new THREE.Vector2(x, y), camera);
-    const intersection = new THREE.Vector3();
-    if (raycaster.current.ray.intersectPlane(planeRef.current, intersection)) {
-      return intersection;
-    }
-    return null;
-  };
+  const getWorldPoint = useCallback(
+    (e: PointerEvent | MouseEvent): THREE.Vector3 | null => {
+      const rect = gl.domElement.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.current.setFromCamera(new THREE.Vector2(x, y), camera);
+      const intersection = new THREE.Vector3();
+      if (raycaster.current.ray.intersectPlane(planeRef.current, intersection)) {
+        return intersection;
+      }
+      return null;
+    },
+    [gl, camera]
+  );
 
   // === VIEW ANGLE HELPERS ===
   // Determine which plane to use for dragging based on camera angle
@@ -826,41 +874,44 @@ export const Part = memo(function Part({ part }: PartProps) {
     axes: { x: boolean; y: boolean; z: boolean };
   };
 
-  const getDragPlaneInfo = (partPosition: THREE.Vector3): DragPlaneInfo => {
-    // Get camera forward direction
-    const forward = new THREE.Vector3(0, 0, -1);
-    forward.applyQuaternion(camera.quaternion);
+  const getDragPlaneInfo = useCallback(
+    (partPosition: THREE.Vector3): DragPlaneInfo => {
+      // Get camera forward direction
+      const forward = new THREE.Vector3(0, 0, -1);
+      forward.applyQuaternion(camera.quaternion);
 
-    // Calculate how much we're looking along each axis
-    const dotX = Math.abs(forward.dot(new THREE.Vector3(1, 0, 0)));
-    const dotY = Math.abs(forward.dot(new THREE.Vector3(0, 1, 0)));
-    const dotZ = Math.abs(forward.dot(new THREE.Vector3(0, 0, 1)));
+      // Calculate how much we're looking along each axis
+      const dotX = Math.abs(forward.dot(new THREE.Vector3(1, 0, 0)));
+      const dotY = Math.abs(forward.dot(new THREE.Vector3(0, 1, 0)));
+      const dotZ = Math.abs(forward.dot(new THREE.Vector3(0, 0, 1)));
 
-    // Find which axis we're most aligned with (looking along)
-    // Use that axis as the plane normal
-    if (dotZ >= dotX && dotZ >= dotY) {
-      // Looking mostly along Z axis (front/back view) -> use XY plane
-      planeRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 0, 1), partPosition);
-      return {
-        normal: new THREE.Vector3(0, 0, 1),
-        axes: { x: true, y: true, z: false }
-      };
-    } else if (dotX >= dotY) {
-      // Looking mostly along X axis (side view) -> use YZ plane
-      planeRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(1, 0, 0), partPosition);
-      return {
-        normal: new THREE.Vector3(1, 0, 0),
-        axes: { x: false, y: true, z: true }
-      };
-    } else {
-      // Looking mostly from above/below (top view) -> use XZ plane
-      planeRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), partPosition);
-      return {
-        normal: new THREE.Vector3(0, 1, 0),
-        axes: { x: true, y: false, z: true }
-      };
-    }
-  };
+      // Find which axis we're most aligned with (looking along)
+      // Use that axis as the plane normal
+      if (dotZ >= dotX && dotZ >= dotY) {
+        // Looking mostly along Z axis (front/back view) -> use XY plane
+        planeRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 0, 1), partPosition);
+        return {
+          normal: new THREE.Vector3(0, 0, 1),
+          axes: { x: true, y: true, z: false }
+        };
+      } else if (dotX >= dotY) {
+        // Looking mostly along X axis (side view) -> use YZ plane
+        planeRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(1, 0, 0), partPosition);
+        return {
+          normal: new THREE.Vector3(1, 0, 0),
+          axes: { x: false, y: true, z: true }
+        };
+      } else {
+        // Looking mostly from above/below (top view) -> use XZ plane
+        planeRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), partPosition);
+        return {
+          normal: new THREE.Vector3(0, 1, 0),
+          axes: { x: true, y: false, z: true }
+        };
+      }
+    },
+    [camera]
+  );
 
   // Attach/detach window listeners when dragging or resizing
   // Handlers are defined inside useEffect to avoid stale closure issues
@@ -1475,27 +1526,40 @@ export const Part = memo(function Part({ part }: PartProps) {
   };
 
   // === RESIZE HANDLERS ===
-  const handleResizeStart = (handlePos: HandlePosition, e: ThreeEvent<PointerEvent>) => {
-    e.stopPropagation();
+  const handleResizeStart = useCallback(
+    (handlePos: HandlePosition, e: ThreeEvent<PointerEvent>) => {
+      e.stopPropagation();
 
-    const partPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
-    // Set up the drag plane based on camera angle
-    getDragPlaneInfo(partPos);
+      const partPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
+      // Set up the drag plane based on camera angle
+      getDragPlaneInfo(partPos);
 
-    const startPoint = getWorldPoint(e.nativeEvent);
-    if (startPoint) {
-      setIsResizing(true);
-      resizeStart.current = {
-        handlePos,
-        startPoint: startPoint.clone(),
-        partPos: new THREE.Vector3(part.position.x, part.position.y, part.position.z),
-        partLength: part.length,
-        partWidth: part.width,
-        partThickness: part.thickness
-      };
-      if (isOrbitControls(controls)) controls.enabled = false;
-    }
-  };
+      const startPoint = getWorldPoint(e.nativeEvent);
+      if (startPoint) {
+        setIsResizing(true);
+        resizeStart.current = {
+          handlePos,
+          startPoint: startPoint.clone(),
+          partPos: new THREE.Vector3(part.position.x, part.position.y, part.position.z),
+          partLength: part.length,
+          partWidth: part.width,
+          partThickness: part.thickness
+        };
+        if (isOrbitControls(controls)) controls.enabled = false;
+      }
+    },
+    [
+      part.position.x,
+      part.position.y,
+      part.position.z,
+      part.length,
+      part.width,
+      part.thickness,
+      controls,
+      getDragPlaneInfo,
+      getWorldPoint
+    ]
+  );
 
   const handleResizeMove = (currentPoint: THREE.Vector3) => {
     if (!resizeStart.current) return;
@@ -1808,49 +1872,52 @@ export const Part = memo(function Part({ part }: PartProps) {
 
   // Handle rotation around an axis (LOCAL rotation - rotates around the part's current axis)
   // Uses quaternion math to properly compose rotations
-  const handleRotate = (axis: 'x' | 'y' | 'z') => {
-    // Convert current rotation to quaternion
-    const currentEuler = new THREE.Euler(
-      (part.rotation.x * Math.PI) / 180,
-      (part.rotation.y * Math.PI) / 180,
-      (part.rotation.z * Math.PI) / 180,
-      'XYZ'
-    );
-    const currentQuat = new THREE.Quaternion().setFromEuler(currentEuler);
+  const handleRotate = useCallback(
+    (axis: 'x' | 'y' | 'z') => {
+      // Convert current rotation to quaternion
+      const currentEuler = new THREE.Euler(
+        (part.rotation.x * Math.PI) / 180,
+        (part.rotation.y * Math.PI) / 180,
+        (part.rotation.z * Math.PI) / 180,
+        'XYZ'
+      );
+      const currentQuat = new THREE.Quaternion().setFromEuler(currentEuler);
 
-    // Create local rotation quaternion (90 degrees around the specified local axis)
-    const localRotationQuat = new THREE.Quaternion();
-    if (axis === 'x') {
-      localRotationQuat.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
-    } else if (axis === 'y') {
-      localRotationQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-    } else {
-      localRotationQuat.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
-    }
-
-    // Apply LOCAL rotation: newQuat = currentQuat * localRotation
-    // This rotates around the part's current orientation, not world axes
-    const newQuat = currentQuat.clone().multiply(localRotationQuat);
-
-    // Convert back to Euler
-    const newEuler = new THREE.Euler().setFromQuaternion(newQuat, 'XYZ');
-
-    // Normalize to 90-degree increments
-    const normalizeAngle = (rad: number): RotationAngle => {
-      let deg = (rad * 180) / Math.PI;
-      deg = ((deg % 360) + 360) % 360;
-      const rounded = Math.round(deg / 90) * 90;
-      return (rounded === 360 ? 0 : rounded) as RotationAngle;
-    };
-
-    updatePart(part.id, {
-      rotation: {
-        x: normalizeAngle(newEuler.x),
-        y: normalizeAngle(newEuler.y),
-        z: normalizeAngle(newEuler.z)
+      // Create local rotation quaternion (90 degrees around the specified local axis)
+      const localRotationQuat = new THREE.Quaternion();
+      if (axis === 'x') {
+        localRotationQuat.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
+      } else if (axis === 'y') {
+        localRotationQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+      } else {
+        localRotationQuat.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
       }
-    });
-  };
+
+      // Apply LOCAL rotation: newQuat = currentQuat * localRotation
+      // This rotates around the part's current orientation, not world axes
+      const newQuat = currentQuat.clone().multiply(localRotationQuat);
+
+      // Convert back to Euler
+      const newEuler = new THREE.Euler().setFromQuaternion(newQuat, 'XYZ');
+
+      // Normalize to 90-degree increments
+      const normalizeAngle = (rad: number): RotationAngle => {
+        let deg = (rad * 180) / Math.PI;
+        deg = ((deg % 360) + 360) % 360;
+        const rounded = Math.round(deg / 90) * 90;
+        return (rounded === 360 ? 0 : rounded) as RotationAngle;
+      };
+
+      updatePart(part.id, {
+        rotation: {
+          x: normalizeAngle(newEuler.x),
+          y: normalizeAngle(newEuler.y),
+          z: normalizeAngle(newEuler.z)
+        }
+      });
+    },
+    [part.rotation.x, part.rotation.y, part.rotation.z, part.id, updatePart]
+  );
 
   // Use live dimensions for rendering
   const dims: [number, number, number] = [liveDims.length, liveDims.thickness, liveDims.width];
