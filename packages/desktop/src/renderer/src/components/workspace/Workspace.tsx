@@ -408,8 +408,7 @@ export function Workspace() {
         const partBottom = Math.max(...screenPoints.map((p) => p.y));
 
         // Check if part's screen bounding box intersects with selection box
-        const intersects =
-          partLeft <= selRight && partRight >= selLeft && partTop <= selBottom && partBottom >= selTop;
+        const intersects = partLeft <= selRight && partRight >= selLeft && partTop <= selBottom && partBottom >= selTop;
 
         if (intersects) {
           selectedIds.push(part.id);

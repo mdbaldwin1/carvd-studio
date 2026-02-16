@@ -1,6 +1,10 @@
 import { useThree } from '@react-three/fiber';
 import { useCallback, useEffect } from 'react';
-import { useProjectStore, registerCanvasCaptureHandler, unregisterCanvasCaptureHandler } from '../../store/projectStore';
+import {
+  useProjectStore,
+  registerCanvasCaptureHandler,
+  unregisterCanvasCaptureHandler
+} from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 
 // Component that handles canvas capture/export
