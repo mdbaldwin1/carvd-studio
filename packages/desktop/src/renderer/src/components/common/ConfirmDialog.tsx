@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { useBackdropClose } from '../../hooks/useBackdropClose';
+import { useEffect } from 'react';
+import { Modal } from './Modal';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -22,43 +22,29 @@ export function ConfirmDialog({
   onConfirm,
   onCancel
 }: ConfirmDialogProps) {
-  const { handleMouseDown, handleClick } = useBackdropClose(onCancel);
-
-  // Handle keyboard shortcuts (Escape to cancel, Enter to confirm)
+  // Handle Enter key to confirm (Escape is handled by Modal)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
 
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onCancel();
-      } else if (e.key === 'Enter') {
+      if (e.key === 'Enter') {
         e.preventDefault();
         onConfirm();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onCancel, onConfirm]);
-
-  if (!isOpen) return null;
+  }, [isOpen, onConfirm]);
 
   return (
-    <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
-      <div className="modal confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
-        <div className="modal-header">
-          <h2 id="confirm-dialog-title">{title}</h2>
-          <button className="modal-close" onClick={onCancel} aria-label="Close">
-            &times;
-          </button>
-        </div>
-
-        <div className="confirm-dialog-content">
-          {variant === 'danger' && <div className="confirm-dialog-icon">⚠️</div>}
-          <p>{message}</p>
-        </div>
-
-        <div className="modal-footer">
+    <Modal
+      isOpen={isOpen}
+      onClose={onCancel}
+      title={title}
+      className="confirm-dialog"
+      role="alertdialog"
+      footer={
+        <>
           <button className="btn btn-sm btn-outlined btn-secondary" onClick={onCancel} title="Press Escape to cancel">
             {cancelLabel}
           </button>
@@ -70,8 +56,13 @@ export function ConfirmDialog({
           >
             {confirmLabel}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="confirm-dialog-content">
+        {variant === 'danger' && <div className="confirm-dialog-icon">⚠️</div>}
+        <p>{message}</p>
       </div>
-    </div>
+    </Modal>
   );
 }
