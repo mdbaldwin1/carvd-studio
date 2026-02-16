@@ -51,6 +51,7 @@ export default [
         atob: 'readonly',
         confirm: 'readonly',
         alert: 'readonly',
+        performance: 'readonly',
         React: 'readonly',
         // Node.js globals
         process: 'readonly',

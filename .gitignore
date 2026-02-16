@@ -158,3 +158,6 @@ my-notes.txt
 # (explicitly documented - .claude/ is tracked by default)
 
 .DS_Store
+
+# Bundle analysis output
+bundle-analysis.html
