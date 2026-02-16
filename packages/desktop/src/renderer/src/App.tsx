@@ -57,6 +57,7 @@ import { useLibraryImportCheck } from './hooks/useLibraryImportCheck';
 import { useLicenseStatus } from './hooks/useLicenseStatus';
 import { useStockLibrary } from './hooks/useStockLibrary';
 import { useProjectStore } from './store/projectStore';
+import { useUIStore } from './store/uiStore';
 import { Assembly, LightingMode, Project, Stock } from './types';
 import { formatMeasurementWithUnit } from './utils/fractions';
 import { getPartBounds } from './utils/snapToPartsUtil';
@@ -194,9 +195,9 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
   const selectPart = useProjectStore((s) => s.selectPart);
   const selectParts = useProjectStore((s) => s.selectParts);
   const togglePartSelection = useProjectStore((s) => s.togglePartSelection);
-  const requestDeleteParts = useProjectStore((s) => s.requestDeleteParts);
+  const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
   const duplicatePart = useProjectStore((s) => s.duplicatePart);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
   const cutList = useProjectStore((s) => s.cutList);
 
   // App-level stock library (persisted)
@@ -752,7 +753,7 @@ function PropertiesPanel() {
   const units = useProjectStore((s) => s.units);
   const updatePart = useProjectStore((s) => s.updatePart);
   const renameGroup = useProjectStore((s) => s.renameGroup);
-  const requestDeleteParts = useProjectStore((s) => s.requestDeleteParts);
+  const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
   const deleteGroup = useProjectStore((s) => s.deleteGroup);
   const duplicateSelectedParts = useProjectStore((s) => s.duplicateSelectedParts);
   const assignStockToSelectedParts = useProjectStore((s) => s.assignStockToSelectedParts);
@@ -2373,12 +2374,12 @@ function App() {
 
   // Part deletion confirmation
   const parts = useProjectStore((s) => s.parts);
-  const pendingDeletePartIds = useProjectStore((s) => s.pendingDeletePartIds);
+  const pendingDeletePartIds = useUIStore((s) => s.pendingDeletePartIds);
   const confirmDeleteParts = useProjectStore((s) => s.confirmDeleteParts);
-  const cancelDeleteParts = useProjectStore((s) => s.cancelDeleteParts);
+  const cancelDeleteParts = useUIStore((s) => s.cancelDeleteParts);
 
   // Cut list modal
-  const openCutListModal = useProjectStore((s) => s.openCutListModal);
+  const openCutListModal = useUIStore((s) => s.openCutListModal);
 
   // App settings
   const { settings: appSettings, updateSettings: updateAppSettings } = useAppSettings();
@@ -2809,8 +2810,8 @@ function App() {
 }
 
 function SaveAssemblyModalWrapper() {
-  const saveAssemblyModalOpen = useProjectStore((s) => s.saveAssemblyModalOpen);
-  const closeSaveAssemblyModal = useProjectStore((s) => s.closeSaveAssemblyModal);
+  const saveAssemblyModalOpen = useUIStore((s) => s.saveAssemblyModalOpen);
+  const closeSaveAssemblyModal = useUIStore((s) => s.closeSaveAssemblyModal);
   const addAssembly = useProjectStore((s) => s.addAssembly);
   const { addAssembly: addToLibrary } = useAssemblyLibrary();
 
@@ -2828,8 +2829,8 @@ function SaveAssemblyModalWrapper() {
 }
 
 function CutListModalWrapper() {
-  const cutListModalOpen = useProjectStore((s) => s.cutListModalOpen);
-  const closeCutListModal = useProjectStore((s) => s.closeCutListModal);
+  const cutListModalOpen = useUIStore((s) => s.cutListModalOpen);
+  const closeCutListModal = useUIStore((s) => s.closeCutListModal);
 
   return <CutListModal isOpen={cutListModalOpen} onClose={closeCutListModal} />;
 }

@@ -12,6 +12,7 @@ import {
   registerThumbnailGenerator,
   unregisterThumbnailGenerator
 } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { CameraState, LightingMode, SnapLine } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
@@ -299,7 +300,7 @@ function CanvasCaptureHandler() {
 
     // Write the image file
     await window.electronAPI.writeBinaryFile(result.filePath, Array.from(uint8Array));
-    useProjectStore.getState().showToast(`Exported to ${result.filePath.split('/').pop()}`);
+    useUIStore.getState().showToast(`Exported to ${result.filePath.split('/').pop()}`);
   }, [gl, scene, camera, projectName]);
 
   // Register the capture handler on mount
@@ -1049,7 +1050,7 @@ export function Workspace() {
   const parts = useProjectStore((s) => s.parts);
   const clearSelection = useProjectStore((s) => s.clearSelection);
   const selectParts = useProjectStore((s) => s.selectParts);
-  const openContextMenu = useProjectStore((s) => s.openContextMenu);
+  const openContextMenu = useUIStore((s) => s.openContextMenu);
   const setSelectionBox = useProjectStore((s) => s.setSelectionBox);
   const showGrid = useProjectStore((s) => s.showGrid);
   const cameraState = useProjectStore((s) => s.cameraState);

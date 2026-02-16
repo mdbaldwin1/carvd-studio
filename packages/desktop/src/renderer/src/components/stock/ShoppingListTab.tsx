@@ -1,6 +1,7 @@
 import { Download, FileText, FileSpreadsheet } from 'lucide-react';
 import React, { useState, useCallback, useMemo } from 'react';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { getBlockedMessage } from '../../utils/featureLimits';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { exportShoppingListToPdf, exportShoppingListToCsv } from '../../utils/pdfExport';
@@ -24,7 +25,7 @@ export function ShoppingListTab({
   const addCustomShoppingItem = useProjectStore((s) => s.addCustomShoppingItem);
   const updateCustomShoppingItem = useProjectStore((s) => s.updateCustomShoppingItem);
   const deleteCustomShoppingItem = useProjectStore((s) => s.deleteCustomShoppingItem);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
 
   // Local state for checkboxes (ephemeral, not saved with project)
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());

@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useProjectStore } from '../store/projectStore';
+import { useUIStore } from '../store/uiStore';
 import {
   saveProject,
   saveProjectAs,
@@ -60,7 +61,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   const isDirty = useProjectStore((s) => s.isDirty);
   const projectName = useProjectStore((s) => s.projectName);
   const filePath = useProjectStore((s) => s.filePath);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
 
   // Dialog state
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);

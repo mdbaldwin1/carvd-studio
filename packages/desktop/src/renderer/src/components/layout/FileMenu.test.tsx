@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { FileMenu } from './FileMenu';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 
 // Mock the fileOperations module
 vi.mock('../../utils/fileOperations', () => ({
@@ -22,7 +23,7 @@ describe('FileMenu', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    useProjectStore.setState({
+    useUIStore.setState({
       showToast: vi.fn()
     });
     vi.mocked(openProjectFromPath).mockResolvedValue({ success: true });
@@ -163,7 +164,7 @@ describe('FileMenu', () => {
 
       // Wait for async operation
       await vi.waitFor(() => {
-        expect(useProjectStore.getState().showToast).toHaveBeenCalledWith('Project opened');
+        expect(useUIStore.getState().showToast).toHaveBeenCalledWith('Project opened');
       });
     });
 
@@ -177,7 +178,7 @@ describe('FileMenu', () => {
       fireEvent.click(screen.getByText('project1'));
 
       await vi.waitFor(() => {
-        expect(useProjectStore.getState().showToast).toHaveBeenCalledWith('Error: File not found');
+        expect(useUIStore.getState().showToast).toHaveBeenCalledWith('Error: File not found');
       });
     });
 

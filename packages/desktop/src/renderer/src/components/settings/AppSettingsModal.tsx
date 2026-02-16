@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { AppSettings } from '../../types';
 import { mmToInches } from '../../utils/fractions';
-import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { AppearanceSection } from './AppearanceSection';
 import { LicenseSection } from './LicenseSection';
 import { DefaultsSection } from './DefaultsSection';
@@ -76,7 +76,7 @@ export function AppSettingsModal({
   // Local form state
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [isExporting, setIsExporting] = useState(false);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
 
   // Handle export app state
   const handleExportAppState = useCallback(async () => {

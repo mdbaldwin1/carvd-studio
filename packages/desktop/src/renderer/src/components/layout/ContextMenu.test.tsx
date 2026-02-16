@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ContextMenu } from './ContextMenu';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 
 describe('ContextMenu', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset store state
     useProjectStore.setState({
-      contextMenu: null,
       selectedPartIds: [],
       selectedGroupIds: [],
       parts: [],
@@ -20,6 +20,9 @@ describe('ContextMenu', () => {
       editingGroupId: null,
       isEditingAssembly: false
     });
+    useUIStore.setState({
+      contextMenu: null
+    });
   });
 
   describe('rendering', () => {
@@ -29,7 +32,7 @@ describe('ContextMenu', () => {
     });
 
     it('renders background menu when type is background', () => {
-      useProjectStore.setState({
+      useUIStore.setState({
         contextMenu: {
           type: 'background',
           x: 100,
@@ -46,13 +49,15 @@ describe('ContextMenu', () => {
     });
 
     it('renders part menu when parts are selected', () => {
-      useProjectStore.setState({
+      useUIStore.setState({
         contextMenu: {
           type: 'part',
           x: 100,
           y: 200,
           partId: 'part-1'
-        },
+        }
+      });
+      useProjectStore.setState({
         selectedPartIds: ['part-1'],
         parts: [{ id: 'part-1', name: 'Part 1', stockId: null }]
       });
@@ -65,13 +70,15 @@ describe('ContextMenu', () => {
     });
 
     it('renders guide menu when type is guide', () => {
-      useProjectStore.setState({
+      useUIStore.setState({
         contextMenu: {
           type: 'guide',
           x: 100,
           y: 200,
           guideId: 'guide-1'
-        },
+        }
+      });
+      useProjectStore.setState({
         snapGuides: [{ id: 'guide-1', axis: 'x', position: 12.5 }]
       });
 
@@ -84,20 +91,22 @@ describe('ContextMenu', () => {
 
   describe('background menu', () => {
     beforeEach(() => {
-      useProjectStore.setState({
+      useUIStore.setState({
         contextMenu: {
           type: 'background',
           x: 100,
           y: 200,
           worldPosition: { x: 10, y: 5, z: 0 }
         },
+        closeContextMenu: vi.fn(),
+        captureManualThumbnail: vi.fn()
+      });
+      useProjectStore.setState({
         requestCenterCameraAtOrigin: vi.fn(),
         requestCenterCameraAtPosition: vi.fn(),
-        closeContextMenu: vi.fn(),
         pasteAtPosition: vi.fn(),
         addSnapGuide: vi.fn(),
-        clearSnapGuides: vi.fn(),
-        captureManualThumbnail: vi.fn()
+        clearSnapGuides: vi.fn()
       });
     });
 
@@ -170,13 +179,17 @@ describe('ContextMenu', () => {
 
   describe('part menu', () => {
     beforeEach(() => {
-      useProjectStore.setState({
+      useUIStore.setState({
         contextMenu: {
           type: 'part',
           x: 100,
           y: 200,
           partId: 'part-1'
         },
+        closeContextMenu: vi.fn(),
+        openSaveAssemblyModal: vi.fn()
+      });
+      useProjectStore.setState({
         selectedPartIds: ['part-1', 'part-2'],
         parts: [
           { id: 'part-1', name: 'Part 1', stockId: 'stock-1' },
@@ -186,9 +199,7 @@ describe('ContextMenu', () => {
         deleteSelectedParts: vi.fn(),
         requestCenterCamera: vi.fn(),
         resetSelectedPartsToStock: vi.fn(),
-        toggleReference: vi.fn(),
-        closeContextMenu: vi.fn(),
-        openSaveAssemblyModal: vi.fn()
+        toggleReference: vi.fn()
       });
     });
 
@@ -244,7 +255,7 @@ describe('ContextMenu', () => {
       render(<ContextMenu />);
       fireEvent.click(screen.getByText('Save as Assembly'));
 
-      expect(useProjectStore.getState().openSaveAssemblyModal).toHaveBeenCalled();
+      expect(useUIStore.getState().openSaveAssemblyModal).toHaveBeenCalled();
     });
 
     it('shows Set as Reference button', () => {
@@ -266,13 +277,16 @@ describe('ContextMenu', () => {
 
   describe('group operations', () => {
     it('shows Create Group when multiple ungrouped items', () => {
-      useProjectStore.setState({
+      useUIStore.setState({
         contextMenu: {
           type: 'part',
           x: 100,
           y: 200,
           partId: 'part-1'
         },
+        closeContextMenu: vi.fn()
+      });
+      useProjectStore.setState({
         selectedPartIds: ['part-1', 'part-2'],
         selectedGroupIds: [],
         parts: [
@@ -281,7 +295,6 @@ describe('ContextMenu', () => {
         ],
         groups: [],
         groupMembers: [],
-        closeContextMenu: vi.fn(),
         createGroup: vi.fn()
       });
 
@@ -291,19 +304,21 @@ describe('ContextMenu', () => {
     });
 
     it('shows Ungroup when a group is selected', () => {
-      useProjectStore.setState({
+      useUIStore.setState({
         contextMenu: {
           type: 'part',
           x: 100,
           y: 200,
           partId: 'part-1'
         },
+        closeContextMenu: vi.fn()
+      });
+      useProjectStore.setState({
         selectedPartIds: [],
         selectedGroupIds: ['group-1'],
         parts: [],
         groups: [{ id: 'group-1', name: 'My Group' }],
         groupMembers: [{ groupId: 'group-1', memberId: 'part-1', memberType: 'part' }],
-        closeContextMenu: vi.fn(),
         deleteGroup: vi.fn()
       });
 
@@ -313,19 +328,21 @@ describe('ContextMenu', () => {
     });
 
     it('shows mixed selection header', () => {
-      useProjectStore.setState({
+      useUIStore.setState({
         contextMenu: {
           type: 'part',
           x: 100,
           y: 200,
           partId: 'part-1'
         },
+        closeContextMenu: vi.fn()
+      });
+      useProjectStore.setState({
         selectedPartIds: ['part-1'],
         selectedGroupIds: ['group-1'],
         parts: [{ id: 'part-1', name: 'Part 1' }],
         groups: [{ id: 'group-1', name: 'Group 1' }],
-        groupMembers: [],
-        closeContextMenu: vi.fn()
+        groupMembers: []
       });
 
       render(<ContextMenu />);
@@ -336,17 +353,19 @@ describe('ContextMenu', () => {
 
   describe('guide menu', () => {
     beforeEach(() => {
-      useProjectStore.setState({
+      useUIStore.setState({
         contextMenu: {
           type: 'guide',
           x: 100,
           y: 200,
           guideId: 'guide-1'
         },
+        closeContextMenu: vi.fn()
+      });
+      useProjectStore.setState({
         snapGuides: [{ id: 'guide-1', axis: 'y', position: 24.75 }],
         removeSnapGuide: vi.fn(),
-        clearSnapGuides: vi.fn(),
-        closeContextMenu: vi.fn()
+        clearSnapGuides: vi.fn()
       });
     });
 
@@ -390,7 +409,7 @@ describe('ContextMenu', () => {
   describe('keyboard and click handlers', () => {
     it('closes on Escape key', async () => {
       const closeContextMenu = vi.fn();
-      useProjectStore.setState({
+      useUIStore.setState({
         contextMenu: {
           type: 'background',
           x: 100,
@@ -413,7 +432,7 @@ describe('ContextMenu', () => {
 
   describe('styling', () => {
     it('positions menu at context menu coordinates', () => {
-      useProjectStore.setState({
+      useUIStore.setState({
         contextMenu: {
           type: 'background',
           x: 150,

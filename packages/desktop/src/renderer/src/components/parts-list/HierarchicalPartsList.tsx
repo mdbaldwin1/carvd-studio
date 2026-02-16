@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ChevronRight, ChevronDown, Layers, AlertTriangle } from 'lucide-react';
 import { Part, Group, GroupMember, Stock } from '../../types';
 import { useProjectStore, getAllDescendantPartIds, validatePartsForCutList } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { useStockLibrary } from '../../hooks/useStockLibrary';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { IconButton } from '../common/IconButton';
@@ -196,7 +197,7 @@ function GroupItem({ group, children, level, onPartClick, onDuplicate, onDelete 
   const selectGroup = useProjectStore((s) => s.selectGroup);
   const toggleGroupSelection = useProjectStore((s) => s.toggleGroupSelection);
   const enterGroup = useProjectStore((s) => s.enterGroup);
-  const openContextMenu = useProjectStore((s) => s.openContextMenu);
+  const openContextMenu = useUIStore((s) => s.openContextMenu);
 
   // Use library stocks when editing assembly, project stocks otherwise
   const { stocks: libraryStocks } = useStockLibrary();

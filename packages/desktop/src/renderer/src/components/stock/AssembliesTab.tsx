@@ -1,6 +1,7 @@
 import { Copy, Download, Plus, Search, Upload, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { isBuiltInAssembly } from '../../templates/builtInAssemblies';
 import { Assembly } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
@@ -28,7 +29,7 @@ export function AssembliesTab({
   onClose
 }: AssembliesTabProps) {
   const units = useProjectStore((s) => s.units);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
 
   const [selectedAssemblyId, setSelectedAssemblyId] = useState<string | null>(null);
   const [isEditingAssembly, setIsEditingAssembly] = useState(false);

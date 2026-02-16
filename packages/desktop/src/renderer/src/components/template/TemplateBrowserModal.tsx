@@ -5,6 +5,7 @@ import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
 import { Project } from '../../types';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { getFeatureLimits, getBlockedMessage } from '../../utils/featureLimits';
 import { logger } from '../../utils/logger';
 
@@ -101,10 +102,10 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
 
   const handleSaveCurrentAsTemplate = useCallback(async () => {
     // Check license limits for custom templates
-    const projectStore = useProjectStore.getState();
-    const limits = getFeatureLimits(projectStore.licenseMode);
+    const projectState = useProjectStore.getState();
+    const limits = getFeatureLimits(projectState.licenseMode);
     if (!limits.canUseCustomTemplates) {
-      projectStore.showToast(getBlockedMessage('useTemplates'));
+      useUIStore.getState().showToast(getBlockedMessage('useTemplates'));
       return;
     }
 
@@ -136,18 +137,18 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
     // Get the full project state (reuse projectStore from license check above)
     const fullProject: Project = {
       version: '1.0',
-      name: projectStore.name,
-      stocks: projectStore.stocks,
-      parts: projectStore.parts,
-      groups: projectStore.groups,
-      groupMembers: projectStore.groupMembers,
-      assemblies: projectStore.assemblies,
-      units: projectStore.units,
-      gridSize: projectStore.gridSize,
-      kerfWidth: projectStore.kerfWidth,
-      overageFactor: projectStore.overageFactor,
-      projectNotes: projectStore.projectNotes,
-      stockConstraints: projectStore.stockConstraints,
+      name: projectState.name,
+      stocks: projectState.stocks,
+      parts: projectState.parts,
+      groups: projectState.groups,
+      groupMembers: projectState.groupMembers,
+      assemblies: projectState.assemblies,
+      units: projectState.units,
+      gridSize: projectState.gridSize,
+      kerfWidth: projectState.kerfWidth,
+      overageFactor: projectState.overageFactor,
+      projectNotes: projectState.projectNotes,
+      stockConstraints: projectState.stockConstraints,
       createdAt: new Date().toISOString(),
       modifiedAt: new Date().toISOString()
     };

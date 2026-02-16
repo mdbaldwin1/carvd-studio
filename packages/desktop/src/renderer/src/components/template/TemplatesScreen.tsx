@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useEffect, useState, useCallback } from 'react';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { getFeatureLimits } from '../../utils/featureLimits';
 import { Project } from '../../types';
 import './TemplatesScreen.css';
@@ -100,13 +101,13 @@ export function TemplatesScreen({
     try {
       const result = await window.electronAPI.exportTemplate(templateId);
       if (result.success && result.filePath) {
-        useProjectStore.getState().showToast(`Template exported to ${result.filePath.split('/').pop()}`, 'success');
+        useUIStore.getState().showToast(`Template exported to ${result.filePath.split('/').pop()}`, 'success');
       } else if (!result.canceled && result.error) {
-        useProjectStore.getState().showToast(result.error, 'error');
+        useUIStore.getState().showToast(result.error, 'error');
       }
     } catch (error) {
       console.error('Failed to export template:', error);
-      useProjectStore.getState().showToast('Failed to export template', 'error');
+      useUIStore.getState().showToast('Failed to export template', 'error');
     }
   }, []);
 
@@ -122,13 +123,13 @@ export function TemplatesScreen({
             type: 'user' as const
           }))
         );
-        useProjectStore.getState().showToast('Template imported successfully', 'success');
+        useUIStore.getState().showToast('Template imported successfully', 'success');
       } else if (!result.canceled && result.error) {
-        useProjectStore.getState().showToast(result.error, 'error');
+        useUIStore.getState().showToast(result.error, 'error');
       }
     } catch (error) {
       console.error('Failed to import template:', error);
-      useProjectStore.getState().showToast('Failed to import template', 'error');
+      useUIStore.getState().showToast('Failed to import template', 'error');
     }
   }, []);
 

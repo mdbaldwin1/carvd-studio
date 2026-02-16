@@ -2,6 +2,7 @@ import { Download } from 'lucide-react';
 import React, { useState, useCallback, useMemo } from 'react';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useProjectStore, validatePartsForCutList, generateThumbnail } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { generateOptimizedCutList } from '../../utils/cutListOptimizer';
 import { getFeatureLimits, getBlockedMessage } from '../../utils/featureLimits';
 import { exportProjectReportToPdf } from '../../utils/pdfExport';
@@ -32,7 +33,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
   const cutList = useProjectStore((s) => s.cutList);
   const setCutList = useProjectStore((s) => s.setCutList);
   const licenseMode = useProjectStore((s) => s.licenseMode);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
   const projectName = useProjectStore((s) => s.projectName);
   const projectNotes = useProjectStore((s) => s.notes);
   const customShoppingItems = useProjectStore((s) => s.customShoppingItems);

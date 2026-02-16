@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { CutListModal } from './CutListModal';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { generateOptimizedCutList } from '../../utils/cutListOptimizer';
 import { Part, Stock, CutList } from '../../types';
 
@@ -144,12 +145,14 @@ describe('CutListModal', () => {
       modifiedAt: new Date().toISOString(),
       cutList: null,
       customShoppingItems: [],
-      showToast: vi.fn(),
       setCutList: vi.fn(),
       addCustomShoppingItem: vi.fn(),
       updateCustomShoppingItem: vi.fn(),
       deleteCustomShoppingItem: vi.fn(),
       projectName: 'Test Project'
+    });
+    useUIStore.setState({
+      showToast: vi.fn()
     });
   });
 

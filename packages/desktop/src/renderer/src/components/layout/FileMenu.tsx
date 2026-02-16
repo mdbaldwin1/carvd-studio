@@ -5,7 +5,7 @@
 import { ChevronDown, File, FolderOpen, Save, FilePlus } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { openProjectFromPath } from '../../utils/fileOperations';
-import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import './FileMenu.css';
 
 interface FileMenuProps {
@@ -21,7 +21,7 @@ export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRe
   const [isOpen, setIsOpen] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
 
   const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
   const modKey = isMac ? '⌘' : 'Ctrl+';

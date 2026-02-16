@@ -6,6 +6,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useProjectStore, generateThumbnail } from '../store/projectStore';
+import { useUIStore } from '../store/uiStore';
 import { UserTemplate } from '../templates';
 import { Project } from '../types';
 import { getFeatureLimits, getBlockedMessage } from '../utils/featureLimits';
@@ -53,7 +54,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
   const { onSaveComplete, onDiscardComplete } = options;
   const loadProject = useProjectStore((s) => s.loadProject);
   const isDirty = useProjectStore((s) => s.isDirty);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
   const markClean = useProjectStore((s) => s.markClean);
 
   // Template editing state
@@ -278,7 +279,8 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
         let thumbnailData:
           | { data: string; width: number; height: number; generatedAt: string; manuallySet?: boolean }
           | undefined;
-        const manualThumbnail = projectStore.manualThumbnail;
+        const uiState = useUIStore.getState();
+        const manualThumbnail = uiState.manualThumbnail;
 
         if (manualThumbnail) {
           // Use the manually captured thumbnail
@@ -290,7 +292,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
             manuallySet: true
           };
           // Clear the manual thumbnail after using it
-          projectStore.clearManualThumbnail();
+          uiState.clearManualThumbnail();
         } else if (!state.isCreatingNew && state.templateId) {
           // Check if existing template has a manually set thumbnail - preserve it
           try {

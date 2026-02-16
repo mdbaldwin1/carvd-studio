@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from 'react';
 import { useProjectStore, generateThumbnail } from '../store/projectStore';
+import { useUIStore } from '../store/uiStore';
 import { useAssemblyLibrary } from './useAssemblyLibrary';
 import { useStockLibrary } from './useStockLibrary';
 import { Assembly, Part, Group, GroupMember, Stock } from '../types';
@@ -153,7 +154,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
   const cancelEditingAssembly = useProjectStore((s) => s.cancelEditingAssembly);
   const restorePreviousProject = useProjectStore((s) => s.restorePreviousProject);
   const startFreshAfterAssemblyEdit = useProjectStore((s) => s.startFreshAfterAssemblyEdit);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
 
   const { assemblies, addAssembly, updateAssembly } = useAssemblyLibrary();
   const { stocks: libraryStocks } = useStockLibrary();
@@ -256,7 +257,8 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
       let thumbnailData:
         | { data: string; width: number; height: number; generatedAt: string; manuallySet?: boolean }
         | undefined;
-      const manualThumbnail = projectStore.manualThumbnail;
+      const uiState = useUIStore.getState();
+      const manualThumbnail = uiState.manualThumbnail;
 
       if (manualThumbnail) {
         // Use the manually captured thumbnail
@@ -268,7 +270,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
           manuallySet: true
         };
         // Clear the manual thumbnail after using it
-        projectStore.clearManualThumbnail();
+        uiState.clearManualThumbnail();
       } else if (!shouldCreateNew) {
         // Check if existing assembly has a manually set thumbnail - preserve it
         const existingAssembly = assemblies.find((c) => c.id === editingAssemblyId);

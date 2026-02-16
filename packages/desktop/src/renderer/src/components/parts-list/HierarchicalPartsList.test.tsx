@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vite
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { HierarchicalPartsList } from './HierarchicalPartsList';
 import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 import { Part, Group, GroupMember, Stock } from '../../types';
 
 // Mock useStockLibrary
@@ -384,14 +385,16 @@ describe('HierarchicalPartsList', () => {
 
     it('opens context menu on right click', () => {
       useProjectStore.setState({
-        groups: mockGroups,
+        groups: mockGroups
+      });
+      useUIStore.setState({
         contextMenu: null
       });
       render(<HierarchicalPartsList {...defaultProps} />);
 
       fireEvent.contextMenu(screen.getByText('Cabinet Parts'));
 
-      expect(useProjectStore.getState().contextMenu).not.toBeNull();
+      expect(useUIStore.getState().contextMenu).not.toBeNull();
     });
   });
 

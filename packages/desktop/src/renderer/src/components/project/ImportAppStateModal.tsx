@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Upload, CheckCircle, AlertTriangle, Package, Palette, FileBox, LayoutTemplate } from 'lucide-react';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
-import { useProjectStore } from '../../store/projectStore';
+import { useUIStore } from '../../store/uiStore';
 
 interface ImportPreview {
   valid: boolean;
@@ -28,7 +28,7 @@ type ImportStep = 'select' | 'options' | 'result';
 
 export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProps) {
   const { handleMouseDown, handleClick } = useBackdropClose(onClose);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
 
   const [step, setStep] = useState<ImportStep>('select');
   const [isLoading, setIsLoading] = useState(false);
