@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useProjectStore, getContainingGroupId, getAllDescendantPartIds } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
+import { useCameraStore } from '../../store/cameraStore';
 import { getFeatureLimits } from '../../utils/featureLimits';
 
 interface PartContextMenuProps {
@@ -16,7 +17,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const copySelectedParts = useProjectStore((s) => s.copySelectedParts);
   const deleteSelectedParts = useProjectStore((s) => s.deleteSelectedParts);
   const resetSelectedPartsToStock = useProjectStore((s) => s.resetSelectedPartsToStock);
-  const requestCenterCamera = useProjectStore((s) => s.requestCenterCamera);
+  const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
   const referencePartIds = useProjectStore((s) => s.referencePartIds);
   const toggleReference = useProjectStore((s) => s.toggleReference);
   const clearReferences = useProjectStore((s) => s.clearReferences);

@@ -58,6 +58,7 @@ import { useLicenseStatus } from './hooks/useLicenseStatus';
 import { useStockLibrary } from './hooks/useStockLibrary';
 import { useProjectStore } from './store/projectStore';
 import { useUIStore } from './store/uiStore';
+import { useCameraStore } from './store/cameraStore';
 import { Assembly, LightingMode, Project, Stock } from './types';
 import { formatMeasurementWithUnit } from './utils/fractions';
 import { getPartBounds } from './utils/snapToPartsUtil';
@@ -1590,14 +1591,14 @@ function BrightnessPopup({ isOpen, onClose }: BrightnessPopupProps) {
 }
 
 function DisplayToolbar() {
-  const displayMode = useProjectStore((s) => s.displayMode);
-  const showGrid = useProjectStore((s) => s.showGrid);
-  const showGrainDirection = useProjectStore((s) => s.showGrainDirection);
+  const displayMode = useCameraStore((s) => s.displayMode);
+  const showGrid = useCameraStore((s) => s.showGrid);
+  const showGrainDirection = useCameraStore((s) => s.showGrainDirection);
   const snapToPartsEnabled = useProjectStore((s) => s.snapToPartsEnabled);
   const referencePartIds = useProjectStore((s) => s.referencePartIds);
-  const setDisplayMode = useProjectStore((s) => s.setDisplayMode);
-  const setShowGrid = useProjectStore((s) => s.setShowGrid);
-  const toggleGrainDirection = useProjectStore((s) => s.toggleGrainDirection);
+  const setDisplayMode = useCameraStore((s) => s.setDisplayMode);
+  const setShowGrid = useCameraStore((s) => s.setShowGrid);
+  const toggleGrainDirection = useCameraStore((s) => s.toggleGrainDirection);
   const setSnapToPartsEnabled = useProjectStore((s) => s.setSnapToPartsEnabled);
   const clearReferences = useProjectStore((s) => s.clearReferences);
   const [brightnessOpen, setBrightnessOpen] = useState(false);

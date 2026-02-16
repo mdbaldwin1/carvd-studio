@@ -7,6 +7,7 @@ import { useState, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useProjectStore, generateThumbnail } from '../store/projectStore';
 import { useUIStore } from '../store/uiStore';
+import { useCameraStore } from '../store/cameraStore';
 import { UserTemplate } from '../templates';
 import { Project } from '../types';
 import { getFeatureLimits, getBlockedMessage } from '../utils/featureLimits';
@@ -101,7 +102,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
           overageFactor: projectStore.overageFactor,
           projectNotes: projectStore.projectNotes,
           stockConstraints: projectStore.stockConstraints,
-          cameraState: projectStore.cameraState || undefined,
+          cameraState: useCameraStore.getState().cameraState || undefined,
           createdAt: projectStore.createdAt,
           modifiedAt: projectStore.modifiedAt
         };
@@ -178,7 +179,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
         overageFactor: projectStore.overageFactor,
         projectNotes: projectStore.projectNotes,
         stockConstraints: projectStore.stockConstraints,
-        cameraState: projectStore.cameraState || undefined,
+        cameraState: useCameraStore.getState().cameraState || undefined,
         createdAt: projectStore.createdAt,
         modifiedAt: projectStore.modifiedAt
       };

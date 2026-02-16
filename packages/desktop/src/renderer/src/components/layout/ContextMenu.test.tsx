@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ContextMenu } from './ContextMenu';
 import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
+import { useCameraStore } from '../../store/cameraStore';
 
 describe('ContextMenu', () => {
   beforeEach(() => {
@@ -101,9 +102,11 @@ describe('ContextMenu', () => {
         closeContextMenu: vi.fn(),
         captureManualThumbnail: vi.fn()
       });
-      useProjectStore.setState({
+      useCameraStore.setState({
         requestCenterCameraAtOrigin: vi.fn(),
-        requestCenterCameraAtPosition: vi.fn(),
+        requestCenterCameraAtPosition: vi.fn()
+      });
+      useProjectStore.setState({
         pasteAtPosition: vi.fn(),
         addSnapGuide: vi.fn(),
         clearSnapGuides: vi.fn()
@@ -114,14 +117,14 @@ describe('ContextMenu', () => {
       render(<ContextMenu />);
       fireEvent.click(screen.getByText('Reset View'));
 
-      expect(useProjectStore.getState().requestCenterCameraAtOrigin).toHaveBeenCalled();
+      expect(useCameraStore.getState().requestCenterCameraAtOrigin).toHaveBeenCalled();
     });
 
     it('calls requestCenterCameraAtPosition on Center View Here', () => {
       render(<ContextMenu />);
       fireEvent.click(screen.getByText('Center View Here'));
 
-      expect(useProjectStore.getState().requestCenterCameraAtPosition).toHaveBeenCalledWith({
+      expect(useCameraStore.getState().requestCenterCameraAtPosition).toHaveBeenCalledWith({
         x: 10,
         y: 5,
         z: 0
@@ -189,6 +192,9 @@ describe('ContextMenu', () => {
         closeContextMenu: vi.fn(),
         openSaveAssemblyModal: vi.fn()
       });
+      useCameraStore.setState({
+        requestCenterCamera: vi.fn()
+      });
       useProjectStore.setState({
         selectedPartIds: ['part-1', 'part-2'],
         parts: [
@@ -197,7 +203,6 @@ describe('ContextMenu', () => {
         ],
         copySelectedParts: vi.fn(),
         deleteSelectedParts: vi.fn(),
-        requestCenterCamera: vi.fn(),
         resetSelectedPartsToStock: vi.fn(),
         toggleReference: vi.fn()
       });
@@ -227,7 +232,7 @@ describe('ContextMenu', () => {
       render(<ContextMenu />);
       fireEvent.click(screen.getByText('Center View'));
 
-      expect(useProjectStore.getState().requestCenterCamera).toHaveBeenCalled();
+      expect(useCameraStore.getState().requestCenterCamera).toHaveBeenCalled();
     });
 
     it('shows Reset to Stock when parts have stock assigned', () => {

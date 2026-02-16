@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Extract cameraStore from projectStore** — Moved 9 camera/viewport state fields and 10 actions into a dedicated `cameraStore`, reducing projectStore complexity and continuing the store decomposition (bead 3.3)
+
 ### Fixed
 
 - **Update Notification Visibility** — Update toast now appears above all modals on the start screen (z-index increased from 1100 to 10003)
