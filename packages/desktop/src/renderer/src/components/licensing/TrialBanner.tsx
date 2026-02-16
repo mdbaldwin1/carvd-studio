@@ -12,7 +12,7 @@ interface TrialBannerProps {
 }
 
 export function TrialBanner({ daysRemaining, onActivateLicense, onPurchase }: TrialBannerProps) {
-  const urgency = daysRemaining <= 3 ? 'urgent' : 'normal';
+  const isUrgent = daysRemaining <= 3;
 
   const handlePurchase = () => {
     // Open Lemon Squeezy checkout in default browser
@@ -21,11 +21,15 @@ export function TrialBanner({ daysRemaining, onActivateLicense, onPurchase }: Tr
   };
 
   return (
-    <div className={`trial-banner trial-banner--${urgency}`}>
-      <span className="trial-banner__text">
+    <div
+      className={`flex items-center justify-between px-4 py-2 text-[13px] flex-shrink-0 border-b ${
+        isUrgent ? 'bg-error-bg border-error-border' : 'bg-warning-bg border-warning-border'
+      }`}
+    >
+      <span className={`font-medium ${isUrgent ? 'text-error' : 'text-warning'}`}>
         {daysRemaining === 1 ? '1 day left in your trial' : `${daysRemaining} days left in your trial`}
       </span>
-      <div className="trial-banner__actions">
+      <div className="flex gap-2">
         <button className="btn btn-small btn-ghost" onClick={onActivateLicense}>
           Enter License
         </button>

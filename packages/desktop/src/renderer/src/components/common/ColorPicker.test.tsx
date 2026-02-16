@@ -49,7 +49,7 @@ describe('ColorPicker', () => {
       render(<ColorPicker value="#ff0000" onChange={mockOnChange} />);
 
       // STOCK_COLORS has preset colors - check we have buttons
-      const presetButtons = document.querySelectorAll('.color-preset');
+      const presetButtons = document.querySelectorAll('.color-picker-row button');
       expect(presetButtons.length).toBeGreaterThan(0);
     });
 
@@ -57,7 +57,7 @@ describe('ColorPicker', () => {
       render(<ColorPicker value="#c4a574" onChange={mockOnChange} />);
 
       // #c4a574 is one of the STOCK_COLORS
-      const selectedButton = document.querySelector('.color-preset.selected');
+      const selectedButton = document.querySelector('.color-picker-row button.border-text');
       expect(selectedButton).toBeInTheDocument();
     });
   });
@@ -75,7 +75,7 @@ describe('ColorPicker', () => {
     it('calls onChange when preset button is clicked', () => {
       render(<ColorPicker value="#ff0000" onChange={mockOnChange} />);
 
-      const presetButtons = document.querySelectorAll('.color-preset');
+      const presetButtons = document.querySelectorAll('.color-picker-row button');
       fireEvent.click(presetButtons[0]);
 
       expect(mockOnChange).toHaveBeenCalled();
@@ -122,7 +122,7 @@ describe('ColorPicker', () => {
 
       render(<ColorPicker value="#ff0000" onChange={mockOnChange} />);
 
-      const customColorWrappers = document.querySelectorAll('.custom-color-wrapper');
+      const customColorWrappers = document.querySelectorAll('.group');
       expect(customColorWrappers).toHaveLength(2);
     });
 
@@ -137,7 +137,7 @@ describe('ColorPicker', () => {
 
       render(<ColorPicker value="#ff0000" onChange={mockOnChange} />);
 
-      const customColorButton = document.querySelector('.custom-color-wrapper .color-preset')!;
+      const customColorButton = document.querySelector('.group button:first-child')!;
       fireEvent.click(customColorButton);
 
       expect(mockOnChange).toHaveBeenCalledWith('#123456');
@@ -154,7 +154,7 @@ describe('ColorPicker', () => {
 
       render(<ColorPicker value="#ff0000" onChange={mockOnChange} />);
 
-      const removeButton = document.querySelector('.remove-custom-color')!;
+      const removeButton = screen.getByLabelText(/Remove color/);
       fireEvent.click(removeButton);
 
       // The handler calls removeColor with just the color

@@ -19,9 +19,9 @@ export function UpgradePrompt({ message, onUpgrade, onDismiss }: UpgradePromptPr
   };
 
   return (
-    <div className="upgrade-prompt">
-      <p className="upgrade-prompt__message">{message}</p>
-      <div className="upgrade-prompt__actions">
+    <div className="flex items-center justify-between px-4 py-3 bg-surface border border-primary rounded-md my-2">
+      <p className="m-0 text-[13px] text-text">{message}</p>
+      <div className="flex gap-2 flex-shrink-0">
         <button className="btn btn-primary btn-small" onClick={handleUpgrade}>
           Upgrade
         </button>

@@ -3,8 +3,6 @@
  * Offers options to save, discard, or cancel.
  */
 
-import './AssemblyEditingExitDialog.css';
-
 interface AssemblyEditingExitDialogProps {
   isOpen: boolean;
   assemblyName: string;
@@ -26,13 +24,13 @@ export function AssemblyEditingExitDialog({
 
   return (
     <div className="modal-overlay">
-      <div className="modal assembly-exit-dialog">
+      <div className="modal max-w-[420px] w-[90vw]">
         <div className="modal-header">
           <h2>{isCreatingNew ? 'Save Assembly?' : 'Save Changes?'}</h2>
         </div>
 
         <div className="modal-body">
-          <p>
+          <p className="m-0 mb-3 leading-relaxed">
             {isCreatingNew ? (
               <>
                 You have unsaved changes to your new assembly <strong>{assemblyName}</strong>.
@@ -43,13 +41,13 @@ export function AssemblyEditingExitDialog({
               </>
             )}
           </p>
-          <p className="exit-question">
+          <p className="m-0 leading-relaxed text-text-secondary">
             Do you want to save {isCreatingNew ? 'this assembly' : 'your changes'} to the library?
           </p>
         </div>
 
-        <div className="modal-footer exit-actions">
-          <button className="btn btn-sm btn-ghost btn-secondary" onClick={onCancel}>
+        <div className="modal-footer flex gap-2 justify-end">
+          <button className="btn btn-sm btn-ghost btn-secondary mr-auto" onClick={onCancel}>
             Keep Editing
           </button>
           <button className="btn btn-sm btn-outlined btn-danger" onClick={onDiscard}>
