@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useTutorial, TutorialStep } from '../../hooks/useTutorial';
 import { TutorialOverlay } from './TutorialOverlay';
-import { useProjectStore } from '../../store/projectStore';
+import { useCameraStore } from '../../store/cameraStore';
 
 interface WelcomeTutorialProps {
   onComplete: () => void;
@@ -38,7 +38,7 @@ const tutorialSteps: TutorialStep[] = [
 
 export function WelcomeTutorial({ onComplete }: WelcomeTutorialProps) {
   const tutorial = useTutorial(tutorialSteps);
-  const requestCenterCamera = useProjectStore((s) => s.requestCenterCamera);
+  const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
 
   useEffect(() => {
     // Auto-start the tutorial
