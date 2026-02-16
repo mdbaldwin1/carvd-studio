@@ -2017,6 +2017,54 @@ code {
   max-width: 896px;
 }
 
+/* Docs Prev/Next Navigation */
+.docs-prev-next {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-top: var(--space-3xl);
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--color-border);
+}
+
+.docs-prev-next-link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  max-width: 45%;
+}
+
+.docs-prev-next-link:hover {
+  border-color: var(--color-accent);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.docs-prev-next-link--next {
+  text-align: right;
+  margin-left: auto;
+}
+
+@media (max-width: 600px) {
+  .docs-prev-next {
+    flex-direction: column;
+  }
+
+  .docs-prev-next-link {
+    max-width: 100%;
+  }
+
+  .docs-prev-next-link--next {
+    text-align: left;
+  }
+}
+
 /* Mobile: Hide sidebar, show mobile TOC */
 @media (max-width: 1024px) {
   .docs-layout {
