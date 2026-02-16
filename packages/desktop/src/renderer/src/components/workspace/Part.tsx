@@ -395,12 +395,10 @@ const ResizeHandle = memo(
     return (
       <group position={[handleX, handleY, handleZ]}>
         {/* Dark outline for contrast on any background */}
-        <mesh scale={1.15}>
-          <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
-          <meshBasicMaterial color="#000000" transparent opacity={0.5} />
-        </mesh>
+        <mesh scale={1.15} geometry={RESIZE_HANDLE_GEOMETRY} material={RESIZE_OUTLINE_MATERIAL} />
         {/* Main handle */}
         <mesh
+          geometry={RESIZE_HANDLE_GEOMETRY}
           onPointerDown={(e) => {
             e.stopPropagation();
             onResizeStart(handlePos, e);
@@ -415,7 +413,6 @@ const ResizeHandle = memo(
             if (!isResizing) document.body.style.cursor = 'auto';
           }}
         >
-          <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
           <meshStandardMaterial
             color={isActive ? RESIZE_COLORS.hover : baseColor}
             emissive={isActive ? baseColor : '#000000'}
@@ -445,6 +442,51 @@ const ROTATION_COLORS = {
   z: '#4499ff', // Bright blue for Z
   hover: '#ffffff'
 };
+
+// Shared geometries — created once at module level, reused across all handle instances
+const RESIZE_HANDLE_GEOMETRY = new THREE.BoxGeometry(HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE);
+
+const ROTATION_HIT_GEOMETRY = new THREE.CircleGeometry(ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS, 24);
+const ROTATION_OUTLINE_RING_GEOMETRY = new THREE.RingGeometry(
+  ROTATION_HANDLE_SIZE - ROTATION_RING_THICKNESS - 0.02,
+  ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS + 0.02,
+  24
+);
+const ROTATION_MAIN_RING_GEOMETRY = new THREE.RingGeometry(
+  ROTATION_HANDLE_SIZE - ROTATION_RING_THICKNESS,
+  ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS,
+  24
+);
+
+const ROTATION_ARROW_SIZE = 0.4;
+const ROTATION_ARROW_GEOMETRY = new THREE.BufferGeometry();
+ROTATION_ARROW_GEOMETRY.setAttribute(
+  'position',
+  new THREE.BufferAttribute(
+    new Float32Array([
+      0,
+      -ROTATION_ARROW_SIZE * 0.7,
+      0,
+      0,
+      ROTATION_ARROW_SIZE * 0.7,
+      0,
+      ROTATION_ARROW_SIZE * 1.1,
+      0,
+      0
+    ]),
+    3
+  )
+);
+
+// Shared materials — only for constant materials with no per-instance variation
+const RESIZE_OUTLINE_MATERIAL = new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.5 });
+const ROTATION_HIT_MATERIAL = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
+const ROTATION_OUTLINE_MATERIAL = new THREE.MeshBasicMaterial({
+  color: '#000000',
+  side: THREE.DoubleSide,
+  transparent: true,
+  opacity: 0.4
+});
 
 const RotationHandle = memo(
   function RotationHandle({
@@ -487,22 +529,8 @@ const RotationHandle = memo(
     const baseColor = ROTATION_COLORS[axis];
     const color = hovered ? ROTATION_COLORS.hover : baseColor;
 
-    // Arrow triangle vertices (flat, pointing tangent to the ring)
-    // Small Z offset to sit on top of the ring and avoid z-fighting
-    const arrowSize = 0.4; // Slightly larger arrow
-    const zOffset = 0.02; // Z offset applied to mesh position
+    const zOffset = 0.02; // Z offset to sit on top of the ring and avoid z-fighting
     const arrowPosX = ROTATION_HANDLE_SIZE - 0.1; // Position on the ring
-    const arrowVertices = new Float32Array([
-      0,
-      -arrowSize * 0.7,
-      0, // back left (wider)
-      0,
-      arrowSize * 0.7,
-      0, // back right (wider)
-      arrowSize * 1.1,
-      0,
-      0 // tip (longer)
-    ]);
 
     // Shared event handlers
     const handleClick = (e: ThreeEvent<MouseEvent>) => {
@@ -524,28 +552,19 @@ const RotationHandle = memo(
     return (
       <group position={position} rotation={rotation}>
         {/* Invisible hit area - covers entire circular region for easier clicking */}
-        <mesh onClick={handleClick} onPointerOver={handlePointerOver} onPointerOut={handlePointerOut}>
-          <circleGeometry args={[ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS, 24]} />
-          <meshBasicMaterial visible={false} side={THREE.DoubleSide} />
-        </mesh>
+        <mesh
+          geometry={ROTATION_HIT_GEOMETRY}
+          material={ROTATION_HIT_MATERIAL}
+          onClick={handleClick}
+          onPointerOver={handlePointerOver}
+          onPointerOut={handlePointerOut}
+        />
 
         {/* Dark outline ring for contrast */}
-        <mesh>
-          <ringGeometry
-            args={[
-              ROTATION_HANDLE_SIZE - ROTATION_RING_THICKNESS - 0.02,
-              ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS + 0.02,
-              24
-            ]}
-          />
-          <meshBasicMaterial color="#000000" side={THREE.DoubleSide} transparent opacity={0.4} />
-        </mesh>
+        <mesh geometry={ROTATION_OUTLINE_RING_GEOMETRY} material={ROTATION_OUTLINE_MATERIAL} />
 
         {/* Main visible ring - thicker and bolder */}
-        <mesh>
-          <ringGeometry
-            args={[ROTATION_HANDLE_SIZE - ROTATION_RING_THICKNESS, ROTATION_HANDLE_SIZE + ROTATION_RING_THICKNESS, 24]}
-          />
+        <mesh geometry={ROTATION_MAIN_RING_GEOMETRY}>
           <meshStandardMaterial
             color={color}
             side={THREE.DoubleSide}
@@ -555,10 +574,7 @@ const RotationHandle = memo(
         </mesh>
 
         {/* Flat arrow indicator showing rotation direction - positioned on the ring */}
-        <mesh position={[arrowPosX, 0, zOffset]} rotation={[0, 0, -Math.PI / 6]}>
-          <bufferGeometry>
-            <bufferAttribute attach="attributes-position" count={3} array={arrowVertices} itemSize={3} />
-          </bufferGeometry>
+        <mesh geometry={ROTATION_ARROW_GEOMETRY} position={[arrowPosX, 0, zOffset]} rotation={[0, 0, -Math.PI / 6]}>
           <meshStandardMaterial
             color={color}
             side={THREE.DoubleSide}
