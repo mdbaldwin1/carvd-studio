@@ -1,12 +1,14 @@
 import React from 'react';
 import { FormField } from './FormField';
 
+/** A single option in a {@link RadioGroup}. */
 export interface RadioOption {
   value: string;
   label: string;
   disabled?: boolean;
 }
 
+/** Props for the {@link RadioGroup} component. */
 export interface RadioGroupProps {
   label: string;
   name: string;
@@ -19,6 +21,26 @@ export interface RadioGroupProps {
   className?: string;
 }
 
+/**
+ * Group of mutually exclusive radio buttons with label and error support.
+ *
+ * Renders a `role="radiogroup"` container with proper `aria-label`.
+ * Individual options can be disabled via {@link RadioOption.disabled}.
+ *
+ * @example
+ * ```tsx
+ * <RadioGroup
+ *   label="Units"
+ *   name="units"
+ *   value={units}
+ *   onChange={setUnits}
+ *   options={[
+ *     { value: 'imperial', label: 'Imperial (inches)' },
+ *     { value: 'metric', label: 'Metric (mm)' },
+ *   ]}
+ * />
+ * ```
+ */
 export function RadioGroup({
   label,
   name,

@@ -1,6 +1,7 @@
 import { useEffect, useId } from 'react';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
 
+/** Props for the {@link Modal} component. */
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -14,6 +15,13 @@ interface ModalProps {
   closeOnBackdrop?: boolean;
 }
 
+/**
+ * Base modal dialog with backdrop, title bar, and close button.
+ *
+ * All application modals should use this as their foundation.
+ * Supports Escape-to-close and click-outside-to-close by default.
+ * Renders with `aria-modal="true"` and `aria-labelledby` for accessibility.
+ */
 export function Modal({
   isOpen,
   onClose,

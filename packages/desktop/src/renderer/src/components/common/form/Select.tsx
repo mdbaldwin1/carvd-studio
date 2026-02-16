@@ -1,12 +1,14 @@
 import React from 'react';
 import { FormField } from './FormField';
 
+/** A single option in a {@link Select} dropdown. */
 export interface SelectOption {
   value: string;
   label: string;
   disabled?: boolean;
 }
 
+/** Props for the {@link Select} component. */
 export interface SelectProps {
   label: string;
   value: string;
@@ -20,6 +22,25 @@ export interface SelectProps {
   id?: string;
 }
 
+/**
+ * Labeled dropdown select with error and help text support.
+ *
+ * Auto-generates an `id` from the label for `<label htmlFor>` linking.
+ * Individual options can be disabled via {@link SelectOption.disabled}.
+ *
+ * @example
+ * ```tsx
+ * <Select
+ *   label="Units"
+ *   value={units}
+ *   onChange={setUnits}
+ *   options={[
+ *     { value: 'imperial', label: 'Imperial (inches)' },
+ *     { value: 'metric', label: 'Metric (mm)' },
+ *   ]}
+ * />
+ * ```
+ */
 export function Select({
   label,
   value,

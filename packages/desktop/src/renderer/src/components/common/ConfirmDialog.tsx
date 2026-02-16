@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Modal } from './Modal';
 
+/** Props for the {@link ConfirmDialog} component. */
 interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
@@ -12,6 +13,12 @@ interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
+/**
+ * Confirmation dialog for destructive or significant actions.
+ *
+ * Uses {@link Modal} with `role="alertdialog"`. Supports Enter to confirm
+ * and Escape to cancel. Set `variant="danger"` for destructive actions.
+ */
 export function ConfirmDialog({
   isOpen,
   title,
