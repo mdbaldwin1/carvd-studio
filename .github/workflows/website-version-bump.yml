@@ -49,38 +49,17 @@ jobs:
             echo "version=$CURRENT" >> $GITHUB_OUTPUT
           fi
 
-      - name: Wait for Vercel deployment
+      - name: Deploy to Vercel
         if: steps.check.outputs.should_bump == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
-          SHA="${{ github.sha }}"
-          echo "Waiting for Vercel deployment to complete for $SHA..."
-
-          MAX_ATTEMPTS=60  # 10 minutes (60 * 10s)
-          ATTEMPT=0
-
-          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            STATE=$(gh api "repos/${{ github.repository }}/commits/$SHA/status" \
-              --jq '.statuses[] | select(.context == "Vercel") | .state' 2>/dev/null || echo "")
-
-            if [ "$STATE" = "success" ]; then
-              echo "✅ Vercel deployment succeeded"
-              break
-            elif [ "$STATE" = "failure" ] || [ "$STATE" = "error" ]; then
-              echo "❌ Vercel deployment failed (state: $STATE)"
-              exit 1
-            fi
-
-            ATTEMPT=$((ATTEMPT + 1))
-            echo "⏳ Vercel status: ${STATE:-pending} (attempt $ATTEMPT/$MAX_ATTEMPTS)"
-            sleep 10
-          done
-
-          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-            echo "⏰ Timed out waiting for Vercel deployment"
-            exit 1
-          fi
+          npm install --global vercel@latest
+          vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+          vercel build --prod --token=$VERCEL_TOKEN
+          vercel deploy --prebuilt --prod --token=$VERCEL_TOKEN
 
       - name: Create website version tag
         if: steps.check.outputs.should_bump == 'true'
