@@ -1,14 +1,18 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import HomePage from '../src/pages/HomePage';
-import FeaturesPage from '../src/pages/FeaturesPage';
-import PricingPage from '../src/pages/PricingPage';
-import DocsPage from '../src/pages/DocsPage';
-import PrivacyPolicyPage from '../src/pages/PrivacyPolicyPage';
-import TermsPage from '../src/pages/TermsPage';
-import ChangelogPage from '../src/pages/ChangelogPage';
-import NotFoundPage from '../src/pages/NotFoundPage';
+import { describe, it, expect } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
+import HomePage from "../src/pages/HomePage";
+import FeaturesPage from "../src/pages/FeaturesPage";
+import PricingPage from "../src/pages/PricingPage";
+import DocsLayout from "../src/pages/docs/DocsLayout";
+import DocsIndexPage from "../src/pages/docs/DocsIndexPage";
+import QuickStartPage from "../src/pages/docs/QuickStartPage";
+import PartsPage from "../src/pages/docs/PartsPage";
+import FaqPage from "../src/pages/docs/FaqPage";
+import PrivacyPolicyPage from "../src/pages/PrivacyPolicyPage";
+import TermsPage from "../src/pages/TermsPage";
+import ChangelogPage from "../src/pages/ChangelogPage";
+import NotFoundPage from "../src/pages/NotFoundPage";
 
 // Create a test router that mimics the app's routing structure
 // We can't use App directly because it already has a BrowserRouter
@@ -19,7 +23,12 @@ const TestRouter = ({ initialRoute }: { initialRoute: string }) => {
         <Route path="/" element={<HomePage />} />
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/pricing" element={<PricingPage />} />
-        <Route path="/docs" element={<DocsPage />} />
+        <Route path="/docs" element={<DocsLayout />}>
+          <Route index element={<DocsIndexPage />} />
+          <Route path="quick-start" element={<QuickStartPage />} />
+          <Route path="parts" element={<PartsPage />} />
+          <Route path="faq" element={<FaqPage />} />
+        </Route>
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/changelog" element={<ChangelogPage />} />
@@ -29,28 +38,28 @@ const TestRouter = ({ initialRoute }: { initialRoute: string }) => {
   );
 };
 
-describe('Routing', () => {
-  describe('HomePage route', () => {
-    it('renders HomePage at /', () => {
+describe("Routing", () => {
+  describe("HomePage route", () => {
+    it("renders HomePage at /", () => {
       render(<TestRouter initialRoute="/" />);
       expect(screen.getByText(/Stop Wasting Wood/i)).toBeInTheDocument();
     });
 
-    it('renders HomePage hero content', () => {
+    it("renders HomePage hero content", () => {
       render(<TestRouter initialRoute="/" />);
       expect(screen.getByText(/Start Building Smarter/i)).toBeInTheDocument();
     });
   });
 
-  describe('FeaturesPage route', () => {
-    it('renders FeaturesPage at /features', () => {
+  describe("FeaturesPage route", () => {
+    it("renders FeaturesPage at /features", () => {
       render(<TestRouter initialRoute="/features" />);
       expect(screen.getByText(/Every Tool You Need/i)).toBeInTheDocument();
     });
   });
 
-  describe('PricingPage route', () => {
-    it('renders PricingPage at /pricing', () => {
+  describe("PricingPage route", () => {
+    it("renders PricingPage at /pricing", () => {
       render(<TestRouter initialRoute="/pricing" />);
       // "Own It Forever" appears multiple times on the pricing page
       const ownItForeverTexts = screen.getAllByText(/Own It Forever/i);
@@ -58,86 +67,150 @@ describe('Routing', () => {
     });
   });
 
-  describe('DocsPage route', () => {
-    it('renders DocsPage at /docs', () => {
+  describe("Docs routes", () => {
+    it("renders DocsLayout at /docs", () => {
       render(<TestRouter initialRoute="/docs" />);
-      // DocsPage should have documentation content
-      const main = screen.getByRole('main');
+      const main = screen.getByRole("main");
       expect(main).toBeInTheDocument();
+    });
+
+    it("renders DocsIndexPage at /docs with welcome text", () => {
+      render(<TestRouter initialRoute="/docs" />);
+      expect(screen.getByText(/Welcome to the Docs/i)).toBeInTheDocument();
+    });
+
+    it("renders QuickStartPage at /docs/quick-start", () => {
+      render(<TestRouter initialRoute="/docs/quick-start" />);
+      expect(
+        screen.getByRole("heading", { level: 2, name: /Quick Start Guide/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("renders PartsPage at /docs/parts", () => {
+      render(<TestRouter initialRoute="/docs/parts" />);
+      expect(
+        screen.getByRole("heading", { level: 2, name: /Working with Parts/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("renders FaqPage at /docs/faq", () => {
+      render(<TestRouter initialRoute="/docs/faq" />);
+      expect(
+        screen.getByText(/Frequently Asked Questions/i),
+      ).toBeInTheDocument();
+    });
+
+    it("DocsLayout has sidebar navigation", () => {
+      render(<TestRouter initialRoute="/docs" />);
+      const sidebar = screen.getByRole("complementary");
+      expect(sidebar).toBeInTheDocument();
+    });
+
+    it("DocsLayout has documentation heading", () => {
+      render(<TestRouter initialRoute="/docs" />);
+      expect(
+        screen.getByRole("heading", { level: 1, name: /documentation/i }),
+      ).toBeInTheDocument();
+    });
+
+    it("DocsLayout has footer with copyright on doc pages", () => {
+      render(<TestRouter initialRoute="/docs/quick-start" />);
+      expect(screen.getByText(/© 2026 Carvd Studio/i)).toBeInTheDocument();
     });
   });
 
-  describe('PrivacyPolicyPage route', () => {
-    it('renders PrivacyPolicyPage at /privacy', () => {
+  describe("PrivacyPolicyPage route", () => {
+    it("renders PrivacyPolicyPage at /privacy", () => {
       render(<TestRouter initialRoute="/privacy" />);
-      const main = screen.getByRole('main');
+      const main = screen.getByRole("main");
       expect(main).toBeInTheDocument();
     });
   });
 
-  describe('TermsPage route', () => {
-    it('renders TermsPage at /terms', () => {
+  describe("TermsPage route", () => {
+    it("renders TermsPage at /terms", () => {
       render(<TestRouter initialRoute="/terms" />);
-      const main = screen.getByRole('main');
+      const main = screen.getByRole("main");
       expect(main).toBeInTheDocument();
     });
   });
 
-  describe('ChangelogPage route', () => {
-    it('renders ChangelogPage at /changelog', () => {
+  describe("ChangelogPage route", () => {
+    it("renders ChangelogPage at /changelog", () => {
       render(<TestRouter initialRoute="/changelog" />);
-      expect(screen.getByRole('heading', { level: 1, name: /changelog/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("heading", { level: 1, name: /changelog/i }),
+      ).toBeInTheDocument();
     });
   });
 
-  describe('NotFoundPage route', () => {
-    it('renders NotFoundPage for unknown routes', () => {
+  describe("NotFoundPage route", () => {
+    it("renders NotFoundPage for unknown routes", () => {
       render(<TestRouter initialRoute="/this-page-does-not-exist" />);
-      expect(screen.getByText('404')).toBeInTheDocument();
+      expect(screen.getByText("404")).toBeInTheDocument();
     });
 
-    it('renders NotFoundPage for deeply nested unknown routes', () => {
+    it("renders NotFoundPage for deeply nested unknown routes", () => {
       render(<TestRouter initialRoute="/some/deeply/nested/route" />);
       expect(screen.getByText(/Page Not Found/i)).toBeInTheDocument();
     });
 
-    it('renders NotFoundPage with recovery options', () => {
+    it("renders NotFoundPage with recovery options", () => {
       render(<TestRouter initialRoute="/unknown-page" />);
-      expect(screen.getByRole('link', { name: /back to home/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /back to home/i }),
+      ).toBeInTheDocument();
     });
   });
 
-  describe('navigation consistency', () => {
-    it('HomePage has navigation header with brand', () => {
+  describe("navigation consistency", () => {
+    it("HomePage has navigation header with brand", () => {
       render(<TestRouter initialRoute="/" />);
-      const header = screen.getByRole('banner');
-      const brandLink = within(header).getByRole('link', { name: /carvd studio/i });
+      const header = screen.getByRole("banner");
+      const brandLink = within(header).getByRole("link", {
+        name: /carvd studio/i,
+      });
       expect(brandLink).toBeInTheDocument();
     });
 
-    it('FeaturesPage has navigation header with brand', () => {
+    it("FeaturesPage has navigation header with brand", () => {
       render(<TestRouter initialRoute="/features" />);
-      const header = screen.getByRole('banner');
-      const brandLink = within(header).getByRole('link', { name: /carvd studio/i });
+      const header = screen.getByRole("banner");
+      const brandLink = within(header).getByRole("link", {
+        name: /carvd studio/i,
+      });
       expect(brandLink).toBeInTheDocument();
     });
 
-    it('PricingPage has navigation header with brand', () => {
+    it("PricingPage has navigation header with brand", () => {
       render(<TestRouter initialRoute="/pricing" />);
-      const header = screen.getByRole('banner');
-      const brandLink = within(header).getByRole('link', { name: /carvd studio/i });
+      const header = screen.getByRole("banner");
+      const brandLink = within(header).getByRole("link", {
+        name: /carvd studio/i,
+      });
       expect(brandLink).toBeInTheDocument();
     });
 
-    it('NotFoundPage has navigation header with brand', () => {
+    it("DocsLayout has navigation header with brand", () => {
+      render(<TestRouter initialRoute="/docs" />);
+      const header = screen.getByRole("banner");
+      const brandLink = within(header).getByRole("link", {
+        name: /carvd studio/i,
+      });
+      expect(brandLink).toBeInTheDocument();
+    });
+
+    it("NotFoundPage has navigation header with brand", () => {
       render(<TestRouter initialRoute="/unknown" />);
-      const header = screen.getByRole('banner');
-      const brandLink = within(header).getByRole('link', { name: /carvd studio/i });
+      const header = screen.getByRole("banner");
+      const brandLink = within(header).getByRole("link", {
+        name: /carvd studio/i,
+      });
       expect(brandLink).toBeInTheDocument();
     });
 
-    it('all main pages have footer with copyright', () => {
-      const routes = ['/', '/features', '/pricing', '/unknown'];
+    it("all main pages have footer with copyright", () => {
+      const routes = ["/", "/features", "/pricing", "/docs", "/unknown"];
 
       routes.forEach((route) => {
         const { unmount } = render(<TestRouter initialRoute={route} />);

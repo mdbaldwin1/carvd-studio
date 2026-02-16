@@ -1,12 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
-import { axe } from 'vitest-axe';
-import { MemoryRouter } from 'react-router-dom';
-import HomePage from '../src/pages/HomePage';
-import FeaturesPage from '../src/pages/FeaturesPage';
-import PricingPage from '../src/pages/PricingPage';
-import ChangelogPage from '../src/pages/ChangelogPage';
-import NotFoundPage from '../src/pages/NotFoundPage';
+import { describe, it, expect } from "vitest";
+import { render } from "@testing-library/react";
+import { axe } from "vitest-axe";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
+import HomePage from "../src/pages/HomePage";
+import FeaturesPage from "../src/pages/FeaturesPage";
+import PricingPage from "../src/pages/PricingPage";
+import ChangelogPage from "../src/pages/ChangelogPage";
+import NotFoundPage from "../src/pages/NotFoundPage";
+import DocsLayout from "../src/pages/docs/DocsLayout";
+import DocsIndexPage from "../src/pages/docs/DocsIndexPage";
+import QuickStartPage from "../src/pages/docs/QuickStartPage";
 
 // Helper to render with router
 const renderWithRouter = (ui: React.ReactElement) => {
@@ -22,70 +25,108 @@ const expectNoViolations = async (container: HTMLElement) => {
     const violationMessages = results.violations
       .map(
         (v) =>
-          `${v.id}: ${v.description}\n  Impact: ${v.impact}\n  Nodes: ${v.nodes.map((n) => n.html).join('\n    ')}`
+          `${v.id}: ${v.description}\n  Impact: ${v.impact}\n  Nodes: ${v.nodes.map((n) => n.html).join("\n    ")}`,
       )
-      .join('\n\n');
+      .join("\n\n");
     throw new Error(`Accessibility violations found:\n\n${violationMessages}`);
   }
   expect(results.violations).toHaveLength(0);
 };
 
-describe('Accessibility', () => {
+describe("Accessibility", () => {
   // Increase timeout for axe tests as they can be slow
   const axeTimeout = 30000;
 
-  describe('HomePage', () => {
+  describe("HomePage", () => {
     it(
-      'has no accessibility violations',
+      "has no accessibility violations",
       async () => {
         const { container } = renderWithRouter(<HomePage />);
         await expectNoViolations(container);
       },
-      axeTimeout
+      axeTimeout,
     );
   });
 
-  describe('FeaturesPage', () => {
+  describe("FeaturesPage", () => {
     it(
-      'has no accessibility violations',
+      "has no accessibility violations",
       async () => {
         const { container } = renderWithRouter(<FeaturesPage />);
         await expectNoViolations(container);
       },
-      axeTimeout
+      axeTimeout,
     );
   });
 
-  describe('PricingPage', () => {
+  describe("PricingPage", () => {
     it(
-      'has no accessibility violations',
+      "has no accessibility violations",
       async () => {
         const { container } = renderWithRouter(<PricingPage />);
         await expectNoViolations(container);
       },
-      axeTimeout
+      axeTimeout,
     );
   });
 
-  describe('ChangelogPage', () => {
+  describe("ChangelogPage", () => {
     it(
-      'has no accessibility violations',
+      "has no accessibility violations",
       async () => {
         const { container } = renderWithRouter(<ChangelogPage />);
         await expectNoViolations(container);
       },
-      axeTimeout
+      axeTimeout,
     );
   });
 
-  describe('NotFoundPage', () => {
+  describe("NotFoundPage", () => {
     it(
-      'has no accessibility violations',
+      "has no accessibility violations",
       async () => {
         const { container } = renderWithRouter(<NotFoundPage />);
         await expectNoViolations(container);
       },
-      axeTimeout
+      axeTimeout,
+    );
+  });
+
+  describe("DocsLayout with DocsIndexPage", () => {
+    it(
+      "has no accessibility violations",
+      async () => {
+        const { container } = render(
+          <MemoryRouter initialEntries={["/docs"]}>
+            <Routes>
+              <Route path="/docs" element={<DocsLayout />}>
+                <Route index element={<DocsIndexPage />} />
+              </Route>
+            </Routes>
+          </MemoryRouter>,
+        );
+        await expectNoViolations(container);
+      },
+      axeTimeout,
+    );
+  });
+
+  describe("DocsLayout with QuickStartPage", () => {
+    it(
+      "has no accessibility violations",
+      async () => {
+        const { container } = render(
+          <MemoryRouter initialEntries={["/docs/quick-start"]}>
+            <Routes>
+              <Route path="/docs" element={<DocsLayout />}>
+                <Route path="quick-start" element={<QuickStartPage />} />
+              </Route>
+            </Routes>
+          </MemoryRouter>,
+        );
+        await expectNoViolations(container);
+      },
+      axeTimeout,
     );
   });
 });
