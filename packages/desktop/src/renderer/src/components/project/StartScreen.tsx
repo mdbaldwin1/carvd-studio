@@ -169,7 +169,7 @@ export function StartScreen({
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center bg-bg z-1000">
+    <div className="start-screen fixed inset-0 flex flex-col items-center bg-bg z-1000">
       {/* Draggable title bar area for window movement */}
       <div className="w-full h-[38px] shrink-0" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
       <div className="max-w-[700px] w-full px-12 pb-12 flex-1 min-h-0 flex flex-col gap-8 overflow-hidden [&>:first-child]:mt-auto [&>:last-child]:mb-auto">

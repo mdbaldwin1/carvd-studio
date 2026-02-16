@@ -95,7 +95,7 @@ export function TemplatesSection({
       <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         {/* Blank Project - always first */}
         <button
-          className={`${templateCardBase} border-dashed`}
+          className={`blank-template ${templateCardBase} border-dashed`}
           onClick={onNewProject}
           title="Start with a blank project"
         >

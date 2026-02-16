@@ -171,7 +171,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
       }}
     >
       <div
-        className="bg-bg rounded-lg w-[480px] max-h-[90vh] flex flex-col shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] border border-border"
+        className="new-project-dialog bg-bg rounded-lg w-[480px] max-h-[90vh] flex flex-col shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] border border-border"
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-project-dialog-title"
