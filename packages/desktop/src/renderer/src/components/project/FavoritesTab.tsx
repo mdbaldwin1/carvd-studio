@@ -23,9 +23,6 @@ export function FavoritesTab({
   const handleDragStart = (index: number, e: React.DragEvent) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
-    setTimeout(() => {
-      (e.target as HTMLElement).classList.add('dragging');
-    }, 0);
   };
 
   const handleDragOver = (index: number, e: React.DragEvent) => {
@@ -58,28 +55,27 @@ export function FavoritesTab({
     onReorder(newFavorites);
   };
 
-  const handleDragEnd = (e: React.DragEvent) => {
-    (e.target as HTMLElement).classList.remove('dragging');
+  const handleDragEnd = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
   };
 
   if (projects.length === 0) {
     return (
-      <div className="projects-list">
-        <div className="empty-tab">
-          <p>No favorites yet. Star a project to add it here.</p>
+      <div className="flex flex-col gap-1 flex-auto min-h-0 max-h-full overflow-y-auto">
+        <div className="text-center py-6 text-text-muted text-sm">
+          <p className="m-0">No favorites yet. Star a project to add it here.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="projects-list">
+    <div className="flex flex-col gap-1 flex-auto min-h-0 max-h-full overflow-y-auto">
       {projects.map((project, index) => (
         <div
           key={project.path}
-          className={`project-item ${!project.exists ? 'missing' : ''} ${dragOverIndex === index ? 'drag-over' : ''} ${draggedIndex === index ? 'dragging' : ''}`}
+          className={`project-item group relative flex items-center gap-3 py-3 px-4 bg-transparent border border-transparent rounded-lg cursor-pointer transition-all duration-100 text-left w-full hover:bg-bg-secondary hover:border-border ${!project.exists ? 'missing opacity-60 !cursor-default hover:!bg-transparent hover:!border-transparent' : ''} ${dragOverIndex === index ? 'drag-over !border-primary !bg-bg-secondary before:content-[""] before:absolute before:top-[-2px] before:left-0 before:right-0 before:h-0.5 before:bg-primary before:rounded-sm' : ''} ${draggedIndex === index ? 'dragging opacity-50' : ''}`}
           onClick={() => {
             if (project.exists) {
               onOpenProject(project.path);
@@ -106,24 +102,35 @@ export function FavoritesTab({
           onDrop={(e) => handleDrop(index, e)}
           onDragEnd={handleDragEnd}
         >
-          <span className="drag-handle" title="Drag to reorder">
+          <span
+            className="drag-handle text-text-muted text-xs tracking-[-2px] cursor-grab opacity-0 transition-opacity duration-100 select-none shrink-0 px-1 group-hover:opacity-50 hover:!opacity-100 hover:text-text active:cursor-grabbing"
+            title="Drag to reorder"
+          >
             ⋮⋮
           </span>
           {!project.exists ? (
-            <AlertTriangle size={20} className="project-icon missing-icon" />
+            <AlertTriangle size={20} className="text-warning shrink-0" />
           ) : project.thumbnail ? (
-            <img src={`data:image/png;base64,${project.thumbnail.data}`} alt="" className="project-thumbnail" />
+            <img
+              src={`data:image/png;base64,${project.thumbnail.data}`}
+              alt=""
+              className="project-thumbnail w-12 h-9 object-cover rounded bg-bg-tertiary shrink-0"
+            />
           ) : (
-            <FileText size={20} className="project-icon" />
+            <FileText size={20} className="text-text-muted shrink-0" />
           )}
-          <span className="project-name">{project.name}</span>
+          <span className="flex-1 text-sm text-text whitespace-nowrap overflow-hidden text-ellipsis">
+            {project.name}
+          </span>
           {!project.exists ? (
-            <span className="project-date missing-label">Click to locate</span>
+            <span className="text-xs text-warning italic whitespace-nowrap shrink-0">Click to locate</span>
           ) : project.modifiedAt ? (
-            <span className="project-date">{formatRelativeDate(project.modifiedAt)}</span>
+            <span className="text-xs text-text-muted whitespace-nowrap shrink-0">
+              {formatRelativeDate(project.modifiedAt)}
+            </span>
           ) : null}
           <button
-            className={`project-action favorite ${project.exists ? 'active' : ''}`}
+            className={`project-action favorite w-7 h-7 flex items-center justify-center bg-transparent border-none rounded text-text-muted cursor-pointer transition-all duration-100 hover:bg-bg-tertiary hover:text-text ${project.exists ? 'active !opacity-100 text-warning' : ''}`}
             onClick={(e) => onToggleFavorite(project, e)}
             title="Remove from favorites"
             aria-label={`Remove ${project.name} from favorites`}

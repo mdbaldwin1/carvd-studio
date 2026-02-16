@@ -5,7 +5,6 @@ import { Project } from '../../types';
 import { TemplatesSection } from './TemplatesSection';
 import { RecentsTab } from './RecentsTab';
 import { FavoritesTab } from './FavoritesTab';
-import './StartScreen.css';
 
 // Format a date as relative time (e.g., "2 days ago", "Just now")
 export function formatRelativeDate(dateString: string): string {
@@ -170,17 +169,19 @@ export function StartScreen({
   };
 
   return (
-    <div className="start-screen">
+    <div className="fixed inset-0 flex flex-col items-center bg-bg z-1000">
       {/* Draggable title bar area for window movement */}
-      <div className="start-screen-titlebar" />
-      <div className="start-screen-content">
+      <div className="w-full h-[38px] shrink-0" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
+      <div className="max-w-[700px] w-full px-12 pb-12 flex-1 min-h-0 flex flex-col gap-8 overflow-hidden [&>:first-child]:mt-auto [&>:last-child]:mb-auto">
         {/* Header */}
-        <div className="start-screen-header">
-          <div className="start-screen-logo">
-            <span className="logo-icon">🪵</span>
-            <h1>Carvd Studio</h1>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-4">
+            <span className="text-5xl">🪵</span>
+            <h1 className="text-[32px] font-bold text-text m-0">Carvd Studio</h1>
           </div>
-          {appVersion && <span className="version-badge">v{appVersion}</span>}
+          {appVersion && (
+            <span className="text-xs text-text-muted bg-bg-secondary py-1 px-2 rounded">v{appVersion}</span>
+          )}
         </div>
 
         <TemplatesSection
@@ -192,25 +193,28 @@ export function StartScreen({
         />
 
         {/* Projects Section with Tabs */}
-        <div className="projects-section">
-          <div className="section-header">
-            <div className="section-tabs">
+        <div className="flex flex-col gap-3 min-h-0 max-h-[50vh]">
+          <div className="flex items-stretch justify-between relative m-0 p-0 cursor-default rounded-none bg-transparent after:content-[''] after:absolute after:left-0 after:right-0 after:bottom-0 after:h-px after:bg-border after:z-0">
+            <div className="flex gap-0 relative z-1">
               <button
-                className={`section-tab ${activeTab === 'recents' ? 'active' : ''}`}
+                className={`section-tab flex items-center gap-1.5 py-2.5 px-4 bg-transparent border border-transparent border-b-border rounded-t-md -mb-px text-sm font-medium text-text-muted cursor-pointer transition-[color,background-color] duration-100 hover:text-text hover:bg-bg-secondary ${activeTab === 'recents' ? 'active text-text !bg-bg !border-border !border-b-bg' : ''}`}
                 onClick={() => setActiveTab('recents')}
               >
                 <Clock size={16} />
                 Recents
               </button>
               <button
-                className={`section-tab ${activeTab === 'favorites' ? 'active' : ''}`}
+                className={`section-tab flex items-center gap-1.5 py-2.5 px-4 bg-transparent border border-transparent border-b-border rounded-t-md -mb-px text-sm font-medium text-text-muted cursor-pointer transition-[color,background-color] duration-100 hover:text-text hover:bg-bg-secondary ${activeTab === 'favorites' ? 'active text-text !bg-bg !border-border !border-b-bg' : ''}`}
                 onClick={() => setActiveTab('favorites')}
               >
                 <Star size={16} />
                 Favorites
               </button>
             </div>
-            <button className="open-file-link" onClick={onOpenFile}>
+            <button
+              className="flex items-center gap-1.5 py-1.5 px-3 my-auto bg-transparent border-none rounded text-[13px] text-accent cursor-pointer transition-all duration-100 relative z-1 hover:text-primary hover:bg-bg-secondary"
+              onClick={onOpenFile}
+            >
               <FolderOpen size={14} />
               Open file...
             </button>

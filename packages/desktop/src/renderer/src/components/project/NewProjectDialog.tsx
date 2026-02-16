@@ -1,6 +1,5 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import './NewProjectDialog.css';
 
 // Stock item from the app-level stock library
 interface StockLibraryItem {
@@ -24,6 +23,9 @@ function categorizeStock(stock: StockLibraryItem): string {
   }
   return 'Dimensional Lumber';
 }
+
+const inputClass =
+  'py-2.5 px-3 text-sm bg-bg-secondary border border-border rounded-md text-text outline-none transition-[border-color] duration-100 focus:border-accent placeholder:text-text-muted';
 
 interface NewProjectDialogProps {
   isOpen: boolean;
@@ -168,18 +170,31 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
         mouseDownOnOverlay.current = false;
       }}
     >
-      <div className="new-project-dialog" role="dialog" aria-modal="true" aria-labelledby="new-project-dialog-title">
-        <div className="dialog-header">
-          <h2 id="new-project-dialog-title">New Project</h2>
-          <button className="close-btn" onClick={onClose} aria-label="Close">
+      <div
+        className="bg-bg rounded-lg w-[480px] max-h-[90vh] flex flex-col shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] border border-border"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-project-dialog-title"
+      >
+        <div className="flex items-center justify-between py-5 px-6 border-b border-border">
+          <h2 id="new-project-dialog-title" className="m-0 text-lg font-semibold text-text">
+            New Project
+          </h2>
+          <button
+            className="w-8 h-8 flex items-center justify-center bg-transparent border-none rounded-md text-text-muted cursor-pointer transition-all duration-100 hover:bg-bg-secondary hover:text-text"
+            onClick={onClose}
+            aria-label="Close"
+          >
             <X size={20} />
           </button>
         </div>
 
-        <div className="dialog-content">
+        <div className="p-6 overflow-y-auto flex flex-col gap-5">
           {/* Project Name */}
-          <div className="form-group">
-            <label htmlFor="project-name">Project Name</label>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="project-name" className="text-sm font-medium text-text">
+              Project Name
+            </label>
             <input
               id="project-name"
               type="text"
@@ -187,72 +202,84 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
               onChange={(e) => setProjectName(e.target.value)}
               placeholder="Enter project name"
               autoFocus
+              className={inputClass}
             />
           </div>
 
           {/* Units */}
-          <div className="form-group">
-            <label>Units</label>
-            <div className="radio-group">
-              <label className="radio-option">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-text">Units</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
                   name="units"
                   value="imperial"
                   checked={units === 'imperial'}
                   onChange={() => setUnits('imperial')}
+                  className="w-4.5 h-4.5 m-0 accent-accent cursor-pointer"
                 />
-                <span>Imperial (inches)</span>
+                <span className="text-sm text-text">Imperial (inches)</span>
               </label>
-              <label className="radio-option">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
                   name="units"
                   value="metric"
                   checked={units === 'metric'}
                   onChange={() => setUnits('metric')}
+                  className="w-4.5 h-4.5 m-0 accent-accent cursor-pointer"
                 />
-                <span>Metric (mm)</span>
+                <span className="text-sm text-text">Metric (mm)</span>
               </label>
             </div>
           </div>
 
           {/* Materials Selection */}
-          <div className="form-group materials-section">
-            <div className="materials-header">
-              <label>Add materials from your library?</label>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-text">Add materials from your library?</label>
               {stockLibrary.length > 0 && (
-                <div className="materials-actions">
-                  <button type="button" className="text-btn" onClick={handleSelectAll}>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="bg-transparent border-none text-accent text-[13px] cursor-pointer p-0 hover:underline"
+                    onClick={handleSelectAll}
+                  >
                     Select All
                   </button>
-                  <span className="separator">|</span>
-                  <button type="button" className="text-btn" onClick={handleSelectNone}>
+                  <span className="text-text-muted text-xs">|</span>
+                  <button
+                    type="button"
+                    className="bg-transparent border-none text-accent text-[13px] cursor-pointer p-0 hover:underline"
+                    onClick={handleSelectNone}
+                  >
                     Select None
                   </button>
                 </div>
               )}
             </div>
 
-            <div className="materials-grid">
+            <div className="flex flex-col gap-4 p-4 bg-bg-secondary rounded-lg border border-border max-h-60 overflow-y-auto">
               {isLoadingStocks ? (
-                <div className="materials-loading">Loading materials...</div>
+                <div className="text-center p-4 text-text-muted text-sm">Loading materials...</div>
               ) : stockLibrary.length === 0 ? (
-                <div className="materials-empty">
+                <div className="text-center p-4 text-text-muted text-sm">
                   No materials in your library yet. You can add materials later from the Stock Library.
                 </div>
               ) : (
                 sortedCategories.map((category) => (
-                  <div key={category} className="material-category">
-                    <span className="category-label">{category}</span>
+                  <div key={category} className="flex flex-col gap-2">
+                    <span className="text-xs font-semibold text-text-muted uppercase tracking-wide">{category}</span>
                     {materialsByCategory[category].map((stock) => (
-                      <label key={stock.id} className="material-option">
+                      <label key={stock.id} className="flex items-center gap-2.5 cursor-pointer py-1">
                         <input
                           type="checkbox"
                           checked={selectedMaterials.includes(stock.id)}
                           onChange={() => handleToggleMaterial(stock.id)}
+                          className="w-4 h-4 m-0 accent-accent cursor-pointer"
                         />
-                        <span>{stock.name}</span>
+                        <span className="text-sm text-text">{stock.name}</span>
                       </label>
                     ))}
                   </div>
@@ -262,17 +289,28 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
           </div>
 
           {/* Remember Choices */}
-          <label className="remember-option">
-            <input type="checkbox" checked={rememberChoices} onChange={(e) => setRememberChoices(e.target.checked)} />
-            <span>Remember these choices (skip this dialog next time)</span>
+          <label className="flex items-center gap-2.5 cursor-pointer py-3 px-4 bg-bg-tertiary rounded-lg mt-1">
+            <input
+              type="checkbox"
+              checked={rememberChoices}
+              onChange={(e) => setRememberChoices(e.target.checked)}
+              className="w-4 h-4 m-0 accent-accent cursor-pointer"
+            />
+            <span className="text-[13px] text-text-secondary">Remember these choices (skip this dialog next time)</span>
           </label>
         </div>
 
-        <div className="dialog-footer">
-          <button className="btn btn-secondary" onClick={onClose}>
+        <div className="flex justify-end gap-3 py-4 px-6 border-t border-border">
+          <button
+            className="py-2.5 px-5 text-sm font-medium rounded-md cursor-pointer transition-all duration-100 bg-bg-secondary border border-border text-text hover:bg-bg-tertiary"
+            onClick={onClose}
+          >
             Cancel
           </button>
-          <button className="btn btn-accent" onClick={handleCreate}>
+          <button
+            className="py-2.5 px-5 text-sm font-medium rounded-md cursor-pointer transition-all duration-100 bg-accent border border-accent text-accent-foreground hover:bg-accent-hover hover:border-accent-hover"
+            onClick={handleCreate}
+          >
             Create Project
           </button>
         </div>
