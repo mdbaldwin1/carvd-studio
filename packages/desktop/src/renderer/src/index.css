@@ -2456,9 +2456,6 @@ input[type='radio'] {
   outline-offset: -2px;
 }
 
-
-
-
 .color-picker-row input[type='color']:hover,
 .property-group input[type='color']:hover {
   border-color: var(--color-text-muted);
