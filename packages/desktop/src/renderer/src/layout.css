@@ -1,0 +1,328 @@
+/*
+ * App Layout Shell — Tailwind component classes
+ *
+ * These define the foundational layout structure: app container, header,
+ * sidebar, canvas, and properties panel. Re-implemented with @apply
+ * for Tailwind integration.
+ */
+
+/* ===========================================
+   APP CONTAINER & MAIN
+   =========================================== */
+
+@layer components {
+  .app {
+    @apply flex flex-col h-full;
+  }
+
+  .app-main {
+    @apply flex-1 flex overflow-hidden;
+  }
+}
+
+/* ===========================================
+   HEADER
+   =========================================== */
+
+@layer components {
+  .app-header {
+    @apply bg-surface border-b border-border flex items-center justify-between gap-6;
+    height: var(--header-height);
+    padding: 0 16px;
+    -webkit-app-region: drag;
+  }
+
+  /* macOS: Add padding for traffic lights on the left */
+  .app-header.platform-darwin {
+    padding-left: 80px;
+  }
+
+  /* Windows/Linux: Add padding for window controls overlay on the right */
+  .app-header.platform-win32,
+  .app-header.platform-linux {
+    padding-right: 140px;
+  }
+
+  .header-left {
+    @apply flex items-center gap-4;
+    margin-left: 5px;
+    -webkit-app-region: no-drag;
+  }
+
+  .header-title {
+    @apply flex items-center gap-2;
+  }
+
+  .header-title .app-name {
+    @apply text-accent font-semibold;
+    font-size: 16px;
+  }
+
+  .header-title .app-name-btn {
+    @apply text-accent font-semibold bg-transparent border-none p-0 m-0 cursor-pointer;
+    font-size: 16px;
+    font-family: inherit;
+    -webkit-app-region: no-drag;
+    transition: opacity 0.15s ease;
+  }
+
+  .header-title .app-name-btn:hover {
+    opacity: 0.7;
+  }
+
+  .header-title .title-separator {
+    @apply text-text-muted font-light;
+    font-size: 16px;
+    opacity: 0.5;
+  }
+
+  .header-title .project-name {
+    @apply text-text font-medium overflow-hidden text-ellipsis whitespace-nowrap;
+    font-size: 14px;
+    max-width: 350px;
+  }
+
+  .header-title .dirty-indicator {
+    @apply text-accent font-bold;
+  }
+
+  .app-header h1 {
+    @apply text-accent font-semibold;
+    font-size: 16px;
+    -webkit-app-region: no-drag;
+  }
+
+  .header-actions {
+    @apply flex items-center gap-3;
+    -webkit-app-region: no-drag;
+  }
+
+  .header-actions-group {
+    @apply flex items-center gap-2;
+  }
+
+  .header-divider {
+    @apply bg-border;
+    width: 1px;
+    height: 24px;
+  }
+
+  .upgrade-btn {
+    @apply font-semibold;
+  }
+
+  .undo-redo-buttons {
+    @apply flex gap-1;
+  }
+}
+
+/* ===========================================
+   TOOLBAR
+   =========================================== */
+
+@layer components {
+  .toolbar {
+    @apply flex gap-2;
+    -webkit-app-region: no-drag;
+  }
+
+  .toolbar-group {
+    @apply flex gap-1;
+  }
+
+  .toolbar-btn {
+    @apply bg-bg border border-border text-text rounded-sm cursor-pointer;
+    padding: 6px 12px;
+    font-size: 12px;
+    transition: all 0.15s ease;
+  }
+
+  .toolbar-btn:hover:not(:disabled) {
+    @apply bg-surface-hover;
+  }
+
+  .toolbar-btn.active {
+    @apply bg-accent text-bg-dark border-accent;
+  }
+
+  .toolbar-btn:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+}
+
+/* ===========================================
+   SIDEBAR
+   =========================================== */
+
+@layer components {
+  .sidebar {
+    @apply flex-shrink-0 bg-surface border-r border-border flex flex-col overflow-hidden;
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+  }
+
+  .sidebar-section {
+    @apply p-3 border-b border-border flex flex-col flex-1 min-h-0 overflow-hidden;
+    transition:
+      flex 0.2s ease-out,
+      padding 0.2s ease-out;
+  }
+
+  .sidebar-section-bottom {
+    @apply mt-auto border-b-0 border-t border-border flex flex-col gap-2 bg-surface overflow-visible;
+    flex: 0 0 auto;
+  }
+
+  .sidebar-settings-btn {
+    @apply w-full flex justify-center;
+  }
+
+  /* Section header (clickable collapse toggle) */
+  .section-header {
+    @apply flex items-center gap-1 cursor-pointer rounded-sm;
+    margin: -12px -12px 8px -12px;
+    padding: 12px;
+    padding-right: 8px;
+    transition:
+      background-color 0.15s,
+      margin 0.2s ease-out;
+  }
+
+  .section-header:hover {
+    @apply bg-bg-hover;
+  }
+
+  .section-header:hover .section-collapse-btn {
+    @apply text-text;
+  }
+
+  .section-header h2 {
+    @apply flex-1 leading-none;
+    margin-bottom: 0 !important;
+  }
+
+  .section-collapse-btn {
+    @apply bg-transparent border-none p-0 m-0 text-text-muted inline-flex items-center justify-center flex-shrink-0;
+    border-radius: 2px;
+    transition: color 0.15s;
+    width: 11px;
+    height: 11px;
+  }
+
+  .section-collapse-btn svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  /* Section content animation (grid-row collapse) */
+  .section-content {
+    @apply grid flex-1 min-h-0 overflow-hidden;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.2s ease-out;
+  }
+
+  .section-content-inner {
+    @apply min-h-0 overflow-hidden flex flex-col;
+  }
+
+  .section-content-inner > .stock-list,
+  .section-content-inner > .assembly-list,
+  .section-content-inner > .parts-list {
+    @apply flex-1 overflow-y-auto min-h-0;
+  }
+
+  /* Collapsed section */
+  .sidebar-section.collapsed {
+    @apply overflow-visible pb-0;
+    flex: 0 0 auto;
+  }
+
+  .sidebar-section.collapsed .section-content {
+    grid-template-rows: 0fr;
+  }
+
+  .sidebar-section.collapsed .section-header {
+    @apply mb-0;
+  }
+
+  /* Section typography */
+  .sidebar-section h2 {
+    @apply text-text-muted font-semibold uppercase mb-2;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Section search bar */
+  .section-search {
+    @apply flex items-center gap-1 sticky top-0 z-[1] bg-bg-sidebar;
+    padding: 0 12px 8px 12px;
+    margin-top: -4px;
+  }
+
+  .section-search input {
+    @apply flex-1 bg-bg border border-border text-text outline-none rounded-sm;
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  .section-search input:focus {
+    @apply border-primary;
+  }
+
+  .section-search input::placeholder {
+    @apply text-text-muted;
+  }
+
+  .section-search-clear {
+    @apply flex items-center justify-center border-none bg-transparent text-text-muted cursor-pointer p-0;
+    width: 20px;
+    height: 20px;
+    border-radius: 2px;
+  }
+
+  .section-search-clear:hover {
+    @apply text-text bg-bg-hover;
+  }
+
+  /* Active search button */
+  .section-header .btn-icon-sm.active {
+    @apply text-primary;
+  }
+}
+
+/* ===========================================
+   CANVAS CONTAINER
+   =========================================== */
+
+@layer components {
+  .canvas-container {
+    @apply flex-1 min-w-0 overflow-hidden bg-bg relative;
+  }
+}
+
+/* ===========================================
+   PROPERTIES PANEL
+   =========================================== */
+
+@layer components {
+  .properties-panel {
+    @apply flex-shrink-0 bg-surface border-l border-border p-3 overflow-y-auto;
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+  }
+
+  .properties-panel h2 {
+    @apply text-text-muted font-semibold uppercase mb-3;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+
+  .property-group {
+    @apply mb-4;
+  }
+
+  .property-group > label {
+    @apply block text-text-muted mb-1;
+    font-size: 12px;
+  }
+}
