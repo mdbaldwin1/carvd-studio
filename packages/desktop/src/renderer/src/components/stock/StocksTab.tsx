@@ -7,6 +7,7 @@ import { Stock } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { ColorPicker } from '../common/ColorPicker';
 import { FractionInput } from '../common/FractionInput';
+import { IconButton } from '../common/IconButton';
 
 const defaultStock: Omit<Stock, 'id'> = {
   name: 'New Stock',
@@ -170,22 +171,12 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
         <div className="stock-library-list-header">
           <span>{stocks.length} available</span>
           <div className="stock-library-header-actions">
-            <button
-              className="btn btn-icon-xs btn-ghost btn-secondary"
-              onClick={handleImportStocks}
-              title="Import stocks from file"
-              aria-label="Import stocks"
-            >
+            <IconButton label="Import stocks" size="xs" onClick={handleImportStocks}>
               <Upload size={14} />
-            </button>
-            <button
-              className="btn btn-icon-xs btn-ghost btn-secondary"
-              onClick={handleStartCreate}
-              title="Create new stock"
-              aria-label="Create new stock"
-            >
+            </IconButton>
+            <IconButton label="Create new stock" size="xs" onClick={handleStartCreate}>
               <Plus size={14} />
-            </button>
+            </IconButton>
           </div>
         </div>
         {stocks.length > 0 && (
