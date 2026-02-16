@@ -117,7 +117,7 @@ export function useDevTools() {
             const result = addPart({
               name: `Test Part ${i + 1}`,
               length: 4 + Math.random() * 20, // 4-24 inches
-              width: 2 + Math.random() * 10,  // 2-12 inches
+              width: 2 + Math.random() * 10, // 2-12 inches
               thickness: 0.5 + Math.random() * 1, // 0.5-1.5 inches
               position: {
                 x: col * gridSpacing,
@@ -159,7 +159,9 @@ export function useDevTools() {
           console.log('[Perf] Undo/Redo Snapshot Analysis:');
           console.log(`   History depth: ${pastStates.length} past, ${futureStates.length} future`);
           console.log(`   Latest snapshot: ${(snapshotBytes / 1024).toFixed(1)} KB`);
-          console.log(`   Total history: ${(totalBytes / 1024).toFixed(1)} KB (${(totalBytes / 1024 / 1024).toFixed(2)} MB)`);
+          console.log(
+            `   Total history: ${(totalBytes / 1024).toFixed(1)} KB (${(totalBytes / 1024 / 1024).toFixed(2)} MB)`
+          );
           console.log(`   Avg per snapshot: ${(totalBytes / pastStates.length / 1024).toFixed(1)} KB`);
         },
 
@@ -180,7 +182,11 @@ export function useDevTools() {
           console.log(`   Groups: ${state.groups.length}`);
 
           // Memory (Chrome-only)
-          const mem = (performance as unknown as { memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
+          const mem = (
+            performance as unknown as {
+              memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number };
+            }
+          ).memory;
           if (mem) {
             console.log('\n[Memory]');
             console.log(`   Used JS heap: ${(mem.usedJSHeapSize / 1024 / 1024).toFixed(1)} MB`);
