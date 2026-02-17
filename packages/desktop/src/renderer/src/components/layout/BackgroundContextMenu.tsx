@@ -1,4 +1,5 @@
 import { useProjectStore, captureCanvas } from '../../store/projectStore';
+import { useClipboardStore } from '../../store/clipboardStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
 
@@ -11,10 +12,10 @@ interface BackgroundContextMenuProps {
 }
 
 export function BackgroundContextMenu({ menuRef, x, y, onClose, worldPosition }: BackgroundContextMenuProps) {
-  const clipboard = useProjectStore((s) => s.clipboard);
+  const clipboard = useClipboardStore((s) => s.clipboard);
   const requestCenterCameraAtOrigin = useCameraStore((s) => s.requestCenterCameraAtOrigin);
   const requestCenterCameraAtPosition = useCameraStore((s) => s.requestCenterCameraAtPosition);
-  const pasteAtPosition = useProjectStore((s) => s.pasteAtPosition);
+  const pasteAtPosition = useClipboardStore((s) => s.pasteAtPosition);
   const addSnapGuide = useProjectStore((s) => s.addSnapGuide);
   const snapGuides = useProjectStore((s) => s.snapGuides);
   const clearSnapGuides = useProjectStore((s) => s.clearSnapGuides);

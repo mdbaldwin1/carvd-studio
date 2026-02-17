@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Extract clipboardStore from projectStore** — Moved clipboard state and 3 clipboard actions (copy, paste, pasteAtPosition) into a dedicated `clipboardStore`, with cross-store coordination for paste operations (bead 3.7)
 - **Extract assemblyEditingStore from projectStore** — Moved 4 assembly editing state fields and 5 orchestrator actions into a dedicated `assemblyEditingStore`, with cross-store coordination for project snapshot save/restore (bead 3.6)
 - **Extract snapStore from projectStore** — Moved 4 transient snap state fields and 9 actions into a dedicated `snapStore`, with cross-store cleanup in delete actions and assembly editing (bead 3.5)
 - **Extract selectionStore from projectStore** — Moved 8 selection/UI state fields and 18 actions into a dedicated `selectionStore`, with a subscription bridge for reference distance updates (bead 3.4)

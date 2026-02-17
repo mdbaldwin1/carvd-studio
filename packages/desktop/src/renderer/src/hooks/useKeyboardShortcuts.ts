@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import * as THREE from 'three';
 import { useProjectStore, getContainingGroupId, getAllDescendantPartIds } from '../store/projectStore';
+import { useClipboardStore } from '../store/clipboardStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useSnapStore } from '../store/snapStore';
 import { useUIStore } from '../store/uiStore';
@@ -26,8 +27,8 @@ export function useKeyboardShortcuts() {
   const updatePart = useProjectStore((s) => s.updatePart);
   const batchUpdateParts = useProjectStore((s) => s.batchUpdateParts);
   const clearSelection = useSelectionStore((s) => s.clearSelection);
-  const copySelectedParts = useProjectStore((s) => s.copySelectedParts);
-  const pasteClipboard = useProjectStore((s) => s.pasteClipboard);
+  const copySelectedParts = useClipboardStore((s) => s.copySelectedParts);
+  const pasteClipboard = useClipboardStore((s) => s.pasteClipboard);
   const moveSelectedParts = useProjectStore((s) => s.moveSelectedParts);
   const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
   const requestCenterCameraAtOrigin = useCameraStore((s) => s.requestCenterCameraAtOrigin);
