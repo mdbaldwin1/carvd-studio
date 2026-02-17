@@ -3,8 +3,7 @@
    Web Application Styles
    ========================================================================== */
 
-/* Google Fonts - Roboto & Roboto Slab */
-@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&family=Roboto+Slab:wght@400;500;600;700&display=swap");
+/* Google Fonts loaded via <link> in index.html for faster discovery */
 
 /* CSS Variables - Design Tokens
    ========================================================================== */
