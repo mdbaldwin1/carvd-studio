@@ -464,7 +464,7 @@ export function Workspace() {
         userData={{ isSky: true }}
         renderOrder={-1}
       >
-        <sphereGeometry args={[500, 32, 32]} />
+        <sphereGeometry args={[500, 8, 6]} />
         <meshBasicMaterial visible={false} side={1} /> {/* BackSide = 1 */}
       </mesh>
 
