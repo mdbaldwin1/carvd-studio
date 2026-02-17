@@ -6,7 +6,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useLicenseStore } from '../../store/licenseStore';
 import { generateOptimizedCutList } from '../../utils/cutListOptimizer';
 import { getFeatureLimits, getBlockedMessage } from '../../utils/featureLimits';
-import { exportProjectReportToPdf } from '../../utils/pdfExport';
+// pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { logger } from '../../utils/logger';
 import { PartValidationIssue } from '../../types';
 import { CutListPartsTab } from './CutListPartsTab';
@@ -95,6 +95,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
       // Generate thumbnail for the report
       const thumbnailData = await generateThumbnail();
 
+      const { exportProjectReportToPdf } = await import('../../utils/pdfExport');
       const result = await exportProjectReportToPdf(cutList, {
         projectName: projectName || 'Untitled Project',
         projectNotes: projectNotes || undefined,
