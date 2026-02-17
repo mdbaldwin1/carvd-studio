@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSnapStore } from './snapStore';
 import { useProjectStore } from './projectStore';
+import { useAssemblyEditingStore } from './assemblyEditingStore';
 import { useSelectionStore } from './selectionStore';
 
 // Helper to reset store state before each test
@@ -342,7 +343,7 @@ describe('snapStore', () => {
       const partId = useProjectStore.getState().addPart();
       useSnapStore.getState().addToReferences([partId]);
 
-      useProjectStore.getState().startEditingAssembly('assembly-123', 'Test Assembly', [
+      useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test Assembly', [
         {
           id: 'asm-part-1',
           name: 'Asm Part',

@@ -4,6 +4,7 @@
 
 import { useEffect } from 'react';
 import { useProjectStore } from '../store/projectStore';
+import { useAssemblyEditingStore } from '../store/assemblyEditingStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useUIStore } from '../store/uiStore';
 import {
@@ -41,7 +42,7 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const resetCamera = useProjectStore((s) => s.resetCamera);
   const showToast = useUIStore((s) => s.showToast);
-  const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
+  const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
   const filePath = useProjectStore((s) => s.filePath);
 
   useEffect(() => {
