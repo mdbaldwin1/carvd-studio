@@ -8,8 +8,8 @@ interface SnappingSectionProps {
 
 export function SnappingSection({ formData, onSettingChange }: SnappingSectionProps) {
   return (
-    <div className="settings-section">
-      <h3>
+    <div className="mb-6 last:mb-0">
+      <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">
         Snapping
         <HelpTooltip
           text="Configure how parts snap to other parts, guides, and the grid. Hold Alt/Option while dragging to temporarily bypass snapping."
@@ -17,9 +17,9 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
           inline
         />
       </h3>
-      <div className="settings-row">
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <div className="label-with-help">
-          <label>Snap Sensitivity</label>
+          <label className="text-[13px] text-text">Snap Sensitivity</label>
           <HelpTooltip
             text="How close parts need to be before snapping. Tight requires closer proximity."
             docsSection="snapping"
@@ -28,15 +28,16 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
         <select
           value={formData.snapSensitivity ?? 'normal'}
           onChange={(e) => onSettingChange('snapSensitivity', e.target.value as SnapSensitivity)}
+          className="w-40 bg-bg border border-border text-text py-1.5 px-2 rounded text-[13px] cursor-pointer outline-none focus:border-accent"
         >
           <option value="tight">Tight (precise)</option>
           <option value="normal">Normal</option>
           <option value="loose">Loose (easier)</option>
         </select>
       </div>
-      <div className="settings-row">
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <div className="label-with-help">
-          <label>Live Grid Snapping</label>
+          <label className="text-[13px] text-text">Live Grid Snapping</label>
           <HelpTooltip
             text="Snap to grid continuously while dragging (instead of only when releasing)."
             docsSection="snapping"
@@ -46,22 +47,24 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
           type="checkbox"
           checked={formData.liveGridSnap ?? false}
           onChange={(e) => onSettingChange('liveGridSnap', e.target.checked)}
+          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
-      <div className="settings-row">
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <div className="label-with-help">
-          <label>Snap to Origin</label>
+          <label className="text-[13px] text-text">Snap to Origin</label>
           <HelpTooltip text="Snap parts to workspace origin planes (X=0, Y=0, Z=0)." docsSection="snapping" />
         </div>
         <input
           type="checkbox"
           checked={formData.snapToOrigin ?? true}
           onChange={(e) => onSettingChange('snapToOrigin', e.target.checked)}
+          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
-      <div className="settings-row">
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <div className="label-with-help">
-          <label>Match Same Dimensions Only</label>
+          <label className="text-[13px] text-text">Match Same Dimensions Only</label>
           <HelpTooltip
             text="During resize, only match same dimension types (length to length, width to width)."
             docsSection="snapping"
@@ -71,6 +74,7 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
           type="checkbox"
           checked={formData.dimensionSnapSameTypeOnly ?? false}
           onChange={(e) => onSettingChange('dimensionSnapSameTypeOnly', e.target.checked)}
+          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
     </div>

@@ -67,9 +67,9 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
   if (!isOpen) return null;
 
   return (
-    <div className="license-modal-backdrop" onClick={onClose}>
+    <div className="fixed inset-0 bg-overlay-heavy flex items-center justify-center z-[9999]" onClick={onClose}>
       <div
-        className="license-modal"
+        className="relative bg-surface rounded-xl p-8 max-w-[500px] w-[90%] shadow-[0_20px_60px_var(--color-overlay)] border border-border"
         role="dialog"
         aria-modal="true"
         aria-labelledby="license-modal-title"
@@ -77,35 +77,41 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
       >
         {/* Close button */}
         {onClose && (
-          <button className="license-modal-close" onClick={onClose} aria-label="Close">
+          <button
+            className="absolute top-3 right-3 bg-transparent border-none text-text-secondary cursor-pointer p-2 rounded-sm flex items-center justify-center transition-colors duration-150 hover:bg-bg-hover hover:text-text"
+            onClick={onClose}
+            aria-label="Close"
+          >
             <X size={20} />
           </button>
         )}
 
         {/* Header */}
-        <div className="license-modal-header">
-          <div className="license-modal-icon">
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary mb-4 text-text">
             <Key size={32} />
           </div>
-          <h2 id="license-modal-title">Activate Carvd Studio</h2>
-          <p>Enter your license key to unlock all features</p>
+          <h2 id="license-modal-title" className="m-0 text-2xl font-semibold text-text">
+            Activate Carvd Studio
+          </h2>
+          <p className="mt-2 mb-0 text-text-secondary text-sm">Enter your license key to unlock all features</p>
         </div>
 
         {/* Success Message */}
         {success && (
-          <div className="license-success-message">
+          <div className="flex items-center gap-3 p-4 bg-success-bg border border-success-border rounded-lg mb-6">
             <CheckCircle size={20} />
-            <span>License activated successfully!</span>
+            <span className="text-success text-sm font-medium">License activated successfully!</span>
           </div>
         )}
 
         {/* Error Message */}
         {error && !success && (
-          <div className="license-error-message">
-            <AlertCircle size={20} className="error-icon" />
+          <div className="flex items-start gap-3 p-4 bg-danger-bg border border-danger-border rounded-lg mb-6">
+            <AlertCircle size={20} className="shrink-0 mt-0.5" />
             <div>
-              <div className="license-error-title">Activation Failed</div>
-              <div className="license-error-detail">{error}</div>
+              <div className="text-danger text-sm font-medium mb-1">Activation Failed</div>
+              <div className="text-text-secondary text-[13px]">{error}</div>
             </div>
           </div>
         )}
@@ -113,9 +119,11 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
         {/* License Key Input */}
         {!success && (
           <>
-            <div className="license-input-group">
+            <div className="mb-6">
               <div className="label-with-help">
-                <label htmlFor="license-key-input">License Key</label>
+                <label htmlFor="license-key-input" className="block mb-2 text-sm font-medium text-text">
+                  License Key
+                </label>
                 <HelpTooltip
                   text="You should have received your license key via email after purchase from Lemon Squeezy."
                   docsSection="faq"
@@ -129,7 +137,7 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
                 placeholder="Paste your license key here"
                 disabled={isValidating}
                 autoFocus
-                className={error ? 'has-error' : ''}
+                className={`w-full p-3 text-sm font-mono border rounded-md bg-bg text-text outline-none transition-colors duration-200 focus:border-primary ${error ? 'has-error border-danger' : 'border-border'}`}
               />
             </div>
 
@@ -145,11 +153,12 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
         )}
 
         {/* Help Text */}
-        <div className="license-modal-footer">
-          <p>
+        <div className="mt-6 pt-6 border-t border-border text-center">
+          <p className="m-0 text-[13px] text-text-secondary">
             Need help?{' '}
             <a
               href="#"
+              className="text-primary no-underline font-medium hover:underline"
               onClick={(e) => {
                 e.preventDefault();
                 window.electronAPI?.openExternal?.('https://carvd-studio.com/docs#troubleshooting');
@@ -160,6 +169,7 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
             {' · '}
             <a
               href="#"
+              className="text-primary no-underline font-medium hover:underline"
               onClick={(e) => {
                 e.preventDefault();
                 window.electronAPI?.openExternal?.(
@@ -171,9 +181,10 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
             </a>
           </p>
           {onClose && (
-            <p className="license-modal-skip">
+            <p className="mt-3 mb-0 text-[13px] text-text-secondary">
               <a
                 href="#"
+                className="text-text-muted no-underline hover:text-text-secondary hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   onClose();

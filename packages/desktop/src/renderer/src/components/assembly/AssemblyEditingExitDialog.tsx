@@ -23,13 +23,15 @@ export function AssemblyEditingExitDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay">
-      <div className="modal max-w-[420px] w-[90vw]">
-        <div className="modal-header">
-          <h2>{isCreatingNew ? 'Save Assembly?' : 'Save Changes?'}</h2>
+    <div className="modal-overlay fixed inset-0 bg-overlay flex items-center justify-center z-[1100]">
+      <div className="modal bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[420px] w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in">
+        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+          <h2 className="m-0 text-base font-semibold text-text">
+            {isCreatingNew ? 'Save Assembly?' : 'Save Changes?'}
+          </h2>
         </div>
 
-        <div className="modal-body">
+        <div className="p-5 overflow-y-auto">
           <p className="m-0 mb-3 leading-relaxed">
             {isCreatingNew ? (
               <>
@@ -46,7 +48,7 @@ export function AssemblyEditingExitDialog({
           </p>
         </div>
 
-        <div className="modal-footer flex gap-2 justify-end">
+        <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
           <button className="btn btn-sm btn-ghost btn-secondary mr-auto" onClick={onCancel}>
             Keep Editing
           </button>
