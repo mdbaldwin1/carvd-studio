@@ -4,7 +4,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import { getBlockedMessage } from '../../utils/featureLimits';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
-import { exportShoppingListToPdf, exportShoppingListToCsv } from '../../utils/pdfExport';
+// pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { logger } from '../../utils/logger';
 import { CutList, StockSummary, CustomShoppingItem } from '../../types';
 import { DropdownButton, DropdownItem } from '../common/DropdownButton';
@@ -78,6 +78,7 @@ export function ShoppingListTab({
     }
 
     try {
+      const { exportShoppingListToPdf } = await import('../../utils/pdfExport');
       const result = await exportShoppingListToPdf(cutList, customShoppingItems || [], { projectName, units });
       if (result.success) {
         showToast('Shopping list saved to PDF');
@@ -92,7 +93,8 @@ export function ShoppingListTab({
   }, [cutList, customShoppingItems, projectName, units, canExportPDF, showToast]);
 
   // Export shopping list to CSV
-  const handleDownloadCSV = useCallback(() => {
+  const handleDownloadCSV = useCallback(async () => {
+    const { exportShoppingListToCsv } = await import('../../utils/pdfExport');
     const csvContent = exportShoppingListToCsv(cutList, customShoppingItems || [], units);
     const BOM = '\uFEFF';
     const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8' });

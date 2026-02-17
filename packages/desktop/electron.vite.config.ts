@@ -43,6 +43,15 @@ export default defineConfig({
   },
   renderer: {
     root: 'src/renderer',
+    resolve: {
+      alias: {
+        // Stub out unused jsPDF optional dependencies (saves ~386 KB)
+        // jsPDF only needs these for its .html() method, which we never call —
+        // pdfExport.ts draws everything programmatically with .text()/.line()/.rect()
+        'html2canvas': resolve(__dirname, 'src/renderer/src/stubs/empty-module.ts'),
+        dompurify: resolve(__dirname, 'src/renderer/src/stubs/empty-module.ts')
+      }
+    },
     build: {
       rollupOptions: {
         input: {

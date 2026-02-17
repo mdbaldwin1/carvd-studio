@@ -928,18 +928,20 @@ describe('CutListModal', () => {
       revokeObjectURLSpy.mockRestore();
     });
 
-    it('creates CSV when Download CSV clicked', () => {
+    it('creates CSV when Download CSV clicked', async () => {
       render(<CutListModal {...defaultProps} />);
 
       // Click the Download dropdown, then the Download CSV option
       fireEvent.click(screen.getByText('Download'));
       fireEvent.click(screen.getByText('Download CSV'));
 
-      expect(createObjectURLSpy).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(createObjectURLSpy).toHaveBeenCalled();
+      });
       expect(revokeObjectURLSpy).toHaveBeenCalled();
     });
 
-    it('creates shopping list CSV when Download CSV clicked in shopping tab', () => {
+    it('creates shopping list CSV when Download CSV clicked in shopping tab', async () => {
       render(<CutListModal {...defaultProps} />);
 
       fireEvent.click(screen.getByText(/Shopping List/));
@@ -947,7 +949,9 @@ describe('CutListModal', () => {
       fireEvent.click(screen.getByText('Download'));
       fireEvent.click(screen.getByText('Download CSV'));
 
-      expect(createObjectURLSpy).toHaveBeenCalled();
+      await waitFor(() => {
+        expect(createObjectURLSpy).toHaveBeenCalled();
+      });
     });
   });
 
