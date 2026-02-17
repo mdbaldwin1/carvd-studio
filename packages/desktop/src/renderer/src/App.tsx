@@ -1,15 +1,12 @@
 import { Canvas } from '@react-three/fiber';
 import { ChevronDown, ChevronRight, Library, Redo2, Save, Search, Settings, Sun, Undo2, X } from 'lucide-react';
 import { ColorPicker } from './components/common/ColorPicker';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
-import { AboutModal } from './components/settings/AboutModal';
 import { AddAssemblyModal } from './components/assembly/AddAssemblyModal';
 import { AddStockModal } from './components/stock/AddStockModal';
 import { StartScreen } from './components/project/StartScreen';
 import { NewProjectDialog } from './components/project/NewProjectDialog';
-import { AppSettingsModal } from './components/settings/AppSettingsModal';
-import { ImportAppStateModal } from './components/project/ImportAppStateModal';
 import { AssemblyEditingBanner } from './components/assembly/AssemblyEditingBanner';
 import { AssemblyEditingExitDialog } from './components/assembly/AssemblyEditingExitDialog';
 import { TemplateEditingBanner } from './components/template/TemplateEditingBanner';
@@ -21,25 +18,17 @@ import {
 import { UpdateNotificationBanner } from './components/update/UpdateNotificationBanner';
 import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { ContextMenu } from './components/layout/ContextMenu';
-import { CutListModal } from './components/stock/CutListModal';
 import { EditStockModal } from './components/stock/EditStockModal';
 import { useMenuCommands } from './hooks/useMenuCommands';
 import { FractionInput } from './components/common/FractionInput';
 import { HelpTooltip } from './components/common/HelpTooltip';
 import { HierarchicalPartsList } from './components/parts-list/HierarchicalPartsList';
 import { ImportToLibraryDialog } from './components/parts-list/ImportToLibraryDialog';
-import { LicenseActivationModal } from './components/licensing/LicenseActivationModal';
-import { ProjectSettingsModal } from './components/project/ProjectSettingsModal';
 import { RecoveryDialog } from './components/project/RecoveryDialog';
-import { SaveAssemblyModal } from './components/assembly/SaveAssemblyModal';
-import { StockLibraryModal } from './components/stock/StockLibraryModal';
-import { TemplateBrowserModal } from './components/template/TemplateBrowserModal';
-import { TemplatesScreen } from './components/template/TemplatesScreen';
 import { Toast } from './components/common/Toast';
 import { TrialBanner } from './components/licensing/TrialBanner';
 import { TrialExpiredModal } from './components/licensing/TrialExpiredModal';
 import { Workspace } from './components/workspace/Workspace';
-import { WelcomeTutorial } from './components/tutorial/WelcomeTutorial';
 import { STOCK_COLORS } from './constants';
 import { logger } from './utils/logger';
 import { getFeatureLimits } from './utils/featureLimits';
@@ -68,6 +57,45 @@ import { Assembly, LightingMode, Project, Stock } from './types';
 import { formatMeasurementWithUnit } from './utils/fractions';
 import { getPartBounds } from './utils/snapToPartsUtil';
 import { generateSeedProject } from './utils/seedData';
+
+// Lazy-loaded modal components (deferred until first use)
+const LazyAboutModal = React.lazy(() =>
+  import('./components/settings/AboutModal').then((m) => ({ default: m.AboutModal }))
+);
+const LazyAppSettingsModal = React.lazy(() =>
+  import('./components/settings/AppSettingsModal').then((m) => ({ default: m.AppSettingsModal }))
+);
+const LazyCutListModalWrapper = React.lazy(() =>
+  import('./components/stock/CutListModalWrapper').then((m) => ({ default: m.CutListModalWrapper }))
+);
+const LazyImportAppStateModal = React.lazy(() =>
+  import('./components/project/ImportAppStateModal').then((m) => ({ default: m.ImportAppStateModal }))
+);
+const LazyLicenseActivationModal = React.lazy(() =>
+  import('./components/licensing/LicenseActivationModal').then((m) => ({
+    default: m.LicenseActivationModal
+  }))
+);
+const LazyProjectSettingsModal = React.lazy(() =>
+  import('./components/project/ProjectSettingsModal').then((m) => ({ default: m.ProjectSettingsModal }))
+);
+const LazySaveAssemblyModalWrapper = React.lazy(() =>
+  import('./components/assembly/SaveAssemblyModalWrapper').then((m) => ({
+    default: m.SaveAssemblyModalWrapper
+  }))
+);
+const LazyStockLibraryModal = React.lazy(() =>
+  import('./components/stock/StockLibraryModal').then((m) => ({ default: m.StockLibraryModal }))
+);
+const LazyTemplateBrowserModal = React.lazy(() =>
+  import('./components/template/TemplateBrowserModal').then((m) => ({ default: m.TemplateBrowserModal }))
+);
+const LazyTemplatesScreen = React.lazy(() =>
+  import('./components/template/TemplatesScreen').then((m) => ({ default: m.TemplatesScreen }))
+);
+const LazyWelcomeTutorial = React.lazy(() =>
+  import('./components/tutorial/WelcomeTutorial').then((m) => ({ default: m.WelcomeTutorial }))
+);
 
 // Selection box overlay (rendered outside Canvas for correct positioning)
 function SelectionBox() {
@@ -2411,6 +2439,10 @@ function App() {
 
   // Cut list modal
   const openCutListModal = useUIStore((s) => s.openCutListModal);
+  const cutListModalOpen = useUIStore((s) => s.cutListModalOpen);
+
+  // Save assembly modal
+  const saveAssemblyModalOpen = useUIStore((s) => s.saveAssemblyModalOpen);
 
   // App settings
   const { settings: appSettings, updateSettings: updateAppSettings } = useAppSettings();
@@ -2657,20 +2689,24 @@ function App() {
       <ContextMenu />
       <SelectionBox />
       <Toast />
-      <StockLibraryModal
-        isOpen={isStockLibraryOpen}
-        onClose={() => setIsStockLibraryOpen(false)}
-        stocks={stockLibrary}
-        onAddStock={addToLibrary}
-        onUpdateStock={updateLibraryStock}
-        onDeleteStock={deleteLibraryStock}
-        assemblies={assemblyLibrary}
-        onUpdateAssembly={updateLibraryAssembly}
-        onDeleteAssembly={deleteLibraryAssembly}
-        onDuplicateAssembly={duplicateLibraryAssembly}
-        onEditAssemblyIn3D={startAssemblyEditing}
-        onCreateNewAssembly={startCreatingNewAssembly}
-      />
+      {isStockLibraryOpen && (
+        <Suspense fallback={null}>
+          <LazyStockLibraryModal
+            isOpen={isStockLibraryOpen}
+            onClose={() => setIsStockLibraryOpen(false)}
+            stocks={stockLibrary}
+            onAddStock={addToLibrary}
+            onUpdateStock={updateLibraryStock}
+            onDeleteStock={deleteLibraryStock}
+            assemblies={assemblyLibrary}
+            onUpdateAssembly={updateLibraryAssembly}
+            onDeleteAssembly={deleteLibraryAssembly}
+            onDuplicateAssembly={duplicateLibraryAssembly}
+            onEditAssemblyIn3D={startAssemblyEditing}
+            onCreateNewAssembly={startCreatingNewAssembly}
+          />
+        </Suspense>
+      )}
 
       {/* Delete Part(s) Confirmation - only shown when confirmBeforeDelete is enabled */}
       <ConfirmDialog
@@ -2701,50 +2737,82 @@ function App() {
       )}
 
       {/* License Activation Modal */}
-      <LicenseActivationModal
-        isOpen={showLicenseModal}
-        onActivate={handleLicenseActivate}
-        onClose={() => setShowLicenseModal(false)}
-      />
+      {showLicenseModal && (
+        <Suspense fallback={null}>
+          <LazyLicenseActivationModal
+            isOpen={showLicenseModal}
+            onActivate={handleLicenseActivate}
+            onClose={() => setShowLicenseModal(false)}
+          />
+        </Suspense>
+      )}
 
       {/* App Settings Modal */}
-      <AppSettingsModal
-        isOpen={isAppSettingsOpen}
-        onClose={() => setIsAppSettingsOpen(false)}
-        settings={appSettings}
-        onUpdateSettings={updateAppSettings}
-        licenseMode={licenseMode}
-        licenseData={licenseData}
-        onDeactivateLicense={handleLicenseDeactivate}
-        onShowLicenseModal={() => setShowLicenseModal(true)}
-        onShowImportModal={() => setIsImportAppStateOpen(true)}
-      />
+      {isAppSettingsOpen && (
+        <Suspense fallback={null}>
+          <LazyAppSettingsModal
+            isOpen={isAppSettingsOpen}
+            onClose={() => setIsAppSettingsOpen(false)}
+            settings={appSettings}
+            onUpdateSettings={updateAppSettings}
+            licenseMode={licenseMode}
+            licenseData={licenseData}
+            onDeactivateLicense={handleLicenseDeactivate}
+            onShowLicenseModal={() => setShowLicenseModal(true)}
+            onShowImportModal={() => setIsImportAppStateOpen(true)}
+          />
+        </Suspense>
+      )}
 
       {/* Import App State Modal */}
-      <ImportAppStateModal isOpen={isImportAppStateOpen} onClose={() => setIsImportAppStateOpen(false)} />
+      {isImportAppStateOpen && (
+        <Suspense fallback={null}>
+          <LazyImportAppStateModal isOpen={isImportAppStateOpen} onClose={() => setIsImportAppStateOpen(false)} />
+        </Suspense>
+      )}
 
       {/* About Modal */}
-      <AboutModal isOpen={isAboutModalOpen} onClose={() => setIsAboutModalOpen(false)} />
+      {isAboutModalOpen && (
+        <Suspense fallback={null}>
+          <LazyAboutModal isOpen={isAboutModalOpen} onClose={() => setIsAboutModalOpen(false)} />
+        </Suspense>
+      )}
 
       {/* Project Settings Modal */}
-      <ProjectSettingsModal
-        isOpen={isProjectSettingsOpen}
-        onClose={() => setIsProjectSettingsOpen(false)}
-        isEditingTemplate={isEditingTemplate}
-      />
+      {isProjectSettingsOpen && (
+        <Suspense fallback={null}>
+          <LazyProjectSettingsModal
+            isOpen={isProjectSettingsOpen}
+            onClose={() => setIsProjectSettingsOpen(false)}
+            isEditingTemplate={isEditingTemplate}
+          />
+        </Suspense>
+      )}
 
       {/* Template Browser Modal */}
-      <TemplateBrowserModal
-        isOpen={isTemplateBrowserOpen}
-        onClose={() => setIsTemplateBrowserOpen(false)}
-        onCreateProject={handleCreateFromTemplate}
-      />
+      {isTemplateBrowserOpen && (
+        <Suspense fallback={null}>
+          <LazyTemplateBrowserModal
+            isOpen={isTemplateBrowserOpen}
+            onClose={() => setIsTemplateBrowserOpen(false)}
+            onCreateProject={handleCreateFromTemplate}
+          />
+        </Suspense>
+      )}
 
       {/* Save Assembly Modal */}
-      <SaveAssemblyModalWrapper />
+      {saveAssemblyModalOpen && (
+        <Suspense fallback={null}>
+          <LazySaveAssemblyModalWrapper />
+        </Suspense>
+      )}
 
       {/* Cut List Modal */}
-      <CutListModalWrapper />
+      {cutListModalOpen && (
+        <Suspense fallback={null}>
+          <LazyCutListModalWrapper />
+        </Suspense>
+      )}
 
       {/* Unsaved Changes Dialog */}
       <UnsavedChangesDialogComponent />
@@ -2804,7 +2872,11 @@ function App() {
       />
 
       {/* Welcome Tutorial (first-run experience) */}
-      {showTutorial && <WelcomeTutorial onComplete={handleTutorialComplete} />}
+      {showTutorial && (
+        <Suspense fallback={null}>
+          <LazyWelcomeTutorial onComplete={handleTutorialComplete} />
+        </Suspense>
+      )}
 
       {/* Start Screen (shown when no project is loaded, or while checking license/trial) */}
       {showStartScreen && canUseApp && !showTutorial && !isLicenseLoading && (
@@ -2821,13 +2893,15 @@ function App() {
 
       {/* Templates Screen (full-screen view of all templates) */}
       {showTemplatesScreen && (
-        <TemplatesScreen
-          onBack={handleTemplatesScreenBack}
-          onSelectTemplate={handleTemplatesScreenSelectTemplate}
-          onStartTutorial={handleTemplatesScreenStartTutorial}
-          onEditTemplate={handleTemplatesScreenEditTemplate}
-          onNewTemplate={handleTemplatesScreenNewTemplate}
-        />
+        <Suspense fallback={null}>
+          <LazyTemplatesScreen
+            onBack={handleTemplatesScreenBack}
+            onSelectTemplate={handleTemplatesScreenSelectTemplate}
+            onStartTutorial={handleTemplatesScreenStartTutorial}
+            onEditTemplate={handleTemplatesScreenEditTemplate}
+            onNewTemplate={handleTemplatesScreenNewTemplate}
+          />
+        </Suspense>
       )}
 
       {/* New Project Dialog */}
@@ -2838,32 +2912,6 @@ function App() {
       />
     </div>
   );
-}
-
-function SaveAssemblyModalWrapper() {
-  const saveAssemblyModalOpen = useUIStore((s) => s.saveAssemblyModalOpen);
-  const closeSaveAssemblyModal = useUIStore((s) => s.closeSaveAssemblyModal);
-  const addAssembly = useProjectStore((s) => s.addAssembly);
-  const { addAssembly: addToLibrary } = useAssemblyLibrary();
-
-  const handleSave = (assembly: Assembly, addToLibrary_: boolean) => {
-    // Add to project
-    addAssembly(assembly);
-
-    // Optionally add to app-level library
-    if (addToLibrary_) {
-      addToLibrary(assembly);
-    }
-  };
-
-  return <SaveAssemblyModal isOpen={saveAssemblyModalOpen} onClose={closeSaveAssemblyModal} onSave={handleSave} />;
-}
-
-function CutListModalWrapper() {
-  const cutListModalOpen = useUIStore((s) => s.cutListModalOpen);
-  const closeCutListModal = useUIStore((s) => s.closeCutListModal);
-
-  return <CutListModal isOpen={cutListModalOpen} onClose={closeCutListModal} />;
 }
 
 export default App;
