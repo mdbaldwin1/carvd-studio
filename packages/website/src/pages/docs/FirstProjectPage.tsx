@@ -43,12 +43,12 @@ export default function FirstProjectPage() {
           <h3 className="text-2xl font-bold mb-md">Step 2: Add the Shelves</h3>
           <div className="grid gap-md text-sm">
             <p>
-              1. Press <code>N</code> or click the + button to add a part
+              1. Press <code>P</code> or click the + button to add a part
             </p>
             <p>2. In the properties panel, set dimensions: 24" × 3/4" × 10"</p>
             <p>3. Name it "Shelf" and assign 3/4" plywood as the stock</p>
             <p>
-              4. Duplicate it (<code>Cmd/Ctrl + D</code>) to create more shelves
+              4. Duplicate it (<code>Shift + D</code>) to create more shelves
             </p>
             <p>5. Position each shelf vertically using the Y coordinate</p>
           </div>
@@ -70,7 +70,8 @@ export default function FirstProjectPage() {
           </h3>
           <div className="grid gap-md text-sm">
             <p>
-              1. Press <code>Cmd/Ctrl + L</code> to open the cut list
+              1. Click <strong>"Generate Cut List"</strong> in the sidebar to
+              open the cut list
             </p>
             <p>
               2. Review the optimized cutting diagrams showing how to cut your

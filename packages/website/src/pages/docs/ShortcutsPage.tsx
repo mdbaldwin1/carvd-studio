@@ -60,7 +60,7 @@ export default function ShortcutsPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-muted">Duplicate</span>
-              <code>Cmd/Ctrl + D</code>
+              <code>Shift + D</code>
             </div>
             <div className="flex justify-between">
               <span className="text-muted">Delete</span>
@@ -78,15 +78,19 @@ export default function ShortcutsPage() {
           <div className="grid gap-sm text-sm">
             <div className="flex justify-between">
               <span className="text-muted">New Part</span>
-              <code>N</code>
+              <code>P</code>
             </div>
             <div className="flex justify-between">
               <span className="text-muted">Create Group</span>
               <code>G</code>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted">Rename</span>
-              <code>F2</code>
+              <span className="text-muted">Ungroup</span>
+              <code>Cmd/Ctrl + Shift + G</code>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Toggle References</span>
+              <code>R</code>
             </div>
           </div>
         </div>
@@ -96,15 +100,15 @@ export default function ShortcutsPage() {
           <div className="grid gap-sm text-sm">
             <div className="flex justify-between">
               <span className="text-muted">Reset Camera</span>
-              <code>R</code>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted">Toggle Grid</span>
-              <code>Shift + G</code>
+              <code>Home</code>
             </div>
             <div className="flex justify-between">
               <span className="text-muted">Focus Selected</span>
               <code>F</code>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Rotate 90°</span>
+              <code>X / Y / Z</code>
             </div>
           </div>
         </div>
@@ -113,15 +117,7 @@ export default function ShortcutsPage() {
           <h3 className="card-title">Tools</h3>
           <div className="grid gap-sm text-sm">
             <div className="flex justify-between">
-              <span className="text-muted">Cut List</span>
-              <code>Cmd/Ctrl + L</code>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted">Stock Library</span>
-              <code>Cmd/Ctrl + M</code>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted">Project Settings</span>
+              <span className="text-muted">App Settings</span>
               <code>Cmd/Ctrl + ,</code>
             </div>
           </div>
@@ -135,7 +131,7 @@ export default function ShortcutsPage() {
               <code>Arrow Keys</code>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted">Large Nudge</span>
+              <span className="text-muted">Nudge 1 Inch</span>
               <code>Shift + Arrow</code>
             </div>
             <div className="flex justify-between">

@@ -61,7 +61,8 @@ export default function InterfacePage() {
             <div>
               <p className="font-bold mb-xs">Reset View</p>
               <p className="text-muted">
-                Press <code>R</code> to reset to the default camera angle
+                Press <code>Home</code> to reset the camera, or <code>F</code>{" "}
+                to focus on the selected part
               </p>
             </div>
           </div>

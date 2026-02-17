@@ -90,7 +90,7 @@ export default function SnappingPage() {
               <p className="font-bold mb-xs">Arrow Keys</p>
               <p className="text-muted">
                 Use arrow keys to nudge selected parts by one grid unit. Hold{" "}
-                <code>Shift</code> for larger steps.
+                <code>Shift</code> to nudge in fixed 1-inch steps.
               </p>
             </div>
             <div>
