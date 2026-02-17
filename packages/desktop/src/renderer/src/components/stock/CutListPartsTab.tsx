@@ -133,20 +133,20 @@ export function CutListPartsTab({
   );
 
   return (
-    <div className="cut-list-parts-tab">
-      <div className="tab-content-header">
-        <span className="tab-header-info">
+    <div className="cut-list-parts-tab flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="flex items-center justify-between py-2 px-0 mb-2 shrink-0">
+        <span className="text-[12px] text-text-muted">
           {groupedInstructions.length} unique dimension{groupedInstructions.length !== 1 ? 's' : ''} (
           {cutList.instructions.length} parts total)
         </span>
         <DropdownButton label="Download" icon={<Download size={14} />} items={downloadItems} />
       </div>
-      <div className="cut-list-table-wrapper">
-        <table className="cut-list-table">
+      <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 border border-border rounded bg-surface">
+        <table className="w-full border-collapse text-[13px] [&_th]:py-2 [&_th]:px-3 [&_th]:text-left [&_th]:border-b [&_th]:border-border [&_td]:py-2 [&_td]:px-3 [&_td]:text-left [&_td]:border-b [&_td]:border-border [&_th]:bg-bg [&_th]:text-text-muted [&_th]:font-medium [&_th]:text-[11px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:z-[1]">
           <thead>
             <tr>
-              <th className="col-expand"></th>
-              <th className="col-qty">Qty</th>
+              <th className="col-expand w-6 text-center"></th>
+              <th className="col-qty w-12 text-center">Qty</th>
               <th>Part Name</th>
               <th>Cut Length</th>
               <th>Cut Width</th>
@@ -164,16 +164,16 @@ export function CutListPartsTab({
                 <React.Fragment key={group.key}>
                   {/* Group row */}
                   <tr
-                    className={`group-row ${group.isGlueUp ? 'glue-up-row' : ''} ${hasMultiple ? 'expandable' : ''}`}
+                    className={`${group.isGlueUp ? 'glue-up-row' : ''} ${hasMultiple ? 'cursor-pointer hover:bg-bg-hover' : ''}`}
                     onClick={hasMultiple ? () => toggleGroup(group.key) : undefined}
                   >
-                    <td className="col-expand">
+                    <td className="col-expand w-6 text-center">
                       {hasMultiple && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
                     </td>
-                    <td className="col-qty">{group.quantity}</td>
+                    <td className="col-qty w-12 text-center">{group.quantity}</td>
                     <td className="col-part-name">
                       {hasMultiple ? (
-                        <span className="multiple-parts-hint">
+                        <span className="text-[11px] text-text-muted italic">
                           {isExpanded ? 'Click to collapse' : 'Click to expand'}
                         </span>
                       ) : (
@@ -185,10 +185,18 @@ export function CutListPartsTab({
                     <td>{formatMeasurementWithUnit(group.thickness, units)}</td>
                     <td>{group.stockName}</td>
                     <td>
-                      {group.isGlueUp && <span className="glue-up-badge">Glue-up strip</span>}
-                      {group.grainSensitive && !group.isGlueUp && <span className="grain-badge">Grain</span>}
+                      {group.isGlueUp && (
+                        <span className="inline-block text-[10px] bg-[rgba(147,112,219,0.15)] text-[#9370db] py-0.5 px-1.5 rounded-sm font-medium">
+                          Glue-up strip
+                        </span>
+                      )}
+                      {group.grainSensitive && !group.isGlueUp && (
+                        <span className="grain-badge inline-block text-[10px] bg-[rgba(76,175,80,0.15)] text-[#4caf50] py-0.5 px-1.5 rounded-sm font-medium">
+                          Grain
+                        </span>
+                      )}
                       {!hasMultiple && group.items[0].notes && (
-                        <span className="notes-text">{group.items[0].notes}</span>
+                        <span className="text-[11px] text-text-muted italic">{group.items[0].notes}</span>
                       )}
                     </td>
                   </tr>
@@ -196,12 +204,14 @@ export function CutListPartsTab({
                   {/* Expanded item rows */}
                   {isExpanded &&
                     group.items.map((item) => (
-                      <tr key={item.partId} className="item-row">
-                        <td className="col-expand"></td>
-                        <td className="col-qty"></td>
-                        <td className="col-part-name item-name">{item.partName}</td>
+                      <tr key={item.partId} className="bg-bg-alt [&>td]:border-[rgba(255,255,255,0.05)]">
+                        <td className="col-expand w-6 text-center"></td>
+                        <td className="col-qty w-12 text-center"></td>
+                        <td className="col-part-name pl-2 text-text-muted text-[12px]">{item.partName}</td>
                         <td colSpan={4}></td>
-                        <td>{item.notes && <span className="notes-text">{item.notes}</span>}</td>
+                        <td>
+                          {item.notes && <span className="text-[11px] text-text-muted italic">{item.notes}</span>}
+                        </td>
                       </tr>
                     ))}
                 </React.Fragment>

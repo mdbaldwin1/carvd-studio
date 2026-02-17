@@ -120,7 +120,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
   return (
     <div
-      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
+      className="cut-list-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
       onMouseDown={handleMouseDown}
       onClick={handleClick}
     >
@@ -130,7 +130,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
         aria-modal="true"
         aria-labelledby="cut-list-modal-title"
       >
-        <div className="py-5 px-6 bg-bg border-b border-border flex justify-between items-center rounded-t-lg">
+        <div className="modal-header py-5 px-6 bg-bg border-b border-border flex justify-between items-center rounded-t-lg">
           <h2 id="cut-list-modal-title" className="text-lg font-semibold text-text m-0">
             Cut List
           </h2>
@@ -145,8 +145,8 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
         {/* No cut list - show generate UI */}
         {!cutList && (
-          <div className="cut-list-generate">
-            <p className="cut-list-intro">
+          <div className="cut-list-generate flex flex-col items-center justify-center gap-4 p-10 text-center">
+            <p className="text-[13px] text-text-secondary leading-relaxed max-w-[500px] mx-auto m-0">
               Generate an optimized cut list from your design. All parts must be assigned to a stock material before
               generating.{' '}
               <a
@@ -162,7 +162,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
             </p>
 
             {parts.length === 0 ? (
-              <div className="cut-list-empty">
+              <div className="py-4 text-text-muted text-center">
                 <div className="text-5xl mb-3">📋</div>
                 <p className="font-semibold mb-2">No parts in your project yet</p>
                 <p className="text-sm text-gray-400">
@@ -180,18 +180,21 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
                 </button>
 
                 {validationIssues.length > 0 && (
-                  <div className="cut-list-issues">
-                    <h3>Issues Found</h3>
+                  <div className="cut-list-issues mt-4 bg-bg border border-border rounded p-4 text-left w-full max-w-[500px]">
+                    <h3 className="text-[14px] font-semibold text-text m-0 mb-2">Issues Found</h3>
                     {hasBlockingIssues && (
-                      <p className="cut-list-issues-note">
+                      <p className="text-[12px] text-text-muted mb-2 m-0">
                         Fix the errors below before generating. Each part must be assigned to a stock material.
                       </p>
                     )}
-                    <ul className="cut-list-issues-list">
+                    <ul className="list-none p-0 m-0">
                       {validationIssues.map((issue, index) => (
-                        <li key={index} className={`cut-list-issue ${issue.severity}`}>
+                        <li
+                          key={index}
+                          className={`text-[13px] py-1.5 border-b border-border last:border-b-0 ${issue.severity === 'error' ? 'text-danger' : issue.severity === 'warning' ? 'text-warning' : ''}`}
+                        >
                           <strong>{issue.partName}:</strong> {issue.message}
-                          {issue.canBypass && <span className="bypass-note"> (can proceed)</span>}
+                          {issue.canBypass && <span className="text-[11px] text-text-muted"> (can proceed)</span>}
                         </li>
                       ))}
                     </ul>
@@ -207,7 +210,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
           <>
             {/* Stale warning */}
             {cutList.isStale && (
-              <div className="cut-list-stale-warning">
+              <div className="cut-list-stale-warning flex items-center gap-3 py-2.5 px-6 bg-warning-bg text-warning text-[13px]">
                 <span>Project changed since cut list was generated.</span>
                 <button className="btn btn-sm btn-filled btn-primary" onClick={handleGenerate}>
                   Regenerate
@@ -217,7 +220,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
             {/* Skipped parts warning */}
             {cutList.skippedParts.length > 0 && (
-              <div className="cut-list-error-warning">
+              <div className="py-2.5 px-6 bg-[rgba(196,84,84,0.15)] text-danger text-[13px]">
                 <strong>Warning:</strong> {cutList.skippedParts.length} part
                 {cutList.skippedParts.length !== 1 ? 's' : ''} could not be placed (too large for stock):
                 <ul>
@@ -229,28 +232,28 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
             )}
 
             {/* Tab bar */}
-            <div className="cut-list-tabs">
+            <div className="cut-list-tabs flex border-b border-border px-6 gap-0 bg-bg">
               <button
-                className={`cut-list-tab ${activeTab === 'parts' ? 'active' : ''}`}
+                className={`cut-list-tab py-2.5 px-4 bg-transparent border-none text-[13px] cursor-pointer transition-colors duration-150 border-b-2 hover:text-text ${activeTab === 'parts' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
                 onClick={() => setActiveTab('parts')}
               >
                 Parts List ({cutList.instructions.length})
               </button>
               <button
-                className={`cut-list-tab ${activeTab === 'diagrams' ? 'active' : ''}`}
+                className={`cut-list-tab py-2.5 px-4 bg-transparent border-none text-[13px] cursor-pointer transition-colors duration-150 border-b-2 hover:text-text ${activeTab === 'diagrams' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
                 onClick={() => setActiveTab('diagrams')}
               >
                 Cutting Diagrams ({cutList.stockBoards.length})
               </button>
               <button
-                className={`cut-list-tab ${activeTab === 'shopping' ? 'active' : ''}`}
+                className={`cut-list-tab py-2.5 px-4 bg-transparent border-none text-[13px] cursor-pointer transition-colors duration-150 border-b-2 hover:text-text ${activeTab === 'shopping' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
                 onClick={() => setActiveTab('shopping')}
               >
                 Shopping List ({cutList.statistics.byStock.length})
               </button>
             </div>
 
-            <div className="cut-list-content">
+            <div className="cut-list-content flex-1 flex flex-col overflow-hidden py-5 px-6 bg-bg-alt min-h-0">
               {activeTab === 'parts' && (
                 <CutListPartsTab
                   cutList={cutList}
@@ -277,7 +280,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
           </>
         )}
 
-        <div className="flex items-center justify-end gap-2 py-4 px-6 border-t border-border bg-bg rounded-b-lg">
+        <div className="cut-list-footer flex items-center justify-end gap-2 py-4 px-6 border-t border-border bg-bg rounded-b-lg">
           {cutList && (
             <>
               <button

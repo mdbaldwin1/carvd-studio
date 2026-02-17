@@ -2,26 +2,32 @@ import { CutList } from '../../types';
 
 export function CutListStatistics({ cutList }: { cutList: CutList }) {
   return (
-    <div className="cut-list-statistics">
-      <div className="stat-item">
-        <span className="stat-label">Parts</span>
-        <span className="stat-value">{cutList.statistics.totalParts}</span>
+    <div className="cut-list-statistics flex items-center gap-4 py-3 px-6 border-t border-border bg-bg">
+      <div className="stat-item flex flex-col items-center gap-0.5 px-3 border-r border-border">
+        <span className="text-[11px] text-text-muted uppercase tracking-wide">Parts</span>
+        <span className="text-[16px] font-semibold text-text leading-none">{cutList.statistics.totalParts}</span>
       </div>
-      <div className="stat-item">
-        <span className="stat-label">Boards</span>
-        <span className="stat-value">{cutList.statistics.totalStockBoards}</span>
+      <div className="stat-item flex flex-col items-center gap-0.5 px-3 border-r border-border">
+        <span className="text-[11px] text-text-muted uppercase tracking-wide">Boards</span>
+        <span className="text-[16px] font-semibold text-text leading-none">{cutList.statistics.totalStockBoards}</span>
       </div>
-      <div className="stat-item">
-        <span className="stat-label">Board Feet</span>
-        <span className="stat-value">{cutList.statistics.totalBoardFeet.toFixed(2)}</span>
+      <div className="stat-item flex flex-col items-center gap-0.5 px-3 border-r border-border">
+        <span className="text-[11px] text-text-muted uppercase tracking-wide">Board Feet</span>
+        <span className="text-[16px] font-semibold text-text leading-none">
+          {cutList.statistics.totalBoardFeet.toFixed(2)}
+        </span>
       </div>
-      <div className="stat-item">
-        <span className="stat-label">Waste</span>
-        <span className="stat-value">{cutList.statistics.wastePercentage.toFixed(1)}%</span>
+      <div className="stat-item flex flex-col items-center gap-0.5 px-3 border-r border-border">
+        <span className="text-[11px] text-text-muted uppercase tracking-wide">Waste</span>
+        <span className="text-[16px] font-semibold text-text leading-none">
+          {cutList.statistics.wastePercentage.toFixed(1)}%
+        </span>
       </div>
-      <div className="stat-item">
-        <span className="stat-label">Est. Cost</span>
-        <span className="stat-value">${cutList.statistics.estimatedCost.toFixed(2)}</span>
+      <div className="stat-item flex flex-col items-center gap-0.5 px-3">
+        <span className="text-[11px] text-text-muted uppercase tracking-wide">Est. Cost</span>
+        <span className="text-[16px] font-semibold text-text leading-none">
+          ${cutList.statistics.estimatedCost.toFixed(2)}
+        </span>
       </div>
     </div>
   );
