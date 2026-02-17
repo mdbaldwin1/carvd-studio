@@ -57,6 +57,7 @@ import { useLibraryImportCheck } from './hooks/useLibraryImportCheck';
 import { useLicenseStatus } from './hooks/useLicenseStatus';
 import { useStockLibrary } from './hooks/useStockLibrary';
 import { useProjectStore } from './store/projectStore';
+import { useSelectionStore } from './store/selectionStore';
 import { useUIStore } from './store/uiStore';
 import { useCameraStore } from './store/cameraStore';
 import { Assembly, LightingMode, Project, Stock } from './types';
@@ -66,7 +67,7 @@ import { generateSeedProject } from './utils/seedData';
 
 // Selection box overlay (rendered outside Canvas for correct positioning)
 function SelectionBox() {
-  const selectionBox = useProjectStore((s) => s.selectionBox);
+  const selectionBox = useSelectionStore((s) => s.selectionBox);
 
   if (!selectionBox) return null;
 
@@ -91,8 +92,8 @@ function SelectionBox() {
 
 // Contextual hotkey hints bar
 function HotkeyHints({ show }: { show: boolean }) {
-  const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
-  const selectedGroupIds = useProjectStore((s) => s.selectedGroupIds);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
+  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const clipboard = useProjectStore((s) => s.clipboard);
 
   const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
@@ -183,7 +184,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
   const parts = useProjectStore((s) => s.parts);
   const projectStocks = useProjectStore((s) => s.stocks);
   const projectAssemblies = useProjectStore((s) => s.assemblies);
-  const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const units = useProjectStore((s) => s.units);
   const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
   const licenseMode = useProjectStore((s) => s.licenseMode);
@@ -193,9 +194,9 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
   const updateProjectStock = useProjectStore((s) => s.updateStock);
   const deleteProjectStock = useProjectStore((s) => s.deleteStock);
   const deleteProjectAssembly = useProjectStore((s) => s.deleteAssembly);
-  const selectPart = useProjectStore((s) => s.selectPart);
-  const selectParts = useProjectStore((s) => s.selectParts);
-  const togglePartSelection = useProjectStore((s) => s.togglePartSelection);
+  const selectPart = useSelectionStore((s) => s.selectPart);
+  const selectParts = useSelectionStore((s) => s.selectParts);
+  const togglePartSelection = useSelectionStore((s) => s.togglePartSelection);
   const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
   const duplicatePart = useProjectStore((s) => s.duplicatePart);
   const showToast = useUIStore((s) => s.showToast);
@@ -748,8 +749,8 @@ function PropertiesPanel() {
   const projectStocks = useProjectStore((s) => s.stocks);
   const addProjectStock = useProjectStore((s) => s.addStock);
   const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
-  const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
-  const selectedGroupIds = useProjectStore((s) => s.selectedGroupIds);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
+  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const groups = useProjectStore((s) => s.groups);
   const units = useProjectStore((s) => s.units);
   const updatePart = useProjectStore((s) => s.updatePart);

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useProjectStore } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { Assembly } from '../../types';
 import { HelpTooltip } from '../common/HelpTooltip';
 
@@ -11,8 +12,8 @@ interface SaveAssemblyModalProps {
 
 export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModalProps) {
   const createAssemblyFromSelection = useProjectStore((s) => s.createAssemblyFromSelection);
-  const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
-  const selectedGroupIds = useProjectStore((s) => s.selectedGroupIds);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
+  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
