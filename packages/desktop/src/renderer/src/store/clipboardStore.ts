@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Clipboard } from '../types';
 import { canAddPart, getBlockedMessage } from '../utils/featureLimits';
 import { useProjectStore, generateCopyName, getAllDescendantPartIds } from './projectStore';
+import { useLicenseStore } from './licenseStore';
 import { useSelectionStore } from './selectionStore';
 import { useUIStore } from './uiStore';
 
@@ -77,7 +78,8 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
 
   pasteClipboard: () => {
     const { clipboard } = get();
-    const { licenseMode, parts } = useProjectStore.getState();
+    const { parts } = useProjectStore.getState();
+    const { licenseMode } = useLicenseStore.getState();
     if (clipboard.parts.length === 0) return [];
 
     // Check license limits before pasting
@@ -180,7 +182,8 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
 
   pasteAtPosition: (position) => {
     const { clipboard } = get();
-    const { licenseMode, parts } = useProjectStore.getState();
+    const { parts } = useProjectStore.getState();
+    const { licenseMode } = useLicenseStore.getState();
     if (clipboard.parts.length === 0) return [];
 
     // Check license limits before pasting

@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react';
 import { useProjectStore, generateThumbnail } from '../store/projectStore';
 import { useAssemblyEditingStore } from '../store/assemblyEditingStore';
+import { useLicenseStore } from '../store/licenseStore';
 import { useUIStore } from '../store/uiStore';
 import { useAssemblyLibrary } from './useAssemblyLibrary';
 import { useStockLibrary } from './useStockLibrary';
@@ -191,8 +192,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
   // Start creating a new assembly from scratch
   const startCreatingNew = useCallback(async (): Promise<boolean> => {
     // Check license limits for assemblies
-    const projectStore = useProjectStore.getState();
-    const limits = getFeatureLimits(projectStore.licenseMode);
+    const limits = getFeatureLimits(useLicenseStore.getState().licenseMode);
     if (!limits.canUseAssemblies) {
       showToast(getBlockedMessage('useAssemblies'));
       return false;

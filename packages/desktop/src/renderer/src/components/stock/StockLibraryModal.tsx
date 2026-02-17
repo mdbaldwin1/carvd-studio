@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useProjectStore } from '../../store/projectStore';
+import { useLicenseStore } from '../../store/licenseStore';
 import { Assembly, Stock } from '../../types';
 import { getFeatureLimits } from '../../utils/featureLimits';
 import { StocksTab } from './StocksTab';
@@ -37,7 +38,7 @@ export function StockLibraryModal({
   onEditAssemblyIn3D,
   onCreateNewAssembly
 }: StockLibraryModalProps) {
-  const licenseMode = useProjectStore((s) => s.licenseMode);
+  const licenseMode = useLicenseStore((s) => s.licenseMode);
   const limits = getFeatureLimits(licenseMode);
   const canCreateAssemblies = limits.canUseAssemblies;
   const [activeTab, setActiveTab] = useState<LibraryTab>('stocks');

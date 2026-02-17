@@ -6,6 +6,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useProjectStore, generateThumbnail } from '../store/projectStore';
+import { useLicenseStore } from '../store/licenseStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
 import { UserTemplate } from '../templates';
@@ -143,8 +144,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
   // Start creating a new template - shows setup dialog first
   const startCreatingNew = useCallback(() => {
     // Check license limits for custom templates
-    const projectStore = useProjectStore.getState();
-    const limits = getFeatureLimits(projectStore.licenseMode);
+    const limits = getFeatureLimits(useLicenseStore.getState().licenseMode);
     if (!limits.canUseCustomTemplates) {
       showToast(getBlockedMessage('useTemplates'));
       return;

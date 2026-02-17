@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useProjectStore, getContainingGroupId, getAllDescendantPartIds } from '../../store/projectStore';
 import { useClipboardStore } from '../../store/clipboardStore';
+import { useLicenseStore } from '../../store/licenseStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
@@ -34,7 +35,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const addToGroup = useProjectStore((s) => s.addToGroup);
   const mergeGroups = useProjectStore((s) => s.mergeGroups);
   const openSaveAssemblyModal = useUIStore((s) => s.openSaveAssemblyModal);
-  const licenseMode = useProjectStore((s) => s.licenseMode);
+  const licenseMode = useLicenseStore((s) => s.licenseMode);
   const limits = getFeatureLimits(licenseMode);
   const canUseAssemblies = limits.canUseAssemblies;
   const canUseGroups = limits.canUseGroups;
