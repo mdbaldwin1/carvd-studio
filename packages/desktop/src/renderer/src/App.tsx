@@ -1210,7 +1210,7 @@ function PropertiesPanel() {
 
       <div className="property-group">
         <label>Dimensions (L × W × T)</label>
-        <div className="flex items-center gap-1">
+        <div className="dimension-inputs flex items-center gap-1">
           <FractionInput
             key={`${selectedPart.id}-length`}
             value={selectedPart.length}
@@ -1851,7 +1851,7 @@ function CanvasWithDrop() {
       )}
       {/* Empty state overlay - rendered outside Canvas so it doesn't move with camera */}
       {parts.length === 0 && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10 text-center">
+        <div className="empty-state-overlay absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10 text-center">
           <div className="bg-bg border border-border rounded-lg py-8 px-10 shadow-[0_4px_16px_rgba(0,0,0,0.3)]">
             <div className="text-5xl mb-4">🛠️</div>
             <h2 className="text-xl font-semibold text-text m-0 mb-2">Start Building</h2>
