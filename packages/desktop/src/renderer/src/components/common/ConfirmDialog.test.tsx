@@ -132,10 +132,10 @@ describe('ConfirmDialog', () => {
       const onCancel = vi.fn();
       render(<ConfirmDialog {...defaultProps} onCancel={onCancel} />);
 
-      const backdrop = screen.getByText('Confirm Action').closest('.modal-backdrop');
+      const backdrop = screen.getByRole('alertdialog').parentElement!;
       // Simulate proper backdrop click (mousedown then click on backdrop)
-      fireEvent.mouseDown(backdrop!);
-      fireEvent.click(backdrop!);
+      fireEvent.mouseDown(backdrop);
+      fireEvent.click(backdrop);
 
       expect(onCancel).toHaveBeenCalledTimes(1);
     });
@@ -144,9 +144,9 @@ describe('ConfirmDialog', () => {
       const onCancel = vi.fn();
       render(<ConfirmDialog {...defaultProps} onCancel={onCancel} />);
 
-      const modalContent = screen.getByText('Confirm Action').closest('.modal');
-      fireEvent.mouseDown(modalContent!);
-      fireEvent.click(modalContent!);
+      const modalContent = screen.getByRole('alertdialog');
+      fireEvent.mouseDown(modalContent);
+      fireEvent.click(modalContent);
 
       expect(onCancel).not.toHaveBeenCalled();
     });

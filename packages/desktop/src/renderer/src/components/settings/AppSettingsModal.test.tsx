@@ -696,9 +696,9 @@ describe('AppSettingsModal', () => {
       const onClose = vi.fn();
       const { container } = render(<AppSettingsModal {...defaultProps} onClose={onClose} />);
 
-      const backdrop = container.querySelector('.modal-backdrop');
-      fireEvent.mouseDown(backdrop!);
-      fireEvent.click(backdrop!);
+      const backdrop = container.firstChild as HTMLElement;
+      fireEvent.mouseDown(backdrop);
+      fireEvent.click(backdrop);
 
       expect(onClose).toHaveBeenCalled();
     });

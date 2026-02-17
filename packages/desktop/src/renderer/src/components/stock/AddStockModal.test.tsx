@@ -222,8 +222,7 @@ describe('AddStockModal', () => {
       });
 
       // Find the clear button (X icon)
-      const clearButtons = screen.getAllByRole('button');
-      const clearBtn = clearButtons.find((btn) => btn.classList.contains('modal-search-clear'));
+      const clearBtn = screen.getByLabelText('Clear search');
       expect(clearBtn).toBeInTheDocument();
     });
   });
@@ -376,9 +375,9 @@ describe('AddStockModal', () => {
       const onClose = vi.fn();
       const { container } = render(<AddStockModal {...defaultProps} onClose={onClose} />);
 
-      const backdrop = container.querySelector('.modal-backdrop');
-      fireEvent.mouseDown(backdrop!);
-      fireEvent.click(backdrop!);
+      const backdrop = container.firstChild as HTMLElement;
+      fireEvent.mouseDown(backdrop);
+      fireEvent.click(backdrop);
 
       expect(onClose).toHaveBeenCalled();
     });

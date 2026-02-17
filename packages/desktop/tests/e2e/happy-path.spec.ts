@@ -70,9 +70,7 @@ async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'>
       if (isVisible(errorBoundary)) {
         const details = document.querySelector('.error-boundary-details pre');
         const errorMsg = details?.textContent || 'unknown error';
-        const tryAgainBtn = document.querySelector(
-          '.error-boundary-actions .btn-secondary'
-        ) as HTMLElement;
+        const tryAgainBtn = document.querySelector('.error-boundary-actions .btn-secondary') as HTMLElement;
         if (tryAgainBtn) tryAgainBtn.click();
         return { type: 'error-boundary' as const, error: errorMsg };
       }
@@ -308,12 +306,14 @@ test.describe('Happy Path Workflow', () => {
     });
 
     // Wait for the cut list modal to appear
-    await expect(window.locator('.cut-list-modal')).toBeVisible({ timeout: 10000 });
+    await expect(window.locator('[role="dialog"][aria-labelledby="cut-list-modal-title"]')).toBeVisible({
+      timeout: 10000
+    });
 
     // The modal should show meaningful content — either a generate button,
     // validation issues (part has no stock), or tabs (if auto-generated)
     const modalContent = await window.evaluate(() => {
-      const modal = document.querySelector('.cut-list-modal');
+      const modal = document.querySelector('[role="dialog"][aria-labelledby="cut-list-modal-title"]');
       if (!modal) return { hasGenerate: false, hasIssues: false, hasTabs: false };
       return {
         hasGenerate: !!modal.querySelector('.cut-list-generate'),
@@ -325,14 +325,16 @@ test.describe('Happy Path Workflow', () => {
 
     // Close the modal
     await window.evaluate(() => {
-      const closeBtn = document.querySelector('.cut-list-modal .modal-close') as HTMLElement;
+      const closeBtn = document.querySelector(
+        '[role="dialog"][aria-labelledby="cut-list-modal-title"] [aria-label="Close"]'
+      ) as HTMLElement;
       if (closeBtn) closeBtn.click();
     });
     await window.waitForTimeout(500);
 
     // Verify modal is closed
     const modalGone = await window.evaluate(() => {
-      const modal = document.querySelector('.cut-list-modal');
+      const modal = document.querySelector('[role="dialog"][aria-labelledby="cut-list-modal-title"]');
       if (!modal) return true;
       const rect = modal.getBoundingClientRect();
       return rect.width === 0 || rect.height === 0;

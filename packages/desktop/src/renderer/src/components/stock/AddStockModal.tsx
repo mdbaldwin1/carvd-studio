@@ -194,11 +194,26 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
   };
 
   return (
-    <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
-      <div className="modal add-stock-modal" role="dialog" aria-modal="true" aria-labelledby="add-stock-modal-title">
-        <div className="modal-header">
-          <h2 id="add-stock-modal-title">Add Stock to Project</h2>
-          <button className="modal-close" onClick={onClose} aria-label="Close">
+    <div
+      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
+      onMouseDown={handleMouseDown}
+      onClick={handleClick}
+    >
+      <div
+        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in w-[700px]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-stock-modal-title"
+      >
+        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+          <h2 id="add-stock-modal-title" className="text-base font-semibold text-text m-0">
+            Add Stock to Project
+          </h2>
+          <button
+            className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text"
+            onClick={onClose}
+            aria-label="Close"
+          >
             &times;
           </button>
         </div>
@@ -228,16 +243,21 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
                 </div>
               </div>
               {stockLibrary.length > 0 && (
-                <div className="modal-search">
-                  <Search size={14} className="modal-search-icon" />
+                <div className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded mb-2">
+                  <Search size={14} className="text-text-muted shrink-0" />
                   <input
+                    className="flex-1 border-none bg-transparent text-text text-[13px] outline-none placeholder:text-text-muted"
                     type="text"
                     placeholder="Search stock..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                   {searchTerm && (
-                    <button className="modal-search-clear" onClick={() => setSearchTerm('')} aria-label="Clear search">
+                    <button
+                      className="flex items-center justify-center w-5 h-5 border-none bg-none text-text-muted cursor-pointer p-0 rounded-sm shrink-0 hover:text-text hover:bg-bg-hover"
+                      onClick={() => setSearchTerm('')}
+                      aria-label="Clear search"
+                    >
                       <X size={14} />
                     </button>
                   )}
@@ -422,7 +442,7 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
           </div>
         </div>
 
-        <div className="modal-footer">
+        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
           <button
             className="btn btn-sm btn-outlined btn-secondary"
             onClick={isCreatingNew ? handleCancelCreate : onClose}
