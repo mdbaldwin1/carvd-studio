@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ChevronRight, ChevronDown, Layers, AlertTriangle } from 'lucide-react';
 import { Part, Group, GroupMember, Stock } from '../../types';
 import { useProjectStore, getAllDescendantPartIds, validatePartsForCutList } from '../../store/projectStore';
+import { useAssemblyEditingStore } from '../../store/assemblyEditingStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { useStockLibrary } from '../../hooks/useStockLibrary';
@@ -87,7 +88,7 @@ interface PartItemProps {
 function PartItem({ part, level, onPartClick, onDuplicate, onDelete }: PartItemProps) {
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const projectStocks = useProjectStore((s) => s.stocks);
-  const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
+  const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
   const units = useProjectStore((s) => s.units);
 
   // Use library stocks when editing assembly, project stocks otherwise
@@ -193,7 +194,7 @@ function GroupItem({ group, children, level, onPartClick, onDuplicate, onDelete 
   const groupMembers = useProjectStore((s) => s.groupMembers);
   const projectStocks = useProjectStore((s) => s.stocks);
   const allParts = useProjectStore((s) => s.parts);
-  const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
+  const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
   const toggleGroupExpanded = useSelectionStore((s) => s.toggleGroupExpanded);
   const selectGroup = useSelectionStore((s) => s.selectGroup);
   const toggleGroupSelection = useSelectionStore((s) => s.toggleGroupSelection);

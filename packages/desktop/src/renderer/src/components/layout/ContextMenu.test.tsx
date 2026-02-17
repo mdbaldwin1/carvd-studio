@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ContextMenu } from './ContextMenu';
 import { useProjectStore } from '../../store/projectStore';
+import { useAssemblyEditingStore } from '../../store/assemblyEditingStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
@@ -16,7 +17,9 @@ describe('ContextMenu', () => {
       groups: [],
       groupMembers: [],
       clipboard: { parts: [], groups: [], groupMembers: [] },
-      snapGuides: [],
+      snapGuides: []
+    });
+    useAssemblyEditingStore.setState({
       isEditingAssembly: false
     });
     useSnapStore.setState({

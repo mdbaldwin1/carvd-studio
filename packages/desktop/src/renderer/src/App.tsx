@@ -61,6 +61,7 @@ import { useSelectionStore } from './store/selectionStore';
 import { useUIStore } from './store/uiStore';
 import { useCameraStore } from './store/cameraStore';
 import { useSnapStore } from './store/snapStore';
+import { useAssemblyEditingStore } from './store/assemblyEditingStore';
 import { Assembly, LightingMode, Project, Stock } from './types';
 import { formatMeasurementWithUnit } from './utils/fractions';
 import { getPartBounds } from './utils/snapToPartsUtil';
@@ -187,7 +188,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
   const projectAssemblies = useProjectStore((s) => s.assemblies);
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const units = useProjectStore((s) => s.units);
-  const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
+  const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
   const licenseMode = useProjectStore((s) => s.licenseMode);
   const canUseAssemblies = getFeatureLimits(licenseMode).canUseAssemblies;
   const addPart = useProjectStore((s) => s.addPart);
@@ -749,7 +750,7 @@ function PropertiesPanel() {
   const parts = useProjectStore((s) => s.parts);
   const projectStocks = useProjectStore((s) => s.stocks);
   const addProjectStock = useProjectStore((s) => s.addStock);
-  const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
+  const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const groups = useProjectStore((s) => s.groups);
