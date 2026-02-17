@@ -144,8 +144,8 @@ describe('UpdateNotificationBanner', () => {
         onUpdateDownloadProgressCallback?.({ percent: 75, transferred: 7500, total: 10000 });
       });
 
-      const progressBar = container.querySelector('.update-toast-progress-bar') as HTMLElement;
-      expect(progressBar?.style.width).toBe('75%');
+      const progressBar = screen.getByTestId('progress-bar');
+      expect(progressBar.style.width).toBe('75%');
     });
   });
 
@@ -216,14 +216,13 @@ describe('UpdateNotificationBanner', () => {
 
   describe('dismissing', () => {
     it('hides toast when dismiss button is clicked', () => {
-      const { container } = render(<UpdateNotificationBanner />);
+      render(<UpdateNotificationBanner />);
 
       act(() => {
         onUpdateAvailableCallback?.({ version: '2.0.0' });
       });
 
-      const dismissButton = container.querySelector('.update-toast-dismiss');
-      fireEvent.click(dismissButton!);
+      fireEvent.click(screen.getByLabelText('Dismiss'));
 
       expect(screen.queryByText('v2.0.0 available')).not.toBeInTheDocument();
     });
@@ -310,7 +309,7 @@ describe('UpdateNotificationBanner', () => {
     });
 
     it('can be dismissed', () => {
-      const { container } = render(<UpdateNotificationBanner />);
+      render(<UpdateNotificationBanner />);
 
       act(() => {
         onUpdateJustInstalledCallback?.({
@@ -319,8 +318,7 @@ describe('UpdateNotificationBanner', () => {
         });
       });
 
-      const dismissButton = container.querySelector('.update-toast-dismiss');
-      fireEvent.click(dismissButton!);
+      fireEvent.click(screen.getByLabelText('Dismiss'));
 
       expect(screen.queryByText('Updated to v2.0.0')).not.toBeInTheDocument();
     });

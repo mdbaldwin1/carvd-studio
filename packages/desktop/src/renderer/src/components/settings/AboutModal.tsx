@@ -24,26 +24,26 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
       isOpen={isOpen}
       onClose={onClose}
       title="About Carvd Studio"
-      className="about-modal"
+      className="w-[420px]"
       footer={
         <button className="btn btn-sm btn-filled btn-secondary" onClick={onClose}>
           Close
         </button>
       }
     >
-      <div className="about-content">
-        <div className="about-logo">
-          <span className="about-icon">🪑</span>
-          <h3>Carvd Studio</h3>
-          <p className="about-version">Version {appVersion || '...'}</p>
+      <div className="p-6 text-center">
+        <div className="mb-5">
+          <span className="text-5xl block mb-2">🪑</span>
+          <h3 className="text-xl font-semibold text-text m-0 mb-1">Carvd Studio</h3>
+          <p className="text-[13px] text-text-muted m-0">Version {appVersion || '...'}</p>
         </div>
 
-        <p className="about-description">
+        <p className="text-[13px] text-text-secondary leading-relaxed m-0 mb-5">
           Professional woodworking design software for furniture makers, cabinet builders, and craftspeople. Design
           projects in 3D, generate cut lists, and optimize material usage.
         </p>
 
-        <div className="about-links">
+        <div className="flex flex-wrap gap-2 justify-center mb-5">
           <button
             className="btn btn-sm btn-ghost btn-secondary"
             onClick={() => handleOpenLink('https://carvd-studio.com')}
@@ -73,18 +73,21 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
           </button>
         </div>
 
-        <div className="about-disclaimer">
-          <p>
+        <div className="p-3 bg-bg rounded-md mb-4">
+          <p className="text-[11px] text-text-muted leading-normal m-0">
             This software is provided "as is" without warranty of any kind, express or implied. Use at your own risk.
             Always verify measurements before cutting materials.
           </p>
         </div>
 
-        <div className="about-copyright">
-          <p>&copy; {new Date().getFullYear()} Carvd Studio. All rights reserved.</p>
-          <p className="about-contact">
+        <div className="text-[11px] text-text-muted">
+          <p className="m-0 mb-1">&copy; {new Date().getFullYear()} Carvd Studio. All rights reserved.</p>
+          <p className="m-0 mb-1">
             Contact:{' '}
-            <button className="btn-link" onClick={() => handleOpenLink('mailto:support@carvd-studio.com')}>
+            <button
+              className="bg-none border-none text-primary cursor-pointer p-0 text-[inherit] underline hover:text-primary-hover"
+              onClick={() => handleOpenLink('mailto:support@carvd-studio.com')}
+            >
               support@carvd-studio.com
             </button>
           </p>

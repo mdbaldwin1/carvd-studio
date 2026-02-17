@@ -86,7 +86,7 @@ export function ReferenceDistanceIndicators(): React.ReactElement | null {
               {isEditing ? (
                 <input
                   type="text"
-                  className="reference-distance-input"
+                  className="w-[70px] py-0.5 px-1.5 text-[11px] font-medium rounded-[3px] border-2 border-accent bg-surface text-text text-center outline-none focus:shadow-[0_0_0_2px_rgba(0,127,255,0.3)]"
                   autoFocus
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
@@ -104,7 +104,7 @@ export function ReferenceDistanceIndicators(): React.ReactElement | null {
                 />
               ) : (
                 <div
-                  className={`reference-distance-label ${indicator.type}`}
+                  className={`py-0.5 px-1.5 text-[11px] font-medium rounded-[3px] cursor-pointer whitespace-nowrap select-none transition-all duration-100 hover:scale-105 ${indicator.type === 'edge-to-edge' ? 'bg-[rgba(0,217,255,0.9)] text-black' : 'bg-[rgba(255,204,0,0.9)] text-black'}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleStartEdit(indicator);

@@ -37,17 +37,17 @@ describe('TutorialTooltip', () => {
     });
 
     it('positions tooltip at specified coordinates', () => {
-      const { container } = render(<TutorialTooltip {...defaultProps} />);
+      render(<TutorialTooltip {...defaultProps} />);
 
-      const tooltip = container.querySelector('.tutorial-tooltip') as HTMLElement;
+      const tooltip = screen.getByTestId('tutorial-tooltip');
       expect(tooltip.style.left).toBe('100px');
       expect(tooltip.style.top).toBe('200px');
     });
 
     it('sets progress bar width', () => {
-      const { container } = render(<TutorialTooltip {...defaultProps} progress={60} />);
+      render(<TutorialTooltip {...defaultProps} progress={60} />);
 
-      const progressBar = container.querySelector('.tutorial-tooltip-progress-bar') as HTMLElement;
+      const progressBar = screen.getByTestId('tutorial-progress-bar');
       expect(progressBar.style.width).toBe('60%');
     });
 

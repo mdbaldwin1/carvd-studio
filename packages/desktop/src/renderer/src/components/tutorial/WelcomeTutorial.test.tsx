@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { WelcomeTutorial } from './WelcomeTutorial';
-import { useProjectStore } from '../../store/projectStore';
+import { useCameraStore } from '../../store/cameraStore';
 
 // Mock useTutorial hook
 vi.mock('../../hooks/useTutorial', () => ({
@@ -44,8 +44,8 @@ describe('WelcomeTutorial', () => {
     vi.clearAllMocks();
     vi.mocked(useTutorial).mockReturnValue(mockTutorial);
 
-    // Reset project store
-    useProjectStore.setState({
+    // Reset camera store
+    useCameraStore.setState({
       requestCenterCamera: vi.fn()
     });
 
@@ -64,7 +64,7 @@ describe('WelcomeTutorial', () => {
     it('centers camera on mount', () => {
       render(<WelcomeTutorial {...defaultProps} />);
 
-      expect(useProjectStore.getState().requestCenterCamera).toHaveBeenCalled();
+      expect(useCameraStore.getState().requestCenterCamera).toHaveBeenCalled();
     });
   });
 

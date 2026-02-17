@@ -3,7 +3,6 @@
  */
 
 import { useProjectStore } from '../../store/projectStore';
-import './UnsavedChangesDialog.css';
 
 export type UnsavedChangesAction = 'new' | 'open' | 'close' | 'home' | 'custom';
 
@@ -59,24 +58,27 @@ export function UnsavedChangesDialog({
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal unsaved-changes-dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="modal max-w-[420px]" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Unsaved Changes</h2>
         </div>
 
         <div className="modal-body">
-          <p className="unsaved-changes-message">{getMessage()}</p>
-          <p className="unsaved-changes-warning">Your changes will be lost if you don't save them.</p>
+          <p className="mb-2 text-sm text-text leading-relaxed">{getMessage()}</p>
+          <p className="m-0 text-[13px] text-text-muted">Your changes will be lost if you don&apos;t save them.</p>
         </div>
 
-        <div className="modal-footer unsaved-changes-actions">
-          <button className="btn btn-secondary" onClick={onCancel}>
+        <div className="modal-footer flex gap-2 justify-end">
+          <button className="btn btn-secondary min-w-22.5" onClick={onCancel}>
             Cancel
           </button>
-          <button className="btn btn-danger" onClick={onDiscard}>
+          <button
+            className="btn min-w-22.5 bg-transparent border border-border text-danger hover:bg-danger hover:border-danger hover:text-white"
+            onClick={onDiscard}
+          >
             {getDiscardLabel()}
           </button>
-          <button className="btn btn-primary" onClick={onSave} autoFocus>
+          <button className="btn btn-primary min-w-22.5" onClick={onSave} autoFocus>
             Save
           </button>
         </div>

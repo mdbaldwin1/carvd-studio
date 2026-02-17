@@ -1,5 +1,11 @@
 import { useProjectStore } from '../../store/projectStore';
 
+/**
+ * Notification toast rendered at the bottom of the viewport.
+ *
+ * Reads toast state from the project store. Trigger via
+ * `useProjectStore.getState().showToast(message)`.
+ */
 export function Toast() {
   const toast = useProjectStore((s) => s.toast);
 

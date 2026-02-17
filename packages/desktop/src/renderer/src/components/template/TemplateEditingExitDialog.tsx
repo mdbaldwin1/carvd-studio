@@ -6,7 +6,9 @@
  */
 
 import { useState, useEffect } from 'react';
-import './TemplateEditingExitDialog.css';
+
+const inputClass =
+  'w-full bg-bg border border-border rounded-md py-2 px-3 text-sm text-text font-[inherit] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-text-muted';
 
 /**
  * Setup dialog shown BEFORE entering template edit mode.
@@ -49,18 +51,20 @@ export function TemplateSetupDialog({ isOpen, onConfirm, onCancel }: TemplateSet
 
   return (
     <div className="modal-overlay">
-      <div className="modal template-exit-dialog" onKeyDown={handleKeyDown}>
+      <div className="modal max-w-120 w-[90vw]" onKeyDown={handleKeyDown}>
         <div className="modal-header">
           <h2>Create New Template</h2>
         </div>
 
         <div className="modal-body">
-          <p className="setup-description">
+          <p className="text-text-secondary text-sm mb-5">
             Templates let you save reusable project layouts. Give your template a name and optional description.
           </p>
-          <div className="template-save-form">
-            <div className="form-group">
-              <label htmlFor="template-setup-name">Name</label>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="template-setup-name" className="text-[13px] font-medium text-text-secondary">
+                Name
+              </label>
               <input
                 id="template-setup-name"
                 type="text"
@@ -68,22 +72,26 @@ export function TemplateSetupDialog({ isOpen, onConfirm, onCancel }: TemplateSet
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Basic Bookshelf, Simple Desk"
                 autoFocus
+                className={inputClass}
               />
             </div>
-            <div className="form-group">
-              <label htmlFor="template-setup-description">Description (optional)</label>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="template-setup-description" className="text-[13px] font-medium text-text-secondary">
+                Description (optional)
+              </label>
               <textarea
                 id="template-setup-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Brief description of this template"
                 rows={3}
+                className={`${inputClass} resize-y min-h-15`}
               />
             </div>
           </div>
         </div>
 
-        <div className="modal-footer exit-actions">
+        <div className="modal-footer flex gap-2 justify-end">
           <button className="btn btn-sm btn-ghost btn-secondary" onClick={onCancel}>
             Cancel
           </button>
@@ -141,15 +149,17 @@ export function TemplateSaveDialog({
 
   return (
     <div className="modal-overlay">
-      <div className="modal template-exit-dialog" onKeyDown={handleKeyDown}>
+      <div className="modal max-w-120 w-[90vw]" onKeyDown={handleKeyDown}>
         <div className="modal-header">
           <h2>{isCreatingNew ? 'Save New Template' : 'Save Template'}</h2>
         </div>
 
         <div className="modal-body">
-          <div className="template-save-form">
-            <div className="form-group">
-              <label htmlFor="template-name">Name</label>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="template-name" className="text-[13px] font-medium text-text-secondary">
+                Name
+              </label>
               <input
                 id="template-name"
                 type="text"
@@ -157,22 +167,26 @@ export function TemplateSaveDialog({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Template name"
                 autoFocus
+                className={inputClass}
               />
             </div>
-            <div className="form-group">
-              <label htmlFor="template-description">Description (optional)</label>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="template-description" className="text-[13px] font-medium text-text-secondary">
+                Description (optional)
+              </label>
               <textarea
                 id="template-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Brief description of this template"
                 rows={3}
+                className={`${inputClass} resize-y min-h-15`}
               />
             </div>
           </div>
         </div>
 
-        <div className="modal-footer exit-actions">
+        <div className="modal-footer flex gap-2 justify-end">
           <button className="btn btn-sm btn-ghost btn-secondary" onClick={onCancel}>
             Cancel
           </button>
@@ -207,7 +221,7 @@ export function TemplateDiscardDialog({
 
   return (
     <div className="modal-overlay">
-      <div className="modal template-exit-dialog">
+      <div className="modal max-w-120 w-[90vw]">
         <div className="modal-header">
           <h2>Discard Changes?</h2>
         </div>
@@ -224,8 +238,8 @@ export function TemplateDiscardDialog({
           </p>
         </div>
 
-        <div className="modal-footer exit-actions">
-          <button className="btn btn-sm btn-ghost btn-secondary" onClick={onCancel}>
+        <div className="modal-footer flex gap-2 justify-end">
+          <button className="btn btn-sm btn-ghost btn-secondary mr-auto" onClick={onCancel}>
             Keep Editing
           </button>
           <button className="btn btn-sm btn-filled btn-danger" onClick={onDiscard}>

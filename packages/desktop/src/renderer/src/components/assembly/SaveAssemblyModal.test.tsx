@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SaveAssemblyModal } from './SaveAssemblyModal';
 import { useProjectStore } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
 
 describe('SaveAssemblyModal', () => {
   const defaultProps = {
@@ -23,9 +24,11 @@ describe('SaveAssemblyModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Set up store with some selected parts
-    useProjectStore.setState({
+    useSelectionStore.setState({
       selectedPartIds: ['part-1', 'part-2'],
-      selectedGroupIds: [],
+      selectedGroupIds: []
+    });
+    useProjectStore.setState({
       createAssemblyFromSelection: vi.fn().mockReturnValue(mockAssembly)
     });
   });
@@ -70,7 +73,7 @@ describe('SaveAssemblyModal', () => {
 
   describe('default name generation', () => {
     it('generates name based on part count', () => {
-      useProjectStore.setState({
+      useSelectionStore.setState({
         selectedPartIds: ['part-1', 'part-2', 'part-3'],
         selectedGroupIds: []
       });
@@ -82,7 +85,7 @@ describe('SaveAssemblyModal', () => {
     });
 
     it('uses singular "part" for single part', () => {
-      useProjectStore.setState({
+      useSelectionStore.setState({
         selectedPartIds: ['part-1'],
         selectedGroupIds: []
       });
@@ -94,7 +97,7 @@ describe('SaveAssemblyModal', () => {
     });
 
     it('generates name based on group count when only groups selected', () => {
-      useProjectStore.setState({
+      useSelectionStore.setState({
         selectedPartIds: [],
         selectedGroupIds: ['group-1', 'group-2']
       });
@@ -108,7 +111,7 @@ describe('SaveAssemblyModal', () => {
 
   describe('form validation', () => {
     it('shows warning when no selection', () => {
-      useProjectStore.setState({
+      useSelectionStore.setState({
         selectedPartIds: [],
         selectedGroupIds: []
       });
@@ -119,7 +122,7 @@ describe('SaveAssemblyModal', () => {
     });
 
     it('disables Save button when no selection', () => {
-      useProjectStore.setState({
+      useSelectionStore.setState({
         selectedPartIds: [],
         selectedGroupIds: []
       });
@@ -216,7 +219,7 @@ describe('SaveAssemblyModal', () => {
       const onClose = vi.fn();
       const { container } = render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
 
-      const overlay = container.querySelector('.modal-overlay')!;
+      const overlay = container.firstChild as HTMLElement;
       fireEvent.click(overlay);
 
       expect(onClose).toHaveBeenCalled();
@@ -224,9 +227,9 @@ describe('SaveAssemblyModal', () => {
 
     it('does not close when modal content is clicked', () => {
       const onClose = vi.fn();
-      const { container } = render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
+      render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
 
-      const modal = container.querySelector('.modal')!;
+      const modal = screen.getByRole('dialog');
       fireEvent.click(modal);
 
       expect(onClose).not.toHaveBeenCalled();
@@ -236,7 +239,7 @@ describe('SaveAssemblyModal', () => {
       const onClose = vi.fn();
       const { container } = render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
 
-      const overlay = container.querySelector('.modal-overlay')!;
+      const overlay = container.firstChild as HTMLElement;
       fireEvent.keyDown(overlay, { key: 'Escape' });
 
       expect(onClose).toHaveBeenCalled();

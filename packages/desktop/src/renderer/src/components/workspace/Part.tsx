@@ -4,6 +4,8 @@ import { memo, useCallback, useEffect, useState } from 'react';
 import * as THREE from 'three';
 import { useShallow } from 'zustand/shallow';
 import { useProjectStore, getAncestorGroupIds } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
+import { useCameraStore } from '../../store/cameraStore';
 import { Part as PartType, RotationAngle } from '../../types';
 import { LiveDimensions, HANDLE_POSITIONS } from './partTypes';
 import { DimensionLabel } from './DimensionLabel';
@@ -20,43 +22,40 @@ interface PartProps {
 export const Part = memo(function Part({ part }: PartProps) {
   const { camera, gl, controls } = useThree();
 
-  // Consolidated state selector - only re-renders when these specific values change
-  const {
-    selectedPartIds,
-    hoveredPartId,
-    activeDragDelta,
-    units,
-    showGrainDirection,
-    displayMode,
-    referencePartIds,
-    groupMembers,
-    selectedGroupIds,
-    editingGroupId
-  } = useProjectStore(
+  // Project state selector - only re-renders when these specific values change
+  const { units, referencePartIds, groupMembers } = useProjectStore(
+    useShallow((s) => ({
+      units: s.units,
+      referencePartIds: s.referencePartIds,
+      groupMembers: s.groupMembers
+    }))
+  );
+
+  // Selection state selector
+  const { selectedPartIds, hoveredPartId, activeDragDelta, selectedGroupIds, editingGroupId } = useSelectionStore(
     useShallow((s) => ({
       selectedPartIds: s.selectedPartIds,
       hoveredPartId: s.hoveredPartId,
       activeDragDelta: s.activeDragDelta,
-      units: s.units,
-      showGrainDirection: s.showGrainDirection,
-      displayMode: s.displayMode,
-      referencePartIds: s.referencePartIds,
-      groupMembers: s.groupMembers,
       selectedGroupIds: s.selectedGroupIds,
       editingGroupId: s.editingGroupId
     }))
   );
 
+  // Camera store state
+  const showGrainDirection = useCameraStore((s) => s.showGrainDirection);
+  const displayMode = useCameraStore((s) => s.displayMode);
+
   // Actions are stable references - grab them once outside the render cycle
-  const selectPart = useProjectStore((s) => s.selectPart);
-  const togglePartSelection = useProjectStore((s) => s.togglePartSelection);
-  const setHoveredPart = useProjectStore((s) => s.setHoveredPart);
+  const selectPart = useSelectionStore((s) => s.selectPart);
+  const togglePartSelection = useSelectionStore((s) => s.togglePartSelection);
+  const setHoveredPart = useSelectionStore((s) => s.setHoveredPart);
   const updatePart = useProjectStore((s) => s.updatePart);
   const moveSelectedParts = useProjectStore((s) => s.moveSelectedParts);
-  const clearSelection = useProjectStore((s) => s.clearSelection);
-  const selectGroup = useProjectStore((s) => s.selectGroup);
-  const toggleGroupSelection = useProjectStore((s) => s.toggleGroupSelection);
-  const enterGroup = useProjectStore((s) => s.enterGroup);
+  const clearSelection = useSelectionStore((s) => s.clearSelection);
+  const selectGroup = useSelectionStore((s) => s.selectGroup);
+  const toggleGroupSelection = useSelectionStore((s) => s.toggleGroupSelection);
+  const enterGroup = useSelectionStore((s) => s.enterGroup);
 
   // Group membership - get all ancestor groups (from immediate to top-level)
   const ancestorGroupIds = getAncestorGroupIds(part.id, groupMembers);

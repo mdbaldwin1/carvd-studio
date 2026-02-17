@@ -83,8 +83,8 @@
   }
 
   .btn-md {
-    @apply py-2 px-4;
-    font-size: 13px;
+    @apply py-2.5 px-5;
+    font-size: 14px;
   }
 
   .btn-lg {
@@ -242,20 +242,22 @@
 
 @layer components {
   .form-group {
-    @apply mb-4;
+    @apply flex flex-col mb-4;
+    gap: 8px;
   }
 
   .form-group > label {
-    @apply block text-xs text-text-muted mb-1.5;
+    @apply block text-sm font-medium text-text;
   }
 
   .form-group input[type='text'],
   .form-group input[type='number'],
   .form-group select,
   .form-group textarea {
-    @apply w-full bg-bg border border-border text-text rounded-sm;
-    padding: 8px 10px;
-    font-size: 13px;
+    @apply w-full bg-bg border border-border text-text;
+    padding: 10px 12px;
+    font-size: 14px;
+    border-radius: 6px;
     font-family: inherit;
   }
 
@@ -284,6 +286,15 @@
 
   .form-actions {
     @apply flex justify-end gap-2 mt-5 pt-4 border-t border-border;
+  }
+
+  .field-error {
+    @apply text-xs mt-1;
+    color: var(--color-danger);
+  }
+
+  .field-help {
+    @apply text-xs text-text-muted mt-1;
   }
 
   .checkbox-label {

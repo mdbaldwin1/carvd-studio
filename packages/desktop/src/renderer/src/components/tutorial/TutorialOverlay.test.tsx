@@ -32,15 +32,15 @@ describe('TutorialOverlay', () => {
 
   describe('rendering', () => {
     it('renders tutorial overlay', () => {
-      const { container } = render(<TutorialOverlay {...defaultProps} />);
+      render(<TutorialOverlay {...defaultProps} />);
 
-      expect(container.querySelector('.tutorial-overlay')).toBeInTheDocument();
+      expect(screen.getByTestId('tutorial-overlay')).toBeInTheDocument();
     });
 
     it('renders SVG backdrop', () => {
-      const { container } = render(<TutorialOverlay {...defaultProps} />);
+      render(<TutorialOverlay {...defaultProps} />);
 
-      expect(container.querySelector('.tutorial-overlay-svg')).toBeInTheDocument();
+      expect(screen.getByTestId('tutorial-overlay-svg')).toBeInTheDocument();
     });
 
     it('renders TutorialTooltip with correct props', () => {
@@ -91,10 +91,10 @@ describe('TutorialOverlay', () => {
     });
 
     it('centers tooltip when no target selector', () => {
-      const { container } = render(<TutorialOverlay {...defaultProps} />);
+      render(<TutorialOverlay {...defaultProps} />);
 
       // The tooltip should be rendered and positioned
-      expect(container.querySelector('.tutorial-overlay-content')).toBeInTheDocument();
+      expect(screen.getByTestId('tutorial-overlay-content')).toBeInTheDocument();
     });
 
     it('centers tooltip when target element not found', () => {
@@ -103,9 +103,9 @@ describe('TutorialOverlay', () => {
         targetSelector: '.non-existent-element'
       };
 
-      const { container } = render(<TutorialOverlay {...defaultProps} step={stepWithMissingTarget} />);
+      render(<TutorialOverlay {...defaultProps} step={stepWithMissingTarget} />);
 
-      expect(container.querySelector('.tutorial-overlay-content')).toBeInTheDocument();
+      expect(screen.getByTestId('tutorial-overlay-content')).toBeInTheDocument();
     });
   });
 

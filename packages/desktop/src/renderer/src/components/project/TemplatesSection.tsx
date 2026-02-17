@@ -6,6 +6,9 @@ import { Project } from '../../types';
 // Maximum number of templates to show in the preview (excluding Blank and Tutorial)
 const MAX_PREVIEW_TEMPLATES = 4;
 
+const templateCardBase =
+  'flex flex-col items-center gap-2 py-4 px-3 bg-bg-secondary border border-border rounded-lg cursor-pointer transition-all duration-150 text-center relative hover:bg-bg-tertiary hover:border-accent hover:-translate-y-0.5';
+
 interface TemplatesSectionProps {
   userTemplates: UserTemplate[];
   onNewProject: () => void;
@@ -78,36 +81,45 @@ export function TemplatesSection({
   }, [userTemplates]);
 
   return (
-    <div className="projects-section templates-section">
-      <div className="templates-header">
-        <h2 className="section-title">Templates</h2>
-        <button className="view-all-link" onClick={onViewAllTemplates}>
+    <div className="flex flex-col gap-3 min-h-0 max-h-[50vh] mt-2">
+      <div className="flex items-center justify-between pb-3 border-b border-border mb-3">
+        <h2 className="text-sm font-semibold text-text-secondary m-0 p-0">Templates</h2>
+        <button
+          className="flex items-center gap-1 py-1.5 px-3 bg-transparent border-none text-[13px] font-medium text-accent cursor-pointer transition-all duration-100 rounded hover:text-primary hover:bg-bg-secondary"
+          onClick={onViewAllTemplates}
+        >
           View All
           <ChevronRight size={14} />
         </button>
       </div>
-      <div className="templates-grid">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         {/* Blank Project - always first */}
-        <button className="template-card blank-template" onClick={onNewProject} title="Start with a blank project">
-          <span className="template-thumbnail">
+        <button
+          className={`blank-template ${templateCardBase} border-dashed`}
+          onClick={onNewProject}
+          title="Start with a blank project"
+        >
+          <span className="text-[32px] leading-none w-full max-w-30 h-[90px] flex items-center justify-center bg-bg-tertiary rounded-md text-primary">
             <Plus size={32} />
           </span>
-          <div className="template-info">
-            <span className="template-name">Blank</span>
-            <span className="template-meta">Start from scratch</span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium text-text">Blank</span>
+            <span className="text-[11px] text-text-muted">Start from scratch</span>
           </div>
         </button>
         {/* Tutorial - always second */}
         {tutorialTemplate && (
           <button
-            className="template-card tutorial-template"
+            className={`${templateCardBase} !border-primary bg-[linear-gradient(135deg,var(--color-bg-secondary)_0%,rgba(7,113,135,0.1)_100%)] hover:!border-primary-hover hover:bg-[linear-gradient(135deg,var(--color-bg-tertiary)_0%,rgba(7,113,135,0.15)_100%)]`}
             onClick={() => handleSelectTemplate(tutorialTemplate)}
             title={tutorialTemplate.description}
           >
-            <span className="template-thumbnail">{tutorialTemplate.thumbnail}</span>
-            <div className="template-info">
-              <span className="template-name">{tutorialTemplate.name}</span>
-              <span className="template-meta">Guided walkthrough</span>
+            <span className="text-[32px] leading-none w-full max-w-30 h-[90px] flex items-center justify-center bg-bg-tertiary rounded-md text-text-muted">
+              {tutorialTemplate.thumbnail}
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-text">{tutorialTemplate.name}</span>
+              <span className="text-[11px] text-text-muted">Guided walkthrough</span>
             </div>
           </button>
         )}
@@ -115,7 +127,7 @@ export function TemplatesSection({
         {previewTemplates.map((template) => (
           <button
             key={template.id}
-            className="template-card"
+            className={templateCardBase}
             onClick={() => handleSelectTemplate(template)}
             title={template.description}
           >
@@ -123,18 +135,24 @@ export function TemplatesSection({
               <img
                 src={`data:image/png;base64,${template.thumbnailData.data}`}
                 alt={template.name}
-                className="template-thumbnail-img"
+                className="w-full max-w-30 h-[90px] object-cover rounded-md bg-bg-tertiary"
               />
             ) : (
-              <span className="template-thumbnail">{template.thumbnail}</span>
+              <span className="text-[32px] leading-none w-full max-w-30 h-[90px] flex items-center justify-center bg-bg-tertiary rounded-md text-text-muted">
+                {template.thumbnail}
+              </span>
             )}
-            <div className="template-info">
-              <span className="template-name">{template.name}</span>
-              <span className="template-meta">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-text">{template.name}</span>
+              <span className="text-[11px] text-text-muted">
                 {formatDimensions(template.dimensions)} • {template.partCount} parts
               </span>
             </div>
-            {template.type === 'user' && <span className="template-badge">Custom</span>}
+            {template.type === 'user' && (
+              <span className="absolute top-2 right-2 text-[10px] py-0.5 px-1.5 bg-accent text-white rounded font-medium">
+                Custom
+              </span>
+            )}
           </button>
         ))}
       </div>

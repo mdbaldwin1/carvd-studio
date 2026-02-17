@@ -80,7 +80,7 @@ export function EditStockModal({
       isOpen={isOpen}
       onClose={onClose}
       title={createMode ? 'Create New Stock' : 'Edit Stock'}
-      className="edit-stock-modal"
+      className="w-[450px]"
       footer={
         <>
           <button className="btn btn-sm btn-outlined btn-secondary" onClick={onClose}>
@@ -92,7 +92,7 @@ export function EditStockModal({
         </>
       }
     >
-      <div className="edit-stock-content">
+      <div className="p-5 overflow-y-auto">
         <div className="form-group">
           <label>Name</label>
           <input

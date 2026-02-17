@@ -47,11 +47,26 @@ export function StockLibraryModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
-      <div className="modal stock-library-modal" role="dialog" aria-modal="true" aria-labelledby="library-modal-title">
-        <div className="modal-header">
-          <h2 id="library-modal-title">Library</h2>
-          <button className="modal-close" onClick={onClose} aria-label="Close">
+    <div
+      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
+      onMouseDown={handleMouseDown}
+      onClick={handleClick}
+    >
+      <div
+        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in w-[750px] h-[500px]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="library-modal-title"
+      >
+        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+          <h2 id="library-modal-title" className="text-base font-semibold text-text m-0">
+            Library
+          </h2>
+          <button
+            className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text"
+            onClick={onClose}
+            aria-label="Close"
+          >
             &times;
           </button>
         </div>
@@ -102,7 +117,7 @@ export function StockLibraryModal({
           )}
         </div>
 
-        <div className="modal-footer">
+        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
           <button className="btn btn-sm btn-filled btn-secondary" onClick={onClose}>
             Done
           </button>

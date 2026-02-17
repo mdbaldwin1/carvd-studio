@@ -464,7 +464,7 @@ describe('StockLibraryModal', () => {
         target: { value: 'test' }
       });
 
-      expect(document.querySelector('.modal-search-clear')).toBeInTheDocument();
+      expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
     });
 
     it('clears search when clear button clicked', () => {
@@ -475,7 +475,7 @@ describe('StockLibraryModal', () => {
         target: { value: 'Cabinet' }
       });
 
-      const clearBtn = document.querySelector('.modal-search-clear');
+      const clearBtn = screen.getByLabelText('Clear search');
       fireEvent.click(clearBtn!);
 
       expect(screen.getByPlaceholderText('Search assemblies...')).toHaveValue('');
@@ -658,7 +658,7 @@ describe('StockLibraryModal', () => {
         target: { value: 'test' }
       });
 
-      expect(document.querySelector('.modal-search-clear')).toBeInTheDocument();
+      expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
     });
 
     it('clears stock search when clear button clicked', () => {
@@ -668,7 +668,7 @@ describe('StockLibraryModal', () => {
         target: { value: 'Plywood' }
       });
 
-      const clearBtn = document.querySelector('.modal-search-clear');
+      const clearBtn = screen.getByLabelText('Clear search');
       fireEvent.click(clearBtn!);
 
       expect(screen.getByPlaceholderText('Search stocks...')).toHaveValue('');
@@ -746,8 +746,8 @@ describe('StockLibraryModal', () => {
       const onClose = vi.fn();
       const { container } = render(<StockLibraryModal {...defaultProps} onClose={onClose} />);
 
-      const closeBtn = container.querySelector('.modal-close');
-      fireEvent.click(closeBtn!);
+      const closeBtn = screen.getByLabelText('Close');
+      fireEvent.click(closeBtn);
 
       expect(onClose).toHaveBeenCalled();
     });
@@ -781,9 +781,9 @@ describe('StockLibraryModal', () => {
       const onClose = vi.fn();
       const { container } = render(<StockLibraryModal {...defaultProps} onClose={onClose} />);
 
-      const backdrop = container.querySelector('.modal-backdrop');
-      fireEvent.mouseDown(backdrop!);
-      fireEvent.click(backdrop!);
+      const backdrop = container.firstChild as HTMLElement;
+      fireEvent.mouseDown(backdrop);
+      fireEvent.click(backdrop);
 
       expect(onClose).toHaveBeenCalled();
     });

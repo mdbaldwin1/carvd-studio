@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GRID_SIZE } from '../../constants';
 import { useProjectStore } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
+import { useCameraStore } from '../../store/cameraStore';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { CameraState } from '../../types';
 import { AxisIndicator } from './AxisIndicator';
@@ -28,17 +30,17 @@ import {
 
 export function Workspace() {
   const parts = useProjectStore((s) => s.parts);
-  const clearSelection = useProjectStore((s) => s.clearSelection);
-  const selectParts = useProjectStore((s) => s.selectParts);
+  const clearSelection = useSelectionStore((s) => s.clearSelection);
+  const selectParts = useSelectionStore((s) => s.selectParts);
   const openContextMenu = useUIStore((s) => s.openContextMenu);
-  const setSelectionBox = useProjectStore((s) => s.setSelectionBox);
-  const showGrid = useProjectStore((s) => s.showGrid);
-  const cameraState = useProjectStore((s) => s.cameraState);
-  const setCameraState = useProjectStore((s) => s.setCameraState);
-  const pendingCameraRestore = useProjectStore((s) => s.pendingCameraRestore);
-  const clearPendingCameraRestore = useProjectStore((s) => s.clearPendingCameraRestore);
-  const editingGroupId = useProjectStore((s) => s.editingGroupId);
-  const exitGroup = useProjectStore((s) => s.exitGroup);
+  const setSelectionBox = useSelectionStore((s) => s.setSelectionBox);
+  const showGrid = useCameraStore((s) => s.showGrid);
+  const cameraState = useCameraStore((s) => s.cameraState);
+  const setCameraState = useCameraStore((s) => s.setCameraState);
+  const pendingCameraRestore = useCameraStore((s) => s.pendingCameraRestore);
+  const clearPendingCameraRestore = useCameraStore((s) => s.clearPendingCameraRestore);
+  const editingGroupId = useSelectionStore((s) => s.editingGroupId);
+  const exitGroup = useSelectionStore((s) => s.exitGroup);
   const lightingMode = useAppSettingsStore((s) => s.settings.lightingMode) || 'default';
   const brightnessMultiplier = useAppSettingsStore((s) => s.settings.brightnessMultiplier) ?? 1.0;
   const lightingPreset = LIGHTING_PRESETS[lightingMode];

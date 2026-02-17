@@ -2,23 +2,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ContextMenu } from './ContextMenu';
 import { useProjectStore } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
+import { useCameraStore } from '../../store/cameraStore';
 
 describe('ContextMenu', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset store state
     useProjectStore.setState({
-      selectedPartIds: [],
-      selectedGroupIds: [],
       parts: [],
       groups: [],
       groupMembers: [],
       clipboard: { parts: [], groups: [], groupMembers: [] },
       referencePartIds: [],
       snapGuides: [],
-      editingGroupId: null,
       isEditingAssembly: false
+    });
+    useSelectionStore.setState({
+      selectedPartIds: [],
+      selectedGroupIds: [],
+      editingGroupId: null
     });
     useUIStore.setState({
       contextMenu: null
@@ -57,8 +61,10 @@ describe('ContextMenu', () => {
           partId: 'part-1'
         }
       });
+      useSelectionStore.setState({
+        selectedPartIds: ['part-1']
+      });
       useProjectStore.setState({
-        selectedPartIds: ['part-1'],
         parts: [{ id: 'part-1', name: 'Part 1', stockId: null }]
       });
 
@@ -101,9 +107,11 @@ describe('ContextMenu', () => {
         closeContextMenu: vi.fn(),
         captureManualThumbnail: vi.fn()
       });
-      useProjectStore.setState({
+      useCameraStore.setState({
         requestCenterCameraAtOrigin: vi.fn(),
-        requestCenterCameraAtPosition: vi.fn(),
+        requestCenterCameraAtPosition: vi.fn()
+      });
+      useProjectStore.setState({
         pasteAtPosition: vi.fn(),
         addSnapGuide: vi.fn(),
         clearSnapGuides: vi.fn()
@@ -114,14 +122,14 @@ describe('ContextMenu', () => {
       render(<ContextMenu />);
       fireEvent.click(screen.getByText('Reset View'));
 
-      expect(useProjectStore.getState().requestCenterCameraAtOrigin).toHaveBeenCalled();
+      expect(useCameraStore.getState().requestCenterCameraAtOrigin).toHaveBeenCalled();
     });
 
     it('calls requestCenterCameraAtPosition on Center View Here', () => {
       render(<ContextMenu />);
       fireEvent.click(screen.getByText('Center View Here'));
 
-      expect(useProjectStore.getState().requestCenterCameraAtPosition).toHaveBeenCalledWith({
+      expect(useCameraStore.getState().requestCenterCameraAtPosition).toHaveBeenCalledWith({
         x: 10,
         y: 5,
         z: 0
@@ -189,15 +197,19 @@ describe('ContextMenu', () => {
         closeContextMenu: vi.fn(),
         openSaveAssemblyModal: vi.fn()
       });
+      useCameraStore.setState({
+        requestCenterCamera: vi.fn()
+      });
+      useSelectionStore.setState({
+        selectedPartIds: ['part-1', 'part-2']
+      });
       useProjectStore.setState({
-        selectedPartIds: ['part-1', 'part-2'],
         parts: [
           { id: 'part-1', name: 'Part 1', stockId: 'stock-1' },
           { id: 'part-2', name: 'Part 2', stockId: null }
         ],
         copySelectedParts: vi.fn(),
         deleteSelectedParts: vi.fn(),
-        requestCenterCamera: vi.fn(),
         resetSelectedPartsToStock: vi.fn(),
         toggleReference: vi.fn()
       });
@@ -227,7 +239,7 @@ describe('ContextMenu', () => {
       render(<ContextMenu />);
       fireEvent.click(screen.getByText('Center View'));
 
-      expect(useProjectStore.getState().requestCenterCamera).toHaveBeenCalled();
+      expect(useCameraStore.getState().requestCenterCamera).toHaveBeenCalled();
     });
 
     it('shows Reset to Stock when parts have stock assigned', () => {
@@ -286,9 +298,11 @@ describe('ContextMenu', () => {
         },
         closeContextMenu: vi.fn()
       });
-      useProjectStore.setState({
+      useSelectionStore.setState({
         selectedPartIds: ['part-1', 'part-2'],
-        selectedGroupIds: [],
+        selectedGroupIds: []
+      });
+      useProjectStore.setState({
         parts: [
           { id: 'part-1', name: 'Part 1' },
           { id: 'part-2', name: 'Part 2' }
@@ -313,9 +327,11 @@ describe('ContextMenu', () => {
         },
         closeContextMenu: vi.fn()
       });
-      useProjectStore.setState({
+      useSelectionStore.setState({
         selectedPartIds: [],
-        selectedGroupIds: ['group-1'],
+        selectedGroupIds: ['group-1']
+      });
+      useProjectStore.setState({
         parts: [],
         groups: [{ id: 'group-1', name: 'My Group' }],
         groupMembers: [{ groupId: 'group-1', memberId: 'part-1', memberType: 'part' }],
@@ -337,9 +353,11 @@ describe('ContextMenu', () => {
         },
         closeContextMenu: vi.fn()
       });
-      useProjectStore.setState({
+      useSelectionStore.setState({
         selectedPartIds: ['part-1'],
-        selectedGroupIds: ['group-1'],
+        selectedGroupIds: ['group-1']
+      });
+      useProjectStore.setState({
         parts: [{ id: 'part-1', name: 'Part 1' }],
         groups: [{ id: 'group-1', name: 'Group 1' }],
         groupMembers: []

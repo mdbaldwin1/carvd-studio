@@ -6,7 +6,6 @@ import { ChevronDown, File, FolderOpen, Save, FilePlus } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { openProjectFromPath } from '../../utils/fileOperations';
 import { useUIStore } from '../../store/uiStore';
-import './FileMenu.css';
 
 interface FileMenuProps {
   onNew: () => void;
@@ -68,52 +67,60 @@ export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRe
     return parts[parts.length - 1]?.replace(/\.carvd$/i, '') || filePath;
   };
 
+  const menuItemClass =
+    'flex items-center gap-2.5 w-full py-2 px-3 bg-transparent border-none rounded text-text text-[13px] cursor-pointer text-left hover:bg-surface-hover';
+
+  const dropdownClass =
+    'absolute top-full left-0 mt-1 min-w-50 bg-surface border border-border rounded-md shadow-[0_4px_16px_rgba(0,0,0,0.2)] z-1000 p-1';
+
   return (
-    <div className="file-menu" ref={menuRef}>
+    <div className="relative" ref={menuRef}>
       <button
-        className="file-menu-trigger btn btn-ghost btn-secondary"
+        className="btn btn-ghost btn-secondary flex items-center gap-1.5 py-1.5 px-2.5 text-[13px] font-medium"
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
         <File size={16} />
         <span>File</span>
-        <ChevronDown size={14} className={`chevron ${isOpen ? 'open' : ''}`} />
+        <ChevronDown size={14} className={`transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
-        <div className="file-menu-dropdown">
-          <button className="file-menu-item" onClick={() => handleMenuAction(onNew)}>
+        <div className={dropdownClass}>
+          <button className={menuItemClass} onClick={() => handleMenuAction(onNew)}>
             <FilePlus size={16} />
-            <span>New Project</span>
-            <span className="shortcut">{modKey}N</span>
+            <span className="flex-1">New Project</span>
+            <span className="ml-auto text-xs text-text-muted">{modKey}N</span>
           </button>
 
-          <button className="file-menu-item" onClick={() => handleMenuAction(onOpen)}>
+          <button className={menuItemClass} onClick={() => handleMenuAction(onOpen)}>
             <FolderOpen size={16} />
-            <span>Open...</span>
-            <span className="shortcut">{modKey}O</span>
+            <span className="flex-1">Open...</span>
+            <span className="ml-auto text-xs text-text-muted">{modKey}O</span>
           </button>
 
           <div
-            className="file-menu-item file-menu-submenu-trigger"
+            className={`${menuItemClass} relative`}
             onMouseEnter={() => setShowRecent(true)}
             onMouseLeave={() => setShowRecent(false)}
           >
             <FolderOpen size={16} />
-            <span>Open Recent</span>
-            <ChevronDown size={14} className="submenu-chevron" />
+            <span className="flex-1">Open Recent</span>
+            <ChevronDown size={14} className="ml-auto -rotate-90" />
 
             {showRecent && (
-              <div className="file-menu-submenu">
+              <div className={`${dropdownClass} left-full -top-1 max-w-75 z-1001`}>
                 {recentProjects.length === 0 ? (
-                  <div className="file-menu-item disabled">
+                  <div className={`${menuItemClass} opacity-50 cursor-default`}>
                     <span>No recent projects</span>
                   </div>
                 ) : (
                   recentProjects.map((path) => (
-                    <button key={path} className="file-menu-item" onClick={() => handleOpenRecent(path)} title={path}>
-                      <span className="recent-name">{getFileName(path)}</span>
+                    <button key={path} className={menuItemClass} onClick={() => handleOpenRecent(path)} title={path}>
+                      <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {getFileName(path)}
+                      </span>
                     </button>
                   ))
                 )}
@@ -121,18 +128,18 @@ export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRe
             )}
           </div>
 
-          <div className="file-menu-divider" />
+          <div className="h-px bg-border my-1" />
 
-          <button className="file-menu-item" onClick={() => handleMenuAction(onSave)}>
+          <button className={menuItemClass} onClick={() => handleMenuAction(onSave)}>
             <Save size={16} />
-            <span>Save</span>
-            <span className="shortcut">{modKey}S</span>
+            <span className="flex-1">Save</span>
+            <span className="ml-auto text-xs text-text-muted">{modKey}S</span>
           </button>
 
-          <button className="file-menu-item" onClick={() => handleMenuAction(onSaveAs)}>
+          <button className={menuItemClass} onClick={() => handleMenuAction(onSaveAs)}>
             <Save size={16} />
-            <span>Save As...</span>
-            <span className="shortcut">{modKey}⇧S</span>
+            <span className="flex-1">Save As...</span>
+            <span className="ml-auto text-xs text-text-muted">{modKey}⇧S</span>
           </button>
         </div>
       )}

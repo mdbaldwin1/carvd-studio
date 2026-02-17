@@ -5,6 +5,7 @@
 
 import { useEffect } from 'react';
 import { useProjectStore } from '../store/projectStore';
+import { useSelectionStore } from '../store/selectionStore';
 import { generateSeedProject, generateStockLibraryItems } from '../utils/seedData';
 
 // Colors for randomized test parts
@@ -129,7 +130,7 @@ export function useDevTools() {
             if (result) created++;
           }
           // Clear selection so all parts are visible without highlight
-          useProjectStore.getState().clearSelection();
+          useSelectionStore.getState().clearSelection();
           console.log(`Created ${created} test parts (${cols}x${Math.ceil(count / cols)} grid)`);
         },
 

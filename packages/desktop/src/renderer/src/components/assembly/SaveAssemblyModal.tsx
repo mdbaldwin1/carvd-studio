@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useProjectStore } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { Assembly } from '../../types';
 import { HelpTooltip } from '../common/HelpTooltip';
 
@@ -11,8 +12,8 @@ interface SaveAssemblyModalProps {
 
 export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModalProps) {
   const createAssemblyFromSelection = useProjectStore((s) => s.createAssemblyFromSelection);
-  const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
-  const selectedGroupIds = useProjectStore((s) => s.selectedGroupIds);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
+  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -74,29 +75,39 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
   const hasSelection = selectedPartIds.length > 0 || selectedGroupIds.length > 0;
 
   return (
-    <div className="modal-overlay" onClick={onClose} onKeyDown={handleKeyDown}>
+    <div
+      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
+      onClick={onClose}
+      onKeyDown={handleKeyDown}
+    >
       <div
-        className="modal save-assembly-modal"
+        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in w-[450px]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="save-assembly-modal-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="modal-header">
-          <h2 id="save-assembly-modal-title">Save as Assembly</h2>
+        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+          <h2 id="save-assembly-modal-title" className="text-base font-semibold text-text m-0">
+            Save as Assembly
+          </h2>
           <button className="btn btn-icon-sm btn-ghost btn-secondary" onClick={onClose} aria-label="Close">
             ×
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="modal-body">
-            <p className="modal-description">
+          <div className="p-5 overflow-y-auto">
+            <p className="text-[13px] text-text-muted mb-4 leading-relaxed">
               Save the current selection as a reusable assembly. You can place copies of this assembly on the canvas
               later.
             </p>
 
-            {!hasSelection && <div className="modal-warning">No parts or groups selected.</div>}
+            {!hasSelection && (
+              <div className="bg-warning-bg border border-warning text-warning py-2.5 px-3 rounded text-[13px] mb-4">
+                No parts or groups selected.
+              </div>
+            )}
 
             <div className="property-group">
               <label>Name *</label>
@@ -115,6 +126,7 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
             <div className="property-group">
               <label>Description (optional)</label>
               <textarea
+                className="w-full min-h-[60px] bg-bg border border-border text-text p-2 rounded text-[13px] font-[inherit] resize-y leading-snug focus:outline-none focus:border-accent placeholder:text-text-muted"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder='e.g., Standard drawer with 1/2" bottom, pocket screw joinery'
@@ -134,10 +146,14 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
               </label>
             </div>
 
-            {error && <div className="modal-error">{error}</div>}
+            {error && (
+              <div className="bg-[rgba(196,84,84,0.15)] border border-[rgba(196,84,84,0.4)] text-danger py-2.5 px-3 rounded text-[13px] mt-3">
+                {error}
+              </div>
+            )}
           </div>
 
-          <div className="modal-footer">
+          <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
             <button type="button" className="btn btn-sm btn-ghost btn-secondary" onClick={onClose}>
               Cancel
             </button>

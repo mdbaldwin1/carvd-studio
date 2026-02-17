@@ -2,20 +2,22 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useProjectStore, getAllDescendantPartIds } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
+import { useCameraStore } from '../../store/cameraStore';
 import { isOrbitControls } from './workspaceUtils';
 
 // Component that handles camera centering and view vector tracking
 export function CameraController() {
   const { camera, controls } = useThree();
   const parts = useProjectStore((s) => s.parts);
-  const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
-  const selectedGroupIds = useProjectStore((s) => s.selectedGroupIds);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
+  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const groupMembers = useProjectStore((s) => s.groupMembers);
-  const centerCameraRequested = useProjectStore((s) => s.centerCameraRequested);
-  const centerCameraAtOriginRequested = useProjectStore((s) => s.centerCameraAtOriginRequested);
-  const centerCameraAtPosition = useProjectStore((s) => s.centerCameraAtPosition);
-  const clearCenterCameraRequest = useProjectStore((s) => s.clearCenterCameraRequest);
-  const setCameraViewVectors = useProjectStore((s) => s.setCameraViewVectors);
+  const centerCameraRequested = useCameraStore((s) => s.centerCameraRequested);
+  const centerCameraAtOriginRequested = useCameraStore((s) => s.centerCameraAtOriginRequested);
+  const centerCameraAtPosition = useCameraStore((s) => s.centerCameraAtPosition);
+  const clearCenterCameraRequest = useCameraStore((s) => s.clearCenterCameraRequest);
+  const setCameraViewVectors = useCameraStore((s) => s.setCameraViewVectors);
 
   // Track previous camera view vectors to avoid unnecessary state updates
   const prevVectorsRef = useRef({

@@ -252,14 +252,13 @@ describe('NewProjectDialog', () => {
 
     it('calls onClose when X button is clicked', async () => {
       const onClose = vi.fn();
-      const { container } = render(<NewProjectDialog {...defaultProps} onClose={onClose} />);
+      render(<NewProjectDialog {...defaultProps} onClose={onClose} />);
 
       await waitFor(() => {
-        expect(container.querySelector('.close-btn')).toBeInTheDocument();
+        expect(screen.getByLabelText('Close')).toBeInTheDocument();
       });
 
-      const closeBtn = container.querySelector('.close-btn')!;
-      fireEvent.click(closeBtn);
+      fireEvent.click(screen.getByLabelText('Close'));
 
       expect(onClose).toHaveBeenCalled();
     });

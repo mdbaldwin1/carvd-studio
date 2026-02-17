@@ -6,6 +6,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useUIStore } from '../store/uiStore';
+import { useCameraStore } from '../store/cameraStore';
 import { serializeProject, parseCarvdFile, deserializeToProject } from '../utils/fileFormat';
 import { logger } from '../utils/logger';
 
@@ -59,7 +60,7 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
   const groupMembers = useProjectStore((s) => s.groupMembers);
   const assemblies = useProjectStore((s) => s.assemblies);
   const snapGuides = useProjectStore((s) => s.snapGuides);
-  const cameraState = useProjectStore((s) => s.cameraState);
+  const cameraState = useCameraStore((s) => s.cameraState);
   const customShoppingItems = useProjectStore((s) => s.customShoppingItems);
   const cutList = useProjectStore((s) => s.cutList);
   const loadProject = useProjectStore((s) => s.loadProject);

@@ -22,6 +22,7 @@
 
   /* Aliases for semantic naming */
   --color-bg-secondary: var(--color-bg-alt);
+  --color-bg-tertiary: #2e2e2e;
   --color-bg-sidebar: var(--color-surface);
 
   /* Text - cream tones */
@@ -112,6 +113,7 @@
 
   /* Aliases for semantic naming */
   --color-bg-secondary: var(--color-bg-alt);
+  --color-bg-tertiary: #e5d8b5;
   --color-bg-sidebar: var(--color-surface);
 
   /* Text - dark tones */
@@ -811,82 +813,6 @@ input[type='radio'] {
   display: block;
 }
 
-/* Dropdown Button */
-.dropdown-button-container {
-  position: relative;
-  display: inline-block;
-}
-
-.dropdown-button-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.dropdown-button-trigger.active {
-  background-color: var(--color-surface-hover);
-}
-
-.dropdown-button-icon {
-  display: flex;
-  align-items: center;
-}
-
-.dropdown-chevron {
-  transition: transform 0.15s ease;
-}
-
-.dropdown-chevron.rotated {
-  transform: rotate(180deg);
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 4px;
-  min-width: 160px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  padding: 4px;
-}
-
-.dropdown-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  background: none;
-  color: var(--color-text);
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.1s ease;
-}
-
-.dropdown-menu-item:hover:not(:disabled) {
-  background-color: var(--color-surface-hover);
-}
-
-.dropdown-menu-item:disabled,
-.dropdown-menu-item.disabled {
-  color: var(--color-text-muted);
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.dropdown-item-icon {
-  display: flex;
-  align-items: center;
-  color: var(--color-text-muted);
-}
-
 /* Camera Controls Legend (bottom-left corner of canvas) */
 .camera-controls-legend {
   position: absolute;
@@ -1246,99 +1172,6 @@ input[type='radio'] {
   color: var(--color-text-muted);
 }
 
-/* Add Stock Modal */
-.add-stock-modal {
-  width: 700px;
-}
-
-/* Modal search bar (for modals with filterable lists) */
-.modal-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  margin: 0 0 8px 0;
-}
-
-.modal-search-icon {
-  color: var(--color-text-muted);
-  flex-shrink: 0;
-}
-
-.modal-search input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--color-text);
-  font-size: 13px;
-  outline: none;
-}
-
-.modal-search input::placeholder {
-  color: var(--color-text-muted);
-}
-
-.modal-search-clear {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border: none;
-  background: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  padding: 0;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.modal-search-clear:hover {
-  color: var(--color-text);
-  background: var(--color-bg-hover);
-}
-
-/* Save Assembly Modal */
-.save-assembly-modal {
-  width: 450px;
-}
-
-.save-assembly-modal textarea {
-  width: 100%;
-  min-height: 60px;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  padding: 8px;
-  border-radius: 4px;
-  font-size: 13px;
-  font-family: inherit;
-  resize: vertical;
-  line-height: 1.4;
-}
-
-.save-assembly-modal textarea:focus {
-  outline: none;
-  border-color: var(--color-accent);
-}
-
-.save-assembly-modal textarea::placeholder {
-  color: var(--color-text-muted);
-}
-
-/* Edit Stock Modal */
-.edit-stock-modal {
-  width: 450px;
-}
-
-.edit-stock-content {
-  padding: 20px;
-  overflow-y: auto;
-}
-
 /* Rename Dialog Input */
 .rename-input {
   width: 100%;
@@ -1353,11 +1186,6 @@ input[type='radio'] {
 .rename-input:focus {
   outline: none;
   border-color: var(--color-primary);
-}
-
-/* App Settings Modal */
-.app-settings-modal {
-  width: 480px;
 }
 
 /* Project Settings Modal */
@@ -1692,49 +1520,6 @@ input[type='radio'] {
   background: var(--color-accent);
   color: var(--color-bg);
   border-color: var(--color-accent);
-}
-
-/* Reference Distance Indicators */
-.reference-distance-label {
-  padding: 2px 6px;
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: 3px;
-  cursor: pointer;
-  white-space: nowrap;
-  user-select: none;
-  transition: all 0.1s ease;
-}
-
-.reference-distance-label.edge-to-edge {
-  background: rgba(0, 217, 255, 0.9);
-  color: #000;
-}
-
-.reference-distance-label.edge-offset {
-  background: rgba(255, 204, 0, 0.9);
-  color: #000;
-}
-
-.reference-distance-label:hover {
-  transform: scale(1.05);
-}
-
-.reference-distance-input {
-  width: 70px;
-  padding: 2px 6px;
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: 3px;
-  border: 2px solid var(--color-accent);
-  background: var(--color-surface);
-  color: var(--color-text);
-  text-align: center;
-  outline: none;
-}
-
-.reference-distance-input:focus {
-  box-shadow: 0 0 0 2px rgba(0, 127, 255, 0.3);
 }
 
 .add-stock-content {
@@ -2532,12 +2317,6 @@ input[type='radio'] {
   margin-right: 4px;
 }
 
-/* Stock Library Modal */
-.stock-library-modal {
-  width: 750px;
-  height: 500px;
-}
-
 .stock-library-content {
   display: flex;
   flex: 1;
@@ -2809,15 +2588,6 @@ input[type='radio'] {
   content: '⚠ ';
 }
 
-/* Add Assembly Modal */
-.add-assembly-modal {
-  width: 700px;
-  max-width: 90vw;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-}
-
 .add-assembly-content {
   display: flex;
   flex: 1;
@@ -3085,33 +2855,6 @@ input[type='radio'] {
 
 .group-warning-icon.error {
   color: var(--color-danger, #c45454);
-}
-
-/* Cut List Modal */
-.cut-list-modal {
-  display: flex;
-  flex-direction: column;
-  max-height: 85vh;
-  min-height: 500px;
-  width: 900px;
-  max-width: 95vw;
-}
-
-.cut-list-modal .modal-header {
-  padding: 20px 24px;
-  background: var(--color-bg);
-}
-
-.cut-list-modal .modal-header h2 {
-  font-size: 18px;
-}
-
-.cut-list-modal .modal-body {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  padding: 0;
 }
 
 .cut-list-content {
@@ -4097,17 +3840,6 @@ input[type='radio'] {
   color: var(--color-text-secondary);
 }
 
-/* Cut List Modal Footer */
-.cut-list-modal .modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 16px 24px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg);
-}
-
 .cut-list-footer {
   display: flex;
   align-items: center;
@@ -4305,209 +4037,6 @@ input[type='radio'] {
   body.printing-diagrams .part-label {
     color: black !important;
   }
-}
-
-/* ============================================
-   Tutorial Tooltip Styles
-   ============================================ */
-
-.tutorial-tooltip {
-  position: fixed;
-  z-index: 10002;
-  max-width: 420px;
-  min-width: 360px;
-}
-
-.tutorial-tooltip-card {
-  background-color: var(--color-surface);
-  border-radius: 8px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  border: 2px solid var(--color-accent);
-  overflow: hidden;
-}
-
-.tutorial-tooltip-progress {
-  height: 8px;
-  background-color: var(--color-bg);
-}
-
-.tutorial-tooltip-progress-bar {
-  height: 100%;
-  background-color: var(--color-accent);
-  transition: width 0.3s ease;
-}
-
-.tutorial-tooltip-header {
-  padding: 24px 24px 16px;
-}
-
-.tutorial-tooltip-header-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.tutorial-tooltip-title {
-  font-size: 20px;
-  font-weight: bold;
-  color: var(--color-text);
-  padding-right: 16px;
-  margin: 0;
-}
-
-.tutorial-tooltip-close {
-  background: none;
-  border: none;
-  color: var(--color-text-muted);
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-  margin-top: -4px;
-  margin-right: -4px;
-  transition: color 0.2s;
-}
-
-.tutorial-tooltip-close:hover {
-  color: var(--color-text);
-}
-
-.tutorial-tooltip-step {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-accent);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.tutorial-tooltip-content {
-  margin: 0 24px 24px;
-  padding: 20px;
-  background-color: var(--color-bg);
-  border-radius: 6px;
-  border: 1px solid var(--color-border);
-}
-
-.tutorial-tooltip-content p {
-  color: var(--color-text);
-  font-size: 16px;
-  line-height: 1.6;
-  margin: 0;
-}
-
-.tutorial-tooltip-footer {
-  padding: 0 24px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.tutorial-tooltip-skip {
-  background: none;
-  border: none;
-  font-size: 14px;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font-weight: 500;
-  text-decoration: underline;
-  padding: 0;
-  transition: color 0.2s;
-}
-
-.tutorial-tooltip-skip:hover {
-  color: var(--color-accent);
-}
-
-.tutorial-tooltip-docs-link {
-  font-size: 14px;
-  color: var(--color-text-muted);
-  text-decoration: underline;
-  cursor: pointer;
-  font-weight: 500;
-  transition: color 0.2s;
-}
-
-.tutorial-tooltip-docs-link:hover {
-  color: var(--color-accent);
-}
-
-.tutorial-tooltip-nav {
-  display: flex;
-  gap: 8px;
-}
-
-.tutorial-tooltip-btn-secondary {
-  padding: 8px 20px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--color-text);
-  background-color: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.tutorial-tooltip-btn-secondary:hover {
-  background-color: var(--color-bg-hover);
-}
-
-.tutorial-tooltip-btn-primary {
-  padding: 8px 24px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-bg-dark);
-  background-color: var(--color-accent);
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  box-shadow: 0 10px 15px -3px var(--color-overlay);
-  transition: background-color 0.2s;
-}
-
-.tutorial-tooltip-btn-primary:hover {
-  background-color: var(--color-accent-hover);
-}
-
-.tutorial-tooltip-arrow {
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 8px solid transparent;
-  border-right: 8px solid transparent;
-  border-bottom: 8px solid var(--color-accent);
-}
-
-/* ============================================
-   Tutorial Overlay Styles
-   ============================================ */
-
-.tutorial-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 10000;
-  pointer-events: none;
-}
-
-.tutorial-overlay-svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.tutorial-overlay-content {
-  pointer-events: all;
 }
 
 /* ============================================
@@ -4784,94 +4313,6 @@ input[type='radio'] {
   display: flex;
   gap: 8px;
   justify-content: center;
-}
-
-/* ============================================================
-   About Modal
-   ============================================================ */
-
-.about-modal {
-  width: 420px;
-}
-
-.about-content {
-  padding: 24px;
-  text-align: center;
-}
-
-.about-logo {
-  margin-bottom: 20px;
-}
-
-.about-icon {
-  font-size: 48px;
-  display: block;
-  margin-bottom: 8px;
-}
-
-.about-logo h3 {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin: 0 0 4px 0;
-}
-
-.about-version {
-  font-size: 13px;
-  color: var(--color-text-muted);
-  margin: 0;
-}
-
-.about-description {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-  margin: 0 0 20px 0;
-}
-
-.about-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  margin-bottom: 20px;
-}
-
-.about-disclaimer {
-  padding: 12px;
-  background: var(--color-bg);
-  border-radius: 6px;
-  margin-bottom: 16px;
-}
-
-.about-disclaimer p {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-  margin: 0;
-}
-
-.about-copyright {
-  font-size: 11px;
-  color: var(--color-text-muted);
-}
-
-.about-copyright p {
-  margin: 0 0 4px 0;
-}
-
-.about-contact .btn-link {
-  background: none;
-  border: none;
-  color: var(--color-primary);
-  cursor: pointer;
-  padding: 0;
-  font-size: inherit;
-  text-decoration: underline;
-}
-
-.about-contact .btn-link:hover {
-  color: var(--color-primary-hover);
 }
 
 /* ============================================================

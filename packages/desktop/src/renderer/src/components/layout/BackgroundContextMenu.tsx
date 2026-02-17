@@ -1,5 +1,6 @@
 import { useProjectStore, captureCanvas } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
+import { useCameraStore } from '../../store/cameraStore';
 
 interface BackgroundContextMenuProps {
   menuRef: React.RefObject<HTMLDivElement>;
@@ -11,8 +12,8 @@ interface BackgroundContextMenuProps {
 
 export function BackgroundContextMenu({ menuRef, x, y, onClose, worldPosition }: BackgroundContextMenuProps) {
   const clipboard = useProjectStore((s) => s.clipboard);
-  const requestCenterCameraAtOrigin = useProjectStore((s) => s.requestCenterCameraAtOrigin);
-  const requestCenterCameraAtPosition = useProjectStore((s) => s.requestCenterCameraAtPosition);
+  const requestCenterCameraAtOrigin = useCameraStore((s) => s.requestCenterCameraAtOrigin);
+  const requestCenterCameraAtPosition = useCameraStore((s) => s.requestCenterCameraAtPosition);
   const pasteAtPosition = useProjectStore((s) => s.pasteAtPosition);
   const addSnapGuide = useProjectStore((s) => s.addSnapGuide);
   const snapGuides = useProjectStore((s) => s.snapGuides);
