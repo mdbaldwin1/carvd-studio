@@ -61,12 +61,5 @@ export const GRAIN_ARROW_MATERIAL = new THREE.MeshStandardMaterial({
 export const GRAIN_ARROW_HEAD_GEOMETRY = new THREE.BufferGeometry();
 GRAIN_ARROW_HEAD_GEOMETRY.setAttribute(
   'position',
-  new THREE.BufferAttribute(
-    new Float32Array([
-      -0.5, -1, 0,
-      -0.5, 1, 0,
-      0.5, 0, 0
-    ]),
-    3
-  )
+  new THREE.BufferAttribute(new Float32Array([-0.5, -1, 0, -0.5, 1, 0, 0.5, 0, 0]), 3)
 );

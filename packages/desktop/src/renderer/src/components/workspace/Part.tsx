@@ -314,9 +314,7 @@ export const Part = memo(function Part({ part }: PartProps) {
         {/* Grain direction arrow - show when enabled, grain-sensitive, and close enough to camera */}
         {showGrainDirection &&
           part.grainSensitive &&
-          (camera.position.x - renderX) ** 2 +
-            (camera.position.y - renderY) ** 2 +
-            (camera.position.z - renderZ) ** 2 <
+          (camera.position.x - renderX) ** 2 + (camera.position.y - renderY) ** 2 + (camera.position.z - renderZ) ** 2 <
             GRAIN_ARROW_MAX_DISTANCE_SQ && (
             <GrainDirectionArrow liveDims={liveDims} grainDirection={part.grainDirection} />
           )}
