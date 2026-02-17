@@ -1,6 +1,6 @@
 import { Edges } from '@react-three/drei';
 import { ThreeEvent, useThree } from '@react-three/fiber';
-import { memo, useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { useShallow } from 'zustand/shallow';
 import { useProjectStore, getAncestorGroupIds } from '../../store/projectStore';
@@ -15,6 +15,7 @@ import { ResizeHandle } from './ResizeHandle';
 import { RotationHandle } from './RotationHandle';
 import { usePartDrag } from './usePartDrag';
 import { usePartResize } from './usePartResize';
+import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 
 interface PartProps {
   part: PartType;
@@ -109,20 +110,7 @@ export const Part = memo(function Part({ part }: PartProps) {
 
   // Enforce ground constraint after rotation or dimension changes
   useEffect(() => {
-    const rotX = (part.rotation.x * Math.PI) / 180;
-    const rotY = (part.rotation.y * Math.PI) / 180;
-    const rotZ = (part.rotation.z * Math.PI) / 180;
-    const euler = new THREE.Euler(rotX, rotY, rotZ, 'XYZ');
-    const quat = new THREE.Quaternion().setFromEuler(euler);
-
-    const upVector = new THREE.Vector3(0, 1, 0);
-    const localX = new THREE.Vector3(1, 0, 0).applyQuaternion(quat);
-    const localY = new THREE.Vector3(0, 1, 0).applyQuaternion(quat);
-    const localZ = new THREE.Vector3(0, 0, 1).applyQuaternion(quat);
-    const worldHalfHeight =
-      Math.abs(localX.dot(upVector)) * (part.length / 2) +
-      Math.abs(localY.dot(upVector)) * (part.thickness / 2) +
-      Math.abs(localZ.dot(upVector)) * (part.width / 2);
+    const worldHalfHeight = calculateWorldHalfHeightFromDegrees(part.rotation, part.length, part.thickness, part.width);
 
     if (part.position.y < worldHalfHeight) {
       updatePart(part.id, {
@@ -146,10 +134,12 @@ export const Part = memo(function Part({ part }: PartProps) {
   const rotationY = (part.rotation.y * Math.PI) / 180;
   const rotationZ = (part.rotation.z * Math.PI) / 180;
 
-  // Create rotation matrix and its inverse for transforming between world and local space
-  const rotationEuler = new THREE.Euler(rotationX, rotationY, rotationZ, 'XYZ');
-  const rotationQuaternion = new THREE.Quaternion().setFromEuler(rotationEuler);
-  const inverseRotationQuaternion = rotationQuaternion.clone().invert();
+  // Memoized rotation objects - only recreated when rotation actually changes
+  const rotationQuaternion = useMemo(() => {
+    const euler = new THREE.Euler(rotationX, rotationY, rotationZ, 'XYZ');
+    return new THREE.Quaternion().setFromEuler(euler);
+  }, [rotationX, rotationY, rotationZ]);
+  const inverseRotationQuaternion = useMemo(() => rotationQuaternion.clone().invert(), [rotationQuaternion]);
 
   // Drag hook
   const { isDragging, justFinishedDragging, handlePointerDown } = usePartDrag(

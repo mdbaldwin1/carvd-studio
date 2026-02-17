@@ -21,6 +21,7 @@ import {
 } from '../../utils/snapToPartsUtil';
 import { LiveDimensions, snapToGrid } from './partTypes';
 import { isOrbitControls, setRightClickTarget } from './workspaceUtils';
+import { calculateWorldHalfHeight, calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 
 /**
  * Hook encapsulating all drag (move) logic for a Part component.
@@ -57,6 +58,17 @@ export function usePartDrag(
 
   const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const raycaster = useRef(new THREE.Raycaster());
+
+  // Reusable objects for hot-path calculations (avoids GC pressure during drag)
+  const _tempVec2 = useRef(new THREE.Vector2());
+  const _tempIntersection = useRef(new THREE.Vector3());
+  const _tempForward = useRef(new THREE.Vector3());
+  const _tempAxisX = useRef(new THREE.Vector3());
+  const _tempAxisY = useRef(new THREE.Vector3());
+  const _tempAxisZ = useRef(new THREE.Vector3());
+  const _tempNormal = useRef(new THREE.Vector3());
+  const _tempCameraTarget = useRef(new THREE.Vector3());
+  const _tempDelta = useRef(new THREE.Vector3());
 
   // Calculate axis-aligned bounding box for a part at a given position (considering rotation)
   const getPartAABB = (p: PartType, position: { x: number; y: number; z: number }) => {
@@ -138,10 +150,9 @@ export function usePartDrag(
       const rect = gl.domElement.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.current.setFromCamera(new THREE.Vector2(x, y), camera);
-      const intersection = new THREE.Vector3();
-      if (raycaster.current.ray.intersectPlane(planeRef.current, intersection)) {
-        return intersection;
+      raycaster.current.setFromCamera(_tempVec2.current.set(x, y), camera);
+      if (raycaster.current.ray.intersectPlane(planeRef.current, _tempIntersection.current)) {
+        return _tempIntersection.current;
       }
       return null;
     },
@@ -155,29 +166,28 @@ export function usePartDrag(
 
   const getDragPlaneInfo = useCallback(
     (partPosition: THREE.Vector3): DragPlaneInfo => {
-      const forward = new THREE.Vector3(0, 0, -1);
-      forward.applyQuaternion(camera.quaternion);
+      _tempForward.current.set(0, 0, -1).applyQuaternion(camera.quaternion);
 
-      const dotX = Math.abs(forward.dot(new THREE.Vector3(1, 0, 0)));
-      const dotY = Math.abs(forward.dot(new THREE.Vector3(0, 1, 0)));
-      const dotZ = Math.abs(forward.dot(new THREE.Vector3(0, 0, 1)));
+      const dotX = Math.abs(_tempForward.current.dot(_tempAxisX.current.set(1, 0, 0)));
+      const dotY = Math.abs(_tempForward.current.dot(_tempAxisY.current.set(0, 1, 0)));
+      const dotZ = Math.abs(_tempForward.current.dot(_tempAxisZ.current.set(0, 0, 1)));
 
       if (dotZ >= dotX && dotZ >= dotY) {
-        planeRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 0, 1), partPosition);
+        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.set(0, 0, 1), partPosition);
         return {
-          normal: new THREE.Vector3(0, 0, 1),
+          normal: _tempNormal.current.set(0, 0, 1),
           axes: { x: true, y: true, z: false }
         };
       } else if (dotX >= dotY) {
-        planeRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(1, 0, 0), partPosition);
+        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.set(1, 0, 0), partPosition);
         return {
-          normal: new THREE.Vector3(1, 0, 0),
+          normal: _tempNormal.current.set(1, 0, 0),
           axes: { x: false, y: true, z: true }
         };
       } else {
-        planeRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), partPosition);
+        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.set(0, 1, 0), partPosition);
         return {
-          normal: new THREE.Vector3(0, 1, 0),
+          normal: _tempNormal.current.set(0, 1, 0),
           axes: { x: true, y: false, z: true }
         };
       }
@@ -193,7 +203,7 @@ export function usePartDrag(
       if (isDragging && dragStart.current) {
         const currentPoint = getWorldPoint(e);
         if (currentPoint) {
-          const delta = currentPoint.clone().sub(dragStart.current.point);
+          const delta = _tempDelta.current.copy(currentPoint).sub(dragStart.current.point);
           const planeInfo = getDragPlaneInfo(dragStart.current.partPos);
 
           let newX = planeInfo.axes.x ? dragStart.current.partPos.x + delta.x : liveDims.x;
@@ -201,14 +211,12 @@ export function usePartDrag(
           let newZ = planeInfo.axes.z ? dragStart.current.partPos.z + delta.z : liveDims.z;
 
           // Constrain to ground during move
-          const upVector = new THREE.Vector3(0, 1, 0);
-          const localX = new THREE.Vector3(1, 0, 0).applyQuaternion(rotationQuaternion);
-          const localY = new THREE.Vector3(0, 1, 0).applyQuaternion(rotationQuaternion);
-          const localZ = new THREE.Vector3(0, 0, 1).applyQuaternion(rotationQuaternion);
-          const worldHalfHeight =
-            Math.abs(localX.dot(upVector)) * (liveDims.length / 2) +
-            Math.abs(localY.dot(upVector)) * (liveDims.thickness / 2) +
-            Math.abs(localZ.dot(upVector)) * (liveDims.width / 2);
+          const worldHalfHeight = calculateWorldHalfHeight(
+            rotationQuaternion,
+            liveDims.length,
+            liveDims.thickness,
+            liveDims.width
+          );
           newY = Math.max(worldHalfHeight, newY);
 
           // Apply snap-to-parts if enabled (Alt key temporarily bypasses snapping)
@@ -237,7 +245,7 @@ export function usePartDrag(
           const snapLines: import('../../types').SnapLine[] = [];
 
           if (isSnapEnabled) {
-            const cameraDistance = camera.position.distanceTo(new THREE.Vector3(newX, newY, newZ));
+            const cameraDistance = camera.position.distanceTo(_tempCameraTarget.current.set(newX, newY, newZ));
             const snapThreshold = calculateSnapThreshold(cameraDistance, snapSensitivity);
 
             const draggingBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
@@ -478,22 +486,12 @@ export function usePartDrag(
             const selectedPart = allParts.find((p) => p.id === selectedId);
             if (!selectedPart) continue;
 
-            const partRotation = new THREE.Quaternion().setFromEuler(
-              new THREE.Euler(
-                (selectedPart.rotation.x * Math.PI) / 180,
-                (selectedPart.rotation.y * Math.PI) / 180,
-                (selectedPart.rotation.z * Math.PI) / 180
-              )
+            const worldHalfHeight = calculateWorldHalfHeightFromDegrees(
+              selectedPart.rotation,
+              selectedPart.length,
+              selectedPart.thickness,
+              selectedPart.width
             );
-
-            const upVector = new THREE.Vector3(0, 1, 0);
-            const localX = new THREE.Vector3(1, 0, 0).applyQuaternion(partRotation);
-            const localY = new THREE.Vector3(0, 1, 0).applyQuaternion(partRotation);
-            const localZ = new THREE.Vector3(0, 0, 1).applyQuaternion(partRotation);
-            const worldHalfHeight =
-              Math.abs(localX.dot(upVector)) * (selectedPart.length / 2) +
-              Math.abs(localY.dot(upVector)) * (selectedPart.thickness / 2) +
-              Math.abs(localZ.dot(upVector)) * (selectedPart.width / 2);
 
             const projectedY = selectedPart.position.y + baseDelta.y;
             const minY = worldHalfHeight;
@@ -561,15 +559,13 @@ export function usePartDrag(
           useSelectionStore.getState().setActiveDragDelta(null);
         } else {
           // Single part - apply ground constraint just to this one
-          const upVector = new THREE.Vector3(0, 1, 0);
-          const localX = new THREE.Vector3(1, 0, 0).applyQuaternion(rotationQuaternion);
-          const localY = new THREE.Vector3(0, 1, 0).applyQuaternion(rotationQuaternion);
-          const localZ = new THREE.Vector3(0, 0, 1).applyQuaternion(rotationQuaternion);
-          const worldHalfHeight =
-            Math.abs(localX.dot(upVector)) * (liveDims.length / 2) +
-            Math.abs(localY.dot(upVector)) * (liveDims.thickness / 2) +
-            Math.abs(localZ.dot(upVector)) * (liveDims.width / 2);
-          newY = Math.max(worldHalfHeight, newY);
+          const singlePartWorldHalfHeight = calculateWorldHalfHeight(
+            rotationQuaternion,
+            liveDims.length,
+            liveDims.thickness,
+            liveDims.width
+          );
+          newY = Math.max(singlePartWorldHalfHeight, newY);
 
           // Check overlap prevention for final snapped position
           const stockConstraints = useProjectStore.getState().stockConstraints;

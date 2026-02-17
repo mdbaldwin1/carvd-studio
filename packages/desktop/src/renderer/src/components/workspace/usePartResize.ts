@@ -13,6 +13,7 @@ import {
 } from '../../utils/snapToPartsUtil';
 import { LiveDimensions, HandlePosition, snapToGrid } from './partTypes';
 import { isOrbitControls } from './workspaceUtils';
+import { calculateWorldHalfHeight } from '../../utils/mathPool';
 
 /**
  * Hook encapsulating all resize logic for a Part component.
@@ -42,9 +43,23 @@ export function usePartResize(
   const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const raycaster = useRef(new THREE.Raycaster());
 
+  // Reusable objects for hot-path calculations (avoids GC pressure during resize)
+  const _tempVec2 = useRef(new THREE.Vector2());
+  const _tempIntersection = useRef(new THREE.Vector3());
+  const _tempForward = useRef(new THREE.Vector3());
+  const _tempAxisX = useRef(new THREE.Vector3());
+  const _tempAxisY = useRef(new THREE.Vector3());
+  const _tempAxisZ = useRef(new THREE.Vector3());
+  const _tempNormal = useRef(new THREE.Vector3());
+  const _tempLocalDelta = useRef(new THREE.Vector3());
+  const _tempWorldDelta = useRef(new THREE.Vector3());
+  const _tempLocalOffset = useRef(new THREE.Vector3());
+  const _tempWorldOffset = useRef(new THREE.Vector3());
+  const _tempCameraTarget = useRef(new THREE.Vector3());
+
   // Transform a world-space vector to local space (accounts for part rotation)
   const worldToLocal = (worldDelta: THREE.Vector3): THREE.Vector3 => {
-    return worldDelta.clone().applyQuaternion(inverseRotationQuaternion);
+    return _tempLocalDelta.current.copy(worldDelta).applyQuaternion(inverseRotationQuaternion);
   };
 
   const getWorldPoint = useCallback(
@@ -52,10 +67,9 @@ export function usePartResize(
       const rect = gl.domElement.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.current.setFromCamera(new THREE.Vector2(x, y), camera);
-      const intersection = new THREE.Vector3();
-      if (raycaster.current.ray.intersectPlane(planeRef.current, intersection)) {
-        return intersection;
+      raycaster.current.setFromCamera(_tempVec2.current.set(x, y), camera);
+      if (raycaster.current.ray.intersectPlane(planeRef.current, _tempIntersection.current)) {
+        return _tempIntersection.current;
       }
       return null;
     },
@@ -64,19 +78,18 @@ export function usePartResize(
 
   const getDragPlaneInfo = useCallback(
     (partPosition: THREE.Vector3) => {
-      const forward = new THREE.Vector3(0, 0, -1);
-      forward.applyQuaternion(camera.quaternion);
+      _tempForward.current.set(0, 0, -1).applyQuaternion(camera.quaternion);
 
-      const dotX = Math.abs(forward.dot(new THREE.Vector3(1, 0, 0)));
-      const dotY = Math.abs(forward.dot(new THREE.Vector3(0, 1, 0)));
-      const dotZ = Math.abs(forward.dot(new THREE.Vector3(0, 0, 1)));
+      const dotX = Math.abs(_tempForward.current.dot(_tempAxisX.current.set(1, 0, 0)));
+      const dotY = Math.abs(_tempForward.current.dot(_tempAxisY.current.set(0, 1, 0)));
+      const dotZ = Math.abs(_tempForward.current.dot(_tempAxisZ.current.set(0, 0, 1)));
 
       if (dotZ >= dotX && dotZ >= dotY) {
-        planeRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 0, 1), partPosition);
+        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.set(0, 0, 1), partPosition);
       } else if (dotX >= dotY) {
-        planeRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(1, 0, 0), partPosition);
+        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.set(1, 0, 0), partPosition);
       } else {
-        planeRef.current.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), partPosition);
+        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.set(0, 1, 0), partPosition);
       }
     },
     [camera]
@@ -86,7 +99,7 @@ export function usePartResize(
     if (!resizeStart.current) return;
 
     const { handlePos, startPoint, partPos, partLength, partWidth, partThickness } = resizeStart.current;
-    const worldDelta = currentPoint.clone().sub(startPoint);
+    const worldDelta = _tempWorldDelta.current.copy(currentPoint).sub(startPoint);
     const localDelta = worldToLocal(worldDelta);
 
     let newLength = partLength;
@@ -144,7 +157,7 @@ export function usePartResize(
       currentReferenceIds.length > 0 ? allParts.filter((p) => currentReferenceIds.includes(p.id)) : allParts;
 
     if (isSnapEnabled) {
-      const cameraDistance = camera.position.distanceTo(new THREE.Vector3(partPos.x, partPos.y, partPos.z));
+      const cameraDistance = camera.position.distanceTo(_tempCameraTarget.current.set(partPos.x, partPos.y, partPos.z));
       const snapThreshold = calculateSnapThreshold(cameraDistance, snapSensitivity);
 
       const dimensionSnaps = detectDimensionSnaps(
@@ -206,16 +219,16 @@ export function usePartResize(
     useSnapStore.getState().setActiveReferenceDistances([]);
 
     // Calculate the world-space center offset to keep the fixed corner/edge in place
-    const localCenterOffset = new THREE.Vector3(
+    _tempLocalOffset.current.set(
       ((newLength - partLength) / 2) * handlePos.x,
       ((newThickness - partThickness) / 2) * handlePos.y,
       ((newWidth - partWidth) / 2) * handlePos.z
     );
-    const worldCenterOffset = localCenterOffset.clone().applyQuaternion(rotationQuaternion);
+    _tempWorldOffset.current.copy(_tempLocalOffset.current).applyQuaternion(rotationQuaternion);
 
-    const newX = partPos.x + worldCenterOffset.x;
-    const newY = partPos.y + worldCenterOffset.y;
-    const newZ = partPos.z + worldCenterOffset.z;
+    const newX = partPos.x + _tempWorldOffset.current.x;
+    const newY = partPos.y + _tempWorldOffset.current.y;
+    const newZ = partPos.z + _tempWorldOffset.current.z;
 
     // Note: We don't clamp to ground during live resize to avoid the "opposite direction"
     // bug where clamping position but not dimensions causes inconsistent behavior.
@@ -251,30 +264,23 @@ export function usePartResize(
     let newWidth = Math.min(maxWidth, Math.max(0.5, snapToGrid(liveDims.width)));
     let newThickness = Math.min(maxThickness, Math.max(0.25, snapToGrid(liveDims.thickness)));
 
-    const localCenterOffset = new THREE.Vector3(
+    _tempLocalOffset.current.set(
       ((newLength - partLength) / 2) * handlePos.x,
       ((newThickness - partThickness) / 2) * handlePos.y,
       ((newWidth - partWidth) / 2) * handlePos.z
     );
-    const worldCenterOffset = localCenterOffset.clone().applyQuaternion(rotationQuaternion);
+    _tempWorldOffset.current.copy(_tempLocalOffset.current).applyQuaternion(rotationQuaternion);
 
-    let newX = partPos.x + worldCenterOffset.x;
-    let newY = partPos.y + worldCenterOffset.y;
-    let newZ = partPos.z + worldCenterOffset.z;
+    let newX = partPos.x + _tempWorldOffset.current.x;
+    let newY = partPos.y + _tempWorldOffset.current.y;
+    let newZ = partPos.z + _tempWorldOffset.current.z;
 
     newX = snapToGrid(newX);
     newY = snapToGrid(newY);
     newZ = snapToGrid(newZ);
 
     // Keep part above ground
-    const upVector = new THREE.Vector3(0, 1, 0);
-    const localX = new THREE.Vector3(1, 0, 0).applyQuaternion(rotationQuaternion);
-    const localY = new THREE.Vector3(0, 1, 0).applyQuaternion(rotationQuaternion);
-    const localZ = new THREE.Vector3(0, 0, 1).applyQuaternion(rotationQuaternion);
-    const worldHalfHeight =
-      Math.abs(localX.dot(upVector)) * (newLength / 2) +
-      Math.abs(localY.dot(upVector)) * (newThickness / 2) +
-      Math.abs(localZ.dot(upVector)) * (newWidth / 2);
+    const worldHalfHeight = calculateWorldHalfHeight(rotationQuaternion, newLength, newThickness, newWidth);
     newY = Math.max(worldHalfHeight, newY);
 
     updatePart(part.id, {
