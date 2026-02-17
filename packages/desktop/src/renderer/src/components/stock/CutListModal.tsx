@@ -152,7 +152,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
               generating.{' '}
               <a
                 href="#"
-                className="learn-more-link"
+                className="text-accent no-underline hover:underline hover:text-accent-hover transition-colors duration-150"
                 onClick={(e) => {
                   e.preventDefault();
                   window.electronAPI.openExternal('https://carvd-studio.com/docs#cut-lists');

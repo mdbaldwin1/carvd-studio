@@ -645,7 +645,7 @@ describe('StockLibraryModal', () => {
 
       fireEvent.click(screen.getByText('Assemblies (1)'));
 
-      const assemblyItem = screen.getByText('Drawer Assembly').closest('.stock-library-item');
+      const assemblyItem = screen.getByText('Drawer Assembly').closest('li');
       expect(assemblyItem).toHaveAttribute('draggable', 'true');
     });
   });
@@ -727,7 +727,7 @@ describe('StockLibraryModal', () => {
 
       fireEvent.click(screen.getByText('Plywood 3/4"'));
 
-      const swatch = document.querySelector('.detail-color-swatch');
+      const swatch = document.querySelector('span[style*="background-color"]');
       expect(swatch).toHaveStyle({ backgroundColor: '#c4a574' });
     });
   });

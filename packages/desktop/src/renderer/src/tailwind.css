@@ -1,15 +1,189 @@
+/* Google Fonts - Roboto & Roboto Slab */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&family=Roboto+Slab:wght@400;500;600;700&display=swap');
+
 @import 'tailwindcss';
 
+/* ===========================================
+   CSS CUSTOM PROPERTIES
+   Dark theme (default) and light theme overrides
+   =========================================== */
+
+:root {
+  /* Backgrounds - dark greys */
+  --color-bg: #1a1a1a;
+  --color-bg-alt: #222222;
+  --color-bg-hover: #2a2a2a;
+  --color-bg-dark: #1a1a1a;
+  --color-surface: #242424;
+  --color-surface-hover: #2a2a2a;
+  --color-border: #333;
+  --color-selected: #3a3a3a;
+  --color-overlay: rgba(0, 0, 0, 0.6);
+  --color-overlay-heavy: rgba(0, 0, 0, 0.75);
+
+  /* Aliases for semantic naming */
+  --color-bg-secondary: var(--color-bg-alt);
+  --color-bg-tertiary: #2e2e2e;
+  --color-bg-sidebar: var(--color-surface);
+
+  /* Text - cream tones */
+  --color-text: #ffeecf;
+  --color-text-muted: #a89f8f;
+  --color-text-secondary: var(--color-text-muted);
+  --color-text-tertiary: #7a7265;
+
+  /* Accent - lavender (decorative, focus, highlights) */
+  --color-accent: #aea4bf;
+  --color-accent-hover: #c4bcd0;
+  --color-accent-muted: #8d82a3;
+  --color-accent-bg: rgba(174, 164, 191, 0.15);
+  --color-accent-foreground: #1a1a1a; /* Dark text on light lavender */
+
+  /* Primary - teal (main CTAs, buttons) */
+  --color-primary: #077187;
+  --color-primary-hover: #09a2bc;
+  --color-primary-muted: #055f70;
+  --color-primary-bg: rgba(7, 113, 135, 0.15);
+  --color-primary-foreground: #ffffff; /* White text on teal */
+
+  /* Secondary - deep navy (emphasis, active states) */
+  --color-secondary: #203864;
+  --color-secondary-hover: #2d4a80;
+  --color-secondary-muted: #162749;
+  --color-secondary-foreground: #ffffff; /* White text on navy */
+
+  /* Semantic colors */
+  --color-warning: #ffd21f;
+  --color-warning-hover: #ffe566;
+  --color-warning-bg: rgba(255, 210, 31, 0.15);
+  --color-warning-border: #ffd21f;
+  --color-warning-text: #1a1a1a;
+
+  --color-danger: #c45454;
+  --color-danger-hover: #d46b6b;
+  --color-danger-bg: rgba(196, 84, 84, 0.15);
+  --color-danger-border: #c45454;
+
+  --color-success: #2a9d6a;
+  --color-success-hover: #34b87d;
+  --color-success-bg: rgba(42, 157, 106, 0.15);
+  --color-success-border: #2a9d6a;
+
+  /* Error - alias for danger (commonly used naming) */
+  --color-error: var(--color-danger);
+  --color-error-hover: var(--color-danger-hover);
+  --color-error-bg: var(--color-danger-bg);
+  --color-error-border: var(--color-danger-border);
+  --color-error-text: var(--color-danger);
+
+  /* Reference parts - uses teal from palette */
+  --color-reference: #077187;
+  --color-reference-bg: rgba(7, 113, 135, 0.15);
+
+  /* Info - uses lavender for informational elements */
+  --color-info: #aea4bf;
+  --color-info-bg: rgba(174, 164, 191, 0.15);
+  --color-info-border: #aea4bf;
+  --color-info-text: #ffeecf;
+
+  /* Layout */
+  --sidebar-width: 240px;
+  --header-height: 48px;
+
+  /* Spacing & Radii */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  color-scheme: dark;
+}
+
+/* Light theme */
+[data-theme='light'] {
+  /* Backgrounds - light cream/neutral tones */
+  --color-bg: #ffeecf;
+  --color-bg-alt: #f5e4bf;
+  --color-bg-hover: #ebe0c0;
+  --color-bg-dark: #1a1a1a;
+  --color-surface: #fff8eb;
+  --color-surface-hover: #f5eddc;
+  --color-border: #d4c9b0;
+  --color-selected: #e8dcc5;
+  --color-overlay: rgba(0, 0, 0, 0.5);
+  --color-overlay-heavy: rgba(0, 0, 0, 0.65);
+
+  /* Aliases for semantic naming */
+  --color-bg-secondary: var(--color-bg-alt);
+  --color-bg-tertiary: #e5d8b5;
+  --color-bg-sidebar: var(--color-surface);
+
+  /* Text - dark tones */
+  --color-text: #1a1a1a;
+  --color-text-muted: #5a5247;
+  --color-text-secondary: var(--color-text-muted);
+  --color-text-tertiary: #8a8275;
+
+  /* Accent - lavender */
+  --color-accent: #8d82a3;
+  --color-accent-hover: #7a6f91;
+  --color-accent-muted: #aea4bf;
+  --color-accent-bg: rgba(141, 130, 163, 0.15);
+  --color-accent-foreground: #ffffff; /* White text on darker lavender in light mode */
+
+  /* Primary - teal */
+  --color-primary: #055f70;
+  --color-primary-hover: #044d5b;
+  --color-primary-muted: #077187;
+  --color-primary-bg: rgba(5, 95, 112, 0.12);
+  --color-primary-foreground: #ffffff; /* White text on teal */
+
+  /* Secondary - deep navy */
+  --color-secondary: #203864;
+  --color-secondary-hover: #162749;
+  --color-secondary-muted: #2d4a80;
+  --color-secondary-foreground: #ffffff; /* White text on navy */
+
+  /* Semantic colors */
+  --color-warning: #d9a800;
+  --color-warning-hover: #c49700;
+  --color-warning-bg: rgba(217, 168, 0, 0.15);
+  --color-warning-border: #d9a800;
+  --color-warning-text: #1a1a1a;
+
+  --color-danger: #b84343;
+  --color-danger-hover: #a33a3a;
+  --color-danger-bg: rgba(184, 67, 67, 0.15);
+  --color-danger-border: #b84343;
+
+  --color-success: #228055;
+  --color-success-hover: #1a6644;
+  --color-success-bg: rgba(34, 128, 85, 0.12);
+  --color-success-border: #228055;
+
+  /* Error - alias for danger */
+  --color-error: var(--color-danger);
+  --color-error-hover: var(--color-danger-hover);
+  --color-error-bg: var(--color-danger-bg);
+  --color-error-border: var(--color-danger-border);
+  --color-error-text: var(--color-danger);
+
+  /* Reference parts */
+  --color-reference: #055f70;
+  --color-reference-bg: rgba(5, 95, 112, 0.12);
+
+  /* Info - lavender for informational elements */
+  --color-info: #7a6f91;
+  --color-info-bg: rgba(122, 111, 145, 0.12);
+  --color-info-border: #8d82a3;
+  --color-info-text: #1a1a1a;
+
+  color-scheme: light;
+}
+
 /*
- * Map existing CSS custom properties (defined in index.css :root / [data-theme])
- * to Tailwind theme tokens so they're available as utility classes.
- *
+ * Map CSS custom properties to Tailwind theme tokens.
  * Uses @theme inline to avoid generating duplicate CSS custom properties —
- * the actual values come from :root and [data-theme='light'] in index.css.
- *
- * Example usage after migration:
- *   bg-bg, bg-surface, text-text, text-muted, border-border,
- *   bg-primary, text-accent, rounded-sm, etc.
+ * the actual values come from :root and [data-theme='light'] above.
  */
 @theme inline {
   /* Backgrounds */
@@ -97,6 +271,7 @@
 
 @import './primitives.css';
 @import './layout.css';
+@import './domain.css';
 
 /* ===========================================
    CUSTOM ANIMATIONS

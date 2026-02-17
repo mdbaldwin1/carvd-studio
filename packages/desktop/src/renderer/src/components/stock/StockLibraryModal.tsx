@@ -73,15 +73,15 @@ export function StockLibraryModal({
         </div>
 
         {/* Tab bar */}
-        <div className="library-tabs">
+        <div className="flex border-b border-border">
           <button
-            className={`library-tab ${activeTab === 'stocks' ? 'active' : ''}`}
+            className={`flex-1 py-3 px-4 bg-transparent border-none border-b-2 border-b-transparent text-text-muted text-[13px] font-medium cursor-pointer transition-all duration-150 hover:text-text hover:bg-surface-hover ${activeTab === 'stocks' ? '!text-accent !border-b-accent' : ''}`}
             onClick={() => setActiveTab('stocks')}
           >
             Stocks ({stocks.length})
           </button>
           <button
-            className={`library-tab ${activeTab === 'assemblies' ? 'active' : ''}`}
+            className={`flex-1 py-3 px-4 bg-transparent border-none border-b-2 border-b-transparent text-text-muted text-[13px] font-medium cursor-pointer transition-all duration-150 hover:text-text hover:bg-surface-hover ${activeTab === 'assemblies' ? '!text-accent !border-b-accent' : ''}`}
             onClick={() => setActiveTab('assemblies')}
           >
             Assemblies ({assemblies.length})
@@ -90,12 +90,12 @@ export function StockLibraryModal({
 
         {/* Upgrade banner for free mode users - shown above assemblies tab content */}
         {activeTab === 'assemblies' && !canCreateAssemblies && (
-          <div className="upgrade-banner">
+          <div className="py-2.5 px-4 bg-bg-tertiary border-b border-border text-xs text-text-secondary text-center">
             <span>Upgrade to create and edit assemblies</span>
           </div>
         )}
 
-        <div className="stock-library-content">
+        <div className="flex flex-1 overflow-hidden">
           {activeTab === 'stocks' ? (
             <StocksTab
               stocks={stocks}

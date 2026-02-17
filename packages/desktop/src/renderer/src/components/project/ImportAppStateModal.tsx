@@ -191,9 +191,9 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
                 Import templates, assemblies, stock materials, and custom colors from a Carvd backup file.
               </p>
               {error && (
-                <div className="alert alert-error">
-                  <AlertTriangle size={16} />
-                  <span>{error}</span>
+                <div className="p-4 rounded-lg flex items-start gap-3 bg-error-bg border border-error-border">
+                  <AlertTriangle size={16} className="text-error shrink-0" />
+                  <span className="text-[13px] text-text-secondary leading-relaxed">{error}</span>
                 </div>
               )}
               <button className="btn btn-md btn-filled btn-primary" onClick={handleSelectFile} disabled={isLoading}>
@@ -333,9 +333,9 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
               )}
 
               {error && (
-                <div className="alert alert-error">
-                  <AlertTriangle size={16} />
-                  <span>{error}</span>
+                <div className="p-4 rounded-lg flex items-start gap-3 bg-error-bg border border-error-border">
+                  <AlertTriangle size={16} className="text-error shrink-0" />
+                  <span className="text-[13px] text-text-secondary leading-relaxed">{error}</span>
                 </div>
               )}
             </div>

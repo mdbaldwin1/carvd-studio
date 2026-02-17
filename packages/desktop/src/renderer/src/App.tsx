@@ -83,7 +83,7 @@ function SelectionBox() {
 
   return (
     <div
-      className="selection-rectangle"
+      className="fixed border border-dashed border-primary bg-primary-bg pointer-events-none z-[100]"
       style={{
         left: `${left}px`,
         top: `${top}px`,
@@ -402,7 +402,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                 {isEditingAssembly ? 'No stock in library. Click + to create.' : 'No stock yet. Click + to add.'}
               </p>
             ) : (
-              <ul className="stock-list">
+              <ul className="list-none m-0 mx-[-12px] flex-1 overflow-y-auto min-h-0">
                 {stocks
                   .filter(
                     (stock) => !searchTerms.stock || stock.name.toLowerCase().includes(searchTerms.stock.toLowerCase())
@@ -412,7 +412,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                     return (
                       <li
                         key={stock.id}
-                        className="stock-item"
+                        className="group/stock flex items-center gap-2 py-2 px-3 cursor-grab transition-colors duration-100 select-none hover:bg-surface-hover active:cursor-grabbing"
                         draggable
                         onDragStart={(e) => {
                           e.dataTransfer.setData('application/carvd-stock', stock.id);
@@ -420,11 +420,17 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                         }}
                         title={`Drag onto canvas to create part\n${formatMeasurementWithUnit(stock.length, units)} × ${formatMeasurementWithUnit(stock.width, units)} × ${formatMeasurementWithUnit(stock.thickness, units)}${!isEditingAssembly ? `\n${partCount} part${partCount !== 1 ? 's' : ''} assigned` : ''}`}
                       >
-                        <span className="stock-color" style={{ backgroundColor: stock.color }} />
-                        <span className="stock-name">{stock.name}</span>
-                        {!isEditingAssembly && partCount > 0 && <span className="stock-part-count">{partCount}</span>}
-                        <span className="stock-thickness">{formatMeasurementWithUnit(stock.thickness, units)}</span>
-                        <div className="stock-actions">
+                        <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: stock.color }} />
+                        <span className="flex-1 text-xs truncate">{stock.name}</span>
+                        {!isEditingAssembly && partCount > 0 && (
+                          <span className="text-[10px] bg-border text-text py-px px-1.5 rounded-full min-w-4 text-center">
+                            {partCount}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-text-muted">
+                          {formatMeasurementWithUnit(stock.thickness, units)}
+                        </span>
+                        <div className="flex gap-0.5 opacity-0 group-hover/stock:opacity-100 transition-opacity duration-100">
                           <button
                             className="btn btn-icon-sm btn-ghost btn-secondary"
                             onClick={(e) => {
@@ -544,7 +550,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                   : 'No assemblies yet. Click + to add from library.'}
               </p>
             ) : (
-              <ul className="assembly-list">
+              <ul className="list-none m-0 mx-[-12px] flex-1 overflow-y-auto min-h-0">
                 {assemblies
                   .filter(
                     (assembly) =>
@@ -554,7 +560,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                   .map((assembly) => (
                     <li
                       key={assembly.id}
-                      className="assembly-item"
+                      className="flex items-center gap-2 py-2 px-3 cursor-grab transition-colors duration-100 select-none hover:bg-surface-hover active:cursor-grabbing"
                       draggable
                       onDragStart={(e) => {
                         e.dataTransfer.setData('application/carvd-assembly', assembly.id);
@@ -570,13 +576,15 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                         <img
                           src={`data:image/png;base64,${assembly.thumbnailData.data}`}
                           alt=""
-                          className="assembly-thumbnail"
+                          className="w-8 h-6 object-cover rounded-sm shrink-0 bg-bg-tertiary"
                         />
                       ) : (
-                        <span className="assembly-icon">{assembly.thumbnail || '📦'}</span>
+                        <span className="text-sm shrink-0">{assembly.thumbnail || '📦'}</span>
                       )}
-                      <span className="assembly-name">{assembly.name}</span>
-                      <span className="assembly-count">{assembly.parts.length}</span>
+                      <span className="flex-1 text-xs truncate">{assembly.name}</span>
+                      <span className="text-[10px] bg-border text-text py-px px-1.5 rounded-full min-w-4 text-center">
+                        {assembly.parts.length}
+                      </span>
                       <button
                         className="btn btn-icon-sm btn-ghost btn-danger"
                         onClick={(e) => {
@@ -945,7 +953,7 @@ function PropertiesPanel() {
       <aside className="properties-panel">
         <h2>Properties</h2>
         <p className="text-text-muted text-xs italic">Select a part or group to edit properties</p>
-        <p className="hint">Shift+click to select multiple, {modKey}+drag for box select</p>
+        <p className="text-[11px] text-text-muted mt-1">Shift+click to select multiple, {modKey}+drag for box select</p>
       </aside>
     );
   }
@@ -969,7 +977,7 @@ function PropertiesPanel() {
           </div>
 
           <div className="property-group">
-            <p className="selection-info">
+            <p className="text-sm mb-3 text-text">
               {memberCount} member{memberCount !== 1 ? 's' : ''}
             </p>
           </div>
@@ -988,7 +996,7 @@ function PropertiesPanel() {
               Delete Group
             </button>
           </div>
-          <p className="hint">
+          <p className="text-[11px] text-text-muted mt-1">
             Double-click group to edit individual parts
             <br />
             {modKey}+Shift+G to ungroup
@@ -1003,8 +1011,8 @@ function PropertiesPanel() {
     return (
       <aside className="properties-panel">
         <h2>Properties</h2>
-        <p className="selection-info">{selectedGroupIds.length} groups selected</p>
-        <p className="hint">
+        <p className="text-sm mb-3 text-text">{selectedGroupIds.length} groups selected</p>
+        <p className="text-[11px] text-text-muted mt-1">
           Press G to merge into a new group
           <br />
           {modKey}+Shift+G to ungroup all
@@ -1018,11 +1026,11 @@ function PropertiesPanel() {
     return (
       <aside className="properties-panel">
         <h2>Properties</h2>
-        <p className="selection-info">
+        <p className="text-sm mb-3 text-text">
           {selectedPartIds.length} part{selectedPartIds.length !== 1 ? 's' : ''}, {selectedGroupIds.length} group
           {selectedGroupIds.length !== 1 ? 's' : ''} selected
         </p>
-        <p className="hint">
+        <p className="text-[11px] text-text-muted mt-1">
           Press G to group selection
           <br />
           Press Delete to remove all
@@ -1042,7 +1050,7 @@ function PropertiesPanel() {
     return (
       <aside className="properties-panel">
         <h2>Properties</h2>
-        <p className="selection-info">{selectedPartIds.length} parts selected</p>
+        <p className="text-sm mb-3 text-text">{selectedPartIds.length} parts selected</p>
 
         <div className="property-group">
           <label>Assign Stock to All</label>
@@ -1202,7 +1210,7 @@ function PropertiesPanel() {
 
       <div className="property-group">
         <label>Dimensions (L × W × T)</label>
-        <div className="dimension-inputs">
+        <div className="dimension-inputs flex items-center gap-1">
           <FractionInput
             key={`${selectedPart.id}-length`}
             value={selectedPart.length}
@@ -1225,7 +1233,7 @@ function PropertiesPanel() {
           />
         </div>
         {isDimensionConstrained && assignedStock && (
-          <p className="hint">
+          <p className="text-[11px] text-text-muted mt-1">
             Max: {formatMeasurementWithUnit(assignedStock.length, units)} ×{' '}
             {formatMeasurementWithUnit(assignedStock.width, units)} ×{' '}
             {formatMeasurementWithUnit(assignedStock.thickness, units)} (from {assignedStock.name})
@@ -1243,7 +1251,7 @@ function PropertiesPanel() {
           />
         </summary>
         <div className="collapsible-content">
-          <div className="dimension-inputs">
+          <div className="flex items-center gap-1">
             <FractionInput
               key={`${selectedPart.id}-posX`}
               value={selectedPart.position.x}
@@ -1289,9 +1297,9 @@ function PropertiesPanel() {
           const warnings = getConstraintWarnings(selectedPart);
           if (warnings.length === 0) return null;
           return (
-            <div className="constraint-warnings">
+            <div className="mt-2 mb-2 p-2 bg-warning-bg border border-warning rounded">
               {warnings.map((warning, index) => (
-                <p key={index} className="constraint-warning">
+                <p key={index} className="text-[11px] text-warning m-0 py-0.5 leading-snug before:content-['⚠\_']">
                   {warning}
                 </p>
               ))}
@@ -1306,8 +1314,10 @@ function PropertiesPanel() {
         return (
           <div className="property-group">
             {overlapping.length > 0 && !selectedPart.ignoreOverlap && (
-              <div className="constraint-warnings overlap-warnings">
-                <p className="constraint-warning">Overlaps with: {overlapping.join(', ')}</p>
+              <div className="mt-2 mb-2 p-2 bg-warning-bg border border-warning rounded">
+                <p className="text-[11px] text-warning m-0 py-0.5 leading-snug before:content-['⚠\_']">
+                  Overlaps with: {overlapping.join(', ')}
+                </p>
               </div>
             )}
             <label>
@@ -1399,7 +1409,7 @@ function PropertiesPanel() {
               const cutWidth = selectedPart.width + (selectedPart.extraWidth || 0);
               const boardsNeeded = Math.ceil(cutWidth / assignedStock.width);
               return (
-                <p className="hint glue-up-info">
+                <p className="text-[11px] text-text-muted mt-1">
                   Requires {boardsNeeded} board{boardsNeeded !== 1 ? 's' : ''} of {assignedStock.name}
                 </p>
               );
@@ -1458,7 +1468,7 @@ function PropertiesPanel() {
       <div className="property-group properties-learn-more">
         <a
           href="#"
-          className="learn-more-link text-xs"
+          className="text-accent no-underline text-xs hover:underline hover:text-accent-hover transition-colors duration-150"
           onClick={(e) => {
             e.preventDefault();
             window.electronAPI?.openExternal?.('https://carvd-studio.com/docs#parts');
@@ -1799,7 +1809,7 @@ function CanvasWithDrop() {
 
   return (
     <div
-      className={`canvas-container ${isDragOver ? 'drag-over' : ''}`}
+      className={`canvas-container ${isDragOver ? 'outline-2 outline-dashed outline-accent -outline-offset-2' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -1819,43 +1829,45 @@ function CanvasWithDrop() {
       <DisplayToolbar />
       <HotkeyHints show={appSettings.showHotkeyHints} />
       {appSettings.showHotkeyHints && (
-        <div className="camera-controls-legend">
-          <div className="legend-item">
+        <div className="absolute bottom-3 left-3 flex flex-col gap-1 py-2 px-2.5 bg-surface opacity-70 hover:opacity-95 border border-border rounded-md backdrop-blur-[4px] z-50 pointer-events-none [&_kbd]:inline-block [&_kbd]:min-w-10 [&_kbd]:py-px [&_kbd]:px-1 [&_kbd]:bg-bg [&_kbd]:border [&_kbd]:border-border [&_kbd]:rounded-sm [&_kbd]:font-mono [&_kbd]:text-[9px] [&_kbd]:text-text [&_kbd]:text-center">
+          <div className="flex items-center gap-2 text-[10px] text-text-muted whitespace-nowrap">
             <kbd>LMB</kbd> Orbit
           </div>
-          <div className="legend-item">
+          <div className="flex items-center gap-2 text-[10px] text-text-muted whitespace-nowrap">
             <kbd>RMB</kbd> Pan
           </div>
-          <div className="legend-item">
+          <div className="flex items-center gap-2 text-[10px] text-text-muted whitespace-nowrap">
             <kbd>Scroll</kbd> Zoom
           </div>
-          <div className="legend-item">
+          <div className="flex items-center gap-2 text-[10px] text-text-muted whitespace-nowrap">
             <kbd>F</kbd> Focus
           </div>
         </div>
       )}
       {isDragOver && (
-        <div className="drop-indicator">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-accent text-bg-dark py-4 px-8 rounded-lg text-base font-medium pointer-events-none z-[100]">
           <span>{dropType === 'assembly' ? 'Drop to place assembly' : 'Drop to create part'}</span>
         </div>
       )}
       {/* Empty state overlay - rendered outside Canvas so it doesn't move with camera */}
       {parts.length === 0 && (
-        <div className="empty-state-overlay">
-          <div className="empty-state-content">
-            <div className="empty-state-icon">🛠️</div>
-            <h2 className="empty-state-title">Start Building</h2>
-            <p className="empty-state-description">
+        <div className="empty-state-overlay absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10 text-center">
+          <div className="bg-bg border border-border rounded-lg py-8 px-10 shadow-[0_4px_16px_rgba(0,0,0,0.3)]">
+            <div className="text-5xl mb-4">🛠️</div>
+            <h2 className="text-xl font-semibold text-text m-0 mb-2">Start Building</h2>
+            <p className="text-sm text-text-muted m-0 mb-5 max-w-80 leading-relaxed">
               Add parts to your design to get started. You can create parts from the sidebar or drag stock materials
               onto the canvas.
             </p>
-            <div className="empty-state-hints">
-              <div className="empty-state-hint">
-                <kbd>P</kbd>
+            <div className="flex flex-col gap-2 items-center">
+              <div className="flex items-center gap-2 text-[13px] text-text-muted">
+                <kbd className="bg-bg-dark border border-border rounded-sm py-0.5 px-2 font-sans text-xs text-text">
+                  P
+                </kbd>
                 <span>Add new part</span>
               </div>
-              <div className="empty-state-hint">
-                <span className="empty-state-hint-label">Drag stock →</span>
+              <div className="flex items-center gap-2 text-[13px] text-text-muted">
+                <span className="text-xs text-text-muted">Drag stock →</span>
                 <span>Create part from stock</span>
               </div>
             </div>

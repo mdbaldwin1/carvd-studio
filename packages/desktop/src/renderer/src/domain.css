@@ -1,0 +1,352 @@
+/*
+ * Domain-Specific CSS
+ *
+ * Styles that cannot be expressed as Tailwind utilities due to complex
+ * selectors (:has(), vendor pseudo-elements, <details> styling, @media print).
+ */
+
+/* ===========================================
+   PROPERTY GROUP INPUTS
+   Sidebar property panel form controls
+   Uses :has(), vendor pseudo-elements
+   =========================================== */
+
+@layer components {
+  .property-group > label:has(input[type='checkbox']) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+
+  .property-group input[type='text'],
+  .property-group input[type='number'],
+  .property-group select {
+    width: 100%;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+
+  .property-group select {
+    cursor: pointer;
+  }
+
+  .property-group input[type='color'] {
+    width: 100%;
+    height: 32px;
+    background-color: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding: 0;
+  }
+
+  .property-group input[type='color']::-webkit-color-swatch-wrapper {
+    padding: 3px;
+    background: var(--color-bg);
+    border-radius: 3px;
+  }
+
+  .property-group input[type='color']::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px;
+  }
+
+  .property-group input[type='color']::-moz-color-swatch {
+    border: none;
+    border-radius: 2px;
+  }
+
+  .property-group input:focus,
+  .property-group select:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+
+  .property-group input[type='color']:hover {
+    border-color: var(--color-text-muted);
+  }
+
+  .property-group input[type='color']:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+
+  /* Part notes textarea */
+  .part-notes-textarea {
+    width: 100%;
+    min-height: 60px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+    line-height: 1.4;
+  }
+
+  .part-notes-textarea:focus {
+    outline: none;
+    border-color: var(--color-accent);
+  }
+
+  .part-notes-textarea::placeholder {
+    color: var(--color-text-muted);
+  }
+}
+
+/* ===========================================
+   JOINERY ADJUSTMENTS
+   <details> collapsible with animated marker
+   Uses ::-webkit-details-marker, summary::before
+   =========================================== */
+
+@layer components {
+  .joinery-adjustments {
+    margin-top: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 0;
+  }
+
+  .joinery-adjustments summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    user-select: none;
+    list-style: none;
+  }
+
+  .joinery-adjustments summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .joinery-adjustments summary::before {
+    content: '▶';
+    font-size: 8px;
+    transition: transform 0.15s ease;
+  }
+
+  .joinery-adjustments[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  .joinery-adjustments summary:hover {
+    color: var(--color-text);
+  }
+
+  .joinery-indicator {
+    color: var(--color-accent);
+    font-size: 8px;
+  }
+
+  .joinery-inputs {
+    padding: 0 12px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .joinery-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .joinery-input-row label {
+    flex: 0 0 80px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+
+  .joinery-input-row input {
+    flex: 1;
+    width: auto;
+  }
+}
+
+/* ===========================================
+   COLLAPSIBLE SECTIONS
+   Generic <details> styling (Position, Notes)
+   Uses ::-webkit-details-marker, summary::before
+   =========================================== */
+
+@layer components {
+  .collapsible-section {
+    margin-top: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 0;
+  }
+
+  .collapsible-section summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    user-select: none;
+    list-style: none;
+  }
+
+  .collapsible-section summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .collapsible-section summary::before {
+    content: '▶';
+    font-size: 8px;
+    transition: transform 0.15s ease;
+  }
+
+  .collapsible-section[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  .collapsible-section summary:hover {
+    color: var(--color-text);
+  }
+
+  .collapsible-content {
+    padding: 0 12px 12px 12px;
+  }
+
+  .has-content-indicator {
+    color: var(--color-accent);
+    font-size: 8px;
+  }
+}
+
+/* ===========================================
+   PRINT STYLES
+   @media print for cutting diagrams
+   =========================================== */
+
+@media print {
+  /* Only apply when printing diagrams (currently unused — PDF export is used instead) */
+
+  /* Make the modal backdrop static and transparent */
+  body.printing-diagrams .cut-list-backdrop {
+    position: static !important;
+    background: none !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Make the dialog fill the page */
+  body.printing-diagrams [aria-labelledby='cut-list-modal-title'] {
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Hide non-printable UI elements */
+  body.printing-diagrams .cut-list-tabs,
+  body.printing-diagrams .cut-list-footer,
+  body.printing-diagrams .cut-list-stale-warning,
+  body.printing-diagrams .cut-list-statistics,
+  body.printing-diagrams .modal-header [aria-label='Close'] {
+    display: none !important;
+  }
+
+  /* Show modal header text */
+  body.printing-diagrams .modal-header {
+    border-bottom: 2px solid #333 !important;
+    padding-bottom: 10px !important;
+    margin-bottom: 20px !important;
+    background: none !important;
+  }
+
+  body.printing-diagrams .modal-header h2 {
+    color: black !important;
+    font-size: 18pt !important;
+  }
+
+  body.printing-diagrams .modal-header h2::after {
+    content: ' - Cutting Diagrams';
+  }
+
+  /* Tab content should be visible and expand */
+  body.printing-diagrams .cut-list-content {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+  }
+
+  /* Hide non-diagram tabs */
+  body.printing-diagrams .cut-list-parts-tab,
+  body.printing-diagrams .shopping-list-tab {
+    display: none !important;
+  }
+
+  /* Diagrams tab */
+  body.printing-diagrams .cut-list-diagrams-tab {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  body.printing-diagrams .diagrams-content {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  body.printing-diagrams .stock-group {
+    break-inside: avoid;
+    margin-bottom: 20px !important;
+    border: 1px solid #ccc !important;
+    page-break-inside: avoid;
+  }
+
+  body.printing-diagrams .stock-group-title {
+    background: #f0f0f0 !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.printing-diagrams .stock-boards {
+    overflow: visible !important;
+  }
+
+  body.printing-diagrams .stock-board-diagram {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #ddd !important;
+    background: white !important;
+    margin-bottom: 10px !important;
+  }
+
+  body.printing-diagrams .board-svg rect {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
