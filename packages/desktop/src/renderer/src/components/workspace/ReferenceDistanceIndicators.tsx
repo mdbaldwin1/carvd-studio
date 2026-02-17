@@ -7,11 +7,12 @@
 import React, { useState } from 'react';
 import { Line, Html } from '@react-three/drei';
 import { useProjectStore } from '../../store/projectStore';
+import { useSnapStore } from '../../store/snapStore';
 import { formatMeasurementWithUnit, parseInput } from '../../utils/fractions';
 import { ReferenceDistanceIndicator } from '../../types';
 
 export function ReferenceDistanceIndicators(): React.ReactElement | null {
-  const activeReferenceDistances = useProjectStore((s) => s.activeReferenceDistances);
+  const activeReferenceDistances = useSnapStore((s) => s.activeReferenceDistances);
   const units = useProjectStore((s) => s.units);
   const moveSelectedParts = useProjectStore((s) => s.moveSelectedParts);
   const [editingId, setEditingId] = useState<string | null>(null);

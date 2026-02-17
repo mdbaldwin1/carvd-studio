@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useProjectStore, validatePartsForCutList } from './projectStore';
 import { useSelectionStore } from './selectionStore';
+import { useSnapStore } from './snapStore';
 import { useUIStore } from './uiStore';
 import {
   createTestPart,
@@ -35,6 +36,12 @@ const resetStore = () => {
     cutListModalOpen: false,
     saveAssemblyModalOpen: false,
     manualThumbnail: null
+  });
+  useSnapStore.setState({
+    snapToPartsEnabled: true,
+    activeSnapLines: [],
+    referencePartIds: [],
+    activeReferenceDistances: []
   });
 };
 
@@ -224,13 +231,13 @@ describe('projectStore', () => {
       it('removes the part from reference parts', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart();
-        store.addToReferences([partId]);
+        useSnapStore.getState().addToReferences([partId]);
 
-        expect(useProjectStore.getState().referencePartIds).toContain(partId);
+        expect(useSnapStore.getState().referencePartIds).toContain(partId);
 
         store.deletePart(partId);
 
-        expect(useProjectStore.getState().referencePartIds).not.toContain(partId);
+        expect(useSnapStore.getState().referencePartIds).not.toContain(partId);
       });
 
       it('removes the part from group memberships', () => {
@@ -944,131 +951,8 @@ describe('projectStore', () => {
   });
 
   // ============================================================
-  // View State (display mode and grid tests moved to cameraStore.test.ts)
+  // View State (snap state tests moved to snapStore.test.ts)
   // ============================================================
-
-  describe('view state', () => {
-    describe('setSnapToPartsEnabled', () => {
-      it('enables snap to parts', () => {
-        useProjectStore.setState({ snapToPartsEnabled: false });
-        const store = useProjectStore.getState();
-
-        store.setSnapToPartsEnabled(true);
-
-        expect(useProjectStore.getState().snapToPartsEnabled).toBe(true);
-      });
-
-      it('disables snap to parts', () => {
-        useProjectStore.setState({ snapToPartsEnabled: true });
-        const store = useProjectStore.getState();
-
-        store.setSnapToPartsEnabled(false);
-
-        expect(useProjectStore.getState().snapToPartsEnabled).toBe(false);
-      });
-    });
-
-    describe('setActiveSnapLines', () => {
-      it('sets active snap lines', () => {
-        const store = useProjectStore.getState();
-        const snapLines = [{ start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 0, z: 0 }, color: '#ff0000' }];
-
-        store.setActiveSnapLines(snapLines);
-
-        expect(useProjectStore.getState().activeSnapLines).toEqual(snapLines);
-      });
-
-      it('clears active snap lines', () => {
-        const store = useProjectStore.getState();
-        store.setActiveSnapLines([{ start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 0, z: 0 }, color: '#ff0000' }]);
-
-        store.setActiveSnapLines([]);
-
-        expect(useProjectStore.getState().activeSnapLines).toHaveLength(0);
-      });
-    });
-
-    describe('setReferencePartIds', () => {
-      it('sets reference part IDs directly', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-
-        store.setReferencePartIds([part1Id, part2Id]);
-
-        expect(useProjectStore.getState().referencePartIds).toEqual([part1Id, part2Id]);
-      });
-
-      it('replaces existing reference part IDs', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-        const part3Id = store.addPart();
-        store.setReferencePartIds([part1Id, part2Id]);
-
-        store.setReferencePartIds([part3Id]);
-
-        expect(useProjectStore.getState().referencePartIds).toEqual([part3Id]);
-      });
-    });
-  });
-
-  // ============================================================
-  // Reference Parts
-  // ============================================================
-
-  describe('reference parts', () => {
-    describe('addToReferences', () => {
-      it('adds parts to reference list', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-
-        store.addToReferences([part1Id, part2Id]);
-
-        expect(useProjectStore.getState().referencePartIds).toContain(part1Id);
-        expect(useProjectStore.getState().referencePartIds).toContain(part2Id);
-      });
-    });
-
-    describe('removeFromReferences', () => {
-      it('removes parts from reference list', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart();
-        store.addToReferences([partId]);
-
-        store.removeFromReferences([partId]);
-
-        expect(useProjectStore.getState().referencePartIds).not.toContain(partId);
-      });
-    });
-
-    describe('toggleReference', () => {
-      it('toggles reference status', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart();
-
-        store.toggleReference([partId]);
-        expect(useProjectStore.getState().referencePartIds).toContain(partId);
-
-        store.toggleReference([partId]);
-        expect(useProjectStore.getState().referencePartIds).not.toContain(partId);
-      });
-    });
-
-    describe('clearReferences', () => {
-      it('clears all reference parts', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-        store.addToReferences([part1Id, part2Id]);
-
-        store.clearReferences();
-
-        expect(useProjectStore.getState().referencePartIds).toHaveLength(0);
-      });
-    });
-  });
 
   // ============================================================
   // Snap Guides
@@ -1664,12 +1548,12 @@ describe('projectStore', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart({ name: 'Selected Part' });
         useSelectionStore.getState().selectPart(partId);
-        store.addToReferences([partId]);
+        useSnapStore.getState().addToReferences([partId]);
 
         store.startEditingAssembly('assembly-123', 'Test Assembly', [createTestPart()]);
 
         expect(useSelectionStore.getState().selectedPartIds).toHaveLength(0);
-        expect(useProjectStore.getState().referencePartIds).toHaveLength(0);
+        expect(useSnapStore.getState().referencePartIds).toHaveLength(0);
         expect(useSelectionStore.getState().editingGroupId).toBeNull();
       });
     });
