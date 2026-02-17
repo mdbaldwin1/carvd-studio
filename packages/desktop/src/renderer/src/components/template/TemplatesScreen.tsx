@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
 import { useProjectStore } from '../../store/projectStore';
+import { useLicenseStore } from '../../store/licenseStore';
 import { useUIStore } from '../../store/uiStore';
 import { getFeatureLimits } from '../../utils/featureLimits';
 import { Project } from '../../types';
@@ -36,7 +37,7 @@ export function TemplatesScreen({
   onEditTemplate,
   onNewTemplate
 }: TemplatesScreenProps) {
-  const licenseMode = useProjectStore((s) => s.licenseMode);
+  const licenseMode = useLicenseStore((s) => s.licenseMode);
   const limits = getFeatureLimits(licenseMode);
   const canUseCustomTemplates = limits.canUseCustomTemplates;
 

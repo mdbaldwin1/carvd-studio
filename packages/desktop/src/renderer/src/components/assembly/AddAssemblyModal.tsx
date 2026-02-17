@@ -2,6 +2,7 @@ import { Plus, Search, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useProjectStore } from '../../store/projectStore';
+import { useLicenseStore } from '../../store/licenseStore';
 import { Assembly } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { getFeatureLimits } from '../../utils/featureLimits';
@@ -23,7 +24,7 @@ export function AddAssemblyModal({
 }: AddAssemblyModalProps) {
   const units = useProjectStore((s) => s.units);
   const assemblies = useProjectStore((s) => s.assemblies);
-  const licenseMode = useProjectStore((s) => s.licenseMode);
+  const licenseMode = useLicenseStore((s) => s.licenseMode);
   const limits = getFeatureLimits(licenseMode);
   const canCreateAssemblies = limits.canUseAssemblies;
 

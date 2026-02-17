@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { useProjectStore, generateThumbnail } from './projectStore';
+import { useLicenseStore } from './licenseStore';
 import { getFeatureLimits, getBlockedMessage } from '../utils/featureLimits';
 
 // Track toast timeout for cleanup (module-level, not in store state since it's not serializable)
@@ -104,7 +105,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   closeCutListModal: () => set({ cutListModalOpen: false }),
 
   openSaveAssemblyModal: () => {
-    const { licenseMode } = useProjectStore.getState();
+    const { licenseMode } = useLicenseStore.getState();
     const limits = getFeatureLimits(licenseMode);
     if (!limits.canUseAssemblies) {
       get().showToast(getBlockedMessage('useAssemblies'));
