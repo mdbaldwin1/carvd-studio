@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ContextMenu } from './ContextMenu';
 import { useProjectStore } from '../../store/projectStore';
 import { useAssemblyEditingStore } from '../../store/assemblyEditingStore';
+import { useClipboardStore } from '../../store/clipboardStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
@@ -16,8 +17,10 @@ describe('ContextMenu', () => {
       parts: [],
       groups: [],
       groupMembers: [],
-      clipboard: { parts: [], groups: [], groupMembers: [] },
       snapGuides: []
+    });
+    useClipboardStore.setState({
+      clipboard: { parts: [], groups: [], groupMembers: [] }
     });
     useAssemblyEditingStore.setState({
       isEditingAssembly: false
@@ -143,7 +146,7 @@ describe('ContextMenu', () => {
     });
 
     it('shows Paste Here when clipboard has items', () => {
-      useProjectStore.setState({
+      useClipboardStore.setState({
         clipboard: {
           parts: [{ id: 'part-1' }],
           groups: [],
@@ -214,9 +217,13 @@ describe('ContextMenu', () => {
           { id: 'part-1', name: 'Part 1', stockId: 'stock-1' },
           { id: 'part-2', name: 'Part 2', stockId: null }
         ],
-        copySelectedParts: vi.fn(),
         deleteSelectedParts: vi.fn(),
-        resetSelectedPartsToStock: vi.fn(),
+        resetSelectedPartsToStock: vi.fn()
+      });
+      useClipboardStore.setState({
+        copySelectedParts: vi.fn()
+      });
+      useSnapStore.setState({
         toggleReference: vi.fn()
       });
     });
@@ -231,7 +238,7 @@ describe('ContextMenu', () => {
       render(<ContextMenu />);
       fireEvent.click(screen.getByText('Copy'));
 
-      expect(useProjectStore.getState().copySelectedParts).toHaveBeenCalled();
+      expect(useClipboardStore.getState().copySelectedParts).toHaveBeenCalled();
     });
 
     it('calls deleteSelectedParts on Delete', () => {
