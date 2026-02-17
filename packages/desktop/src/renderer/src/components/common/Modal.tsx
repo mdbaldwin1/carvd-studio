@@ -52,21 +52,32 @@ export function Modal({
 
   return (
     <div
-      className="modal-backdrop"
+      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
       onMouseDown={closeOnBackdrop ? handleMouseDown : undefined}
       onClick={closeOnBackdrop ? handleClick : undefined}
     >
-      <div className={`modal ${className || ''}`} role={role} aria-modal="true" aria-labelledby={titleId}>
-        <div className="modal-header">
-          <h2 id={titleId}>{title}</h2>
+      <div
+        className={`bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in ${className || ''}`}
+        role={role}
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+          <h2 id={titleId} className="text-base font-semibold text-text m-0">
+            {title}
+          </h2>
           {showCloseButton && (
-            <button className="modal-close" onClick={onClose} aria-label="Close">
+            <button
+              className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text"
+              onClick={onClose}
+              aria-label="Close"
+            >
               &times;
             </button>
           )}
         </div>
         {children}
-        {footer && <div className="modal-footer">{footer}</div>}
+        {footer && <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">{footer}</div>}
       </div>
     </div>
   );

@@ -216,7 +216,7 @@ describe('SaveAssemblyModal', () => {
       const onClose = vi.fn();
       const { container } = render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
 
-      const overlay = container.querySelector('.modal-overlay')!;
+      const overlay = container.firstChild as HTMLElement;
       fireEvent.click(overlay);
 
       expect(onClose).toHaveBeenCalled();
@@ -224,9 +224,9 @@ describe('SaveAssemblyModal', () => {
 
     it('does not close when modal content is clicked', () => {
       const onClose = vi.fn();
-      const { container } = render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
+      render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
 
-      const modal = container.querySelector('.modal')!;
+      const modal = screen.getByRole('dialog');
       fireEvent.click(modal);
 
       expect(onClose).not.toHaveBeenCalled();
@@ -236,7 +236,7 @@ describe('SaveAssemblyModal', () => {
       const onClose = vi.fn();
       const { container } = render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
 
-      const overlay = container.querySelector('.modal-overlay')!;
+      const overlay = container.firstChild as HTMLElement;
       fireEvent.keyDown(overlay, { key: 'Escape' });
 
       expect(onClose).toHaveBeenCalled();

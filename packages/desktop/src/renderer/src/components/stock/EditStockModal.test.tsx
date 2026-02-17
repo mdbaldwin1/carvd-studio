@@ -213,8 +213,8 @@ describe('EditStockModal', () => {
       const onClose = vi.fn();
       const { container } = render(<EditStockModal {...defaultProps} onClose={onClose} />);
 
-      const closeBtn = container.querySelector('.modal-close');
-      fireEvent.click(closeBtn!);
+      const closeBtn = screen.getByLabelText('Close');
+      fireEvent.click(closeBtn);
 
       expect(onClose).toHaveBeenCalled();
     });
@@ -232,9 +232,9 @@ describe('EditStockModal', () => {
       const onClose = vi.fn();
       const { container } = render(<EditStockModal {...defaultProps} onClose={onClose} />);
 
-      const backdrop = container.querySelector('.modal-backdrop');
-      fireEvent.mouseDown(backdrop!);
-      fireEvent.click(backdrop!);
+      const backdrop = container.firstChild as HTMLElement;
+      fireEvent.mouseDown(backdrop);
+      fireEvent.click(backdrop);
 
       expect(onClose).toHaveBeenCalled();
     });

@@ -166,16 +166,21 @@ export function AssembliesTab({
           </div>
         </div>
         {assemblies.length > 0 && (
-          <div className="modal-search">
-            <Search size={14} className="modal-search-icon" />
+          <div className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded mb-2">
+            <Search size={14} className="text-text-muted shrink-0" />
             <input
+              className="flex-1 border-none bg-transparent text-text text-[13px] outline-none placeholder:text-text-muted"
               type="text"
               placeholder="Search assemblies..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             {searchTerm && (
-              <button className="modal-search-clear" onClick={() => setSearchTerm('')} aria-label="Clear search">
+              <button
+                className="flex items-center justify-center w-5 h-5 border-none bg-none text-text-muted cursor-pointer p-0 rounded-sm shrink-0 hover:text-text hover:bg-bg-hover"
+                onClick={() => setSearchTerm('')}
+                aria-label="Clear search"
+              >
                 <X size={14} />
               </button>
             )}

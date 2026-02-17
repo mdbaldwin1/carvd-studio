@@ -119,11 +119,26 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
   const hasBlockingIssues = validationIssues.some((i) => i.severity === 'error' && !i.canBypass);
 
   return (
-    <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
-      <div className="modal cut-list-modal" role="dialog" aria-modal="true" aria-labelledby="cut-list-modal-title">
-        <div className="modal-header">
-          <h2 id="cut-list-modal-title">Cut List</h2>
-          <button className="modal-close" onClick={onClose} aria-label="Close">
+    <div
+      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
+      onMouseDown={handleMouseDown}
+      onClick={handleClick}
+    >
+      <div
+        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] flex flex-col animate-modal-fade-in max-h-[85vh] min-h-[500px] w-[900px] max-w-[95vw]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cut-list-modal-title"
+      >
+        <div className="py-5 px-6 bg-bg border-b border-border flex justify-between items-center rounded-t-lg">
+          <h2 id="cut-list-modal-title" className="text-lg font-semibold text-text m-0">
+            Cut List
+          </h2>
+          <button
+            className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text"
+            onClick={onClose}
+            aria-label="Close"
+          >
             &times;
           </button>
         </div>
@@ -262,7 +277,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
           </>
         )}
 
-        <div className="modal-footer">
+        <div className="flex items-center justify-end gap-2 py-4 px-6 border-t border-border bg-bg rounded-b-lg">
           {cutList && (
             <>
               <button

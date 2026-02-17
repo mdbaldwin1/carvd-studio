@@ -153,7 +153,7 @@ describe('AboutModal', () => {
     it('calls onClose when backdrop is clicked', () => {
       render(<AboutModal isOpen={true} onClose={mockOnClose} />);
 
-      const backdrop = document.querySelector('.modal-backdrop')!;
+      const backdrop = document.querySelector('[aria-modal="true"]')!.parentElement!;
       fireEvent.mouseDown(backdrop);
       fireEvent.click(backdrop);
 
@@ -163,7 +163,7 @@ describe('AboutModal', () => {
     it('does not close when modal content is clicked', () => {
       render(<AboutModal isOpen={true} onClose={mockOnClose} />);
 
-      const modal = document.querySelector('.modal')!;
+      const modal = document.querySelector('[aria-modal="true"]')!;
       fireEvent.mouseDown(modal);
       fireEvent.click(modal);
 
