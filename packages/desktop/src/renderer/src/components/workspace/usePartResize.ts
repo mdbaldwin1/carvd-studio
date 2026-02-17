@@ -57,6 +57,10 @@ export function usePartResize(
   const _tempWorldOffset = useRef(new THREE.Vector3());
   const _tempCameraTarget = useRef(new THREE.Vector3());
 
+  // RAF gating refs for coalescing pointer events to animation frame rate
+  const rafIdRef = useRef<number | null>(null);
+  const latestEventRef = useRef<PointerEvent | null>(null);
+
   // Transform a world-space vector to local space (accounts for part rotation)
   const worldToLocal = (worldDelta: THREE.Vector3): THREE.Vector3 => {
     return _tempLocalDelta.current.copy(worldDelta).applyQuaternion(inverseRotationQuaternion);
@@ -212,11 +216,11 @@ export function usePartResize(
         snapLines.push(snapLine);
       }
 
-      useSnapStore.getState().setActiveSnapLines(snapLines);
+      // Batch snap lines + reference distances into single store update
+      useSnapStore.getState().setSnapIndicators(snapLines, []);
     } else {
-      useSnapStore.getState().setActiveSnapLines([]);
+      useSnapStore.getState().setSnapIndicators([], []);
     }
-    useSnapStore.getState().setActiveReferenceDistances([]);
 
     // Calculate the world-space center offset to keep the fixed corner/edge in place
     _tempLocalOffset.current.set(
@@ -303,12 +307,18 @@ export function usePartResize(
     if (!isResizing) return;
 
     const handleWindowPointerMove = (e: PointerEvent) => {
-      if (isResizing && resizeStart.current) {
-        const currentPoint = getWorldPoint(e);
+      // Coalesce pointer events to animation frame rate
+      latestEventRef.current = e;
+      if (rafIdRef.current !== null) return;
+      rafIdRef.current = window.requestAnimationFrame(() => {
+        rafIdRef.current = null;
+        const evt = latestEventRef.current;
+        if (!evt || !isResizing || !resizeStart.current) return;
+        const currentPoint = getWorldPoint(evt);
         if (currentPoint) {
           handleResizeMove(currentPoint);
         }
-      }
+      });
     };
 
     const handleWindowPointerUp = () => {
@@ -322,6 +332,10 @@ export function usePartResize(
     return () => {
       window.removeEventListener('pointermove', handleWindowPointerMove);
       window.removeEventListener('pointerup', handleWindowPointerUp);
+      if (rafIdRef.current !== null) {
+        window.cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isResizing, liveDims]);
