@@ -71,19 +71,21 @@ export function CutListDiagramsTab({
   );
 
   return (
-    <div className="cut-list-diagrams-tab">
-      <div className="tab-content-header">
-        <span className="tab-header-info">
+    <div className="cut-list-diagrams-tab flex flex-col flex-1 min-h-0 overflow-hidden">
+      <div className="flex items-center justify-between py-2 px-0 mb-2 shrink-0">
+        <span className="text-[12px] text-text-muted">
           {cutList.stockBoards.length} board{cutList.stockBoards.length !== 1 ? 's' : ''} needed
         </span>
         <DropdownButton label="Download" icon={<Download size={14} />} items={downloadItems} />
       </div>
 
-      <div className="diagrams-content">
+      <div className="diagrams-content flex-1 overflow-y-auto min-h-0 flex flex-col gap-5">
         {Array.from(boardsByStock.entries()).map(([stockId, boards]) => (
-          <div key={stockId} className="stock-group">
-            <h3 className="stock-group-title">{boards[0].stockName}</h3>
-            <div className="stock-boards">
+          <div key={stockId} className="stock-group border border-border rounded overflow-hidden">
+            <h3 className="stock-group-title text-[14px] font-semibold text-text py-2.5 px-4 bg-bg m-0 border-b border-border">
+              {boards[0].stockName}
+            </h3>
+            <div className="stock-boards flex flex-col gap-3 p-4">
               {boards.map((board) => (
                 <StockBoardDiagram key={`${stockId}-${board.boardIndex}`} board={board} units={units} />
               ))}
@@ -91,7 +93,9 @@ export function CutListDiagramsTab({
           </div>
         ))}
 
-        {cutList.stockBoards.length === 0 && <p className="no-diagrams">No cutting diagrams to display.</p>}
+        {cutList.stockBoards.length === 0 && (
+          <p className="text-center text-text-muted py-8">No cutting diagrams to display.</p>
+        )}
       </div>
     </div>
   );
@@ -106,15 +110,20 @@ function StockBoardDiagram({ board, units }: { board: StockBoard; units: 'imperi
   const svgHeight = board.stockWidth * scale;
 
   return (
-    <div className="stock-board-diagram">
-      <div className="board-header">
-        <span className="board-title">Board #{board.boardIndex}</span>
-        <span className="board-dims">
+    <div className="stock-board-diagram border border-border rounded bg-surface overflow-hidden">
+      <div className="flex items-center gap-3 py-2 px-3 bg-bg text-[12px]">
+        <span className="font-semibold text-text">Board #{board.boardIndex}</span>
+        <span className="board-dims text-text-muted">
           {formatMeasurementWithUnit(board.stockLength, units)} × {formatMeasurementWithUnit(board.stockWidth, units)}
         </span>
-        <span className="board-utilization">{board.utilizationPercent.toFixed(1)}% used</span>
+        <span className="ml-auto font-medium text-accent">{board.utilizationPercent.toFixed(1)}% used</span>
       </div>
-      <svg width={svgWidth} height={svgHeight} viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="board-svg">
+      <svg
+        width={svgWidth}
+        height={svgHeight}
+        viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+        className="board-svg block w-full"
+      >
         {/* Board outline (waste area background) */}
         <rect x={0} y={0} width={svgWidth} height={svgHeight} fill="#ddd" stroke="#999" strokeWidth={1} />
 

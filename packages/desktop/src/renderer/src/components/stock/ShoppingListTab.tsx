@@ -123,9 +123,9 @@ export function ShoppingListTab({
   );
 
   return (
-    <div className="shopping-list-tab">
-      <div className="tab-content-header">
-        <span className="tab-header-info">
+    <div className="shopping-list-tab flex flex-col flex-1 min-h-0 overflow-y-auto gap-4">
+      <div className="flex items-center justify-between py-2 px-0 mb-2 shrink-0">
+        <span className="text-[12px] text-text-muted">
           {cutList.statistics.byStock.length} stock type{cutList.statistics.byStock.length !== 1 ? 's' : ''}, Est. $
           {grandTotal.toFixed(2)}
         </span>
@@ -133,9 +133,11 @@ export function ShoppingListTab({
       </div>
 
       {/* Stock items as checklist cards */}
-      <div className="shopping-list-section">
-        <div className="shopping-list-section-header">Lumber & Sheet Goods</div>
-        <div className="shopping-list-items">
+      <div className="flex flex-col">
+        <div className="flex items-center justify-between text-[12px] font-semibold text-text-muted uppercase tracking-wider py-2 px-0 border-b border-border mb-2">
+          Lumber & Sheet Goods
+        </div>
+        <div className="flex flex-col gap-2">
           {cutList.statistics.byStock.map((summary) => (
             <ShoppingListItem
               key={summary.stockId}
@@ -150,26 +152,29 @@ export function ShoppingListTab({
 
       {/* High utilization warnings */}
       {overageWarnings.length > 0 && (
-        <div className="shopping-list-warnings">
+        <div className="flex flex-col gap-2">
           {overageWarnings.map((warning) => (
-            <div key={warning.stockId} className="overage-warning">
-              "{warning.stockName}" boards are {warning.utilization.toFixed(0)}% utilized — consider an extra board in
-              case of defects or cutting mistakes
+            <div
+              key={warning.stockId}
+              className="bg-warning-bg border border-warning text-warning rounded py-2 px-3 text-[12px] leading-relaxed"
+            >
+              &ldquo;{warning.stockName}&rdquo; boards are {warning.utilization.toFixed(0)}% utilized — consider an
+              extra board in case of defects or cutting mistakes
             </div>
           ))}
         </div>
       )}
 
       {/* Custom shopping items section */}
-      <div className="shopping-list-section custom-items-section">
-        <div className="shopping-list-section-header">
+      <div className="flex flex-col">
+        <div className="flex items-center justify-between text-[12px] font-semibold text-text-muted uppercase tracking-wider py-2 px-0 border-b border-border mb-2">
           <span>Other Items</span>
           <button className="btn btn-xs btn-text" onClick={() => setIsAddingItem(true)} disabled={isAddingItem}>
             + Add Item
           </button>
         </div>
 
-        <div className="shopping-list-items custom-items">
+        <div className="custom-items flex flex-col gap-2">
           {customShoppingItems.map((item) =>
             editingItemId === item.id ? (
               <CustomItemForm
@@ -204,30 +209,32 @@ export function ShoppingListTab({
           )}
 
           {customShoppingItems.length === 0 && !isAddingItem && (
-            <div className="custom-items-empty">Add hardware, fasteners, glue, finish, and other supplies</div>
+            <div className="py-4 text-center text-[12px] text-text-muted italic">
+              Add hardware, fasteners, glue, finish, and other supplies
+            </div>
           )}
         </div>
       </div>
 
       {/* Totals */}
-      <div className="shopping-list-totals">
+      <div className="border-t border-border pt-3">
         {customShoppingItems.length > 0 && (
           <>
-            <div className="total-row subtotal">
+            <div className="flex justify-between py-1 text-[13px] text-text-secondary">
               <span>Lumber & Sheet Goods:</span>
               <span>${cutList.statistics.estimatedCost.toFixed(2)}</span>
             </div>
-            <div className="total-row subtotal">
+            <div className="flex justify-between py-1 text-[13px] text-text-secondary">
               <span>Other Items:</span>
               <span>${customItemsTotal.toFixed(2)}</span>
             </div>
           </>
         )}
-        <div className="total-row grand-total">
+        <div className="flex justify-between py-1 text-[15px] font-bold text-text border-t border-border pt-2 mt-1">
           <span>Est. Total:</span>
           <span>${grandTotal.toFixed(2)}</span>
         </div>
-        <div className="total-row waste-info">
+        <div className="flex justify-between py-1 text-[11px] text-text-muted mt-1 italic">
           <span>Waste value:</span>
           <span>
             ${cutList.statistics.totalWasteCost.toFixed(2)} ({cutList.statistics.wastePercentage.toFixed(0)}% of
@@ -270,19 +277,27 @@ function ShoppingListItem({
       : `$${summary.pricePerUnit.toFixed(2)}/sheet`;
 
   return (
-    <div className={`shopping-list-item ${checked ? 'checked' : ''}`}>
-      <label className="shopping-checkbox">
-        <input type="checkbox" checked={checked} onChange={onToggle} />
-        <span className="checkmark" />
+    <div
+      className={`flex items-start gap-3 py-3 px-4 bg-surface border border-border rounded transition-colors duration-150 ${checked ? 'opacity-50 bg-bg-alt' : ''}`}
+    >
+      <label className="flex items-center pt-0.5 shrink-0 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onToggle}
+          className="w-[18px] h-[18px] cursor-pointer accent-primary"
+        />
       </label>
 
-      <div className="item-details">
-        <div className="item-name">{summary.stockName}</div>
-        <div className="item-dimensions">{dimensions}</div>
-        <div className="item-quantity">
+      <div className="flex-1 min-w-0">
+        <div className={`text-[13px] font-medium text-text mb-0.5 ${checked ? 'line-through' : ''}`}>
+          {summary.stockName}
+        </div>
+        <div className="text-[11px] text-text-muted mb-0.5">{dimensions}</div>
+        <div className="text-[12px] text-text-secondary">
           Buy: {summary.boardsNeeded} {qtyLabel}
           {hasOverage && (
-            <span className="overage-note">
+            <span className="text-[11px] text-text-muted">
               {' '}
               (uses {summary.actualBoardsUsed}, +{summary.boardsNeeded - summary.actualBoardsUsed} overage)
             </span>
@@ -290,13 +305,13 @@ function ShoppingListItem({
           {linearFeetDisplay}
         </div>
         {summary.pricingUnit === 'board_foot' && (
-          <div className="item-board-feet">{summary.boardFeet.toFixed(2)} board feet total</div>
+          <div className="text-[11px] text-text-muted mt-0.5">{summary.boardFeet.toFixed(2)} board feet total</div>
         )}
       </div>
 
-      <div className="item-pricing">
-        <div className="unit-price">{priceDisplay}</div>
-        <div className="line-total">${summary.cost.toFixed(2)}</div>
+      <div className="text-right shrink-0">
+        <div className="text-[11px] text-text-muted mb-0.5">{priceDisplay}</div>
+        <div className="line-total text-[13px] font-semibold text-text">${summary.cost.toFixed(2)}</div>
       </div>
     </div>
   );
@@ -319,29 +334,39 @@ function CustomShoppingListItem({
   const lineTotal = item.quantity * item.unitPrice;
 
   return (
-    <div className={`shopping-list-item custom-item ${checked ? 'checked' : ''}`}>
-      <label className="shopping-checkbox">
-        <input type="checkbox" checked={checked} onChange={onToggle} />
-        <span className="checkmark" />
+    <div
+      className={`group flex items-start gap-3 py-3 px-4 bg-surface border border-border rounded transition-colors duration-150 ${checked ? 'opacity-50 bg-bg-alt' : ''}`}
+    >
+      <label className="flex items-center pt-0.5 shrink-0 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={onToggle}
+          className="w-[18px] h-[18px] cursor-pointer accent-primary"
+        />
       </label>
 
-      <div className="item-details">
-        <div className="item-name">{item.name}</div>
-        {item.description && <div className="item-description">{item.description}</div>}
-        {item.category && <div className="item-category">{item.category}</div>}
-        <div className="item-quantity">Qty: {item.quantity}</div>
+      <div className="flex-1 min-w-0">
+        <div className={`text-[13px] font-medium text-text mb-0.5 ${checked ? 'line-through' : ''}`}>{item.name}</div>
+        {item.description && <div className="text-[11px] text-text-muted mt-0.5 italic">{item.description}</div>}
+        {item.category && (
+          <div className="inline-block text-[10px] bg-bg py-0.5 px-1.5 rounded text-text-muted mt-0.5">
+            {item.category}
+          </div>
+        )}
+        <div className="text-[12px] text-text-secondary">Qty: {item.quantity}</div>
       </div>
 
-      <div className="item-pricing">
-        <div className="unit-price">${item.unitPrice.toFixed(2)}/ea</div>
-        <div className="line-total">${lineTotal.toFixed(2)}</div>
+      <div className="text-right shrink-0">
+        <div className="text-[11px] text-text-muted mb-0.5">${item.unitPrice.toFixed(2)}/ea</div>
+        <div className="line-total text-[13px] font-semibold text-text">${lineTotal.toFixed(2)}</div>
       </div>
 
-      <div className="item-actions">
+      <div className="flex gap-1 shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
         <button className="btn btn-xs btn-text" onClick={onEdit} title="Edit">
           ✎
         </button>
-        <button className="btn btn-xs btn-text btn-danger" onClick={onDelete} title="Delete">
+        <button className="btn btn-xs btn-text text-danger" onClick={onDelete} title="Delete">
           ×
         </button>
       </div>
@@ -381,11 +406,14 @@ function CustomItemForm({
   const lineTotal = quantity * unitPrice;
 
   return (
-    <form className="custom-item-form" onSubmit={handleSubmit}>
-      <div className="form-row">
+    <form
+      className="custom-item-form flex flex-col gap-2 p-3 bg-surface border border-border rounded"
+      onSubmit={handleSubmit}
+    >
+      <div>
         <input
           type="text"
-          className="form-input"
+          className="w-full py-1.5 px-2 border border-border rounded text-[13px] bg-bg text-text outline-none focus:border-primary focus:shadow-[0_0_0_2px_var(--color-primary-faded)]"
           placeholder="Item name (e.g., Wood screws #8 x 1-1/4)"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -393,53 +421,53 @@ function CustomItemForm({
           required
         />
       </div>
-      <div className="form-row">
+      <div>
         <input
           type="text"
-          className="form-input"
+          className="w-full py-1.5 px-2 border border-border rounded text-[13px] bg-bg text-text outline-none focus:border-primary focus:shadow-[0_0_0_2px_var(--color-primary-faded)]"
           placeholder="Description (optional)"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
       </div>
-      <div className="form-row form-row-inline">
-        <div className="form-field">
-          <label>Qty</label>
+      <div className="flex gap-2 items-end">
+        <div className="flex flex-col gap-1 flex-1">
+          <label className="text-[11px] text-text-muted font-medium">Qty</label>
           <input
             type="number"
-            className="form-input form-input-sm"
+            className="w-20 py-1.5 px-2 border border-border rounded text-[13px] bg-bg text-text outline-none focus:border-primary focus:shadow-[0_0_0_2px_var(--color-primary-faded)]"
             value={quantity}
             onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
             min={1}
           />
         </div>
-        <div className="form-field">
-          <label>Unit Price</label>
+        <div className="flex flex-col gap-1 flex-1">
+          <label className="text-[11px] text-text-muted font-medium">Unit Price</label>
           <input
             type="number"
-            className="form-input form-input-sm"
+            className="w-20 py-1.5 px-2 border border-border rounded text-[13px] bg-bg text-text outline-none focus:border-primary focus:shadow-[0_0_0_2px_var(--color-primary-faded)]"
             value={unitPrice}
             onChange={(e) => setUnitPrice(Math.max(0, parseFloat(e.target.value) || 0))}
             min={0}
             step={0.01}
           />
         </div>
-        <div className="form-field">
-          <label>Category</label>
+        <div className="flex flex-col gap-1 flex-1">
+          <label className="text-[11px] text-text-muted font-medium">Category</label>
           <input
             type="text"
-            className="form-input form-input-sm"
+            className="w-20 py-1.5 px-2 border border-border rounded text-[13px] bg-bg text-text outline-none focus:border-primary focus:shadow-[0_0_0_2px_var(--color-primary-faded)]"
             placeholder="e.g., Hardware"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           />
         </div>
-        <div className="form-field form-total">
-          <label>Total</label>
-          <span>${lineTotal.toFixed(2)}</span>
+        <div className="flex flex-col gap-1 min-w-[70px]">
+          <label className="text-[11px] text-text-muted font-medium">Total</label>
+          <span className="text-[14px] font-semibold text-text">${lineTotal.toFixed(2)}</span>
         </div>
       </div>
-      <div className="form-actions">
+      <div className="flex justify-end gap-2 pt-1">
         <button type="button" className="btn btn-xs btn-text" onClick={onCancel}>
           Cancel
         </button>
