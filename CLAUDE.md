@@ -121,6 +121,7 @@ npm run dev          # Start dev server
 npm test             # Run tests
 npm run lint         # Lint check
 npm run typecheck    # Type check
+npm run analyze      # Bundle size analysis (opens treemap)
 
 # Website
 cd packages/website
@@ -128,3 +129,32 @@ npm run dev          # Start dev server
 npm test             # Run tests
 npm run build        # Build for production
 ```
+
+## Performance Guidelines
+
+### React & Rendering
+
+- Use `React.memo` for components rendered inside `.map()` loops or passed as children to Three.js groups
+- Use `useCallback` for event handlers passed as props to memoized children
+- Use `useMemo` for expensive computations derived from props or state
+- Use fine-grained Zustand selectors with `useShallow` — select only the fields your component needs
+
+### Three.js / React Three Fiber
+
+- Never allocate objects (`new Vector3()`, `new Color()`, `new Float32Array()`) inside `useFrame` or render — pre-allocate at module scope and reuse with `.set()` / `.copy()`
+- Pool geometries and materials at module level in shared files (e.g., `partGeometry.ts`) — all instances should share via import
+- Prefer conditional mounting (`{condition && <Component />}`) over `visible={false}` for complex Three.js objects — unmounted components don't consume draw calls
+- Use distance-based LOD for decorative elements (grain arrows, labels) in large scenes
+
+### Code Splitting & Bundle Size
+
+- Lazy-load components not visible on initial render (modals, dialogs, secondary screens) with `React.lazy` + `<Suspense>`
+- Use dynamic `await import()` for heavy optional features triggered by user action (PDF export, CSV download)
+- Audit `optionalDependencies` when adding large libraries — stub unused optional deps via `resolve.alias` in `electron.vite.config.ts`
+- Run `npm run analyze` before and after changes that add dependencies to verify bundle impact
+
+### State Management
+
+- Keep undo-tracked stores (zundo) focused on domain data only — exclude transient UI state (hover, selection, camera, drag)
+- Batch related store updates into single actions to minimize re-render cascades
+- Use separate stores for independent concerns (UI, camera, selection, etc.) to avoid unnecessary subscriber notifications
