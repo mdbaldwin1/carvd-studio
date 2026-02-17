@@ -120,7 +120,7 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
         {!success && (
           <>
             <div className="mb-6">
-              <div className="label-with-help">
+              <div className="flex items-center gap-1">
                 <label htmlFor="license-key-input" className="block mb-2 text-sm font-medium text-text">
                   License Key
                 </label>

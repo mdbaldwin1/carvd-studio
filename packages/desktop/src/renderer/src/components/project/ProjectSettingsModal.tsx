@@ -168,7 +168,7 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
             {!isEditingTemplate && (
               <>
                 <div className="settings-row flex items-center justify-between gap-4 mb-3 mt-3">
-                  <div className="label-with-help">
+                  <div className="inline-flex items-center gap-1">
                     <label className="text-[13px] text-text">Favorite</label>
                     {!filePath && (
                       <HelpTooltip text="Save this project to add it to favorites." docsSection="project-settings" />
@@ -230,7 +230,7 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
               </select>
             </div>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
-              <div className="label-with-help">
+              <div className="inline-flex items-center gap-1">
                 <label className="text-[13px] text-text">Grid Snap Size</label>
                 <HelpTooltip
                   text="Grid snap determines how parts align when moved or resized."
@@ -254,7 +254,7 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
           <div className="mb-6 last:mb-0">
             <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">Cut List Settings</h3>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
-              <div className="label-with-help">
+              <div className="inline-flex items-center gap-1">
                 <label className="text-[13px] text-text">Blade Kerf</label>
                 <HelpTooltip
                   text='Width of your saw blade cut. Common values: 1/8" (table saw), 1/16" (track saw).'
@@ -264,7 +264,7 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
               <FractionInput value={kerfWidth} onChange={(val) => setKerfWidth(Math.max(0, val))} min={0} />
             </div>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
-              <div className="label-with-help">
+              <div className="inline-flex items-center gap-1">
                 <label className="text-[13px] text-text">Material Overage</label>
                 <HelpTooltip
                   text="Extra boards to buy beyond what's calculated, to account for mistakes. 10-15% is typical, max 50%."
@@ -295,7 +295,7 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
               />
             </h3>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
-              <div className="label-with-help">
+              <div className="inline-flex items-center gap-1">
                 <label className="text-[13px] text-text">Constrain Dimensions</label>
                 <HelpTooltip
                   text="Show warning when part dimensions (including joinery adjustments) exceed stock dimensions."
@@ -310,7 +310,7 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
               />
             </div>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
-              <div className="label-with-help">
+              <div className="inline-flex items-center gap-1">
                 <label className="text-[13px] text-text">Constrain Grain</label>
                 <HelpTooltip
                   text="Show warning when part grain direction doesn't match stock grain direction."
@@ -325,7 +325,7 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
               />
             </div>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
-              <div className="label-with-help">
+              <div className="inline-flex items-center gap-1">
                 <label className="text-[13px] text-text">Sync Part Color</label>
                 <HelpTooltip
                   text="Automatically update part color when stock is assigned."
@@ -340,7 +340,7 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
               />
             </div>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
-              <div className="label-with-help">
+              <div className="inline-flex items-center gap-1">
                 <label className="text-[13px] text-text">Prevent Overlap</label>
                 <HelpTooltip text="Prevent parts from occupying the same space." docsSection="project-settings" />
               </div>

@@ -11,7 +11,7 @@ export function BehaviorSection({ formData, onSettingChange }: BehaviorSectionPr
     <div className="mb-6 last:mb-0">
       <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">Behavior</h3>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
-        <div className="label-with-help">
+        <div className="inline-flex items-center gap-1">
           <label className="text-[13px] text-text">Auto-Save</label>
           <HelpTooltip
             text="Automatically save your project 30 seconds after changes. If the project hasn't been saved yet, you'll be prompted to choose a location."
@@ -26,7 +26,7 @@ export function BehaviorSection({ formData, onSettingChange }: BehaviorSectionPr
         />
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
-        <div className="label-with-help">
+        <div className="inline-flex items-center gap-1">
           <label className="text-[13px] text-text">Confirm Before Delete</label>
           <HelpTooltip text="Show a confirmation dialog when deleting parts or stocks." docsSection="app-settings" />
         </div>
@@ -39,7 +39,7 @@ export function BehaviorSection({ formData, onSettingChange }: BehaviorSectionPr
       </div>
 
       <div className="settings-row flex items-center justify-between gap-4 mb-3 mt-4">
-        <div className="label-with-help">
+        <div className="inline-flex items-center gap-1">
           <label className="text-[13px] text-text">Welcome Tutorial</label>
           <HelpTooltip text="Reset the welcome tutorial to show it again on next launch." docsSection="quick-start" />
         </div>

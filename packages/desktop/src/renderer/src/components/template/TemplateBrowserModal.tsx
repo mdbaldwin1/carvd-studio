@@ -256,7 +256,7 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
                 )}
               </div>
               {userTemplates.length === 0 ? (
-                <p className="placeholder-text">
+                <p className="text-text-muted text-xs italic">
                   No custom templates yet. Save your current project as a template to reuse it later.
                 </p>
               ) : (

@@ -13,7 +13,7 @@ export function DataManagementSection({ isExporting, onExport, onImport }: DataM
       <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">Data Management</h3>
       <div className="settings-row flex flex-col items-start gap-3 mb-3">
         <div className="flex flex-col gap-1">
-          <div className="label-with-help">
+          <div className="inline-flex items-center gap-1">
             <label className="text-[13px] text-text">Backup & Sync</label>
             <HelpTooltip
               text="Export your templates, assemblies, and stock library to sync with another machine or create a backup."

@@ -202,7 +202,7 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
           </div>
         )}
         {stocks.length === 0 ? (
-          <div className="placeholder-text">
+          <div className="text-text-muted text-xs italic p-4 text-center">
             <p className="mb-2">📦 No stocks in library yet</p>
             <p className="hint text-xs">
               Click "+" above to create your first stock material.{' '}
@@ -219,7 +219,7 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
             </p>
           </div>
         ) : filteredStocks.length === 0 ? (
-          <div className="placeholder-text">
+          <div className="text-text-muted text-xs italic p-4 text-center">
             <p>No stocks match "{searchTerm}"</p>
           </div>
         ) : (
