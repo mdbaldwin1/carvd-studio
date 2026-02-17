@@ -8,8 +8,8 @@ interface StockConstraintsSectionProps {
 
 export function StockConstraintsSection({ formData, onSettingChange }: StockConstraintsSectionProps) {
   return (
-    <div className="settings-section">
-      <h3>
+    <div className="mb-6 last:mb-0">
+      <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">
         Stock Constraints (Defaults)
         <HelpTooltip
           text="These settings are applied when creating a new project. Each project has its own settings that can be changed in Project Settings."
@@ -17,9 +17,9 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
           inline
         />
       </h3>
-      <div className="settings-row">
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <div className="label-with-help">
-          <label>Constrain Dimensions</label>
+          <label className="text-[13px] text-text">Constrain Dimensions</label>
           <HelpTooltip
             text="Show warning when part dimensions (including joinery adjustments) exceed stock dimensions."
             docsSection="stock"
@@ -34,11 +34,12 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
               constrainDimensions: e.target.checked
             })
           }
+          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
-      <div className="settings-row">
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <div className="label-with-help">
-          <label>Constrain Grain Direction</label>
+          <label className="text-[13px] text-text">Constrain Grain Direction</label>
           <HelpTooltip
             text="Show warning when part grain direction doesn't match stock grain direction."
             docsSection="stock"
@@ -53,11 +54,12 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
               constrainGrain: e.target.checked
             })
           }
+          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
-      <div className="settings-row">
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <div className="label-with-help">
-          <label>Auto-sync Color</label>
+          <label className="text-[13px] text-text">Auto-sync Color</label>
           <HelpTooltip text="Automatically update part color when stock is assigned." docsSection="stock" />
         </div>
         <input
@@ -69,11 +71,12 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
               constrainColor: e.target.checked
             })
           }
+          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
-      <div className="settings-row">
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <div className="label-with-help">
-          <label>Prevent Overlap</label>
+          <label className="text-[13px] text-text">Prevent Overlap</label>
           <HelpTooltip
             text="Prevent parts from occupying the same space. Shows warnings when parts overlap."
             docsSection="parts"
@@ -88,6 +91,7 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
               preventOverlap: e.target.checked
             })
           }
+          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
     </div>

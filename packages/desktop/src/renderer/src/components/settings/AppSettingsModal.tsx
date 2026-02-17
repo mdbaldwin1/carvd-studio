@@ -165,7 +165,7 @@ export function AppSettingsModal({
           </div>
         </div>
 
-        <div className="settings-content">
+        <div className="p-5 overflow-y-auto max-h-[60vh]">
           <AppearanceSection formData={formData} onSettingChange={handleChange} />
 
           {licenseData && (

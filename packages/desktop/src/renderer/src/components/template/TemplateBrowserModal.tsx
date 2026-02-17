@@ -193,37 +193,51 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
+    <div
+      className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
+      onMouseDown={handleMouseDown}
+      onClick={handleClick}
+    >
       <div
-        className="modal template-browser-modal"
+        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] flex flex-col animate-modal-fade-in w-[800px] max-h-[80vh] relative"
         role="dialog"
         aria-modal="true"
         aria-labelledby="template-browser-modal-title"
       >
-        <div className="modal-header">
-          <h2 id="template-browser-modal-title">New from Template</h2>
-          <button className="modal-close" onClick={onClose} aria-label="Close">
+        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+          <h2 id="template-browser-modal-title" className="text-base font-semibold text-text m-0">
+            New from Template
+          </h2>
+          <button
+            className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text"
+            onClick={onClose}
+            aria-label="Close"
+          >
             &times;
           </button>
         </div>
 
-        <div className="template-browser-content">
+        <div className="flex min-h-[400px] max-h-[60vh]">
           {/* Templates list */}
-          <div className="template-list-panel">
+          <div className="flex-1 p-4 overflow-y-auto border-r border-border">
             {/* Built-in templates */}
-            <div className="template-section">
-              <h4 className="template-section-header">Built-in Templates</h4>
-              <div className="template-grid">
+            <div className="mb-6 last:mb-0">
+              <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider m-0 mb-3">
+                Built-in Templates
+              </h4>
+              <div className="grid grid-cols-2 gap-2.5">
                 {builtInTemplates.map((template) => (
                   <div
                     key={template.id}
-                    className={`template-card ${selectedTemplate?.id === template.id ? 'selected' : ''}`}
+                    className={`relative flex items-center gap-3 p-3 bg-bg border rounded-lg cursor-pointer transition-all duration-150 hover:border-border-hover hover:bg-bg-secondary ${selectedTemplate?.id === template.id ? 'border-accent bg-accent-bg' : 'border-border'}`}
                     onClick={() => handleSelectTemplate(template)}
                   >
-                    <div className="template-thumbnail">{template.thumbnail}</div>
-                    <div className="template-card-info">
-                      <span className="template-card-name">{template.name}</span>
-                      <span className="template-card-dims">{formatDimensions(template.dimensions)}</span>
+                    <div className="text-[28px] w-11 h-11 flex items-center justify-center bg-bg-tertiary rounded-md shrink-0">
+                      {template.thumbnail}
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <span className="text-[13px] font-medium text-text truncate">{template.name}</span>
+                      <span className="text-[11px] text-text-muted">{formatDimensions(template.dimensions)}</span>
                     </div>
                   </div>
                 ))}
@@ -231,9 +245,9 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
             </div>
 
             {/* User templates */}
-            <div className="template-section">
-              <div className="template-section-header-row">
-                <h4 className="template-section-header">My Templates</h4>
+            <div className="mb-6 last:mb-0">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider m-0">My Templates</h4>
                 {parts.length > 0 && canUseCustomTemplates && (
                   <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleSaveCurrentAsTemplate}>
                     + Save Current
@@ -245,20 +259,22 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
                   No custom templates yet. Save your current project as a template to reuse it later.
                 </p>
               ) : (
-                <div className="template-grid">
+                <div className="grid grid-cols-2 gap-2.5">
                   {userTemplates.map((template) => (
                     <div
                       key={template.id}
-                      className={`template-card user-template ${selectedTemplate?.id === template.id ? 'selected' : ''}`}
+                      className={`group relative flex items-center gap-3 p-3 bg-bg border border-dashed rounded-lg cursor-pointer transition-all duration-150 hover:border-border-hover hover:bg-bg-secondary ${selectedTemplate?.id === template.id ? '!border-solid border-accent bg-accent-bg' : 'border-border'}`}
                       onClick={() => handleSelectTemplate(template)}
                     >
-                      <div className="template-thumbnail">{template.thumbnail}</div>
-                      <div className="template-card-info">
-                        <span className="template-card-name">{template.name}</span>
-                        <span className="template-card-dims">{formatDimensions(template.dimensions)}</span>
+                      <div className="text-[28px] w-11 h-11 flex items-center justify-center bg-bg-tertiary rounded-md shrink-0">
+                        {template.thumbnail}
+                      </div>
+                      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                        <span className="text-[13px] font-medium text-text truncate">{template.name}</span>
+                        <span className="text-[11px] text-text-muted">{formatDimensions(template.dimensions)}</span>
                       </div>
                       <button
-                        className="template-delete-btn"
+                        className="absolute top-1.5 right-1.5 w-[22px] h-[22px] p-0 flex items-center justify-center bg-transparent border-none rounded cursor-pointer text-text-muted opacity-0 group-hover:opacity-100 transition-all duration-150 hover:bg-danger-bg hover:text-danger"
                         onClick={(e) => {
                           e.stopPropagation();
                           setDeleteConfirmId(template.id);
@@ -276,51 +292,63 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
           </div>
 
           {/* Template details */}
-          <div className="template-details-panel">
+          <div className="w-[280px] p-5 flex flex-col">
             {selectedTemplate ? (
               <>
-                <div className="template-details-header">
-                  <span className="template-thumbnail-large">{selectedTemplate.thumbnail}</span>
+                <div className="flex items-center gap-4 mb-5">
+                  <span className="text-5xl w-[72px] h-[72px] flex items-center justify-center bg-bg-tertiary rounded-xl">
+                    {selectedTemplate.thumbnail}
+                  </span>
                   <div>
-                    <h3>{selectedTemplate.name}</h3>
-                    {selectedTemplate.type === 'user' && <span className="template-badge">Custom</span>}
+                    <h3 className="text-lg font-semibold text-text m-0 mb-1">{selectedTemplate.name}</h3>
+                    {selectedTemplate.type === 'user' && (
+                      <span className="inline-block text-[10px] font-semibold text-accent bg-accent-bg py-0.5 px-2 rounded-full uppercase tracking-wider">
+                        Custom
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="template-details-body">
-                  <p className="template-description">{selectedTemplate.description}</p>
+                <div className="flex-1">
+                  <p className="text-[13px] text-text-secondary leading-relaxed m-0 mb-5">
+                    {selectedTemplate.description}
+                  </p>
 
-                  <div className="template-stats">
-                    <div className="template-stat">
-                      <label>Dimensions</label>
-                      <span>{formatDimensions(selectedTemplate.dimensions)}</span>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs text-text-muted">Dimensions</label>
+                      <span className="text-[13px] text-text font-medium">
+                        {formatDimensions(selectedTemplate.dimensions)}
+                      </span>
                     </div>
-                    <div className="template-stat">
-                      <label>Parts</label>
-                      <span>{selectedTemplate.partCount}</span>
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs text-text-muted">Parts</label>
+                      <span className="text-[13px] text-text font-medium">{selectedTemplate.partCount}</span>
                     </div>
-                    <div className="template-stat">
-                      <label>Category</label>
-                      <span style={{ textTransform: 'capitalize' }}>{selectedTemplate.category}</span>
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs text-text-muted">Category</label>
+                      <span className="text-[13px] text-text font-medium capitalize">{selectedTemplate.category}</span>
                     </div>
                     {selectedTemplate.type === 'user' && (
-                      <div className="template-stat">
-                        <label>Created</label>
-                        <span>{new Date((selectedTemplate as UserTemplate).createdAt).toLocaleDateString()}</span>
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs text-text-muted">Created</label>
+                        <span className="text-[13px] text-text font-medium">
+                          {new Date((selectedTemplate as UserTemplate).createdAt).toLocaleDateString()}
+                        </span>
                       </div>
                     )}
                   </div>
                 </div>
               </>
             ) : (
-              <div className="template-details-placeholder">
-                <p>Select a template to view details</p>
+              <div className="flex-1 flex items-center justify-center">
+                <p className="text-text-muted text-[13px]">Select a template to view details</p>
               </div>
             )}
           </div>
         </div>
 
-        <div className="modal-footer">
+        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
           <button className="btn btn-sm btn-outlined btn-secondary" onClick={onClose}>
             Cancel
           </button>
@@ -335,11 +363,11 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
 
         {/* Delete confirmation overlay */}
         {deleteConfirmId && (
-          <div className="template-delete-confirm-overlay">
-            <div className="template-delete-confirm">
-              <p>Delete this template?</p>
-              <p className="template-delete-warning">This action cannot be undone.</p>
-              <div className="template-delete-actions">
+          <div className="absolute inset-0 bg-[rgba(0,0,0,0.6)] flex items-center justify-center rounded-lg">
+            <div className="bg-surface p-5 rounded-lg text-center max-w-[280px]">
+              <p className="m-0 mb-2 text-sm text-text">Delete this template?</p>
+              <p className="text-xs text-text-muted mb-4">This action cannot be undone.</p>
+              <div className="flex gap-2 justify-center">
                 <button className="btn btn-sm btn-outlined btn-secondary" onClick={() => setDeleteConfirmId(null)}>
                   Cancel
                 </button>

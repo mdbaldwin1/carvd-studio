@@ -24,13 +24,13 @@ export function RecoveryDialog({ isOpen, recoveryInfo, onRestore, onDiscard }: R
   };
 
   return (
-    <div className="modal-overlay z-[1001]">
-      <div className="modal max-w-[450px]">
-        <div className="modal-header">
-          <h2>Recover Unsaved Work</h2>
+    <div className="modal-overlay fixed inset-0 bg-overlay flex items-center justify-center z-[1001]">
+      <div className="modal bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[450px] max-h-[85vh] flex flex-col animate-modal-fade-in">
+        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+          <h2 className="m-0 text-base font-semibold text-text">Recover Unsaved Work</h2>
         </div>
 
-        <div className="modal-body">
+        <div className="p-5 overflow-y-auto">
           <p className="m-0 mb-4 text-sm text-text leading-relaxed">
             A recovery file was found from a previous session that may not have been saved properly.
           </p>
@@ -49,7 +49,7 @@ export function RecoveryDialog({ isOpen, recoveryInfo, onRestore, onDiscard }: R
           <p className="m-0 text-sm text-text">Would you like to restore this work?</p>
         </div>
 
-        <div className="modal-footer flex gap-2 justify-end">
+        <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
           <button className="btn btn-secondary min-w-[90px]" onClick={onDiscard}>
             Discard
           </button>

@@ -50,13 +50,16 @@ export function TemplateSetupDialog({ isOpen, onConfirm, onCancel }: TemplateSet
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal max-w-120 w-[90vw]" onKeyDown={handleKeyDown}>
-        <div className="modal-header">
-          <h2>Create New Template</h2>
+    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]">
+      <div
+        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-120 w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in"
+        onKeyDown={handleKeyDown}
+      >
+        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+          <h2 className="m-0 text-base font-semibold text-text">Create New Template</h2>
         </div>
 
-        <div className="modal-body">
+        <div className="p-5 overflow-y-auto">
           <p className="text-text-secondary text-sm mb-5">
             Templates let you save reusable project layouts. Give your template a name and optional description.
           </p>
@@ -91,7 +94,7 @@ export function TemplateSetupDialog({ isOpen, onConfirm, onCancel }: TemplateSet
           </div>
         </div>
 
-        <div className="modal-footer flex gap-2 justify-end">
+        <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
           <button className="btn btn-sm btn-ghost btn-secondary" onClick={onCancel}>
             Cancel
           </button>
@@ -148,13 +151,18 @@ export function TemplateSaveDialog({
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal max-w-120 w-[90vw]" onKeyDown={handleKeyDown}>
-        <div className="modal-header">
-          <h2>{isCreatingNew ? 'Save New Template' : 'Save Template'}</h2>
+    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]">
+      <div
+        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-120 w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in"
+        onKeyDown={handleKeyDown}
+      >
+        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+          <h2 className="m-0 text-base font-semibold text-text">
+            {isCreatingNew ? 'Save New Template' : 'Save Template'}
+          </h2>
         </div>
 
-        <div className="modal-body">
+        <div className="p-5 overflow-y-auto">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="template-name" className="text-[13px] font-medium text-text-secondary">
@@ -186,7 +194,7 @@ export function TemplateSaveDialog({
           </div>
         </div>
 
-        <div className="modal-footer flex gap-2 justify-end">
+        <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
           <button className="btn btn-sm btn-ghost btn-secondary" onClick={onCancel}>
             Cancel
           </button>
@@ -220,13 +228,13 @@ export function TemplateDiscardDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay">
-      <div className="modal max-w-120 w-[90vw]">
-        <div className="modal-header">
-          <h2>Discard Changes?</h2>
+    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]">
+      <div className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-120 w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in">
+        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+          <h2 className="m-0 text-base font-semibold text-text">Discard Changes?</h2>
         </div>
 
-        <div className="modal-body">
+        <div className="p-5 overflow-y-auto">
           <p>
             {isCreatingNew ? (
               <>Are you sure you want to discard this new template? Your changes will be lost.</>
@@ -238,7 +246,7 @@ export function TemplateDiscardDialog({
           </p>
         </div>
 
-        <div className="modal-footer flex gap-2 justify-end">
+        <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
           <button className="btn btn-sm btn-ghost btn-secondary mr-auto" onClick={onCancel}>
             Keep Editing
           </button>
