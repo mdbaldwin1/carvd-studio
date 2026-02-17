@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import * as THREE from 'three';
 import { LiveDimensions } from './partTypes';
+import { GRAIN_ARROW_HEAD_GEOMETRY, GRAIN_ARROW_MATERIAL } from './partGeometry';
 
 // Double-headed arrow showing grain direction painted on the part surface
 export const GrainDirectionArrow = memo(
@@ -27,66 +28,30 @@ export const GrainDirectionArrow = memo(
     // Rotation for width direction (rotate 90 degrees around Y)
     const rotation: [number, number, number] = grainDirection === 'length' ? [0, 0, 0] : [0, Math.PI / 2, 0];
 
-    // Wood grain brown color
-    const arrowColor = '#8B4513';
-
     return (
       <group position={[0, surfaceY, 0]} rotation={rotation}>
         {/* Arrow shaft - flat rectangle */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} material={GRAIN_ARROW_MATERIAL}>
           <planeGeometry args={[arrowLength - headLength * 2, shaftWidth]} />
-          <meshStandardMaterial color={arrowColor} side={THREE.DoubleSide} />
         </mesh>
 
         {/* Arrow head 1 (positive X direction) */}
-        <mesh position={[halfArrow - headLength / 2, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <bufferGeometry>
-            <bufferAttribute
-              attach="attributes-position"
-              count={3}
-              array={
-                new Float32Array([
-                  -headLength / 2,
-                  -headWidth,
-                  0, // back left
-                  -headLength / 2,
-                  headWidth,
-                  0, // back right
-                  headLength / 2,
-                  0,
-                  0 // tip
-                ])
-              }
-              itemSize={3}
-            />
-          </bufferGeometry>
-          <meshStandardMaterial color={arrowColor} side={THREE.DoubleSide} />
-        </mesh>
+        <mesh
+          position={[halfArrow - headLength / 2, 0, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          scale={[headLength, headWidth, 1]}
+          geometry={GRAIN_ARROW_HEAD_GEOMETRY}
+          material={GRAIN_ARROW_MATERIAL}
+        />
 
         {/* Arrow head 2 (negative X direction) */}
-        <mesh position={[-halfArrow + headLength / 2, 0, 0]} rotation={[-Math.PI / 2, 0, Math.PI]}>
-          <bufferGeometry>
-            <bufferAttribute
-              attach="attributes-position"
-              count={3}
-              array={
-                new Float32Array([
-                  -headLength / 2,
-                  -headWidth,
-                  0, // back left
-                  -headLength / 2,
-                  headWidth,
-                  0, // back right
-                  headLength / 2,
-                  0,
-                  0 // tip
-                ])
-              }
-              itemSize={3}
-            />
-          </bufferGeometry>
-          <meshStandardMaterial color={arrowColor} side={THREE.DoubleSide} />
-        </mesh>
+        <mesh
+          position={[-halfArrow + headLength / 2, 0, 0]}
+          rotation={[-Math.PI / 2, 0, Math.PI]}
+          scale={[headLength, headWidth, 1]}
+          geometry={GRAIN_ARROW_HEAD_GEOMETRY}
+          material={GRAIN_ARROW_MATERIAL}
+        />
       </group>
     );
   },

@@ -49,3 +49,17 @@ export const ROTATION_OUTLINE_MATERIAL = new THREE.MeshBasicMaterial({
   transparent: true,
   opacity: 0.4
 });
+
+// Grain direction arrow — shared geometry and material
+export const GRAIN_ARROW_MATERIAL = new THREE.MeshStandardMaterial({
+  color: '#8B4513',
+  side: THREE.DoubleSide
+});
+
+// Unit triangle: vertices at (-0.5, -1, 0), (-0.5, 1, 0), (0.5, 0, 0)
+// Each instance scales X by headLength, Y by headWidth
+export const GRAIN_ARROW_HEAD_GEOMETRY = new THREE.BufferGeometry();
+GRAIN_ARROW_HEAD_GEOMETRY.setAttribute(
+  'position',
+  new THREE.BufferAttribute(new Float32Array([-0.5, -1, 0, -0.5, 1, 0, 0.5, 0, 0]), 3)
+);
