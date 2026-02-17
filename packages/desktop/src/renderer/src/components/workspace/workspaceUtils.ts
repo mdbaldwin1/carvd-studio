@@ -63,6 +63,13 @@ export function clearRightClickTarget() {
   globalRightClickTarget = null;
 }
 
+// Module-level reusable objects for getPartAABB calculations.
+// Safe because JS is single-threaded and the return value is a plain object.
+const _aabbEuler = new THREE.Euler();
+const _aabbQuat = new THREE.Quaternion();
+const _aabbCorners = Array.from({ length: 8 }, () => new THREE.Vector3());
+const _aabbPosition = new THREE.Vector3();
+
 // Helper to calculate axis-aligned bounding box for a part
 export function getPartAABB(part: {
   position: { x: number; y: number; z: number };
@@ -71,26 +78,28 @@ export function getPartAABB(part: {
   width: number;
   thickness: number;
 }) {
-  const rotX = (part.rotation.x * Math.PI) / 180;
-  const rotY = (part.rotation.y * Math.PI) / 180;
-  const rotZ = (part.rotation.z * Math.PI) / 180;
-  const euler = new THREE.Euler(rotX, rotY, rotZ, 'XYZ');
-  const quat = new THREE.Quaternion().setFromEuler(euler);
+  _aabbEuler.set(
+    (part.rotation.x * Math.PI) / 180,
+    (part.rotation.y * Math.PI) / 180,
+    (part.rotation.z * Math.PI) / 180,
+    'XYZ'
+  );
+  _aabbQuat.setFromEuler(_aabbEuler);
 
   const halfLength = part.length / 2;
   const halfThickness = part.thickness / 2;
   const halfWidth = part.width / 2;
 
-  const corners = [
-    new THREE.Vector3(-halfLength, -halfThickness, -halfWidth),
-    new THREE.Vector3(-halfLength, -halfThickness, halfWidth),
-    new THREE.Vector3(-halfLength, halfThickness, -halfWidth),
-    new THREE.Vector3(-halfLength, halfThickness, halfWidth),
-    new THREE.Vector3(halfLength, -halfThickness, -halfWidth),
-    new THREE.Vector3(halfLength, -halfThickness, halfWidth),
-    new THREE.Vector3(halfLength, halfThickness, -halfWidth),
-    new THREE.Vector3(halfLength, halfThickness, halfWidth)
-  ];
+  _aabbCorners[0].set(-halfLength, -halfThickness, -halfWidth);
+  _aabbCorners[1].set(-halfLength, -halfThickness, halfWidth);
+  _aabbCorners[2].set(-halfLength, halfThickness, -halfWidth);
+  _aabbCorners[3].set(-halfLength, halfThickness, halfWidth);
+  _aabbCorners[4].set(halfLength, -halfThickness, -halfWidth);
+  _aabbCorners[5].set(halfLength, -halfThickness, halfWidth);
+  _aabbCorners[6].set(halfLength, halfThickness, -halfWidth);
+  _aabbCorners[7].set(halfLength, halfThickness, halfWidth);
+
+  _aabbPosition.set(part.position.x, part.position.y, part.position.z);
 
   let minX = Infinity,
     maxX = -Infinity;
@@ -99,9 +108,9 @@ export function getPartAABB(part: {
   let minZ = Infinity,
     maxZ = -Infinity;
 
-  for (const corner of corners) {
-    corner.applyQuaternion(quat);
-    corner.add(new THREE.Vector3(part.position.x, part.position.y, part.position.z));
+  for (const corner of _aabbCorners) {
+    corner.applyQuaternion(_aabbQuat);
+    corner.add(_aabbPosition);
     minX = Math.min(minX, corner.x);
     maxX = Math.max(maxX, corner.x);
     minY = Math.min(minY, corner.y);

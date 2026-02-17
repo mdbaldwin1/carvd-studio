@@ -1,6 +1,6 @@
 import { Grid, OrbitControls } from '@react-three/drei';
 import { ThreeEvent, useThree } from '@react-three/fiber';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GRID_SIZE } from '../../constants';
 import { useProjectStore } from '../../store/projectStore';
@@ -51,6 +51,12 @@ export function Workspace() {
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);
   const boxStartRef = useRef<{ x: number; y: number } | null>(null);
   const boxEndRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Reusable objects for box selection (avoids 18 THREE allocs per part per frame)
+  const _selEuler = useMemo(() => new THREE.Euler(), []);
+  const _selQuat = useMemo(() => new THREE.Quaternion(), []);
+  const _selCorners = useMemo(() => Array.from({ length: 8 }, () => new THREE.Vector3()), []);
+  const _selPosition = useMemo(() => new THREE.Vector3(), []);
 
   // Camera state persistence
   const cameraSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -368,46 +374,43 @@ export function Workspace() {
         const halfThickness = part.thickness / 2;
         const halfWidth = part.width / 2;
 
-        // Calculate rotation quaternion
-        const rotX = (part.rotation.x * Math.PI) / 180;
-        const rotY = (part.rotation.y * Math.PI) / 180;
-        const rotZ = (part.rotation.z * Math.PI) / 180;
-        const euler = new THREE.Euler(rotX, rotY, rotZ, 'XYZ');
-        const quat = new THREE.Quaternion().setFromEuler(euler);
+        // Reuse pooled objects (no allocations in this loop)
+        _selEuler.set(
+          (part.rotation.x * Math.PI) / 180,
+          (part.rotation.y * Math.PI) / 180,
+          (part.rotation.z * Math.PI) / 180,
+          'XYZ'
+        );
+        _selQuat.setFromEuler(_selEuler);
+        _selPosition.set(part.position.x, part.position.y, part.position.z);
 
-        // Get the 8 corners of the bounding box in local space
-        const localCorners = [
-          new THREE.Vector3(-halfLength, -halfThickness, -halfWidth),
-          new THREE.Vector3(-halfLength, -halfThickness, halfWidth),
-          new THREE.Vector3(-halfLength, halfThickness, -halfWidth),
-          new THREE.Vector3(-halfLength, halfThickness, halfWidth),
-          new THREE.Vector3(halfLength, -halfThickness, -halfWidth),
-          new THREE.Vector3(halfLength, -halfThickness, halfWidth),
-          new THREE.Vector3(halfLength, halfThickness, -halfWidth),
-          new THREE.Vector3(halfLength, halfThickness, halfWidth)
-        ];
+        // Set corner values in-place
+        _selCorners[0].set(-halfLength, -halfThickness, -halfWidth);
+        _selCorners[1].set(-halfLength, -halfThickness, halfWidth);
+        _selCorners[2].set(-halfLength, halfThickness, -halfWidth);
+        _selCorners[3].set(-halfLength, halfThickness, halfWidth);
+        _selCorners[4].set(halfLength, -halfThickness, -halfWidth);
+        _selCorners[5].set(halfLength, -halfThickness, halfWidth);
+        _selCorners[6].set(halfLength, halfThickness, -halfWidth);
+        _selCorners[7].set(halfLength, halfThickness, halfWidth);
 
-        // Transform corners to world space and project to screen
-        const screenPoints: { x: number; y: number }[] = [];
-        for (const corner of localCorners) {
-          // Apply rotation
-          corner.applyQuaternion(quat);
-          // Apply position
-          corner.add(new THREE.Vector3(part.position.x, part.position.y, part.position.z));
-          // Project to screen
+        // Transform corners to screen space and track bounding box
+        let partLeft = Infinity,
+          partRight = -Infinity,
+          partTop = Infinity,
+          partBottom = -Infinity;
+
+        for (const corner of _selCorners) {
+          corner.applyQuaternion(_selQuat);
+          corner.add(_selPosition);
           corner.project(camera);
-          // Convert to screen coordinates
-          screenPoints.push({
-            x: ((corner.x + 1) / 2) * rect.width + rect.left,
-            y: ((-corner.y + 1) / 2) * rect.height + rect.top
-          });
+          const screenX = ((corner.x + 1) / 2) * rect.width + rect.left;
+          const screenY = ((-corner.y + 1) / 2) * rect.height + rect.top;
+          partLeft = Math.min(partLeft, screenX);
+          partRight = Math.max(partRight, screenX);
+          partTop = Math.min(partTop, screenY);
+          partBottom = Math.max(partBottom, screenY);
         }
-
-        // Get screen-space bounding box of the part
-        const partLeft = Math.min(...screenPoints.map((p) => p.x));
-        const partRight = Math.max(...screenPoints.map((p) => p.x));
-        const partTop = Math.min(...screenPoints.map((p) => p.y));
-        const partBottom = Math.max(...screenPoints.map((p) => p.y));
 
         // Check if part's screen bounding box intersects with selection box
         const intersects = partLeft <= selRight && partRight >= selLeft && partTop <= selBottom && partBottom >= selTop;
@@ -419,7 +422,7 @@ export function Workspace() {
 
       return selectedIds;
     },
-    [parts, gl, camera]
+    [parts, gl, camera, _selEuler, _selQuat, _selCorners, _selPosition]
   );
 
   return (
