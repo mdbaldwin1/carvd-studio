@@ -690,7 +690,7 @@ export function usePartDrag(
         collectGroupParts(groupId);
       }
 
-      const partsToMeasure = currentState.parts.filter((p) => partIdsToInclude.has(p.id));
+      const partsToMeasure = useProjectStore.getState().parts.filter((p) => partIdsToInclude.has(p.id));
       if (partsToMeasure.length > 0) {
         const combinedBounds = getCombinedBounds(partsToMeasure);
         anchorPos = new THREE.Vector3(combinedBounds.centerX, combinedBounds.centerY, combinedBounds.centerZ);
