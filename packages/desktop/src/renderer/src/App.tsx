@@ -60,6 +60,7 @@ import { useProjectStore } from './store/projectStore';
 import { useSelectionStore } from './store/selectionStore';
 import { useUIStore } from './store/uiStore';
 import { useCameraStore } from './store/cameraStore';
+import { useSnapStore } from './store/snapStore';
 import { Assembly, LightingMode, Project, Stock } from './types';
 import { formatMeasurementWithUnit } from './utils/fractions';
 import { getPartBounds } from './utils/snapToPartsUtil';
@@ -1595,13 +1596,13 @@ function DisplayToolbar() {
   const displayMode = useCameraStore((s) => s.displayMode);
   const showGrid = useCameraStore((s) => s.showGrid);
   const showGrainDirection = useCameraStore((s) => s.showGrainDirection);
-  const snapToPartsEnabled = useProjectStore((s) => s.snapToPartsEnabled);
-  const referencePartIds = useProjectStore((s) => s.referencePartIds);
+  const snapToPartsEnabled = useSnapStore((s) => s.snapToPartsEnabled);
+  const referencePartIds = useSnapStore((s) => s.referencePartIds);
   const setDisplayMode = useCameraStore((s) => s.setDisplayMode);
   const setShowGrid = useCameraStore((s) => s.setShowGrid);
   const toggleGrainDirection = useCameraStore((s) => s.toggleGrainDirection);
-  const setSnapToPartsEnabled = useProjectStore((s) => s.setSnapToPartsEnabled);
-  const clearReferences = useProjectStore((s) => s.clearReferences);
+  const setSnapToPartsEnabled = useSnapStore((s) => s.setSnapToPartsEnabled);
+  const clearReferences = useSnapStore((s) => s.clearReferences);
   const [brightnessOpen, setBrightnessOpen] = useState(false);
 
   return (

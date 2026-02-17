@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useSelectionStore } from './selectionStore';
 import { useProjectStore } from './projectStore';
+import { useSnapStore } from './snapStore';
 import { useUIStore } from './uiStore';
 
 // Helper to reset store state before each test
@@ -23,6 +24,12 @@ const resetStores = () => {
     cutListModalOpen: false,
     saveAssemblyModalOpen: false,
     manualThumbnail: null
+  });
+  useSnapStore.setState({
+    snapToPartsEnabled: true,
+    activeSnapLines: [],
+    referencePartIds: [],
+    activeReferenceDistances: []
   });
 };
 

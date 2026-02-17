@@ -6,6 +6,7 @@ import { useShallow } from 'zustand/shallow';
 import { useProjectStore, getAncestorGroupIds } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useCameraStore } from '../../store/cameraStore';
+import { useSnapStore } from '../../store/snapStore';
 import { Part as PartType, RotationAngle } from '../../types';
 import { LiveDimensions, HANDLE_POSITIONS } from './partTypes';
 import { DimensionLabel } from './DimensionLabel';
@@ -23,13 +24,13 @@ export const Part = memo(function Part({ part }: PartProps) {
   const { camera, gl, controls } = useThree();
 
   // Project state selector - only re-renders when these specific values change
-  const { units, referencePartIds, groupMembers } = useProjectStore(
+  const { units, groupMembers } = useProjectStore(
     useShallow((s) => ({
       units: s.units,
-      referencePartIds: s.referencePartIds,
       groupMembers: s.groupMembers
     }))
   );
+  const referencePartIds = useSnapStore((s) => s.referencePartIds);
 
   // Selection state selector
   const { selectedPartIds, hoveredPartId, activeDragDelta, selectedGroupIds, editingGroupId } = useSelectionStore(

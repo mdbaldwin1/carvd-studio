@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useProjectStore, isDescendantOf } from './projectStore';
+import { useSnapStore } from './snapStore';
 
 interface SelectionStoreState {
   // Part selection
@@ -187,14 +188,14 @@ export const useSelectionStore = create<SelectionStoreState>((set, get) => ({
   }
 }));
 
-// Bridge: when selection changes, update reference distances in projectStore
-// Located here (not in projectStore) to avoid circular module initialization issues
+// Bridge: when selection changes, update reference distances in snapStore
+// Located here (not in snapStore) to avoid circular module initialization issues
 let _prevSelectedPartIds: string[] = [];
 let _prevSelectedGroupIds: string[] = [];
 useSelectionStore.subscribe((state) => {
   if (state.selectedPartIds !== _prevSelectedPartIds || state.selectedGroupIds !== _prevSelectedGroupIds) {
     _prevSelectedPartIds = state.selectedPartIds;
     _prevSelectedGroupIds = state.selectedGroupIds;
-    useProjectStore.getState().updateReferenceDistances();
+    useSnapStore.getState().updateReferenceDistances();
   }
 });

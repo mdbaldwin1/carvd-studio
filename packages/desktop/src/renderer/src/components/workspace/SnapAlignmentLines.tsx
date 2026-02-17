@@ -1,11 +1,12 @@
 import { Html, Line } from '@react-three/drei';
 import { useProjectStore } from '../../store/projectStore';
+import { useSnapStore } from '../../store/snapStore';
 import { SnapLine } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 
 // Component that renders snap alignment lines during drag operations
 export function SnapAlignmentLines() {
-  const activeSnapLines = useProjectStore((s) => s.activeSnapLines);
+  const activeSnapLines = useSnapStore((s) => s.activeSnapLines);
   const units = useProjectStore((s) => s.units);
 
   if (activeSnapLines.length === 0) return null;

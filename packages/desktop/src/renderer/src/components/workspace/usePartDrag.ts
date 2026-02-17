@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { Part as PartType } from '../../types';
 import { useProjectStore, getAllDescendantPartIds } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
+import { useSnapStore } from '../../store/snapStore';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
 import {
   detectSnaps,
@@ -211,11 +212,11 @@ export function usePartDrag(
           newY = Math.max(worldHalfHeight, newY);
 
           // Apply snap-to-parts if enabled (Alt key temporarily bypasses snapping)
-          const isSnapEnabled = useProjectStore.getState().snapToPartsEnabled && !e.altKey;
+          const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled && !e.altKey;
           const allParts = useProjectStore.getState().parts;
           const currentSelectedIds = useSelectionStore.getState().selectedPartIds;
           const currentSelectedGroupIds = useSelectionStore.getState().selectedGroupIds;
-          const currentReferenceIds = useProjectStore.getState().referencePartIds;
+          const currentReferenceIds = useSnapStore.getState().referencePartIds;
           const snapGuides = useProjectStore.getState().snapGuides;
 
           const appSettings = useAppSettingsStore.getState().settings;
@@ -353,7 +354,7 @@ export function usePartDrag(
               }
             }
 
-            useProjectStore.getState().setActiveSnapLines(snapLines);
+            useSnapStore.getState().setActiveSnapLines(snapLines);
 
             wasSnappedByParts.current = {
               x: snapLines.some((l) => l.axis === 'x'),
@@ -385,21 +386,21 @@ export function usePartDrag(
                   z: newZ - dragStart.current!.partPos.z
                 };
                 const referenceDistances = calculateGroupReferenceDistances(draggingParts, dragDelta, referenceParts);
-                useProjectStore.getState().setActiveReferenceDistances(referenceDistances);
+                useSnapStore.getState().setActiveReferenceDistances(referenceDistances);
               } else {
                 const referenceDistances = calculateReferenceDistances(
                   part,
                   { x: newX, y: newY, z: newZ },
                   referenceParts
                 );
-                useProjectStore.getState().setActiveReferenceDistances(referenceDistances);
+                useSnapStore.getState().setActiveReferenceDistances(referenceDistances);
               }
             } else {
-              useProjectStore.getState().setActiveReferenceDistances([]);
+              useSnapStore.getState().setActiveReferenceDistances([]);
             }
           } else {
-            useProjectStore.getState().setActiveSnapLines([]);
-            useProjectStore.getState().setActiveReferenceDistances([]);
+            useSnapStore.getState().setActiveSnapLines([]);
+            useSnapStore.getState().setActiveReferenceDistances([]);
             wasSnappedByParts.current = { x: false, y: false, z: false };
           }
 
@@ -550,8 +551,8 @@ export function usePartDrag(
               lastDragPosition.current = null;
               useSelectionStore.getState().setActiveDragDelta(null);
               if (isOrbitControls(controls)) controls.enabled = true;
-              useProjectStore.getState().setActiveSnapLines([]);
-              useProjectStore.getState().updateReferenceDistances();
+              useSnapStore.getState().setActiveSnapLines([]);
+              useSnapStore.getState().updateReferenceDistances();
               return;
             }
           }
@@ -588,8 +589,8 @@ export function usePartDrag(
               lastDragPosition.current = null;
               wasSnappedByParts.current = { x: false, y: false, z: false };
               if (isOrbitControls(controls)) controls.enabled = true;
-              useProjectStore.getState().setActiveSnapLines([]);
-              useProjectStore.getState().updateReferenceDistances();
+              useSnapStore.getState().setActiveSnapLines([]);
+              useSnapStore.getState().updateReferenceDistances();
               return;
             }
           }
@@ -605,8 +606,8 @@ export function usePartDrag(
         wasSnappedByParts.current = { x: false, y: false, z: false };
         justFinishedDragging.current = true;
         if (isOrbitControls(controls)) controls.enabled = true;
-        useProjectStore.getState().setActiveSnapLines([]);
-        useProjectStore.getState().updateReferenceDistances();
+        useSnapStore.getState().setActiveSnapLines([]);
+        useSnapStore.getState().updateReferenceDistances();
       }
     };
 

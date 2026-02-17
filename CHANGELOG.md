@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Extract snapStore from projectStore** — Moved 4 transient snap state fields and 9 actions into a dedicated `snapStore`, with cross-store cleanup in delete actions and assembly editing (bead 3.5)
 - **Extract selectionStore from projectStore** — Moved 8 selection/UI state fields and 18 actions into a dedicated `selectionStore`, with a subscription bridge for reference distance updates (bead 3.4)
 - **Extract cameraStore from projectStore** — Moved 9 camera/viewport state fields and 10 actions into a dedicated `cameraStore`, reducing projectStore complexity and continuing the store decomposition (bead 3.3)
 

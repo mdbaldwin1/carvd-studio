@@ -3,6 +3,7 @@ import { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Part as PartType } from '../../types';
 import { useProjectStore } from '../../store/projectStore';
+import { useSnapStore } from '../../store/snapStore';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
 import {
   calculateSnapThreshold,
@@ -131,9 +132,9 @@ export function usePartResize(
     }
 
     // Apply dimension matching snap if enabled
-    const isSnapEnabled = useProjectStore.getState().snapToPartsEnabled;
+    const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled;
     const allParts = useProjectStore.getState().parts;
-    const currentReferenceIds = useProjectStore.getState().referencePartIds;
+    const currentReferenceIds = useSnapStore.getState().referencePartIds;
     const units = useProjectStore.getState().units;
 
     const appSettings = useAppSettingsStore.getState().settings;
@@ -198,11 +199,11 @@ export function usePartResize(
         snapLines.push(snapLine);
       }
 
-      useProjectStore.getState().setActiveSnapLines(snapLines);
+      useSnapStore.getState().setActiveSnapLines(snapLines);
     } else {
-      useProjectStore.getState().setActiveSnapLines([]);
+      useSnapStore.getState().setActiveSnapLines([]);
     }
-    useProjectStore.getState().setActiveReferenceDistances([]);
+    useSnapStore.getState().setActiveReferenceDistances([]);
 
     // Calculate the world-space center offset to keep the fixed corner/edge in place
     const localCenterOffset = new THREE.Vector3(
@@ -287,8 +288,8 @@ export function usePartResize(
     resizeStart.current = null;
     if (isOrbitControls(controls)) controls.enabled = true;
     document.body.style.cursor = 'auto';
-    useProjectStore.getState().setActiveSnapLines([]);
-    useProjectStore.getState().updateReferenceDistances();
+    useSnapStore.getState().setActiveSnapLines([]);
+    useSnapStore.getState().updateReferenceDistances();
   };
 
   // Attach/detach window listeners when resizing

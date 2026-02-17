@@ -7,7 +7,6 @@ import {
   Group,
   GroupMember,
   Project,
-  SnapLine,
   SnapGuide,
   Clipboard,
   Assembly,
@@ -19,15 +18,14 @@ import {
   PartValidationIssue,
   EmbeddedStock,
   CustomShoppingItem,
-  CameraState,
-  ReferenceDistanceIndicator
+  CameraState
 } from '../types';
 import { STOCK_COLORS } from '../constants';
 import { LicenseMode, canAddPart, canAddStock, getBlockedMessage, getFeatureLimits } from '../utils/featureLimits';
-import { getCombinedBounds, calculateDistancesFromBounds } from '../utils/snapToPartsUtil';
 import { useUIStore } from './uiStore';
 import { useCameraStore } from './cameraStore';
 import { useSelectionStore } from './selectionStore';
+import { useSnapStore } from './snapStore';
 
 interface ProjectState {
   // Project data
@@ -55,12 +53,6 @@ interface ProjectState {
 
   // UI state
   clipboard: Clipboard;
-  // Snap-to-parts feature
-  snapToPartsEnabled: boolean;
-  activeSnapLines: SnapLine[]; // Current alignment lines to display during drag
-  // Reference parts for precision snapping
-  referencePartIds: string[]; // Parts marked as snap reference targets
-  activeReferenceDistances: ReferenceDistanceIndicator[]; // Distance indicators to reference parts during drag
   // Persistent snap guides
   snapGuides: SnapGuide[]; // User-created guide planes for snapping
   // Custom shopping list items (hardware, fasteners, etc.)
@@ -153,17 +145,6 @@ interface ProjectState {
   setProjectNotes: (notes: string) => void;
   setStockConstraints: (constraints: StockConstraintSettings) => void;
 
-  // Snap-to-parts actions
-  setSnapToPartsEnabled: (enabled: boolean) => void;
-  setActiveSnapLines: (lines: SnapLine[]) => void;
-  // Reference parts actions
-  setReferencePartIds: (ids: string[]) => void;
-  addToReferences: (ids: string[]) => void;
-  removeFromReferences: (ids: string[]) => void;
-  toggleReference: (ids: string[]) => void;
-  clearReferences: () => void;
-  setActiveReferenceDistances: (distances: ReferenceDistanceIndicator[]) => void;
-  updateReferenceDistances: () => void; // Recalculate distances based on current selection and references
   // Snap guide actions
   addSnapGuide: (axis: 'x' | 'y' | 'z', position: number, label?: string) => string;
   removeSnapGuide: (id: string) => void;
@@ -474,10 +455,6 @@ export const useProjectStore = create<ProjectState>()(
       modifiedAt: new Date().toISOString(),
 
       clipboard: { parts: [], groups: [], groupMembers: [] },
-      snapToPartsEnabled: true, // Enabled by default
-      activeSnapLines: [],
-      referencePartIds: [], // No reference parts by default
-      activeReferenceDistances: [], // Distance indicators to references during drag
       snapGuides: [], // No guides by default
       customShoppingItems: [], // No custom shopping items by default
 
@@ -521,7 +498,7 @@ export const useProjectStore = create<ProjectState>()(
         get().markCutListStale();
         // Update reference distances if position changed
         if (updates.position) {
-          get().updateReferenceDistances();
+          useSnapStore.getState().updateReferenceDistances();
         }
       },
 
@@ -598,19 +575,21 @@ export const useProjectStore = create<ProjectState>()(
           }),
           isDirty: true
         }));
-        get().updateReferenceDistances();
+        useSnapStore.getState().updateReferenceDistances();
       },
 
       deletePart: (id) => {
         set((state) => ({
           parts: state.parts.filter((p) => p.id !== id),
-          referencePartIds: state.referencePartIds.filter((pid) => pid !== id),
           // Remove from any groups
           groupMembers: state.groupMembers.filter((gm) => !(gm.memberType === 'part' && gm.memberId === id)),
           isDirty: true
         }));
         useSelectionStore.setState((state) => ({
           selectedPartIds: state.selectedPartIds.filter((pid) => pid !== id)
+        }));
+        useSnapStore.setState((state) => ({
+          referencePartIds: state.referencePartIds.filter((pid) => pid !== id)
         }));
         get().markCutListStale();
       },
@@ -620,7 +599,6 @@ export const useProjectStore = create<ProjectState>()(
         if (selectedPartIds.length === 0) return;
         set((state) => ({
           parts: state.parts.filter((p) => !selectedPartIds.includes(p.id)),
-          referencePartIds: state.referencePartIds.filter((id) => !selectedPartIds.includes(id)),
           // Remove from any groups
           groupMembers: state.groupMembers.filter(
             (gm) => !(gm.memberType === 'part' && selectedPartIds.includes(gm.memberId))
@@ -628,6 +606,9 @@ export const useProjectStore = create<ProjectState>()(
           isDirty: true
         }));
         useSelectionStore.setState({ selectedPartIds: [] });
+        useSnapStore.setState((state) => ({
+          referencePartIds: state.referencePartIds.filter((id) => !selectedPartIds.includes(id))
+        }));
         get().markCutListStale();
       },
 
@@ -636,7 +617,6 @@ export const useProjectStore = create<ProjectState>()(
         if (!pendingDeletePartIds || pendingDeletePartIds.length === 0) return;
         set((state) => ({
           parts: state.parts.filter((p) => !pendingDeletePartIds.includes(p.id)),
-          referencePartIds: state.referencePartIds.filter((id) => !pendingDeletePartIds.includes(id)),
           // Remove from any groups
           groupMembers: state.groupMembers.filter(
             (gm) => !(gm.memberType === 'part' && pendingDeletePartIds.includes(gm.memberId))
@@ -645,6 +625,9 @@ export const useProjectStore = create<ProjectState>()(
         }));
         useSelectionStore.setState((state) => ({
           selectedPartIds: state.selectedPartIds.filter((id) => !pendingDeletePartIds.includes(id))
+        }));
+        useSnapStore.setState((state) => ({
+          referencePartIds: state.referencePartIds.filter((id) => !pendingDeletePartIds.includes(id))
         }));
         useUIStore.getState().cancelDeleteParts();
         get().markCutListStale();
@@ -1522,7 +1505,6 @@ export const useProjectStore = create<ProjectState>()(
           createdAt: now,
           modifiedAt: now,
           clipboard: { parts: [], groups: [], groupMembers: [] },
-          referencePartIds: [],
           snapGuides: [],
           customShoppingItems: [],
           cutList: null
@@ -1533,6 +1515,7 @@ export const useProjectStore = create<ProjectState>()(
           expandedGroupIds: [],
           editingGroupId: null
         });
+        useSnapStore.setState({ referencePartIds: [], activeSnapLines: [], activeReferenceDistances: [] });
         // Reset camera state for new project
         useCameraStore.getState().setCameraState(null);
         useCameraStore.getState().clearPendingCameraRestore();
@@ -1569,7 +1552,6 @@ export const useProjectStore = create<ProjectState>()(
           createdAt: project.createdAt || new Date().toISOString(),
           modifiedAt: project.modifiedAt || new Date().toISOString(),
           clipboard: { parts: [], groups: [], groupMembers: [] },
-          referencePartIds: [],
           snapGuides: project.snapGuides || [],
           customShoppingItems: project.customShoppingItems || [],
           cutList: project.cutList || null
@@ -1580,6 +1562,7 @@ export const useProjectStore = create<ProjectState>()(
           expandedGroupIds: [],
           editingGroupId: null
         });
+        useSnapStore.setState({ referencePartIds: [], activeSnapLines: [], activeReferenceDistances: [] });
         // Set camera state in cameraStore (cross-store)
         const cameraState = project.cameraState || null;
         useCameraStore.getState().setCameraState(cameraState);
@@ -1610,88 +1593,6 @@ export const useProjectStore = create<ProjectState>()(
       setProjectNotes: (projectNotes) => set({ projectNotes, isDirty: true }),
       setStockConstraints: (stockConstraints) => set({ stockConstraints, isDirty: true }),
 
-      // Snap-to-parts actions
-      setSnapToPartsEnabled: (snapToPartsEnabled) => set({ snapToPartsEnabled }),
-      setActiveSnapLines: (activeSnapLines) => set({ activeSnapLines }),
-      // Reference parts actions
-      setReferencePartIds: (referencePartIds) => {
-        set({ referencePartIds });
-        get().updateReferenceDistances();
-      },
-      addToReferences: (ids) => {
-        set((state) => ({
-          referencePartIds: [...new Set([...state.referencePartIds, ...ids])]
-        }));
-        get().updateReferenceDistances();
-      },
-      removeFromReferences: (ids) => {
-        set((state) => ({
-          referencePartIds: state.referencePartIds.filter((id) => !ids.includes(id))
-        }));
-        get().updateReferenceDistances();
-      },
-      toggleReference: (ids) => {
-        set((state) => {
-          // Check if all ids are already references
-          const allAreReferences = ids.every((id) => state.referencePartIds.includes(id));
-          if (allAreReferences) {
-            // Remove all from references
-            return { referencePartIds: state.referencePartIds.filter((id) => !ids.includes(id)) };
-          } else {
-            // Add all to references
-            return { referencePartIds: [...new Set([...state.referencePartIds, ...ids])] };
-          }
-        });
-        get().updateReferenceDistances();
-      },
-      clearReferences: () => set({ referencePartIds: [], activeReferenceDistances: [] }),
-      setActiveReferenceDistances: (activeReferenceDistances) => set({ activeReferenceDistances }),
-      updateReferenceDistances: () => {
-        const { referencePartIds, parts, groupMembers } = get();
-        const { selectedPartIds, selectedGroupIds } = useSelectionStore.getState();
-
-        // No references set or nothing selected - clear indicators
-        if (referencePartIds.length === 0 || (selectedPartIds.length === 0 && selectedGroupIds.length === 0)) {
-          set({ activeReferenceDistances: [] });
-          return;
-        }
-
-        // Get reference parts
-        const referenceParts = parts.filter((p) => referencePartIds.includes(p.id));
-        if (referenceParts.length === 0) {
-          set({ activeReferenceDistances: [] });
-          return;
-        }
-
-        // Get all selected parts (including parts from selected groups)
-        const selectedPartsFromGroups: string[] = [];
-        for (const groupId of selectedGroupIds) {
-          const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
-          selectedPartsFromGroups.push(...groupPartIds);
-        }
-        const allSelectedPartIds = [...new Set([...selectedPartIds, ...selectedPartsFromGroups])];
-
-        // Remove reference parts from selection (can't measure to self)
-        const selectedPartsToMeasure = allSelectedPartIds.filter((id) => !referencePartIds.includes(id));
-        if (selectedPartsToMeasure.length === 0) {
-          set({ activeReferenceDistances: [] });
-          return;
-        }
-
-        // Get selected parts
-        const selectedParts = parts.filter((p) => selectedPartsToMeasure.includes(p.id));
-        if (selectedParts.length === 0) {
-          set({ activeReferenceDistances: [] });
-          return;
-        }
-
-        // Calculate combined bounds of selected parts and generate indicators
-        const selectedBounds = getCombinedBounds(selectedParts);
-        const fromPartId = selectedParts.length === 1 ? selectedParts[0].id : 'selected-group';
-        const indicators = calculateDistancesFromBounds(selectedBounds, fromPartId, referenceParts);
-
-        set({ activeReferenceDistances: indicators });
-      },
       // Snap guide actions
       addSnapGuide: (axis, position, label) => {
         const id = uuidv4();
@@ -1846,7 +1747,6 @@ export const useProjectStore = create<ProjectState>()(
               return true;
             }),
             parts: state.parts.filter((p) => !descendantPartIds.includes(p.id)),
-            referencePartIds: state.referencePartIds.filter((id) => !descendantPartIds.includes(id)),
             isDirty: true
           }));
           useSelectionStore.setState((state) => ({
@@ -1854,6 +1754,9 @@ export const useProjectStore = create<ProjectState>()(
             selectedGroupIds: state.selectedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
             expandedGroupIds: state.expandedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
             editingGroupId: descendantGroupIds.includes(state.editingGroupId || '') ? null : state.editingGroupId
+          }));
+          useSnapStore.setState((state) => ({
+            referencePartIds: state.referencePartIds.filter((id) => !descendantPartIds.includes(id))
           }));
         }
       },
@@ -2109,7 +2012,7 @@ export const useProjectStore = create<ProjectState>()(
           cutList: state.cutList,
           // UI state to restore
           expandedGroupIds: useSelectionStore.getState().expandedGroupIds,
-          referencePartIds: state.referencePartIds,
+          referencePartIds: useSnapStore.getState().referencePartIds,
           cameraState: useCameraStore.getState().cameraState
         };
 
@@ -2134,7 +2037,6 @@ export const useProjectStore = create<ProjectState>()(
           filePath: null,
           isDirty: false,
           cutList: null,
-          referencePartIds: [],
           snapGuides: []
         });
         useSelectionStore.setState({
@@ -2143,6 +2045,7 @@ export const useProjectStore = create<ProjectState>()(
           expandedGroupIds: groups.map((g) => g.id),
           editingGroupId: null
         });
+        useSnapStore.setState({ referencePartIds: [] });
         // Reset camera to default so it orbits correctly around the assembly
         useCameraStore.getState().setCameraState(null);
         useCameraStore.getState().clearPendingCameraRestore();
@@ -2283,8 +2186,7 @@ export const useProjectStore = create<ProjectState>()(
           isEditingAssembly: false,
           editingAssemblyId: null,
           editingAssemblyName: '',
-          previousProjectSnapshot: null,
-          referencePartIds: snapshot.referencePartIds
+          previousProjectSnapshot: null
         });
         useSelectionStore.setState({
           selectedPartIds: [],
@@ -2292,6 +2194,7 @@ export const useProjectStore = create<ProjectState>()(
           expandedGroupIds: snapshot.expandedGroupIds,
           editingGroupId: null
         });
+        useSnapStore.setState({ referencePartIds: snapshot.referencePartIds });
         // Restore camera position via cameraStore
         const snapshotCameraState = snapshot.cameraState || null;
         useCameraStore.getState().setCameraState(snapshotCameraState);

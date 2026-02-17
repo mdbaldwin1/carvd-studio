@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ContextMenu } from './ContextMenu';
 import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
+import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
 
@@ -15,9 +16,11 @@ describe('ContextMenu', () => {
       groups: [],
       groupMembers: [],
       clipboard: { parts: [], groups: [], groupMembers: [] },
-      referencePartIds: [],
       snapGuides: [],
       isEditingAssembly: false
+    });
+    useSnapStore.setState({
+      referencePartIds: []
     });
     useSelectionStore.setState({
       selectedPartIds: [],
@@ -277,7 +280,7 @@ describe('ContextMenu', () => {
     });
 
     it('shows Clear Reference when all parts are references', () => {
-      useProjectStore.setState({
+      useSnapStore.setState({
         referencePartIds: ['part-1', 'part-2']
       });
 
