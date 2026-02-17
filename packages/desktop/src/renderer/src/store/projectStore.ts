@@ -131,7 +131,7 @@ interface ProjectState {
   deleteCustomShoppingItem: (id: string) => void;
 }
 
-// Generate a smart copy name that avoids "Part 1 (copy) (copy) (copy)"
+/** Generate a smart copy name that avoids "Part 1 (copy) (copy) (copy)" chains. */
 export const generateCopyName = (originalName: string): string => {
   // Check if name ends with "(copy N)" pattern
   const copyWithNumberMatch = originalName.match(/^(.+) \(copy (\d+)\)$/);
@@ -216,14 +216,16 @@ export async function generateThumbnail(): Promise<string | null> {
   return null;
 }
 
-// Helper function: Find which group a part belongs to (if any)
+/** Find which group a part belongs to, or null if ungrouped. */
 export const getContainingGroupId = (partId: string, groupMembers: GroupMember[]): string | null => {
   const member = groupMembers.find((gm) => gm.memberType === 'part' && gm.memberId === partId);
   return member ? member.groupId : null;
 };
 
-// Helper function: Get all descendant part IDs from a group (recursively includes nested groups)
-// Memoized: caches results per groupMembers array reference to avoid repeated recursive traversals
+/**
+ * Get all descendant part IDs from a group, recursively including nested groups.
+ * Memoized: caches results per groupMembers array reference to avoid repeated traversals.
+ */
 let _descendantCache: WeakRef<GroupMember[]> | null = null;
 let _descendantResults: Map<string, string[]> = new Map();
 
@@ -253,7 +255,19 @@ export const getAllDescendantPartIds = (groupId: string, groupMembers: GroupMemb
   return partIds;
 };
 
-// Helper function: Get all ancestor group IDs for a part (for auto-expand functionality)
+/** Get all descendant group IDs recursively, including the given group itself. */
+export const getAllDescendantGroupIds = (groupId: string, groupMembers: GroupMember[]): string[] => {
+  const groupIds: string[] = [groupId];
+  const members = groupMembers.filter((gm) => gm.groupId === groupId);
+  for (const member of members) {
+    if (member.memberType === 'group') {
+      groupIds.push(...getAllDescendantGroupIds(member.memberId, groupMembers));
+    }
+  }
+  return groupIds;
+};
+
+/** Get all ancestor group IDs for a part, walking up the group hierarchy (for auto-expand). */
 export const getAncestorGroupIds = (partId: string, groupMembers: GroupMember[]): string[] => {
   const ancestors: string[] = [];
   let currentId: string | null = partId;
@@ -273,7 +287,7 @@ export const getAncestorGroupIds = (partId: string, groupMembers: GroupMember[])
   return ancestors;
 };
 
-// Helper function: Check if a group contains another group (to prevent circular references)
+/** Check if a group is a descendant of another group (to prevent circular references). */
 export const isDescendantOf = (
   potentialDescendantId: string,
   potentialAncestorId: string,
@@ -298,7 +312,7 @@ export const isDescendantOf = (
   return descendantGroupIds.includes(potentialDescendantId);
 };
 
-// Helper function: Validate parts for cut list generation
+/** Validate parts for cut list generation, returning any issues found. */
 export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartValidationIssue[] => {
   const issues: PartValidationIssue[] = [];
 
@@ -1348,37 +1362,8 @@ export const useProjectStore = create<ProjectState>()(
       deleteGroup: (groupId, mode, targetParentGroupId) => {
         const { groupMembers } = get();
 
-        // Helper to get all descendant part IDs recursively
-        const getAllDescendantPartIds = (gId: string): string[] => {
-          const partIds: string[] = [];
-          const members = groupMembers.filter((gm) => gm.groupId === gId);
-
-          for (const member of members) {
-            if (member.memberType === 'part') {
-              partIds.push(member.memberId);
-            } else {
-              // Nested group - recurse
-              partIds.push(...getAllDescendantPartIds(member.memberId));
-            }
-          }
-          return partIds;
-        };
-
-        // Helper to get all descendant group IDs recursively
-        const getAllDescendantGroupIds = (gId: string): string[] => {
-          const groupIds: string[] = [gId];
-          const members = groupMembers.filter((gm) => gm.groupId === gId);
-
-          for (const member of members) {
-            if (member.memberType === 'group') {
-              groupIds.push(...getAllDescendantGroupIds(member.memberId));
-            }
-          }
-          return groupIds;
-        };
-
-        const descendantGroupIds = getAllDescendantGroupIds(groupId);
-        const descendantPartIds = getAllDescendantPartIds(groupId);
+        const descendantGroupIds = getAllDescendantGroupIds(groupId, groupMembers);
+        const descendantPartIds = getAllDescendantPartIds(groupId, groupMembers);
 
         if (mode === 'ungroup') {
           // Remove the group, but keep its immediate children

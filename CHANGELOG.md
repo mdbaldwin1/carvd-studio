@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Store cleanup and architecture docs** — Extracted duplicate helper from `deleteGroup()`, added JSDoc to all exported helpers, created `STORES.md` architecture guide documenting all 9 stores (bead 3.9)
 - **Extract licenseStore from projectStore** — Moved `licenseMode` state and `setLicenseMode` action into a dedicated `licenseStore`, updating 7 projectStore actions and 11 consumer files to read from the new store (bead 3.8)
 - **Extract clipboardStore from projectStore** — Moved clipboard state and 3 clipboard actions (copy, paste, pasteAtPosition) into a dedicated `clipboardStore`, with cross-store coordination for paste operations (bead 3.7)
 - **Extract assemblyEditingStore from projectStore** — Moved 4 assembly editing state fields and 5 orchestrator actions into a dedicated `assemblyEditingStore`, with cross-store coordination for project snapshot save/restore (bead 3.6)
