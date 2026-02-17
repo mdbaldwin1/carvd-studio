@@ -4,7 +4,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import { getBlockedMessage } from '../../utils/featureLimits';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
-import { exportDiagramsToPdf } from '../../utils/pdfExport';
+// pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { logger } from '../../utils/logger';
 import { CutList, StockBoard } from '../../types';
 import { DropdownButton, DropdownItem } from '../common/DropdownButton';
@@ -40,6 +40,7 @@ export function CutListDiagramsTab({
     }
 
     try {
+      const { exportDiagramsToPdf } = await import('../../utils/pdfExport');
       const result = await exportDiagramsToPdf(cutList, {
         projectName: projectName || 'Untitled Project',
         units

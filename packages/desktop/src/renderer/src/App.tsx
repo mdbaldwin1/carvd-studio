@@ -2519,12 +2519,6 @@ function App() {
 
     // Add template assemblies to the app-level assembly library (if any and not already present)
     if (project.assemblies && project.assemblies.length > 0) {
-      const { addAssembly } = await import('./hooks/useAssemblyLibrary').then((m) => {
-        // We need to call the hook, but we can't use hooks directly here
-        // So we'll use the electronAPI directly
-        return { addAssembly: null };
-      });
-      // For assemblies, we'll add them via electronAPI directly
       for (const templateAssembly of project.assemblies) {
         const exists = assemblyLibrary.some((a) => a.name === templateAssembly.name);
         if (!exists) {
