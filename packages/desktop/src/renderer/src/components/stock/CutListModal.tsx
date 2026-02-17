@@ -145,7 +145,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
         {/* No cut list - show generate UI */}
         {!cutList && (
-          <div className="flex flex-col items-center justify-center gap-4 p-10 text-center">
+          <div className="cut-list-generate flex flex-col items-center justify-center gap-4 p-10 text-center">
             <p className="text-[13px] text-text-secondary leading-relaxed max-w-[500px] mx-auto m-0">
               Generate an optimized cut list from your design. All parts must be assigned to a stock material before
               generating.{' '}
@@ -180,7 +180,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
                 </button>
 
                 {validationIssues.length > 0 && (
-                  <div className="mt-4 bg-bg border border-border rounded p-4 text-left w-full max-w-[500px]">
+                  <div className="cut-list-issues mt-4 bg-bg border border-border rounded p-4 text-left w-full max-w-[500px]">
                     <h3 className="text-[14px] font-semibold text-text m-0 mb-2">Issues Found</h3>
                     {hasBlockingIssues && (
                       <p className="text-[12px] text-text-muted mb-2 m-0">
