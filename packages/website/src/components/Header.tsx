@@ -1,7 +1,10 @@
 export default function Header() {
   return (
     <header className="header">
-      <nav className="nav container">
+      <a href="#main-content" className="skip-to-content">
+        Skip to content
+      </a>
+      <nav className="nav container" aria-label="Main navigation">
         <a href="/" className="nav-brand">
           Carvd Studio
         </a>

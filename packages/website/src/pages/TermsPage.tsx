@@ -32,7 +32,7 @@ export default function TermsPage() {
       </header>
 
       {/* Main Content */}
-      <main className="page-content container">
+      <main id="main-content" className="page-content container">
         <div className="py-3xl">
           <div className="max-w-3xl mx-auto">
             <h1 className="text-5xl font-bold mb-lg">Terms of Service</h1>

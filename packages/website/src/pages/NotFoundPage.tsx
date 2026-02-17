@@ -13,7 +13,7 @@ export default function NotFoundPage() {
       <Header />
 
       {/* Main Content */}
-      <main className="page-content container">
+      <main id="main-content" className="page-content container">
         <div className="py-3xl">
           <div className="max-w-2xl mx-auto text-center">
             <div className="text-9xl mb-lg">🪵</div>

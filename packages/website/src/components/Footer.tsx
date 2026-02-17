@@ -1,7 +1,7 @@
 export default function Footer() {
   return (
     <footer className="footer container">
-      <div className="mb-lg">
+      <nav aria-label="Footer navigation" className="mb-lg">
         <div className="flex justify-center gap-2xl mb-md">
           <a href="/features" className="nav-link">
             Features
@@ -27,7 +27,7 @@ export default function Footer() {
             Changelog
           </a>
         </div>
-      </div>
+      </nav>
       <p>&copy; 2026 Carvd Studio. All rights reserved.</p>
     </footer>
   );

@@ -12,7 +12,7 @@ export default function DocsLayout() {
       <Header />
 
       {/* Main Content */}
-      <main className="page-content container">
+      <main id="main-content" className="page-content container">
         <div className="py-3xl">
           {/* Page Header */}
           <div className="text-center mb-2xl">
