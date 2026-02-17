@@ -400,9 +400,7 @@ describe('clipboardStore', () => {
       useClipboardStore.getState().pasteClipboard();
 
       const { expandedGroupIds } = useSelectionStore.getState();
-      const pastedGroupId = useProjectStore
-        .getState()
-        .groups.find((g) => g.id !== groupId)?.id;
+      const pastedGroupId = useProjectStore.getState().groups.find((g) => g.id !== groupId)?.id;
       expect(expandedGroupIds).toContain(pastedGroupId);
     });
   });
@@ -484,9 +482,7 @@ describe('clipboardStore', () => {
         { id: p2, type: 'part' }
       ]);
 
-      const outerGroupId = useProjectStore.getState().groups.find(
-        (g) => g.name === 'Outer Group'
-      )!.id;
+      const outerGroupId = useProjectStore.getState().groups.find((g) => g.name === 'Outer Group')!.id;
       useSelectionStore.getState().selectGroup(outerGroupId);
       useClipboardStore.getState().copySelectedParts();
 
@@ -510,9 +506,7 @@ describe('clipboardStore', () => {
         { id: p2, type: 'part' }
       ]);
 
-      const outerGroupId = useProjectStore.getState().groups.find(
-        (g) => g.name === 'Outer Group'
-      )!.id;
+      const outerGroupId = useProjectStore.getState().groups.find((g) => g.name === 'Outer Group')!.id;
       useSelectionStore.getState().selectGroup(outerGroupId);
       useClipboardStore.getState().copySelectedParts();
 

@@ -1724,10 +1724,7 @@ describe('projectStore', () => {
 describe('projectStore utility functions', () => {
   describe('getContainingGroupId', () => {
     it('returns groupId for a part that belongs to a group', () => {
-      const groupMembers = [
-        createTestGroupMember('g1', 'p1', 'part'),
-        createTestGroupMember('g1', 'p2', 'part')
-      ];
+      const groupMembers = [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g1', 'p2', 'part')];
 
       expect(getContainingGroupId('p1', groupMembers)).toBe('g1');
     });
@@ -1745,10 +1742,7 @@ describe('projectStore utility functions', () => {
 
   describe('getAllDescendantPartIds', () => {
     it('returns direct part members', () => {
-      const groupMembers = [
-        createTestGroupMember('g1', 'p1', 'part'),
-        createTestGroupMember('g1', 'p2', 'part')
-      ];
+      const groupMembers = [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g1', 'p2', 'part')];
 
       const result = getAllDescendantPartIds('g1', groupMembers);
       expect(result).toEqual(expect.arrayContaining(['p1', 'p2']));
@@ -1837,10 +1831,7 @@ describe('projectStore utility functions', () => {
     });
 
     it('returns false for unrelated groups', () => {
-      const groupMembers = [
-        createTestGroupMember('g1', 'p1', 'part'),
-        createTestGroupMember('g2', 'p2', 'part')
-      ];
+      const groupMembers = [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g2', 'p2', 'part')];
 
       expect(isDescendantOf('g2', 'g1', groupMembers)).toBe(false);
     });
