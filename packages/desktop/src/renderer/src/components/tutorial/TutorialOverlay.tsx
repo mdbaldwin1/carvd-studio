@@ -121,9 +121,9 @@ export function TutorialOverlay({
   }, [isFirstStep, onNext, onPrevious, onSkip]);
 
   return (
-    <div className="tutorial-overlay">
+    <div data-testid="tutorial-overlay" className="fixed inset-0 w-screen h-screen z-[10000] pointer-events-none">
       {/* Dark backdrop with spotlight cutout */}
-      <svg className="tutorial-overlay-svg">
+      <svg data-testid="tutorial-overlay-svg" className="absolute inset-0 w-full h-full pointer-events-none">
         <defs>
           <mask id={`spotlight-mask-${step.id}`}>
             <rect x="0" y="0" width="100%" height="100%" fill="white" />
@@ -163,7 +163,7 @@ export function TutorialOverlay({
       </svg>
 
       {/* Tooltip - allow interaction */}
-      <div className="tutorial-overlay-content">
+      <div data-testid="tutorial-overlay-content" className="pointer-events-auto">
         <TutorialTooltip
           title={step.title}
           content={step.content}
