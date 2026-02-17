@@ -6,6 +6,8 @@ import HomePage from "../src/pages/HomePage";
 import FeaturesPage from "../src/pages/FeaturesPage";
 import PricingPage from "../src/pages/PricingPage";
 import ChangelogPage from "../src/pages/ChangelogPage";
+import SupportPage from "../src/pages/SupportPage";
+import DownloadPage from "../src/pages/DownloadPage";
 import NotFoundPage from "../src/pages/NotFoundPage";
 import DocsLayout from "../src/pages/docs/DocsLayout";
 import DocsIndexPage from "../src/pages/docs/DocsIndexPage";
@@ -75,6 +77,28 @@ describe("Accessibility", () => {
       "has no accessibility violations",
       async () => {
         const { container } = renderWithRouter(<ChangelogPage />);
+        await expectNoViolations(container);
+      },
+      axeTimeout,
+    );
+  });
+
+  describe("SupportPage", () => {
+    it(
+      "has no accessibility violations",
+      async () => {
+        const { container } = renderWithRouter(<SupportPage />);
+        await expectNoViolations(container);
+      },
+      axeTimeout,
+    );
+  });
+
+  describe("DownloadPage", () => {
+    it(
+      "has no accessibility violations",
+      async () => {
+        const { container } = renderWithRouter(<DownloadPage />);
         await expectNoViolations(container);
       },
       axeTimeout,

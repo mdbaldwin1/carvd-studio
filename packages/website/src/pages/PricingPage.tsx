@@ -22,7 +22,7 @@ export default function PricingPage() {
       <Header />
 
       {/* Main Content */}
-      <main className="page-content container">
+      <main id="main-content" className="page-content container">
         <div className="py-3xl">
           <div className="max-w-4xl mx-auto text-center">
             <div className="badge badge-highlight mb-lg">

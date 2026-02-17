@@ -38,7 +38,7 @@ export default function HomePage() {
       <Header />
 
       {/* Main Content */}
-      <main className="page-content">
+      <main id="main-content" className="page-content">
         {/* Hero Section */}
         <section className="hero container">
           <div className="max-w-4xl mx-auto">

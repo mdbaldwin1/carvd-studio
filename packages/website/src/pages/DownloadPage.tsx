@@ -21,7 +21,7 @@ export default function DownloadPage() {
       <Header />
 
       {/* Main Content */}
-      <main>
+      <main id="main-content">
         {/* Hero Download Section */}
         <section className="hero">
           <div className="container">
@@ -198,7 +198,7 @@ export default function DownloadPage() {
                 <span className="badge badge-highlight">Latest</span>
               </div>
               <div className="version-content">
-                <h4 className="font-bold mb-sm">Initial Release</h4>
+                <h3 className="font-bold mb-sm">Initial Release</h3>
                 <ul className="version-changes">
                   <li>3D furniture design workspace with intuitive controls</li>
                   <li>Smart cut list optimizer to minimize material waste</li>

@@ -25,6 +25,7 @@
   /* Primary - Teal */
   --color-primary: #077187;
   --color-primary-hover: #09a2bc;
+  --color-primary-text: #09a2bc; /* AA-compliant text on dark bg (5.97:1) */
 
   /* Semantic Colors */
   --color-success: #2a9d6a;
@@ -535,7 +536,7 @@ code {
   color: var(--color-accent);
 }
 .text-primary {
-  color: var(--color-primary);
+  color: var(--color-primary-text);
 }
 .text-success {
   color: var(--color-success);
@@ -1338,7 +1339,7 @@ code {
 .badge-primary {
   background-color: rgba(7, 113, 135, 0.2);
   border-color: var(--color-primary);
-  color: var(--color-primary);
+  color: var(--color-primary-text);
 }
 
 .badge-warning {
@@ -1739,6 +1740,25 @@ code {
 
 /* Accessibility Utilities
    ========================================================================== */
+
+/* Skip to content link - visible on focus for keyboard users */
+.skip-to-content {
+  position: absolute;
+  left: -9999px;
+  z-index: 999;
+  padding: 8px 16px;
+  background: var(--color-primary);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.skip-to-content:focus {
+  left: 8px;
+  top: 8px;
+  color: var(--color-text);
+}
 
 /* Screen reader only - visually hidden but accessible to assistive technology */
 .sr-only {
