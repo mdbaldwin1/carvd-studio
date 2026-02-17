@@ -585,6 +585,7 @@ code {
   transition: all var(--transition-fast);
   text-decoration: none;
   white-space: nowrap;
+  min-height: 44px;
 }
 
 .btn:disabled {
@@ -746,6 +747,10 @@ code {
   color: var(--color-text);
   font-weight: 500;
   transition: color var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 4px 8px;
 }
 
 .nav-link:hover {
@@ -811,7 +816,7 @@ code {
   }
 
   .nav-link {
-    font-size: 11px;
+    font-size: var(--font-size-xs);
   }
 }
 
@@ -827,6 +832,7 @@ code {
   font-weight: 700;
   margin-bottom: var(--space-lg);
   line-height: var(--line-height-tight);
+  overflow-wrap: break-word;
 }
 
 .hero-subtitle {
@@ -966,7 +972,7 @@ code {
   /* Stack footer links vertically on mobile */
   .footer .flex {
     flex-direction: column;
-    gap: var(--space-sm) !important;
+    gap: var(--space-sm);
   }
 }
 
