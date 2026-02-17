@@ -157,7 +157,11 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
     : 0;
 
   return (
-    <div className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]" onMouseDown={handleMouseDown} onClick={handleClick}>
+    <div
+      className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
+      onMouseDown={handleMouseDown}
+      onClick={handleClick}
+    >
       <div
         className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in w-[480px]"
         role="dialog"
@@ -165,8 +169,14 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
         aria-labelledby="import-app-state-modal-title"
       >
         <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 id="import-app-state-modal-title" className="text-base font-semibold text-text m-0">Import App State</h2>
-          <button className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text" onClick={onClose} aria-label="Close">
+          <h2 id="import-app-state-modal-title" className="text-base font-semibold text-text m-0">
+            Import App State
+          </h2>
+          <button
+            className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text"
+            onClick={onClose}
+            aria-label="Close"
+          >
             &times;
           </button>
         </div>
@@ -233,7 +243,9 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
                     />
                     <span className="disabled:opacity-50">Templates ({preview.counts.templates})</span>
                     {preview.duplicates.templates.length > 0 && (
-                      <span className="ml-auto text-[11px] text-warning bg-warning-bg py-0.5 px-1.5 rounded">{preview.duplicates.templates.length} existing</span>
+                      <span className="ml-auto text-[11px] text-warning bg-warning-bg py-0.5 px-1.5 rounded">
+                        {preview.duplicates.templates.length} existing
+                      </span>
                     )}
                   </label>
                   <label className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded-md cursor-pointer text-[13px] text-text hover:border-border-hover">
@@ -246,7 +258,9 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
                     />
                     <span>Assemblies ({preview.counts.assemblies})</span>
                     {preview.duplicates.assemblies.length > 0 && (
-                      <span className="ml-auto text-[11px] text-warning bg-warning-bg py-0.5 px-1.5 rounded">{preview.duplicates.assemblies.length} existing</span>
+                      <span className="ml-auto text-[11px] text-warning bg-warning-bg py-0.5 px-1.5 rounded">
+                        {preview.duplicates.assemblies.length} existing
+                      </span>
                     )}
                   </label>
                   <label className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded-md cursor-pointer text-[13px] text-text hover:border-border-hover">
@@ -259,7 +273,9 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
                     />
                     <span>Stock Materials ({preview.counts.stocks})</span>
                     {preview.duplicates.stocks.length > 0 && (
-                      <span className="ml-auto text-[11px] text-warning bg-warning-bg py-0.5 px-1.5 rounded">{preview.duplicates.stocks.length} existing</span>
+                      <span className="ml-auto text-[11px] text-warning bg-warning-bg py-0.5 px-1.5 rounded">
+                        {preview.duplicates.stocks.length} existing
+                      </span>
                     )}
                   </label>
                   <label className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded-md cursor-pointer text-[13px] text-text hover:border-border-hover">

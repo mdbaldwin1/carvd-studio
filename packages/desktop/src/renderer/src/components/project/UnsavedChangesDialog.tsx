@@ -57,7 +57,10 @@ export function UnsavedChangesDialog({
   };
 
   return (
-    <div className="modal-overlay fixed inset-0 bg-overlay flex items-center justify-center z-[1100]" onClick={onCancel}>
+    <div
+      className="modal-overlay fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
+      onClick={onCancel}
+    >
       <div
         className="modal bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[420px] max-h-[85vh] flex flex-col animate-modal-fade-in"
         onClick={(e) => e.stopPropagation()}

@@ -193,7 +193,11 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]" onMouseDown={handleMouseDown} onClick={handleClick}>
+    <div
+      className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
+      onMouseDown={handleMouseDown}
+      onClick={handleClick}
+    >
       <div
         className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] flex flex-col animate-modal-fade-in w-[800px] max-h-[80vh] relative"
         role="dialog"
@@ -201,8 +205,14 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
         aria-labelledby="template-browser-modal-title"
       >
         <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 id="template-browser-modal-title" className="text-base font-semibold text-text m-0">New from Template</h2>
-          <button className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text" onClick={onClose} aria-label="Close">
+          <h2 id="template-browser-modal-title" className="text-base font-semibold text-text m-0">
+            New from Template
+          </h2>
+          <button
+            className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text"
+            onClick={onClose}
+            aria-label="Close"
+          >
             &times;
           </button>
         </div>
@@ -212,7 +222,9 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
           <div className="flex-1 p-4 overflow-y-auto border-r border-border">
             {/* Built-in templates */}
             <div className="mb-6 last:mb-0">
-              <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider m-0 mb-3">Built-in Templates</h4>
+              <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider m-0 mb-3">
+                Built-in Templates
+              </h4>
               <div className="grid grid-cols-2 gap-2.5">
                 {builtInTemplates.map((template) => (
                   <div
@@ -220,7 +232,9 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
                     className={`relative flex items-center gap-3 p-3 bg-bg border rounded-lg cursor-pointer transition-all duration-150 hover:border-border-hover hover:bg-bg-secondary ${selectedTemplate?.id === template.id ? 'border-accent bg-accent-bg' : 'border-border'}`}
                     onClick={() => handleSelectTemplate(template)}
                   >
-                    <div className="text-[28px] w-11 h-11 flex items-center justify-center bg-bg-tertiary rounded-md shrink-0">{template.thumbnail}</div>
+                    <div className="text-[28px] w-11 h-11 flex items-center justify-center bg-bg-tertiary rounded-md shrink-0">
+                      {template.thumbnail}
+                    </div>
                     <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                       <span className="text-[13px] font-medium text-text truncate">{template.name}</span>
                       <span className="text-[11px] text-text-muted">{formatDimensions(template.dimensions)}</span>
@@ -252,7 +266,9 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
                       className={`group relative flex items-center gap-3 p-3 bg-bg border border-dashed rounded-lg cursor-pointer transition-all duration-150 hover:border-border-hover hover:bg-bg-secondary ${selectedTemplate?.id === template.id ? '!border-solid border-accent bg-accent-bg' : 'border-border'}`}
                       onClick={() => handleSelectTemplate(template)}
                     >
-                      <div className="text-[28px] w-11 h-11 flex items-center justify-center bg-bg-tertiary rounded-md shrink-0">{template.thumbnail}</div>
+                      <div className="text-[28px] w-11 h-11 flex items-center justify-center bg-bg-tertiary rounded-md shrink-0">
+                        {template.thumbnail}
+                      </div>
                       <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                         <span className="text-[13px] font-medium text-text truncate">{template.name}</span>
                         <span className="text-[11px] text-text-muted">{formatDimensions(template.dimensions)}</span>
@@ -280,22 +296,30 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
             {selectedTemplate ? (
               <>
                 <div className="flex items-center gap-4 mb-5">
-                  <span className="text-5xl w-[72px] h-[72px] flex items-center justify-center bg-bg-tertiary rounded-xl">{selectedTemplate.thumbnail}</span>
+                  <span className="text-5xl w-[72px] h-[72px] flex items-center justify-center bg-bg-tertiary rounded-xl">
+                    {selectedTemplate.thumbnail}
+                  </span>
                   <div>
                     <h3 className="text-lg font-semibold text-text m-0 mb-1">{selectedTemplate.name}</h3>
                     {selectedTemplate.type === 'user' && (
-                      <span className="inline-block text-[10px] font-semibold text-accent bg-accent-bg py-0.5 px-2 rounded-full uppercase tracking-wider">Custom</span>
+                      <span className="inline-block text-[10px] font-semibold text-accent bg-accent-bg py-0.5 px-2 rounded-full uppercase tracking-wider">
+                        Custom
+                      </span>
                     )}
                   </div>
                 </div>
 
                 <div className="flex-1">
-                  <p className="text-[13px] text-text-secondary leading-relaxed m-0 mb-5">{selectedTemplate.description}</p>
+                  <p className="text-[13px] text-text-secondary leading-relaxed m-0 mb-5">
+                    {selectedTemplate.description}
+                  </p>
 
                   <div className="flex flex-col gap-3">
                     <div className="flex justify-between items-center">
                       <label className="text-xs text-text-muted">Dimensions</label>
-                      <span className="text-[13px] text-text font-medium">{formatDimensions(selectedTemplate.dimensions)}</span>
+                      <span className="text-[13px] text-text font-medium">
+                        {formatDimensions(selectedTemplate.dimensions)}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <label className="text-xs text-text-muted">Parts</label>
@@ -308,7 +332,9 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
                     {selectedTemplate.type === 'user' && (
                       <div className="flex justify-between items-center">
                         <label className="text-xs text-text-muted">Created</label>
-                        <span className="text-[13px] text-text font-medium">{new Date((selectedTemplate as UserTemplate).createdAt).toLocaleDateString()}</span>
+                        <span className="text-[13px] text-text font-medium">
+                          {new Date((selectedTemplate as UserTemplate).createdAt).toLocaleDateString()}
+                        </span>
                       </div>
                     )}
                   </div>

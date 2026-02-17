@@ -119,7 +119,11 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
   const displayValue = findClosestGridValue(gridSize, gridOptions);
 
   return (
-    <div className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]" onMouseDown={handleMouseDown} onClick={handleClick}>
+    <div
+      className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
+      onMouseDown={handleMouseDown}
+      onClick={handleClick}
+    >
       <div
         className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in w-[450px]"
         role="dialog"
