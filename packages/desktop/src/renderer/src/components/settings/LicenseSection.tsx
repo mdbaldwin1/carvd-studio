@@ -20,8 +20,8 @@ export function LicenseSection({
   onClose
 }: LicenseSectionProps) {
   return (
-    <div className="settings-section">
-      <h3>License</h3>
+    <div className="mb-6 last:mb-0">
+      <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">License</h3>
       {licenseData.licenseEmail ? (
         <>
           <div className="alert alert-success" style={{ marginBottom: '16px' }}>
@@ -61,12 +61,12 @@ export function LicenseSection({
           )}
         </>
       ) : licenseMode === 'free' ? (
-        <div className="upgrade-section">
-          <p className="upgrade-text">
+        <div className="bg-bg-secondary border border-border rounded-lg p-4">
+          <p className="text-[13px] text-text-secondary leading-relaxed m-0 mb-4">
             You're using the free version of Carvd Studio. Upgrade to unlock all features including assemblies, custom
             templates, and the cut list optimizer.
           </p>
-          <div className="upgrade-actions">
+          <div className="flex gap-2">
             <a
               href="https://carvd-studio.com/pricing"
               target="_blank"

@@ -9,19 +9,19 @@ interface DataManagementSectionProps {
 
 export function DataManagementSection({ isExporting, onExport, onImport }: DataManagementSectionProps) {
   return (
-    <div className="settings-section">
-      <h3>Data Management</h3>
-      <div className="settings-row settings-row-data-management">
-        <div className="settings-label-block">
+    <div className="mb-6 last:mb-0">
+      <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">Data Management</h3>
+      <div className="settings-row flex flex-col items-start gap-3 mb-3">
+        <div className="flex flex-col gap-1">
           <div className="label-with-help">
-            <label>Backup & Sync</label>
+            <label className="text-[13px] text-text">Backup & Sync</label>
             <HelpTooltip
               text="Export your templates, assemblies, and stock library to sync with another machine or create a backup."
               docsSection="backup-sync"
             />
           </div>
         </div>
-        <div className="settings-actions">
+        <div className="flex gap-2">
           <button className="btn btn-sm btn-outlined btn-secondary" onClick={onExport} disabled={isExporting}>
             <Download size={14} />
             {isExporting ? 'Exporting...' : 'Export'}

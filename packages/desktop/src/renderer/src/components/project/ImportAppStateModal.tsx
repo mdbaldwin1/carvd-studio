@@ -157,27 +157,27 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
     : 0;
 
   return (
-    <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
+    <div className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]" onMouseDown={handleMouseDown} onClick={handleClick}>
       <div
-        className="modal import-app-state-modal"
+        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in w-[480px]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="import-app-state-modal-title"
       >
-        <div className="modal-header">
-          <h2 id="import-app-state-modal-title">Import App State</h2>
-          <button className="modal-close" onClick={onClose} aria-label="Close">
+        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+          <h2 id="import-app-state-modal-title" className="text-base font-semibold text-text m-0">Import App State</h2>
+          <button className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text" onClick={onClose} aria-label="Close">
             &times;
           </button>
         </div>
 
-        <div className="import-content">
+        <div className="p-6 min-h-[300px]">
           {step === 'select' && (
-            <div className="import-step-select">
-              <div className="import-icon">
+            <div className="flex flex-col items-center justify-center text-center p-6">
+              <div className="text-text-muted mb-4">
                 <Upload size={48} />
               </div>
-              <p className="import-description">
+              <p className="text-sm text-text-secondary m-0 mb-6 leading-relaxed">
                 Import templates, assemblies, stock materials, and custom colors from a Carvd backup file.
               </p>
               {error && (
@@ -193,78 +193,82 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
           )}
 
           {step === 'options' && preview && (
-            <div className="import-step-options">
-              <div className="import-preview-section">
-                <h3>Backup Contents</h3>
-                <div className="import-preview-grid">
-                  <div className="import-preview-item">
-                    <LayoutTemplate size={20} />
-                    <span className="import-preview-count">{preview.counts.templates}</span>
-                    <span className="import-preview-label">Templates</span>
+            <div>
+              <div className="mb-6">
+                <h3 className="text-[13px] font-semibold text-text m-0 mb-3">Backup Contents</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-3 p-3 bg-bg border border-border rounded-lg">
+                    <LayoutTemplate size={20} className="text-text-muted shrink-0" />
+                    <span className="text-lg font-semibold text-text">{preview.counts.templates}</span>
+                    <span className="text-xs text-text-secondary">Templates</span>
                   </div>
-                  <div className="import-preview-item">
-                    <Package size={20} />
-                    <span className="import-preview-count">{preview.counts.assemblies}</span>
-                    <span className="import-preview-label">Assemblies</span>
+                  <div className="flex items-center gap-3 p-3 bg-bg border border-border rounded-lg">
+                    <Package size={20} className="text-text-muted shrink-0" />
+                    <span className="text-lg font-semibold text-text">{preview.counts.assemblies}</span>
+                    <span className="text-xs text-text-secondary">Assemblies</span>
                   </div>
-                  <div className="import-preview-item">
-                    <FileBox size={20} />
-                    <span className="import-preview-count">{preview.counts.stocks}</span>
-                    <span className="import-preview-label">Stock Materials</span>
+                  <div className="flex items-center gap-3 p-3 bg-bg border border-border rounded-lg">
+                    <FileBox size={20} className="text-text-muted shrink-0" />
+                    <span className="text-lg font-semibold text-text">{preview.counts.stocks}</span>
+                    <span className="text-xs text-text-secondary">Stock Materials</span>
                   </div>
-                  <div className="import-preview-item">
-                    <Palette size={20} />
-                    <span className="import-preview-count">{preview.counts.colors}</span>
-                    <span className="import-preview-label">Custom Colors</span>
+                  <div className="flex items-center gap-3 p-3 bg-bg border border-border rounded-lg">
+                    <Palette size={20} className="text-text-muted shrink-0" />
+                    <span className="text-lg font-semibold text-text">{preview.counts.colors}</span>
+                    <span className="text-xs text-text-secondary">Custom Colors</span>
                   </div>
                 </div>
               </div>
 
-              <div className="import-options-section">
-                <h3>What to Import</h3>
-                <div className="import-checkboxes">
-                  <label className="import-checkbox">
+              <div className="mb-6">
+                <h3 className="text-[13px] font-semibold text-text m-0 mb-3">What to Import</h3>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded-md cursor-pointer text-[13px] text-text hover:border-border-hover">
                     <input
                       type="checkbox"
                       checked={includeTemplates}
                       onChange={(e) => setIncludeTemplates(e.target.checked)}
                       disabled={preview.counts.templates === 0}
+                      className="w-4 h-4 accent-accent disabled:opacity-50"
                     />
-                    <span>Templates ({preview.counts.templates})</span>
+                    <span className="disabled:opacity-50">Templates ({preview.counts.templates})</span>
                     {preview.duplicates.templates.length > 0 && (
-                      <span className="import-duplicate-count">{preview.duplicates.templates.length} existing</span>
+                      <span className="ml-auto text-[11px] text-warning bg-warning-bg py-0.5 px-1.5 rounded">{preview.duplicates.templates.length} existing</span>
                     )}
                   </label>
-                  <label className="import-checkbox">
+                  <label className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded-md cursor-pointer text-[13px] text-text hover:border-border-hover">
                     <input
                       type="checkbox"
                       checked={includeAssemblies}
                       onChange={(e) => setIncludeAssemblies(e.target.checked)}
                       disabled={preview.counts.assemblies === 0}
+                      className="w-4 h-4 accent-accent disabled:opacity-50"
                     />
                     <span>Assemblies ({preview.counts.assemblies})</span>
                     {preview.duplicates.assemblies.length > 0 && (
-                      <span className="import-duplicate-count">{preview.duplicates.assemblies.length} existing</span>
+                      <span className="ml-auto text-[11px] text-warning bg-warning-bg py-0.5 px-1.5 rounded">{preview.duplicates.assemblies.length} existing</span>
                     )}
                   </label>
-                  <label className="import-checkbox">
+                  <label className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded-md cursor-pointer text-[13px] text-text hover:border-border-hover">
                     <input
                       type="checkbox"
                       checked={includeStocks}
                       onChange={(e) => setIncludeStocks(e.target.checked)}
                       disabled={preview.counts.stocks === 0}
+                      className="w-4 h-4 accent-accent disabled:opacity-50"
                     />
                     <span>Stock Materials ({preview.counts.stocks})</span>
                     {preview.duplicates.stocks.length > 0 && (
-                      <span className="import-duplicate-count">{preview.duplicates.stocks.length} existing</span>
+                      <span className="ml-auto text-[11px] text-warning bg-warning-bg py-0.5 px-1.5 rounded">{preview.duplicates.stocks.length} existing</span>
                     )}
                   </label>
-                  <label className="import-checkbox">
+                  <label className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded-md cursor-pointer text-[13px] text-text hover:border-border-hover">
                     <input
                       type="checkbox"
                       checked={includeColors}
                       onChange={(e) => setIncludeColors(e.target.checked)}
                       disabled={preview.counts.colors === 0}
+                      className="w-4 h-4 accent-accent disabled:opacity-50"
                     />
                     <span>Custom Colors ({preview.counts.colors})</span>
                   </label>
@@ -272,36 +276,38 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
               </div>
 
               {totalDuplicates > 0 && (
-                <div className="import-strategy-section">
-                  <h3>Duplicate Handling</h3>
-                  <p className="import-strategy-hint">
+                <div className="mb-6">
+                  <h3 className="text-[13px] font-semibold text-text m-0 mb-3">Duplicate Handling</h3>
+                  <p className="text-xs text-text-muted m-0 mb-3">
                     {totalDuplicates} item{totalDuplicates !== 1 ? 's' : ''} already exist in your library.
                   </p>
-                  <div className="import-strategy-options">
-                    <label className="import-radio">
+                  <div className="flex flex-col gap-2">
+                    <label className="flex items-start gap-3 p-3 bg-bg border border-border rounded-md cursor-pointer hover:border-border-hover">
                       <input
                         type="radio"
                         name="mergeStrategy"
                         value="merge"
                         checked={mergeStrategy === 'merge'}
                         onChange={() => setMergeStrategy('merge')}
+                        className="w-4 h-4 mt-0.5 accent-accent"
                       />
-                      <div className="import-radio-content">
-                        <span className="import-radio-title">Keep existing (recommended)</span>
-                        <span className="import-radio-description">Skip items that already exist in your library</span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[13px] font-medium text-text">Keep existing (recommended)</span>
+                        <span className="text-xs text-text-muted">Skip items that already exist in your library</span>
                       </div>
                     </label>
-                    <label className="import-radio">
+                    <label className="flex items-start gap-3 p-3 bg-bg border border-border rounded-md cursor-pointer hover:border-border-hover">
                       <input
                         type="radio"
                         name="mergeStrategy"
                         value="replace"
                         checked={mergeStrategy === 'replace'}
                         onChange={() => setMergeStrategy('replace')}
+                        className="w-4 h-4 mt-0.5 accent-accent"
                       />
-                      <div className="import-radio-content">
-                        <span className="import-radio-title">Replace all</span>
-                        <span className="import-radio-description">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[13px] font-medium text-text">Replace all</span>
+                        <span className="text-xs text-text-muted">
                           Remove your existing items and import all from backup
                         </span>
                       </div>
@@ -320,39 +326,39 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
           )}
 
           {step === 'result' && importResult && (
-            <div className="import-step-result">
-              <div className="import-success-icon">
+            <div className="flex flex-col items-center text-center p-6">
+              <div className="text-success mb-4">
                 <CheckCircle size={48} />
               </div>
-              <h3>Import Complete</h3>
-              <div className="import-result-summary">
+              <h3 className="text-lg font-semibold text-text m-0 mb-6">Import Complete</h3>
+              <div className="flex flex-col gap-2 w-full text-left">
                 {importResult.imported.templates > 0 && (
-                  <div className="import-result-item">
-                    <LayoutTemplate size={16} />
+                  <div className="flex items-center gap-2 py-2 px-3 bg-success-bg rounded-md text-[13px] text-text">
+                    <LayoutTemplate size={16} className="text-success" />
                     <span>{importResult.imported.templates} templates imported</span>
                   </div>
                 )}
                 {importResult.imported.assemblies > 0 && (
-                  <div className="import-result-item">
-                    <Package size={16} />
+                  <div className="flex items-center gap-2 py-2 px-3 bg-success-bg rounded-md text-[13px] text-text">
+                    <Package size={16} className="text-success" />
                     <span>{importResult.imported.assemblies} assemblies imported</span>
                   </div>
                 )}
                 {importResult.imported.stocks > 0 && (
-                  <div className="import-result-item">
-                    <FileBox size={16} />
+                  <div className="flex items-center gap-2 py-2 px-3 bg-success-bg rounded-md text-[13px] text-text">
+                    <FileBox size={16} className="text-success" />
                     <span>{importResult.imported.stocks} stock materials imported</span>
                   </div>
                 )}
                 {importResult.imported.colors > 0 && (
-                  <div className="import-result-item">
-                    <Palette size={16} />
+                  <div className="flex items-center gap-2 py-2 px-3 bg-success-bg rounded-md text-[13px] text-text">
+                    <Palette size={16} className="text-success" />
                     <span>{importResult.imported.colors} custom colors imported</span>
                   </div>
                 )}
                 {importResult.skipped.templates + importResult.skipped.assemblies + importResult.skipped.stocks > 0 && (
-                  <div className="import-result-skipped">
-                    <span className="import-result-skipped-label">Skipped (already exist):</span>
+                  <div className="flex flex-wrap gap-2 py-2 px-3 bg-bg border border-border rounded-md text-xs text-text-muted mt-2">
+                    <span className="font-medium mr-1">Skipped (already exist):</span>
                     {importResult.skipped.templates > 0 && <span>{importResult.skipped.templates} templates</span>}
                     {importResult.skipped.assemblies > 0 && <span>{importResult.skipped.assemblies} assemblies</span>}
                     {importResult.skipped.stocks > 0 && <span>{importResult.skipped.stocks} stock materials</span>}
@@ -363,7 +369,7 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
           )}
         </div>
 
-        <div className="modal-footer">
+        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
           {step === 'select' && (
             <button className="btn btn-sm btn-outlined btn-secondary" onClick={onClose}>
               Cancel

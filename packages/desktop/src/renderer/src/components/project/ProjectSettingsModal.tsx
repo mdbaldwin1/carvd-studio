@@ -119,19 +119,21 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
   const displayValue = findClosestGridValue(gridSize, gridOptions);
 
   return (
-    <div className="modal-backdrop" onMouseDown={handleMouseDown} onClick={handleClick}>
+    <div className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]" onMouseDown={handleMouseDown} onClick={handleClick}>
       <div
-        className="modal project-settings-modal"
+        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in w-[450px]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="project-settings-modal-title"
       >
-        <div className="modal-header">
-          <h2 id="project-settings-modal-title">{isEditingTemplate ? 'Template Settings' : 'Project Settings'}</h2>
-          <div className="modal-header-actions">
+        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+          <h2 id="project-settings-modal-title" className="text-base font-semibold text-text m-0">
+            {isEditingTemplate ? 'Template Settings' : 'Project Settings'}
+          </h2>
+          <div className="flex items-center gap-4">
             <a
               href="#"
-              className="modal-help-link"
+              className="text-xs text-text-muted no-underline transition-colors duration-150 hover:text-accent hover:underline"
               onClick={(e) => {
                 e.preventDefault();
                 window.electronAPI.openExternal('https://carvd-studio.com/docs#settings');
@@ -145,29 +147,31 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
           </div>
         </div>
 
-        <div className="settings-content">
-          <div className="settings-section">
-            <h3>{isEditingTemplate ? 'Template Name' : 'Project Name'}</h3>
-            <div className="settings-row">
+        <div className="p-5 overflow-y-auto max-h-[60vh]">
+          <div className="mb-6 last:mb-0">
+            <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">
+              {isEditingTemplate ? 'Template Name' : 'Project Name'}
+            </h3>
+            <div className="settings-row flex items-center justify-between gap-4 mb-3">
               <input
                 type="text"
                 value={projectName ?? ''}
                 onChange={(e) => setProjectName(e.target.value)}
                 placeholder={isEditingTemplate ? 'Template name' : 'Project name'}
-                className="project-name-input"
+                className="flex-1 bg-bg border border-border text-text py-2 px-3 rounded text-sm font-medium outline-none focus:border-accent"
               />
             </div>
             {!isEditingTemplate && (
               <>
-                <div className="settings-row favorite-row">
+                <div className="settings-row flex items-center justify-between gap-4 mb-3 mt-3">
                   <div className="label-with-help">
-                    <label>Favorite</label>
+                    <label className="text-[13px] text-text">Favorite</label>
                     {!filePath && (
                       <HelpTooltip text="Save this project to add it to favorites." docsSection="project-settings" />
                     )}
                   </div>
                   <button
-                    className={`favorite-toggle ${isFavorite ? 'active' : ''}`}
+                    className={`flex items-center gap-2 py-2 px-4 bg-bg border rounded-md text-[13px] cursor-pointer transition-all duration-150 ${isFavorite ? 'border-warning text-warning bg-[rgba(255,193,7,0.1)]' : 'border-border text-text-muted hover:border-warning hover:text-text'} disabled:opacity-50 disabled:cursor-not-allowed`}
                     onClick={handleToggleFavorite}
                     title={
                       filePath ? (isFavorite ? 'Remove from favorites' : 'Add to favorites') : 'Save project first'
@@ -182,8 +186,8 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
             )}
           </div>
 
-          <div className="settings-section">
-            <h3>
+          <div className="mb-6 last:mb-0">
+            <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">
               {isEditingTemplate ? 'Template Description' : 'Project Notes'}
               <HelpTooltip
                 text={
@@ -196,7 +200,7 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
               />
             </h3>
             <textarea
-              className="project-notes-textarea"
+              className="w-full min-h-[80px] bg-bg border border-border text-text p-2 rounded text-[13px] font-[inherit] resize-y leading-snug outline-none focus:border-accent placeholder:text-text-muted"
               value={projectNotes ?? ''}
               onChange={(e) => setProjectNotes(e.target.value)}
               placeholder={
@@ -208,24 +212,32 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
             />
           </div>
 
-          <div className="settings-section">
-            <h3>Units & Grid</h3>
-            <div className="settings-row">
-              <label>Units</label>
-              <select value={units} onChange={(e) => handleUnitsChange(e.target.value as 'imperial' | 'metric')}>
+          <div className="mb-6 last:mb-0">
+            <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">Units & Grid</h3>
+            <div className="settings-row flex items-center justify-between gap-4 mb-3">
+              <label className="text-[13px] text-text">Units</label>
+              <select
+                value={units}
+                onChange={(e) => handleUnitsChange(e.target.value as 'imperial' | 'metric')}
+                className="w-40 bg-bg border border-border text-text py-1.5 px-2 rounded text-[13px] cursor-pointer outline-none focus:border-accent"
+              >
                 <option value="imperial">Imperial (inches)</option>
                 <option value="metric">Metric (mm)</option>
               </select>
             </div>
-            <div className="settings-row">
+            <div className="settings-row flex items-center justify-between gap-4 mb-3">
               <div className="label-with-help">
-                <label>Grid Snap Size</label>
+                <label className="text-[13px] text-text">Grid Snap Size</label>
                 <HelpTooltip
                   text="Grid snap determines how parts align when moved or resized."
                   docsSection="project-settings"
                 />
               </div>
-              <select value={displayValue} onChange={(e) => setProjectGridSize(parseFloat(e.target.value))}>
+              <select
+                value={displayValue}
+                onChange={(e) => setProjectGridSize(parseFloat(e.target.value))}
+                className="w-40 bg-bg border border-border text-text py-1.5 px-2 rounded text-[13px] cursor-pointer outline-none focus:border-accent"
+              >
                 {gridOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
@@ -235,11 +247,11 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
             </div>
           </div>
 
-          <div className="settings-section">
-            <h3>Cut List Settings</h3>
-            <div className="settings-row">
+          <div className="mb-6 last:mb-0">
+            <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">Cut List Settings</h3>
+            <div className="settings-row flex items-center justify-between gap-4 mb-3">
               <div className="label-with-help">
-                <label>Blade Kerf</label>
+                <label className="text-[13px] text-text">Blade Kerf</label>
                 <HelpTooltip
                   text='Width of your saw blade cut. Common values: 1/8" (table saw), 1/16" (track saw).'
                   docsSection="project-settings"
@@ -247,9 +259,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
               </div>
               <FractionInput value={kerfWidth} onChange={(val) => setKerfWidth(Math.max(0, val))} min={0} />
             </div>
-            <div className="settings-row">
+            <div className="settings-row flex items-center justify-between gap-4 mb-3">
               <div className="label-with-help">
-                <label>Material Overage</label>
+                <label className="text-[13px] text-text">Material Overage</label>
                 <HelpTooltip
                   text="Extra boards to buy beyond what's calculated, to account for mistakes. 10-15% is typical, max 50%."
                   docsSection="project-settings"
@@ -269,8 +281,8 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
             </div>
           </div>
 
-          <div className="settings-section">
-            <h3>
+          <div className="mb-6 last:mb-0">
+            <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">
               Stock Constraints
               <HelpTooltip
                 text="Control how parts relate to their assigned stock material."
@@ -278,9 +290,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                 inline
               />
             </h3>
-            <div className="settings-row">
+            <div className="settings-row flex items-center justify-between gap-4 mb-3">
               <div className="label-with-help">
-                <label>Constrain Dimensions</label>
+                <label className="text-[13px] text-text">Constrain Dimensions</label>
                 <HelpTooltip
                   text="Show warning when part dimensions (including joinery adjustments) exceed stock dimensions."
                   docsSection="project-settings"
@@ -290,11 +302,12 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                 type="checkbox"
                 checked={stockConstraints.constrainDimensions}
                 onChange={(e) => setStockConstraints({ ...stockConstraints, constrainDimensions: e.target.checked })}
+                className="w-[18px] h-[18px] cursor-pointer accent-accent"
               />
             </div>
-            <div className="settings-row">
+            <div className="settings-row flex items-center justify-between gap-4 mb-3">
               <div className="label-with-help">
-                <label>Constrain Grain</label>
+                <label className="text-[13px] text-text">Constrain Grain</label>
                 <HelpTooltip
                   text="Show warning when part grain direction doesn't match stock grain direction."
                   docsSection="project-settings"
@@ -304,11 +317,12 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                 type="checkbox"
                 checked={stockConstraints.constrainGrain}
                 onChange={(e) => setStockConstraints({ ...stockConstraints, constrainGrain: e.target.checked })}
+                className="w-[18px] h-[18px] cursor-pointer accent-accent"
               />
             </div>
-            <div className="settings-row">
+            <div className="settings-row flex items-center justify-between gap-4 mb-3">
               <div className="label-with-help">
-                <label>Sync Part Color</label>
+                <label className="text-[13px] text-text">Sync Part Color</label>
                 <HelpTooltip
                   text="Automatically update part color when stock is assigned."
                   docsSection="project-settings"
@@ -318,23 +332,25 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                 type="checkbox"
                 checked={stockConstraints.constrainColor}
                 onChange={(e) => setStockConstraints({ ...stockConstraints, constrainColor: e.target.checked })}
+                className="w-[18px] h-[18px] cursor-pointer accent-accent"
               />
             </div>
-            <div className="settings-row">
+            <div className="settings-row flex items-center justify-between gap-4 mb-3">
               <div className="label-with-help">
-                <label>Prevent Overlap</label>
+                <label className="text-[13px] text-text">Prevent Overlap</label>
                 <HelpTooltip text="Prevent parts from occupying the same space." docsSection="project-settings" />
               </div>
               <input
                 type="checkbox"
                 checked={stockConstraints.preventOverlap}
                 onChange={(e) => setStockConstraints({ ...stockConstraints, preventOverlap: e.target.checked })}
+                className="w-[18px] h-[18px] cursor-pointer accent-accent"
               />
             </div>
           </div>
         </div>
 
-        <div className="modal-footer">
+        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
           <button className="btn btn-sm btn-filled btn-secondary" onClick={onClose}>
             Done
           </button>
