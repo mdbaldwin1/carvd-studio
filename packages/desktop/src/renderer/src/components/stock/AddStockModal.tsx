@@ -218,13 +218,13 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
           </button>
         </div>
 
-        <div className="add-stock-content">
+        <div className="flex flex-1 overflow-hidden">
           {/* Library list */}
-          <div className="stock-library-sidebar">
-            <div className="stock-library-section">
-              <div className="stock-library-section-header">
-                <span>{stockLibrary.length} available</span>
-                <div className="stock-library-section-actions">
+          <div className="w-60 border-r border-border flex flex-col overflow-hidden">
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="shrink-0 flex items-center justify-between py-3 px-4 border-b border-border gap-2">
+                <span className="text-xs text-text-muted">{stockLibrary.length} available</span>
+                <div className="flex items-center gap-2">
                   {stockLibrary.length > 0 && (
                     <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleSelectAll}>
                       {filteredStockLibrary.every((s) => selectedIds.has(s.id)) && filteredStockLibrary.length > 0
@@ -266,22 +266,22 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
               {stockLibrary.length === 0 ? (
                 <div className="text-text-muted text-xs italic p-4 text-center">
                   <p>No stocks in library yet</p>
-                  <p className="hint">Click "+" to create your first stock</p>
+                  <p className="text-[11px] text-text-muted mt-1">Click "+" to create your first stock</p>
                 </div>
               ) : filteredStockLibrary.length === 0 ? (
                 <p className="text-text-muted text-xs italic p-4 text-center">No stocks match "{searchTerm}"</p>
               ) : (
-                <ul className="stock-library-list">
+                <ul className="list-none m-0 p-2 flex-1 min-h-0 overflow-y-auto">
                   {filteredStockLibrary.map((stock) => (
                     <li
                       key={stock.id}
-                      className={`stock-library-item ${selectedIds.has(stock.id) ? 'selected' : ''} ${displayedStockId === stock.id ? 'displayed' : ''}`}
+                      className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-[background] duration-100 hover:bg-surface-hover ${selectedIds.has(stock.id) ? 'bg-selected' : ''} ${displayedStockId === stock.id ? 'outline-2 outline-solid outline-primary -outline-offset-2' : ''}`}
                       onClick={() => handleItemClick(stock)}
                     >
-                      <span className="stock-color" style={{ backgroundColor: stock.color }} />
-                      <div className="stock-info">
-                        <span className="stock-name">{stock.name}</span>
-                        <span className="stock-dims">
+                      <span className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: stock.color }} />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs whitespace-nowrap overflow-hidden text-ellipsis">{stock.name}</span>
+                        <span className="text-[10px] text-text-muted">
                           {formatMeasurementWithUnit(stock.length, units)} ×{' '}
                           {formatMeasurementWithUnit(stock.width, units)} ×{' '}
                           {formatMeasurementWithUnit(stock.thickness, units)}
@@ -293,22 +293,22 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
               )}
             </div>
             {selectedIds.size > 0 && (
-              <div className="stock-library-selection-bar">
-                <span>{selectedIds.size} selected</span>
+              <div className="flex items-center justify-between gap-3 pt-3 mt-auto border-t border-border shrink-0">
+                <span className="text-xs text-text-muted">{selectedIds.size} selected</span>
               </div>
             )}
           </div>
 
           {/* Stock details display or create form */}
-          <div className="stock-details">
+          <div className="flex-1 p-5 overflow-y-auto flex flex-col">
             {isCreatingNew ? (
               <>
-                <div className="stock-details-header">
-                  <span className="stock-color-large" style={{ backgroundColor: formData.color }} />
-                  <h3>Create New Stock</h3>
+                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border">
+                  <span className="w-6 h-6 rounded shrink-0" style={{ backgroundColor: formData.color }} />
+                  <h3 className="m-0 text-lg font-semibold">Create New Stock</h3>
                 </div>
 
-                <div className="create-stock-form">
+                <div className="flex flex-col gap-4">
                   <div className="form-group">
                     <label>Name</label>
                     <input
@@ -320,7 +320,7 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
 
                   <div className="form-group">
                     <label>Dimensions (L × W × T)</label>
-                    <div className="dimension-inputs">
+                    <div className="flex items-center gap-1">
                       <FractionInput
                         value={formData.length}
                         onChange={(length) => setFormData({ ...formData, length })}
@@ -395,14 +395,16 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
               </>
             ) : displayedStock ? (
               <>
-                <div className="stock-details-header">
-                  <span className="stock-color-large" style={{ backgroundColor: displayedStock.color }} />
-                  <h3>{displayedStock.name}</h3>
+                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border">
+                  <span className="w-6 h-6 rounded shrink-0" style={{ backgroundColor: displayedStock.color }} />
+                  <h3 className="m-0 text-lg font-semibold">{displayedStock.name}</h3>
                 </div>
 
-                <div className="stock-details-grid">
-                  <div className="detail-item">
-                    <label>Dimensions (L × W × T)</label>
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                      Dimensions (L × W × T)
+                    </label>
                     <span>
                       {formatMeasurementWithUnit(displayedStock.length, units)} ×{' '}
                       {formatMeasurementWithUnit(displayedStock.width, units)} ×{' '}
@@ -410,13 +412,15 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
                     </span>
                   </div>
 
-                  <div className="detail-item">
-                    <label>Grain Direction</label>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                      Grain Direction
+                    </label>
                     <span>{grainDirectionLabel(displayedStock.grainDirection)}</span>
                   </div>
 
-                  <div className="detail-item">
-                    <label>Pricing</label>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Pricing</label>
                     <span>
                       ${displayedStock.pricePerUnit.toFixed(2)} {pricingUnitLabel(displayedStock.pricingUnit)}
                     </span>
@@ -424,12 +428,12 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
                 </div>
               </>
             ) : (
-              <div className="stock-details-placeholder">
+              <div className="flex-1 flex flex-col items-center justify-center text-text-muted gap-2">
                 <p className="mb-2">Select a stock from the library to view details</p>
-                <p className="hint text-xs">or click "+" to create one</p>
+                <p className="text-[11px] text-text-muted mt-1">or click "+" to create one</p>
                 <a
                   href="#"
-                  className="learn-more-link text-xs"
+                  className="text-accent no-underline text-xs hover:underline hover:text-accent-hover transition-colors duration-150"
                   onClick={(e) => {
                     e.preventDefault();
                     window.electronAPI.openExternal('https://carvd-studio.com/docs#stock');

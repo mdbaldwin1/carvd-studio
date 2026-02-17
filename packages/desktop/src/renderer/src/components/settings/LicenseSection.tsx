@@ -24,11 +24,11 @@ export function LicenseSection({
       <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">License</h3>
       {licenseData.licenseEmail ? (
         <>
-          <div className="alert alert-success" style={{ marginBottom: '16px' }}>
-            <CheckCircle size={20} className="alert-icon" />
-            <div className="alert-content">
-              <div className="alert-title">License Active</div>
-              <div className="alert-message">
+          <div className="p-4 rounded-lg flex items-start gap-3 bg-success-bg border border-success-border mb-4">
+            <CheckCircle size={20} className="text-success shrink-0" />
+            <div className="flex-1">
+              <div className="text-sm font-semibold mb-1 text-success">License Active</div>
+              <div className="text-[13px] text-text-secondary leading-relaxed">
                 <div>
                   <strong>Email:</strong> {licenseData.licenseEmail}
                 </div>
@@ -89,9 +89,9 @@ export function LicenseSection({
           </div>
         </div>
       ) : (
-        <div className="alert alert-info">
-          <Key size={20} className="alert-icon" />
-          <span className="alert-message">Trial mode active</span>
+        <div className="p-4 rounded-lg flex items-start gap-3 bg-info-bg border border-info-border">
+          <Key size={20} className="text-info shrink-0" />
+          <span className="text-[13px] text-text-secondary leading-relaxed">Trial mode active</span>
         </div>
       )}
     </div>

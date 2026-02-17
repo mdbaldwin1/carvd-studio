@@ -162,12 +162,12 @@ export function AddAssemblyModal({
           </button>
         </div>
 
-        <div className="add-assembly-content">
+        <div className="flex flex-1 overflow-hidden min-h-[300px]">
           {/* Library list sidebar */}
-          <div className="add-assembly-list-panel">
-            <div className="add-assembly-list-header">
+          <div className="w-60 shrink-0 border-r border-border flex flex-col overflow-hidden">
+            <div className="flex justify-between items-center py-3 px-4 border-b border-border text-xs text-text-muted">
               <span>{availableAssemblies.length} available</span>
-              <div className="add-assembly-list-actions">
+              <div className="flex gap-1 items-center">
                 {availableAssemblies.length > 0 && (
                   <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleSelectAll}>
                     {filteredAssemblies.every((a) => selectedIds.has(a.id)) && filteredAssemblies.length > 0
@@ -214,7 +214,7 @@ export function AddAssemblyModal({
             {availableAssemblies.length === 0 ? (
               <div className="text-text-muted text-xs italic p-4 text-center">
                 <p>No assemblies available</p>
-                <p className="hint">
+                <p className="text-[11px] text-text-muted mt-1">
                   {assemblyLibrary.length === 0
                     ? onCreateNew
                       ? 'Click "+" above or save a selection as an assembly from the canvas'
@@ -227,25 +227,27 @@ export function AddAssemblyModal({
                 <p>No assemblies match "{searchTerm}"</p>
               </div>
             ) : (
-              <ul className="add-assembly-list">
+              <ul className="list-none m-0 p-2 overflow-y-auto flex-1">
                 {filteredAssemblies.map((assembly) => (
                   <li
                     key={assembly.id}
-                    className={`add-assembly-item ${selectedIds.has(assembly.id) ? 'selected' : ''} ${displayedAssemblyId === assembly.id ? 'displayed' : ''}`}
+                    className={`flex items-center gap-2 py-2.5 px-3 rounded-md cursor-pointer transition-[background] duration-150 hover:bg-surface-hover ${selectedIds.has(assembly.id) ? 'bg-selected' : ''} ${displayedAssemblyId === assembly.id ? 'outline-2 outline-solid outline-primary -outline-offset-2' : ''}`}
                     onClick={() => handleItemClick(assembly)}
                   >
                     {assembly.thumbnailData ? (
                       <img
                         src={`data:image/png;base64,${assembly.thumbnailData.data}`}
                         alt={assembly.name}
-                        className="assembly-thumbnail"
+                        className="w-10 h-[30px] object-cover rounded shrink-0 bg-bg-tertiary"
                       />
                     ) : (
-                      <span className="assembly-icon">{assembly.thumbnail || '📦'}</span>
+                      <span className="text-base shrink-0">{assembly.thumbnail || '📦'}</span>
                     )}
-                    <div className="assembly-info">
-                      <span className="assembly-name">{assembly.name}</span>
-                      <span className="assembly-dims">
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <span className="text-[13px] text-text whitespace-nowrap overflow-hidden text-ellipsis">
+                        {assembly.name}
+                      </span>
+                      <span className="text-[11px] text-text-muted">
                         {assembly.parts.length} part{assembly.parts.length !== 1 ? 's' : ''}
                       </span>
                     </div>
@@ -254,21 +256,21 @@ export function AddAssemblyModal({
               </ul>
             )}
             {selectedIds.size > 0 && (
-              <div className="add-assembly-selection-bar">
+              <div className="py-2 px-3 border-t border-border text-xs text-text-muted shrink-0">
                 <span>{selectedIds.size} selected</span>
               </div>
             )}
           </div>
 
           {/* Detail/edit panel */}
-          <div className="add-assembly-detail-panel">
+          <div className="flex-1 flex flex-col p-5 overflow-y-auto">
             {!displayedAssembly ? (
-              <div className="add-assembly-empty">
+              <div className="flex-1 flex flex-col items-center justify-center text-text-muted gap-2">
                 <p className="mb-2">Select an assembly from the library to view details</p>
-                <p className="hint text-xs">or click "+" to create one</p>
+                <p className="text-[11px] text-text-muted mt-1">or click "+" to create one</p>
                 <a
                   href="#"
-                  className="learn-more-link text-xs"
+                  className="text-accent no-underline text-xs hover:underline hover:text-accent-hover transition-colors duration-150"
                   onClick={(e) => {
                     e.preventDefault();
                     window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
@@ -279,33 +281,33 @@ export function AddAssemblyModal({
               </div>
             ) : (
               <>
-                <div className="assembly-details-header">
+                <div className="flex items-center gap-3 mb-4">
                   {displayedAssembly.thumbnailData ? (
                     <img
                       src={`data:image/png;base64,${displayedAssembly.thumbnailData.data}`}
                       alt={displayedAssembly.name}
-                      className="assembly-thumbnail-large"
+                      className="w-[120px] h-[90px] object-cover rounded-md shrink-0 bg-bg-tertiary"
                     />
                   ) : (
-                    <span className="assembly-icon-large">{displayedAssembly.thumbnail || '📦'}</span>
+                    <span className="text-2xl">{displayedAssembly.thumbnail || '📦'}</span>
                   )}
-                  <h3>{displayedAssembly.name}</h3>
+                  <h3 className="m-0 text-lg text-text">{displayedAssembly.name}</h3>
                 </div>
 
                 {displayedAssembly.description && (
-                  <div className="assembly-description">
-                    <p>{displayedAssembly.description}</p>
+                  <div className="mb-4 p-3 bg-bg rounded-md">
+                    <p className="m-0 text-[13px] text-text-muted leading-relaxed">{displayedAssembly.description}</p>
                   </div>
                 )}
 
                 {/* Parts preview */}
-                <div className="assembly-preview">
-                  <label className="detail-label">Parts ({displayedAssembly.parts.length})</label>
-                  <ul className="assembly-parts-preview">
+                <div className="mt-5 pt-4 border-t border-border">
+                  <label className="block mb-3 text-xs text-text-muted">Parts ({displayedAssembly.parts.length})</label>
+                  <ul className="list-none m-0 p-0 max-h-[150px] overflow-y-auto">
                     {displayedAssembly.parts.slice(0, 5).map((part, index) => (
-                      <li key={index} className="assembly-part-preview-item">
-                        <span className="part-name">{part.name}</span>
-                        <span className="part-dims">
+                      <li key={index} className="flex justify-between items-center py-1.5 px-2.5 bg-bg rounded mb-1">
+                        <span className="text-xs text-text">{part.name}</span>
+                        <span className="text-[11px] text-text-muted">
                           {formatMeasurementWithUnit(part.length, units)} ×{' '}
                           {formatMeasurementWithUnit(part.width, units)} ×{' '}
                           {formatMeasurementWithUnit(part.thickness, units)}
@@ -313,7 +315,9 @@ export function AddAssemblyModal({
                       </li>
                     ))}
                     {displayedAssembly.parts.length > 5 && (
-                      <li className="assembly-part-preview-more">+{displayedAssembly.parts.length - 5} more parts</li>
+                      <li className="py-1.5 px-2.5 text-[11px] text-text-muted italic">
+                        +{displayedAssembly.parts.length - 5} more parts
+                      </li>
                     )}
                   </ul>
                 </div>

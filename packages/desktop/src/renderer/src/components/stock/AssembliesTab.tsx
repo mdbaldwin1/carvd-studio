@@ -134,10 +134,10 @@ export function AssembliesTab({
   return (
     <>
       {/* Assemblies list sidebar */}
-      <div className="stock-library-list-panel">
-        <div className="stock-library-list-header">
+      <div className="w-60 border-r border-border flex flex-col">
+        <div className="flex justify-between items-center py-3 px-4 border-b border-border text-xs text-text-muted">
           <span>{assemblies.length} available</span>
-          <div className="stock-library-header-actions">
+          <div className="flex items-center gap-1">
             {canCreateAssemblies && (
               <button
                 className="btn btn-icon-xs btn-ghost btn-secondary"
@@ -191,11 +191,11 @@ export function AssembliesTab({
             {!canCreateAssemblies ? (
               <>
                 <p>Assemblies require a license</p>
-                <p className="hint">
+                <p className="text-[11px] text-text-muted mt-1">
                   Upgrade to create and use assemblies.{' '}
                   <a
                     href="#"
-                    className="learn-more-link"
+                    className="text-accent no-underline hover:underline hover:text-accent-hover transition-colors duration-150"
                     onClick={(e) => {
                       e.preventDefault();
                       window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
@@ -208,13 +208,13 @@ export function AssembliesTab({
             ) : (
               <>
                 <p>No assemblies in library yet</p>
-                <p className="hint">
+                <p className="text-[11px] text-text-muted mt-1">
                   {onCreateNewAssembly ? (
                     <>
                       Click "+" above or save a selection as an assembly from the canvas.{' '}
                       <a
                         href="#"
-                        className="learn-more-link"
+                        className="text-accent no-underline hover:underline hover:text-accent-hover transition-colors duration-150"
                         onClick={(e) => {
                           e.preventDefault();
                           window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
@@ -228,7 +228,7 @@ export function AssembliesTab({
                       Save a selection as an assembly from the canvas.{' '}
                       <a
                         href="#"
-                        className="learn-more-link"
+                        className="text-accent no-underline hover:underline hover:text-accent-hover transition-colors duration-150"
                         onClick={(e) => {
                           e.preventDefault();
                           window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
@@ -247,11 +247,11 @@ export function AssembliesTab({
             <p>No assemblies match "{searchTerm}"</p>
           </div>
         ) : (
-          <ul className="stock-library-list">
+          <ul className="list-none m-0 p-2 flex-1 min-h-0 overflow-y-auto">
             {filteredAssemblies.map((assembly) => (
               <li
                 key={assembly.id}
-                className={`stock-library-item ${selectedAssemblyId === assembly.id ? 'selected' : ''} ${isBuiltInAssembly(assembly.id) ? 'built-in' : ''}`}
+                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-[background] duration-100 hover:bg-surface-hover ${selectedAssemblyId === assembly.id ? 'bg-selected' : ''}`}
                 onClick={() => handleSelectAssembly(assembly)}
                 draggable
                 onDragStart={(e) => {
@@ -261,16 +261,24 @@ export function AssembliesTab({
                 }}
               >
                 {assembly.thumbnailData?.data ? (
-                  <img src={assembly.thumbnailData.data} alt={assembly.name} className="assembly-thumbnail" />
+                  <img
+                    src={assembly.thumbnailData.data}
+                    alt={assembly.name}
+                    className="w-10 h-[30px] object-cover rounded shrink-0 bg-bg-tertiary"
+                  />
                 ) : (
-                  <span className="assembly-icon">📦</span>
+                  <span className="text-base shrink-0">📦</span>
                 )}
-                <div className="stock-info">
-                  <span className="stock-name">
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs whitespace-nowrap overflow-hidden text-ellipsis">
                     {assembly.name}
-                    {isBuiltInAssembly(assembly.id) && <span className="built-in-badge">Built-in</span>}
+                    {isBuiltInAssembly(assembly.id) && (
+                      <span className="inline-flex items-center ml-1.5 py-px px-1 text-[9px] font-medium text-text-secondary bg-bg-tertiary rounded uppercase tracking-wide">
+                        Built-in
+                      </span>
+                    )}
                   </span>
-                  <span className="stock-dims">
+                  <span className="text-[10px] text-text-muted">
                     {assembly.parts.length} part{assembly.parts.length !== 1 ? 's' : ''}
                     {assembly.groups.length > 0 &&
                       `, ${assembly.groups.length} group${assembly.groups.length !== 1 ? 's' : ''}`}
@@ -283,14 +291,14 @@ export function AssembliesTab({
       </div>
 
       {/* Assembly detail panel */}
-      <div className="stock-library-detail-panel">
+      <div className="flex-1 flex flex-col overflow-y-auto">
         {!selectedAssembly ? (
-          <div className="stock-library-empty">
+          <div className="flex-1 flex flex-col items-center justify-center text-text-muted gap-2">
             <p>Select an assembly to view details</p>
-            <p className="hint">or click "+" to create a new assembly</p>
+            <p className="text-[11px] text-text-muted mt-1">or click "+" to create a new assembly</p>
             <a
               href="#"
-              className="learn-more-link text-xs"
+              className="text-accent no-underline text-xs hover:underline hover:text-accent-hover transition-colors duration-150"
               onClick={(e) => {
                 e.preventDefault();
                 window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
@@ -301,15 +309,17 @@ export function AssembliesTab({
           </div>
         ) : (
           <>
-            <div className="stock-detail-header">
-              <h3>
+            <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+              <h3 className="text-base font-semibold m-0 flex items-center gap-2">
                 {isEditingAssembly ? 'Edit Assembly' : selectedAssembly.name}
                 {!isEditingAssembly && isBuiltInAssembly(selectedAssembly.id) && (
-                  <span className="built-in-badge">Built-in</span>
+                  <span className="inline-flex items-center py-0.5 px-1.5 text-[10px] font-medium text-text-secondary bg-bg-tertiary rounded uppercase tracking-wide">
+                    Built-in
+                  </span>
                 )}
               </h3>
               {!isEditingAssembly && (
-                <div className="stock-detail-actions">
+                <div className="flex gap-2">
                   {!isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
                     <>
                       <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleStartEditAssembly}>
@@ -362,7 +372,7 @@ export function AssembliesTab({
             </div>
 
             {isEditingAssembly ? (
-              <div className="stock-edit-form">
+              <div className="flex-1 p-5 overflow-y-auto">
                 <div className="form-group">
                   <label>Name</label>
                   <input
@@ -385,7 +395,7 @@ export function AssembliesTab({
                 {onEditAssemblyIn3D && !isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
                   <div className="form-group">
                     <button
-                      className="btn btn-sm btn-outlined btn-secondary edit-3d-btn"
+                      className="btn btn-sm btn-outlined btn-secondary w-full"
                       onClick={async () => {
                         const success = await onEditAssemblyIn3D(selectedAssembly);
                         if (success) {
@@ -413,39 +423,48 @@ export function AssembliesTab({
                 </div>
               </div>
             ) : (
-              <div className="stock-detail-view">
+              <div className="flex-1 p-5 overflow-y-auto">
                 {selectedAssembly.description && (
-                  <div className="detail-row">
-                    <span className="detail-label">Description</span>
-                    <span className="detail-value">{selectedAssembly.description}</span>
+                  <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
+                    <span className="text-xs text-text-muted shrink-0">Description</span>
+                    <span className="text-[13px] text-text text-right break-words">{selectedAssembly.description}</span>
                   </div>
                 )}
-                <div className="detail-row">
-                  <span className="detail-label">Parts</span>
-                  <span className="detail-value">{selectedAssembly.parts.length}</span>
+                <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
+                  <span className="text-xs text-text-muted shrink-0">Parts</span>
+                  <span className="text-[13px] text-text text-right break-words">{selectedAssembly.parts.length}</span>
                 </div>
                 {selectedAssembly.groups.length > 0 && (
-                  <div className="detail-row">
-                    <span className="detail-label">Groups</span>
-                    <span className="detail-value">{selectedAssembly.groups.length}</span>
+                  <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
+                    <span className="text-xs text-text-muted shrink-0">Groups</span>
+                    <span className="text-[13px] text-text text-right break-words">
+                      {selectedAssembly.groups.length}
+                    </span>
                   </div>
                 )}
-                <div className="detail-row">
-                  <span className="detail-label">Created</span>
-                  <span className="detail-value">{new Date(selectedAssembly.createdAt).toLocaleDateString()}</span>
+                <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
+                  <span className="text-xs text-text-muted shrink-0">Created</span>
+                  <span className="text-[13px] text-text text-right break-words">
+                    {new Date(selectedAssembly.createdAt).toLocaleDateString()}
+                  </span>
                 </div>
-                <div className="detail-row">
-                  <span className="detail-label">Modified</span>
-                  <span className="detail-value">{new Date(selectedAssembly.modifiedAt).toLocaleDateString()}</span>
+                <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
+                  <span className="text-xs text-text-muted shrink-0">Modified</span>
+                  <span className="text-[13px] text-text text-right break-words">
+                    {new Date(selectedAssembly.modifiedAt).toLocaleDateString()}
+                  </span>
                 </div>
 
-                <div className="assembly-parts-list">
-                  <span className="detail-label">Parts in this assembly:</span>
-                  <ul className="assembly-parts">
+                <div className="mt-4 pt-4 border-t border-border">
+                  <span className="text-xs text-text-muted shrink-0 block mb-3">Parts in this assembly:</span>
+                  <ul className="list-none m-0 p-0 max-h-[200px] overflow-y-auto">
                     {selectedAssembly.parts.map((part, index) => (
-                      <li key={index} className="assembly-part-item">
-                        <span className="assembly-part-name">{part.name}</span>
-                        <span className="assembly-part-dims">
+                      <li
+                        key={index}
+                        className="flex justify-between items-center py-2 px-3 bg-bg rounded mb-1 last:mb-0"
+                      >
+                        <span className="text-xs text-text">{part.name}</span>
+                        <span className="text-[11px] text-text-muted">
                           {formatMeasurementWithUnit(part.length, units)} ×{' '}
                           {formatMeasurementWithUnit(part.width, units)} ×{' '}
                           {formatMeasurementWithUnit(part.thickness, units)}

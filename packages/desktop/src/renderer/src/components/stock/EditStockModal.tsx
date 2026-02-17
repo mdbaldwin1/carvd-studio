@@ -104,7 +104,7 @@ export function EditStockModal({
 
         <div className="form-group">
           <label>Dimensions (L × W × T)</label>
-          <div className="dimension-inputs">
+          <div className="flex items-center gap-1">
             <FractionInput
               value={formData.length}
               onChange={(length) => setFormData({ ...formData, length })}

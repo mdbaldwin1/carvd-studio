@@ -12,6 +12,95 @@
    =========================================== */
 
 @layer base {
+  /* Global reset */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  /* Smooth theme transitions */
+  *,
+  *::before,
+  *::after {
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-duration: 0.2s;
+    transition-timing-function: ease;
+  }
+
+  /* Preserve existing transitions for interactive elements */
+  button,
+  input,
+  select,
+  textarea,
+  .btn,
+  [class*='transition'] {
+    transition-property: all;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    font-family:
+      'Roboto',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Oxygen,
+      Ubuntu,
+      Cantarell,
+      'Open Sans',
+      'Helvetica Neue',
+      sans-serif;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-size: 13px;
+  }
+
+  /* Headings use Roboto Slab */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .sidebar-section h2,
+  .app-header h1 {
+    font-family: 'Roboto Slab', Georgia, 'Times New Roman', serif;
+  }
+
+  /* Remove default focus ring, use focus-visible instead */
+  button:focus:not(:focus-visible),
+  a:focus:not(:focus-visible),
+  input:focus:not(:focus-visible),
+  select:focus:not(:focus-visible),
+  textarea:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Checkbox and radio focus states */
+  input[type='checkbox']:focus-visible,
+  input[type='radio']:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  /* Checkbox styling */
+  input[type='checkbox'] {
+    accent-color: var(--color-accent);
+  }
+
+  /* Radio styling */
+  input[type='radio'] {
+    accent-color: var(--color-accent);
+  }
+
   ::-webkit-scrollbar {
     @apply w-2 h-2;
   }

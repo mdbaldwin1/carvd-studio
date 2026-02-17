@@ -168,10 +168,10 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
   return (
     <>
       {/* Stock list sidebar */}
-      <div className="stock-library-list-panel">
-        <div className="stock-library-list-header">
+      <div className="w-60 border-r border-border flex flex-col">
+        <div className="flex justify-between items-center py-3 px-4 border-b border-border text-xs text-text-muted">
           <span>{stocks.length} available</span>
-          <div className="stock-library-header-actions">
+          <div className="flex items-center gap-1">
             <IconButton label="Import stocks" size="xs" onClick={handleImportStocks}>
               <Upload size={14} />
             </IconButton>
@@ -204,11 +204,11 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
         {stocks.length === 0 ? (
           <div className="text-text-muted text-xs italic p-4 text-center">
             <p className="mb-2">📦 No stocks in library yet</p>
-            <p className="hint text-xs">
+            <p className="text-[11px] text-text-muted mt-1">
               Click "+" above to create your first stock material.{' '}
               <a
                 href="#"
-                className="learn-more-link"
+                className="text-accent no-underline hover:underline hover:text-accent-hover transition-colors duration-150"
                 onClick={(e) => {
                   e.preventDefault();
                   window.electronAPI.openExternal('https://carvd-studio.com/docs#stock');
@@ -223,17 +223,17 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
             <p>No stocks match "{searchTerm}"</p>
           </div>
         ) : (
-          <ul className="stock-library-list">
+          <ul className="list-none m-0 p-2 flex-1 min-h-0 overflow-y-auto">
             {filteredStocks.map((stock) => (
               <li
                 key={stock.id}
-                className={`stock-library-item ${selectedStockId === stock.id ? 'selected' : ''}`}
+                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-[background] duration-100 hover:bg-surface-hover ${selectedStockId === stock.id ? 'bg-selected' : ''}`}
                 onClick={() => handleSelectStock(stock)}
               >
-                <span className="stock-color" style={{ backgroundColor: stock.color }} />
-                <div className="stock-info">
-                  <span className="stock-name">{stock.name}</span>
-                  <span className="stock-dims">
+                <span className="w-4 h-4 rounded-sm shrink-0" style={{ backgroundColor: stock.color }} />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs whitespace-nowrap overflow-hidden text-ellipsis">{stock.name}</span>
+                  <span className="text-[10px] text-text-muted">
                     {formatMeasurementWithUnit(stock.length, units)} × {formatMeasurementWithUnit(stock.width, units)} ×{' '}
                     {formatMeasurementWithUnit(stock.thickness, units)}
                   </span>
@@ -245,14 +245,14 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
       </div>
 
       {/* Stock detail/edit panel */}
-      <div className="stock-library-detail-panel">
+      <div className="flex-1 flex flex-col overflow-y-auto">
         {!selectedStock && !isCreating ? (
-          <div className="stock-library-empty">
+          <div className="flex-1 flex flex-col items-center justify-center text-text-muted gap-2">
             <p className="mb-2">Select a stock to view details</p>
-            <p className="hint text-xs">or click "+" to create a new stock material</p>
+            <p className="text-[11px] text-text-muted mt-1">or click "+" to create a new stock material</p>
             <a
               href="#"
-              className="learn-more-link text-xs"
+              className="text-accent no-underline text-xs hover:underline hover:text-accent-hover transition-colors duration-150"
               onClick={(e) => {
                 e.preventDefault();
                 window.electronAPI.openExternal('https://carvd-studio.com/docs#stock');
@@ -263,10 +263,12 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
           </div>
         ) : (
           <>
-            <div className="stock-detail-header">
-              <h3>{isCreating ? 'New Stock' : formData.name}</h3>
+            <div className="flex justify-between items-center py-4 px-5 border-b border-border">
+              <h3 className="text-base font-semibold m-0 flex items-center gap-2">
+                {isCreating ? 'New Stock' : formData.name}
+              </h3>
               {!isFormMode && (
-                <div className="stock-detail-actions">
+                <div className="flex gap-2">
                   <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleStartEdit}>
                     Edit
                   </button>
@@ -286,7 +288,7 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
             </div>
 
             {isFormMode ? (
-              <div className="stock-edit-form">
+              <div className="flex-1 p-5 overflow-y-auto">
                 <div className="form-group">
                   <label>Name</label>
                   <input
@@ -298,7 +300,7 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
 
                 <div className="form-group">
                   <label>Dimensions (L × W × T)</label>
-                  <div className="dimension-inputs">
+                  <div className="flex items-center gap-1">
                     <FractionInput
                       value={formData.length}
                       onChange={(length) => setFormData({ ...formData, length })}
@@ -380,30 +382,30 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
                 </div>
               </div>
             ) : (
-              <div className="stock-detail-view">
-                <div className="detail-row">
-                  <span className="detail-label">Dimensions</span>
-                  <span className="detail-value">
+              <div className="flex-1 p-5 overflow-y-auto">
+                <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
+                  <span className="text-xs text-text-muted shrink-0">Dimensions</span>
+                  <span className="text-[13px] text-text text-right break-words">
                     {formatMeasurementWithUnit(formData.length, units)} ×{' '}
                     {formatMeasurementWithUnit(formData.width, units)} ×{' '}
                     {formatMeasurementWithUnit(formData.thickness, units)}
                   </span>
                 </div>
-                <div className="detail-row">
-                  <span className="detail-label">Grain</span>
-                  <span className="detail-value">
+                <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
+                  <span className="text-xs text-text-muted shrink-0">Grain</span>
+                  <span className="text-[13px] text-text text-right break-words">
                     {formData.grainDirection === 'none' ? 'None' : `Along ${formData.grainDirection}`}
                   </span>
                 </div>
-                <div className="detail-row">
-                  <span className="detail-label">Pricing</span>
-                  <span className="detail-value">
+                <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
+                  <span className="text-xs text-text-muted shrink-0">Pricing</span>
+                  <span className="text-[13px] text-text text-right break-words">
                     ${formData.pricePerUnit.toFixed(2)} {formData.pricingUnit === 'board_foot' ? '/ bd ft' : '/ sheet'}
                   </span>
                 </div>
-                <div className="detail-row">
-                  <span className="detail-label">Color</span>
-                  <span className="detail-color-swatch" style={{ backgroundColor: formData.color }} />
+                <div className="flex justify-between items-start gap-4 py-3">
+                  <span className="text-xs text-text-muted shrink-0">Color</span>
+                  <span className="w-6 h-6 rounded border border-border" style={{ backgroundColor: formData.color }} />
                 </div>
               </div>
             )}
