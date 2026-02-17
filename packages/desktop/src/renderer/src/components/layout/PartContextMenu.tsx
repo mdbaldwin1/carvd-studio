@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import { useProjectStore, getContainingGroupId, getAllDescendantPartIds } from '../../store/projectStore';
+import { useClipboardStore } from '../../store/clipboardStore';
+import { useLicenseStore } from '../../store/licenseStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
@@ -23,7 +25,7 @@ interface PartContextMenuProps {
 export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps) {
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const parts = useProjectStore((s) => s.parts);
-  const copySelectedParts = useProjectStore((s) => s.copySelectedParts);
+  const copySelectedParts = useClipboardStore((s) => s.copySelectedParts);
   const deleteSelectedParts = useProjectStore((s) => s.deleteSelectedParts);
   const resetSelectedPartsToStock = useProjectStore((s) => s.resetSelectedPartsToStock);
   const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
@@ -40,7 +42,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const addToGroup = useProjectStore((s) => s.addToGroup);
   const mergeGroups = useProjectStore((s) => s.mergeGroups);
   const openSaveAssemblyModal = useUIStore((s) => s.openSaveAssemblyModal);
-  const licenseMode = useProjectStore((s) => s.licenseMode);
+  const licenseMode = useLicenseStore((s) => s.licenseMode);
   const limits = getFeatureLimits(licenseMode);
   const canUseAssemblies = limits.canUseAssemblies;
   const canUseGroups = limits.canUseGroups;

@@ -62,6 +62,8 @@ import { useUIStore } from './store/uiStore';
 import { useCameraStore } from './store/cameraStore';
 import { useSnapStore } from './store/snapStore';
 import { useAssemblyEditingStore } from './store/assemblyEditingStore';
+import { useClipboardStore } from './store/clipboardStore';
+import { useLicenseStore } from './store/licenseStore';
 import { Assembly, LightingMode, Project, Stock } from './types';
 import { formatMeasurementWithUnit } from './utils/fractions';
 import { getPartBounds } from './utils/snapToPartsUtil';
@@ -96,7 +98,7 @@ function SelectionBox() {
 function HotkeyHints({ show }: { show: boolean }) {
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
-  const clipboard = useProjectStore((s) => s.clipboard);
+  const clipboard = useClipboardStore((s) => s.clipboard);
 
   const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
   const modKey = isMac ? '⌘' : 'Ctrl';
@@ -189,7 +191,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const units = useProjectStore((s) => s.units);
   const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
-  const licenseMode = useProjectStore((s) => s.licenseMode);
+  const licenseMode = useLicenseStore((s) => s.licenseMode);
   const canUseAssemblies = getFeatureLimits(licenseMode).canUseAssemblies;
   const addPart = useProjectStore((s) => s.addPart);
   const addProjectStock = useProjectStore((s) => s.addStock);
@@ -1976,7 +1978,7 @@ function App() {
   } = useLicenseStatus();
 
   // Sync license mode to project store for feature limit enforcement
-  const setStoreLicenseMode = useProjectStore((s) => s.setLicenseMode);
+  const setStoreLicenseMode = useLicenseStore((s) => s.setLicenseMode);
   useEffect(() => {
     setStoreLicenseMode(licenseMode);
   }, [licenseMode, setStoreLicenseMode]);

@@ -5,6 +5,7 @@ import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
 import { Project } from '../../types';
 import { useProjectStore } from '../../store/projectStore';
+import { useLicenseStore } from '../../store/licenseStore';
 import { useUIStore } from '../../store/uiStore';
 import { getFeatureLimits, getBlockedMessage } from '../../utils/featureLimits';
 import { logger } from '../../utils/logger';
@@ -25,7 +26,7 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
   // Use individual selectors to avoid creating new object references
   const projectName = useProjectStore((s) => s.name);
   const parts = useProjectStore((s) => s.parts);
-  const licenseMode = useProjectStore((s) => s.licenseMode);
+  const licenseMode = useLicenseStore((s) => s.licenseMode);
   const canUseCustomTemplates = getFeatureLimits(licenseMode).canUseCustomTemplates;
 
   // Load user templates when modal opens
@@ -103,7 +104,7 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
   const handleSaveCurrentAsTemplate = useCallback(async () => {
     // Check license limits for custom templates
     const projectState = useProjectStore.getState();
-    const limits = getFeatureLimits(projectState.licenseMode);
+    const limits = getFeatureLimits(useLicenseStore.getState().licenseMode);
     if (!limits.canUseCustomTemplates) {
       useUIStore.getState().showToast(getBlockedMessage('useTemplates'));
       return;
