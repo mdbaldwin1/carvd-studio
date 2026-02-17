@@ -128,7 +128,7 @@ function PartItem({ part, level, onPartClick, onDuplicate, onDelete }: PartItemP
           <AlertTriangle size={12} />
         </span>
       )}
-      <span className="flex-1 truncate">{part.name}</span>
+      <span className="part-name flex-1 truncate">{part.name}</span>
       <div className="flex gap-0.5 opacity-0 group-hover/part:opacity-100 transition-opacity duration-100">
         <IconButton
           label={`Duplicate ${part.name}`}
