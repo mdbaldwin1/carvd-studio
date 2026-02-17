@@ -8,30 +8,32 @@ interface AppearanceSectionProps {
 
 export function AppearanceSection({ formData, onSettingChange }: AppearanceSectionProps) {
   return (
-    <div className="settings-section">
-      <h3>Appearance</h3>
-      <div className="settings-row">
-        <label>Theme</label>
+    <div className="mb-6 last:mb-0">
+      <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">Appearance</h3>
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
+        <label className="text-[13px] text-text">Theme</label>
         <select
           value={formData.theme}
           onChange={(e) => onSettingChange('theme', e.target.value as AppSettings['theme'])}
+          className="w-40 bg-bg border border-border text-text py-1.5 px-2 rounded text-[13px] cursor-pointer outline-none focus:border-accent"
         >
           <option value="dark">Dark</option>
           <option value="light">Light</option>
           <option value="system">System</option>
         </select>
       </div>
-      <div className="settings-row">
-        <label>Show Hotkey Hints</label>
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
+        <label className="text-[13px] text-text">Show Hotkey Hints</label>
         <input
           type="checkbox"
           checked={formData.showHotkeyHints}
           onChange={(e) => onSettingChange('showHotkeyHints', e.target.checked)}
+          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
-      <div className="settings-row">
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <div className="label-with-help">
-          <label>Lighting Mode</label>
+          <label className="text-[13px] text-text">Lighting Mode</label>
           <HelpTooltip
             text='Adjust 3D workspace lighting. "Bright" is recommended for dark-colored materials.'
             docsSection="app-settings"
@@ -40,6 +42,7 @@ export function AppearanceSection({ formData, onSettingChange }: AppearanceSecti
         <select
           value={formData.lightingMode ?? 'default'}
           onChange={(e) => onSettingChange('lightingMode', e.target.value as LightingMode)}
+          className="w-40 bg-bg border border-border text-text py-1.5 px-2 rounded text-[13px] cursor-pointer outline-none focus:border-accent"
         >
           <option value="default">Default</option>
           <option value="bright">Bright</option>

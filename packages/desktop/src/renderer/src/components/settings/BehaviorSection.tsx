@@ -8,11 +8,11 @@ interface BehaviorSectionProps {
 
 export function BehaviorSection({ formData, onSettingChange }: BehaviorSectionProps) {
   return (
-    <div className="settings-section">
-      <h3>Behavior</h3>
-      <div className="settings-row">
+    <div className="mb-6 last:mb-0">
+      <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">Behavior</h3>
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <div className="label-with-help">
-          <label>Auto-Save</label>
+          <label className="text-[13px] text-text">Auto-Save</label>
           <HelpTooltip
             text="Automatically save your project 30 seconds after changes. If the project hasn't been saved yet, you'll be prompted to choose a location."
             docsSection="app-settings"
@@ -22,23 +22,25 @@ export function BehaviorSection({ formData, onSettingChange }: BehaviorSectionPr
           type="checkbox"
           checked={formData.autoSave ?? false}
           onChange={(e) => onSettingChange('autoSave', e.target.checked)}
+          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
-      <div className="settings-row">
+      <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <div className="label-with-help">
-          <label>Confirm Before Delete</label>
+          <label className="text-[13px] text-text">Confirm Before Delete</label>
           <HelpTooltip text="Show a confirmation dialog when deleting parts or stocks." docsSection="app-settings" />
         </div>
         <input
           type="checkbox"
           checked={formData.confirmBeforeDelete}
           onChange={(e) => onSettingChange('confirmBeforeDelete', e.target.checked)}
+          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
 
-      <div className="settings-row" style={{ marginTop: '16px' }}>
+      <div className="settings-row flex items-center justify-between gap-4 mb-3 mt-4">
         <div className="label-with-help">
-          <label>Welcome Tutorial</label>
+          <label className="text-[13px] text-text">Welcome Tutorial</label>
           <HelpTooltip text="Reset the welcome tutorial to show it again on next launch." docsSection="quick-start" />
         </div>
         <button

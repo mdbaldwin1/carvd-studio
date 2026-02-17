@@ -157,7 +157,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
 
   return (
     <div
-      className="modal-overlay"
+      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
       onMouseDown={(e) => {
         // Only track if mousedown is directly on the overlay (not bubbled from children)
         mouseDownOnOverlay.current = e.target === e.currentTarget;
