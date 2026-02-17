@@ -1,6 +1,8 @@
 import { useDownloadInfo } from "../utils/downloads";
 import { AppleIcon, WindowsIcon } from "../components/BrandIcons";
 import SEO from "../components/SEO";
+import Header from "../components/Header";
+import Footer from "../components/Footer";
 
 export default function DownloadPage() {
   const {
@@ -16,25 +18,7 @@ export default function DownloadPage() {
         description="Download Carvd Studio for macOS and Windows. Free 14-day trial with all features. No credit card required."
         path="/download"
       />
-      {/* Header */}
-      <header className="header">
-        <nav className="nav container">
-          <a href="/" className="nav-brand">
-            Carvd Studio
-          </a>
-          <div className="nav-links">
-            <a href="/features" className="nav-link">
-              Features
-            </a>
-            <a href="/pricing" className="nav-link">
-              Pricing
-            </a>
-            <a href="/docs" className="nav-link">
-              Docs
-            </a>
-          </div>
-        </nav>
-      </header>
+      <Header />
 
       {/* Main Content */}
       <main>
@@ -371,37 +355,7 @@ export default function DownloadPage() {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="footer container">
-        <div className="mb-lg">
-          <div className="flex justify-center gap-2xl mb-md">
-            <a href="/features" className="nav-link">
-              Features
-            </a>
-            <a href="/pricing" className="nav-link">
-              Pricing
-            </a>
-            <a href="/docs" className="nav-link">
-              Documentation
-            </a>
-            <a href="/support" className="nav-link">
-              Support
-            </a>
-          </div>
-          <div className="flex justify-center gap-xl text-sm text-muted">
-            <a href="/privacy" className="nav-link">
-              Privacy Policy
-            </a>
-            <a href="/terms" className="nav-link">
-              Terms of Service
-            </a>
-            <a href="/changelog" className="nav-link">
-              Changelog
-            </a>
-          </div>
-        </div>
-        <p>&copy; 2026 Carvd Studio. All rights reserved.</p>
-      </footer>
+      <Footer />
     </div>
   );
 }
