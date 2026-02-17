@@ -32,7 +32,7 @@ export function AppearanceSection({ formData, onSettingChange }: AppearanceSecti
         />
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
-        <div className="label-with-help">
+        <div className="inline-flex items-center gap-1">
           <label className="text-[13px] text-text">Lighting Mode</label>
           <HelpTooltip
             text='Adjust 3D workspace lighting. "Bright" is recommended for dark-colored materials.'

@@ -187,7 +187,7 @@ export function AssembliesTab({
           </div>
         )}
         {assemblies.length === 0 ? (
-          <div className="placeholder-text">
+          <div className="text-text-muted text-xs italic p-4 text-center">
             {!canCreateAssemblies ? (
               <>
                 <p>Assemblies require a license</p>
@@ -243,7 +243,7 @@ export function AssembliesTab({
             )}
           </div>
         ) : filteredAssemblies.length === 0 ? (
-          <div className="placeholder-text">
+          <div className="text-text-muted text-xs italic p-4 text-center">
             <p>No assemblies match "{searchTerm}"</p>
           </div>
         ) : (

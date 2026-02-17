@@ -114,19 +114,22 @@ function PartItem({ part, level, onPartClick, onDuplicate, onDelete }: PartItemP
 
   return (
     <li
-      className={`part-item ${isSelected ? 'selected' : ''}`}
+      className={`part-item group/part flex items-center gap-2 py-2 px-3 cursor-pointer transition-colors duration-100 select-none hover:bg-surface-hover ${isSelected ? 'selected bg-selected' : ''}`}
       style={{ paddingLeft: `${12 + level * 16}px` }}
       onClick={(e) => onPartClick(part.id, e)}
       title={`${part.name}\n${dimsText}${issueMessages ? '\n\n⚠ ' + issueMessages : ''}`}
     >
-      <span className="part-color" style={{ backgroundColor: part.color }} />
+      <span className="part-color w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: part.color }} />
       {(hasError || hasWarning) && (
-        <span className={`part-warning-icon ${hasError ? 'error' : 'warning'}`} title={issueMessages}>
+        <span
+          className={`part-warning-icon inline-flex items-center justify-center mr-1 shrink-0 ${hasError ? 'error text-danger' : 'warning text-warning'}`}
+          title={issueMessages}
+        >
           <AlertTriangle size={12} />
         </span>
       )}
-      <span className="part-name">{part.name}</span>
-      <div className="part-actions">
+      <span className="flex-1 truncate">{part.name}</span>
+      <div className="flex gap-0.5 opacity-0 group-hover/part:opacity-100 transition-opacity duration-100">
         <IconButton
           label={`Duplicate ${part.name}`}
           title="Duplicate"
@@ -253,17 +256,17 @@ function GroupItem({ group, children, level, onPartClick, onDuplicate, onDelete 
   };
 
   return (
-    <li className="group-item">
+    <li className="list-none">
       <div
-        className={`group-header ${isSelected ? 'selected' : ''} ${isEditing ? 'editing' : ''}`}
-        style={{ paddingLeft: `${12 + level * 16}px` }}
+        className={`group-header flex items-center gap-1.5 py-1.5 px-3 cursor-pointer transition-colors duration-100 select-none font-medium hover:bg-surface-hover ${isSelected ? 'selected bg-selected' : ''} ${isEditing ? 'editing bg-primary-bg border-l-2 border-l-primary !pl-2.5' : ''}`}
+        style={{ paddingLeft: isEditing ? undefined : `${12 + level * 16}px` }}
         onClick={handleGroupClick}
         onDoubleClick={handleGroupDoubleClick}
         onContextMenu={handleGroupContextMenu}
         title={`${group.name} (${partCount} part${partCount === 1 ? '' : 's'})${hasChildError || hasChildWarning ? '\n\n⚠ Contains parts with validation issues' : ''}`}
       >
         <button
-          className="group-expand-btn"
+          className="group-expand-btn flex items-center justify-center w-[18px] h-[18px] p-0 border-none bg-transparent text-text-muted cursor-pointer shrink-0 hover:text-text"
           onClick={handleExpandToggle}
           aria-label={isExpanded ? `Collapse ${group.name}` : `Expand ${group.name}`}
           aria-expanded={isExpanded}
@@ -272,18 +275,18 @@ function GroupItem({ group, children, level, onPartClick, onDuplicate, onDelete 
         </button>
         {(hasChildError || hasChildWarning) && (
           <span
-            className={`group-warning-icon ${hasChildError ? 'error' : 'warning'}`}
+            className={`group-warning-icon inline-flex items-center justify-center shrink-0 ${hasChildError ? 'error text-danger' : 'warning text-warning'}`}
             title="Contains parts with validation issues"
           >
             <AlertTriangle size={12} />
           </span>
         )}
-        <Layers size={14} className="group-icon" />
-        <span className="group-name">{group.name}</span>
-        <span className="group-count">{partCount}</span>
+        <Layers size={14} className="text-text-muted shrink-0" />
+        <span className="flex-1 truncate">{group.name}</span>
+        <span className="text-[10px] text-text-muted bg-surface-hover py-px px-1.5 rounded-full">{partCount}</span>
       </div>
       {isExpanded && children.length > 0 && (
-        <ul className="group-children">
+        <ul className="group-children list-none p-0 m-0">
           {children.map((child) =>
             child.type === 'part' ? (
               <PartItem
@@ -360,15 +363,15 @@ export function HierarchicalPartsList({
   const filteredTree = useMemo(() => (searchFilter ? filterTree(tree, searchFilter) : tree), [tree, searchFilter]);
 
   if (parts.length === 0 && groups.length === 0) {
-    return <p className="placeholder-text">No parts yet. Click + to add one.</p>;
+    return <p className="text-text-muted text-xs italic">No parts yet. Click + to add one.</p>;
   }
 
   if (searchFilter && filteredTree.length === 0) {
-    return <p className="placeholder-text">No parts match "{searchFilter}"</p>;
+    return <p className="text-text-muted text-xs italic">No parts match "{searchFilter}"</p>;
   }
 
   return (
-    <ul className="parts-list hierarchical">
+    <ul className="list-none mx-[-12px] flex-1 overflow-y-auto min-h-0">
       {filteredTree.map((node) =>
         node.type === 'part' ? (
           <PartItem

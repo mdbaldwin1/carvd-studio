@@ -211,7 +211,7 @@ export function AddAssemblyModal({
               </div>
             )}
             {availableAssemblies.length === 0 ? (
-              <div className="placeholder-text">
+              <div className="text-text-muted text-xs italic p-4 text-center">
                 <p>No assemblies available</p>
                 <p className="hint">
                   {assemblyLibrary.length === 0
@@ -222,7 +222,7 @@ export function AddAssemblyModal({
                 </p>
               </div>
             ) : filteredAssemblies.length === 0 ? (
-              <div className="placeholder-text">
+              <div className="text-text-muted text-xs italic p-4 text-center">
                 <p>No assemblies match "{searchTerm}"</p>
               </div>
             ) : (

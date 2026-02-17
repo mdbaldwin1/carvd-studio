@@ -264,12 +264,12 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
                 </div>
               )}
               {stockLibrary.length === 0 ? (
-                <div className="placeholder-text">
+                <div className="text-text-muted text-xs italic p-4 text-center">
                   <p>No stocks in library yet</p>
                   <p className="hint">Click "+" to create your first stock</p>
                 </div>
               ) : filteredStockLibrary.length === 0 ? (
-                <p className="placeholder-text">No stocks match "{searchTerm}"</p>
+                <p className="text-text-muted text-xs italic p-4 text-center">No stocks match "{searchTerm}"</p>
               ) : (
                 <ul className="stock-library-list">
                   {filteredStockLibrary.map((stock) => (

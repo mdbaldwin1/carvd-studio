@@ -396,7 +396,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
         <div className="section-content">
           <div className="section-content-inner">
             {stocks.length === 0 ? (
-              <p className="placeholder-text">
+              <p className="text-text-muted text-xs italic">
                 {isEditingAssembly ? 'No stock in library. Click + to create.' : 'No stock yet. Click + to add.'}
               </p>
             ) : (
@@ -523,7 +523,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
         <div className="section-content">
           <div className="section-content-inner">
             {!canUseAssemblies ? (
-              <p className="placeholder-text upgrade-hint">
+              <p className="text-text-muted text-xs italic">
                 Assemblies require a license.{' '}
                 <a
                   href="#"
@@ -536,7 +536,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                 </a>
               </p>
             ) : assemblies.length === 0 ? (
-              <p className="placeholder-text">
+              <p className="text-text-muted text-xs italic">
                 {isEditingAssembly
                   ? 'No assemblies in library yet.'
                   : 'No assemblies yet. Click + to add from library.'}
@@ -942,7 +942,7 @@ function PropertiesPanel() {
     return (
       <aside className="properties-panel">
         <h2>Properties</h2>
-        <p className="placeholder-text">Select a part or group to edit properties</p>
+        <p className="text-text-muted text-xs italic">Select a part or group to edit properties</p>
         <p className="hint">Shift+click to select multiple, {modKey}+drag for box select</p>
       </aside>
     );
@@ -1101,7 +1101,7 @@ function PropertiesPanel() {
     return (
       <aside className="properties-panel">
         <h2>Properties</h2>
-        <p className="placeholder-text">Select a part to edit properties</p>
+        <p className="text-text-muted text-xs italic">Select a part to edit properties</p>
       </aside>
     );
   }
@@ -1264,7 +1264,7 @@ function PropertiesPanel() {
       </details>
 
       <div className="property-group">
-        <div className="label-with-help">
+        <div className="flex items-center gap-1">
           <label>Stock</label>
           <HelpTooltip
             text="Assign a stock material to this part. Color and grain direction are inherited from the assigned stock."
@@ -1326,7 +1326,7 @@ function PropertiesPanel() {
       })()}
 
       <div className="property-group">
-        <div className="label-with-help">
+        <div className="flex items-center gap-1">
           <label>Color</label>
           {isColorConstrained && (
             <HelpTooltip
@@ -1343,7 +1343,7 @@ function PropertiesPanel() {
       </div>
 
       <div className="property-group">
-        <div className="label-with-help">
+        <div className="flex items-center gap-1">
           <label>Grain Direction</label>
           <HelpTooltip
             text={
@@ -1564,9 +1564,12 @@ function BrightnessPopup({ isOpen, onClose }: BrightnessPopupProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="brightness-popup" ref={popupRef}>
-      <div className="brightness-slider-row">
-        <Sun size={14} />
+    <div
+      className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-surface border border-border rounded-lg p-3 min-w-[200px] z-[100] shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
+      ref={popupRef}
+    >
+      <div className="flex items-center gap-2.5">
+        <Sun size={14} className="text-text-muted shrink-0" />
         <input
           type="range"
           min={0.25}
@@ -1574,15 +1577,16 @@ function BrightnessPopup({ isOpen, onClose }: BrightnessPopupProps) {
           step={0.05}
           value={brightness}
           onChange={(e) => updateSettings({ brightnessMultiplier: parseFloat(e.target.value) })}
+          className="flex-1 h-1 appearance-none bg-border rounded-sm cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent [&::-webkit-slider-thumb]:cursor-pointer"
         />
-        <span className="brightness-value">{Math.round(brightness * 100)}%</span>
+        <span className="text-xs text-text-muted min-w-10 text-right">{Math.round(brightness * 100)}%</span>
       </div>
-      <div className="brightness-popup-divider" />
-      <div className="brightness-presets">
+      <div className="h-px bg-border my-2.5" />
+      <div className="flex gap-1.5">
         {presets.map((p) => (
           <button
             key={p.key}
-            className={lightingMode === p.key ? 'active' : ''}
+            className={`flex-1 py-1.5 px-2 text-[11px] rounded bg-bg border border-border text-text-muted cursor-pointer transition-all duration-100 hover:bg-surface-hover hover:text-text ${lightingMode === p.key ? '!bg-accent !text-bg !border-accent' : ''}`}
             onClick={() => updateSettings({ lightingMode: p.key })}
           >
             {p.label}
@@ -1606,35 +1610,40 @@ function DisplayToolbar() {
   const clearReferences = useSnapStore((s) => s.clearReferences);
   const [brightnessOpen, setBrightnessOpen] = useState(false);
 
+  const toolbarBtn =
+    'py-1.5 px-2.5 text-xs rounded bg-transparent border-none text-text-muted cursor-pointer transition-all duration-100 hover:bg-surface-hover hover:text-text';
+  const activeBtn = `${toolbarBtn} !bg-bg !text-text`;
+  const toggleActiveBtn = `${toolbarBtn} !bg-accent !text-bg`;
+
   return (
-    <div className="display-toolbar">
-      <div className="display-toolbar-group">
+    <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface border border-border rounded-md p-1 z-10">
+      <div className="flex items-center gap-0.5">
         <button
-          className={displayMode === 'solid' ? 'active' : ''}
+          className={displayMode === 'solid' ? activeBtn : toolbarBtn}
           onClick={() => setDisplayMode('solid')}
           title="Solid view"
         >
           Solid
         </button>
         <button
-          className={displayMode === 'wireframe' ? 'active' : ''}
+          className={displayMode === 'wireframe' ? activeBtn : toolbarBtn}
           onClick={() => setDisplayMode('wireframe')}
           title="Wireframe view"
         >
           Wire
         </button>
         <button
-          className={displayMode === 'translucent' ? 'active' : ''}
+          className={displayMode === 'translucent' ? activeBtn : toolbarBtn}
           onClick={() => setDisplayMode('translucent')}
           title="Translucent view"
         >
           Ghost
         </button>
       </div>
-      <div className="display-toolbar-divider" />
-      <div className="display-toolbar-group brightness-toolbar-group">
+      <div className="w-px h-6 bg-border mx-1" />
+      <div className="flex items-center gap-0.5 relative">
         <button
-          className={brightnessOpen ? 'toggle-active' : ''}
+          className={brightnessOpen ? toggleActiveBtn : toolbarBtn}
           onClick={() => setBrightnessOpen(!brightnessOpen)}
           title="Adjust lighting"
         >
@@ -1642,20 +1651,24 @@ function DisplayToolbar() {
         </button>
         <BrightnessPopup isOpen={brightnessOpen} onClose={() => setBrightnessOpen(false)} />
       </div>
-      <div className="display-toolbar-divider" />
-      <div className="display-toolbar-group">
-        <button className={showGrid ? 'toggle-active' : ''} onClick={() => setShowGrid(!showGrid)} title="Toggle grid">
+      <div className="w-px h-6 bg-border mx-1" />
+      <div className="flex items-center gap-0.5">
+        <button
+          className={showGrid ? toggleActiveBtn : toolbarBtn}
+          onClick={() => setShowGrid(!showGrid)}
+          title="Toggle grid"
+        >
           Grid
         </button>
         <button
-          className={showGrainDirection ? 'toggle-active' : ''}
+          className={showGrainDirection ? toggleActiveBtn : toolbarBtn}
           onClick={toggleGrainDirection}
           title="Toggle grain direction arrows"
         >
           Grain
         </button>
         <button
-          className={snapToPartsEnabled ? 'toggle-active' : ''}
+          className={snapToPartsEnabled ? toggleActiveBtn : toolbarBtn}
           onClick={() => setSnapToPartsEnabled(!snapToPartsEnabled)}
           title="Snap to parts (align edges and centers)"
         >
@@ -1663,7 +1676,7 @@ function DisplayToolbar() {
         </button>
         {referencePartIds.length > 0 && (
           <button
-            className="reference-indicator"
+            className="py-1.5 px-2.5 text-xs rounded bg-reference-bg text-primary border border-primary font-medium cursor-pointer transition-all duration-100 hover:bg-primary-bg"
             onClick={clearReferences}
             title={`${referencePartIds.length} reference part${referencePartIds.length === 1 ? '' : 's'} - Click to clear (Esc)`}
           >

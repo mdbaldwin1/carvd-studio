@@ -18,7 +18,7 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
         />
       </h3>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
-        <div className="label-with-help">
+        <div className="inline-flex items-center gap-1">
           <label className="text-[13px] text-text">Snap Sensitivity</label>
           <HelpTooltip
             text="How close parts need to be before snapping. Tight requires closer proximity."
@@ -36,7 +36,7 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
         </select>
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
-        <div className="label-with-help">
+        <div className="inline-flex items-center gap-1">
           <label className="text-[13px] text-text">Live Grid Snapping</label>
           <HelpTooltip
             text="Snap to grid continuously while dragging (instead of only when releasing)."
@@ -51,7 +51,7 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
         />
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
-        <div className="label-with-help">
+        <div className="inline-flex items-center gap-1">
           <label className="text-[13px] text-text">Snap to Origin</label>
           <HelpTooltip text="Snap parts to workspace origin planes (X=0, Y=0, Z=0)." docsSection="snapping" />
         </div>
@@ -63,7 +63,7 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
         />
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
-        <div className="label-with-help">
+        <div className="inline-flex items-center gap-1">
           <label className="text-[13px] text-text">Match Same Dimensions Only</label>
           <HelpTooltip
             text="During resize, only match same dimension types (length to length, width to width)."

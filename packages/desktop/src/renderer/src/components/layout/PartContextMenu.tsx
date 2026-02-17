@@ -6,6 +6,13 @@ import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { getFeatureLimits } from '../../utils/featureLimits';
 
+const menuItem =
+  'block w-full py-2 px-3 bg-transparent border-none text-text text-[13px] text-left cursor-pointer transition-colors duration-100 enabled:hover:bg-surface-hover disabled:text-text-muted disabled:cursor-not-allowed';
+const menuItemDanger = `${menuItem} !text-danger enabled:hover:!bg-danger enabled:hover:!text-white`;
+const submenuTrigger = `${menuItem} flex justify-between items-center`;
+const submenuPanel =
+  'hidden group-hover/submenu:block absolute left-[calc(100%-4px)] top-[-4px] min-w-[180px] bg-surface border border-border rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.15)] py-1 z-[1001] before:content-[""] before:absolute before:left-[-10px] before:top-0 before:w-[14px] before:h-full';
+
 interface PartContextMenuProps {
   menuRef: React.RefObject<HTMLDivElement>;
   x: number;
@@ -186,7 +193,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   return (
     <div
       ref={menuRef}
-      className="context-menu"
+      className="context-menu bg-surface border border-border rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.3)] min-w-[160px] py-1 overflow-visible"
       style={{
         position: 'fixed',
         left: x,
@@ -194,7 +201,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
         zIndex: 1000
       }}
     >
-      <div className="context-menu-header">
+      <div className="py-2 px-3 text-[11px] text-text-muted border-b border-border mb-1">
         {selectedGroupIds.length > 0 && selectedPartIds.length > 0
           ? `${selectedPartIds.length} part${selectedPartIds.length === 1 ? '' : 's'}, ${selectedGroupIds.length} group${selectedGroupIds.length === 1 ? '' : 's'}`
           : selectedGroupIds.length > 0
@@ -203,14 +210,14 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
               ? `${effectiveSelectedPartIds.length} parts selected`
               : '1 part selected'}
       </div>
-      <button className="context-menu-item" onClick={handleCenter}>
+      <button className={menuItem} onClick={handleCenter}>
         Center View
       </button>
-      <button className="context-menu-item" onClick={handleCopy}>
+      <button className={menuItem} onClick={handleCopy}>
         Copy
       </button>
       <button
-        className="context-menu-item"
+        className={menuItem}
         onClick={handleSaveAsAssembly}
         disabled={!canUseAssemblies}
         title={!canUseAssemblies ? 'Upgrade to use assemblies' : undefined}
@@ -218,25 +225,25 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
         Save as Assembly
       </button>
       <button
-        className="context-menu-item"
+        className={menuItem}
         onClick={handleResetToStock}
         disabled={!hasStockAssigned}
         title={hasStockAssigned ? undefined : 'No stock assigned to selected parts'}
       >
         Reset to Stock
       </button>
-      <div className="context-menu-divider" />
-      <button className="context-menu-item" onClick={handleToggleReference}>
+      <div className="h-px bg-border my-1" />
+      <button className={menuItem} onClick={handleToggleReference}>
         {allAreReferences ? 'Clear Reference' : someAreReferences ? 'Set All as Reference' : 'Set as Reference'} (R)
       </button>
       {hasOtherReferences && (
-        <button className="context-menu-item" onClick={handleClearAllReferences}>
+        <button className={menuItem} onClick={handleClearAllReferences}>
           Clear All References
         </button>
       )}
       {canCreateGroup && (
         <button
-          className="context-menu-item"
+          className={menuItem}
           onClick={handleGroup}
           disabled={!canUseGroups}
           title={!canUseGroups ? 'Upgrade to use groups' : undefined}
@@ -245,29 +252,27 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
         </button>
       )}
       {isInEditMode && (partsInGroups.length > 0 || selectedGroupIds.length > 0) && (
-        <button className="context-menu-item" onClick={handleRemoveFromGroup}>
+        <button className={menuItem} onClick={handleRemoveFromGroup}>
           Remove from Group ({partsInGroups.length + selectedGroupIds.length})
         </button>
       )}
       {groupToUngroupObj && (
-        <button className="context-menu-item" onClick={handleUngroup}>
+        <button className={menuItem} onClick={handleUngroup}>
           Ungroup "{groupToUngroupObj.name}"
         </button>
       )}
       {canAddToGroup && (
         <>
           {targetGroupsForAdd.length === 1 ? (
-            <button className="context-menu-item" onClick={() => handleAddToGroup(targetGroupsForAdd[0]!.id)}>
+            <button className={menuItem} onClick={() => handleAddToGroup(targetGroupsForAdd[0]!.id)}>
               Add to "{targetGroupsForAdd[0]!.name}" ({ungroupedPartIds.length})
             </button>
           ) : (
-            <div className="context-menu-submenu">
-              <button className="context-menu-item context-menu-item-has-submenu">
-                Add to Group ({ungroupedPartIds.length}) ▸
-              </button>
-              <div className="context-menu-submenu-items">
+            <div className="group/submenu relative">
+              <button className={submenuTrigger}>Add to Group ({ungroupedPartIds.length}) ▸</button>
+              <div className={submenuPanel}>
                 {targetGroupsForAdd.map((group) => (
-                  <button key={group!.id} className="context-menu-item" onClick={() => handleAddToGroup(group!.id)}>
+                  <button key={group!.id} className={menuItem} onClick={() => handleAddToGroup(group!.id)}>
                     {group!.name}
                   </button>
                 ))}
@@ -277,34 +282,32 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
         </>
       )}
       {canMergeGroups && (
-        <div className="context-menu-submenu">
-          <button className="context-menu-item context-menu-item-has-submenu">
-            Merge Groups ({selectedGroupIds.length}) ▸
-          </button>
-          <div className="context-menu-submenu-items">
-            <button className="context-menu-item" onClick={() => handleMergeGroups('top-level')}>
+        <div className="group/submenu relative">
+          <button className={submenuTrigger}>Merge Groups ({selectedGroupIds.length}) ▸</button>
+          <div className={submenuPanel}>
+            <button className={menuItem} onClick={() => handleMergeGroups('top-level')}>
               Top Level (Preserve Structure)
             </button>
-            <button className="context-menu-item" onClick={() => handleMergeGroups('deep')}>
+            <button className={menuItem} onClick={() => handleMergeGroups('deep')}>
               Deep (Flatten to Parts)
             </button>
           </div>
         </div>
       )}
       {canAddGroupsToGroup && targetGroupsForGroupAdd.length > 0 && (
-        <div className="context-menu-submenu">
-          <button className="context-menu-item context-menu-item-has-submenu">Add to Group ▸</button>
-          <div className="context-menu-submenu-items">
+        <div className="group/submenu relative">
+          <button className={submenuTrigger}>Add to Group ▸</button>
+          <div className={submenuPanel}>
             {targetGroupsForGroupAdd.map((group) => (
-              <button key={group.id} className="context-menu-item" onClick={() => handleAddGroupsToGroup(group.id)}>
+              <button key={group.id} className={menuItem} onClick={() => handleAddGroupsToGroup(group.id)}>
                 Add to "{group.name}"
               </button>
             ))}
           </div>
         </div>
       )}
-      <div className="context-menu-divider" />
-      <button className="context-menu-item context-menu-item-danger" onClick={handleDelete}>
+      <div className="h-px bg-border my-1" />
+      <button className={menuItemDanger} onClick={handleDelete}>
         Delete
       </button>
     </div>
