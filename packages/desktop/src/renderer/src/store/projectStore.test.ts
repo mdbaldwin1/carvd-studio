@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useProjectStore, validatePartsForCutList } from './projectStore';
+import {
+  useProjectStore,
+  validatePartsForCutList,
+  getContainingGroupId,
+  getAllDescendantPartIds,
+  getAllDescendantGroupIds,
+  getAncestorGroupIds,
+  isDescendantOf
+} from './projectStore';
+import { useLicenseStore } from './licenseStore';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
 import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
@@ -50,6 +59,7 @@ const resetStore = () => {
     editingAssemblyName: '',
     previousProjectSnapshot: null
   });
+  useLicenseStore.setState({ licenseMode: 'trial' });
 };
 
 describe('projectStore', () => {
@@ -1474,8 +1484,373 @@ describe('projectStore', () => {
   // Camera actions moved to cameraStore.test.ts
 
   // ============================================================
-  // Toast Actions
+  // mergeGroups
   // ============================================================
+
+  describe('mergeGroups', () => {
+    describe('top-level mode', () => {
+      it('merges two groups into a new group', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'Part 1' });
+        const p2 = store.addPart({ name: 'Part 2' });
+        const g1 = store.createGroup('Group A', [{ id: p1, type: 'part' }]);
+        const g2 = store.createGroup('Group B', [{ id: p2, type: 'part' }]);
+
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
+
+        expect(mergedId).not.toBeNull();
+        const state = useProjectStore.getState();
+        // Original groups should be removed
+        expect(state.groups.find((g) => g.id === g1)).toBeUndefined();
+        expect(state.groups.find((g) => g.id === g2)).toBeUndefined();
+        // Merged group should exist
+        const merged = state.groups.find((g) => g.id === mergedId);
+        expect(merged).toBeDefined();
+        expect(merged?.name).toContain('Merged');
+      });
+
+      it('names merged group from 2 groups with both names', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const g1 = store.createGroup('Alpha', [{ id: p1, type: 'part' }]);
+        const g2 = store.createGroup('Beta', [{ id: p2, type: 'part' }]);
+
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
+
+        const merged = useProjectStore.getState().groups.find((g) => g.id === mergedId);
+        expect(merged?.name).toBe('Alpha & Beta Merged');
+      });
+
+      it('names merged group from 3+ groups with count', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const p3 = store.addPart({ name: 'P3' });
+        const g1 = store.createGroup('Alpha', [{ id: p1, type: 'part' }]);
+        const g2 = store.createGroup('Beta', [{ id: p2, type: 'part' }]);
+        const g3 = store.createGroup('Gamma', [{ id: p3, type: 'part' }]);
+
+        const mergedId = store.mergeGroups([g1!, g2!, g3!], 'top-level');
+
+        const merged = useProjectStore.getState().groups.find((g) => g.id === mergedId);
+        expect(merged?.name).toBe('Alpha & 2 others Merged');
+      });
+
+      it('preserves nested groups in top-level mode', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }]);
+        const g1 = store.createGroup('Outer', [{ id: inner!, type: 'group' }]);
+        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }]);
+
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
+
+        const state = useProjectStore.getState();
+        // Inner group should still exist as a member of the merged group
+        expect(state.groups.find((g) => g.id === inner)).toBeDefined();
+        const mergedMembers = state.groupMembers.filter((gm) => gm.groupId === mergedId);
+        expect(mergedMembers.some((m) => m.memberId === inner && m.memberType === 'group')).toBe(true);
+      });
+
+      it('returns null when fewer than 2 groups provided', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'P1' });
+        const g1 = store.createGroup('Only One', [{ id: p1, type: 'part' }]);
+
+        expect(store.mergeGroups([g1!], 'top-level')).toBeNull();
+        expect(store.mergeGroups([], 'top-level')).toBeNull();
+      });
+
+      it('selects and expands the merged group', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }]);
+        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }]);
+
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
+
+        const { selectedGroupIds, expandedGroupIds } = useSelectionStore.getState();
+        expect(selectedGroupIds).toContain(mergedId);
+        expect(expandedGroupIds).toContain(mergedId);
+      });
+
+      it('marks project as dirty', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }]);
+        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }]);
+        useProjectStore.setState({ isDirty: false });
+
+        store.mergeGroups([g1!, g2!], 'top-level');
+
+        expect(useProjectStore.getState().isDirty).toBe(true);
+      });
+    });
+
+    describe('deep mode', () => {
+      it('flattens nested groups into parts', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'Inner Part' });
+        const p2 = store.addPart({ name: 'Outer Part' });
+        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }]);
+        const g1 = store.createGroup('Outer', [{ id: inner!, type: 'group' }]);
+        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }]);
+
+        const mergedId = store.mergeGroups([g1!, g2!], 'deep');
+
+        const state = useProjectStore.getState();
+        // Inner group should be removed in deep mode
+        expect(state.groups.find((g) => g.id === inner)).toBeUndefined();
+        // Merged group should have only parts (no groups)
+        const mergedMembers = state.groupMembers.filter((gm) => gm.groupId === mergedId);
+        expect(mergedMembers.every((m) => m.memberType === 'part')).toBe(true);
+        expect(mergedMembers).toHaveLength(2);
+      });
+
+      it('removes original groups and nested groups', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }]);
+        const g1 = store.createGroup('Wrapper', [{ id: inner!, type: 'group' }]);
+        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }]);
+
+        store.mergeGroups([g1!, g2!], 'deep');
+
+        const state = useProjectStore.getState();
+        expect(state.groups.find((g) => g.id === g1)).toBeUndefined();
+        expect(state.groups.find((g) => g.id === g2)).toBeUndefined();
+        expect(state.groups.find((g) => g.id === inner)).toBeUndefined();
+      });
+    });
+
+    describe('license checks', () => {
+      it('blocks merge in free mode', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }]);
+        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }]);
+
+        useLicenseStore.setState({ licenseMode: 'free' });
+
+        const result = store.mergeGroups([g1!, g2!], 'top-level');
+
+        expect(result).toBeNull();
+        // Original groups should still exist
+        const state = useProjectStore.getState();
+        expect(state.groups.find((g) => g.id === g1)).toBeDefined();
+        expect(state.groups.find((g) => g.id === g2)).toBeDefined();
+      });
+    });
+  });
+
+  // ============================================================
+  // removeFromGroup: empty group cleanup
+  // ============================================================
+
+  describe('removeFromGroup - empty group cleanup', () => {
+    it('removes the group when last member is removed', () => {
+      const store = useProjectStore.getState();
+      const partId = store.addPart({ name: 'Solo Part' });
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+
+      store.removeFromGroup([partId], 'part');
+
+      const state = useProjectStore.getState();
+      expect(state.groups.find((g) => g.id === groupId)).toBeUndefined();
+      expect(state.groupMembers.filter((gm) => gm.groupId === groupId)).toHaveLength(0);
+    });
+
+    it('deselects the removed empty group', () => {
+      const store = useProjectStore.getState();
+      const partId = store.addPart({ name: 'Solo Part' });
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      useSelectionStore.setState({ selectedGroupIds: [groupId!] });
+
+      store.removeFromGroup([partId], 'part');
+
+      expect(useSelectionStore.getState().selectedGroupIds).not.toContain(groupId);
+    });
+
+    it('clears editingGroupId if the empty group was being edited', () => {
+      const store = useProjectStore.getState();
+      const partId = store.addPart({ name: 'Solo Part' });
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      useSelectionStore.setState({ editingGroupId: groupId! });
+
+      store.removeFromGroup([partId], 'part');
+
+      expect(useSelectionStore.getState().editingGroupId).toBeNull();
+    });
+
+    it('removes empty group from expandedGroupIds', () => {
+      const store = useProjectStore.getState();
+      const partId = store.addPart({ name: 'Solo Part' });
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      useSelectionStore.setState({ expandedGroupIds: [groupId!] });
+
+      store.removeFromGroup([partId], 'part');
+
+      expect(useSelectionStore.getState().expandedGroupIds).not.toContain(groupId);
+    });
+
+    it('keeps non-empty groups when one member is removed', () => {
+      const store = useProjectStore.getState();
+      const p1 = store.addPart({ name: 'Part 1' });
+      const p2 = store.addPart({ name: 'Part 2' });
+      const groupId = store.createGroup('Multi', [
+        { id: p1, type: 'part' },
+        { id: p2, type: 'part' }
+      ]);
+
+      store.removeFromGroup([p1], 'part');
+
+      const state = useProjectStore.getState();
+      expect(state.groups.find((g) => g.id === groupId)).toBeDefined();
+      expect(state.groupMembers.filter((gm) => gm.groupId === groupId)).toHaveLength(1);
+    });
+  });
+});
+
+// ============================================================
+// Exported utility functions
+// ============================================================
+
+describe('projectStore utility functions', () => {
+  describe('getContainingGroupId', () => {
+    it('returns groupId for a part that belongs to a group', () => {
+      const groupMembers = [
+        createTestGroupMember('g1', 'p1', 'part'),
+        createTestGroupMember('g1', 'p2', 'part')
+      ];
+
+      expect(getContainingGroupId('p1', groupMembers)).toBe('g1');
+    });
+
+    it('returns null for an ungrouped part', () => {
+      const groupMembers = [createTestGroupMember('g1', 'p1', 'part')];
+
+      expect(getContainingGroupId('p999', groupMembers)).toBeNull();
+    });
+
+    it('returns null for empty groupMembers', () => {
+      expect(getContainingGroupId('p1', [])).toBeNull();
+    });
+  });
+
+  describe('getAllDescendantPartIds', () => {
+    it('returns direct part members', () => {
+      const groupMembers = [
+        createTestGroupMember('g1', 'p1', 'part'),
+        createTestGroupMember('g1', 'p2', 'part')
+      ];
+
+      const result = getAllDescendantPartIds('g1', groupMembers);
+      expect(result).toEqual(expect.arrayContaining(['p1', 'p2']));
+      expect(result).toHaveLength(2);
+    });
+
+    it('returns nested parts from subgroups', () => {
+      const groupMembers = [
+        createTestGroupMember('outer', 'inner', 'group'),
+        createTestGroupMember('inner', 'p1', 'part'),
+        createTestGroupMember('inner', 'p2', 'part')
+      ];
+
+      const result = getAllDescendantPartIds('outer', groupMembers);
+      expect(result).toEqual(expect.arrayContaining(['p1', 'p2']));
+      expect(result).toHaveLength(2);
+    });
+
+    it('returns empty array for a group with no members', () => {
+      expect(getAllDescendantPartIds('g1', [])).toHaveLength(0);
+    });
+  });
+
+  describe('getAllDescendantGroupIds', () => {
+    it('returns the group itself plus nested groups', () => {
+      const groupMembers = [
+        createTestGroupMember('outer', 'inner', 'group'),
+        createTestGroupMember('inner', 'deep', 'group'),
+        createTestGroupMember('deep', 'p1', 'part')
+      ];
+
+      const result = getAllDescendantGroupIds('outer', groupMembers);
+      expect(result).toEqual(expect.arrayContaining(['outer', 'inner', 'deep']));
+      expect(result).toHaveLength(3);
+    });
+
+    it('returns just the group itself when no nested groups', () => {
+      const groupMembers = [createTestGroupMember('g1', 'p1', 'part')];
+
+      const result = getAllDescendantGroupIds('g1', groupMembers);
+      expect(result).toEqual(['g1']);
+    });
+  });
+
+  describe('getAncestorGroupIds', () => {
+    it('returns ancestor chain for a deeply nested part', () => {
+      const groupMembers = [
+        createTestGroupMember('outer', 'inner', 'group'),
+        createTestGroupMember('inner', 'p1', 'part')
+      ];
+
+      const result = getAncestorGroupIds('p1', groupMembers);
+      expect(result).toEqual(['inner', 'outer']);
+    });
+
+    it('returns single group for a directly grouped part', () => {
+      const groupMembers = [createTestGroupMember('g1', 'p1', 'part')];
+
+      const result = getAncestorGroupIds('p1', groupMembers);
+      expect(result).toEqual(['g1']);
+    });
+
+    it('returns empty array for ungrouped part', () => {
+      expect(getAncestorGroupIds('p1', [])).toHaveLength(0);
+    });
+  });
+
+  describe('isDescendantOf', () => {
+    it('returns true for same group', () => {
+      expect(isDescendantOf('g1', 'g1', [])).toBe(true);
+    });
+
+    it('returns true for direct child group', () => {
+      const groupMembers = [createTestGroupMember('parent', 'child', 'group')];
+
+      expect(isDescendantOf('child', 'parent', groupMembers)).toBe(true);
+    });
+
+    it('returns true for deeply nested group', () => {
+      const groupMembers = [
+        createTestGroupMember('outer', 'inner', 'group'),
+        createTestGroupMember('inner', 'deep', 'group')
+      ];
+
+      expect(isDescendantOf('deep', 'outer', groupMembers)).toBe(true);
+    });
+
+    it('returns false for unrelated groups', () => {
+      const groupMembers = [
+        createTestGroupMember('g1', 'p1', 'part'),
+        createTestGroupMember('g2', 'p2', 'part')
+      ];
+
+      expect(isDescendantOf('g2', 'g1', groupMembers)).toBe(false);
+    });
+
+    it('returns false for parent checking against child (wrong direction)', () => {
+      const groupMembers = [createTestGroupMember('parent', 'child', 'group')];
+
+      expect(isDescendantOf('parent', 'child', groupMembers)).toBe(false);
+    });
+  });
 });
 
 describe('validatePartsForCutList', () => {
