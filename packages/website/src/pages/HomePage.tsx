@@ -1,7 +1,12 @@
 import ScreenshotPlaceholder from "../components/ScreenshotPlaceholder";
 import BuyButton from "../components/BuyButton";
+import SEO from "../components/SEO";
 import { useDownloadInfo } from "../utils/downloads";
 import { AppleIcon, WindowsIcon } from "../components/BrandIcons";
+import {
+  createOrganizationSchema,
+  createSoftwareAppSchema,
+} from "../utils/jsonLd";
 import {
   Sparkles,
   Palette,
@@ -24,6 +29,10 @@ export default function HomePage() {
 
   return (
     <div className="page bg-gradient-radial">
+      <SEO
+        path="/"
+        jsonLd={[createOrganizationSchema(), createSoftwareAppSchema()]}
+      />
       {/* Header */}
       <header className="header">
         <nav className="nav container">

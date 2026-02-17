@@ -1,5 +1,6 @@
 import changelogRaw from "virtual:changelog";
 import { parseChangelog } from "../utils/changelogParser";
+import SEO from "../components/SEO";
 
 const versions = parseChangelog(changelogRaw);
 
@@ -35,6 +36,11 @@ function getCategoryBadgeClass(name: string): string {
 export default function ChangelogPage() {
   return (
     <div className="page bg-gradient-radial">
+      <SEO
+        title="Changelog"
+        description="Latest updates and release notes for Carvd Studio. See what's new in each version."
+        path="/changelog"
+      />
       {/* Header */}
       <header className="header">
         <nav className="nav container">

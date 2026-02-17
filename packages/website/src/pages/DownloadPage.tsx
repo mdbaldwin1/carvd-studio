@@ -1,5 +1,6 @@
 import { useDownloadInfo } from "../utils/downloads";
 import { AppleIcon, WindowsIcon } from "../components/BrandIcons";
+import SEO from "../components/SEO";
 
 export default function DownloadPage() {
   const {
@@ -10,6 +11,11 @@ export default function DownloadPage() {
 
   return (
     <div className="page bg-gradient-radial">
+      <SEO
+        title="Download"
+        description="Download Carvd Studio for macOS and Windows. Free 14-day trial with all features. No credit card required."
+        path="/download"
+      />
       {/* Header */}
       <header className="header">
         <nav className="nav container">

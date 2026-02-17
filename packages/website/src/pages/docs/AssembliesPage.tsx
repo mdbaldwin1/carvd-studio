@@ -1,9 +1,20 @@
 import { Save, Download, Pencil } from "lucide-react";
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function AssembliesPage() {
   return (
     <section>
+      <SEO
+        title="Assemblies - Docs"
+        description="Save reusable component groups like drawers and doors to your library. Insert assemblies into any project."
+        path="/docs/assemblies"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Assemblies", path: "/docs/assemblies" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Assemblies</h2>
 
       <p className="text-muted mb-xl">

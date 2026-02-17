@@ -1,9 +1,20 @@
 import { Layers, Lock } from "lucide-react";
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function StockPage() {
   return (
     <section>
+      <SEO
+        title="Stock Materials - Docs"
+        description="Manage your stock library with plywood, dimensional lumber, and custom materials. Configure stock constraints for cut lists."
+        path="/docs/stock"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Stock Materials", path: "/docs/stock" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Stock Materials</h2>
 
       <p className="text-muted mb-xl">

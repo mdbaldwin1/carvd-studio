@@ -1,8 +1,19 @@
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function RequirementsPage() {
   return (
     <section>
+      <SEO
+        title="System Requirements - Docs"
+        description="Minimum system requirements for Carvd Studio on macOS and Windows. RAM, disk space, and display specs."
+        path="/docs/requirements"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "System Requirements", path: "/docs/requirements" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">System Requirements</h2>
 
       <div className="grid grid-cols-2 gap-xl">

@@ -1,8 +1,19 @@
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function ShortcutsPage() {
   return (
     <section>
+      <SEO
+        title="Keyboard Shortcuts - Docs"
+        description="Complete keyboard shortcut reference for Carvd Studio. File, edit, part, view, and movement shortcuts."
+        path="/docs/shortcuts"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Keyboard Shortcuts", path: "/docs/shortcuts" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Keyboard Shortcuts</h2>
 
       <div className="grid grid-cols-2 gap-xl">

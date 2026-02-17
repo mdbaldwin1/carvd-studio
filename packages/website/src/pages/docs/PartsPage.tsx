@@ -1,9 +1,20 @@
 import { Package, RefreshCw, Layers } from "lucide-react";
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function PartsPage() {
   return (
     <section>
+      <SEO
+        title="Working with Parts - Docs"
+        description="Learn part properties, dimensions, stock assignments, grain direction, colors, and operations like duplicate and copy/paste."
+        path="/docs/parts"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Working with Parts", path: "/docs/parts" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Working with Parts</h2>
 
       <p className="text-muted mb-xl">

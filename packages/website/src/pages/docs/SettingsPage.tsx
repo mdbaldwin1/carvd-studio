@@ -1,8 +1,19 @@
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function SettingsPage() {
   return (
     <section>
+      <SEO
+        title="Settings & Preferences - Docs"
+        description="Configure app settings, project settings, backup and sync, units, grid size, auto-save, and license management."
+        path="/docs/settings"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Settings & Preferences", path: "/docs/settings" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Settings & Preferences</h2>
 
       <div className="grid gap-xl">

@@ -1,9 +1,20 @@
 import { Wrench } from "lucide-react";
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function JoineryPage() {
   return (
     <section>
+      <SEO
+        title="Joinery Allowances - Docs"
+        description="Add extra material for dados, rabbets, and mortise and tenon joints. Cut lists reflect actual cut dimensions."
+        path="/docs/joinery"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Joinery Allowances", path: "/docs/joinery" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Joinery Allowances</h2>
 
       <div className="accent-box">

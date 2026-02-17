@@ -6,11 +6,22 @@ import {
   AlertTriangle,
   Upload,
 } from "lucide-react";
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function CutListsPage() {
   return (
     <section>
+      <SEO
+        title="Cut List Generation - Docs"
+        description="Generate optimized cut lists with cutting diagrams, shopping lists, and cost estimates. Export as PDF or CSV."
+        path="/docs/cut-lists"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Cut List Generation", path: "/docs/cut-lists" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Cut List Generation</h2>
 
       <div className="grid gap-2xl">

@@ -1,8 +1,19 @@
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function QuickStartPage() {
   return (
     <section>
+      <SEO
+        title="Quick Start Guide - Docs"
+        description="Get started with Carvd Studio in 5 minutes. Download, create a project, add parts, and generate your first cut list."
+        path="/docs/quick-start"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Quick Start Guide", path: "/docs/quick-start" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Quick Start Guide</h2>
 
       <div className="accent-box mb-xl">

@@ -1,6 +1,13 @@
+import SEO from "../components/SEO";
+
 export default function NotFoundPage() {
   return (
     <div className="page bg-gradient-radial">
+      <SEO
+        title="Page Not Found"
+        description="The page you're looking for doesn't exist."
+        noindex
+      />
       {/* Header */}
       <header className="header">
         <nav className="nav container">

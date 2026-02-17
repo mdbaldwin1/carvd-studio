@@ -1,8 +1,19 @@
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function TroubleshootingPage() {
   return (
     <section>
+      <SEO
+        title="Troubleshooting - Docs"
+        description="Fix common issues with license activation, app launching, lost work recovery, performance, cut lists, and file errors."
+        path="/docs/troubleshooting"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Troubleshooting", path: "/docs/troubleshooting" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Troubleshooting</h2>
 
       <div className="grid gap-xl">

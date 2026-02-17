@@ -1,6 +1,13 @@
+import SEO from "../components/SEO";
+
 export default function TermsPage() {
   return (
     <div className="page bg-gradient-radial">
+      <SEO
+        title="Terms of Service"
+        description="Carvd Studio terms of service. Simple, fair terms for using our woodworking design software."
+        path="/terms"
+      />
       {/* Header */}
       <header className="header">
         <nav className="nav container">

@@ -1,8 +1,19 @@
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function InterfacePage() {
   return (
     <section>
+      <SEO
+        title="Interface Overview - Docs"
+        description="Learn the Carvd Studio interface: 3D viewport, parts sidebar, properties panel, camera controls, and selection tools."
+        path="/docs/interface"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Interface Overview", path: "/docs/interface" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Interface Overview</h2>
 
       <div className="grid gap-xl mb-xl">

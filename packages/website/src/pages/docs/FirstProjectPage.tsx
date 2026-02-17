@@ -1,8 +1,19 @@
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function FirstProjectPage() {
   return (
     <section>
+      <SEO
+        title="Your First Project - Docs"
+        description="Build a simple bookshelf step by step. Learn to create parts, assign stock materials, and generate a cut list."
+        path="/docs/first-project"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Your First Project", path: "/docs/first-project" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Your First Project</h2>
 
       <p className="text-muted mb-xl">
