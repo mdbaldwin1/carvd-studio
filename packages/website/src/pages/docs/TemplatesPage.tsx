@@ -1,9 +1,20 @@
 import { ClipboardList, Save } from "lucide-react";
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function TemplatesPage() {
   return (
     <section>
+      <SEO
+        title="Templates - Docs"
+        description="Start projects from built-in or custom templates. Save your own furniture designs as reusable project templates."
+        path="/docs/templates"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Templates", path: "/docs/templates" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Templates</h2>
 
       <p className="text-muted mb-xl">

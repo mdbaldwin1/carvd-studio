@@ -1,9 +1,20 @@
 import { FolderOpen, Pencil, MousePointer } from "lucide-react";
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function GroupsPage() {
   return (
     <section>
+      <SEO
+        title="Groups & Organization - Docs"
+        description="Organize parts into groups and nested groups. Create, rename, merge, and dissolve groups for complex furniture projects."
+        path="/docs/groups"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Groups & Organization", path: "/docs/groups" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Groups & Organization</h2>
 
       <p className="text-muted mb-xl">

@@ -7,12 +7,47 @@ import {
   Settings,
   BookOpen,
 } from "lucide-react";
+import SEO from "../components/SEO";
+import { createFAQSchema } from "../utils/jsonLd";
+
+const supportFAQs = [
+  {
+    question: "What is Carvd Studio?",
+    answer:
+      "Carvd Studio is a desktop application for designing furniture and generating optimized cut lists. It helps woodworkers plan projects in 3D, minimize material waste, and track costs — all without requiring an internet connection.",
+  },
+  {
+    question: "Do I need internet to use Carvd Studio?",
+    answer:
+      "No. Carvd Studio works completely offline. Internet is only needed for license activation and checking for updates.",
+  },
+  {
+    question: "Is there a free trial?",
+    answer:
+      "Yes. You get a 14-day free trial with full access to all features. No credit card required.",
+  },
+  {
+    question: "Is this a subscription?",
+    answer:
+      "No. Carvd Studio is a one-time purchase. Pay once, own it forever.",
+  },
+  {
+    question: "How many computers can I use my license on?",
+    answer: "Your license can be activated on up to 3 computers at once.",
+  },
+];
 
 export default function SupportPage() {
   const supportEmail = "support@carvd-studio.com";
 
   return (
     <div className="page bg-gradient-radial">
+      <SEO
+        title="Support"
+        description="Get help with Carvd Studio. Troubleshooting guides, frequently asked questions, and contact information for our support team."
+        path="/support"
+        jsonLd={createFAQSchema(supportFAQs)}
+      />
       {/* Header */}
       <header className="header">
         <nav className="nav container">

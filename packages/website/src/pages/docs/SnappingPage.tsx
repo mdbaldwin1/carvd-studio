@@ -1,9 +1,20 @@
 import { Move, MapPin, Ruler } from "lucide-react";
+import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
 
 export default function SnappingPage() {
   return (
     <section>
+      <SEO
+        title="Snapping & Alignment - Docs"
+        description="Position parts precisely with grid snapping, edge-to-edge snapping, center alignment, and exact coordinate entry."
+        path="/docs/snapping"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Docs", path: "/docs" },
+          { name: "Snapping & Alignment", path: "/docs/snapping" },
+        ])}
+      />
       <h2 className="text-4xl font-bold mb-xl">Snapping & Alignment</h2>
 
       <p className="text-muted mb-xl">

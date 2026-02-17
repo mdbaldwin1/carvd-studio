@@ -7,10 +7,45 @@ import {
   Scissors,
 } from "lucide-react";
 import BuyButton from "../components/BuyButton";
+import SEO from "../components/SEO";
+import { createFAQSchema } from "../utils/jsonLd";
+
+const pricingFAQs = [
+  {
+    question: "Is this really a one-time payment?",
+    answer:
+      "Yes. $59.99 once, and you own Carvd Studio forever. No monthly fees, no annual renewals, no surprise charges.",
+  },
+  {
+    question: "Do I get future updates?",
+    answer:
+      "All future updates are included free forever. New features, improvements, bug fixes — you get them all automatically.",
+  },
+  {
+    question: "What if I'm not satisfied?",
+    answer:
+      "We offer a 30-day, no-questions-asked money-back guarantee. If Carvd Studio doesn't save you time and money, email us for a full refund.",
+  },
+  {
+    question: "Can I use it on multiple computers?",
+    answer:
+      "Your license works on up to 3 devices — any combination of Mac and Windows.",
+  },
+  {
+    question: "Will it work offline?",
+    answer: "Yes. Carvd Studio works 100% offline. No internet required, ever.",
+  },
+];
 
 export default function PricingPage() {
   return (
     <div className="page bg-gradient-radial">
+      <SEO
+        title="Pricing"
+        description="One-time purchase, no subscription. Carvd Studio woodworking design software for $59.99. Own it forever with free updates."
+        path="/pricing"
+        jsonLd={createFAQSchema(pricingFAQs)}
+      />
       {/* Header */}
       <header className="header">
         <nav className="nav container">

@@ -1,3 +1,4 @@
+import SEO from "../../components/SEO";
 import { getNavSections } from "./docsNavConfig";
 
 const navSections = getNavSections();
@@ -5,6 +6,11 @@ const navSections = getNavSections();
 export default function DocsIndexPage() {
   return (
     <div>
+      <SEO
+        title="Documentation"
+        description="Comprehensive documentation for Carvd Studio. Guides, tutorials, and reference for all features."
+        path="/docs"
+      />
       <h2 className="text-3xl font-bold mb-xl">Welcome to the Docs</h2>
       <p className="text-muted mb-2xl">
         Browse the sections below or use the sidebar to jump to a specific

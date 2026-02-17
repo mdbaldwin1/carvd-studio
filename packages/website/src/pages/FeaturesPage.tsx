@@ -1,5 +1,6 @@
 import ScreenshotPlaceholder from "../components/ScreenshotPlaceholder";
 import BuyButton from "../components/BuyButton";
+import SEO from "../components/SEO";
 import {
   Palette,
   Ruler,
@@ -16,6 +17,11 @@ import {
 export default function FeaturesPage() {
   return (
     <div className="page bg-gradient-radial">
+      <SEO
+        title="Features"
+        description="3D furniture design, cut list optimization, stock management, cost tracking, and more. All the tools woodworkers need, nothing they don't."
+        path="/features"
+      />
       {/* Header */}
       <header className="header">
         <nav className="nav container">

@@ -1,6 +1,13 @@
+import SEO from "../components/SEO";
+
 export default function PrivacyPolicyPage() {
   return (
     <div className="page bg-gradient-radial">
+      <SEO
+        title="Privacy Policy"
+        description="Carvd Studio privacy policy. Learn how we handle your data — spoiler: your designs stay on your computer."
+        path="/privacy"
+      />
       {/* Header */}
       <header className="header">
         <nav className="nav container">
