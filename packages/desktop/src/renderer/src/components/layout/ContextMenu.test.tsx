@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ContextMenu } from './ContextMenu';
 import { useProjectStore } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
 
@@ -10,16 +11,18 @@ describe('ContextMenu', () => {
     vi.clearAllMocks();
     // Reset store state
     useProjectStore.setState({
-      selectedPartIds: [],
-      selectedGroupIds: [],
       parts: [],
       groups: [],
       groupMembers: [],
       clipboard: { parts: [], groups: [], groupMembers: [] },
       referencePartIds: [],
       snapGuides: [],
-      editingGroupId: null,
       isEditingAssembly: false
+    });
+    useSelectionStore.setState({
+      selectedPartIds: [],
+      selectedGroupIds: [],
+      editingGroupId: null
     });
     useUIStore.setState({
       contextMenu: null
@@ -58,8 +61,10 @@ describe('ContextMenu', () => {
           partId: 'part-1'
         }
       });
+      useSelectionStore.setState({
+        selectedPartIds: ['part-1']
+      });
       useProjectStore.setState({
-        selectedPartIds: ['part-1'],
         parts: [{ id: 'part-1', name: 'Part 1', stockId: null }]
       });
 
@@ -195,8 +200,10 @@ describe('ContextMenu', () => {
       useCameraStore.setState({
         requestCenterCamera: vi.fn()
       });
+      useSelectionStore.setState({
+        selectedPartIds: ['part-1', 'part-2']
+      });
       useProjectStore.setState({
-        selectedPartIds: ['part-1', 'part-2'],
         parts: [
           { id: 'part-1', name: 'Part 1', stockId: 'stock-1' },
           { id: 'part-2', name: 'Part 2', stockId: null }
@@ -291,9 +298,11 @@ describe('ContextMenu', () => {
         },
         closeContextMenu: vi.fn()
       });
-      useProjectStore.setState({
+      useSelectionStore.setState({
         selectedPartIds: ['part-1', 'part-2'],
-        selectedGroupIds: [],
+        selectedGroupIds: []
+      });
+      useProjectStore.setState({
         parts: [
           { id: 'part-1', name: 'Part 1' },
           { id: 'part-2', name: 'Part 2' }
@@ -318,9 +327,11 @@ describe('ContextMenu', () => {
         },
         closeContextMenu: vi.fn()
       });
-      useProjectStore.setState({
+      useSelectionStore.setState({
         selectedPartIds: [],
-        selectedGroupIds: ['group-1'],
+        selectedGroupIds: ['group-1']
+      });
+      useProjectStore.setState({
         parts: [],
         groups: [{ id: 'group-1', name: 'My Group' }],
         groupMembers: [{ groupId: 'group-1', memberId: 'part-1', memberType: 'part' }],
@@ -342,9 +353,11 @@ describe('ContextMenu', () => {
         },
         closeContextMenu: vi.fn()
       });
-      useProjectStore.setState({
+      useSelectionStore.setState({
         selectedPartIds: ['part-1'],
-        selectedGroupIds: ['group-1'],
+        selectedGroupIds: ['group-1']
+      });
+      useProjectStore.setState({
         parts: [{ id: 'part-1', name: 'Part 1' }],
         groups: [{ id: 'group-1', name: 'Group 1' }],
         groupMembers: []

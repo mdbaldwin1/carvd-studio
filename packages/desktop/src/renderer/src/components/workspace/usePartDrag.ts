@@ -3,6 +3,7 @@ import { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Part as PartType } from '../../types';
 import { useProjectStore, getAllDescendantPartIds } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
 import {
   detectSnaps,
@@ -212,8 +213,8 @@ export function usePartDrag(
           // Apply snap-to-parts if enabled (Alt key temporarily bypasses snapping)
           const isSnapEnabled = useProjectStore.getState().snapToPartsEnabled && !e.altKey;
           const allParts = useProjectStore.getState().parts;
-          const currentSelectedIds = useProjectStore.getState().selectedPartIds;
-          const currentSelectedGroupIds = useProjectStore.getState().selectedGroupIds;
+          const currentSelectedIds = useSelectionStore.getState().selectedPartIds;
+          const currentSelectedGroupIds = useSelectionStore.getState().selectedGroupIds;
           const currentReferenceIds = useProjectStore.getState().referencePartIds;
           const snapGuides = useProjectStore.getState().snapGuides;
 
@@ -433,7 +434,7 @@ export function usePartDrag(
           const hasGroupSelected = currentSelectedGroupIds.length > 0;
           const hasMultiplePartsSelected = currentSelectedIds.length > 1 && currentSelectedIds.includes(part.id);
           if (hasGroupSelected || hasMultiplePartsSelected) {
-            useProjectStore.getState().setActiveDragDelta(proposedDelta);
+            useSelectionStore.getState().setActiveDragDelta(proposedDelta);
           }
         }
       }
@@ -445,8 +446,8 @@ export function usePartDrag(
         let newY = wasSnappedByParts.current.y ? lastDragPosition.current.y : snapToGrid(lastDragPosition.current.y);
         const newZ = wasSnappedByParts.current.z ? lastDragPosition.current.z : snapToGrid(lastDragPosition.current.z);
 
-        const currentSelectedIds = useProjectStore.getState().selectedPartIds;
-        const currentSelectedGroupIds = useProjectStore.getState().selectedGroupIds;
+        const currentSelectedIds = useSelectionStore.getState().selectedPartIds;
+        const currentSelectedGroupIds = useSelectionStore.getState().selectedGroupIds;
         const currentGroupMembers = useProjectStore.getState().groupMembers;
         const allParts = useProjectStore.getState().parts;
 
@@ -547,7 +548,7 @@ export function usePartDrag(
               setIsDragging(false);
               dragStart.current = null;
               lastDragPosition.current = null;
-              useProjectStore.getState().setActiveDragDelta(null);
+              useSelectionStore.getState().setActiveDragDelta(null);
               if (isOrbitControls(controls)) controls.enabled = true;
               useProjectStore.getState().setActiveSnapLines([]);
               useProjectStore.getState().updateReferenceDistances();
@@ -556,7 +557,7 @@ export function usePartDrag(
           }
 
           moveSelectedParts(adjustedDelta);
-          useProjectStore.getState().setActiveDragDelta(null);
+          useSelectionStore.getState().setActiveDragDelta(null);
         } else {
           // Single part - apply ground constraint just to this one
           const upVector = new THREE.Vector3(0, 1, 0);
@@ -660,10 +661,10 @@ export function usePartDrag(
     }
 
     // Get current state after potential selection change
-    const currentState = useProjectStore.getState();
-    const currentSelectedPartIds = currentState.selectedPartIds;
-    const currentSelectedGroupIds = currentState.selectedGroupIds;
-    const currentGroupMembers = currentState.groupMembers;
+    const currentSelectionState = useSelectionStore.getState();
+    const currentSelectedPartIds = currentSelectionState.selectedPartIds;
+    const currentSelectedGroupIds = currentSelectionState.selectedGroupIds;
+    const currentGroupMembers = useProjectStore.getState().groupMembers;
 
     // Determine anchor point for drag
     let anchorPos: THREE.Vector3;
@@ -689,7 +690,7 @@ export function usePartDrag(
         collectGroupParts(groupId);
       }
 
-      const partsToMeasure = currentState.parts.filter((p) => partIdsToInclude.has(p.id));
+      const partsToMeasure = useProjectStore.getState().parts.filter((p) => partIdsToInclude.has(p.id));
       if (partsToMeasure.length > 0) {
         const combinedBounds = getCombinedBounds(partsToMeasure);
         anchorPos = new THREE.Vector3(combinedBounds.centerX, combinedBounds.centerY, combinedBounds.centerZ);

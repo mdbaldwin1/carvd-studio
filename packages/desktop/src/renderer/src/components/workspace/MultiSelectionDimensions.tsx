@@ -2,6 +2,7 @@ import { Html, Line } from '@react-three/drei';
 import { memo, useMemo } from 'react';
 import * as THREE from 'three';
 import { useProjectStore, getAllDescendantPartIds } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { getPartAABB } from './workspaceUtils';
 
@@ -155,10 +156,10 @@ const BoundingBoxDimensionLabel = memo(
 // Component that shows overall bounding box dimensions when multiple parts are selected
 export function MultiSelectionDimensions() {
   const parts = useProjectStore((s) => s.parts);
-  const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
-  const selectedGroupIds = useProjectStore((s) => s.selectedGroupIds);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
+  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const groupMembers = useProjectStore((s) => s.groupMembers);
-  const activeDragDelta = useProjectStore((s) => s.activeDragDelta);
+  const activeDragDelta = useSelectionStore((s) => s.activeDragDelta);
   const units = useProjectStore((s) => s.units);
 
   // Calculate effective selected part IDs (includes parts from selected groups)

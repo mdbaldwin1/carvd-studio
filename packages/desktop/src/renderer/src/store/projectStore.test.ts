@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useProjectStore, validatePartsForCutList } from './projectStore';
+import { useSelectionStore } from './selectionStore';
 import { useUIStore } from './uiStore';
 import {
   createTestPart,
@@ -17,6 +18,16 @@ import type { Assembly } from '../types';
 const resetStore = () => {
   const store = useProjectStore.getState();
   store.newProject();
+  useSelectionStore.setState({
+    selectedPartIds: [],
+    selectedGroupIds: [],
+    hoveredPartId: null,
+    transformMode: 'translate',
+    activeDragDelta: null,
+    selectionBox: null,
+    expandedGroupIds: [],
+    editingGroupId: null
+  });
   useUIStore.setState({
     contextMenu: null,
     toast: null,
@@ -72,8 +83,7 @@ describe('projectStore', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart();
 
-        const state = useProjectStore.getState();
-        expect(state.selectedPartIds).toContain(partId);
+        expect(useSelectionStore.getState().selectedPartIds).toContain(partId);
       });
 
       it('marks the project as dirty', () => {
@@ -204,11 +214,11 @@ describe('projectStore', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart();
 
-        expect(useProjectStore.getState().selectedPartIds).toContain(partId);
+        expect(useSelectionStore.getState().selectedPartIds).toContain(partId);
 
         store.deletePart(partId);
 
-        expect(useProjectStore.getState().selectedPartIds).not.toContain(partId);
+        expect(useSelectionStore.getState().selectedPartIds).not.toContain(partId);
       });
 
       it('removes the part from reference parts', () => {
@@ -243,7 +253,7 @@ describe('projectStore', () => {
         const part2Id = store.addPart({ name: 'Part 2' });
         store.addPart({ name: 'Part 3' });
 
-        store.selectParts([part1Id, part2Id]);
+        useSelectionStore.getState().selectParts([part1Id, part2Id]);
         store.deleteSelectedParts();
 
         const state = useProjectStore.getState();
@@ -254,7 +264,7 @@ describe('projectStore', () => {
       it('does nothing when no parts are selected', () => {
         const store = useProjectStore.getState();
         store.addPart();
-        store.clearSelection();
+        useSelectionStore.getState().clearSelection();
 
         store.deleteSelectedParts();
 
@@ -347,7 +357,7 @@ describe('projectStore', () => {
         const part1Id = store.addPart({ name: 'Part 1' });
         const part2Id = store.addPart({ name: 'Part 2' });
 
-        store.selectParts([part1Id, part2Id]);
+        useSelectionStore.getState().selectParts([part1Id, part2Id]);
         const newIds = store.duplicateSelectedParts();
 
         const state = useProjectStore.getState();
@@ -357,98 +367,7 @@ describe('projectStore', () => {
     });
   });
 
-  // ============================================================
-  // Selection
-  // ============================================================
-
-  describe('selection', () => {
-    describe('selectPart', () => {
-      it('selects a single part', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart();
-        store.clearSelection();
-
-        store.selectPart(partId);
-
-        expect(useProjectStore.getState().selectedPartIds).toEqual([partId]);
-      });
-
-      it('replaces previous selection', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-
-        store.selectPart(part1Id);
-        store.selectPart(part2Id);
-
-        expect(useProjectStore.getState().selectedPartIds).toEqual([part2Id]);
-      });
-
-      it('clears selection when called with null', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart();
-        store.selectPart(partId);
-
-        store.selectPart(null);
-
-        expect(useProjectStore.getState().selectedPartIds).toEqual([]);
-      });
-    });
-
-    describe('togglePartSelection', () => {
-      it('adds a part to selection if not selected', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-
-        store.selectPart(part1Id);
-        store.togglePartSelection(part2Id);
-
-        expect(useProjectStore.getState().selectedPartIds).toContain(part1Id);
-        expect(useProjectStore.getState().selectedPartIds).toContain(part2Id);
-      });
-
-      it('removes a part from selection if already selected', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-
-        store.selectParts([part1Id, part2Id]);
-        store.togglePartSelection(part1Id);
-
-        expect(useProjectStore.getState().selectedPartIds).not.toContain(part1Id);
-        expect(useProjectStore.getState().selectedPartIds).toContain(part2Id);
-      });
-    });
-
-    describe('selectParts', () => {
-      it('selects multiple parts', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-        const part3Id = store.addPart();
-
-        store.selectParts([part1Id, part2Id]);
-
-        const selected = useProjectStore.getState().selectedPartIds;
-        expect(selected).toContain(part1Id);
-        expect(selected).toContain(part2Id);
-        expect(selected).not.toContain(part3Id);
-      });
-    });
-
-    describe('clearSelection', () => {
-      it('clears all selected parts', () => {
-        const store = useProjectStore.getState();
-        store.addPart();
-        store.addPart();
-
-        store.clearSelection();
-
-        expect(useProjectStore.getState().selectedPartIds).toEqual([]);
-      });
-    });
-  });
+  // Selection tests moved to selectionStore.test.ts
 
   // ============================================================
   // Stocks
@@ -526,7 +445,7 @@ describe('projectStore', () => {
         const part1Id = store.addPart();
         const part2Id = store.addPart();
 
-        store.selectParts([part1Id, part2Id]);
+        useSelectionStore.getState().selectParts([part1Id, part2Id]);
         store.assignStockToSelectedParts(stockId);
 
         const state = useProjectStore.getState();
@@ -539,7 +458,7 @@ describe('projectStore', () => {
         const stockId = store.addStock({ color: '#ff0000' });
         const partId = store.addPart({ color: '#000000' });
 
-        store.selectPart(partId);
+        useSelectionStore.getState().selectPart(partId);
         store.assignStockToSelectedParts(stockId);
 
         const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -551,7 +470,7 @@ describe('projectStore', () => {
         const stockId = store.addStock();
         const partId = store.addPart({ stockId });
 
-        store.selectPart(partId);
+        useSelectionStore.getState().selectPart(partId);
         store.assignStockToSelectedParts(null);
 
         const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -589,7 +508,7 @@ describe('projectStore', () => {
 
         const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
 
-        expect(useProjectStore.getState().selectedGroupIds).toContain(groupId);
+        expect(useSelectionStore.getState().selectedGroupIds).toContain(groupId);
       });
     });
 
@@ -738,153 +657,7 @@ describe('projectStore', () => {
       });
     });
 
-    describe('group selection', () => {
-      it('toggles group selection', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.clearSelection();
-        store.toggleGroupSelection(groupId);
-
-        expect(useProjectStore.getState().selectedGroupIds).toContain(groupId);
-
-        store.toggleGroupSelection(groupId);
-
-        expect(useProjectStore.getState().selectedGroupIds).not.toContain(groupId);
-      });
-
-      it('clears group selection', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.selectGroup(groupId);
-        expect(useProjectStore.getState().selectedGroupIds).toHaveLength(1);
-
-        store.clearGroupSelection();
-
-        expect(useProjectStore.getState().selectedGroupIds).toHaveLength(0);
-      });
-    });
-
-    describe('group editing mode', () => {
-      it('enters group editing mode', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.enterGroup(groupId);
-
-        const state = useProjectStore.getState();
-        expect(state.editingGroupId).toBe(groupId);
-        expect(state.selectedGroupIds).toHaveLength(0);
-        expect(state.selectedPartIds).toHaveLength(0);
-      });
-
-      it('exits group editing mode', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.enterGroup(groupId);
-        store.exitGroup();
-
-        expect(useProjectStore.getState().editingGroupId).toBeNull();
-      });
-
-      it('clears part selection when exiting group', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.enterGroup(groupId);
-        store.selectPart(partId);
-        store.exitGroup();
-
-        expect(useProjectStore.getState().selectedPartIds).toHaveLength(0);
-      });
-    });
-
-    describe('group expand/collapse', () => {
-      it('toggles group expanded state', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        // First collapse if auto-expanded
-        store.collapseGroup(groupId);
-        expect(useProjectStore.getState().expandedGroupIds).not.toContain(groupId);
-
-        // Toggle to expand
-        store.toggleGroupExpanded(groupId);
-        expect(useProjectStore.getState().expandedGroupIds).toContain(groupId);
-
-        // Toggle to collapse
-        store.toggleGroupExpanded(groupId);
-        expect(useProjectStore.getState().expandedGroupIds).not.toContain(groupId);
-      });
-
-      it('expands a specific group', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.expandGroup(groupId);
-
-        expect(useProjectStore.getState().expandedGroupIds).toContain(groupId);
-      });
-
-      it('does not duplicate when expanding already expanded group', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.expandGroup(groupId);
-        store.expandGroup(groupId);
-
-        const expandedCount = useProjectStore.getState().expandedGroupIds.filter((id) => id === groupId).length;
-        expect(expandedCount).toBe(1);
-      });
-
-      it('collapses a specific group', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.expandGroup(groupId);
-        store.collapseGroup(groupId);
-
-        expect(useProjectStore.getState().expandedGroupIds).not.toContain(groupId);
-      });
-
-      it('expands all groups', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        const group1Id = store.createGroup('Group 1', [{ id: part1Id, type: 'part' }]);
-        const group2Id = store.createGroup('Group 2', [{ id: part2Id, type: 'part' }]);
-
-        store.expandAllGroups();
-
-        const state = useProjectStore.getState();
-        expect(state.expandedGroupIds).toContain(group1Id);
-        expect(state.expandedGroupIds).toContain(group2Id);
-      });
-
-      it('collapses all groups', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        const group1Id = store.createGroup('Group 1', [{ id: part1Id, type: 'part' }]);
-        const group2Id = store.createGroup('Group 2', [{ id: part2Id, type: 'part' }]);
-
-        store.expandAllGroups();
-        store.collapseAllGroups();
-
-        expect(useProjectStore.getState().expandedGroupIds).toHaveLength(0);
-      });
-    });
+    // Group selection, editing, and expand/collapse tests moved to selectionStore.test.ts
   });
 
   // ============================================================
@@ -896,7 +669,7 @@ describe('projectStore', () => {
       it('copies selected parts to clipboard', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart({ name: 'Test Part' });
-        store.selectPart(partId);
+        useSelectionStore.getState().selectPart(partId);
 
         store.copySelectedParts();
 
@@ -915,7 +688,7 @@ describe('projectStore', () => {
         ]);
 
         // Select the group
-        store.selectGroup(groupId);
+        useSelectionStore.getState().selectGroup(groupId);
         store.copySelectedParts();
 
         const state = useProjectStore.getState();
@@ -929,7 +702,7 @@ describe('projectStore', () => {
       it('creates new parts from clipboard', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart({ name: 'Original' });
-        store.selectPart(partId);
+        useSelectionStore.getState().selectPart(partId);
         store.copySelectedParts();
 
         const newIds = store.pasteClipboard();
@@ -958,13 +731,12 @@ describe('projectStore', () => {
       it('selects pasted parts', () => {
         const store = useProjectStore.getState();
         const originalId = store.addPart();
-        store.selectPart(originalId);
+        useSelectionStore.getState().selectPart(originalId);
         store.copySelectedParts();
 
         const newIds = store.pasteClipboard();
 
-        const state = useProjectStore.getState();
-        expect(state.selectedPartIds).toEqual(newIds);
+        expect(useSelectionStore.getState().selectedPartIds).toEqual(newIds);
       });
     });
 
@@ -996,7 +768,7 @@ describe('projectStore', () => {
           name: 'Part 2',
           position: { x: 10, y: 0.375, z: 0 }
         });
-        store.selectParts([part1Id, part2Id]);
+        useSelectionStore.getState().selectParts([part1Id, part2Id]);
         store.copySelectedParts();
 
         store.pasteAtPosition({ x: 100, y: 0, z: 100 });
@@ -1022,8 +794,7 @@ describe('projectStore', () => {
 
         const newIds = store.pasteAtPosition({ x: 50, y: 0, z: 50 });
 
-        const state = useProjectStore.getState();
-        expect(state.selectedPartIds).toEqual(newIds);
+        expect(useSelectionStore.getState().selectedPartIds).toEqual(newIds);
       });
     });
   });
@@ -1529,7 +1300,7 @@ describe('projectStore', () => {
         position: { x: 0, y: 0, z: 0 }
       });
 
-      store.selectPart(partId);
+      useSelectionStore.getState().selectPart(partId);
       store.moveSelectedParts({ x: 5, y: 10, z: 15 });
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -1545,8 +1316,8 @@ describe('projectStore', () => {
         { id: part2Id, type: 'part' }
       ]);
 
-      store.clearSelection();
-      store.selectGroup(groupId);
+      useSelectionStore.getState().clearSelection();
+      useSelectionStore.getState().selectGroup(groupId);
       store.moveSelectedParts({ x: 5, y: 5, z: 5 });
 
       const state = useProjectStore.getState();
@@ -1655,7 +1426,7 @@ describe('projectStore', () => {
           position: { x: 30, y: 0, z: 0 }
         });
 
-        store.selectParts([part1Id, part2Id]);
+        useSelectionStore.getState().selectParts([part1Id, part2Id]);
         const assembly = store.createAssemblyFromSelection('My Assembly', 'A test assembly');
 
         expect(assembly).not.toBeNull();
@@ -1673,7 +1444,7 @@ describe('projectStore', () => {
           position: { x: 30, y: 0, z: 0 }
         });
 
-        store.selectParts([part1Id, part2Id]);
+        useSelectionStore.getState().selectParts([part1Id, part2Id]);
         const assembly = store.createAssemblyFromSelection('Test');
 
         // Parts should be centered around origin
@@ -1686,7 +1457,7 @@ describe('projectStore', () => {
 
       it('returns null when nothing is selected', () => {
         const store = useProjectStore.getState();
-        store.clearSelection();
+        useSelectionStore.getState().clearSelection();
 
         const assembly = store.createAssemblyFromSelection('Test');
 
@@ -1702,8 +1473,8 @@ describe('projectStore', () => {
           { id: part2Id, type: 'part' }
         ]);
 
-        store.clearSelection();
-        store.selectGroup(groupId);
+        useSelectionStore.getState().clearSelection();
+        useSelectionStore.getState().selectGroup(groupId);
         const assembly = store.createAssemblyFromSelection('Grouped Assembly');
 
         expect(assembly!.groups.length).toBeGreaterThan(0);
@@ -1731,7 +1502,7 @@ describe('projectStore', () => {
           name: 'Shelf',
           position: { x: 0, y: 0, z: 0 }
         });
-        store.selectParts([part1Id]);
+        useSelectionStore.getState().selectParts([part1Id]);
         const assembly = store.createAssemblyFromSelection('Shelf Assembly');
         store.addAssembly(assembly!);
 
@@ -1768,7 +1539,7 @@ describe('projectStore', () => {
           grainSensitive: true,
           grainDirection: 'width'
         });
-        store.selectParts([partId]);
+        useSelectionStore.getState().selectParts([partId]);
         const assembly = store.createAssemblyFromSelection('Custom Assembly');
         store.addAssembly(assembly!);
         store.deletePart(partId);
@@ -1793,8 +1564,8 @@ describe('projectStore', () => {
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
         ]);
-        store.clearSelection();
-        store.selectGroup(groupId);
+        useSelectionStore.getState().clearSelection();
+        useSelectionStore.getState().selectGroup(groupId);
         const assembly = store.createAssemblyFromSelection('Grouped');
         store.addAssembly(assembly!);
 
@@ -1885,23 +1656,21 @@ describe('projectStore', () => {
 
         store.startEditingAssembly('assembly-123', 'Assembly with Groups', [part1, part2], [group], [groupMember]);
 
-        const state = useProjectStore.getState();
-        expect(state.groups).toHaveLength(1);
-        expect(state.expandedGroupIds).toContain(group.id);
+        expect(useProjectStore.getState().groups).toHaveLength(1);
+        expect(useSelectionStore.getState().expandedGroupIds).toContain(group.id);
       });
 
       it('clears selection and UI state when entering edit mode', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart({ name: 'Selected Part' });
-        store.selectPart(partId);
+        useSelectionStore.getState().selectPart(partId);
         store.addToReferences([partId]);
 
         store.startEditingAssembly('assembly-123', 'Test Assembly', [createTestPart()]);
 
-        const state = useProjectStore.getState();
-        expect(state.selectedPartIds).toHaveLength(0);
-        expect(state.referencePartIds).toHaveLength(0);
-        expect(state.editingGroupId).toBeNull();
+        expect(useSelectionStore.getState().selectedPartIds).toHaveLength(0);
+        expect(useProjectStore.getState().referencePartIds).toHaveLength(0);
+        expect(useSelectionStore.getState().editingGroupId).toBeNull();
       });
     });
 
@@ -2153,7 +1922,7 @@ describe('projectStore', () => {
         color: '#0000ff' // Different color
       });
 
-      store.selectPart(partId);
+      useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -2173,7 +1942,7 @@ describe('projectStore', () => {
         grainDirection: 'width' // Different grain
       });
 
-      store.selectPart(partId);
+      useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -2193,7 +1962,7 @@ describe('projectStore', () => {
         grainDirection: 'width'
       });
 
-      store.selectPart(partId);
+      useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -2209,7 +1978,7 @@ describe('projectStore', () => {
         color: '#0000ff'
       });
 
-      store.clearSelection();
+      useSelectionStore.getState().clearSelection();
       store.resetSelectedPartsToStock();
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -2224,7 +1993,7 @@ describe('projectStore', () => {
         color: '#0000ff'
       });
 
-      store.selectPart(partId);
+      useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -2239,7 +2008,7 @@ describe('projectStore', () => {
         color: '#0000ff'
       });
 
-      store.selectPart(partId);
+      useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -2256,7 +2025,7 @@ describe('projectStore', () => {
       const partId1 = store.addPart({ name: 'Part 1', stockId, color: '#0000ff' });
       const partId2 = store.addPart({ name: 'Part 2', stockId, color: '#00ff00' });
 
-      store.selectParts([partId1, partId2]);
+      useSelectionStore.getState().selectParts([partId1, partId2]);
       store.resetSelectedPartsToStock();
 
       const state = useProjectStore.getState();
@@ -2267,98 +2036,7 @@ describe('projectStore', () => {
     });
   });
 
-  // ============================================================
-  // UI State Actions
-  // ============================================================
-
-  describe('UI state', () => {
-    describe('setHoveredPart', () => {
-      it('sets the hovered part ID', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart();
-
-        store.setHoveredPart(partId);
-
-        expect(useProjectStore.getState().hoveredPartId).toBe(partId);
-      });
-
-      it('clears hovered part when set to null', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart();
-        store.setHoveredPart(partId);
-
-        store.setHoveredPart(null);
-
-        expect(useProjectStore.getState().hoveredPartId).toBeNull();
-      });
-    });
-
-    describe('setTransformMode', () => {
-      it('sets transform mode to translate', () => {
-        const store = useProjectStore.getState();
-
-        store.setTransformMode('translate');
-
-        expect(useProjectStore.getState().transformMode).toBe('translate');
-      });
-
-      it('sets transform mode to rotate', () => {
-        const store = useProjectStore.getState();
-
-        store.setTransformMode('rotate');
-
-        expect(useProjectStore.getState().transformMode).toBe('rotate');
-      });
-
-      it('sets transform mode to scale', () => {
-        const store = useProjectStore.getState();
-
-        store.setTransformMode('scale');
-
-        expect(useProjectStore.getState().transformMode).toBe('scale');
-      });
-    });
-
-    describe('setActiveDragDelta', () => {
-      it('sets the active drag delta', () => {
-        const store = useProjectStore.getState();
-        const delta = { x: 10, y: 5, z: 3 };
-
-        store.setActiveDragDelta(delta);
-
-        expect(useProjectStore.getState().activeDragDelta).toEqual(delta);
-      });
-
-      it('clears drag delta when set to null', () => {
-        const store = useProjectStore.getState();
-        store.setActiveDragDelta({ x: 10, y: 5, z: 3 });
-
-        store.setActiveDragDelta(null);
-
-        expect(useProjectStore.getState().activeDragDelta).toBeNull();
-      });
-    });
-
-    describe('setSelectionBox', () => {
-      it('sets selection box coordinates', () => {
-        const store = useProjectStore.getState();
-        const box = { x1: 0, y1: 0, x2: 100, y2: 100 };
-
-        store.setSelectionBox(box);
-
-        expect(useProjectStore.getState().selectionBox).toEqual(box);
-      });
-
-      it('clears selection box when set to null', () => {
-        const store = useProjectStore.getState();
-        store.setSelectionBox({ x1: 0, y1: 0, x2: 100, y2: 100 });
-
-        store.setSelectionBox(null);
-
-        expect(useProjectStore.getState().selectionBox).toBeNull();
-      });
-    });
-  });
+  // UI state tests (setHoveredPart, setTransformMode, setActiveDragDelta, setSelectionBox) moved to selectionStore.test.ts
 
   // Camera actions moved to cameraStore.test.ts
 
