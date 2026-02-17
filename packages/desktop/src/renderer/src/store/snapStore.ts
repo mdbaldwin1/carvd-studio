@@ -16,6 +16,8 @@ interface SnapStoreState {
   setSnapToPartsEnabled: (enabled: boolean) => void;
   setActiveSnapLines: (lines: SnapLine[]) => void;
   setActiveReferenceDistances: (distances: ReferenceDistanceIndicator[]) => void;
+  // Batched setter for hot paths (single setState call instead of two)
+  setSnapIndicators: (lines: SnapLine[], distances: ReferenceDistanceIndicator[]) => void;
 
   // Reference parts actions
   setReferencePartIds: (ids: string[]) => void;
@@ -37,6 +39,7 @@ export const useSnapStore = create<SnapStoreState>((set, get) => ({
   setSnapToPartsEnabled: (snapToPartsEnabled) => set({ snapToPartsEnabled }),
   setActiveSnapLines: (activeSnapLines) => set({ activeSnapLines }),
   setActiveReferenceDistances: (activeReferenceDistances) => set({ activeReferenceDistances }),
+  setSnapIndicators: (activeSnapLines, activeReferenceDistances) => set({ activeSnapLines, activeReferenceDistances }),
 
   setReferencePartIds: (referencePartIds) => {
     set({ referencePartIds });

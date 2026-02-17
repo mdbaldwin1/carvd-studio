@@ -70,6 +70,10 @@ export function usePartDrag(
   const _tempCameraTarget = useRef(new THREE.Vector3());
   const _tempDelta = useRef(new THREE.Vector3());
 
+  // RAF gating refs for coalescing pointer events to animation frame rate
+  const rafIdRef = useRef<number | null>(null);
+  const latestEventRef = useRef<PointerEvent | null>(null);
+
   // Calculate axis-aligned bounding box for a part at a given position (considering rotation)
   const getPartAABB = (p: PartType, position: { x: number; y: number; z: number }) => {
     const bounds = getPartBoundsAtPosition(p, position);
@@ -200,8 +204,16 @@ export function usePartDrag(
     if (!isDragging) return;
 
     const handleWindowPointerMove = (e: PointerEvent) => {
-      if (isDragging && dragStart.current) {
-        const currentPoint = getWorldPoint(e);
+      // Coalesce pointer events to animation frame rate (prevents redundant
+      // snap detection on 120-240Hz displays)
+      latestEventRef.current = e;
+      if (rafIdRef.current !== null) return;
+      rafIdRef.current = window.requestAnimationFrame(() => {
+        rafIdRef.current = null;
+        const evt = latestEventRef.current;
+        if (!evt || !isDragging || !dragStart.current) return;
+
+        const currentPoint = getWorldPoint(evt);
         if (currentPoint) {
           const delta = _tempDelta.current.copy(currentPoint).sub(dragStart.current.point);
           const planeInfo = getDragPlaneInfo(dragStart.current.partPos);
@@ -220,7 +232,7 @@ export function usePartDrag(
           newY = Math.max(worldHalfHeight, newY);
 
           // Apply snap-to-parts if enabled (Alt key temporarily bypasses snapping)
-          const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled && !e.altKey;
+          const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled && !evt.altKey;
           const allParts = useProjectStore.getState().parts;
           const currentSelectedIds = useSelectionStore.getState().selectedPartIds;
           const currentSelectedGroupIds = useSelectionStore.getState().selectedGroupIds;
@@ -362,8 +374,6 @@ export function usePartDrag(
               }
             }
 
-            useSnapStore.getState().setActiveSnapLines(snapLines);
-
             wasSnappedByParts.current = {
               x: snapLines.some((l) => l.axis === 'x'),
               y: snapLines.some((l) => l.axis === 'y'),
@@ -371,6 +381,7 @@ export function usePartDrag(
             };
 
             // Calculate reference distances
+            let referenceDistances: import('../../types').ReferenceDistanceIndicator[] = [];
             if (currentReferenceIds.length > 0 && !currentReferenceIds.includes(part.id)) {
               const referenceParts = allParts.filter((p) => currentReferenceIds.includes(p.id));
               const currentGroupMembers = useProjectStore.getState().groupMembers;
@@ -393,22 +404,16 @@ export function usePartDrag(
                   y: newY - dragStart.current!.partPos.y,
                   z: newZ - dragStart.current!.partPos.z
                 };
-                const referenceDistances = calculateGroupReferenceDistances(draggingParts, dragDelta, referenceParts);
-                useSnapStore.getState().setActiveReferenceDistances(referenceDistances);
+                referenceDistances = calculateGroupReferenceDistances(draggingParts, dragDelta, referenceParts);
               } else {
-                const referenceDistances = calculateReferenceDistances(
-                  part,
-                  { x: newX, y: newY, z: newZ },
-                  referenceParts
-                );
-                useSnapStore.getState().setActiveReferenceDistances(referenceDistances);
+                referenceDistances = calculateReferenceDistances(part, { x: newX, y: newY, z: newZ }, referenceParts);
               }
-            } else {
-              useSnapStore.getState().setActiveReferenceDistances([]);
             }
+
+            // Batch snap lines + reference distances into single store update
+            useSnapStore.getState().setSnapIndicators(snapLines, referenceDistances);
           } else {
-            useSnapStore.getState().setActiveSnapLines([]);
-            useSnapStore.getState().setActiveReferenceDistances([]);
+            useSnapStore.getState().setSnapIndicators([], []);
             wasSnappedByParts.current = { x: false, y: false, z: false };
           }
 
@@ -446,7 +451,7 @@ export function usePartDrag(
             useSelectionStore.getState().setActiveDragDelta(proposedDelta);
           }
         }
-      }
+      });
     };
 
     const handleWindowPointerUp = () => {
@@ -612,6 +617,10 @@ export function usePartDrag(
     return () => {
       window.removeEventListener('pointermove', handleWindowPointerMove);
       window.removeEventListener('pointerup', handleWindowPointerUp);
+      if (rafIdRef.current !== null) {
+        window.cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDragging, liveDims]);

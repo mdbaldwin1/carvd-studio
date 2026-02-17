@@ -94,6 +94,54 @@ describe('snapStore', () => {
     });
   });
 
+  describe('setSnapIndicators', () => {
+    it('sets both snap lines and reference distances in a single call', () => {
+      const snapLines = [{ start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 0, z: 0 }, color: '#ff0000' }];
+      const distances = [
+        {
+          id: 'dist-1',
+          type: 'edge-to-edge' as const,
+          axis: 'x' as const,
+          distance: 5,
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 5, y: 0, z: 0 },
+          labelPosition: { x: 2.5, y: 0, z: 0 },
+          fromPartId: 'p1',
+          toPartId: 'p2'
+        }
+      ];
+
+      useSnapStore.getState().setSnapIndicators(snapLines, distances);
+
+      expect(useSnapStore.getState().activeSnapLines).toEqual(snapLines);
+      expect(useSnapStore.getState().activeReferenceDistances).toEqual(distances);
+    });
+
+    it('clears both snap lines and reference distances', () => {
+      useSnapStore.setState({
+        activeSnapLines: [{ start: { x: 0, y: 0, z: 0 }, end: { x: 1, y: 0, z: 0 }, color: '#ff0000' }],
+        activeReferenceDistances: [
+          {
+            id: 'dist-1',
+            type: 'edge-to-edge' as const,
+            axis: 'x' as const,
+            distance: 5,
+            start: { x: 0, y: 0, z: 0 },
+            end: { x: 5, y: 0, z: 0 },
+            labelPosition: { x: 2.5, y: 0, z: 0 },
+            fromPartId: 'p1',
+            toPartId: 'p2'
+          }
+        ]
+      });
+
+      useSnapStore.getState().setSnapIndicators([], []);
+
+      expect(useSnapStore.getState().activeSnapLines).toHaveLength(0);
+      expect(useSnapStore.getState().activeReferenceDistances).toHaveLength(0);
+    });
+  });
+
   // ============================================================
   // Reference Parts
   // ============================================================
