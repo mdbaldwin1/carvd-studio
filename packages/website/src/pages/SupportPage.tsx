@@ -435,10 +435,11 @@ export default function SupportPage() {
                     What's included in the free version?
                   </h4>
                   <p className="faq-answer">
-                    The free version includes basic 3D design, up to 5 parts per
-                    project, and manual cut list generation. The paid version
-                    adds unlimited parts, automatic cut list optimization, PDF
-                    exports, templates, and assemblies.
+                    The free version includes basic 3D design with up to 10
+                    parts and 5 stock materials per project. The paid version
+                    adds unlimited parts and stocks, cut list optimization with
+                    cutting diagrams, PDF exports, groups, grain direction,
+                    templates, and assemblies.
                   </p>
                 </div>
 

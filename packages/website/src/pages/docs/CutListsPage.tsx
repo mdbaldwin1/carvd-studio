@@ -243,8 +243,9 @@ export default function CutListsPage() {
             <div>
               <p className="font-bold mb-xs">License Requirement</p>
               <p className="text-muted">
-                PDF export requires a licensed version. CSV export is available
-                in all versions including free mode.
+                Cut list generation and all exports (PDF and CSV) require a
+                licensed version. Free users can design parts and assign stock,
+                but generating the optimized cut list is a paid feature.
               </p>
             </div>
           </div>

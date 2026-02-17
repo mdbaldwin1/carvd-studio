@@ -83,8 +83,8 @@ export default function PartsPage() {
             <div>
               <p className="font-bold mb-xs">Duplicate</p>
               <p className="text-muted">
-                <code>Cmd/Ctrl + D</code> — Creates an exact copy of the
-                selected part(s)
+                <code>Shift + D</code> — Creates an exact copy of the selected
+                part(s)
               </p>
             </div>
             <div>
