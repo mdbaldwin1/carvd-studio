@@ -5,6 +5,7 @@
 
 import { useState, useCallback } from 'react';
 import { useProjectStore, generateThumbnail } from '../store/projectStore';
+import { useAssemblyEditingStore } from '../store/assemblyEditingStore';
 import { useUIStore } from '../store/uiStore';
 import { useAssemblyLibrary } from './useAssemblyLibrary';
 import { useStockLibrary } from './useStockLibrary';
@@ -145,15 +146,15 @@ function assemblyToEditableParts(
 }
 
 export function useAssemblyEditing(): UseAssemblyEditingResult {
-  const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
-  const editingAssemblyId = useProjectStore((s) => s.editingAssemblyId);
-  const editingAssemblyName = useProjectStore((s) => s.editingAssemblyName);
+  const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
+  const editingAssemblyId = useAssemblyEditingStore((s) => s.editingAssemblyId);
+  const editingAssemblyName = useAssemblyEditingStore((s) => s.editingAssemblyName);
   const isDirty = useProjectStore((s) => s.isDirty);
-  const startEditingAssembly = useProjectStore((s) => s.startEditingAssembly);
-  const saveEditingAssembly = useProjectStore((s) => s.saveEditingAssembly);
-  const cancelEditingAssembly = useProjectStore((s) => s.cancelEditingAssembly);
-  const restorePreviousProject = useProjectStore((s) => s.restorePreviousProject);
-  const startFreshAfterAssemblyEdit = useProjectStore((s) => s.startFreshAfterAssemblyEdit);
+  const startEditingAssembly = useAssemblyEditingStore((s) => s.startEditingAssembly);
+  const saveEditingAssembly = useAssemblyEditingStore((s) => s.saveEditingAssembly);
+  const cancelEditingAssembly = useAssemblyEditingStore((s) => s.cancelEditingAssembly);
+  const restorePreviousProject = useAssemblyEditingStore((s) => s.restorePreviousProject);
+  const startFreshAfterAssemblyEdit = useAssemblyEditingStore((s) => s.startFreshAfterAssemblyEdit);
   const showToast = useUIStore((s) => s.showToast);
 
   const { assemblies, addAssembly, updateAssembly } = useAssemblyLibrary();

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vite
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { HierarchicalPartsList } from './HierarchicalPartsList';
 import { useProjectStore } from '../../store/projectStore';
+import { useAssemblyEditingStore } from '../../store/assemblyEditingStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { Part, Group, GroupMember, Stock } from '../../types';
@@ -82,8 +83,10 @@ describe('HierarchicalPartsList', () => {
       groups: [],
       groupMembers: [],
       stocks: mockStocks,
-      isEditingAssembly: false,
       units: 'imperial'
+    });
+    useAssemblyEditingStore.setState({
+      isEditingAssembly: false
     });
     useSelectionStore.setState({
       selectedPartIds: [],
