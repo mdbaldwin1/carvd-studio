@@ -79,6 +79,10 @@ export const ROTATION_COLORS = {
   hover: '#ffffff'
 };
 
+// Distance-based LOD: grain arrows hidden beyond 150 inches (~12 feet)
+// Squared to avoid sqrt per part each render
+export const GRAIN_ARROW_MAX_DISTANCE_SQ = 150 * 150;
+
 // Snap to grid helper
 export const snapToGrid = (value: number): number => {
   return Math.round(value / GRID_SIZE) * GRID_SIZE;

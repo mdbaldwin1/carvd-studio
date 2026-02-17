@@ -8,7 +8,7 @@ import { useSelectionStore } from '../../store/selectionStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { useSnapStore } from '../../store/snapStore';
 import { Part as PartType, RotationAngle } from '../../types';
-import { LiveDimensions, HANDLE_POSITIONS } from './partTypes';
+import { LiveDimensions, HANDLE_POSITIONS, GRAIN_ARROW_MAX_DISTANCE_SQ } from './partTypes';
 import { DimensionLabel } from './DimensionLabel';
 import { GrainDirectionArrow } from './GrainDirectionArrow';
 import { ResizeHandle } from './ResizeHandle';
@@ -300,20 +300,26 @@ export const Part = memo(function Part({ part }: PartProps) {
           {displayMode === 'translucent' && (
             <meshStandardMaterial color="#888888" transparent opacity={0.3} depthWrite={false} />
           )}
-          <Edges
-            visible={isSelected || isHovered || isReference || displayMode === 'wireframe'}
-            scale={1.002}
-            threshold={15}
-            color={
-              isSelected ? '#ffffff' : isReference ? '#00ffff' : displayMode === 'wireframe' ? part.color : '#888888'
-            }
-          />
+          {(isSelected || isHovered || isReference || displayMode === 'wireframe') && (
+            <Edges
+              scale={1.002}
+              threshold={15}
+              color={
+                isSelected ? '#ffffff' : isReference ? '#00ffff' : displayMode === 'wireframe' ? part.color : '#888888'
+              }
+            />
+          )}
         </mesh>
 
-        {/* Grain direction arrow - show when enabled and part is grain-sensitive */}
-        {showGrainDirection && part.grainSensitive && (
-          <GrainDirectionArrow liveDims={liveDims} grainDirection={part.grainDirection} />
-        )}
+        {/* Grain direction arrow - show when enabled, grain-sensitive, and close enough to camera */}
+        {showGrainDirection &&
+          part.grainSensitive &&
+          (camera.position.x - renderX) ** 2 +
+            (camera.position.y - renderY) ** 2 +
+            (camera.position.z - renderZ) ** 2 <
+            GRAIN_ARROW_MAX_DISTANCE_SQ && (
+            <GrainDirectionArrow liveDims={liveDims} grainDirection={part.grainDirection} />
+          )}
 
         {/* Resize handles - only show when single part selected */}
         {isOnlySelected &&
