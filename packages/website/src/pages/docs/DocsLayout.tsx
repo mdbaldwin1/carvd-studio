@@ -1,5 +1,7 @@
 import { Outlet, NavLink } from "react-router-dom";
 import BuyButton from "../../components/BuyButton";
+import Header from "../../components/Header";
+import Footer from "../../components/Footer";
 import { getNavSections } from "./docsNavConfig";
 
 const navSections = getNavSections();
@@ -7,28 +9,7 @@ const navSections = getNavSections();
 export default function DocsLayout() {
   return (
     <div className="page bg-gradient-radial">
-      {/* Header */}
-      <header className="header">
-        <nav className="nav container" aria-label="Main">
-          <a href="/" className="nav-brand">
-            Carvd Studio
-          </a>
-          <div className="nav-links">
-            <a href="/features" className="nav-link">
-              Features
-            </a>
-            <a href="/pricing" className="nav-link">
-              Pricing
-            </a>
-            <a href="/docs" className="nav-link">
-              Docs
-            </a>
-            <a href="/download" className="btn btn-highlight btn-sm">
-              Download
-            </a>
-          </div>
-        </nav>
-      </header>
+      <Header />
 
       {/* Main Content */}
       <main className="page-content container">
@@ -155,34 +136,7 @@ export default function DocsLayout() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="footer container">
-        <div className="mb-lg">
-          <div className="flex justify-center gap-2xl mb-md">
-            <a href="/features" className="nav-link">
-              Features
-            </a>
-            <a href="/pricing" className="nav-link">
-              Pricing
-            </a>
-            <a href="/docs" className="nav-link">
-              Documentation
-            </a>
-            <a href="/support" className="nav-link">
-              Support
-            </a>
-          </div>
-          <div className="flex justify-center gap-xl text-sm text-muted">
-            <a href="/privacy" className="nav-link">
-              Privacy Policy
-            </a>
-            <a href="/terms" className="nav-link">
-              Terms of Service
-            </a>
-          </div>
-        </div>
-        <p>&copy; 2026 Carvd Studio. All rights reserved.</p>
-      </footer>
+      <Footer />
     </div>
   );
 }

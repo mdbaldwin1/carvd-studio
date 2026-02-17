@@ -1,6 +1,8 @@
 import { Coins } from "lucide-react";
 import BuyButton from "../components/BuyButton";
 import SEO from "../components/SEO";
+import Header from "../components/Header";
+import Footer from "../components/Footer";
 import { createFAQSchema } from "../utils/jsonLd";
 import PricingCard from "./pricing/PricingCard";
 import ValueComparison from "./pricing/ValueComparison";
@@ -17,28 +19,7 @@ export default function PricingPage() {
         path="/pricing"
         jsonLd={createFAQSchema(pricingFAQs)}
       />
-      {/* Header */}
-      <header className="header">
-        <nav className="nav container">
-          <a href="/" className="nav-brand">
-            Carvd Studio
-          </a>
-          <div className="nav-links">
-            <a href="/features" className="nav-link">
-              Features
-            </a>
-            <a href="/pricing" className="nav-link">
-              Pricing
-            </a>
-            <a href="/docs" className="nav-link">
-              Docs
-            </a>
-            <a href="/download" className="btn btn-highlight btn-sm">
-              Download
-            </a>
-          </div>
-        </nav>
-      </header>
+      <Header />
 
       {/* Main Content */}
       <main className="page-content container">
@@ -90,37 +71,7 @@ export default function PricingPage() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="footer container">
-        <div className="mb-lg">
-          <div className="flex justify-center gap-2xl mb-md">
-            <a href="/features" className="nav-link">
-              Features
-            </a>
-            <a href="/pricing" className="nav-link">
-              Pricing
-            </a>
-            <a href="/docs" className="nav-link">
-              Documentation
-            </a>
-            <a href="/support" className="nav-link">
-              Support
-            </a>
-          </div>
-          <div className="flex justify-center gap-xl text-sm text-muted">
-            <a href="/privacy" className="nav-link">
-              Privacy Policy
-            </a>
-            <a href="/terms" className="nav-link">
-              Terms of Service
-            </a>
-            <a href="/changelog" className="nav-link">
-              Changelog
-            </a>
-          </div>
-        </div>
-        <p>&copy; 2026 Carvd Studio. All rights reserved.</p>
-      </footer>
+      <Footer />
     </div>
   );
 }
