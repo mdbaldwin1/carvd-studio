@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vite
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { HierarchicalPartsList } from './HierarchicalPartsList';
 import { useProjectStore } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { Part, Group, GroupMember, Stock } from '../../types';
 
@@ -81,12 +82,14 @@ describe('HierarchicalPartsList', () => {
       groups: [],
       groupMembers: [],
       stocks: mockStocks,
+      isEditingAssembly: false,
+      units: 'imperial'
+    });
+    useSelectionStore.setState({
       selectedPartIds: [],
       selectedGroupIds: [],
       expandedGroupIds: [],
-      editingGroupId: null,
-      isEditingAssembly: false,
-      units: 'imperial'
+      editingGroupId: null
     });
   });
 
@@ -138,7 +141,7 @@ describe('HierarchicalPartsList', () => {
     });
 
     it('shows selected style when part is selected', () => {
-      useProjectStore.setState({ selectedPartIds: ['part-1'] });
+      useSelectionStore.setState({ selectedPartIds: ['part-1'] });
       const { container } = render(<HierarchicalPartsList {...defaultProps} />);
 
       const selectedPart = container.querySelector('.part-item.selected');
@@ -245,24 +248,24 @@ describe('HierarchicalPartsList', () => {
     it('expands group when expand button clicked', () => {
       useProjectStore.setState({
         groups: mockGroups,
-        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'part-1', memberType: 'part' }],
-        expandedGroupIds: []
+        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'part-1', memberType: 'part' }]
       });
+      useSelectionStore.setState({ expandedGroupIds: [] });
       const { container } = render(<HierarchicalPartsList {...defaultProps} />);
 
       const expandBtn = container.querySelector('.group-expand-btn')!;
       fireEvent.click(expandBtn);
 
       // Should have called toggleGroupExpanded
-      expect(useProjectStore.getState().expandedGroupIds).toContain('group-1');
+      expect(useSelectionStore.getState().expandedGroupIds).toContain('group-1');
     });
 
     it('shows children when group is expanded', () => {
       useProjectStore.setState({
         groups: mockGroups,
-        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'part-1', memberType: 'part' }],
-        expandedGroupIds: ['group-1']
+        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'part-1', memberType: 'part' }]
       });
+      useSelectionStore.setState({ expandedGroupIds: ['group-1'] });
       render(<HierarchicalPartsList {...defaultProps} />);
 
       // Part should be visible as child of group
@@ -270,10 +273,8 @@ describe('HierarchicalPartsList', () => {
     });
 
     it('applies selected style to selected group', () => {
-      useProjectStore.setState({
-        groups: mockGroups,
-        selectedGroupIds: ['group-1']
-      });
+      useProjectStore.setState({ groups: mockGroups });
+      useSelectionStore.setState({ selectedGroupIds: ['group-1'] });
       const { container } = render(<HierarchicalPartsList {...defaultProps} />);
 
       const selectedGroup = container.querySelector('.group-header.selected');
@@ -292,9 +293,9 @@ describe('HierarchicalPartsList', () => {
         groupMembers: [
           { id: 'gm-1', groupId: 'group-1', memberId: 'group-2', memberType: 'group' },
           { id: 'gm-2', groupId: 'group-2', memberId: 'part-1', memberType: 'part' }
-        ],
-        expandedGroupIds: ['group-1', 'group-2']
+        ]
       });
+      useSelectionStore.setState({ expandedGroupIds: ['group-1', 'group-2'] });
       render(<HierarchicalPartsList {...defaultProps} />);
 
       expect(screen.getByText('Outer Group')).toBeInTheDocument();
@@ -335,9 +336,9 @@ describe('HierarchicalPartsList', () => {
     it('includes group when child part matches', () => {
       useProjectStore.setState({
         groups: mockGroups,
-        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'part-1', memberType: 'part' }],
-        expandedGroupIds: ['group-1']
+        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'part-1', memberType: 'part' }]
       });
+      useSelectionStore.setState({ expandedGroupIds: ['group-1'] });
       render(<HierarchicalPartsList {...defaultProps} searchFilter="Side" />);
 
       // Group should be included because child matches
@@ -348,39 +349,33 @@ describe('HierarchicalPartsList', () => {
 
   describe('group interactions', () => {
     it('selects group on click', () => {
-      useProjectStore.setState({
-        groups: mockGroups,
-        selectedGroupIds: []
-      });
+      useProjectStore.setState({ groups: mockGroups });
+      useSelectionStore.setState({ selectedGroupIds: [] });
       render(<HierarchicalPartsList {...defaultProps} />);
 
       fireEvent.click(screen.getByText('Cabinet Parts'));
 
-      expect(useProjectStore.getState().selectedGroupIds).toContain('group-1');
+      expect(useSelectionStore.getState().selectedGroupIds).toContain('group-1');
     });
 
     it('toggles group selection on shift+click', () => {
-      useProjectStore.setState({
-        groups: mockGroups,
-        selectedGroupIds: []
-      });
+      useProjectStore.setState({ groups: mockGroups });
+      useSelectionStore.setState({ selectedGroupIds: [] });
       render(<HierarchicalPartsList {...defaultProps} />);
 
       fireEvent.click(screen.getByText('Cabinet Parts'), { shiftKey: true });
 
-      expect(useProjectStore.getState().selectedGroupIds).toContain('group-1');
+      expect(useSelectionStore.getState().selectedGroupIds).toContain('group-1');
     });
 
     it('enters group on double click', () => {
-      useProjectStore.setState({
-        groups: mockGroups,
-        editingGroupId: null
-      });
+      useProjectStore.setState({ groups: mockGroups });
+      useSelectionStore.setState({ editingGroupId: null });
       render(<HierarchicalPartsList {...defaultProps} />);
 
       fireEvent.doubleClick(screen.getByText('Cabinet Parts'));
 
-      expect(useProjectStore.getState().editingGroupId).toBe('group-1');
+      expect(useSelectionStore.getState().editingGroupId).toBe('group-1');
     });
 
     it('opens context menu on right click', () => {
@@ -402,9 +397,9 @@ describe('HierarchicalPartsList', () => {
     it('shows warning on collapsed group with parts having issues', () => {
       useProjectStore.setState({
         groups: mockGroups,
-        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'part-1', memberType: 'part' }],
-        expandedGroupIds: [] // Group is collapsed
+        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'part-1', memberType: 'part' }]
       });
+      useSelectionStore.setState({ expandedGroupIds: [] }); // Group is collapsed
       const { container } = render(<HierarchicalPartsList {...defaultProps} />);
 
       // Group should show warning because part-1 has no stock
@@ -415,9 +410,9 @@ describe('HierarchicalPartsList', () => {
     it('does not show warning on expanded group', () => {
       useProjectStore.setState({
         groups: mockGroups,
-        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'part-1', memberType: 'part' }],
-        expandedGroupIds: ['group-1'] // Group is expanded
+        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'part-1', memberType: 'part' }]
       });
+      useSelectionStore.setState({ expandedGroupIds: ['group-1'] }); // Group is expanded
       const { container } = render(<HierarchicalPartsList {...defaultProps} />);
 
       // Group warning should not show when expanded (issues visible in children)
@@ -438,9 +433,9 @@ describe('HierarchicalPartsList', () => {
     it('applies increased indentation for nested parts', () => {
       useProjectStore.setState({
         groups: mockGroups,
-        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'part-1', memberType: 'part' }],
-        expandedGroupIds: ['group-1']
+        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'part-1', memberType: 'part' }]
       });
+      useSelectionStore.setState({ expandedGroupIds: ['group-1'] });
       const { container } = render(<HierarchicalPartsList {...defaultProps} />);
 
       // Find the nested part (inside group)

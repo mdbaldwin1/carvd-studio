@@ -2,6 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useProjectStore, getAllDescendantPartIds } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { isOrbitControls } from './workspaceUtils';
 
@@ -9,8 +10,8 @@ import { isOrbitControls } from './workspaceUtils';
 export function CameraController() {
   const { camera, controls } = useThree();
   const parts = useProjectStore((s) => s.parts);
-  const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
-  const selectedGroupIds = useProjectStore((s) => s.selectedGroupIds);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
+  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const groupMembers = useProjectStore((s) => s.groupMembers);
   const centerCameraRequested = useCameraStore((s) => s.centerCameraRequested);
   const centerCameraAtOriginRequested = useCameraStore((s) => s.centerCameraAtOriginRequested);

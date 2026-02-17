@@ -4,6 +4,7 @@
 
 import { useEffect } from 'react';
 import { useProjectStore } from '../store/projectStore';
+import { useSelectionStore } from '../store/selectionStore';
 import { useUIStore } from '../store/uiStore';
 import {
   newProject,
@@ -37,7 +38,7 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
   const redo = useProjectStore((s) => s.redo);
   const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
   const selectAllParts = useProjectStore((s) => s.selectAllParts);
-  const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const resetCamera = useProjectStore((s) => s.resetCamera);
   const showToast = useUIStore((s) => s.showToast);
   const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);

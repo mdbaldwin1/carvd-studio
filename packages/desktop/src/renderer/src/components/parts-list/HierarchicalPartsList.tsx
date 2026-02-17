@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ChevronRight, ChevronDown, Layers, AlertTriangle } from 'lucide-react';
 import { Part, Group, GroupMember, Stock } from '../../types';
 import { useProjectStore, getAllDescendantPartIds, validatePartsForCutList } from '../../store/projectStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { useStockLibrary } from '../../hooks/useStockLibrary';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
@@ -84,7 +85,7 @@ interface PartItemProps {
 }
 
 function PartItem({ part, level, onPartClick, onDuplicate, onDelete }: PartItemProps) {
-  const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const projectStocks = useProjectStore((s) => s.stocks);
   const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
   const units = useProjectStore((s) => s.units);
@@ -186,17 +187,17 @@ function hasDescendantIssues(
 }
 
 function GroupItem({ group, children, level, onPartClick, onDuplicate, onDelete }: GroupItemProps) {
-  const selectedGroupIds = useProjectStore((s) => s.selectedGroupIds);
-  const expandedGroupIds = useProjectStore((s) => s.expandedGroupIds);
-  const editingGroupId = useProjectStore((s) => s.editingGroupId);
+  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
+  const expandedGroupIds = useSelectionStore((s) => s.expandedGroupIds);
+  const editingGroupId = useSelectionStore((s) => s.editingGroupId);
   const groupMembers = useProjectStore((s) => s.groupMembers);
   const projectStocks = useProjectStore((s) => s.stocks);
   const allParts = useProjectStore((s) => s.parts);
   const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
-  const toggleGroupExpanded = useProjectStore((s) => s.toggleGroupExpanded);
-  const selectGroup = useProjectStore((s) => s.selectGroup);
-  const toggleGroupSelection = useProjectStore((s) => s.toggleGroupSelection);
-  const enterGroup = useProjectStore((s) => s.enterGroup);
+  const toggleGroupExpanded = useSelectionStore((s) => s.toggleGroupExpanded);
+  const selectGroup = useSelectionStore((s) => s.selectGroup);
+  const toggleGroupSelection = useSelectionStore((s) => s.toggleGroupSelection);
+  const enterGroup = useSelectionStore((s) => s.enterGroup);
   const openContextMenu = useUIStore((s) => s.openContextMenu);
 
   // Use library stocks when editing assembly, project stocks otherwise
