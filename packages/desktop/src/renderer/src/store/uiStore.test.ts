@@ -1,5 +1,19 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useUIStore } from './uiStore';
+import { useLicenseStore } from './licenseStore';
+
+// Mock generateThumbnail from projectStore
+vi.mock('./projectStore', async () => {
+  const actual = await vi.importActual('./projectStore');
+  return {
+    ...actual,
+    generateThumbnail: vi.fn()
+  };
+});
+
+// Import after mock setup
+import { generateThumbnail } from './projectStore';
+const mockGenerateThumbnail = generateThumbnail as ReturnType<typeof vi.fn>;
 
 // Helper to reset store state before each test
 const resetStore = () => {
@@ -217,6 +231,143 @@ describe('uiStore', () => {
 
         expect(useUIStore.getState().manualThumbnail).toBeNull();
       });
+    });
+
+    describe('captureManualThumbnail', () => {
+      it('captures thumbnail and stores it on success', async () => {
+        mockGenerateThumbnail.mockResolvedValue('base64-thumbnail-data');
+
+        const result = await useUIStore.getState().captureManualThumbnail();
+
+        expect(result).toBe(true);
+        const thumbnail = useUIStore.getState().manualThumbnail;
+        expect(thumbnail).not.toBeNull();
+        expect(thumbnail!.data).toBe('base64-thumbnail-data');
+        expect(thumbnail!.width).toBe(400);
+        expect(thumbnail!.height).toBe(300);
+        expect(thumbnail!.manuallySet).toBe(true);
+        expect(thumbnail!.generatedAt).toBeDefined();
+      });
+
+      it('shows success toast on capture', async () => {
+        mockGenerateThumbnail.mockResolvedValue('base64-data');
+
+        await useUIStore.getState().captureManualThumbnail();
+
+        expect(useUIStore.getState().toast?.message).toBe('Thumbnail captured');
+      });
+
+      it('returns false and shows error toast when generateThumbnail returns null', async () => {
+        mockGenerateThumbnail.mockResolvedValue(null);
+
+        const result = await useUIStore.getState().captureManualThumbnail();
+
+        expect(result).toBe(false);
+        expect(useUIStore.getState().manualThumbnail).toBeNull();
+        expect(useUIStore.getState().toast?.message).toBe('Failed to capture thumbnail');
+      });
+    });
+  });
+
+  // ============================================================
+  // License-gated modal (openSaveAssemblyModal)
+  // ============================================================
+
+  describe('license-gated modals', () => {
+    it('blocks save assembly modal in free mode', () => {
+      useLicenseStore.setState({ licenseMode: 'free' });
+
+      useUIStore.getState().openSaveAssemblyModal();
+
+      expect(useUIStore.getState().saveAssemblyModalOpen).toBe(false);
+      expect(useUIStore.getState().toast?.message).toContain('license');
+    });
+
+    it('allows save assembly modal in trial mode', () => {
+      useLicenseStore.setState({ licenseMode: 'trial' });
+
+      useUIStore.getState().openSaveAssemblyModal();
+
+      expect(useUIStore.getState().saveAssemblyModalOpen).toBe(true);
+    });
+
+    it('allows save assembly modal in licensed mode', () => {
+      useLicenseStore.setState({ licenseMode: 'licensed' });
+
+      useUIStore.getState().openSaveAssemblyModal();
+
+      expect(useUIStore.getState().saveAssemblyModalOpen).toBe(true);
+    });
+  });
+
+  // ============================================================
+  // Context menu: background and guide types
+  // ============================================================
+
+  describe('context menu types', () => {
+    it('opens context menu with background type and world position', () => {
+      useUIStore.getState().openContextMenu({
+        type: 'background',
+        x: 50,
+        y: 75,
+        worldPosition: { x: 10, y: 0, z: 20 }
+      });
+
+      const menu = useUIStore.getState().contextMenu;
+      expect(menu?.type).toBe('background');
+      expect(menu?.worldPosition).toEqual({ x: 10, y: 0, z: 20 });
+    });
+
+    it('opens context menu with guide type and guideId', () => {
+      useUIStore.getState().openContextMenu({
+        type: 'guide',
+        x: 200,
+        y: 300,
+        guideId: 'guide-1'
+      });
+
+      const menu = useUIStore.getState().contextMenu;
+      expect(menu?.type).toBe('guide');
+      expect(menu?.guideId).toBe('guide-1');
+    });
+  });
+
+  // ============================================================
+  // Toast auto-clear timer behavior
+  // ============================================================
+
+  describe('toast timer behavior', () => {
+    it('auto-clears toast after timeout', async () => {
+      vi.useFakeTimers();
+
+      useUIStore.getState().showToast('Auto clear test');
+      expect(useUIStore.getState().toast).not.toBeNull();
+
+      vi.advanceTimersByTime(2000);
+
+      expect(useUIStore.getState().toast).toBeNull();
+
+      vi.useRealTimers();
+    });
+
+    it('does not clear toast if a different toast was shown before timeout', () => {
+      vi.useFakeTimers();
+
+      useUIStore.getState().showToast('First');
+      vi.advanceTimersByTime(1000);
+
+      useUIStore.getState().showToast('Second');
+      vi.advanceTimersByTime(1000);
+
+      // First timer fires, but toast ID changed — should NOT clear
+      expect(useUIStore.getState().toast?.message).toBe('Second');
+
+      vi.advanceTimersByTime(1000);
+
+      // Second timer fires — should clear
+      expect(useUIStore.getState().toast).toBeNull();
+
+      vi.useRealTimers();
     });
   });
 });
