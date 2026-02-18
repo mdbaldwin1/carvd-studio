@@ -298,9 +298,13 @@
     @apply text-text bg-bg-hover;
   }
 
-  /* Active search button */
+  /* Active search button — contrasting icon on accent bg, swaps on hover */
   .section-header .btn-icon-sm.active {
-    @apply text-primary;
+    @apply text-accent-foreground;
+  }
+
+  .section-header .btn-icon-sm.active:hover {
+    @apply text-text;
   }
 }
 
