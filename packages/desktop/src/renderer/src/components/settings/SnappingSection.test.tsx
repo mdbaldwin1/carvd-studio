@@ -35,7 +35,7 @@ describe('SnappingSection', () => {
 
   it('renders snap sensitivity with current value', () => {
     render(<SnappingSection formData={defaultFormData} onSettingChange={vi.fn()} />);
-    const select = getSettingControl('Snap Sensitivity') as HTMLSelectElement;
+    const select = getSettingControl('Snap Sensitivity') as HTMLInputElement;
     expect(select.value).toBe('normal');
   });
 
@@ -88,7 +88,7 @@ describe('SnappingSection', () => {
   it('defaults snap sensitivity to "normal" when undefined', () => {
     const formData = { ...defaultFormData, snapSensitivity: undefined as never };
     render(<SnappingSection formData={formData} onSettingChange={vi.fn()} />);
-    const select = getSettingControl('Snap Sensitivity') as HTMLSelectElement;
+    const select = getSettingControl('Snap Sensitivity') as HTMLInputElement;
     expect(select.value).toBe('normal');
   });
 

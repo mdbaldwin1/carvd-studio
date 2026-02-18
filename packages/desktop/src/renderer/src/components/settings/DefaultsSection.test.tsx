@@ -59,7 +59,7 @@ describe('DefaultsSection', () => {
         onUnitsChange={vi.fn()}
       />
     );
-    const select = getSettingControl('Units') as HTMLSelectElement;
+    const select = getSettingControl('Units') as HTMLInputElement;
     expect(select.value).toBe('imperial');
   });
 
@@ -88,7 +88,7 @@ describe('DefaultsSection', () => {
         onUnitsChange={vi.fn()}
       />
     );
-    const select = getSettingControl('Grid Snap Size') as HTMLSelectElement;
+    const select = getSettingControl('Grid Snap Size') as HTMLInputElement;
     expect(select.value).toBe('0.25');
   });
 

@@ -38,7 +38,7 @@ describe('AppearanceSection', () => {
 
   it('renders theme selector with current value', () => {
     render(<AppearanceSection formData={defaultFormData} onSettingChange={vi.fn()} />);
-    const select = getSettingControl('Theme') as HTMLSelectElement;
+    const select = getSettingControl('Theme') as HTMLInputElement;
     expect(select.value).toBe('dark');
   });
 
@@ -64,7 +64,7 @@ describe('AppearanceSection', () => {
 
   it('renders lighting mode selector with current value', () => {
     render(<AppearanceSection formData={defaultFormData} onSettingChange={vi.fn()} />);
-    const select = getSettingControl('Lighting Mode') as HTMLSelectElement;
+    const select = getSettingControl('Lighting Mode') as HTMLInputElement;
     expect(select.value).toBe('default');
   });
 
@@ -78,7 +78,7 @@ describe('AppearanceSection', () => {
   it('defaults lighting mode to "default" when undefined', () => {
     const formData = { ...defaultFormData, lightingMode: undefined };
     render(<AppearanceSection formData={formData} onSettingChange={vi.fn()} />);
-    const select = getSettingControl('Lighting Mode') as HTMLSelectElement;
+    const select = getSettingControl('Lighting Mode') as HTMLInputElement;
     expect(select.value).toBe('default');
   });
 
