@@ -60,7 +60,7 @@ Core features complete. UX polish in progress for 1.0 release.
 - License system (Lemon Squeezy API + 7-day offline cache)
 - Auto-updater (electron-updater + GitHub Releases)
 - Post-update notification (shows what's new after an update)
-- CI/CD: `test.yml` (desktop unit + e2e, website unit + e2e, lint/typecheck/format) + `release.yml` (automated builds & GitHub Releases) + `changelog-check.yml` (enforces CHANGELOG.md updates on PRs to main)
+- CI/CD: `test.yml` (desktop unit + e2e, website unit + e2e, lint/typecheck/format) + `release.yml` (automated desktop builds & GitHub Releases) + `changelog-check.yml` (enforces CHANGELOG.md updates on PRs to main) + `sync-develop.yml` (merges main back into develop) + `website-version-bump.yml` (Vercel deploy, tag, version bump)
 - Release pipeline: macOS (code-signed + notarized via Developer ID Application cert) + Windows (unsigned)
 - Branch protection: Both `develop` and `main` protected — no direct pushes (even admins), all CI must pass
 - Pre-commit hooks: husky + lint-staged runs `prettier --check` on staged files
@@ -79,13 +79,13 @@ Core features complete. UX polish in progress for 1.0 release.
 - React 19 (from React 18)
 - @react-three/fiber v9, @react-three/drei v10, three.js v0.182
 - electron-builder v26
-- Electron 35
+- Electron 40
 - Tailwind CSS 4 migration (from plain CSS)
 - macOS notarization (Developer ID Application cert + Apple notarytool)
 - Website emoji replacement with lucide-react icons + custom brand SVGs
 - Pre-commit hooks, issue templates, PR template, changelog CI check
 - Website CI integration (typecheck + format checks)
-- Comprehensive test coverage push (1625 → 2675 tests)
+- Comprehensive test coverage push (1625 → 2822 tests)
 
 ## Keyboard Shortcuts
 
@@ -107,7 +107,7 @@ Core features complete. UX polish in progress for 1.0 release.
 
 ## Test Coverage
 
-**Status:** ~92% statement coverage, ~82% branch coverage (2675 tests)
+**Status:** ~92% statement coverage, ~82% branch coverage (2822 tests: 2675 renderer + 147 main process)
 
 | Module              | Coverage |
 | ------------------- | -------- |
