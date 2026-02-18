@@ -3,7 +3,7 @@ import { ThreeEvent, useThree } from '@react-three/fiber';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { useShallow } from 'zustand/shallow';
-import { useProjectStore, getAncestorGroupIds } from '../../store/projectStore';
+import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { useSnapStore } from '../../store/snapStore';
@@ -16,6 +16,7 @@ import { RotationHandle } from './RotationHandle';
 import { usePartDrag } from './usePartDrag';
 import { usePartResize } from './usePartResize';
 import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
+import { getPartGroupContext } from './partClickHandler';
 
 interface PartProps {
   part: PartType;
@@ -59,24 +60,11 @@ export const Part = memo(function Part({ part }: PartProps) {
   const toggleGroupSelection = useSelectionStore((s) => s.toggleGroupSelection);
   const enterGroup = useSelectionStore((s) => s.enterGroup);
 
-  // Group membership - get all ancestor groups (from immediate to top-level)
-  const ancestorGroupIds = getAncestorGroupIds(part.id, groupMembers);
-  const containingGroupId = ancestorGroupIds.length > 0 ? ancestorGroupIds[0] : null;
-  const topLevelGroupId = ancestorGroupIds.length > 0 ? ancestorGroupIds[ancestorGroupIds.length - 1] : null;
-
-  // Determine which group to select when clicking this part
-  let groupToSelectOnClick: string | null = null;
-  let isOutsideEditingContext = false;
-  if (editingGroupId === null) {
-    groupToSelectOnClick = topLevelGroupId;
-  } else {
-    const editingGroupIndex = ancestorGroupIds.indexOf(editingGroupId);
-    if (editingGroupIndex > 0) {
-      groupToSelectOnClick = ancestorGroupIds[editingGroupIndex - 1];
-    } else if (editingGroupIndex === -1) {
-      isOutsideEditingContext = true;
-    }
-  }
+  // Group membership context — uses shared logic with InstancedParts
+  const { groupToSelectOnClick, isOutsideEditingContext, containingGroupId, ancestorGroupIds } = useMemo(
+    () => getPartGroupContext(part.id, groupMembers, editingGroupId),
+    [part.id, groupMembers, editingGroupId]
+  );
 
   // Selection state
   const isDirectlySelected = selectedPartIds.includes(part.id);
@@ -117,6 +105,7 @@ export const Part = memo(function Part({ part }: PartProps) {
         position: { ...part.position, y: worldHalfHeight }
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- using individual rotation axes (x,y,z) as deps is intentional; part.rotation object ref may change without value changes
   }, [
     part.rotation.x,
     part.rotation.y,
@@ -300,7 +289,7 @@ export const Part = memo(function Part({ part }: PartProps) {
           {displayMode === 'translucent' && (
             <meshStandardMaterial color="#888888" transparent opacity={0.3} depthWrite={false} />
           )}
-          {(isSelected || isHovered || isReference || displayMode === 'wireframe') && (
+          {(isDirectlySelected || isHovered || isReference || displayMode === 'wireframe') && (
             <Edges
               scale={1.002}
               threshold={15}

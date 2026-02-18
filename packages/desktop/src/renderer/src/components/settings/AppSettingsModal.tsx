@@ -88,7 +88,7 @@ export function AppSettingsModal({
       } else if (!result.canceled) {
         showToast(result.error || 'Failed to export backup', 'error');
       }
-    } catch (error) {
+    } catch {
       showToast('Failed to export backup', 'error');
     } finally {
       setIsExporting(false);

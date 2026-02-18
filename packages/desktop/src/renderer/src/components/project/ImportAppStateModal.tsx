@@ -93,7 +93,7 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
       setFilePath(result.filePath || null);
       setPreview(result.preview || null);
       setStep('options');
-    } catch (err) {
+    } catch {
       setError('Failed to read backup file');
     } finally {
       setIsLoading(false);
@@ -125,7 +125,7 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
         skipped: result.skipped
       });
       setStep('result');
-    } catch (err) {
+    } catch {
       setError('Import failed');
     } finally {
       setIsLoading(false);

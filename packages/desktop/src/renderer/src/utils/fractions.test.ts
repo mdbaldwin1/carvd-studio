@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  INCHES_TO_MM,
   inchesToMm,
   mmToInches,
   formatMeasurement,

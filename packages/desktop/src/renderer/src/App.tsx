@@ -1,7 +1,7 @@
 import { Canvas } from '@react-three/fiber';
 import { ChevronDown, ChevronRight, Library, Redo2, Save, Search, Settings, Sun, Undo2, X } from 'lucide-react';
 import { ColorPicker } from './components/common/ColorPicker';
-import React, { Suspense, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { AddAssemblyModal } from './components/assembly/AddAssemblyModal';
 import { AddStockModal } from './components/stock/AddStockModal';
@@ -53,7 +53,7 @@ import { useSnapStore } from './store/snapStore';
 import { useAssemblyEditingStore } from './store/assemblyEditingStore';
 import { useClipboardStore } from './store/clipboardStore';
 import { useLicenseStore } from './store/licenseStore';
-import { Assembly, LightingMode, Project, Stock } from './types';
+import { LightingMode, Project, Stock } from './types';
 import { formatMeasurementWithUnit } from './utils/fractions';
 import { getPartBounds } from './utils/snapToPartsUtil';
 import { generateSeedProject } from './utils/seedData';
@@ -216,7 +216,6 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
   const parts = useProjectStore((s) => s.parts);
   const projectStocks = useProjectStore((s) => s.stocks);
   const projectAssemblies = useProjectStore((s) => s.assemblies);
-  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const units = useProjectStore((s) => s.units);
   const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
   const licenseMode = useLicenseStore((s) => s.licenseMode);
@@ -248,7 +247,6 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
   // Use library or project stocks/assemblies based on editing mode
   const stocks = isEditingAssembly ? libraryStocks : projectStocks;
   const assemblies = isEditingAssembly ? libraryAssemblies : projectAssemblies;
-  const addStock = isEditingAssembly ? addLibraryStock : addProjectStock;
   const updateStock = isEditingAssembly ? updateLibraryStock : updateProjectStock;
   const deleteStock = isEditingAssembly ? deleteLibraryStock : deleteProjectStock;
   const deleteAssembly = isEditingAssembly ? deleteLibraryAssembly : deleteProjectAssembly;
@@ -308,10 +306,6 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
     });
   };
 
-  const handleAddStockToProject = (stock: Stock) => {
-    addStock(stock);
-  };
-
   const handleDeleteStock = (stock: Stock) => {
     const partCount = parts.filter((p) => p.stockId === stock.id).length;
     if (partCount > 0) {
@@ -330,35 +324,42 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
     }
   };
 
-  const handlePartClick = (partId: string, e: React.MouseEvent) => {
-    const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
-    const isModKey = isMac ? e.metaKey : e.ctrlKey;
+  // Read store state imperatively for a stable callback reference
+  const handlePartClick = useCallback(
+    (partId: string, e: React.MouseEvent) => {
+      const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+      const isModKey = isMac ? e.metaKey : e.ctrlKey;
+      const currentParts = useProjectStore.getState().parts;
+      const currentSelectedPartIds = useSelectionStore.getState().selectedPartIds;
 
-    if (e.shiftKey && lastClickedIdRef.current) {
-      // Shift+click: Select range from last clicked to current, adding to existing selection
-      const lastIndex = parts.findIndex((p) => p.id === lastClickedIdRef.current);
-      const currentIndex = parts.findIndex((p) => p.id === partId);
+      if (e.shiftKey && lastClickedIdRef.current) {
+        const lastIndex = currentParts.findIndex((p) => p.id === lastClickedIdRef.current);
+        const currentIndex = currentParts.findIndex((p) => p.id === partId);
 
-      if (lastIndex !== -1 && currentIndex !== -1) {
-        const start = Math.min(lastIndex, currentIndex);
-        const end = Math.max(lastIndex, currentIndex);
-        const rangeIds = parts.slice(start, end + 1).map((p) => p.id);
-
-        // Always add range to existing selection (like Finder does after cmd+click)
-        const newSelection = [...new Set([...selectedPartIds, ...rangeIds])];
-        selectParts(newSelection);
+        if (lastIndex !== -1 && currentIndex !== -1) {
+          const start = Math.min(lastIndex, currentIndex);
+          const end = Math.max(lastIndex, currentIndex);
+          const rangeIds = currentParts.slice(start, end + 1).map((p) => p.id);
+          const newSelection = [...new Set([...currentSelectedPartIds, ...rangeIds])];
+          selectParts(newSelection);
+        }
+      } else if (isModKey) {
+        togglePartSelection(partId);
+        lastClickedIdRef.current = partId;
+      } else {
+        selectPart(partId);
+        lastClickedIdRef.current = partId;
       }
-      // Don't update lastClickedIdRef on shift-click to allow extending selection
-    } else if (isModKey) {
-      // Cmd/Ctrl+click: Toggle individual item in selection
-      togglePartSelection(partId);
-      lastClickedIdRef.current = partId;
-    } else {
-      // Regular click: Single select (replace selection)
-      selectPart(partId);
-      lastClickedIdRef.current = partId;
-    }
-  };
+    },
+    [selectPart, selectParts, togglePartSelection]
+  );
+
+  const handleDeletePart = useCallback(
+    (partId: string) => {
+      requestDeleteParts([partId]);
+    },
+    [requestDeleteParts]
+  );
 
   return (
     <aside className="sidebar">
@@ -692,7 +693,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
               onPartClick={handlePartClick}
               searchFilter={searchTerms.parts}
               onDuplicate={duplicatePart}
-              onDelete={(partId) => requestDeleteParts([partId])}
+              onDelete={handleDeletePart}
             />
           </div>
         </div>
@@ -1843,7 +1844,7 @@ function CanvasWithDrop() {
       onDrop={handleDrop}
     >
       <Canvas
-        camera={{ position: [60, 50, 60], fov: 50 }}
+        camera={{ position: [60, 50, 60], fov: 50, far: 5000 }}
         dpr={[1, 1.5]}
         gl={{
           antialias: true,
@@ -1953,7 +1954,6 @@ function App() {
     startCreatingNew: startCreatingNewTemplate,
     confirmNewTemplateSetup,
     cancelNewTemplateSetup,
-    openSaveDialog: openTemplateSaveDialog,
     saveTemplate: saveTemplateDirectly,
     saveAndExit: saveTemplateAndExit,
     requestDiscard: requestTemplateDiscard,
@@ -2024,7 +2024,7 @@ function App() {
   }, [licenseMode, setStoreLicenseMode]);
 
   // License management
-  const [isLicenseValid, setIsLicenseValid] = useState<boolean | null>(null); // null = checking, true = valid, false = invalid
+  const [, setIsLicenseValid] = useState<boolean | null>(null); // null = checking, true = valid, false = invalid
   const [showLicenseModal, setShowLicenseModal] = useState(false);
   const [licenseData, setLicenseData] = useState<{
     licenseEmail: string | null;
@@ -2404,7 +2404,7 @@ function App() {
       } else {
         return { success: false, error: result.error || 'Invalid license key' };
       }
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Failed to verify license' };
     }
   };

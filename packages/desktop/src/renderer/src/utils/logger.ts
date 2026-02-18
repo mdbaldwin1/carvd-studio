@@ -16,7 +16,6 @@ const isDevelopment = import.meta.env.DEV;
 /**
  * No-op function for suppressed logs
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-function
 const noop = (): void => {};
 
 /**

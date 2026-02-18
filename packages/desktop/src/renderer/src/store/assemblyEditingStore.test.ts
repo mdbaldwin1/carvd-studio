@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
 import { useProjectStore } from './projectStore';
 import { useSelectionStore } from './selectionStore';
@@ -8,8 +8,7 @@ import {
   createTestPart,
   createTestStock,
   createTestGroup,
-  createTestGroupMember,
-  createDefaultStockConstraints
+  createTestGroupMember
 } from '../../../../tests/helpers/factories';
 
 const resetStores = () => {

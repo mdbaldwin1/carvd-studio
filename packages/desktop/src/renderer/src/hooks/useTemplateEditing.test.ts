@@ -3,7 +3,6 @@ import { renderHook, act } from '@testing-library/react';
 import { useProjectStore } from '../store/projectStore';
 import { useLicenseStore } from '../store/licenseStore';
 import { useUIStore } from '../store/uiStore';
-import { useCameraStore } from '../store/cameraStore';
 
 // Mock file operations
 vi.mock('../utils/fileOperations', () => ({
@@ -27,6 +26,8 @@ vi.mock('../store/projectStore', async (importOriginal) => {
 
 import { useTemplateEditing } from './useTemplateEditing';
 import { hasUnsavedChanges } from '../utils/fileOperations';
+import type { UserTemplate } from '../templates/types';
+import type { Part } from '../types';
 
 // ============================================================
 // Setup
@@ -168,7 +169,7 @@ describe('useTemplateEditing', () => {
 
       let success: boolean;
       await act(async () => {
-        success = await result.current.startEditing(template as any);
+        success = await result.current.startEditing(template as unknown as UserTemplate);
       });
 
       expect(success!).toBe(true);
@@ -185,7 +186,7 @@ describe('useTemplateEditing', () => {
 
       let success: boolean;
       await act(async () => {
-        success = await result.current.startEditing({ id: 't1', name: 'T' } as any);
+        success = await result.current.startEditing({ id: 't1', name: 'T' } as unknown as UserTemplate);
       });
 
       expect(success!).toBe(false);
@@ -435,7 +436,7 @@ describe('useTemplateEditing', () => {
       const { result } = renderHook(() => useTemplateEditing());
 
       await act(async () => {
-        await result.current.startEditing(template as any);
+        await result.current.startEditing(template as unknown as UserTemplate);
       });
 
       // Make changes and save (the template already exists, so update)
@@ -493,7 +494,7 @@ describe('useTemplateEditing', () => {
 
       // Start editing existing template
       await act(async () => {
-        await result.current.startEditing(makeTemplate() as any);
+        await result.current.startEditing(makeTemplate() as unknown as UserTemplate);
       });
 
       // Save triggers update path (template has id 't1')
@@ -546,7 +547,7 @@ describe('useTemplateEditing', () => {
             grainDirection: 'length' as const,
             color: '#8B4513'
           }
-        ] as any[]
+        ] as unknown as Part[]
       });
 
       await act(async () => {
@@ -612,7 +613,7 @@ describe('useTemplateEditing', () => {
 
       // Start editing existing template
       await act(async () => {
-        await result.current.startEditing(makeTemplate() as any);
+        await result.current.startEditing(makeTemplate() as unknown as UserTemplate);
       });
 
       // Save and exit - should preserve existing manually-set thumbnail
@@ -653,7 +654,7 @@ describe('useTemplateEditing', () => {
             grainDirection: 'length' as const,
             color: '#8B4513'
           }
-        ] as any[]
+        ] as unknown as Part[]
       });
 
       await act(async () => {
@@ -707,7 +708,7 @@ describe('useTemplateEditing', () => {
       const { result } = renderHook(() => useTemplateEditing());
 
       await act(async () => {
-        await result.current.startEditing(makeTemplate() as any);
+        await result.current.startEditing(makeTemplate() as unknown as UserTemplate);
       });
 
       await act(async () => {
@@ -734,7 +735,7 @@ describe('useTemplateEditing', () => {
       const { result } = renderHook(() => useTemplateEditing());
 
       await act(async () => {
-        await result.current.startEditing(makeTemplate() as any);
+        await result.current.startEditing(makeTemplate() as unknown as UserTemplate);
       });
 
       // Should still succeed despite getUserTemplates failure
@@ -874,7 +875,7 @@ describe('useTemplateEditing', () => {
 
       let success: boolean;
       await act(async () => {
-        success = await result.current.startEditing(badTemplate as any);
+        success = await result.current.startEditing(badTemplate as unknown as UserTemplate);
       });
 
       expect(success!).toBe(false);

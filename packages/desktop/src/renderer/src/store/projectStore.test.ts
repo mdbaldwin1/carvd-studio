@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   useProjectStore,
   validatePartsForCutList,
@@ -16,14 +16,11 @@ import { useUIStore } from './uiStore';
 import {
   createTestPart,
   createTestStock,
-  createTestGroup,
   createTestGroupMember,
   createTestProject,
-  createTestAssembly,
-  createNestedGroupStructure,
-  createDefaultStockConstraints
+  createTestAssembly
 } from '../../../../tests/helpers/factories';
-import type { Assembly } from '../types';
+import type { CutList, Stock } from '../types';
 
 // Helper to reset store state before each test
 const resetStore = () => {
@@ -260,7 +257,7 @@ describe('projectStore', () => {
       it('removes the part from group memberships', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart();
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
 
         expect(useProjectStore.getState().groupMembers).toHaveLength(1);
 
@@ -593,7 +590,7 @@ describe('projectStore', () => {
         const part2Id = store.addPart({ name: 'Part 2' });
 
         const innerGroupId = store.createGroup('Inner Group', [{ id: part1Id, type: 'part' }]);
-        const outerGroupId = store.createGroup('Outer Group', [
+        store.createGroup('Outer Group', [
           { id: innerGroupId, type: 'group' },
           { id: part2Id, type: 'part' }
         ]);
@@ -907,7 +904,7 @@ describe('projectStore', () => {
           skippedParts: [],
           kerfWidth: 0.125,
           overageFactor: 0.1
-        } as any;
+        } as unknown as CutList;
 
         store.setCutList(mockCutList);
 
@@ -921,7 +918,7 @@ describe('projectStore', () => {
         store.setCutList({
           id: 'test',
           isStale: false
-        } as any);
+        } as unknown as CutList);
 
         store.markCutListStale();
 
@@ -932,7 +929,7 @@ describe('projectStore', () => {
     describe('clearCutList', () => {
       it('removes the cut list', () => {
         const store = useProjectStore.getState();
-        store.setCutList({ id: 'test' } as any);
+        store.setCutList({ id: 'test' } as unknown as CutList);
 
         store.clearCutList();
 
@@ -1248,7 +1245,7 @@ describe('projectStore', () => {
       it('stores stock ID reference in assembly parts', () => {
         const store = useProjectStore.getState();
         const stockId = store.addStock({ name: 'Test Stock' });
-        const partId = store.addPart({ name: 'Part with Stock' });
+        store.addPart({ name: 'Part with Stock' });
         store.assignStockToSelectedParts(stockId); // Part is auto-selected on creation
 
         const assembly = store.createAssemblyFromSelection('Stock Assembly');
@@ -1848,7 +1845,7 @@ describe('validatePartsForCutList', () => {
   describe('stock assignment validation', () => {
     it('returns error when part has no stock assigned', () => {
       const parts = [createTestPart({ name: 'Unassigned Part', stockId: null })];
-      const stocks: any[] = [];
+      const stocks: Stock[] = [];
 
       const issues = validatePartsForCutList(parts, stocks);
 
@@ -1860,7 +1857,7 @@ describe('validatePartsForCutList', () => {
 
     it('returns error when assigned stock not found', () => {
       const parts = [createTestPart({ name: 'Orphan Part', stockId: 'non-existent-id' })];
-      const stocks: any[] = [];
+      const stocks: Stock[] = [];
 
       const issues = validatePartsForCutList(parts, stocks);
 

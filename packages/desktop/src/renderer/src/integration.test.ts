@@ -14,16 +14,10 @@ import { useLicenseStore } from './store/licenseStore';
 import { useAssemblyEditingStore } from './store/assemblyEditingStore';
 import { generateOptimizedCutList } from './utils/cutListOptimizer';
 import {
-  createTestPart,
-  createTestStock,
   createTestProject,
-  createProjectWithParts,
-  createTestGroup,
-  createTestGroupMember,
   createSimpleCutListScenario,
   createComplexCutListScenario,
-  createNestedGroupStructure,
-  createTestCustomShoppingItem
+  createNestedGroupStructure
 } from '../../../tests/helpers/factories';
 
 // Reset all stores to clean state
@@ -540,7 +534,7 @@ describe('Workflow: Project save and load integrity', () => {
     useProjectStore.getState().assignStockToSelectedParts(stockId);
 
     // Create group
-    const groupId = useProjectStore.getState().createGroup('Panels', [
+    useProjectStore.getState().createGroup('Panels', [
       { id: partId1, type: 'part' },
       { id: partId2, type: 'part' }
     ]);

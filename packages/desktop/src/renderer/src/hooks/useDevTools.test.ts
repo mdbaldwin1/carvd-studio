@@ -40,8 +40,6 @@ import { generateSeedProject, generateStockLibraryItems } from '../utils/seedDat
 // Setup
 // ============================================================
 
-const originalDev = import.meta.env.DEV;
-
 const seedProjectData = {
   version: '1.0',
   name: 'Simple Writing Desk',

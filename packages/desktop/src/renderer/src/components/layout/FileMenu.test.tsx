@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { FileMenu } from './FileMenu';
-import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 
 // Mock the fileOperations module

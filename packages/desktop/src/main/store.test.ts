@@ -25,7 +25,6 @@ import {
   updateStockInLibrary,
   removeStockFromLibrary,
   getAssemblyLibrary,
-  setAssemblyLibrary,
   addAssemblyToLibrary,
   updateAssemblyInLibrary,
   removeAssemblyFromLibrary,

@@ -3,33 +3,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { StartScreen } from './StartScreen';
 
 describe('StartScreen', () => {
-  const mockRecentProjects = [
-    {
-      path: '/path/to/project1.carvd',
-      name: 'Project 1',
-      modifiedAt: new Date().toISOString(),
-      isFavorite: false,
-      exists: true
-    },
-    {
-      path: '/path/to/project2.carvd',
-      name: 'Project 2',
-      modifiedAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-      isFavorite: true,
-      exists: true
-    }
-  ];
-
-  const mockFavoriteProjects = [
-    {
-      path: '/path/to/project2.carvd',
-      name: 'Project 2',
-      modifiedAt: new Date(Date.now() - 86400000).toISOString(),
-      isFavorite: true,
-      exists: true
-    }
-  ];
-
   const defaultProps = {
     onNewProject: vi.fn(),
     onOpenFile: vi.fn(),

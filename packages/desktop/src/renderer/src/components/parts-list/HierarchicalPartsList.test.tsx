@@ -1,11 +1,32 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
+import React from 'react';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { HierarchicalPartsList } from './HierarchicalPartsList';
 import { useProjectStore } from '../../store/projectStore';
 import { useAssemblyEditingStore } from '../../store/assemblyEditingStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
-import { Part, Group, GroupMember, Stock } from '../../types';
+import { Part, Group, Stock } from '../../types';
+
+// Mock Virtuoso to render all items (virtualization hides off-screen items from DOM queries)
+interface VirtuosoMockProps {
+  data?: unknown[];
+  itemContent: (index: number, item: unknown) => React.ReactNode;
+  className?: string;
+}
+
+vi.mock('react-virtuoso', () => ({
+  Virtuoso: React.forwardRef(({ data, itemContent, className }: VirtuosoMockProps, _ref: React.Ref<unknown>) =>
+    React.createElement(
+      'div',
+      { className, 'data-testid': 'virtuoso-list' },
+      data?.map((item: unknown, index: number) =>
+        React.createElement('div', { key: index }, itemContent(index, item))
+      )
+    )
+  )
+}));
+
+import { HierarchicalPartsList } from './HierarchicalPartsList';
 
 // Mock useStockLibrary
 vi.mock('../../hooks/useStockLibrary', () => ({
@@ -67,8 +88,6 @@ describe('HierarchicalPartsList', () => {
       name: 'Cabinet Parts'
     }
   ];
-
-  const mockGroupMembers: GroupMember[] = [];
 
   const defaultProps = {
     onPartClick: vi.fn(),
@@ -441,9 +460,10 @@ describe('HierarchicalPartsList', () => {
       useSelectionStore.setState({ expandedGroupIds: ['group-1'] });
       const { container } = render(<HierarchicalPartsList {...defaultProps} />);
 
-      // Find the nested part (inside group)
-      const groupChildren = container.querySelector('.group-children');
-      const nestedPart = groupChildren?.querySelector('.part-item');
+      // With flattened virtualized list, nested parts are at level 1
+      // Find part items — the one inside the group has level 1 indentation
+      const partItems = container.querySelectorAll('.part-item');
+      const nestedPart = Array.from(partItems).find((el) => el.textContent?.includes('Side Panel'));
       // Level 1 parts should have 12px + 1 * 16px = 28px
       expect(nestedPart).toHaveStyle({ paddingLeft: '28px' });
     });

@@ -1,5 +1,4 @@
 import { memo } from 'react';
-import * as THREE from 'three';
 import { LiveDimensions } from './partTypes';
 import { GRAIN_ARROW_HEAD_GEOMETRY, GRAIN_ARROW_MATERIAL } from './partGeometry';
 

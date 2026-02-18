@@ -6,6 +6,12 @@ import { useSelectionStore } from '../../store/selectionStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { isOrbitControls } from './workspaceUtils';
 
+// Pre-allocated objects for camera centering (avoids per-part allocations in the loop)
+const _ccEuler = new THREE.Euler();
+const _ccQuat = new THREE.Quaternion();
+const _ccCorners = Array.from({ length: 8 }, () => new THREE.Vector3());
+const _ccPosition = new THREE.Vector3();
+
 // Component that handles camera centering and view vector tracking
 export function CameraController() {
   const { camera, controls } = useThree();
@@ -126,32 +132,34 @@ export function CameraController() {
       maxZ = -Infinity;
 
     for (const part of selectedParts) {
-      // Get part's bounding box (accounting for rotation)
-      const rotX = (part.rotation.x * Math.PI) / 180;
-      const rotY = (part.rotation.y * Math.PI) / 180;
-      const rotZ = (part.rotation.z * Math.PI) / 180;
-      const euler = new THREE.Euler(rotX, rotY, rotZ, 'XYZ');
-      const quat = new THREE.Quaternion().setFromEuler(euler);
+      // Get part's bounding box (accounting for rotation) — reuses pre-allocated objects
+      _ccEuler.set(
+        (part.rotation.x * Math.PI) / 180,
+        (part.rotation.y * Math.PI) / 180,
+        (part.rotation.z * Math.PI) / 180,
+        'XYZ'
+      );
+      _ccQuat.setFromEuler(_ccEuler);
 
-      const halfLength = part.length / 2;
-      const halfThickness = part.thickness / 2;
-      const halfWidth = part.width / 2;
+      const hL = part.length / 2;
+      const hT = part.thickness / 2;
+      const hW = part.width / 2;
 
-      // Get the 8 corners and find world-space bounds
-      const corners = [
-        new THREE.Vector3(-halfLength, -halfThickness, -halfWidth),
-        new THREE.Vector3(-halfLength, -halfThickness, halfWidth),
-        new THREE.Vector3(-halfLength, halfThickness, -halfWidth),
-        new THREE.Vector3(-halfLength, halfThickness, halfWidth),
-        new THREE.Vector3(halfLength, -halfThickness, -halfWidth),
-        new THREE.Vector3(halfLength, -halfThickness, halfWidth),
-        new THREE.Vector3(halfLength, halfThickness, -halfWidth),
-        new THREE.Vector3(halfLength, halfThickness, halfWidth)
-      ];
+      // Set the 8 corners (reuses pre-allocated Vector3 array)
+      _ccCorners[0].set(-hL, -hT, -hW);
+      _ccCorners[1].set(-hL, -hT, hW);
+      _ccCorners[2].set(-hL, hT, -hW);
+      _ccCorners[3].set(-hL, hT, hW);
+      _ccCorners[4].set(hL, -hT, -hW);
+      _ccCorners[5].set(hL, -hT, hW);
+      _ccCorners[6].set(hL, hT, -hW);
+      _ccCorners[7].set(hL, hT, hW);
 
-      for (const corner of corners) {
-        corner.applyQuaternion(quat);
-        corner.add(new THREE.Vector3(part.position.x, part.position.y, part.position.z));
+      _ccPosition.set(part.position.x, part.position.y, part.position.z);
+
+      for (const corner of _ccCorners) {
+        corner.applyQuaternion(_ccQuat);
+        corner.add(_ccPosition);
         minX = Math.min(minX, corner.x);
         maxX = Math.max(maxX, corner.x);
         minY = Math.min(minY, corner.y);

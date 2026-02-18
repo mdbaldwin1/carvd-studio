@@ -16,8 +16,7 @@ import {
   CutList,
   PartValidationIssue,
   EmbeddedStock,
-  CustomShoppingItem,
-  CameraState
+  CustomShoppingItem
 } from '../types';
 import { STOCK_COLORS } from '../constants';
 import { canAddPart, canAddStock, getBlockedMessage, getFeatureLimits } from '../utils/featureLimits';

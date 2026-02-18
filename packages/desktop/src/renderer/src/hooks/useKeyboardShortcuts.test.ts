@@ -7,6 +7,7 @@ import { useSelectionStore } from '../store/selectionStore';
 import { useSnapStore } from '../store/snapStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
+import type { Part, Group } from '../types';
 
 // Controllable mock euler output for rotation tests
 let mockEulerOutput = { x: 0, y: 0, z: 0 };
@@ -248,7 +249,7 @@ describe('useKeyboardShortcuts', () => {
         parts: [
           { id: 'p1', name: 'A' },
           { id: 'p2', name: 'B' }
-        ] as any[]
+        ] as unknown as Part[]
       });
       const selectParts = vi.fn();
       useSelectionStore.setState({ selectParts });
@@ -371,7 +372,7 @@ describe('useKeyboardShortcuts', () => {
             width: 5,
             thickness: 0.75
           }
-        ] as any[]
+        ] as unknown as Part[]
       });
       const updatePart = vi.fn();
       useProjectStore.setState({ updatePart });
@@ -394,7 +395,7 @@ describe('useKeyboardShortcuts', () => {
             width: 5,
             thickness: 0.75
           }
-        ] as any[]
+        ] as unknown as Part[]
       });
       const updatePart = vi.fn();
       useProjectStore.setState({ updatePart });
@@ -417,7 +418,7 @@ describe('useKeyboardShortcuts', () => {
             width: 5,
             thickness: 0.75
           }
-        ] as any[]
+        ] as unknown as Part[]
       });
       const updatePart = vi.fn();
       useProjectStore.setState({ updatePart });
@@ -449,7 +450,7 @@ describe('useKeyboardShortcuts', () => {
             width: 5,
             thickness: 0.75
           }
-        ] as any[]
+        ] as unknown as Part[]
       });
       const batchUpdateParts = vi.fn();
       useProjectStore.setState({ batchUpdateParts });
@@ -489,8 +490,8 @@ describe('useKeyboardShortcuts', () => {
             width: 5,
             thickness: 0.75
           }
-        ] as any[],
-        groups: [{ id: 'g1', name: 'Group 1' }] as any[],
+        ] as unknown as Part[],
+        groups: [{ id: 'g1', name: 'Group 1' }] as unknown as Group[],
         groupMembers: [
           { id: 'gm1', groupId: 'g1', memberId: 'p1', memberType: 'part' },
           { id: 'gm2', groupId: 'g1', memberId: 'p2', memberType: 'part' }
@@ -531,7 +532,7 @@ describe('useKeyboardShortcuts', () => {
             width: 5,
             thickness: 0.75
           }
-        ] as any[]
+        ] as unknown as Part[]
       });
       const batchUpdateParts = vi.fn();
       useProjectStore.setState({ batchUpdateParts });
@@ -567,7 +568,7 @@ describe('useKeyboardShortcuts', () => {
             width: 5,
             thickness: 0.75
           }
-        ] as any[]
+        ] as unknown as Part[]
       });
       const batchUpdateParts = vi.fn();
       useProjectStore.setState({ batchUpdateParts });
@@ -603,7 +604,7 @@ describe('useKeyboardShortcuts', () => {
             width: 5,
             thickness: 0.75
           }
-        ] as any[]
+        ] as unknown as Part[]
       });
       const batchUpdateParts = vi.fn();
       useProjectStore.setState({ batchUpdateParts });
@@ -793,7 +794,7 @@ describe('useKeyboardShortcuts', () => {
       // One ungrouped part + one selected group = 2 members
       useSelectionStore.setState({ selectedPartIds: ['p1'], selectedGroupIds: ['g1'] });
       useProjectStore.setState({
-        groups: [{ id: 'g1', name: 'Existing Group' }] as any[],
+        groups: [{ id: 'g1', name: 'Existing Group' }] as unknown as Group[],
         groupMembers: []
       });
       const createGroup = vi.fn();
@@ -814,7 +815,7 @@ describe('useKeyboardShortcuts', () => {
         groups: [
           { id: 'g1', name: 'Group A' },
           { id: 'g2', name: 'Group B' }
-        ] as any[],
+        ] as unknown as Group[],
         groupMembers: []
       });
       const createGroup = vi.fn();

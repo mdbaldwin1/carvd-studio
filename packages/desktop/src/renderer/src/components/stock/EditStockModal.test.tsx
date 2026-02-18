@@ -211,7 +211,7 @@ describe('EditStockModal', () => {
 
     it('calls onClose when X button is clicked', () => {
       const onClose = vi.fn();
-      const { container } = render(<EditStockModal {...defaultProps} onClose={onClose} />);
+      render(<EditStockModal {...defaultProps} onClose={onClose} />);
 
       const closeBtn = screen.getByLabelText('Close');
       fireEvent.click(closeBtn);

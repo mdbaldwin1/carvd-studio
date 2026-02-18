@@ -2,6 +2,14 @@ import { create } from 'zustand';
 import { useProjectStore, isDescendantOf } from './projectStore';
 import { useSnapStore } from './snapStore';
 
+/** Stores pointer info from InstancedMesh pointerDown so the individual Part can pick up the drag */
+export interface DragIntent {
+  partId: string;
+  screenX: number;
+  screenY: number;
+  worldPoint: { x: number; y: number; z: number } | null;
+}
+
 interface SelectionStoreState {
   // Part selection
   selectedPartIds: string[];
@@ -12,6 +20,11 @@ interface SelectionStoreState {
     start: { x: number; y: number };
     end: { x: number; y: number };
   } | null;
+
+  // Drag intent — handoff from InstancedMesh to individual Part
+  dragIntent: DragIntent | null;
+  /** Part ID currently being dragged (keeps the part rendered individually during drag) */
+  draggingPartId: string | null;
 
   // Group selection
   selectedGroupIds: string[];
@@ -29,6 +42,9 @@ interface SelectionStoreState {
   setTransformMode: (mode: 'translate' | 'scale') => void;
   setActiveDragDelta: (delta: { x: number; y: number; z: number } | null) => void;
   setSelectionBox: (box: { start: { x: number; y: number }; end: { x: number; y: number } } | null) => void;
+  setDragIntent: (intent: DragIntent) => void;
+  clearDragIntent: () => void;
+  setDraggingPartId: (id: string | null) => void;
 
   // Actions - Group selection
   selectGroup: (groupId: string) => void;
@@ -53,6 +69,8 @@ export const useSelectionStore = create<SelectionStoreState>((set, get) => ({
   transformMode: 'translate',
   activeDragDelta: null,
   selectionBox: null,
+  dragIntent: null,
+  draggingPartId: null,
   selectedGroupIds: [],
   expandedGroupIds: [],
   editingGroupId: null,
@@ -87,6 +105,9 @@ export const useSelectionStore = create<SelectionStoreState>((set, get) => ({
   setTransformMode: (mode) => set({ transformMode: mode }),
   setActiveDragDelta: (delta) => set({ activeDragDelta: delta }),
   setSelectionBox: (box) => set({ selectionBox: box }),
+  setDragIntent: (intent) => set({ dragIntent: intent }),
+  clearDragIntent: () => set({ dragIntent: null }),
+  setDraggingPartId: (id) => set({ draggingPartId: id }),
 
   // Group selection actions
   selectGroup: (groupId) => {

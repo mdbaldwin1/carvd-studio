@@ -54,6 +54,7 @@ export function AssembliesTab({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handleCancelEditAssembly is a useCallback defined below; deps cover the values it reads
   }, [isEditingAssembly, onClose]);
 
   const handleSelectAssembly = useCallback((assembly: Assembly) => {

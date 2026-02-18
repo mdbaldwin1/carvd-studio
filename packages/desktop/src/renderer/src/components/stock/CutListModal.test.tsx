@@ -559,7 +559,7 @@ describe('CutListModal', () => {
 
     it('calls onClose when X button is clicked', () => {
       const onClose = vi.fn();
-      const { container } = render(<CutListModal {...defaultProps} onClose={onClose} />);
+      render(<CutListModal {...defaultProps} onClose={onClose} />);
 
       const closeBtn = screen.getByLabelText('Close');
       fireEvent.click(closeBtn);

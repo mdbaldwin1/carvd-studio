@@ -335,7 +335,7 @@ export function MultiSelectionDimensions() {
       <group position={[(minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2]}>
         <lineSegments>
           <edgesGeometry args={[new THREE.BoxGeometry(sizeX, sizeY, sizeZ)]} />
-          <lineBasicMaterial color="#888888" transparent opacity={0.5} />
+          <lineBasicMaterial color="#ffffff" transparent opacity={0.7} />
         </lineSegments>
       </group>
     </group>

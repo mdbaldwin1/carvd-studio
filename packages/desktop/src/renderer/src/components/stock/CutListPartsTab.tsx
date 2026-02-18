@@ -1,6 +1,5 @@
 import { ChevronDown, ChevronRight, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import React, { useState, useCallback, useMemo } from 'react';
-import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import { getBlockedMessage } from '../../utils/featureLimits';
 import { formatMeasurementWithUnit } from '../../utils/fractions';

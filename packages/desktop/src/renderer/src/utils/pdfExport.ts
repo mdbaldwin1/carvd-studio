@@ -808,7 +808,6 @@ export async function exportDiagramsToPdf(
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 40;
   const contentWidth = pageWidth - margin * 2;
-  const contentHeight = pageHeight - margin * 2 - 60; // Leave room for header
 
   // Title
   doc.setFontSize(18);

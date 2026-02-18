@@ -155,7 +155,6 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
   const saveEditingAssembly = useAssemblyEditingStore((s) => s.saveEditingAssembly);
   const cancelEditingAssembly = useAssemblyEditingStore((s) => s.cancelEditingAssembly);
   const restorePreviousProject = useAssemblyEditingStore((s) => s.restorePreviousProject);
-  const startFreshAfterAssemblyEdit = useAssemblyEditingStore((s) => s.startFreshAfterAssemblyEdit);
   const showToast = useUIStore((s) => s.showToast);
 
   const { assemblies, addAssembly, updateAssembly } = useAssemblyLibrary();
@@ -163,7 +162,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
 
   // Dialog state
   const [showExitDialog, setShowExitDialog] = useState(false);
-  const [pendingSave, setPendingSave] = useState(false);
+  const [, setPendingSave] = useState(false);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   // Start editing an existing assembly
@@ -252,8 +251,6 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
     }
 
     try {
-      const projectStore = useProjectStore.getState();
-
       // Check for manually captured thumbnail first
       let thumbnailData:
         | { data: string; width: number; height: number; generatedAt: string; manuallySet?: boolean }
@@ -341,7 +338,8 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
     updateAssembly,
     cancelEditingAssembly,
     restorePreviousProject,
-    showToast
+    showToast,
+    isCreatingNew
   ]);
 
   // Discard changes and exit editing mode
