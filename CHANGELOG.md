@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Website: Tailwind CSS 4 + shadcn/ui foundation** — Installed `tailwindcss` and `@tailwindcss/vite` in the website package; configured `vite.config.ts` with the Tailwind Vite plugin and `@/` path alias; created `src/tailwind.css`, `src/lib/utils.ts` with `cn()`, `src/components/ui/` directory, and `components.json` for shadcn CLI; installed `tailwind-merge`, `clsx`, and `class-variance-authority` (bead carvd-studio-9.1)
 - **shadcn/ui foundation** — Installed core utility dependencies (tailwind-merge, clsx, class-variance-authority), created `cn()` class merging utility, and configured `components.json` for the desktop app with `@renderer/` path aliases
 - **shadcn/ui theming bridge** — Mapped Twilight Studio CSS custom properties to shadcn conventions (`--background`, `--foreground`, `--primary`, `--destructive`, etc.) in both dark and light themes, with new Tailwind utility classes for non-conflicting tokens
 
