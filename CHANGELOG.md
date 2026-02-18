@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Start screen Settings & Library buttons** — Added icon buttons in the start screen header for quick access to App Settings and Stock/Assembly Library without needing to open a project first
+- **Assembly editing from start screen** — Can now enter assembly edit mode directly from the start screen's assembly library
+- **Inline name editing on AssemblyEditingBanner** — Click the assembly name in the editing banner to rename it in-place
+
+### Changed
+
+- **Aesthetic redesign ("Twilight Studio" theme)** — Refreshed dark/light color palette with Twilight Indigo (#203864), Cerulean (#077187), Lilac Ash (#AEA4BF), Gold (#FFD21F), and Papaya Whip (#FFEECF); updated backgrounds, borders, text tones, sidebar, header, and button styles
+- **Font update** — Switched to Nunito Sans for improved readability and warmth
+- **Splash screen theming** — Splash screen now respects light/dark mode with theme-aware colors and font
+- **3D scene theming** — Canvas background and grid colors now follow the active theme
+
+### Fixed
+
+- **New Template button text contrast** — Button text on gold background is now dark (Twilight Indigo) instead of invisible white
+- **"Start Editing" from new template modal** — Creating a new template from the templates screen now correctly enters the 3D editor
+- **Recents not opening after templates navigation** — Clicking a recent project after visiting the templates screen now reliably opens the project
+- **Library icon inconsistency** — Start screen library button now uses the same `Library` icon as the editor header
+- **Assembly thumbnail rendering** — Fixed missing `data:image/png;base64,` prefix in AssembliesTab causing broken thumbnail images
+
 ### Changed
 
 - **Updated project documentation** — Corrected outdated coverage thresholds (91/82/90/91), test count (2675), Tailwind CSS 4 architecture, and store inventory across CLAUDE.md, project-prompt.md, design-patterns.md, features-roadmap.md, and launch-checklist.md

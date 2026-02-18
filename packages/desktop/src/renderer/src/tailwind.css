@@ -1,15 +1,25 @@
-/* Google Fonts - Roboto & Roboto Slab */
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&family=Roboto+Slab:wght@400;500;600;700&display=swap');
+/* Google Fonts - Nunito Sans */
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;500;600;700&display=swap');
 
 @import 'tailwindcss';
 
 /* ===========================================
-   CSS CUSTOM PROPERTIES
-   Dark theme (default) and light theme overrides
+   CSS CUSTOM PROPERTIES — "Twilight Studio" redesign
+   Uses Twilight Indigo backgrounds, Cerulean accents,
+   Bright Amber CTAs, Lilac Ash subtle tones
    =========================================== */
 
 :root {
-  /* Backgrounds - dark greys */
+  /*
+   * PALETTE (exact user-supplied hex values):
+   *   #203864  Twilight Indigo
+   *   #077187  Cerulean
+   *   #AEA4BF  Lilac Ash
+   *   #FFD21F  Gold
+   *   #FFEECF  Papaya Whip
+   */
+
+  /* Backgrounds — dark greys (same as original) */
   --color-bg: #1a1a1a;
   --color-bg-alt: #222222;
   --color-bg-hover: #2a2a2a;
@@ -26,156 +36,160 @@
   --color-bg-tertiary: #2e2e2e;
   --color-bg-sidebar: var(--color-surface);
 
-  /* Text - cream tones */
-  --color-text: #ffeecf;
-  --color-text-muted: #a89f8f;
+  /* Text — Papaya Whip & Lilac Ash */
+  --color-text: #ffeecf; /* ← exact Papaya Whip */
+  --color-text-muted: #aea4bf; /* ← exact Lilac Ash */
   --color-text-secondary: var(--color-text-muted);
-  --color-text-tertiary: #7a7265;
+  --color-text-tertiary: #8a7ea3; /* Lilac Ash darkened */
 
-  /* Accent - lavender (decorative, focus, highlights) */
-  --color-accent: #aea4bf;
-  --color-accent-hover: #c4bcd0;
-  --color-accent-muted: #8d82a3;
-  --color-accent-bg: rgba(174, 164, 191, 0.15);
-  --color-accent-foreground: #1a1a1a; /* Dark text on light lavender */
+  /* Accent — Cerulean (interactive: focus, highlights, active states) */
+  --color-accent: #077187; /* ← exact Cerulean */
+  --color-accent-hover: #0990a6; /* Cerulean lightened */
+  --color-accent-muted: #055a6c; /* Cerulean darkened */
+  --color-accent-bg: rgba(7, 113, 135, 0.15);
+  --color-accent-foreground: #ffeecf; /* Papaya Whip on Cerulean */
 
-  /* Primary - teal (main CTAs, buttons) */
-  --color-primary: #077187;
-  --color-primary-hover: #09a2bc;
-  --color-primary-muted: #055f70;
-  --color-primary-bg: rgba(7, 113, 135, 0.15);
-  --color-primary-foreground: #ffffff; /* White text on teal */
+  /* Primary — Gold (CTAs, emphasis) */
+  --color-primary: #ffd21f; /* ← exact Gold */
+  --color-primary-hover: #ffd94d; /* Gold lightened */
+  --color-primary-muted: #d4ae19; /* Gold darkened */
+  --color-primary-bg: rgba(255, 210, 31, 0.1);
+  --color-primary-foreground: #203864; /* Twilight Indigo on Gold */
 
-  /* Secondary - deep navy (emphasis, active states) */
-  --color-secondary: #203864;
-  --color-secondary-hover: #2d4a80;
-  --color-secondary-muted: #162749;
-  --color-secondary-foreground: #ffffff; /* White text on navy */
+  /* Secondary — Twilight Indigo (emphasis, badges, deep accents) */
+  --color-secondary: #203864; /* ← exact Twilight Indigo */
+  --color-secondary-hover: #2a4a82; /* Twilight Indigo lightened */
+  --color-secondary-muted: #182a4c; /* Twilight Indigo darkened */
+  --color-secondary-foreground: #ffeecf; /* Papaya Whip on Indigo */
 
-  /* Semantic colors */
-  --color-warning: #ffd21f;
-  --color-warning-hover: #ffe566;
-  --color-warning-bg: rgba(255, 210, 31, 0.15);
-  --color-warning-border: #ffd21f;
-  --color-warning-text: #1a1a1a;
+  /* Semantic — warning */
+  --color-warning: #ffa600;
+  --color-warning-hover: #ffb833;
+  --color-warning-bg: rgba(255, 166, 0, 0.12);
+  --color-warning-border: #ffa600;
+  --color-warning-text: #203864;
 
+  /* Semantic — danger */
   --color-danger: #c45454;
   --color-danger-hover: #d46b6b;
   --color-danger-bg: rgba(196, 84, 84, 0.15);
   --color-danger-border: #c45454;
 
+  /* Semantic — success */
   --color-success: #2a9d6a;
   --color-success-hover: #34b87d;
-  --color-success-bg: rgba(42, 157, 106, 0.15);
+  --color-success-bg: rgba(42, 157, 106, 0.12);
   --color-success-border: #2a9d6a;
 
-  /* Error - alias for danger (commonly used naming) */
+  /* Error — alias for danger */
   --color-error: var(--color-danger);
   --color-error-hover: var(--color-danger-hover);
   --color-error-bg: var(--color-danger-bg);
   --color-error-border: var(--color-danger-border);
   --color-error-text: var(--color-danger);
 
-  /* Reference parts - uses teal from palette */
-  --color-reference: #077187;
-  --color-reference-bg: rgba(7, 113, 135, 0.15);
+  /* Reference parts — Cerulean */
+  --color-reference: #077187; /* ← exact Cerulean */
+  --color-reference-bg: rgba(7, 113, 135, 0.12);
 
-  /* Info - uses lavender for informational elements */
-  --color-info: #aea4bf;
-  --color-info-bg: rgba(174, 164, 191, 0.15);
-  --color-info-border: #aea4bf;
+  /* Info — Lilac Ash */
+  --color-info: #aea4bf; /* ← exact Lilac Ash */
+  --color-info-bg: rgba(174, 164, 191, 0.12);
+  --color-info-border: #aea4bf; /* ← exact Lilac Ash */
   --color-info-text: #ffeecf;
 
   /* Layout */
-  --sidebar-width: 240px;
-  --header-height: 48px;
+  --sidebar-width: 264px;
+  --header-height: 56px;
 
   /* Spacing & Radii */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 
   color-scheme: dark;
 }
 
-/* Light theme */
+/* Light theme — Papaya Whip backgrounds with Cerulean & Indigo accents */
 [data-theme='light'] {
-  /* Backgrounds - light cream/neutral tones */
-  --color-bg: #ffeecf;
-  --color-bg-alt: #f5e4bf;
-  --color-bg-hover: #ebe0c0;
-  --color-bg-dark: #1a1a1a;
-  --color-surface: #fff8eb;
-  --color-surface-hover: #f5eddc;
-  --color-border: #d4c9b0;
-  --color-selected: #e8dcc5;
-  --color-overlay: rgba(0, 0, 0, 0.5);
-  --color-overlay-heavy: rgba(0, 0, 0, 0.65);
+  /* Backgrounds — warm cream tones from Papaya Whip */
+  --color-bg: #ffeecf; /* ← exact Papaya Whip */
+  --color-bg-alt: #ffe4b5; /* Papaya Whip darkened */
+  --color-bg-hover: #ffddaa;
+  --color-bg-dark: #203864; /* ← exact Twilight Indigo */
+  --color-surface: #fff8e8; /* Warm white (Papaya Whip lightened) */
+  --color-surface-hover: #fff0d4;
+  --color-border: #d4c8b0; /* Warm grey border */
+  --color-selected: #e8dcc8;
+  --color-overlay: rgba(32, 56, 100, 0.4);
+  --color-overlay-heavy: rgba(32, 56, 100, 0.6);
 
-  /* Aliases for semantic naming */
+  /* Aliases */
   --color-bg-secondary: var(--color-bg-alt);
-  --color-bg-tertiary: #e5d8b5;
+  --color-bg-tertiary: #ffd8a0;
   --color-bg-sidebar: var(--color-surface);
 
-  /* Text - dark tones */
-  --color-text: #1a1a1a;
-  --color-text-muted: #5a5247;
+  /* Text — Twilight Indigo & Lilac Ash */
+  --color-text: #203864; /* ← exact Twilight Indigo */
+  --color-text-muted: #756b82; /* Lilac Ash darkened for contrast */
   --color-text-secondary: var(--color-text-muted);
-  --color-text-tertiary: #8a8275;
+  --color-text-tertiary: #aea4bf; /* ← exact Lilac Ash */
 
-  /* Accent - lavender */
-  --color-accent: #8d82a3;
-  --color-accent-hover: #7a6f91;
-  --color-accent-muted: #aea4bf;
-  --color-accent-bg: rgba(141, 130, 163, 0.15);
-  --color-accent-foreground: #ffffff; /* White text on darker lavender in light mode */
+  /* Accent — Cerulean (same hue, works well on light bg) */
+  --color-accent: #077187; /* ← exact Cerulean */
+  --color-accent-hover: #055a6c; /* Cerulean darkened */
+  --color-accent-muted: #0990a6; /* Cerulean lightened */
+  --color-accent-bg: rgba(7, 113, 135, 0.1);
+  --color-accent-foreground: #ffffff;
 
-  /* Primary - teal */
-  --color-primary: #055f70;
-  --color-primary-hover: #044d5b;
-  --color-primary-muted: #077187;
-  --color-primary-bg: rgba(5, 95, 112, 0.12);
-  --color-primary-foreground: #ffffff; /* White text on teal */
+  /* Primary — Gold (darkened for contrast against cream bg) */
+  --color-primary: #d4ae19; /* Gold darkened for light bg */
+  --color-primary-hover: #b8960e; /* Gold further darkened */
+  --color-primary-muted: #ffd21f; /* ← exact Gold */
+  --color-primary-bg: rgba(255, 210, 31, 0.15);
+  --color-primary-foreground: #203864; /* Twilight Indigo on Gold */
 
-  /* Secondary - deep navy */
-  --color-secondary: #203864;
-  --color-secondary-hover: #162749;
-  --color-secondary-muted: #2d4a80;
-  --color-secondary-foreground: #ffffff; /* White text on navy */
+  /* Secondary — Twilight Indigo */
+  --color-secondary: #203864; /* ← exact Twilight Indigo */
+  --color-secondary-hover: #182a4c; /* Indigo darkened */
+  --color-secondary-muted: #2a4a82; /* Indigo lightened */
+  --color-secondary-foreground: #ffffff;
 
-  /* Semantic colors */
-  --color-warning: #d9a800;
-  --color-warning-hover: #c49700;
-  --color-warning-bg: rgba(217, 168, 0, 0.15);
-  --color-warning-border: #d9a800;
-  --color-warning-text: #1a1a1a;
+  /* Semantic — warning */
+  --color-warning: #cc8500;
+  --color-warning-hover: #996300;
+  --color-warning-bg: rgba(204, 133, 0, 0.12);
+  --color-warning-border: #cc8500;
+  --color-warning-text: #203864;
 
+  /* Semantic — danger */
   --color-danger: #b84343;
   --color-danger-hover: #a33a3a;
-  --color-danger-bg: rgba(184, 67, 67, 0.15);
+  --color-danger-bg: rgba(184, 67, 67, 0.12);
   --color-danger-border: #b84343;
 
+  /* Semantic — success */
   --color-success: #228055;
   --color-success-hover: #1a6644;
-  --color-success-bg: rgba(34, 128, 85, 0.12);
+  --color-success-bg: rgba(34, 128, 85, 0.1);
   --color-success-border: #228055;
 
-  /* Error - alias for danger */
+  /* Error — alias for danger */
   --color-error: var(--color-danger);
   --color-error-hover: var(--color-danger-hover);
   --color-error-bg: var(--color-danger-bg);
   --color-error-border: var(--color-danger-border);
   --color-error-text: var(--color-danger);
 
-  /* Reference parts */
-  --color-reference: #055f70;
-  --color-reference-bg: rgba(5, 95, 112, 0.12);
+  /* Reference — Cerulean darkened */
+  --color-reference: #055a6c;
+  --color-reference-bg: rgba(5, 90, 108, 0.1);
 
-  /* Info - lavender for informational elements */
-  --color-info: #7a6f91;
-  --color-info-bg: rgba(122, 111, 145, 0.12);
-  --color-info-border: #8d82a3;
-  --color-info-text: #1a1a1a;
+  /* Info — Lilac Ash */
+  --color-info: #756b82; /* Lilac Ash darkened for contrast */
+  --color-info-bg: rgba(117, 107, 130, 0.1);
+  --color-info-border: #aea4bf; /* ← exact Lilac Ash */
+  --color-info-text: #203864;
 
   color-scheme: light;
 }
@@ -207,21 +221,21 @@
   --color-text-secondary: var(--color-text-secondary);
   --color-text-tertiary: var(--color-text-tertiary);
 
-  /* Accent - lavender */
+  /* Accent - cerulean */
   --color-accent: var(--color-accent);
   --color-accent-hover: var(--color-accent-hover);
   --color-accent-muted: var(--color-accent-muted);
   --color-accent-bg: var(--color-accent-bg);
   --color-accent-foreground: var(--color-accent-foreground);
 
-  /* Primary - teal */
+  /* Primary - gold */
   --color-primary: var(--color-primary);
   --color-primary-hover: var(--color-primary-hover);
   --color-primary-muted: var(--color-primary-muted);
   --color-primary-bg: var(--color-primary-bg);
   --color-primary-foreground: var(--color-primary-foreground);
 
-  /* Secondary - deep navy */
+  /* Secondary - twilight indigo */
   --color-secondary: var(--color-secondary);
   --color-secondary-hover: var(--color-secondary-hover);
   --color-secondary-muted: var(--color-secondary-muted);
