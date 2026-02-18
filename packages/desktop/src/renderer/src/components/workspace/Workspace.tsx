@@ -28,6 +28,39 @@ import {
   clearRightClickTarget
 } from './workspaceUtils';
 
+// Reads the effective theme from the DOM and returns 'light' or 'dark'
+function useEffectiveTheme(): 'light' | 'dark' {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  });
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const t = document.documentElement.getAttribute('data-theme');
+      setTheme(t === 'light' ? 'light' : 'dark');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  return theme;
+}
+
+// Pre-allocated colors for scene background (avoids allocs in render/effect)
+const _bgDark = new THREE.Color('#1a1a1a');
+const _bgLight = new THREE.Color('#f5f0e0');
+
+/** Sets the Three.js scene.background to match the active theme */
+function SceneBackground({ theme }: { theme: 'light' | 'dark' }) {
+  const scene = useThree((s) => s.scene);
+
+  useEffect(() => {
+    scene.background = theme === 'light' ? _bgLight : _bgDark;
+  }, [theme, scene]);
+
+  return null;
+}
+
 export function Workspace() {
   const parts = useProjectStore((s) => s.parts);
   const clearSelection = useSelectionStore((s) => s.clearSelection);
@@ -44,6 +77,7 @@ export function Workspace() {
   const lightingMode = useAppSettingsStore((s) => s.settings.lightingMode) || 'default';
   const brightnessMultiplier = useAppSettingsStore((s) => s.settings.brightnessMultiplier) ?? 1.0;
   const lightingPreset = LIGHTING_PRESETS[lightingMode];
+  const effectiveTheme = useEffectiveTheme();
 
   const { camera, gl, controls } = useThree();
 
@@ -427,6 +461,8 @@ export function Workspace() {
 
   return (
     <>
+      {/* Scene background color (matches theme) */}
+      <SceneBackground theme={effectiveTheme} />
       {/* Camera controller for centering on selection */}
       <CameraController />
       {/* Canvas capture handler for export */}
@@ -468,16 +504,16 @@ export function Workspace() {
         <meshBasicMaterial visible={false} side={1} /> {/* BackSide = 1 */}
       </mesh>
 
-      {/* Visual grid */}
+      {/* Visual grid — colors adapt to theme */}
       {showGrid && (
         <Grid
           args={[200, 200]}
           cellSize={GRID_SIZE}
           cellThickness={0.5}
-          cellColor="#4a4a4a"
+          cellColor={effectiveTheme === 'light' ? '#c0b8a8' : '#4a4a4a'}
           sectionSize={12}
           sectionThickness={1}
-          sectionColor="#6a6a6a"
+          sectionColor={effectiveTheme === 'light' ? '#a09888' : '#6a6a6a'}
           fadeDistance={100}
           fadeStrength={1}
           followCamera={false}
