@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **shadcn/ui foundation** — Installed core utility dependencies (tailwind-merge, clsx, class-variance-authority), created `cn()` class merging utility, and configured `components.json` for the desktop app with `@renderer/` path aliases
+
 - **Start screen Settings & Library buttons** — Added icon buttons in the start screen header for quick access to App Settings and Stock/Assembly Library without needing to open a project first
 - **Assembly editing from start screen** — Can now enter assembly edit mode directly from the start screen's assembly library
 - **Inline name editing on AssemblyEditingBanner** — Click the assembly name in the editing banner to rename it in-place
