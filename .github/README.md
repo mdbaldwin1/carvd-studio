@@ -49,7 +49,15 @@ Runs on pull requests targeting `main`. Fails if `CHANGELOG.md` was not modified
 
 ### `release.yml` - Release Pipeline
 
-Triggered by pushes to `main`. Builds macOS (code-signed + notarized) and Windows installers, creates a GitHub Release, updates the website version on Vercel, and creates a version bump PR targeting `develop`.
+Triggered by pushes to `main`. Builds macOS (code-signed + notarized) and Windows installers, creates a GitHub Release, and creates a desktop version bump PR targeting `develop`.
+
+### `sync-develop.yml` - Main → Develop Sync
+
+Triggered by pushes to `main`. Creates a branch that merges `main` back into `develop` and opens a PR, skipping version-bump commits to avoid loops.
+
+### `website-version-bump.yml` - Website Deployment & Versioning
+
+Triggered by pushes to `main` when `packages/website/**` files change. Deploys to Vercel, creates a `website-v*` git tag, then opens a PR on `develop` to bump the website patch version.
 
 ## Troubleshooting
 

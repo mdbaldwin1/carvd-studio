@@ -184,8 +184,8 @@ The website uses **Tailwind CSS** independently from the desktop app.
 ```
 feat: add dimension matching snap
 fix: kerf not applied correctly
+perf: hybrid InstancedMesh rendering
 refactor: extract snap detection
-style: update button classes
 ```
 
 ## Code Quality
@@ -206,7 +206,7 @@ Both packages have `format:check` scripts for CI:
 ### Overview
 
 - **Framework:** Vitest + React Testing Library
-- **Coverage:** ~92% statements, ~82% branches (2675 tests)
+- **Coverage:** ~92% statements, ~82% branches (2822 tests: 2675 renderer + 147 main)
 - **Location:** Tests colocated with source files (`*.test.ts`, `*.test.tsx`)
 - **Helpers:** `/packages/desktop/tests/helpers/factories.ts`
 
@@ -224,7 +224,7 @@ npm run test -- --watch   # Watch mode
 ```typescript
 // Part factories
 createTestPart(overrides?)
-createTestPartWithStock(overrides?)
+createTestPartWithStock(stockId, overrides?)
 
 // Stock factories
 createTestStock(overrides?)
@@ -233,7 +233,7 @@ createBoardStock(overrides?)
 
 // Group factories
 createTestGroup(overrides?)
-createTestGroupMember(overrides?)
+createTestGroupMember(groupId, memberId, memberType?)
 
 // Assembly factory
 createTestAssembly(overrides?)

@@ -30,7 +30,7 @@ npm run dev:desktop      # Run Electron app
 npm run build:desktop    # Build production
 npm run package:mac      # Create macOS DMG
 npm run package:win      # Create Windows installer
-npm run test             # Run all tests (2675 tests, ~92% coverage)
+npm run test             # Run all tests (2822 tests, ~92% coverage)
 npm run test:coverage    # Run with coverage report
 ```
 
@@ -110,8 +110,10 @@ git worktree add ../carvd-studio-security fix/security-vulnerabilities
 ## CI/CD
 
 - **test.yml** — Runs on all PRs to `main`/`develop`: unit tests, E2E tests (3 platforms), lint/typecheck/format (desktop + website), website unit tests, website E2E tests
-- **release.yml** — Triggered by push to `main`: builds macOS (code-signed + notarized) + Windows, creates GitHub Release, syncs develop, bumps version
+- **release.yml** — Triggered by push to `main`: builds macOS (code-signed + notarized) + Windows, creates GitHub Release, bumps desktop patch version on `develop`
 - **changelog-check.yml** — Fails PRs to `main` if CHANGELOG.md wasn't modified
+- **sync-develop.yml** — Triggered by push to `main`: merges main back into develop via PR
+- **website-version-bump.yml** — Triggered by push to `main` when website files change: deploys to Vercel, creates `website-v*` tag, bumps website version on `develop`
 - **Auto-updater** — electron-updater via GitHub Releases
 - **Pre-commit hooks** — husky + lint-staged runs `prettier --check` on staged files
 - **Node version** — Pinned in `.nvmrc` (Node 22), all CI workflows use `node-version-file`
@@ -123,7 +125,8 @@ Both `develop` and `main` are protected:
 - No direct pushes (even for admins — `enforce_admins: true`)
 - All changes must go through pull requests
 - All CI checks must pass before merging
-- PRs to `main` use squash merge
+- `develop` → `main` uses merge commit (preserves shared ancestry for sync-develop)
+- Hotfix branches → `main` use squash merge
 
 ## Documentation
 

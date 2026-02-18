@@ -9,7 +9,7 @@ Offline desktop application for designing custom furniture and cabinetry with 3D
 - **Stock Management** - Define and assign stock materials
 - **Cut List Generation** - Optimized cutting diagrams with waste tracking
 - **PDF Export** - Professional cut lists and shopping lists
-- **License Verification** - Offline JWT-based licensing
+- **License Verification** - Lemon Squeezy API with 7-day offline cache
 - **Themes** - Dark, Light, and System theme support
 - **Undo/Redo** - Full history with Zundo
 - **Offline First** - No internet required
@@ -48,13 +48,17 @@ packages/desktop/
 │   ├── main/              → Electron main process
 │   │   ├── index.ts       → Main entry point
 │   │   ├── license.ts     → License verification
+│   │   ├── lemonsqueezy-api.ts → Lemon Squeezy API client
+│   │   ├── trial.ts       → Trial period logic
 │   │   ├── keys.ts        → Public key for license verification
+│   │   ├── menu.ts        → Application menu
+│   │   ├── updater.ts     → Auto-update logic
 │   │   └── store.ts       → Persistent storage (electron-store)
 │   ├── renderer/          → React UI
 │   │   └── src/
 │   │       ├── components/     → React components
 │   │       ├── hooks/          → Custom hooks
-│   │       ├── stores/         → Zustand stores
+│   │       ├── store/          → Zustand stores
 │   │       ├── types/          → TypeScript types
 │   │       └── utils/          → Utilities
 │   └── preload/           → Preload scripts (IPC bridge)
@@ -66,12 +70,13 @@ packages/desktop/
 
 ## License System
 
-This app uses offline license verification:
+This app uses a freemium model with Lemon Squeezy for payments:
 
-1. License keys are JWT tokens signed with RSA-2048
-2. Public key is embedded in the app ([src/main/keys.ts](src/main/keys.ts))
-3. Verification happens locally (no phone-home)
+1. 14-day free trial with full features on first launch
+2. License keys purchased through Lemon Squeezy checkout
+3. Validation via Lemon Squeezy API with 7-day offline cache
 4. License data stored in electron-store
+5. Feature-limited free mode after trial expires (10 parts, 5 stocks, no PDF/optimizer/groups)
 
 ### Generate Test License
 
@@ -104,6 +109,7 @@ Update `package.json` build section with your Apple Developer ID:
 ### Notarization (macOS)
 
 Set environment variables:
+
 - `APPLE_ID` - Your Apple ID email
 - `APPLE_ID_PASSWORD` - App-specific password
 - `APPLE_TEAM_ID` - Your team ID
@@ -118,18 +124,18 @@ npm run package:mac
 
 ## Tech Stack
 
-- **Electron** 28 - Desktop framework
-- **React** 18 - UI library
+- **Electron** 40 - Desktop framework
+- **React** 19 - UI library
 - **TypeScript** 5 - Type safety
-- **Three.js** - 3D rendering
-- **@react-three/fiber** - React renderer for Three.js
-- **@react-three/drei** - Three.js helpers
-- **Zustand** - State management
-- **Zundo** - Undo/redo middleware
+- **Three.js** 0.182 - 3D rendering
+- **@react-three/fiber** 9 - React renderer for Three.js
+- **@react-three/drei** 10 - Three.js helpers
+- **Zustand** 5 - State management
+- **Zundo** 2 - Undo/redo middleware
+- **Tailwind CSS** 4 - Styling with CSS custom properties for theming
 - **electron-store** - Persistent storage
-- **jsonwebtoken** - License verification
 - **jsPDF** - PDF export
-- **Vite** - Build tool (via electron-vite)
+- **Vite** 7 - Build tool (via electron-vite)
 
 ## Building for Production
 
@@ -142,6 +148,7 @@ npm run package:mac
 Output: `dist/Carvd Studio-{version}.dmg`
 
 Requirements:
+
 - macOS machine
 - Apple Developer ID certificate (for distribution outside Mac App Store)
 - Code signing identity configured
@@ -155,6 +162,7 @@ npm run package:win
 Output: `dist/Carvd Studio Setup {version}.exe`
 
 Requirements:
+
 - Windows machine or cross-compilation setup
 - Code signing certificate (optional but recommended)
 

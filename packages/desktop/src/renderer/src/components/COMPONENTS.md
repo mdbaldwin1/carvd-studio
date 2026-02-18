@@ -27,7 +27,7 @@ Each directory groups components by **business domain**, not by component type.
 
 - One component per file: `ComponentName.tsx`
 - Colocated tests: `ComponentName.test.tsx`
-- Colocated CSS (legacy, migrating to Tailwind): `ComponentName.css`
+- Colocated CSS (rare — prefer Tailwind utility classes): `ComponentName.css`
 - Hooks: `useHookName.ts` (colocated with consuming component)
 - Types: `types.ts` or `componentTypes.ts` (when shared across files in a directory)
 - Utilities: `componentUtils.ts` (when shared across files in a directory)
@@ -87,11 +87,11 @@ All interactive components must include:
 
 ### CSS & Styling
 
-The codebase is migrating from standalone CSS files to Tailwind CSS:
+The codebase uses Tailwind CSS 4 with CSS custom properties for theming:
 
-- **Shared primitives** are defined in `primitives.css` using `@apply` (buttons, forms, scrollbars)
-- **New components** should use Tailwind utility classes directly or reference `primitives.css` classes
-- **Legacy CSS files** will be migrated incrementally (Epic 1)
+- **Shared primitives** are defined in `primitives.css` (buttons, forms, scrollbars)
+- **Components** use Tailwind utility classes with theme tokens (e.g., `bg-surface`, `text-text-muted`, `border-border`)
+- **Theme styles** are in four CSS files: `tailwind.css`, `primitives.css`, `layout.css`, `domain.css`
 - Avoid creating new `.css` files — use existing primitive classes or inline Tailwind
 
 ### Testing

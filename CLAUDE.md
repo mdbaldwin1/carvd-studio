@@ -11,7 +11,7 @@
 
 - **develop** — Integration branch. All feature work targets here via PRs.
 - **main** — Production branch. Protected. Only receives PRs from develop. Merge commit (not squash).
-- **Feature branches** — Created from develop. Named with prefixes: `feat/`, `fix/`, `chore/`, `docs/`, `test/`, `refactor/`.
+- **Feature branches** — Created from develop. Named with prefixes: `feat/`, `fix/`, `perf/`, `chore/`, `docs/`, `test/`, `refactor/`.
 - **Hotfix branches** — Created from **main** (not develop). Named `hotfix/description`. Used for urgent production fixes.
 
 ### Branch Protection
@@ -28,6 +28,7 @@ Use conventional commit prefixes:
 
 - `feat:` — New feature or functionality
 - `fix:` — Bug fix
+- `perf:` — Performance improvement
 - `chore:` — Maintenance, dependencies, CI/CD changes
 - `docs:` — Documentation only
 - `test:` — Test additions or modifications
