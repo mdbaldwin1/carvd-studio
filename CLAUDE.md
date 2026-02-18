@@ -122,7 +122,7 @@ This project follows [Semantic Versioning](https://semver.org/). Desktop and web
 
 Coverage thresholds are enforced via `coverage.thresholds` in vitest configs. CI will fail if coverage drops below these minimums.
 
-**Renderer** (`vitest.config.ts`): statements 80%, branches 72%, functions 85%, lines 80%
+**Renderer** (`vitest.config.ts`): statements 91%, branches 82%, functions 90%, lines 91%
 **Main process** (`vitest.main.config.ts`): statements 73%, branches 70%, functions 66%, lines 74%
 
 ### Test Patterns
@@ -170,6 +170,31 @@ npm run dev          # Start dev server
 npm test             # Run tests
 npm run build        # Build for production
 ```
+
+## Styling
+
+The desktop app uses **Tailwind CSS 4** with CSS custom properties for theming. Styles are split across:
+
+- `tailwind.css` — Tailwind import, CSS custom properties (`:root` dark theme + `[data-theme='light']`), `@theme inline` mappings, custom animations
+- `primitives.css` — Base component styles (buttons, inputs, modals, scrollbars, fonts)
+- `layout.css` — Layout-specific styles (sidebar, header, panels)
+- `domain.css` — Domain-specific styles (3D workspace, cut list, part rendering)
+
+Components use Tailwind utility classes referencing theme tokens (e.g., `bg-bg`, `text-text-muted`, `border-border`). The website uses Tailwind independently.
+
+## Store Architecture
+
+Zustand stores are split by concern:
+
+- `projectStore` — Domain data (parts, stocks, groups, assemblies), undo/redo via zundo
+- `uiStore` — Transient UI state (toast, modals, thumbnails, tutorial)
+- `selectionStore` — Selection state (selectedPartIds, hoveredPartId)
+- `cameraStore` — Camera state (position, target, zoom)
+- `clipboardStore` — Copy/paste buffer
+- `snapStore` — Snap detection state
+- `licenseStore` — License mode, trial status
+- `appSettingsStore` — User preferences (theme, units, grid)
+- `assemblyEditingStore` — Assembly edit mode state
 
 ## Performance Guidelines
 
