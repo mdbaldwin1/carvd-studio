@@ -1,90 +1,10 @@
 /* ==========================================================================
    Carvd Studio Design System
    Web Application Styles
+   CSS variables are defined in tailwind.css (imported before this file).
    ========================================================================== */
 
 /* Google Fonts loaded via <link> in index.html for faster discovery */
-
-/* CSS Variables - Design Tokens
-   ========================================================================== */
-:root {
-  /* Colors - Dark Theme (matches desktop app) */
-  --color-bg: #1a1a1a;
-  --color-bg-alt: #222222;
-  --color-surface: #242424;
-  --color-surface-elevated: #2d2d2d;
-  --color-border: #333333;
-  --color-text: #ffeecf;
-  --color-text-muted: #a89f8f;
-
-  /* Accent - Lavender */
-  --color-accent: #aea4bf;
-  --color-accent-hover: #c4bcd0;
-  --color-accent-muted: #8d82a3;
-
-  /* Primary - Teal */
-  --color-primary: #077187;
-  --color-primary-hover: #09a2bc;
-  --color-primary-text: #09a2bc; /* AA-compliant text on dark bg (5.97:1) */
-
-  /* Semantic Colors */
-  --color-success: #2a9d6a;
-  --color-warning: #ffd21f;
-  --color-error: #c45454;
-  --color-highlight: #ffd21f;
-
-  /* Spacing Scale */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 16px;
-  --space-lg: 24px;
-  --space-xl: 32px;
-  --space-2xl: 48px;
-  --space-3xl: 64px;
-
-  /* Typography */
-  --font-sans:
-    "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", "Oxygen", "Ubuntu",
-    "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-  --font-heading: "Roboto Slab", Georgia, "Times New Roman", serif;
-  --font-mono: "Monaco", "Courier New", monospace;
-
-  --font-size-xs: 12px;
-  --font-size-sm: 14px;
-  --font-size-base: 16px;
-  --font-size-lg: 18px;
-  --font-size-xl: 20px;
-  --font-size-2xl: 24px;
-  --font-size-3xl: 32px;
-  --font-size-4xl: 40px;
-  --font-size-5xl: 48px;
-  --font-size-6xl: 64px;
-
-  --line-height-tight: 1.2;
-  --line-height-normal: 1.5;
-  --line-height-relaxed: 1.75;
-
-  /* Border Radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-full: 9999px;
-
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
-
-  /* Transitions */
-  --transition-fast: 150ms ease-in-out;
-  --transition-base: 250ms ease-in-out;
-  --transition-slow: 400ms ease-in-out;
-
-  /* Container Width */
-  --container-max-width: 1200px;
-  --container-padding: var(--space-lg);
-}
 
 /* Reset & Base Styles
    ========================================================================== */
