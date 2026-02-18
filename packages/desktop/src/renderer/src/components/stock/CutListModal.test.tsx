@@ -3,6 +3,7 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 import { CutListModal } from './CutListModal';
 import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
+import { useLicenseStore } from '../../store/licenseStore';
 import { generateOptimizedCutList } from '../../utils/cutListOptimizer';
 import { Part, Stock, CutList } from '../../types';
 
@@ -12,13 +13,19 @@ vi.mock('../../utils/cutListOptimizer', () => ({
 }));
 
 // Mock the pdfExport
+const mockExportProjectReportToPdf = vi.fn().mockResolvedValue({ success: true });
 vi.mock('../../utils/pdfExport', () => ({
   exportDiagramsToPdf: vi.fn().mockResolvedValue({ success: true }),
   exportCutListToCsv: vi.fn().mockReturnValue('mock,csv,content'),
   exportShoppingListToCsv: vi.fn().mockReturnValue('mock,shopping,csv'),
   exportCutListToPdf: vi.fn().mockResolvedValue({ success: true }),
   exportShoppingListToPdf: vi.fn().mockResolvedValue({ success: true }),
-  exportProjectReportToPdf: vi.fn().mockResolvedValue({ success: true })
+  exportProjectReportToPdf: (...args: unknown[]) => mockExportProjectReportToPdf(...args)
+}));
+
+// Mock logger
+vi.mock('../../utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
 }));
 
 // Create mock data
@@ -149,11 +156,13 @@ describe('CutListModal', () => {
       addCustomShoppingItem: vi.fn(),
       updateCustomShoppingItem: vi.fn(),
       deleteCustomShoppingItem: vi.fn(),
-      projectName: 'Test Project'
+      projectName: 'Test Project',
+      notes: ''
     });
     useUIStore.setState({
       showToast: vi.fn()
     });
+    useLicenseStore.setState({ licenseMode: 'trial' });
   });
 
   afterEach(() => {
@@ -1002,6 +1011,218 @@ describe('CutListModal', () => {
       fireEvent.click(screen.getByText('Cutting Diagrams (0)'));
 
       expect(screen.getByText('No cutting diagrams to display.')).toBeInTheDocument();
+    });
+  });
+
+  describe('handleDownloadProjectReport', () => {
+    beforeEach(() => {
+      useProjectStore.setState({ cutList: mockCutList });
+    });
+
+    it('shows Download Project Report button when cut list exists', () => {
+      render(<CutListModal {...defaultProps} />);
+
+      expect(screen.getByText('Download Project Report')).toBeInTheDocument();
+    });
+
+    it('calls exportProjectReportToPdf on success', async () => {
+      mockExportProjectReportToPdf.mockResolvedValueOnce({ success: true });
+
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download Project Report'));
+
+      await waitFor(() => {
+        expect(mockExportProjectReportToPdf).toHaveBeenCalledWith(
+          mockCutList,
+          expect.objectContaining({
+            projectName: 'Test Project',
+            units: 'imperial'
+          })
+        );
+      });
+    });
+
+    it('shows success toast on successful export', async () => {
+      mockExportProjectReportToPdf.mockResolvedValueOnce({ success: true });
+
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download Project Report'));
+
+      await waitFor(() => {
+        const showToast = useUIStore.getState().showToast;
+        expect(showToast).toHaveBeenCalledWith('Project report saved to PDF');
+      });
+    });
+
+    it('shows error toast on export error result', async () => {
+      mockExportProjectReportToPdf.mockResolvedValueOnce({ success: false, error: 'Save failed' });
+
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download Project Report'));
+
+      await waitFor(() => {
+        const showToast = useUIStore.getState().showToast;
+        expect(showToast).toHaveBeenCalledWith('Failed to save PDF');
+      });
+    });
+
+    it('does nothing when export is canceled (no error, no success)', async () => {
+      mockExportProjectReportToPdf.mockResolvedValueOnce({ success: false });
+      const showToast = vi.fn();
+      useUIStore.setState({ showToast });
+
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download Project Report'));
+
+      await waitFor(() => {
+        expect(mockExportProjectReportToPdf).toHaveBeenCalled();
+      });
+
+      // showToast should not have been called for a cancel
+      expect(showToast).not.toHaveBeenCalled();
+    });
+
+    it('shows error toast when export throws', async () => {
+      mockExportProjectReportToPdf.mockRejectedValueOnce(new Error('Unexpected error'));
+
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download Project Report'));
+
+      await waitFor(() => {
+        const showToast = useUIStore.getState().showToast;
+        expect(showToast).toHaveBeenCalledWith('Failed to export project report');
+      });
+    });
+
+    it('passes project notes when available', async () => {
+      mockExportProjectReportToPdf.mockResolvedValueOnce({ success: true });
+      useProjectStore.setState({ notes: 'Build notes here' });
+
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download Project Report'));
+
+      await waitFor(() => {
+        expect(mockExportProjectReportToPdf).toHaveBeenCalledWith(
+          mockCutList,
+          expect.objectContaining({
+            projectNotes: 'Build notes here'
+          })
+        );
+      });
+    });
+
+    it('passes custom shopping items to export', async () => {
+      mockExportProjectReportToPdf.mockResolvedValueOnce({ success: true });
+      const customItems = [{ id: 'ci-1', name: 'Screws', quantity: 50, unitPrice: 0.1, category: 'Hardware' }];
+      useProjectStore.setState({ customShoppingItems: customItems });
+
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download Project Report'));
+
+      await waitFor(() => {
+        expect(mockExportProjectReportToPdf).toHaveBeenCalledWith(
+          mockCutList,
+          expect.objectContaining({
+            customShoppingItems: customItems
+          })
+        );
+      });
+    });
+
+    it('uses "Untitled Project" when projectName is null', async () => {
+      mockExportProjectReportToPdf.mockResolvedValueOnce({ success: true });
+      useProjectStore.setState({ projectName: null });
+
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download Project Report'));
+
+      await waitFor(() => {
+        expect(mockExportProjectReportToPdf).toHaveBeenCalledWith(
+          mockCutList,
+          expect.objectContaining({
+            projectName: 'Untitled Project'
+          })
+        );
+      });
+    });
+  });
+
+  describe('license checks', () => {
+    it('blocks project report export when license is free', async () => {
+      useProjectStore.setState({ cutList: mockCutList });
+      useLicenseStore.setState({ licenseMode: 'free' });
+
+      render(<CutListModal {...defaultProps} />);
+
+      // The button should be disabled
+      const reportBtn = screen.getByText('Download Project Report');
+      expect(reportBtn.closest('button')).toBeDisabled();
+    });
+
+    it('blocks optimizer when license is free', () => {
+      useLicenseStore.setState({ licenseMode: 'free' });
+      const showToast = vi.fn();
+      useUIStore.setState({ showToast });
+
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Generate Cut List'));
+
+      expect(showToast).toHaveBeenCalledWith('Cut list optimizer requires a license.');
+      expect(generateOptimizedCutList).not.toHaveBeenCalled();
+    });
+
+    it('allows export when license is licensed', async () => {
+      useProjectStore.setState({ cutList: mockCutList });
+      useLicenseStore.setState({ licenseMode: 'licensed' });
+      mockExportProjectReportToPdf.mockResolvedValueOnce({ success: true });
+
+      render(<CutListModal {...defaultProps} />);
+
+      const reportBtn = screen.getByText('Download Project Report');
+      expect(reportBtn.closest('button')).not.toBeDisabled();
+
+      fireEvent.click(reportBtn);
+
+      await waitFor(() => {
+        expect(mockExportProjectReportToPdf).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('stale cut list regeneration', () => {
+    it('regenerates cut list when Regenerate button is clicked', () => {
+      useProjectStore.setState({
+        cutList: { ...mockCutList, isStale: true }
+      });
+
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Regenerate'));
+
+      expect(generateOptimizedCutList).toHaveBeenCalled();
+    });
+  });
+
+  describe('Learn more link', () => {
+    it('opens external link when Learn more is clicked', () => {
+      const openExternal = vi.fn();
+      window.electronAPI = { ...window.electronAPI, openExternal } as unknown as typeof window.electronAPI;
+
+      render(<CutListModal {...defaultProps} />);
+
+      const learnMore = screen.getByText('Learn more');
+      fireEvent.click(learnMore);
+
+      expect(openExternal).toHaveBeenCalledWith('https://carvd-studio.com/docs#cut-lists');
     });
   });
 });
