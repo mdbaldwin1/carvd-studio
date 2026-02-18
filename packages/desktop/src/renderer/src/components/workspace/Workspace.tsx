@@ -35,6 +35,7 @@ function useEffectiveTheme(): 'light' | 'dark' {
   });
 
   useEffect(() => {
+    // eslint-disable-next-line no-undef
     const observer = new MutationObserver(() => {
       const t = document.documentElement.getAttribute('data-theme');
       setTheme(t === 'light' ? 'light' : 'dark');

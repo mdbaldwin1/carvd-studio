@@ -2507,7 +2507,7 @@ function App() {
       document.documentElement.setAttribute('data-theme', effectiveTheme);
 
       // Cache theme in localStorage for instant restore on next launch (read by index.html)
-      localStorage.setItem('carvd-theme', theme);
+      localStorage.setItem('carvd-theme', theme); // eslint-disable-line no-undef
 
       // Update title bar overlay colors for Windows/Linux
       const overlayColors =
