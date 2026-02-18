@@ -2453,10 +2453,12 @@ function App() {
   const saveAssemblyModalOpen = useUIStore((s) => s.saveAssemblyModalOpen);
 
   // App settings
-  const { settings: appSettings, updateSettings: updateAppSettings } = useAppSettings();
+  const { settings: appSettings, isLoading: settingsLoading, updateSettings: updateAppSettings } = useAppSettings();
 
-  // Apply theme based on settings
+  // Apply theme based on settings (skip while loading — index.html inline script already set the initial theme)
   useEffect(() => {
+    if (settingsLoading) return;
+
     const applyTheme = (theme: 'light' | 'dark' | 'system') => {
       let effectiveTheme: 'light' | 'dark';
       if (theme === 'system') {
@@ -2467,6 +2469,9 @@ function App() {
         effectiveTheme = theme;
       }
       document.documentElement.setAttribute('data-theme', effectiveTheme);
+
+      // Cache theme in localStorage for instant restore on next launch (read by index.html)
+      localStorage.setItem('carvd-theme', theme);
 
       // Update title bar overlay colors for Windows/Linux
       const overlayColors =
@@ -2485,7 +2490,7 @@ function App() {
       mediaQuery.addEventListener('change', handleChange);
       return () => mediaQuery.removeEventListener('change', handleChange);
     }
-  }, [appSettings.theme]);
+  }, [appSettings.theme, settingsLoading]);
 
   // Handle confirm before delete setting
   // When confirmBeforeDelete is false, immediately delete without dialog
