@@ -1,8 +1,10 @@
 /**
- * Hook to handle native menu commands from the main process
+ * Hook to handle native menu commands from the main process.
+ * Uses a ref for the options object and imperative store reads
+ * to avoid re-registering the listener on every render.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useAssemblyEditingStore } from '../store/assemblyEditingStore';
 import { useSelectionStore } from '../store/selectionStore';
@@ -13,8 +15,7 @@ import {
   saveProjectAs,
   openProject,
   openProjectFromPath,
-  clearRecentProjects,
-  hasUnsavedChanges
+  clearRecentProjects
 } from '../utils/fileOperations';
 import { logger } from '../utils/logger';
 
@@ -35,21 +36,23 @@ interface UseMenuCommandsOptions {
 }
 
 export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
-  const undo = useProjectStore((s) => s.undo);
-  const redo = useProjectStore((s) => s.redo);
-  const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
-  const selectAllParts = useProjectStore((s) => s.selectAllParts);
-  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
-  const resetCamera = useProjectStore((s) => s.resetCamera);
-  const showToast = useUIStore((s) => s.showToast);
-  const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
-  const filePath = useProjectStore((s) => s.filePath);
+  // Store options in a ref so the effect doesn't re-run when they change.
+  // The handler always reads the latest options via the ref.
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   useEffect(() => {
     const handleMenuCommand = async (command: string, ...args: unknown[]) => {
+      const opts = optionsRef.current;
+
+      // Read store state imperatively
+      const isEditingAssembly = useAssemblyEditingStore.getState().isEditingAssembly;
+      const showToast = useUIStore.getState().showToast;
+      const filePath = useProjectStore.getState().filePath;
+
       // Block certain file operations when editing a template or assembly
       const blockableFileCommands = ['new-project', 'new-from-template', 'open-project', 'open-recent'];
-      if ((isEditingAssembly || options.isEditingTemplate) && blockableFileCommands.includes(command)) {
+      if ((isEditingAssembly || opts.isEditingTemplate) && blockableFileCommands.includes(command)) {
         showToast(isEditingAssembly ? 'Finish editing assembly first' : 'Finish editing template first');
         return;
       }
@@ -58,8 +61,8 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         // File commands
         case 'new-project': {
           // Use handler with unsaved changes dialog if provided
-          if (options.onNewProject) {
-            await options.onNewProject();
+          if (opts.onNewProject) {
+            await opts.onNewProject();
           } else {
             await newProject();
           }
@@ -67,14 +70,14 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         }
 
         case 'new-from-template': {
-          options.onOpenTemplateBrowser?.();
+          opts.onOpenTemplateBrowser?.();
           break;
         }
 
         case 'open-project': {
           // Use handler with unsaved changes dialog if provided
-          if (options.onOpenProject) {
-            await options.onOpenProject();
+          if (opts.onOpenProject) {
+            await opts.onOpenProject();
           } else {
             const result = await openProject();
             if (!result.success && result.error) {
@@ -85,13 +88,13 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         }
 
         case 'open-recent': {
-          const filePath = args[0] as string;
-          if (filePath) {
+          const recentFilePath = args[0] as string;
+          if (recentFilePath) {
             // Use handler with unsaved changes dialog if provided
-            if (options.onOpenRecentProject) {
-              await options.onOpenRecentProject(filePath);
+            if (opts.onOpenRecentProject) {
+              await opts.onOpenRecentProject(recentFilePath);
             } else {
-              const result = await openProjectFromPath(filePath);
+              const result = await openProjectFromPath(recentFilePath);
               if (!result.success && result.error) {
                 showToast(result.error);
               }
@@ -108,12 +111,12 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
 
         case 'save-project': {
           // Route to template or assembly save when in those modes
-          if (options.isEditingTemplate && options.onSaveTemplate) {
-            await options.onSaveTemplate();
+          if (opts.isEditingTemplate && opts.onSaveTemplate) {
+            await opts.onSaveTemplate();
             break;
           }
-          if (isEditingAssembly && options.onSaveAssembly) {
-            await options.onSaveAssembly();
+          if (isEditingAssembly && opts.onSaveAssembly) {
+            await opts.onSaveAssembly();
             break;
           }
           // Normal project save
@@ -128,7 +131,7 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
 
         case 'save-project-as': {
           // "Save As" doesn't apply to template or assembly editing
-          if (options.isEditingTemplate) {
+          if (opts.isEditingTemplate) {
             showToast('Use "Save Template" to save template changes');
             break;
           }
@@ -147,43 +150,45 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
 
         // Edit commands
         case 'undo':
-          undo();
+          useProjectStore.getState().undo();
           break;
 
         case 'redo':
-          redo();
+          useProjectStore.getState().redo();
           break;
 
-        case 'delete':
+        case 'delete': {
+          const selectedPartIds = useSelectionStore.getState().selectedPartIds;
           if (selectedPartIds.length > 0) {
-            requestDeleteParts(selectedPartIds);
+            useUIStore.getState().requestDeleteParts(selectedPartIds);
           }
           break;
+        }
 
         case 'select-all':
-          selectAllParts();
+          useProjectStore.getState().selectAllParts();
           break;
 
         // View commands
         case 'reset-camera':
-          resetCamera();
+          useProjectStore.getState().resetCamera();
           break;
 
         // App commands
         case 'open-settings':
-          options.onOpenSettings?.();
+          opts.onOpenSettings?.();
           break;
 
         case 'show-shortcuts':
-          options.onShowShortcuts?.();
+          opts.onShowShortcuts?.();
           break;
 
         case 'show-about':
-          options.onShowAbout?.();
+          opts.onShowAbout?.();
           break;
 
         case 'close-project': {
-          options.onCloseProject?.();
+          opts.onCloseProject?.();
           break;
         }
 
@@ -207,21 +212,10 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
       }
     };
 
-    // Listen for menu commands from main process
+    // Listen for menu commands from main process — registered once
     const cleanup = window.electronAPI.onMenuCommand(handleMenuCommand);
 
-    // Clean up the listener when dependencies change or component unmounts
+    // Clean up the listener when component unmounts
     return cleanup;
-  }, [
-    undo,
-    redo,
-    requestDeleteParts,
-    selectAllParts,
-    selectedPartIds,
-    resetCamera,
-    showToast,
-    isEditingAssembly,
-    filePath,
-    options
-  ]);
+  }, []);
 }
