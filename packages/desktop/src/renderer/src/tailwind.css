@@ -10,21 +10,21 @@
    =========================================== */
 
 :root {
-  /* Backgrounds - rich twilight indigo instead of neutral greys */
-  --color-bg: #090f1b; /* twilight-indigo-950 */
-  --color-bg-alt: #0c1627; /* twilight-indigo-900 */
-  --color-bg-hover: #142040; /* between 900 and 800 */
-  --color-bg-dark: #090f1b; /* twilight-indigo-950 */
-  --color-surface: #0e1a30; /* between 950 and 900, panel surfaces */
-  --color-surface-hover: #142040;
-  --color-border: #1e3460; /* between twilight-indigo-700 and 800 */
-  --color-selected: #1a2d55; /* twilight-indigo-800 ish */
-  --color-overlay: rgba(9, 15, 27, 0.7);
-  --color-overlay-heavy: rgba(9, 15, 27, 0.85);
+  /* Backgrounds - dark greys (same as original) */
+  --color-bg: #1a1a1a;
+  --color-bg-alt: #222222;
+  --color-bg-hover: #2a2a2a;
+  --color-bg-dark: #1a1a1a;
+  --color-surface: #242424;
+  --color-surface-hover: #2a2a2a;
+  --color-border: #333;
+  --color-selected: #3a3a3a;
+  --color-overlay: rgba(0, 0, 0, 0.6);
+  --color-overlay-heavy: rgba(0, 0, 0, 0.75);
 
   /* Aliases for semantic naming */
   --color-bg-secondary: var(--color-bg-alt);
-  --color-bg-tertiary: #111d35;
+  --color-bg-tertiary: #2e2e2e;
   --color-bg-sidebar: var(--color-surface);
 
   /* Text - warm papaya-whip tones */
@@ -38,14 +38,14 @@
   --color-accent-hover: #3dd6f5; /* cerulean-400 */
   --color-accent-muted: #087a91; /* cerulean-700 */
   --color-accent-bg: rgba(13, 204, 242, 0.12);
-  --color-accent-foreground: #090f1b; /* Dark text on bright cyan */
+  --color-accent-foreground: #1a1a1a; /* Dark text on bright cyan */
 
   /* Primary - bright amber (golden CTAs that pop) */
   --color-primary: #ffcc00; /* bright-amber-500 */
   --color-primary-hover: #ffd633; /* bright-amber-400 */
   --color-primary-muted: #997a00; /* bright-amber-700 */
   --color-primary-bg: rgba(255, 204, 0, 0.1);
-  --color-primary-foreground: #090f1b; /* Dark text on gold */
+  --color-primary-foreground: #1a1a1a; /* Dark text on gold */
 
   /* Secondary - twilight indigo mid-tones (emphasis, active states) */
   --color-secondary: #31569b; /* twilight-indigo-600 */
@@ -58,11 +58,11 @@
   --color-warning-hover: #ffb833; /* papaya-whip-400 */
   --color-warning-bg: rgba(255, 166, 0, 0.12);
   --color-warning-border: #ffa600;
-  --color-warning-text: #090f1b;
+  --color-warning-text: #1a1a1a;
 
   --color-danger: #c45454;
   --color-danger-hover: #d46b6b;
-  --color-danger-bg: rgba(196, 84, 84, 0.12);
+  --color-danger-bg: rgba(196, 84, 84, 0.15);
   --color-danger-border: #c45454;
 
   --color-success: #2a9d6a;
@@ -105,7 +105,7 @@
   --color-bg: #fffae5; /* bright-amber-50 */
   --color-bg-alt: #ffedcc; /* papaya-whip-200 */
   --color-bg-hover: #ffe4b5;
-  --color-bg-dark: #090f1b; /* twilight-indigo-950 */
+  --color-bg-dark: #1a1a1a;
   --color-surface: #fffdf5; /* warm white */
   --color-surface-hover: #fff5d6;
   --color-border: #cac3d5; /* lilac-ash-200 — subtle purple-grey */
@@ -118,8 +118,8 @@
   --color-bg-tertiary: #ffdb99; /* papaya-whip-200 */
   --color-bg-sidebar: var(--color-surface);
 
-  /* Text - deep twilight indigo tones */
-  --color-text: #090f1b; /* twilight-indigo-950 */
+  /* Text - deep dark tones */
+  --color-text: #1a1a1a;
   --color-text-muted: #254174; /* twilight-indigo-700 */
   --color-text-secondary: var(--color-text-muted);
   --color-text-tertiary: #493f5a; /* lilac-ash-700 */
@@ -136,7 +136,7 @@
   --color-primary-hover: #997a00; /* bright-amber-700 */
   --color-primary-muted: #ffcc00; /* bright-amber-500 */
   --color-primary-bg: rgba(204, 163, 0, 0.1);
-  --color-primary-foreground: #090f1b;
+  --color-primary-foreground: #1a1a1a;
 
   /* Secondary - twilight indigo */
   --color-secondary: #31569b; /* twilight-indigo-600 */
@@ -149,7 +149,7 @@
   --color-warning-hover: #996300; /* papaya-whip-700 */
   --color-warning-bg: rgba(204, 133, 0, 0.12);
   --color-warning-border: #cc8500;
-  --color-warning-text: #090f1b;
+  --color-warning-text: #1a1a1a;
 
   --color-danger: #b84343;
   --color-danger-hover: #a33a3a;
@@ -176,7 +176,7 @@
   --color-info: #615577; /* lilac-ash-600 */
   --color-info-bg: rgba(97, 85, 119, 0.1);
   --color-info-border: #9488aa; /* lilac-ash-400 */
-  --color-info-text: #090f1b;
+  --color-info-text: #1a1a1a;
 
   color-scheme: light;
 }

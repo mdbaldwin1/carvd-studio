@@ -34,6 +34,7 @@
 
   .property-group select {
     cursor: pointer;
+    padding-right: 28px;
   }
 
   .property-group input[type='color'] {

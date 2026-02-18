@@ -350,10 +350,14 @@
   .form-group select,
   .form-group textarea {
     @apply w-full bg-bg border border-border text-text;
-    padding: 12px 14px;
+    padding: 10px 14px;
     font-size: 14px;
     border-radius: var(--radius-md);
     font-family: inherit;
+  }
+
+  .form-group select {
+    padding-right: 32px;
   }
 
   .form-group textarea {

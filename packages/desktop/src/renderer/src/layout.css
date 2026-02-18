@@ -230,6 +230,18 @@
   .section-content-inner > .assembly-list,
   .section-content-inner > .parts-list {
     @apply flex-1 overflow-y-auto min-h-0;
+    margin-left: -16px;
+    margin-right: -16px;
+  }
+
+  /* Sidebar list items — full-width hover, internal padding */
+  .stock-list > li,
+  .assembly-list > li,
+  .parts-list .part-item,
+  .parts-list .group-header {
+    border-radius: 0 !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
   }
 
   /* Collapsed section */
