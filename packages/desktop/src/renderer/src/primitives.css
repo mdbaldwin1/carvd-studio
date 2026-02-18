@@ -154,6 +154,8 @@
       cursor-pointer border border-transparent bg-transparent text-text;
     gap: 8px;
     font-family: inherit;
+    line-height: 1.15;
+    text-rendering: geometricPrecision;
     border-radius: var(--radius-sm);
     transition: all 0.15s ease;
   }
@@ -171,7 +173,7 @@
   }
 
   .btn-sm {
-    @apply py-1.5 px-3;
+    @apply py-2 px-3;
     font-size: 13px;
   }
 
@@ -181,7 +183,7 @@
   }
 
   .btn-lg {
-    @apply py-3.5 px-7;
+    @apply py-4 px-7;
     font-size: 15px;
   }
 
@@ -232,7 +234,7 @@
 
   /* Primary — accent color (cerulean in the redesign) */
   .btn-primary.btn-filled {
-    @apply bg-accent text-bg-dark;
+    @apply bg-accent text-accent-foreground;
   }
 
   .btn-primary.btn-filled:hover:not(:disabled) {
@@ -244,7 +246,7 @@
   }
 
   .btn-primary.btn-outlined:hover:not(:disabled) {
-    @apply bg-accent text-bg-dark;
+    @apply bg-accent text-accent-foreground;
   }
 
   .btn-primary.btn-ghost {
@@ -312,7 +314,7 @@
   }
 
   .btn.active {
-    @apply bg-accent text-bg-dark border-accent;
+    @apply bg-accent text-accent-foreground border-accent;
   }
 
   .btn-group {

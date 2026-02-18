@@ -19,7 +19,7 @@ export function AssemblyEditingBanner({
   onCancel
 }: AssemblyEditingBannerProps) {
   return (
-    <div className="flex items-center justify-between px-4 py-2 bg-accent text-bg-dark text-sm gap-4">
+    <div className="flex items-center justify-between px-4 py-2 bg-accent text-accent-foreground text-sm gap-4">
       <div className="flex items-center gap-2">
         <span className="text-base">📦</span>
         <span>
@@ -36,7 +36,7 @@ export function AssemblyEditingBanner({
       </div>
       <div className="flex items-center gap-2">
         <button
-          className="btn btn-sm btn-ghost btn-secondary text-bg-dark border-black/20 hover:bg-black/10 hover:border-black/30"
+          className="btn btn-sm btn-ghost btn-secondary text-accent-foreground border-black/20 hover:bg-black/10 hover:border-black/30"
           onClick={onCancel}
           title="Cancel editing"
         >

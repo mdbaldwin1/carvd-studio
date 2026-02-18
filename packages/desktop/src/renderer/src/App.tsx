@@ -1626,7 +1626,7 @@ function BrightnessPopup({ isOpen, onClose }: BrightnessPopupProps) {
         {presets.map((p) => (
           <button
             key={p.key}
-            className={`flex-1 py-1.5 px-2 text-[11px] rounded bg-bg border border-border text-text-muted cursor-pointer transition-all duration-100 hover:bg-surface-hover hover:text-text ${lightingMode === p.key ? '!bg-accent !text-bg !border-accent' : ''}`}
+            className={`flex-1 py-1.5 px-2 text-[11px] rounded bg-bg border border-border text-text-muted cursor-pointer transition-all duration-100 hover:bg-surface-hover hover:text-text ${lightingMode === p.key ? '!bg-accent !text-accent-foreground !border-accent' : ''}`}
             onClick={() => updateSettings({ lightingMode: p.key })}
           >
             {p.label}
@@ -1652,8 +1652,8 @@ function DisplayToolbar() {
 
   const toolbarBtn =
     'py-1.5 px-2.5 text-xs rounded bg-transparent border-none text-text-muted cursor-pointer transition-all duration-100 hover:bg-surface-hover hover:text-text';
-  const activeBtn = `${toolbarBtn} !bg-bg !text-text`;
-  const toggleActiveBtn = `${toolbarBtn} !bg-accent !text-bg`;
+  const activeBtn = `${toolbarBtn} !bg-accent !text-accent-foreground`;
+  const toggleActiveBtn = `${toolbarBtn} !bg-accent !text-accent-foreground`;
 
   return (
     <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface border border-border rounded-md p-1 z-10">
@@ -1873,7 +1873,7 @@ function CanvasWithDrop() {
         </div>
       )}
       {isDragOver && (
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-accent text-bg-dark py-4 px-8 rounded-lg text-base font-medium pointer-events-none z-[100]">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-accent text-accent-foreground py-4 px-8 rounded-lg text-base font-medium pointer-events-none z-[100]">
           <span>{dropType === 'assembly' ? 'Drop to place assembly' : 'Drop to create part'}</span>
         </div>
       )}

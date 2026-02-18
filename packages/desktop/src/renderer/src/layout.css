@@ -142,7 +142,7 @@
   }
 
   .toolbar-btn.active {
-    @apply bg-accent text-bg-dark border-accent;
+    @apply bg-accent text-accent-foreground border-accent;
   }
 
   .toolbar-btn:disabled {
