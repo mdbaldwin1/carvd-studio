@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Website: Tailwind CSS 4 + shadcn/ui foundation** — Installed `tailwindcss` and `@tailwindcss/vite` in the website package; configured `vite.config.ts` with the Tailwind Vite plugin and `@/` path alias; created `src/tailwind.css`, `src/lib/utils.ts` with `cn()`, `src/components/ui/` directory, and `components.json` for shadcn CLI; installed `tailwind-merge`, `clsx`, and `class-variance-authority` (bead carvd-studio-9.1)
+
 - **Start screen Settings & Library buttons** — Added icon buttons in the start screen header for quick access to App Settings and Stock/Assembly Library without needing to open a project first
 - **Assembly editing from start screen** — Can now enter assembly edit mode directly from the start screen's assembly library
 - **Inline name editing on AssemblyEditingBanner** — Click the assembly name in the editing banner to rename it in-place

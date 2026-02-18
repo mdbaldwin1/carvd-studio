@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import fs from 'fs';
 import path from 'path';
 
@@ -25,7 +26,12 @@ function changelogPlugin() {
 }
 
 export default defineConfig({
-  plugins: [react(), changelogPlugin()],
+  plugins: [react(), tailwindcss(), changelogPlugin()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   server: {
     port: 3000
   }
