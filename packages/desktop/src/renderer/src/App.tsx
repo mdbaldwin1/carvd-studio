@@ -434,11 +434,11 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
         <div className="section-content">
           <div className="section-content-inner">
             {stocks.length === 0 ? (
-              <p className="text-text-muted text-xs italic">
+              <p className="text-text-muted text-xs italic px-4">
                 {isEditingAssembly ? 'No stock in library. Click + to create.' : 'No stock yet. Click + to add.'}
               </p>
             ) : (
-              <ul className="list-none m-0 mx-[-12px] flex-1 overflow-y-auto min-h-0">
+              <ul className="stock-list list-none my-0 flex-1 overflow-y-auto min-h-0">
                 {stocks
                   .filter(
                     (stock) => !searchTerms.stock || stock.name.toLowerCase().includes(searchTerms.stock.toLowerCase())
@@ -567,7 +567,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
         <div className="section-content">
           <div className="section-content-inner">
             {!canUseAssemblies ? (
-              <p className="text-text-muted text-xs italic">
+              <p className="text-text-muted text-xs italic px-4">
                 Assemblies require a license.{' '}
                 <a
                   href="#"
@@ -580,13 +580,13 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                 </a>
               </p>
             ) : assemblies.length === 0 ? (
-              <p className="text-text-muted text-xs italic">
+              <p className="text-text-muted text-xs italic px-4">
                 {isEditingAssembly
                   ? 'No assemblies in library yet.'
                   : 'No assemblies yet. Click + to add from library.'}
               </p>
             ) : (
-              <ul className="list-none m-0 mx-[-12px] flex-1 overflow-y-auto min-h-0">
+              <ul className="assembly-list list-none my-0 flex-1 overflow-y-auto min-h-0">
                 {assemblies
                   .filter(
                     (assembly) =>

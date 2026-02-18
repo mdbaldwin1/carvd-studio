@@ -162,14 +162,14 @@
   }
 
   .sidebar-section {
-    @apply p-4 border-b border-border flex flex-col flex-1 min-h-0 overflow-hidden;
+    @apply py-4 border-b border-border flex flex-col flex-1 min-h-0 overflow-hidden;
     transition:
       flex 0.2s ease-out,
       padding 0.2s ease-out;
   }
 
   .sidebar-section-bottom {
-    @apply mt-auto border-b-0 border-t border-border flex flex-col gap-2.5 bg-surface overflow-visible;
+    @apply px-4 mt-auto border-b-0 border-t border-border flex flex-col gap-2.5 bg-surface overflow-visible;
     flex: 0 0 auto;
   }
 
@@ -180,10 +180,10 @@
   /* Section header (clickable collapse toggle) */
   .section-header {
     @apply flex items-center gap-1.5 cursor-pointer;
-    margin: -16px -16px 10px -16px;
+    margin: -16px 0 10px 0;
     padding: 16px;
     padding-right: 10px;
-    border-radius: var(--radius-sm);
+    border-radius: 0;
     transition:
       background-color 0.15s,
       margin 0.2s ease-out;
@@ -230,8 +230,6 @@
   .section-content-inner > .assembly-list,
   .section-content-inner > .parts-list {
     @apply flex-1 overflow-y-auto min-h-0;
-    margin-left: -16px;
-    margin-right: -16px;
   }
 
   /* Sidebar list items — full-width hover, internal padding */
