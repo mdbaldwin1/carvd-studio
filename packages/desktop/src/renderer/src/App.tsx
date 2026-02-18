@@ -266,7 +266,15 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
     assemblies: true
   });
   const toggleSection = (section: string) => {
-    setCollapsedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+    setCollapsedSections((prev) => {
+      const isCollapsing = !prev[section];
+      // Clear search when collapsing
+      if (isCollapsing) {
+        setSearchOpen((s) => ({ ...s, [section]: false }));
+        setSearchTerms((t) => ({ ...t, [section]: '' }));
+      }
+      return { ...prev, [section]: !prev[section] };
+    });
   };
 
   // Search state for sidebar sections
