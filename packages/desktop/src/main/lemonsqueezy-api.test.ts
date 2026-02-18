@@ -67,7 +67,7 @@ describe('lemonsqueezy-api', () => {
           }
         })
       };
-      vi.spyOn(global, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
 
       const result = await validateLicense('MY-KEY');
 
@@ -87,7 +87,7 @@ describe('lemonsqueezy-api', () => {
         ok: false,
         json: vi.fn().mockResolvedValue({ error: 'Invalid key' })
       };
-      vi.spyOn(global, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
 
       const result = await validateLicense('BAD-KEY');
 
@@ -96,7 +96,7 @@ describe('lemonsqueezy-api', () => {
     });
 
     it('handles network error', async () => {
-      vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network failure'));
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Network failure'));
 
       const result = await validateLicense('KEY');
 
@@ -107,7 +107,7 @@ describe('lemonsqueezy-api', () => {
     it('handles timeout (AbortError)', async () => {
       const abortError = new Error('The operation was aborted');
       abortError.name = 'AbortError';
-      vi.spyOn(global, 'fetch').mockRejectedValue(abortError);
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(abortError);
 
       const result = await validateLicense('KEY');
 
@@ -126,7 +126,7 @@ describe('lemonsqueezy-api', () => {
           instance: { id: 'i1', name: 'Test' }
         })
       };
-      vi.spyOn(global, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
 
       const result = await activateLicense('KEY');
 
@@ -142,7 +142,7 @@ describe('lemonsqueezy-api', () => {
         ok: false,
         json: vi.fn().mockResolvedValue({ error: 'Limit reached' })
       };
-      vi.spyOn(global, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
 
       const result = await activateLicense('KEY');
 
@@ -151,7 +151,7 @@ describe('lemonsqueezy-api', () => {
     });
 
     it('handles network error', async () => {
-      vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Offline'));
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Offline'));
 
       const result = await activateLicense('KEY');
 
@@ -166,7 +166,7 @@ describe('lemonsqueezy-api', () => {
         ok: true,
         json: vi.fn().mockResolvedValue({ deactivated: true })
       };
-      vi.spyOn(global, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
 
       const result = await deactivateLicense('KEY');
 
@@ -182,7 +182,7 @@ describe('lemonsqueezy-api', () => {
         ok: false,
         json: vi.fn().mockResolvedValue({ error: 'Already deactivated' })
       };
-      vi.spyOn(global, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
 
       const result = await deactivateLicense('KEY');
 
@@ -193,7 +193,7 @@ describe('lemonsqueezy-api', () => {
     it('handles timeout', async () => {
       const abortError = new Error('The operation was aborted');
       abortError.name = 'AbortError';
-      vi.spyOn(global, 'fetch').mockRejectedValue(abortError);
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(abortError);
 
       const result = await deactivateLicense('KEY');
 
