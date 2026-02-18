@@ -279,7 +279,7 @@ describe('ShoppingListTab', () => {
       const nameInput = screen.getByPlaceholderText(/Item name/);
       fireEvent.change(nameInput, { target: { value: 'Hinges' } });
 
-      const form = document.querySelector('.custom-item-form') as HTMLFormElement;
+      const form = document.querySelector('.custom-item-form')!;
       fireEvent.submit(form);
 
       expect(addCustomShoppingItem).toHaveBeenCalledWith(expect.objectContaining({ name: 'Hinges' }));
