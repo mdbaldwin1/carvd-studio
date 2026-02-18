@@ -4,7 +4,7 @@
 
 Electron desktop app for designing furniture and cabinetry. Design in 3D → Get cut lists, cutting diagrams, and cost estimates.
 
-**Tech Stack:** Electron + React + TypeScript + Three.js (React Three Fiber) + Zustand
+**Tech Stack:** Electron + React 19 + TypeScript + Three.js (React Three Fiber) + Zustand + Tailwind CSS 4
 
 **Status:** Production-ready core. UX polish in progress for 1.0 release.
 
@@ -18,8 +18,8 @@ Electron desktop app for designing furniture and cabinetry. Design in 3D → Get
 ```
 carvd-studio/
 ├── packages/
-│   ├── desktop/     → Electron app (NO Tailwind)
-│   └── website/     → Marketing site (CAN use Tailwind)
+│   ├── desktop/     → Electron app
+│   └── website/     → Marketing site
 └── package.json     → Root workspace config
 ```
 
@@ -30,47 +30,9 @@ npm run dev:desktop      # Run Electron app
 npm run build:desktop    # Build production
 npm run package:mac      # Create macOS DMG
 npm run package:win      # Create Windows installer
-npm run test             # Run all tests (1625 tests, ~85% coverage)
+npm run test             # Run all tests (2675 tests, ~92% coverage)
 npm run test:coverage    # Run with coverage report
 ```
-
-## Desktop App Key Files
-
-```
-packages/desktop/src/
-├── main/
-│   ├── index.ts           # Window, IPC, menu
-│   ├── store.ts           # electron-store config
-│   ├── license.ts         # License verification
-│   ├── trial.ts           # Trial system logic
-│   ├── lemonsqueezy-api.ts # Lemon Squeezy API client
-│   └── updater.ts         # Auto-update system
-├── preload/
-│   └── index.ts           # Safe API bridge
-└── renderer/src/
-    ├── App.tsx            # Main component
-    ├── store/projectStore.ts  # Zustand state + undo/redo + license mode
-    ├── components/        # React components
-    │   ├── TrialBanner.tsx       # Days remaining banner
-    │   ├── TrialExpiredModal.tsx # Expired prompt modal
-    │   └── UpgradePrompt.tsx     # Inline upgrade prompt
-    ├── hooks/
-    │   └── useLicenseStatus.ts   # Combined license/trial hook
-    ├── utils/
-    │   └── featureLimits.ts      # Limit definitions & helpers
-    ├── templates/         # Project templates
-    ├── types.ts           # All TypeScript interfaces
-    └── index.css          # ALL STYLES (no Tailwind)
-```
-
-## Critical Rules
-
-### Styling (Desktop App)
-
-1. **NO Tailwind** - Use CSS classes in `index.css` only
-2. **NO inline styles** - All styles in `index.css`
-3. **Use CSS variables** - `var(--color-bg)`, `var(--color-text)`, etc.
-4. **Button system** - Always use `.btn` base class + modifiers
 
 ### Data Constraints
 
@@ -78,40 +40,6 @@ packages/desktop/src/
 2. **90° rotation** - Axis-aligned only
 3. **Offline-only** - No cloud, no accounts
 4. **Guillotine cuts** - Table saw workflow
-
-## Core Data Model
-
-```typescript
-interface Part {
-  id: string;
-  name: string;
-  length: number; // inches
-  width: number;
-  thickness: number;
-  position: { x; y; z };
-  rotation: Rotation3D; // 90° increments
-  stockId: string | null;
-  color: string;
-  notes?: string;
-}
-
-interface Stock {
-  id: string;
-  name: string;
-  length: number;
-  width: number;
-  thickness: number;
-  grainDirection: "length" | "width" | "none";
-  pricePerUnit: number;
-  color: string;
-}
-```
-
-## State Management
-
-- **Zustand** - Global state in `projectStore.ts`
-- **zundo** - Undo/redo middleware (Cmd+Z, Cmd+Shift+Z)
-- **electron-store** - Persistence (settings, libraries)
 
 ## Trial & License System
 
@@ -214,4 +142,4 @@ See also:
 
 ---
 
-**Remember:** Desktop app = `index.css` only. No Tailwind, no inline styles.
+**Styling:** Desktop uses Tailwind CSS 4 with CSS custom properties for theming. Styles split across `tailwind.css` (theme tokens + Tailwind import), `primitives.css` (base components), `layout.css` (layout), `domain.css` (domain-specific). Website uses Tailwind independently.

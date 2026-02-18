@@ -1,9 +1,8 @@
 /*
  * Shared UI Primitives — Tailwind component classes
  *
- * These preserve existing class names (.btn, .form-group, etc.) used across
- * dozens of components, re-implemented with @apply for Tailwind integration.
- * Individual components will migrate to inline utilities in later tickets.
+ * "Twilight Studio" redesign — bigger text, bigger buttons, rounder corners,
+ * Nunito Sans font family, richer visual weight.
  */
 
 /* ===========================================
@@ -46,7 +45,7 @@
 
   body {
     font-family:
-      'Roboto',
+      'Nunito Sans',
       -apple-system,
       BlinkMacSystemFont,
       'Segoe UI',
@@ -58,10 +57,13 @@
       sans-serif;
     background-color: var(--color-bg);
     color: var(--color-text);
-    font-size: 13px;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Headings use Roboto Slab */
+  /* Headings use Nunito Sans bold */
   h1,
   h2,
   h3,
@@ -70,7 +72,12 @@
   h6,
   .sidebar-section h2,
   .app-header h1 {
-    font-family: 'Roboto Slab', Georgia, 'Times New Roman', serif;
+    font-family:
+      'Nunito Sans',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
   }
 
   /* Remove default focus ring, use focus-visible instead */
@@ -109,7 +116,7 @@
 
   ::-webkit-scrollbar-thumb {
     background: var(--color-border);
-    @apply rounded-sm;
+    border-radius: var(--radius-sm);
   }
 
   ::-webkit-scrollbar-thumb:hover {
@@ -146,10 +153,13 @@
 @layer components {
   /* Base button — required on all buttons */
   .btn {
-    @apply inline-flex items-center justify-center rounded-sm font-medium
+    @apply inline-flex items-center justify-center font-semibold
       cursor-pointer border border-transparent bg-transparent text-text;
-    gap: 6px;
+    gap: 8px;
     font-family: inherit;
+    line-height: 1.15;
+    text-rendering: geometricPrecision;
+    border-radius: var(--radius-sm);
     transition: all 0.15s ease;
   }
 
@@ -157,42 +167,44 @@
     @apply opacity-40 cursor-not-allowed;
   }
 
-  /* ----- SIZES ----- */
+  /* ----- SIZES — bumped up across the board ----- */
 
   .btn-xs {
-    @apply py-0.5 px-1.5;
-    font-size: 11px;
-    border-radius: 3px;
+    @apply py-1 px-2;
+    font-size: 12px;
+    border-radius: var(--radius-sm);
   }
 
   .btn-sm {
-    @apply py-1 px-2.5 text-xs;
+    @apply py-2 px-3;
+    font-size: 13px;
   }
 
   .btn-md {
-    @apply py-2.5 px-5;
-    font-size: 14px;
+    @apply py-3 px-6;
+    font-size: 15px;
   }
 
   .btn-lg {
-    @apply py-2.5 px-5 text-sm;
+    @apply py-4 px-7;
+    font-size: 15px;
   }
 
-  /* Icon buttons — square with centered icon */
+  /* Icon buttons — square with centered icon, slightly bigger */
 
   .btn-icon-xs {
-    @apply w-5 h-5 p-0;
-    font-size: 14px;
+    @apply w-6 h-6 p-0;
+    font-size: 15px;
   }
 
   .btn-icon-sm {
-    @apply w-6 h-6 p-0 font-bold;
-    font-size: 16px;
+    @apply w-7 h-7 p-0 font-bold;
+    font-size: 17px;
   }
 
   .btn-icon-md {
-    @apply w-8 h-8 p-0;
-    font-size: 18px;
+    @apply w-9 h-9 p-0;
+    font-size: 19px;
   }
 
   /* ----- VARIANTS ----- */
@@ -202,7 +214,7 @@
   }
 
   .btn-filled:hover:not(:disabled) {
-    filter: brightness(1.1);
+    filter: brightness(1.12);
   }
 
   .btn-outlined {
@@ -221,11 +233,19 @@
     @apply bg-surface-hover;
   }
 
+  .btn-ghost.active {
+    @apply text-accent-foreground;
+  }
+
+  .btn-ghost.active:hover {
+    @apply text-text;
+  }
+
   /* ----- COLORS ----- */
 
-  /* Primary — accent color */
+  /* Primary — accent color (cerulean in the redesign) */
   .btn-primary.btn-filled {
-    @apply bg-accent text-bg-dark;
+    @apply bg-accent text-accent-foreground;
   }
 
   .btn-primary.btn-filled:hover:not(:disabled) {
@@ -237,7 +257,7 @@
   }
 
   .btn-primary.btn-outlined:hover:not(:disabled) {
-    @apply bg-accent text-bg-dark;
+    @apply bg-accent text-accent-foreground;
   }
 
   .btn-primary.btn-ghost {
@@ -305,11 +325,11 @@
   }
 
   .btn.active {
-    @apply bg-accent text-bg-dark border-accent;
+    @apply bg-accent text-accent-foreground border-accent;
   }
 
   .btn-group {
-    @apply flex gap-1;
+    @apply flex gap-1.5;
   }
 
   /* ----- FOCUS STATES ----- */
@@ -330,11 +350,12 @@
 @layer components {
   .form-group {
     @apply flex flex-col mb-4;
-    gap: 8px;
+    gap: 10px;
   }
 
   .form-group > label {
-    @apply block text-sm font-medium text-text;
+    @apply block font-semibold text-text;
+    font-size: 13px;
   }
 
   .form-group input[type='text'],
@@ -342,15 +363,19 @@
   .form-group select,
   .form-group textarea {
     @apply w-full bg-bg border border-border text-text;
-    padding: 10px 12px;
+    padding: 10px 14px;
     font-size: 14px;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font-family: inherit;
+  }
+
+  .form-group select {
+    padding-right: 32px;
   }
 
   .form-group textarea {
     @apply resize-y;
-    min-height: 60px;
+    min-height: 72px;
   }
 
   .form-group input:focus,
@@ -372,21 +397,23 @@
   }
 
   .form-actions {
-    @apply flex justify-end gap-2 mt-5 pt-4 border-t border-border;
+    @apply flex justify-end gap-3 mt-6 pt-5 border-t border-border;
   }
 
   .field-error {
-    @apply text-xs mt-1;
+    @apply mt-1;
+    font-size: 12px;
     color: var(--color-danger);
   }
 
   .field-help {
-    @apply text-xs text-text-muted mt-1;
+    @apply text-text-muted mt-1;
+    font-size: 12px;
   }
 
   .checkbox-label {
-    @apply flex items-center gap-2 cursor-pointer;
-    font-size: 13px;
+    @apply flex items-center gap-2.5 cursor-pointer;
+    font-size: 14px;
   }
 
   .checkbox-label input[type='checkbox'] {
@@ -394,19 +421,20 @@
   }
 
   .checkbox-group label {
-    @apply flex items-center gap-2 cursor-pointer;
-    font-size: 13px;
+    @apply flex items-center gap-2.5 cursor-pointer;
+    font-size: 14px;
   }
 
   .input-with-suffix {
-    @apply flex items-center gap-1;
+    @apply flex items-center gap-1.5;
   }
 
   .input-with-suffix input {
-    @apply bg-bg border border-border text-text rounded-sm;
-    width: 80px;
-    padding: 6px 8px;
-    font-size: 13px;
+    @apply bg-bg border border-border text-text;
+    width: 88px;
+    padding: 8px 10px;
+    font-size: 14px;
+    border-radius: var(--radius-sm);
   }
 
   .input-with-suffix input:focus {
@@ -415,15 +443,16 @@
 
   .input-suffix {
     @apply text-text-muted;
-    font-size: 13px;
+    font-size: 14px;
   }
 
   .radio-group {
-    @apply flex flex-col gap-1.5;
+    @apply flex flex-col gap-2;
   }
 
   .radio-group label {
-    @apply flex items-center gap-1.5 text-xs cursor-pointer;
+    @apply flex items-center gap-2 cursor-pointer;
+    font-size: 13px;
   }
 
   .radio-group label.disabled {
@@ -439,26 +468,27 @@
   }
 
   .color-picker-row input[type='color'] {
-    @apply border border-border rounded-sm p-0 bg-transparent appearance-none;
-    width: 40px;
-    height: 32px;
+    @apply border border-border p-0 bg-transparent appearance-none;
+    width: 44px;
+    height: 36px;
     cursor: pointer;
+    border-radius: var(--radius-sm);
   }
 
   .color-picker-row input[type='color']::-webkit-color-swatch-wrapper {
-    padding: 3px;
+    padding: 4px;
     background: var(--color-bg);
-    border-radius: 3px;
+    border-radius: calc(var(--radius-sm) - 1px);
   }
 
   .color-picker-row input[type='color']::-webkit-color-swatch {
     border: none;
-    border-radius: 2px;
+    border-radius: calc(var(--radius-sm) - 2px);
   }
 
   .color-picker-row input[type='color']::-moz-color-swatch {
     border: none;
-    border-radius: 2px;
+    border-radius: calc(var(--radius-sm) - 2px);
   }
 }
 
@@ -477,7 +507,8 @@
 
   .help-tooltip-trigger {
     @apply bg-transparent border-none cursor-pointer text-text-muted
-      inline-flex items-center justify-center rounded-sm p-0.5;
+      inline-flex items-center justify-center p-0.5;
+    border-radius: var(--radius-sm);
     opacity: 0.5;
     transition:
       color 0.15s ease,
@@ -495,22 +526,24 @@
   }
 
   .help-tooltip-popover {
-    @apply fixed bg-surface border border-border rounded-md;
+    @apply fixed bg-surface border border-border;
     z-index: 10000;
-    padding: 10px 12px;
-    min-width: 200px;
-    max-width: 280px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    padding: 12px 14px;
+    min-width: 220px;
+    max-width: 300px;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
     animation: help-tooltip-fade-in 0.15s ease forwards;
   }
 
   .help-tooltip-text {
-    @apply text-xs text-text leading-relaxed m-0;
+    @apply text-text leading-relaxed m-0;
+    font-size: 13px;
   }
 
   .help-tooltip-link {
     @apply block mt-2 text-primary no-underline;
-    font-size: 11px;
+    font-size: 12px;
     transition: color 0.15s ease;
   }
 
@@ -534,35 +567,36 @@
 
 @layer components {
   .hotkey-hints-container {
-    @apply absolute left-1/2 flex flex-col items-center gap-1.5;
-    bottom: 12px;
+    @apply absolute left-1/2 flex flex-col items-center gap-2;
+    bottom: 16px;
     transform: translateX(-50%);
     z-index: 50;
   }
 
   .hotkey-hints {
-    @apply flex gap-4 bg-surface border border-border rounded-md;
-    padding: 8px 16px;
+    @apply flex gap-5 bg-surface border border-border;
+    padding: 10px 20px;
+    border-radius: var(--radius-lg);
     opacity: 0.95;
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(8px);
   }
 
   .hotkey-hints-camera {
-    @apply gap-3;
-    padding: 6px 12px;
+    @apply gap-4;
+    padding: 8px 14px;
     opacity: 0.7;
   }
 
   .hotkey-hint {
-    @apply flex items-center gap-1.5 text-text-muted whitespace-nowrap;
-    font-size: 11px;
+    @apply flex items-center gap-2 text-text-muted whitespace-nowrap;
+    font-size: 12px;
   }
 
   .hotkey-hint kbd {
     @apply inline-block bg-bg border border-border text-text;
-    padding: 2px 6px;
-    border-radius: 3px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace;
-    font-size: 10px;
+    font-size: 11px;
   }
 }

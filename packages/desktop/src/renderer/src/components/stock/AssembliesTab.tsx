@@ -263,7 +263,7 @@ export function AssembliesTab({
               >
                 {assembly.thumbnailData?.data ? (
                   <img
-                    src={assembly.thumbnailData.data}
+                    src={`data:image/png;base64,${assembly.thumbnailData.data}`}
                     alt={assembly.name}
                     className="w-10 h-[30px] object-cover rounded shrink-0 bg-bg-tertiary"
                   />

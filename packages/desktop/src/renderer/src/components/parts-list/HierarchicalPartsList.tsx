@@ -1,12 +1,12 @@
 import React, { useMemo, useCallback, useRef, useEffect } from 'react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { ChevronRight, ChevronDown, Layers, AlertTriangle } from 'lucide-react';
-import { Part, Group, GroupMember, PartValidationIssue } from '../../types';
-import { useProjectStore, getAllDescendantPartIds, validatePartsForCutList } from '../../store/projectStore';
+import { useStockLibrary } from '../../hooks/useStockLibrary';
 import { useAssemblyEditingStore } from '../../store/assemblyEditingStore';
+import { getAllDescendantPartIds, useProjectStore, validatePartsForCutList } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
-import { useStockLibrary } from '../../hooks/useStockLibrary';
+import { Group, GroupMember, Part, PartValidationIssue } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { IconButton } from '../common/IconButton';
 
@@ -299,7 +299,7 @@ const GroupItem = React.memo(function GroupItem({
   return (
     <li className="list-none">
       <div
-        className={`group-header flex items-center gap-1.5 py-1.5 px-3 cursor-pointer transition-colors duration-100 select-none font-medium hover:bg-surface-hover ${isSelected ? 'selected bg-selected' : ''} ${isEditing ? 'editing bg-primary-bg border-l-2 border-l-primary !pl-2.5' : ''}`}
+        className={`group-header flex items-center gap-2 py-2 px-3 cursor-pointer transition-colors duration-100 select-none font-medium ${isSelected ? 'selected bg-selected' : ''} ${isEditing ? 'editing bg-primary-bg border-l-2 border-l-primary !pl-2.5' : ''}`}
         style={{ paddingLeft: isEditing ? undefined : `${12 + level * 16}px` }}
         onClick={(e) => onGroupClick(group.id, e)}
         onDoubleClick={() => onGroupDoubleClick(group.id)}
@@ -307,11 +307,12 @@ const GroupItem = React.memo(function GroupItem({
         title={`${group.name} (${childCount} part${childCount === 1 ? '' : 's'})${hasChildError || hasChildWarning ? '\n\n⚠ Contains parts with validation issues' : ''}`}
       >
         <button
-          className="group-expand-btn flex items-center justify-center w-[18px] h-[18px] p-0 border-none bg-transparent text-text-muted cursor-pointer shrink-0 hover:text-text"
+          className={`group-expand-btn btn btn-icon-sm btn-ghost btn-secondary ${isExpanded ? 'active' : ''}`}
           onClick={(e) => {
             e.stopPropagation();
             onExpandToggle(group.id);
           }}
+          title={isExpanded ? `Collapse ${group.name}` : `Expand ${group.name}`}
           aria-label={isExpanded ? `Collapse ${group.name}` : `Expand ${group.name}`}
           aria-expanded={isExpanded}
         >
@@ -327,7 +328,9 @@ const GroupItem = React.memo(function GroupItem({
         )}
         <Layers size={14} className="text-text-muted shrink-0" />
         <span className="flex-1 truncate">{group.name}</span>
-        <span className="text-[10px] text-text-muted bg-surface-hover py-px px-1.5 rounded-full">{childCount}</span>
+        <span className="text-[10px] bg-border text-text py-px px-1.5 rounded-full min-w-4 text-center">
+          {childCount}
+        </span>
       </div>
     </li>
   );
@@ -521,7 +524,7 @@ export function HierarchicalPartsList({
   );
 
   if (parts.length === 0 && groups.length === 0) {
-    return <p className="text-text-muted text-xs italic">No parts yet. Click + to add one.</p>;
+    return <p className="text-text-muted text-xs italic px-4">No parts yet. Click + to add one.</p>;
   }
 
   if (searchFilter && filteredTree.length === 0) {

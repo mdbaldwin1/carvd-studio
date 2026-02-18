@@ -1,4 +1,4 @@
-import { FolderOpen, Star, Clock } from 'lucide-react';
+import { FolderOpen, Star, Clock, Library, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { UserTemplate } from '../../templates';
 import { Project } from '../../types';
@@ -52,6 +52,8 @@ interface StartScreenProps {
   onSelectTemplate: (project: Project) => void;
   onStartTutorial: (project: Project) => void;
   onViewAllTemplates: () => void;
+  onOpenSettings: () => void;
+  onOpenLibrary: () => void;
 }
 
 export function StartScreen({
@@ -61,7 +63,9 @@ export function StartScreen({
   onRelocateFile,
   onSelectTemplate,
   onStartTutorial,
-  onViewAllTemplates
+  onViewAllTemplates,
+  onOpenSettings,
+  onOpenLibrary
 }: StartScreenProps) {
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [favoriteProjects, setFavoriteProjects] = useState<RecentProject[]>([]);
@@ -179,9 +183,17 @@ export function StartScreen({
             <span className="text-5xl">🪵</span>
             <h1 className="text-[32px] font-bold text-text m-0">Carvd Studio</h1>
           </div>
-          {appVersion && (
-            <span className="text-xs text-text-muted bg-bg-secondary py-1 px-2 rounded">v{appVersion}</span>
-          )}
+          <div className="flex items-center gap-2">
+            <button className="btn btn-icon-sm btn-ghost" onClick={onOpenLibrary} title="Stock & Assembly Library">
+              <Library size={18} />
+            </button>
+            <button className="btn btn-icon-sm btn-ghost" onClick={onOpenSettings} title="App Settings">
+              <Settings size={18} />
+            </button>
+            {appVersion && (
+              <span className="text-xs text-text-muted bg-bg-secondary py-1 px-2 rounded ml-1">v{appVersion}</span>
+            )}
+          </div>
         </div>
 
         <TemplatesSection

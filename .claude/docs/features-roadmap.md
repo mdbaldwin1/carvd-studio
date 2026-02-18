@@ -74,16 +74,18 @@ Core features complete. UX polish in progress for 1.0 release.
 - Dependabot: Weekly dependency updates for desktop and website, targeting develop branch
 - Welcome tutorial (3 steps)
 
-### Recent Upgrades (through v0.1.9)
+### Recent Upgrades (through v0.1.14)
 
 - React 19 (from React 18)
 - @react-three/fiber v9, @react-three/drei v10, three.js v0.182
 - electron-builder v26
 - Electron 35
+- Tailwind CSS 4 migration (from plain CSS)
 - macOS notarization (Developer ID Application cert + Apple notarytool)
 - Website emoji replacement with lucide-react icons + custom brand SVGs
 - Pre-commit hooks, issue templates, PR template, changelog CI check
 - Website CI integration (typecheck + format checks)
+- Comprehensive test coverage push (1625 → 2675 tests)
 
 ## Keyboard Shortcuts
 
@@ -105,20 +107,22 @@ Core features complete. UX polish in progress for 1.0 release.
 
 ## Test Coverage
 
-**Status:** ~85% statement coverage, ~76% branch coverage (1625 tests)
+**Status:** ~92% statement coverage, ~82% branch coverage (2675 tests)
 
 | Module              | Coverage |
 | ------------------- | -------- |
 | Hooks               | 100%     |
 | fileFormat.ts       | 100%     |
 | logger.ts           | 100%     |
+| featureLimits.ts    | 100%     |
+| seedData.ts         | 100%     |
 | fractions.ts        | 99%      |
 | cutListOptimizer.ts | 98%      |
-| featureLimits.ts    | 100%     |
-| templates/loader.ts | 90%      |
-| Trial components    | 90%+     |
-| Components          | 85-97%   |
-| projectStore.ts     | 76%      |
+| templates/loader.ts | ~90%     |
+| Components          | 88-97%   |
+| Trial components    | ~90%     |
+| projectStore.ts     | ~76%     |
+| appSettingsStore.ts | ~76%     |
 
 ## Known Issues
 

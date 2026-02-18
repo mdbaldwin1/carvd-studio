@@ -242,7 +242,7 @@ node scripts/version-bump.cjs patch  # or minor, major
 # Or merge a PR that bumps the version, then merge develop → main
 ```
 
-**Current state (v0.1.9):**
+**Current state (v0.1.14):**
 
 - macOS: Code-signed (Developer ID Application) + notarized by Apple — Gatekeeper allows the app
 - Windows: Build works, no code signing yet (shows SmartScreen warning)

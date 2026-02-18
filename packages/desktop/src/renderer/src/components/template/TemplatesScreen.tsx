@@ -329,7 +329,7 @@ export function TemplatesScreen({
                   Import
                 </button>
                 <button
-                  className="flex items-center gap-1.5 py-2 px-3.5 bg-primary border-none rounded-md text-[13px] font-medium text-white cursor-pointer transition-all duration-150 hover:bg-primary-hover"
+                  className="flex items-center gap-1.5 py-2 px-3.5 bg-primary border-none rounded-md text-[13px] font-medium text-primary-foreground cursor-pointer transition-all duration-150 hover:bg-primary-hover"
                   onClick={onNewTemplate}
                 >
                   <Plus size={16} />

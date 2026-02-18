@@ -4,6 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Carvd Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <script>
+    // Apply theme synchronously before first paint.
+    // The main process passes the stored theme via ?theme= query parameter.
+    (function () {
+      var t = new URLSearchParams(window.location.search).get('theme');
+      if (t === 'system') {
+        t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      if (t === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
   <style>
     * {
       margin: 0;
@@ -12,10 +28,9 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-      /* Using design system colors */
+      font-family: 'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
       background: #1a1a1a;
-      color: #ffeecf;
+      color: #FFEECF;
       height: 100vh;
       display: flex;
       flex-direction: column;
@@ -24,6 +39,12 @@
       overflow: hidden;
       -webkit-app-region: drag;
       user-select: none;
+    }
+
+    /* Light mode overrides */
+    [data-theme='light'] body {
+      background: #FFEECF;
+      color: #203864;
     }
 
     .splash-content {
@@ -62,8 +83,16 @@
       font-weight: 700;
       letter-spacing: 2px;
       margin-bottom: 8px;
-      /* Using palette: cream to teal gradient */
-      background: linear-gradient(135deg, #ffeecf 0%, #077187 100%);
+      /* Papaya Whip → Cerulean gradient */
+      background: linear-gradient(135deg, #FFEECF 0%, #077187 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Light mode: Indigo → Cerulean gradient */
+    [data-theme='light'] .app-name {
+      background: linear-gradient(135deg, #203864 0%, #077187 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -71,10 +100,13 @@
 
     .tagline {
       font-size: 14px;
-      /* Muted cream tone */
-      color: #a89f8f;
+      color: #AEA4BF;
       letter-spacing: 1px;
       margin-bottom: 32px;
+    }
+
+    [data-theme='light'] .tagline {
+      color: #756b82;
     }
 
     .loading {
@@ -92,7 +124,6 @@
     .loading-dot {
       width: 8px;
       height: 8px;
-      /* Using teal from palette */
       background: #077187;
       border-radius: 50%;
       animation: pulse 1.4s ease-in-out infinite;
@@ -121,7 +152,11 @@
       position: absolute;
       bottom: 16px;
       font-size: 11px;
-      color: rgba(168, 159, 143, 0.6);
+      color: rgba(174, 164, 191, 0.6);
+    }
+
+    [data-theme='light'] .version {
+      color: rgba(117, 107, 130, 0.6);
     }
   </style>
 </head>
