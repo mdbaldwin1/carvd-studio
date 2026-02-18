@@ -116,7 +116,7 @@ beforeEach(() => {
   resetStores();
 });
 
-function fireKey(key: string, opts: Partial<KeyboardEventInit> = {}) {
+function fireKey(key: string, opts: Partial<{ metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }> = {}) {
   window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, ...opts }));
 }
 
