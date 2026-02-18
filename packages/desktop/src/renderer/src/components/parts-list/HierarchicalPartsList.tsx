@@ -1,11 +1,11 @@
+import { AlertTriangle, ChevronDown, ChevronRight, Layers } from 'lucide-react';
 import React, { useMemo } from 'react';
-import { ChevronRight, ChevronDown, Layers, AlertTriangle } from 'lucide-react';
-import { Part, Group, GroupMember, Stock } from '../../types';
-import { useProjectStore, getAllDescendantPartIds, validatePartsForCutList } from '../../store/projectStore';
+import { useStockLibrary } from '../../hooks/useStockLibrary';
 import { useAssemblyEditingStore } from '../../store/assemblyEditingStore';
+import { getAllDescendantPartIds, useProjectStore, validatePartsForCutList } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
-import { useStockLibrary } from '../../hooks/useStockLibrary';
+import { Group, GroupMember, Part, Stock } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { IconButton } from '../common/IconButton';
 
@@ -258,7 +258,7 @@ function GroupItem({ group, children, level, onPartClick, onDuplicate, onDelete 
   return (
     <li className="list-none">
       <div
-        className={`group-header flex items-center gap-1.5 py-1.5 px-3 cursor-pointer transition-colors duration-100 select-none font-medium hover:bg-surface-hover ${isSelected ? 'selected bg-selected' : ''} ${isEditing ? 'editing bg-primary-bg border-l-2 border-l-primary !pl-2.5' : ''}`}
+        className={`group-header flex items-center gap-2 py-2 px-3 cursor-pointer transition-colors duration-100 select-none font-medium ${isSelected ? 'selected bg-selected' : ''} ${isEditing ? 'editing bg-primary-bg border-l-2 border-l-primary !pl-2.5' : ''}`}
         style={{ paddingLeft: isEditing ? undefined : `${12 + level * 16}px` }}
         onClick={handleGroupClick}
         onDoubleClick={handleGroupDoubleClick}
@@ -266,8 +266,9 @@ function GroupItem({ group, children, level, onPartClick, onDuplicate, onDelete 
         title={`${group.name} (${partCount} part${partCount === 1 ? '' : 's'})${hasChildError || hasChildWarning ? '\n\n⚠ Contains parts with validation issues' : ''}`}
       >
         <button
-          className="group-expand-btn flex items-center justify-center w-[18px] h-[18px] p-0 border-none bg-transparent text-text-muted cursor-pointer shrink-0 hover:text-text"
+          className={`group-expand-btn btn btn-icon-sm btn-ghost btn-secondary ${isExpanded ? 'active' : ''}`}
           onClick={handleExpandToggle}
+          title={isExpanded ? `Collapse ${group.name}` : `Expand ${group.name}`}
           aria-label={isExpanded ? `Collapse ${group.name}` : `Expand ${group.name}`}
           aria-expanded={isExpanded}
         >
@@ -283,7 +284,9 @@ function GroupItem({ group, children, level, onPartClick, onDuplicate, onDelete 
         )}
         <Layers size={14} className="text-text-muted shrink-0" />
         <span className="flex-1 truncate">{group.name}</span>
-        <span className="text-[10px] text-text-muted bg-surface-hover py-px px-1.5 rounded-full">{partCount}</span>
+        <span className="text-[10px] bg-border text-text py-px px-1.5 rounded-full min-w-4 text-center">
+          {partCount}
+        </span>
       </div>
       {isExpanded && children.length > 0 && (
         <ul className="group-children list-none p-0 m-0">
@@ -363,7 +366,7 @@ export function HierarchicalPartsList({
   const filteredTree = useMemo(() => (searchFilter ? filterTree(tree, searchFilter) : tree), [tree, searchFilter]);
 
   if (parts.length === 0 && groups.length === 0) {
-    return <p className="text-text-muted text-xs italic">No parts yet. Click + to add one.</p>;
+    return <p className="text-text-muted text-xs italic px-4">No parts yet. Click + to add one.</p>;
   }
 
   if (searchFilter && filteredTree.length === 0) {
@@ -371,7 +374,7 @@ export function HierarchicalPartsList({
   }
 
   return (
-    <ul className="list-none mx-[-12px] flex-1 overflow-y-auto min-h-0">
+    <ul className="list-none flex-1 overflow-y-auto min-h-0">
       {filteredTree.map((node) =>
         node.type === 'part' ? (
           <PartItem

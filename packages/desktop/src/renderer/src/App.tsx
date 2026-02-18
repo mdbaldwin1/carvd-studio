@@ -1,62 +1,62 @@
 import { Canvas } from '@react-three/fiber';
 import { ChevronDown, ChevronRight, Library, Redo2, Save, Search, Settings, Sun, Undo2, X } from 'lucide-react';
-import { ColorPicker } from './components/common/ColorPicker';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { AddAssemblyModal } from './components/assembly/AddAssemblyModal';
-import { AddStockModal } from './components/stock/AddStockModal';
-import { StartScreen } from './components/project/StartScreen';
-import { NewProjectDialog } from './components/project/NewProjectDialog';
 import { AssemblyEditingBanner } from './components/assembly/AssemblyEditingBanner';
 import { AssemblyEditingExitDialog } from './components/assembly/AssemblyEditingExitDialog';
-import { TemplateEditingBanner } from './components/template/TemplateEditingBanner';
-import {
-  TemplateSetupDialog,
-  TemplateSaveDialog,
-  TemplateDiscardDialog
-} from './components/template/TemplateEditingExitDialog';
-import { UpdateNotificationBanner } from './components/update/UpdateNotificationBanner';
+import { ColorPicker } from './components/common/ColorPicker';
 import { ConfirmDialog } from './components/common/ConfirmDialog';
-import { ContextMenu } from './components/layout/ContextMenu';
-import { EditStockModal } from './components/stock/EditStockModal';
-import { useMenuCommands } from './hooks/useMenuCommands';
 import { FractionInput } from './components/common/FractionInput';
 import { HelpTooltip } from './components/common/HelpTooltip';
-import { HierarchicalPartsList } from './components/parts-list/HierarchicalPartsList';
-import { ImportToLibraryDialog } from './components/parts-list/ImportToLibraryDialog';
-import { RecoveryDialog } from './components/project/RecoveryDialog';
 import { Toast } from './components/common/Toast';
+import { ContextMenu } from './components/layout/ContextMenu';
 import { TrialBanner } from './components/licensing/TrialBanner';
 import { TrialExpiredModal } from './components/licensing/TrialExpiredModal';
+import { HierarchicalPartsList } from './components/parts-list/HierarchicalPartsList';
+import { ImportToLibraryDialog } from './components/parts-list/ImportToLibraryDialog';
+import { NewProjectDialog } from './components/project/NewProjectDialog';
+import { RecoveryDialog } from './components/project/RecoveryDialog';
+import { StartScreen } from './components/project/StartScreen';
+import { AddStockModal } from './components/stock/AddStockModal';
+import { EditStockModal } from './components/stock/EditStockModal';
+import { TemplateEditingBanner } from './components/template/TemplateEditingBanner';
+import {
+  TemplateDiscardDialog,
+  TemplateSaveDialog,
+  TemplateSetupDialog
+} from './components/template/TemplateEditingExitDialog';
+import { UpdateNotificationBanner } from './components/update/UpdateNotificationBanner';
 import { Workspace } from './components/workspace/Workspace';
 import { STOCK_COLORS } from './constants';
-import { logger } from './utils/logger';
-import { getFeatureLimits } from './utils/featureLimits';
 import { useAppSettings } from './hooks/useAppSettings';
-import { useAutoRecovery } from './hooks/useAutoRecovery';
-import { useAutoSave } from './hooks/useAutoSave';
 import { useAssemblyEditing } from './hooks/useAssemblyEditing';
 import { useAssemblyLibrary } from './hooks/useAssemblyLibrary';
-import { useTemplateEditing } from './hooks/useTemplateEditing';
-import { useEffectiveStockConstraints } from './hooks/useEffectiveStockConstraints';
+import { useAutoRecovery } from './hooks/useAutoRecovery';
+import { useAutoSave } from './hooks/useAutoSave';
 import { useDevTools } from './hooks/useDevTools';
+import { useEffectiveStockConstraints } from './hooks/useEffectiveStockConstraints';
 import { useFileOperations } from './hooks/useFileOperations';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useLibraryImportCheck } from './hooks/useLibraryImportCheck';
 import { useLicenseStatus } from './hooks/useLicenseStatus';
+import { useMenuCommands } from './hooks/useMenuCommands';
 import { useStockLibrary } from './hooks/useStockLibrary';
-import { useProjectStore } from './store/projectStore';
-import { useSelectionStore } from './store/selectionStore';
-import { useUIStore } from './store/uiStore';
-import { useCameraStore } from './store/cameraStore';
-import { useSnapStore } from './store/snapStore';
+import { useTemplateEditing } from './hooks/useTemplateEditing';
 import { useAssemblyEditingStore } from './store/assemblyEditingStore';
+import { useCameraStore } from './store/cameraStore';
 import { useClipboardStore } from './store/clipboardStore';
 import { useLicenseStore } from './store/licenseStore';
-import { Assembly, LightingMode, Project, Stock } from './types';
+import { useProjectStore } from './store/projectStore';
+import { useSelectionStore } from './store/selectionStore';
+import { useSnapStore } from './store/snapStore';
+import { useUIStore } from './store/uiStore';
+import { LightingMode, Project, Stock } from './types';
+import { getFeatureLimits } from './utils/featureLimits';
 import { formatMeasurementWithUnit } from './utils/fractions';
-import { getPartBounds } from './utils/snapToPartsUtil';
+import { logger } from './utils/logger';
 import { generateSeedProject } from './utils/seedData';
+import { getPartBounds } from './utils/snapToPartsUtil';
 
 // Lazy-loaded modal components (deferred until first use)
 const LazyAboutModal = React.lazy(() =>
@@ -385,9 +385,14 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             className={`btn btn-icon-sm btn-ghost btn-secondary ${searchOpen.stock ? 'active' : ''}`}
             onClick={(e) => {
               e.stopPropagation();
+              // if opening search, also expand section if collapsed
+              if (!searchOpen.stock && collapsedSections.stock) {
+                setCollapsedSections((prev) => ({ ...prev, stock: false }));
+              }
               toggleSearch('stock');
             }}
             title="Search"
+            disabled={stocks.length === 0}
           >
             <Search size={12} />
           </button>
@@ -410,25 +415,28 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
         </div>
         {searchOpen.stock && (
           <div className="section-search">
-            <input
-              type="text"
-              placeholder="Search stock..."
-              value={searchTerms.stock || ''}
-              onChange={(e) => setSearchTerms((t) => ({ ...t, stock: e.target.value }))}
-              onClick={(e) => e.stopPropagation()}
-              autoFocus
-            />
-            {searchTerms.stock && (
-              <button
-                className="section-search-clear"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSearchTerms((t) => ({ ...t, stock: '' }));
-                }}
-              >
-                <X size={12} />
-              </button>
-            )}
+            <div className="section-search-inner">
+              <Search size={12} className="text-text-muted" />
+              <input
+                type="text"
+                placeholder="Search stock..."
+                value={searchTerms.stock || ''}
+                onChange={(e) => setSearchTerms((t) => ({ ...t, stock: e.target.value }))}
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+              />
+              {searchTerms.stock && (
+                <button
+                  className="section-search-clear"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSearchTerms((t) => ({ ...t, stock: '' }));
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
           </div>
         )}
         <div className="section-content">
@@ -512,9 +520,14 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             className={`btn btn-icon-sm btn-ghost btn-secondary ${searchOpen.assemblies ? 'active' : ''}`}
             onClick={(e) => {
               e.stopPropagation();
+              // if opening search, also expand section if collapsed
+              if (!searchOpen.assemblies && collapsedSections.assemblies) {
+                setCollapsedSections((prev) => ({ ...prev, assemblies: false }));
+              }
               toggleSearch('assemblies');
             }}
             title="Search"
+            disabled={assemblies.length === 0}
           >
             <Search size={12} />
           </button>
@@ -543,25 +556,28 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
         </div>
         {searchOpen.assemblies && (
           <div className="section-search">
-            <input
-              type="text"
-              placeholder="Search assemblies..."
-              value={searchTerms.assemblies || ''}
-              onChange={(e) => setSearchTerms((t) => ({ ...t, assemblies: e.target.value }))}
-              onClick={(e) => e.stopPropagation()}
-              autoFocus
-            />
-            {searchTerms.assemblies && (
-              <button
-                className="section-search-clear"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSearchTerms((t) => ({ ...t, assemblies: '' }));
-                }}
-              >
-                <X size={12} />
-              </button>
-            )}
+            <div className="section-search-inner">
+              <Search size={12} className="text-text-muted" />
+              <input
+                type="text"
+                placeholder="Search assemblies..."
+                value={searchTerms.assemblies || ''}
+                onChange={(e) => setSearchTerms((t) => ({ ...t, assemblies: e.target.value }))}
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+              />
+              {searchTerms.assemblies && (
+                <button
+                  className="section-search-clear"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSearchTerms((t) => ({ ...t, assemblies: '' }));
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
           </div>
         )}
         <div className="section-content">
@@ -654,9 +670,14 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             className={`btn btn-icon-sm btn-ghost btn-secondary ${searchOpen.parts ? 'active' : ''}`}
             onClick={(e) => {
               e.stopPropagation();
+              // if opening search, also expand section if collapsed
+              if (!searchOpen.parts && collapsedSections.parts) {
+                setCollapsedSections((prev) => ({ ...prev, parts: false }));
+              }
               toggleSearch('parts');
             }}
             title="Search"
+            disabled={parts.length === 0}
           >
             <Search size={12} />
           </button>
@@ -673,25 +694,28 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
         </div>
         {searchOpen.parts && (
           <div className="section-search">
-            <input
-              type="text"
-              placeholder="Search parts..."
-              value={searchTerms.parts || ''}
-              onChange={(e) => setSearchTerms((t) => ({ ...t, parts: e.target.value }))}
-              onClick={(e) => e.stopPropagation()}
-              autoFocus
-            />
-            {searchTerms.parts && (
-              <button
-                className="section-search-clear"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSearchTerms((t) => ({ ...t, parts: '' }));
-                }}
-              >
-                <X size={12} />
-              </button>
-            )}
+            <div className="section-search-inner">
+              <Search size={12} className="text-text-muted" />
+              <input
+                type="text"
+                placeholder="Search parts..."
+                value={searchTerms.parts || ''}
+                onChange={(e) => setSearchTerms((t) => ({ ...t, parts: e.target.value }))}
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+              />
+              {searchTerms.parts && (
+                <button
+                  className="section-search-clear"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSearchTerms((t) => ({ ...t, parts: '' }));
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
           </div>
         )}
         <div className="section-content">
@@ -1948,6 +1972,17 @@ function App() {
   const [showStartScreen, setShowStartScreen] = useState(true);
   const [showTemplatesScreen, setShowTemplatesScreen] = useState(false);
 
+  // Track if assembly editing was initiated from the start screen (library modal)
+  const assemblyEditingFromStartScreen = useRef(false);
+
+  // Return to start screen when assembly editing ends if it was started from there
+  useEffect(() => {
+    if (!isEditingAssembly && assemblyEditingFromStartScreen.current) {
+      assemblyEditingFromStartScreen.current = false;
+      setShowStartScreen(true);
+    }
+  }, [isEditingAssembly]);
+
   // Template editing mode
   const {
     isEditingTemplate,
@@ -2183,15 +2218,19 @@ function App() {
   };
 
   const handleStartScreenOpenProject = async () => {
-    // The handleOpen function will load the project into the store
-    // and the useEffect above will hide the start screen when projectFilePath is set
     await handleOpen();
+    // Explicitly hide start screen if a project was successfully loaded
+    if (useProjectStore.getState().filePath) {
+      setShowStartScreen(false);
+    }
   };
 
-  const handleStartScreenOpenRecent = async (filePath: string) => {
-    // The handleOpenRecent function will load the project into the store
-    // and the useEffect above will hide the start screen when projectFilePath is set
-    await handleOpenRecent(filePath);
+  const handleStartScreenOpenRecent = async (openPath: string) => {
+    await handleOpenRecent(openPath);
+    // Explicitly hide start screen if a project was successfully loaded
+    if (useProjectStore.getState().filePath) {
+      setShowStartScreen(false);
+    }
   };
 
   const handleStartScreenViewAllTemplates = () => {
@@ -2227,12 +2266,9 @@ function App() {
     }
   };
 
-  const handleTemplatesScreenNewTemplate = async () => {
-    const success = await startCreatingNewTemplate();
-    if (success) {
-      setShowTemplatesScreen(false);
-      setShowStartScreen(false);
-    }
+  const handleTemplatesScreenNewTemplate = () => {
+    // This just shows the setup dialog; actual editing starts when confirmNewTemplateSetup is called
+    startCreatingNewTemplate();
   };
 
   // Handle recovery restore - need to hide start screen after successful restore
@@ -2670,6 +2706,7 @@ function App() {
               isCreatingNew={isCreatingNewAssembly}
               onSave={saveAssemblyAndExit}
               onCancel={requestAssemblyExit}
+              onRename={(name) => useAssemblyEditingStore.setState({ editingAssemblyName: name })}
             />
           )}
           {/* Template Editing Banner */}
@@ -2709,8 +2746,22 @@ function App() {
             onUpdateAssembly={updateLibraryAssembly}
             onDeleteAssembly={deleteLibraryAssembly}
             onDuplicateAssembly={duplicateLibraryAssembly}
-            onEditAssemblyIn3D={startAssemblyEditing}
-            onCreateNewAssembly={startCreatingNewAssembly}
+            onEditAssemblyIn3D={async (assembly) => {
+              const success = await startAssemblyEditing(assembly);
+              if (success && showStartScreen) {
+                assemblyEditingFromStartScreen.current = true;
+                setShowStartScreen(false);
+              }
+              return success;
+            }}
+            onCreateNewAssembly={async () => {
+              const success = await startCreatingNewAssembly();
+              if (success && showStartScreen) {
+                assemblyEditingFromStartScreen.current = true;
+                setShowStartScreen(false);
+              }
+              return success;
+            }}
           />
         </Suspense>
       )}
@@ -2874,7 +2925,13 @@ function App() {
       {/* Template Setup Dialog (shown before entering edit mode for new templates) */}
       <TemplateSetupDialog
         isOpen={showNewTemplateSetupDialog}
-        onConfirm={confirmNewTemplateSetup}
+        onConfirm={async (name, description) => {
+          const success = await confirmNewTemplateSetup(name, description);
+          if (success) {
+            setShowTemplatesScreen(false);
+            setShowStartScreen(false);
+          }
+        }}
         onCancel={cancelNewTemplateSetup}
       />
 
@@ -2895,6 +2952,8 @@ function App() {
           onSelectTemplate={handleStartScreenSelectTemplate}
           onStartTutorial={handleStartScreenStartTutorial}
           onViewAllTemplates={handleStartScreenViewAllTemplates}
+          onOpenSettings={() => setIsAppSettingsOpen(true)}
+          onOpenLibrary={() => setIsStockLibraryOpen(true)}
         />
       )}
 

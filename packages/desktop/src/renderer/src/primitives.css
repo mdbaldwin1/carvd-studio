@@ -2,7 +2,7 @@
  * Shared UI Primitives — Tailwind component classes
  *
  * "Twilight Studio" redesign — bigger text, bigger buttons, rounder corners,
- * Inter font family, richer visual weight.
+ * Nunito Sans font family, richer visual weight.
  */
 
 /* ===========================================
@@ -47,7 +47,7 @@
 
   body {
     font-family:
-      'Inter',
+      'Nunito Sans',
       -apple-system,
       BlinkMacSystemFont,
       'Segoe UI',
@@ -65,7 +65,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Headings use DM Serif Display */
+  /* Headings use Nunito Sans bold */
   h1,
   h2,
   h3,
@@ -74,7 +74,12 @@
   h6,
   .sidebar-section h2,
   .app-header h1 {
-    font-family: 'DM Serif Display', Georgia, 'Times New Roman', serif;
+    font-family:
+      'Nunito Sans',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
   }
 
   /* Remove default focus ring, use focus-visible instead */
@@ -228,6 +233,14 @@
 
   .btn-ghost:hover:not(:disabled) {
     @apply bg-surface-hover;
+  }
+
+  .btn-ghost.active {
+    @apply text-accent-foreground;
+  }
+
+  .btn-ghost.active:hover {
+    @apply text-text;
   }
 
   /* ----- COLORS ----- */

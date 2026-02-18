@@ -49,7 +49,8 @@ import {
   importStocks,
   TemplateExport,
   AssemblyExport,
-  StocksExport
+  StocksExport,
+  getTheme
 } from './store';
 import { createApplicationMenu, refreshMenu } from './menu';
 import {
@@ -223,7 +224,7 @@ function createSplashWindow(): BrowserWindow {
     }
   });
 
-  splash.loadFile(join(__dirname, 'splash.html'));
+  splash.loadFile(join(__dirname, 'splash.html'), { query: { theme: getTheme() } });
   splash.show();
 
   return splash;

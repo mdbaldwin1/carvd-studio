@@ -162,14 +162,14 @@
   }
 
   .sidebar-section {
-    @apply py-4 border-b border-border flex flex-col flex-1 min-h-0 overflow-hidden;
+    @apply border-b border-border flex flex-col flex-1 min-h-0 overflow-hidden;
     transition:
       flex 0.2s ease-out,
       padding 0.2s ease-out;
   }
 
   .sidebar-section-bottom {
-    @apply px-4 mt-auto border-b-0 border-t border-border flex flex-col gap-2.5 bg-surface overflow-visible;
+    @apply px-4 py-2 mt-auto border-b-0 border-t border-border flex flex-col gap-2.5 bg-surface overflow-visible;
     flex: 0 0 auto;
   }
 
@@ -180,7 +180,7 @@
   /* Section header (clickable collapse toggle) */
   .section-header {
     @apply flex items-center gap-1.5 cursor-pointer;
-    margin: -16px 0 10px 0;
+    /* margin: -16px 0 10px 0; */
     padding: 16px;
     padding-right: 10px;
     border-radius: 0;
@@ -238,8 +238,10 @@
   .parts-list .part-item,
   .parts-list .group-header {
     border-radius: 0 !important;
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+  }
+
+  .group-header:hover {
+    @apply bg-surface-hover;
   }
 
   /* Collapsed section */
@@ -265,23 +267,30 @@
 
   /* Section search bar */
   .section-search {
-    @apply flex items-center gap-1.5 sticky top-0 z-[1] bg-bg-sidebar;
-    padding: 0 16px 10px 16px;
-    margin-top: -4px;
+    @apply flex items-center px-2 py-2;
   }
 
-  .section-search input {
-    @apply flex-1 bg-bg border border-border text-text outline-none;
+  .section-search-inner {
+    @apply flex flex-1 items-center gap-1.5 px-2 py-1 sticky top-0 z-[1] bg-bg rounded-md;
+  }
+
+  .section-search-inner:hover {
+    @apply bg-bg;
+  }
+
+  .section-search-inner input {
+    @apply flex-1 text-text outline-none;
     padding: 6px 10px;
+    border: 0px;
+    border-radius: 0px;
     font-size: 13px;
-    border-radius: var(--radius-sm);
   }
 
-  .section-search input:focus {
+  .section-search-inner input:focus {
     @apply border-primary;
   }
 
-  .section-search input::placeholder {
+  .section-search-inner input::placeholder {
     @apply text-text-muted;
   }
 
@@ -294,15 +303,6 @@
 
   .section-search-clear:hover {
     @apply text-text bg-bg-hover;
-  }
-
-  /* Active search button — contrasting icon on accent bg, swaps on hover */
-  .section-header .btn-icon-sm.active {
-    @apply text-accent-foreground;
-  }
-
-  .section-header .btn-icon-sm.active:hover {
-    @apply text-text;
   }
 }
 
