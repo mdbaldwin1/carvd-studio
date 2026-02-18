@@ -22,11 +22,12 @@ export default defineConfig({
         'src/main/index.ts', // Electron main entry
         'src/preload/index.ts' // Preload script
       ],
-      // Coverage thresholds
-      lines: 80,
-      functions: 80,
-      branches: 75,
-      statements: 80
+      thresholds: {
+        statements: 80,
+        branches: 72,
+        functions: 85,
+        lines: 80
+      }
     },
     // Mock Electron APIs
     mockReset: true,

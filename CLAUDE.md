@@ -112,6 +112,47 @@ This project follows [Semantic Versioning](https://semver.org/). Desktop and web
 - Test framework: Vitest with v8 coverage
 - Tests are colocated with source files (`*.test.ts`, `*.test.tsx`)
 
+### Test Configurations
+
+- **Renderer tests**: `vitest.config.ts` — uses `happy-dom` environment, covers `src/renderer/`
+- **Main process tests**: `vitest.main.config.ts` — uses `node` environment, covers `src/main/`
+- **E2E tests**: Playwright, run separately via `npm run test:e2e`
+
+### Coverage Thresholds
+
+Coverage thresholds are enforced via `coverage.thresholds` in vitest configs. CI will fail if coverage drops below these minimums.
+
+**Renderer** (`vitest.config.ts`): statements 80%, branches 72%, functions 85%, lines 80%
+**Main process** (`vitest.main.config.ts`): statements 73%, branches 70%, functions 66%, lines 74%
+
+### Test Patterns
+
+**Zustand store tests**: Reset store state in `beforeEach` using `useStore.setState()`. For stores that call Electron APIs, mock `window.electronAPI` in `beforeAll`.
+
+**Component tests**: Use `@testing-library/react` with `render`, `screen`, `fireEvent`. Reset relevant store state in `beforeEach`.
+
+**Hook tests**: Use `renderHook` and `act` from `@testing-library/react`. Wrap state mutations in `act()`.
+
+**Electron API mocks**: Define mocks in `beforeAll`:
+
+```typescript
+beforeAll(() => {
+  window.electronAPI = { getPreference: vi.fn(), setPreference: vi.fn() };
+});
+```
+
+**Factory functions**: Use helpers from `tests/helpers/factories.ts` — e.g., `createTestPart()`, `createTestStock()`, `createTestProject()`.
+
+### Common Gotchas
+
+- Use `toBeCloseTo()` for floating-point position assertions
+- Groups auto-expand on creation — collapse first before testing toggle
+- `pendingDeletePartIds` is `null` (not empty array) when no pending deletes
+- Use `fireEvent.submit(form)` over `fireEvent.click(submitButton)` for form tests
+- Use `td.col-qty` (not `.col-qty`) to target table data cells over headers
+- Mock `window.confirm`/`window.alert` in `beforeAll` before calling `mockReturnValue`
+- For undo/redo tests with `newProject()`, enable `vi.useFakeTimers()` before the call so the `setTimeout` clear is captured
+
 ## Key Commands
 
 ```bash
