@@ -20,13 +20,15 @@ export default defineConfig({
         '**/mockData',
         '**/types.ts',
         'src/main/index.ts', // Electron main entry
-        'src/preload/index.ts' // Preload script
+        'src/preload/index.ts', // Preload script
+        '**/templates/data/*.json',
+        '**/templates/thumbnails.json'
       ],
       thresholds: {
-        statements: 80,
-        branches: 72,
-        functions: 85,
-        lines: 80
+        statements: 91,
+        branches: 82,
+        functions: 90,
+        lines: 91
       }
     },
     // Mock Electron APIs

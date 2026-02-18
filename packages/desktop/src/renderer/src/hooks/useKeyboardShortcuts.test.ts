@@ -8,6 +8,9 @@ import { useSnapStore } from '../store/snapStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
 
+// Controllable mock euler output for rotation tests
+let mockEulerOutput = { x: 0, y: 0, z: 0 };
+
 // Mock THREE.js quaternion/euler math (used for rotation)
 vi.mock('three', () => {
   class MockVector3 {
@@ -62,6 +65,10 @@ vi.mock('three', () => {
       this.z = z;
     }
     setFromQuaternion() {
+      // Use controllable output for testing different rotation results
+      this.x = mockEulerOutput.x;
+      this.y = mockEulerOutput.y;
+      this.z = mockEulerOutput.z;
       return this;
     }
   }
@@ -114,6 +121,7 @@ function resetStores() {
 beforeEach(() => {
   vi.clearAllMocks();
   resetStores();
+  mockEulerOutput = { x: 0, y: 0, z: 0 };
 });
 
 function fireKey(key: string, opts: Partial<{ metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }> = {}) {
@@ -373,6 +381,239 @@ describe('useKeyboardShortcuts', () => {
       expect(updatePart).toHaveBeenCalledWith('p1', expect.objectContaining({ rotation: expect.any(Object) }));
     });
 
+    it('rotates selected part around Z axis when Z key pressed (not Ctrl+Z)', () => {
+      useSelectionStore.setState({ selectedPartIds: ['p1'] });
+      useProjectStore.setState({
+        parts: [
+          {
+            id: 'p1',
+            name: 'Part',
+            position: { x: 0, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            length: 10,
+            width: 5,
+            thickness: 0.75
+          }
+        ] as any[]
+      });
+      const updatePart = vi.fn();
+      useProjectStore.setState({ updatePart });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('z');
+      expect(updatePart).toHaveBeenCalledWith('p1', expect.objectContaining({ rotation: expect.any(Object) }));
+    });
+
+    it('rotates selected part around Y axis when Y key pressed', () => {
+      useSelectionStore.setState({ selectedPartIds: ['p1'] });
+      useProjectStore.setState({
+        parts: [
+          {
+            id: 'p1',
+            name: 'Part',
+            position: { x: 0, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            length: 10,
+            width: 5,
+            thickness: 0.75
+          }
+        ] as any[]
+      });
+      const updatePart = vi.fn();
+      useProjectStore.setState({ updatePart });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('y');
+      expect(updatePart).toHaveBeenCalledWith('p1', expect.objectContaining({ rotation: expect.any(Object) }));
+    });
+
+    it('batch-rotates multiple selected parts around their collective center', () => {
+      useSelectionStore.setState({ selectedPartIds: ['p1', 'p2'] });
+      useProjectStore.setState({
+        parts: [
+          {
+            id: 'p1',
+            name: 'Part A',
+            position: { x: -5, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            length: 10,
+            width: 5,
+            thickness: 0.75
+          },
+          {
+            id: 'p2',
+            name: 'Part B',
+            position: { x: 5, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            length: 10,
+            width: 5,
+            thickness: 0.75
+          }
+        ] as any[]
+      });
+      const batchUpdateParts = vi.fn();
+      useProjectStore.setState({ batchUpdateParts });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('x');
+      expect(batchUpdateParts).toHaveBeenCalledTimes(1);
+      const updates = batchUpdateParts.mock.calls[0][0];
+      expect(updates).toHaveLength(2);
+      expect(updates[0].id).toBe('p1');
+      expect(updates[1].id).toBe('p2');
+      // Each update should have position and rotation changes
+      expect(updates[0].changes).toHaveProperty('position');
+      expect(updates[0].changes).toHaveProperty('rotation');
+    });
+
+    it('batch-rotates parts from selected groups', () => {
+      // Select a group rather than individual parts
+      useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1'] });
+      useProjectStore.setState({
+        parts: [
+          {
+            id: 'p1',
+            name: 'Part A',
+            position: { x: 0, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            length: 10,
+            width: 5,
+            thickness: 0.75
+          },
+          {
+            id: 'p2',
+            name: 'Part B',
+            position: { x: 10, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            length: 10,
+            width: 5,
+            thickness: 0.75
+          }
+        ] as any[],
+        groups: [{ id: 'g1', name: 'Group 1' }] as any[],
+        groupMembers: [
+          { id: 'gm1', groupId: 'g1', memberId: 'p1', memberType: 'part' },
+          { id: 'gm2', groupId: 'g1', memberId: 'p2', memberType: 'part' }
+        ]
+      });
+      const batchUpdateParts = vi.fn();
+      useProjectStore.setState({ batchUpdateParts });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('y');
+      expect(batchUpdateParts).toHaveBeenCalledTimes(1);
+      const updates = batchUpdateParts.mock.calls[0][0];
+      expect(updates).toHaveLength(2);
+    });
+
+    it('uses width as half-height when rotX is 90 (multi-part ground constraint)', () => {
+      // Mock rotation result to have rotX=90 and rotZ=0
+      mockEulerOutput = { x: Math.PI / 2, y: 0, z: 0 };
+
+      useSelectionStore.setState({ selectedPartIds: ['p1', 'p2'] });
+      useProjectStore.setState({
+        parts: [
+          {
+            id: 'p1',
+            name: 'Part A',
+            position: { x: -5, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            length: 10,
+            width: 5,
+            thickness: 0.75
+          },
+          {
+            id: 'p2',
+            name: 'Part B',
+            position: { x: 5, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            length: 10,
+            width: 5,
+            thickness: 0.75
+          }
+        ] as any[]
+      });
+      const batchUpdateParts = vi.fn();
+      useProjectStore.setState({ batchUpdateParts });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('x');
+      expect(batchUpdateParts).toHaveBeenCalledTimes(1);
+      // effectiveHalfHeight should be width/2 = 2.5 (rotX=90, rotZ=0)
+    });
+
+    it('uses length as half-height when rotX is 90 and rotZ is 90 (multi-part ground constraint)', () => {
+      // Mock rotation result to have rotX=90 and rotZ=90
+      mockEulerOutput = { x: Math.PI / 2, y: 0, z: Math.PI / 2 };
+
+      useSelectionStore.setState({ selectedPartIds: ['p1', 'p2'] });
+      useProjectStore.setState({
+        parts: [
+          {
+            id: 'p1',
+            name: 'Part A',
+            position: { x: -5, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            length: 10,
+            width: 5,
+            thickness: 0.75
+          },
+          {
+            id: 'p2',
+            name: 'Part B',
+            position: { x: 5, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            length: 10,
+            width: 5,
+            thickness: 0.75
+          }
+        ] as any[]
+      });
+      const batchUpdateParts = vi.fn();
+      useProjectStore.setState({ batchUpdateParts });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('x');
+      expect(batchUpdateParts).toHaveBeenCalledTimes(1);
+      // effectiveHalfHeight should be length/2 = 5 (rotX=90, rotZ=90)
+    });
+
+    it('uses length as half-height when rotZ is 90 only (multi-part ground constraint)', () => {
+      // Mock rotation result to have rotX=0 and rotZ=90
+      mockEulerOutput = { x: 0, y: 0, z: Math.PI / 2 };
+
+      useSelectionStore.setState({ selectedPartIds: ['p1', 'p2'] });
+      useProjectStore.setState({
+        parts: [
+          {
+            id: 'p1',
+            name: 'Part A',
+            position: { x: -5, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            length: 10,
+            width: 5,
+            thickness: 0.75
+          },
+          {
+            id: 'p2',
+            name: 'Part B',
+            position: { x: 5, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            length: 10,
+            width: 5,
+            thickness: 0.75
+          }
+        ] as any[]
+      });
+      const batchUpdateParts = vi.fn();
+      useProjectStore.setState({ batchUpdateParts });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('z');
+      expect(batchUpdateParts).toHaveBeenCalledTimes(1);
+      // effectiveHalfHeight should be length/2 = 5 (rotX=0, rotZ=90)
+    });
+
     it('does not rotate when nothing selected', () => {
       const updatePart = vi.fn();
       useProjectStore.setState({ updatePart });
@@ -415,6 +656,109 @@ describe('useKeyboardShortcuts', () => {
       fireKey('ArrowUp');
       expect(moveSelectedParts).not.toHaveBeenCalled();
     });
+
+    it('moves along Y axis when camera up vector is Y-dominant', () => {
+      useSelectionStore.setState({ selectedPartIds: ['p1'] });
+      // Camera looking from the side: up vector is Y-dominant
+      useCameraStore.setState({
+        cameraViewVectors: {
+          up: { x: 0, y: 1, z: 0 },
+          right: { x: 1, y: 0, z: 0 }
+        }
+      });
+      const moveSelectedParts = vi.fn();
+      useProjectStore.setState({ moveSelectedParts, gridSize: 1 });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('ArrowUp');
+      const call = moveSelectedParts.mock.calls[0][0];
+      // Y axis is most aligned with up vector, so delta.y should be non-zero
+      expect(call.y).toBe(1);
+      expect(call.x).toBe(0);
+      expect(call.z).toBe(0);
+    });
+
+    it('moves along Z axis when camera up vector is Z-dominant', () => {
+      useSelectionStore.setState({ selectedPartIds: ['p1'] });
+      // Camera looking from top: up vector is Z-dominant
+      useCameraStore.setState({
+        cameraViewVectors: {
+          up: { x: 0, y: 0, z: -1 },
+          right: { x: 1, y: 0, z: 0 }
+        }
+      });
+      const moveSelectedParts = vi.fn();
+      useProjectStore.setState({ moveSelectedParts, gridSize: 1 });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('ArrowUp');
+      const call = moveSelectedParts.mock.calls[0][0];
+      // Z axis is most aligned with up vector, so delta.z should be non-zero
+      expect(call.z).not.toBe(0);
+      expect(call.y).toBe(0);
+      expect(call.x).toBe(0);
+    });
+
+    it('moves along Z axis when camera right vector is Z-dominant', () => {
+      useSelectionStore.setState({ selectedPartIds: ['p1'] });
+      // Camera where right vector is Z-dominant
+      useCameraStore.setState({
+        cameraViewVectors: {
+          up: { x: 0, y: 1, z: 0 },
+          right: { x: 0, y: 0, z: 1 }
+        }
+      });
+      const moveSelectedParts = vi.fn();
+      useProjectStore.setState({ moveSelectedParts, gridSize: 1 });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('ArrowRight');
+      const call = moveSelectedParts.mock.calls[0][0];
+      // Z axis is most aligned with right vector
+      expect(call.z).toBe(1);
+      expect(call.x).toBe(0);
+      expect(call.y).toBe(0);
+    });
+
+    it('moves negative Y when ArrowDown and camera up is Y-dominant', () => {
+      useSelectionStore.setState({ selectedPartIds: ['p1'] });
+      useCameraStore.setState({
+        cameraViewVectors: {
+          up: { x: 0, y: 1, z: 0 },
+          right: { x: 1, y: 0, z: 0 }
+        }
+      });
+      const moveSelectedParts = vi.fn();
+      useProjectStore.setState({ moveSelectedParts, gridSize: 1 });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('ArrowDown');
+      const call = moveSelectedParts.mock.calls[0][0];
+      expect(call.y).toBe(-1);
+      expect(call.x).toBe(0);
+      expect(call.z).toBe(0);
+    });
+
+    it('moves along Y axis when camera right vector is Y-dominant', () => {
+      useSelectionStore.setState({ selectedPartIds: ['p1'] });
+      // Camera oriented so right vector is Y-dominant (unusual but valid)
+      useCameraStore.setState({
+        cameraViewVectors: {
+          up: { x: 0, y: 0, z: 1 },
+          right: { x: 0, y: 1, z: 0 }
+        }
+      });
+      const moveSelectedParts = vi.fn();
+      useProjectStore.setState({ moveSelectedParts, gridSize: 1 });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('ArrowRight');
+      const call = moveSelectedParts.mock.calls[0][0];
+      // Y axis is most aligned with right vector
+      expect(call.y).toBe(1);
+      expect(call.x).toBe(0);
+      expect(call.z).toBe(0);
+    });
   });
 
   describe('G (Create Group)', () => {
@@ -443,6 +787,45 @@ describe('useKeyboardShortcuts', () => {
 
       fireKey('g');
       expect(createGroup).not.toHaveBeenCalled();
+    });
+
+    it('creates group from a part and a selected group', () => {
+      // One ungrouped part + one selected group = 2 members
+      useSelectionStore.setState({ selectedPartIds: ['p1'], selectedGroupIds: ['g1'] });
+      useProjectStore.setState({
+        groups: [{ id: 'g1', name: 'Existing Group' }] as any[],
+        groupMembers: []
+      });
+      const createGroup = vi.fn();
+      useProjectStore.setState({ createGroup });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('g');
+      expect(createGroup).toHaveBeenCalledWith('Group 2', [
+        { id: 'p1', type: 'part' },
+        { id: 'g1', type: 'group' }
+      ]);
+    });
+
+    it('creates group from two selected groups', () => {
+      // No parts selected, two groups selected = 2 members
+      useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1', 'g2'] });
+      useProjectStore.setState({
+        groups: [
+          { id: 'g1', name: 'Group A' },
+          { id: 'g2', name: 'Group B' }
+        ] as any[],
+        groupMembers: []
+      });
+      const createGroup = vi.fn();
+      useProjectStore.setState({ createGroup });
+      renderHook(() => useKeyboardShortcuts());
+
+      fireKey('g');
+      expect(createGroup).toHaveBeenCalledWith('Group 3', [
+        { id: 'g1', type: 'group' },
+        { id: 'g2', type: 'group' }
+      ]);
     });
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useUIStore } from '../../store/uiStore';
 import type { CutList, CutInstruction } from '../../types';
 
@@ -14,9 +14,11 @@ vi.mock('../../utils/featureLimits', () => ({
 }));
 
 // Mock pdfExport (dynamic import)
+const mockExportCutListToPdf = vi.fn().mockResolvedValue({ success: true });
+const mockExportCutListToCsv = vi.fn().mockReturnValue('Part,Length,Width\nTop,24,12');
 vi.mock('../../utils/pdfExport', () => ({
-  exportCutListToPdf: vi.fn().mockResolvedValue({ success: true }),
-  exportCutListToCsv: vi.fn().mockReturnValue('Part,Length,Width\nTop,24,12')
+  exportCutListToPdf: (...args: unknown[]) => mockExportCutListToPdf(...args),
+  exportCutListToCsv: (...args: unknown[]) => mockExportCutListToCsv(...args)
 }));
 
 import { CutListPartsTab } from './CutListPartsTab';
@@ -206,6 +208,160 @@ describe('CutListPartsTab', () => {
     it('renders download button', () => {
       render(<CutListPartsTab {...defaultProps} />);
       expect(screen.getByText('Download')).toBeInTheDocument();
+    });
+  });
+
+  describe('handleDownloadPDF', () => {
+    it('disables Download PDF item when canExportPDF is false', () => {
+      render(<CutListPartsTab {...defaultProps} canExportPDF={false} />);
+
+      fireEvent.click(screen.getByText('Download'));
+
+      const pdfButton = screen.getByText('Download PDF').closest('button');
+      expect(pdfButton).toBeDisabled();
+    });
+
+    it('does not call export when Download PDF is clicked while disabled', () => {
+      render(<CutListPartsTab {...defaultProps} canExportPDF={false} />);
+
+      fireEvent.click(screen.getByText('Download'));
+      fireEvent.click(screen.getByText('Download PDF'));
+
+      expect(mockExportCutListToPdf).not.toHaveBeenCalled();
+    });
+
+    it('shows success toast on successful PDF export', async () => {
+      mockExportCutListToPdf.mockResolvedValueOnce({ success: true });
+
+      render(<CutListPartsTab {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download'));
+      fireEvent.click(screen.getByText('Download PDF'));
+
+      await waitFor(() => {
+        const toast = useUIStore.getState().toast;
+        expect(toast?.message).toBe('Parts list saved to PDF');
+      });
+    });
+
+    it('shows error toast on PDF export error result', async () => {
+      mockExportCutListToPdf.mockResolvedValueOnce({ success: false, error: 'Save failed' });
+
+      render(<CutListPartsTab {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download'));
+      fireEvent.click(screen.getByText('Download PDF'));
+
+      await waitFor(() => {
+        const toast = useUIStore.getState().toast;
+        expect(toast?.message).toBe('Failed to save PDF');
+      });
+    });
+
+    it('does nothing when PDF export is canceled (no error, no success)', async () => {
+      mockExportCutListToPdf.mockResolvedValueOnce({ success: false });
+
+      render(<CutListPartsTab {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download'));
+      fireEvent.click(screen.getByText('Download PDF'));
+
+      await waitFor(() => {
+        expect(mockExportCutListToPdf).toHaveBeenCalled();
+      });
+
+      const toast = useUIStore.getState().toast;
+      expect(toast).toBeNull();
+    });
+
+    it('shows error toast when PDF export throws', async () => {
+      mockExportCutListToPdf.mockRejectedValueOnce(new Error('Unexpected error'));
+
+      render(<CutListPartsTab {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download'));
+      fireEvent.click(screen.getByText('Download PDF'));
+
+      await waitFor(() => {
+        const toast = useUIStore.getState().toast;
+        expect(toast?.message).toBe('Failed to export PDF');
+      });
+    });
+  });
+
+  describe('handleDownloadCSV', () => {
+    it('creates CSV download and shows toast', async () => {
+      const createElementSpy = vi.spyOn(document, 'createElement');
+
+      render(<CutListPartsTab {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download'));
+      fireEvent.click(screen.getByText('Download CSV'));
+
+      await waitFor(() => {
+        expect(mockExportCutListToCsv).toHaveBeenCalled();
+      });
+
+      // Verify a link element was created for download
+      expect(URL.createObjectURL).toHaveBeenCalled();
+      expect(URL.revokeObjectURL).toHaveBeenCalled();
+
+      const toast = useUIStore.getState().toast;
+      expect(toast?.message).toBe('Parts list exported to CSV');
+
+      createElementSpy.mockRestore();
+    });
+
+    it('uses project name in CSV filename', async () => {
+      let capturedDownload = '';
+      const originalCreateElement = document.createElement.bind(document);
+      const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+        const el = originalCreateElement(tag);
+        if (tag === 'a') {
+          el.click = vi.fn(() => {
+            capturedDownload = (el as unknown as { download: string }).download;
+          });
+        }
+        return el;
+      });
+
+      render(<CutListPartsTab {...defaultProps} projectName="My Project" />);
+
+      fireEvent.click(screen.getByText('Download'));
+      fireEvent.click(screen.getByText('Download CSV'));
+
+      await waitFor(() => {
+        expect(mockExportCutListToCsv).toHaveBeenCalled();
+      });
+
+      expect(capturedDownload).toBe('My Project-parts.csv');
+      createElementSpy.mockRestore();
+    });
+
+    it('uses fallback filename when project name is empty', async () => {
+      let capturedDownload = '';
+      const originalCreateElement = document.createElement.bind(document);
+      const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+        const el = originalCreateElement(tag);
+        if (tag === 'a') {
+          el.click = vi.fn(() => {
+            capturedDownload = (el as unknown as { download: string }).download;
+          });
+        }
+        return el;
+      });
+
+      render(<CutListPartsTab {...defaultProps} projectName="" />);
+
+      fireEvent.click(screen.getByText('Download'));
+      fireEvent.click(screen.getByText('Download CSV'));
+
+      await waitFor(() => {
+        expect(mockExportCutListToCsv).toHaveBeenCalled();
+      });
+
+      expect(capturedDownload).toBe('cut-list-parts.csv');
+      createElementSpy.mockRestore();
     });
   });
 });
