@@ -70,7 +70,7 @@ export function StartScreen({
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [favoriteProjects, setFavoriteProjects] = useState<RecentProject[]>([]);
   const [userTemplates, setUserTemplates] = useState<UserTemplate[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
   const [appVersion, setAppVersion] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'recents' | 'favorites'>('recents');
 

@@ -298,7 +298,6 @@ export interface FileRepairResult {
  */
 export function repairCarvdFile(jsonString: string): FileRepairResult {
   const repairActions: string[] = [];
-  const remainingErrors: string[] = [];
   const warnings: string[] = [];
 
   // First, try to parse the JSON

@@ -17,8 +17,6 @@ vi.mock('./lemonsqueezy-api', () => ({
   deactivateLicense: vi.fn()
 }));
 
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
-
 // Helper to create a valid LS response
 function createValidResponse(overrides = {}) {
   return {

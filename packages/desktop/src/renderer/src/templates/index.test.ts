@@ -10,6 +10,7 @@ import {
   formatDimensions
 } from './index';
 import type { UserTemplate } from './types';
+import type { Project } from '../types';
 
 describe('templates/index', () => {
   describe('built-in templates', () => {
@@ -97,7 +98,7 @@ describe('templates/index', () => {
           thumbnail: '🪑',
           category: 'furniture',
           createdAt: '2026-01-01',
-          project: { parts: [], stocks: [], groups: [], groupMembers: [] } as any
+          project: { parts: [], stocks: [], groups: [], groupMembers: [] } as unknown as Project
         }
       ];
       const all = getAllTemplates(userTemplates);
@@ -118,7 +119,7 @@ describe('templates/index', () => {
           thumbnail: '',
           category: 'other',
           createdAt: '2026-01-01',
-          project: {} as any
+          project: {} as unknown as Project
         }
       ];
       const all = getAllTemplates(userTemplates);

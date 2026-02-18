@@ -744,7 +744,7 @@ describe('StockLibraryModal', () => {
 
     it('calls onClose when X button is clicked', () => {
       const onClose = vi.fn();
-      const { container } = render(<StockLibraryModal {...defaultProps} onClose={onClose} />);
+      render(<StockLibraryModal {...defaultProps} onClose={onClose} />);
 
       const closeBtn = screen.getByLabelText('Close');
       fireEvent.click(closeBtn);

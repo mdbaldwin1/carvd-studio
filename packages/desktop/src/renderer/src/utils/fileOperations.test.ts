@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { useProjectStore } from '../store/projectStore';
-import { useCameraStore } from '../store/cameraStore';
 
 // Mock fileFormat module
 vi.mock('./fileFormat', () => ({
@@ -49,6 +48,7 @@ import {
   clearRecentProjects
 } from './fileOperations';
 import { parseCarvdFile, deserializeToProject, repairCarvdFile } from './fileFormat';
+import type { CarvdFile, Part } from '../types';
 import { generateThumbnail } from '../store/projectStore';
 
 // ============================================================
@@ -228,7 +228,7 @@ describe('saveToPath (via saveProject)', () => {
 
   it('generates thumbnail when parts exist', async () => {
     useProjectStore.setState({
-      parts: [{ id: 'p1' }] as any[]
+      parts: [{ id: 'p1' }] as unknown as Part[]
     });
     (generateThumbnail as ReturnType<typeof vi.fn>).mockResolvedValue('data:image/png;base64,abc');
 
@@ -449,7 +449,7 @@ describe('attemptFileRepair', () => {
 
 describe('loadRepairedFile', () => {
   it('loads repaired data and marks as dirty', async () => {
-    const repairedData = { version: '1.0', projectName: 'Repaired' } as any;
+    const repairedData = { version: '1.0', projectName: 'Repaired' } as unknown as CarvdFile;
     (deserializeToProject as ReturnType<typeof vi.fn>).mockReturnValue({
       name: 'Repaired',
       parts: [],
@@ -467,7 +467,7 @@ describe('loadRepairedFile', () => {
     (deserializeToProject as ReturnType<typeof vi.fn>).mockReturnValue({ name: 'Test' });
     (window.electronAPI.addRecentProject as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
 
-    await loadRepairedFile({} as any, '/path/to/file.carvd');
+    await loadRepairedFile({} as unknown as CarvdFile, '/path/to/file.carvd');
     expect(window.electronAPI.addRecentProject).toHaveBeenCalledWith('/path/to/file.carvd');
   });
 
@@ -476,7 +476,7 @@ describe('loadRepairedFile', () => {
       throw new Error('Deserialization failed');
     });
 
-    const result = await loadRepairedFile({} as any, '/path/to/bad.carvd');
+    const result = await loadRepairedFile({} as unknown as CarvdFile, '/path/to/bad.carvd');
     expect(result.success).toBe(false);
     expect(result.error).toContain('Deserialization failed');
   });

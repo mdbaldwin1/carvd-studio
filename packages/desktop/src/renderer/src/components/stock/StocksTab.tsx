@@ -59,6 +59,7 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleCancelEdit is a useCallback defined below; deps cover the values it reads
   }, [isFormMode, onClose]);
 
   const handleSelectStock = useCallback((stock: Stock) => {

@@ -4,6 +4,7 @@ import { useProjectStore } from '../store/projectStore';
 import { useAssemblyEditingStore } from '../store/assemblyEditingStore';
 import { useLicenseStore } from '../store/licenseStore';
 import { useUIStore } from '../store/uiStore';
+import type { Assembly } from '../types';
 
 // Mock file operations
 vi.mock('../utils/fileOperations', () => ({
@@ -151,7 +152,7 @@ describe('useAssemblyEditing', () => {
 
       let success: boolean;
       await act(async () => {
-        success = await result.current.startEditing(assembly as any);
+        success = await result.current.startEditing(assembly as unknown as Assembly);
       });
 
       expect(success!).toBe(true);
@@ -166,7 +167,7 @@ describe('useAssemblyEditing', () => {
 
       let success: boolean;
       await act(async () => {
-        success = await result.current.startEditing({ id: 'a1', name: 'A' } as any);
+        success = await result.current.startEditing({ id: 'a1', name: 'A' } as unknown as Assembly);
       });
 
       expect(success!).toBe(false);
@@ -630,7 +631,7 @@ describe('useAssemblyEditing', () => {
       const { result } = renderHook(() => useAssemblyEditing());
 
       await act(async () => {
-        await result.current.startEditing(assembly as any);
+        await result.current.startEditing(assembly as unknown as Assembly);
       });
 
       // startEditingAssembly should have been called with the resolved parts
@@ -682,7 +683,7 @@ describe('useAssemblyEditing', () => {
       const { result } = renderHook(() => useAssemblyEditing());
 
       await act(async () => {
-        await result.current.startEditing(assembly as any);
+        await result.current.startEditing(assembly as unknown as Assembly);
       });
 
       expect(startEditingAssembly).toHaveBeenCalled();
@@ -748,7 +749,7 @@ describe('useAssemblyEditing', () => {
       const { result } = renderHook(() => useAssemblyEditing());
 
       await act(async () => {
-        await result.current.startEditing(assembly as any);
+        await result.current.startEditing(assembly as unknown as Assembly);
       });
 
       expect(startEditingAssembly).toHaveBeenCalled();
@@ -790,7 +791,7 @@ describe('useAssemblyEditing', () => {
       const { result } = renderHook(() => useAssemblyEditing());
 
       await act(async () => {
-        await result.current.startEditing(assembly as any);
+        await result.current.startEditing(assembly as unknown as Assembly);
       });
 
       expect(startEditingAssembly).toHaveBeenCalled();
@@ -846,7 +847,7 @@ describe('useAssemblyEditing', () => {
       const { result } = renderHook(() => useAssemblyEditing());
 
       await act(async () => {
-        await result.current.startEditing(assembly as any);
+        await result.current.startEditing(assembly as unknown as Assembly);
       });
 
       expect(startEditingAssembly).toHaveBeenCalled();
@@ -889,7 +890,7 @@ describe('useAssemblyEditing', () => {
       const { result } = renderHook(() => useAssemblyEditing());
 
       await act(async () => {
-        await result.current.startEditing(assembly as any);
+        await result.current.startEditing(assembly as unknown as Assembly);
       });
 
       expect(startEditingAssembly).toHaveBeenCalled();

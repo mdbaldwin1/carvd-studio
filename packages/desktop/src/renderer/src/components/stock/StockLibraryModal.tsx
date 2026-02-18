@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
-import { useProjectStore } from '../../store/projectStore';
 import { useLicenseStore } from '../../store/licenseStore';
 import { Assembly, Stock } from '../../types';
 import { getFeatureLimits } from '../../utils/featureLimits';

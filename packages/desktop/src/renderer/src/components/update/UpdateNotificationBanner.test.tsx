@@ -130,7 +130,7 @@ describe('UpdateNotificationBanner', () => {
     });
 
     it('shows progress bar with correct width', async () => {
-      const { container } = render(<UpdateNotificationBanner />);
+      render(<UpdateNotificationBanner />);
 
       act(() => {
         onUpdateAvailableCallback?.({ version: '2.0.0' });

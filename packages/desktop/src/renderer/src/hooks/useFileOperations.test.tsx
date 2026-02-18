@@ -1049,7 +1049,7 @@ describe('useFileOperations', () => {
       const showToast = vi.fn();
       useUIStore.setState({ showToast });
 
-      const { hookRef } = renderWithDialogs();
+      renderWithDialogs();
 
       // Trigger close with unsaved changes via the captured callback
       expect(onBeforeCloseCallback).not.toBeNull();
@@ -1077,7 +1077,7 @@ describe('useFileOperations', () => {
         canceled: true
       });
 
-      const { hookRef } = renderWithDialogs();
+      renderWithDialogs();
 
       await act(async () => {
         onBeforeCloseCallback!();

@@ -18,23 +18,21 @@
     box-sizing: border-box;
   }
 
-  /* Smooth theme transitions */
-  *,
-  *::before,
-  *::after {
-    transition-property: background-color, border-color, color, fill, stroke;
-    transition-duration: 0.2s;
-    transition-timing-function: ease;
-  }
-
-  /* Preserve existing transitions for interactive elements */
+  /* Theme transitions — scoped to interactive elements only.
+   * A global * selector was here before but forced the browser to track
+   * transition state on every DOM element (including 2048+ list items),
+   * causing significant layout/style overhead. Components that need smooth
+   * color transitions already use Tailwind transition-colors. */
   button,
   input,
   select,
   textarea,
   .btn,
+  .sidebar-section,
   [class*='transition'] {
-    transition-property: all;
+    transition-property: background-color, border-color, color, fill, stroke;
+    transition-duration: 0.2s;
+    transition-timing-function: ease;
   }
 
   html,

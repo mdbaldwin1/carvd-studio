@@ -1,15 +1,17 @@
-import { AlertTriangle, ChevronDown, ChevronRight, Layers } from 'lucide-react';
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback, useRef, useEffect } from 'react';
+import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
+import { ChevronRight, ChevronDown, Layers, AlertTriangle } from 'lucide-react';
 import { useStockLibrary } from '../../hooks/useStockLibrary';
 import { useAssemblyEditingStore } from '../../store/assemblyEditingStore';
 import { getAllDescendantPartIds, useProjectStore, validatePartsForCutList } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
-import { Group, GroupMember, Part, Stock } from '../../types';
+import { Group, GroupMember, Part, PartValidationIssue } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { IconButton } from '../common/IconButton';
 
-// Tree node types for rendering
+// ── Tree types ──────────────────────────────────────────────────────────
+
 interface PartNode {
   type: 'part';
   data: Part;
@@ -23,9 +25,33 @@ interface GroupNode {
 
 type TreeNode = PartNode | GroupNode;
 
-// Build the hierarchical tree from flat data
+// ── Flat item for virtualization ────────────────────────────────────────
+
+interface FlatPartItem {
+  type: 'part';
+  data: Part;
+  level: number;
+  /** Whether this part's parent group is expanded (always true for top-level) */
+  parentGroupId: string | null;
+}
+
+interface FlatGroupItem {
+  type: 'group';
+  data: Group;
+  level: number;
+  childCount: number;
+  isExpanded: boolean;
+  isSelected: boolean;
+  isEditing: boolean;
+  hasChildError: boolean;
+  hasChildWarning: boolean;
+}
+
+type FlatItem = FlatPartItem | FlatGroupItem;
+
+// ── Build tree from flat data ───────────────────────────────────────────
+
 function buildTree(parts: Part[], groups: Group[], groupMembers: GroupMember[]): TreeNode[] {
-  // Create lookup maps
   const membersByGroup = new Map<string, GroupMember[]>();
   const partIdToGroupId = new Map<string, string>();
   const groupIdToParentGroupId = new Map<string, string>();
@@ -41,11 +67,9 @@ function buildTree(parts: Part[], groups: Group[], groupMembers: GroupMember[]):
     membersByGroup.set(member.groupId, members);
   }
 
-  // Find top-level items (not inside any group)
   const topLevelGroups = groups.filter((g) => !groupIdToParentGroupId.has(g.id));
   const topLevelParts = parts.filter((p) => !partIdToGroupId.has(p.id));
 
-  // Recursively build tree
   function buildNode(item: Part | Group, itemType: 'part' | 'group'): TreeNode {
     if (itemType === 'part') {
       return { type: 'part', data: item as Part };
@@ -68,49 +92,134 @@ function buildTree(parts: Part[], groups: Group[], groupMembers: GroupMember[]):
     return { type: 'group', data: group, children };
   }
 
-  // Build top-level tree
-  const tree: TreeNode[] = [
-    ...topLevelGroups.map((g) => buildNode(g, 'group')),
-    ...topLevelParts.map((p) => buildNode(p, 'part'))
-  ];
-
-  return tree;
+  return [...topLevelGroups.map((g) => buildNode(g, 'group')), ...topLevelParts.map((p) => buildNode(p, 'part'))];
 }
+
+// ── Filter tree by search ───────────────────────────────────────────────
+
+function filterTree(nodes: TreeNode[], searchTerm: string): TreeNode[] {
+  const lowerSearch = searchTerm.toLowerCase();
+
+  return nodes.reduce<TreeNode[]>((acc, node) => {
+    if (node.type === 'part') {
+      if (node.data.name.toLowerCase().includes(lowerSearch)) {
+        acc.push(node);
+      }
+    } else {
+      const filteredChildren = filterTree(node.children, searchTerm);
+      if (filteredChildren.length > 0 || node.data.name.toLowerCase().includes(lowerSearch)) {
+        acc.push({
+          ...node,
+          children: filteredChildren.length > 0 ? filteredChildren : node.children
+        });
+      }
+    }
+    return acc;
+  }, []);
+}
+
+// ── Flatten tree for Virtuoso ───────────────────────────────────────────
+
+function flattenTree(
+  nodes: TreeNode[],
+  expandedGroupIdSet: Set<string>,
+  selectedGroupIdSet: Set<string>,
+  editingGroupId: string | null,
+  validationByPart: Map<string, PartValidationIssue[]>,
+  groupMembers: GroupMember[],
+  level = 0,
+  parentGroupId: string | null = null
+): FlatItem[] {
+  const result: FlatItem[] = [];
+
+  for (const node of nodes) {
+    if (node.type === 'part') {
+      result.push({ type: 'part', data: node.data, level, parentGroupId });
+    } else {
+      const group = node.data;
+      const isExpanded = expandedGroupIdSet.has(group.id);
+      const isSelected = selectedGroupIdSet.has(group.id);
+      const isEditing = editingGroupId === group.id;
+      const childCount = getAllDescendantPartIds(group.id, groupMembers).length;
+
+      // Compute descendant issues only for collapsed groups
+      let hasChildError = false;
+      let hasChildWarning = false;
+      if (!isExpanded) {
+        const descendantPartIds = getAllDescendantPartIds(group.id, groupMembers);
+        for (const partId of descendantPartIds) {
+          const issues = validationByPart.get(partId);
+          if (issues && issues.length > 0) {
+            if (issues.some((i) => i.severity === 'error')) hasChildError = true;
+            else hasChildWarning = true;
+          } else {
+            // Check no-stock (parts with no stockId that had no validation entry)
+            // Actually validation already catches no_stock, but check if there's a part with no stockId
+            // that somehow has no issues entry
+          }
+        }
+      }
+
+      result.push({
+        type: 'group',
+        data: group,
+        level,
+        childCount,
+        isExpanded,
+        isSelected,
+        isEditing,
+        hasChildError,
+        hasChildWarning: !hasChildError && hasChildWarning
+      });
+
+      if (isExpanded && node.children.length > 0) {
+        result.push(
+          ...flattenTree(
+            node.children,
+            expandedGroupIdSet,
+            selectedGroupIdSet,
+            editingGroupId,
+            validationByPart,
+            groupMembers,
+            level + 1,
+            group.id
+          )
+        );
+      }
+    }
+  }
+
+  return result;
+}
+
+// ── Memoized PartItem ───────────────────────────────────────────────────
 
 interface PartItemProps {
   part: Part;
   level: number;
+  isSelected: boolean;
+  hasError: boolean;
+  hasWarning: boolean;
+  issueMessages: string;
+  units: string;
   onPartClick: (partId: string, e: React.MouseEvent) => void;
   onDuplicate: (partId: string) => void;
   onDelete: (partId: string) => void;
 }
 
-function PartItem({ part, level, onPartClick, onDuplicate, onDelete }: PartItemProps) {
-  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
-  const projectStocks = useProjectStore((s) => s.stocks);
-  const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
-  const units = useProjectStore((s) => s.units);
-
-  // Use library stocks when editing assembly, project stocks otherwise
-  const { stocks: libraryStocks } = useStockLibrary();
-  const stocks = isEditingAssembly ? libraryStocks : projectStocks;
-
-  const isSelected = selectedPartIds.includes(part.id);
+const PartItem = React.memo(function PartItem({
+  part,
+  level,
+  isSelected,
+  hasError,
+  hasWarning,
+  issueMessages,
+  units,
+  onPartClick,
+  onDuplicate,
+  onDelete
+}: PartItemProps) {
   const dimsText = `${formatMeasurementWithUnit(part.length, units)} × ${formatMeasurementWithUnit(part.width, units)} × ${formatMeasurementWithUnit(part.thickness, units)}`;
-
-  // Validate this part for cut list issues
-  const validationIssues = useMemo(() => {
-    return validatePartsForCutList([part], stocks);
-  }, [part, stocks]);
-
-  // Also check directly for no-stock case (belt and suspenders)
-  const hasNoStock = !part.stockId;
-  const hasError = hasNoStock || validationIssues.some((i) => i.severity === 'error');
-  const hasWarning = !hasError && validationIssues.some((i) => i.severity === 'warning');
-  const issueMessages =
-    hasNoStock && validationIssues.length === 0
-      ? 'No stock assigned'
-      : validationIssues.map((i) => i.message).join('\n');
 
   return (
     <li
@@ -154,120 +263,55 @@ function PartItem({ part, level, onPartClick, onDuplicate, onDelete }: PartItemP
       </div>
     </li>
   );
-}
+});
+
+// ── Memoized GroupItem ──────────────────────────────────────────────────
 
 interface GroupItemProps {
   group: Group;
-  children: TreeNode[];
   level: number;
-  onPartClick: (partId: string, e: React.MouseEvent) => void;
-  onDuplicate: (partId: string) => void;
-  onDelete: (partId: string) => void;
+  childCount: number;
+  isSelected: boolean;
+  isExpanded: boolean;
+  isEditing: boolean;
+  hasChildError: boolean;
+  hasChildWarning: boolean;
+  onGroupClick: (groupId: string, e: React.MouseEvent) => void;
+  onGroupDoubleClick: (groupId: string) => void;
+  onGroupContextMenu: (groupId: string, e: React.MouseEvent) => void;
+  onExpandToggle: (groupId: string) => void;
 }
 
-// Helper function to recursively check for validation issues in a tree node
-function hasDescendantIssues(
-  node: TreeNode,
-  stocks: Stock[],
-  parts: Part[]
-): { hasError: boolean; hasWarning: boolean } {
-  if (node.type === 'part') {
-    const validationIssues = validatePartsForCutList([node.data], stocks);
-    const hasNoStock = !node.data.stockId;
-    const hasError = hasNoStock || validationIssues.some((i) => i.severity === 'error');
-    const hasWarning = !hasError && validationIssues.some((i) => i.severity === 'warning');
-    return { hasError, hasWarning };
-  }
-
-  // For groups, check all children recursively
-  let hasError = false;
-  let hasWarning = false;
-  for (const child of node.children) {
-    const childResult = hasDescendantIssues(child, stocks, parts);
-    if (childResult.hasError) hasError = true;
-    if (childResult.hasWarning) hasWarning = true;
-  }
-  return { hasError, hasWarning };
-}
-
-function GroupItem({ group, children, level, onPartClick, onDuplicate, onDelete }: GroupItemProps) {
-  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
-  const expandedGroupIds = useSelectionStore((s) => s.expandedGroupIds);
-  const editingGroupId = useSelectionStore((s) => s.editingGroupId);
-  const groupMembers = useProjectStore((s) => s.groupMembers);
-  const projectStocks = useProjectStore((s) => s.stocks);
-  const allParts = useProjectStore((s) => s.parts);
-  const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
-  const toggleGroupExpanded = useSelectionStore((s) => s.toggleGroupExpanded);
-  const selectGroup = useSelectionStore((s) => s.selectGroup);
-  const toggleGroupSelection = useSelectionStore((s) => s.toggleGroupSelection);
-  const enterGroup = useSelectionStore((s) => s.enterGroup);
-  const openContextMenu = useUIStore((s) => s.openContextMenu);
-
-  // Use library stocks when editing assembly, project stocks otherwise
-  const { stocks: libraryStocks } = useStockLibrary();
-  const stocks = isEditingAssembly ? libraryStocks : projectStocks;
-
-  const isSelected = selectedGroupIds.includes(group.id);
-  const isExpanded = expandedGroupIds.includes(group.id);
-  const isEditing = editingGroupId === group.id;
-  const partCount = getAllDescendantPartIds(group.id, groupMembers).length;
-
-  // Check for descendant validation issues (only when collapsed)
-  const descendantIssues = useMemo(() => {
-    if (isExpanded) return { hasError: false, hasWarning: false };
-    // Create a temporary group node to check children
-    const groupNode: GroupNode = { type: 'group', data: group, children };
-    return hasDescendantIssues(groupNode, stocks, allParts);
-  }, [isExpanded, group, children, stocks, allParts]);
-
-  const hasChildError = descendantIssues.hasError;
-  const hasChildWarning = !hasChildError && descendantIssues.hasWarning;
-
-  const handleGroupClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (e.shiftKey) {
-      // Shift+click: toggle selection (add/remove from multi-select)
-      toggleGroupSelection(group.id);
-    } else {
-      // Regular click: replace selection
-      selectGroup(group.id);
-    }
-  };
-
-  const handleGroupContextMenu = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    // Don't change selection if this group is already selected
-    if (!isSelected) {
-      selectGroup(group.id);
-    }
-    openContextMenu({ x: e.clientX, y: e.clientY, type: 'part' });
-  };
-
-  const handleGroupDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    enterGroup(group.id);
-  };
-
-  const handleExpandToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    toggleGroupExpanded(group.id);
-  };
-
+const GroupItem = React.memo(function GroupItem({
+  group,
+  level,
+  childCount,
+  isSelected,
+  isExpanded,
+  isEditing,
+  hasChildError,
+  hasChildWarning,
+  onGroupClick,
+  onGroupDoubleClick,
+  onGroupContextMenu,
+  onExpandToggle
+}: GroupItemProps) {
   return (
     <li className="list-none">
       <div
         className={`group-header flex items-center gap-2 py-2 px-3 cursor-pointer transition-colors duration-100 select-none font-medium ${isSelected ? 'selected bg-selected' : ''} ${isEditing ? 'editing bg-primary-bg border-l-2 border-l-primary !pl-2.5' : ''}`}
         style={{ paddingLeft: isEditing ? undefined : `${12 + level * 16}px` }}
-        onClick={handleGroupClick}
-        onDoubleClick={handleGroupDoubleClick}
-        onContextMenu={handleGroupContextMenu}
-        title={`${group.name} (${partCount} part${partCount === 1 ? '' : 's'})${hasChildError || hasChildWarning ? '\n\n⚠ Contains parts with validation issues' : ''}`}
+        onClick={(e) => onGroupClick(group.id, e)}
+        onDoubleClick={() => onGroupDoubleClick(group.id)}
+        onContextMenu={(e) => onGroupContextMenu(group.id, e)}
+        title={`${group.name} (${childCount} part${childCount === 1 ? '' : 's'})${hasChildError || hasChildWarning ? '\n\n⚠ Contains parts with validation issues' : ''}`}
       >
         <button
           className={`group-expand-btn btn btn-icon-sm btn-ghost btn-secondary ${isExpanded ? 'active' : ''}`}
-          onClick={handleExpandToggle}
+          onClick={(e) => {
+            e.stopPropagation();
+            onExpandToggle(group.id);
+          }}
           title={isExpanded ? `Collapse ${group.name}` : `Expand ${group.name}`}
           aria-label={isExpanded ? `Collapse ${group.name}` : `Expand ${group.name}`}
           aria-expanded={isExpanded}
@@ -285,68 +329,20 @@ function GroupItem({ group, children, level, onPartClick, onDuplicate, onDelete 
         <Layers size={14} className="text-text-muted shrink-0" />
         <span className="flex-1 truncate">{group.name}</span>
         <span className="text-[10px] bg-border text-text py-px px-1.5 rounded-full min-w-4 text-center">
-          {partCount}
+          {childCount}
         </span>
       </div>
-      {isExpanded && children.length > 0 && (
-        <ul className="group-children list-none p-0 m-0">
-          {children.map((child) =>
-            child.type === 'part' ? (
-              <PartItem
-                key={child.data.id}
-                part={child.data}
-                level={level + 1}
-                onPartClick={onPartClick}
-                onDuplicate={onDuplicate}
-                onDelete={onDelete}
-              />
-            ) : (
-              <GroupItem
-                key={child.data.id}
-                group={child.data}
-                children={child.children}
-                level={level + 1}
-                onPartClick={onPartClick}
-                onDuplicate={onDuplicate}
-                onDelete={onDelete}
-              />
-            )
-          )}
-        </ul>
-      )}
     </li>
   );
-}
+});
+
+// ── Main component ──────────────────────────────────────────────────────
 
 interface HierarchicalPartsListProps {
   onPartClick: (partId: string, e: React.MouseEvent) => void;
   onDuplicate: (partId: string) => void;
   onDelete: (partId: string) => void;
   searchFilter?: string;
-}
-
-// Helper function to filter tree nodes based on search term
-function filterTree(nodes: TreeNode[], searchTerm: string): TreeNode[] {
-  const lowerSearch = searchTerm.toLowerCase();
-
-  return nodes.reduce<TreeNode[]>((acc, node) => {
-    if (node.type === 'part') {
-      if (node.data.name.toLowerCase().includes(lowerSearch)) {
-        acc.push(node);
-      }
-    } else {
-      // For groups, filter children first
-      const filteredChildren = filterTree(node.children, searchTerm);
-      // Include group if it has matching children or its name matches
-      if (filteredChildren.length > 0 || node.data.name.toLowerCase().includes(lowerSearch)) {
-        acc.push({
-          ...node,
-          children: filteredChildren.length > 0 ? filteredChildren : node.children
-        });
-      }
-    }
-    return acc;
-  }, []);
 }
 
 export function HierarchicalPartsList({
@@ -358,45 +354,190 @@ export function HierarchicalPartsList({
   const parts = useProjectStore((s) => s.parts);
   const groups = useProjectStore((s) => s.groups);
   const groupMembers = useProjectStore((s) => s.groupMembers);
+  const projectStocks = useProjectStore((s) => s.stocks);
+  const units = useProjectStore((s) => s.units);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
+  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
+  const expandedGroupIds = useSelectionStore((s) => s.expandedGroupIds);
+  const editingGroupId = useSelectionStore((s) => s.editingGroupId);
+  const toggleGroupExpanded = useSelectionStore((s) => s.toggleGroupExpanded);
+  const selectGroup = useSelectionStore((s) => s.selectGroup);
+  const toggleGroupSelection = useSelectionStore((s) => s.toggleGroupSelection);
+  const enterGroup = useSelectionStore((s) => s.enterGroup);
+  const openContextMenu = useUIStore((s) => s.openContextMenu);
+  const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
+  const { stocks: libraryStocks } = useStockLibrary();
+  const stocks = isEditingAssembly ? libraryStocks : projectStocks;
 
-  // Memoize tree building for performance
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+
+  // Batch validation: run once for all parts, build lookup
+  const validationByPart = useMemo(() => {
+    const map = new Map<string, PartValidationIssue[]>();
+    const allIssues = validatePartsForCutList(parts, stocks);
+    for (const issue of allIssues) {
+      const existing = map.get(issue.partId) || [];
+      existing.push(issue);
+      map.set(issue.partId, existing);
+    }
+    // Ensure parts with no stock still have an entry for convenience
+    for (const part of parts) {
+      if (!map.has(part.id) && !part.stockId) {
+        map.set(part.id, [
+          {
+            partId: part.id,
+            partName: part.name,
+            type: 'no_stock',
+            message: 'No stock assigned',
+            severity: 'error'
+          }
+        ]);
+      }
+    }
+    return map;
+  }, [parts, stocks]);
+
+  // Build tree
   const tree = useMemo(() => buildTree(parts, groups, groupMembers), [parts, groups, groupMembers]);
 
-  // Filter tree based on search
+  // Filter
   const filteredTree = useMemo(() => (searchFilter ? filterTree(tree, searchFilter) : tree), [tree, searchFilter]);
+
+  // Sets for O(1) lookups
+  const selectedPartIdSet = useMemo(() => new Set(selectedPartIds), [selectedPartIds]);
+  const selectedGroupIdSet = useMemo(() => new Set(selectedGroupIds), [selectedGroupIds]);
+  const expandedGroupIdSet = useMemo(() => new Set(expandedGroupIds), [expandedGroupIds]);
+
+  // Flatten tree into a flat list respecting expansion state
+  const flatItems = useMemo(
+    () =>
+      flattenTree(filteredTree, expandedGroupIdSet, selectedGroupIdSet, editingGroupId, validationByPart, groupMembers),
+    [filteredTree, expandedGroupIdSet, selectedGroupIdSet, editingGroupId, validationByPart, groupMembers]
+  );
+
+  // Scroll to selected part when selection changes from 3D view
+  useEffect(() => {
+    if (selectedPartIds.length === 1 && virtuosoRef.current) {
+      const idx = flatItems.findIndex((item) => item.type === 'part' && item.data.id === selectedPartIds[0]);
+      if (idx >= 0) {
+        virtuosoRef.current.scrollToIndex({ index: idx, align: 'center', behavior: 'smooth' });
+      }
+    }
+  }, [selectedPartIds, flatItems]);
+
+  // Stable group callbacks
+  const handleGroupClick = useCallback(
+    (groupId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (e.shiftKey) {
+        toggleGroupSelection(groupId);
+      } else {
+        selectGroup(groupId);
+      }
+    },
+    [selectGroup, toggleGroupSelection]
+  );
+
+  const handleGroupDoubleClick = useCallback(
+    (groupId: string) => {
+      enterGroup(groupId);
+    },
+    [enterGroup]
+  );
+
+  const handleGroupContextMenu = useCallback(
+    (groupId: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const isAlreadySelected = useSelectionStore.getState().selectedGroupIds.includes(groupId);
+      if (!isAlreadySelected) {
+        selectGroup(groupId);
+      }
+      openContextMenu({ x: e.clientX, y: e.clientY, type: 'part' });
+    },
+    [selectGroup, openContextMenu]
+  );
+
+  const handleExpandToggle = useCallback(
+    (groupId: string) => {
+      toggleGroupExpanded(groupId);
+    },
+    [toggleGroupExpanded]
+  );
+
+  // Render a single flat item
+  const itemContent = useCallback(
+    (index: number, item: FlatItem) => {
+      if (item.type === 'part') {
+        const issues = validationByPart.get(item.data.id) || [];
+        const hasNoStock = !item.data.stockId;
+        const hasError = hasNoStock || issues.some((i) => i.severity === 'error');
+        const hasWarning = !hasError && issues.some((i) => i.severity === 'warning');
+        const issueMessages =
+          hasNoStock && issues.length === 0 ? 'No stock assigned' : issues.map((i) => i.message).join('\n');
+
+        return (
+          <PartItem
+            part={item.data}
+            level={item.level}
+            isSelected={selectedPartIdSet.has(item.data.id)}
+            hasError={hasError}
+            hasWarning={hasWarning}
+            issueMessages={issueMessages}
+            units={units}
+            onPartClick={onPartClick}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
+          />
+        );
+      }
+
+      return (
+        <GroupItem
+          group={item.data}
+          level={item.level}
+          childCount={item.childCount}
+          isSelected={item.isSelected}
+          isExpanded={item.isExpanded}
+          isEditing={item.isEditing}
+          hasChildError={item.hasChildError}
+          hasChildWarning={item.hasChildWarning}
+          onGroupClick={handleGroupClick}
+          onGroupDoubleClick={handleGroupDoubleClick}
+          onGroupContextMenu={handleGroupContextMenu}
+          onExpandToggle={handleExpandToggle}
+        />
+      );
+    },
+    [
+      validationByPart,
+      selectedPartIdSet,
+      units,
+      onPartClick,
+      onDuplicate,
+      onDelete,
+      handleGroupClick,
+      handleGroupDoubleClick,
+      handleGroupContextMenu,
+      handleExpandToggle
+    ]
+  );
 
   if (parts.length === 0 && groups.length === 0) {
     return <p className="text-text-muted text-xs italic px-4">No parts yet. Click + to add one.</p>;
   }
 
   if (searchFilter && filteredTree.length === 0) {
-    return <p className="text-text-muted text-xs italic">No parts match "{searchFilter}"</p>;
+    return <p className="text-text-muted text-xs italic">No parts match &quot;{searchFilter}&quot;</p>;
   }
 
   return (
-    <ul className="list-none flex-1 overflow-y-auto min-h-0">
-      {filteredTree.map((node) =>
-        node.type === 'part' ? (
-          <PartItem
-            key={node.data.id}
-            part={node.data}
-            level={0}
-            onPartClick={onPartClick}
-            onDuplicate={onDuplicate}
-            onDelete={onDelete}
-          />
-        ) : (
-          <GroupItem
-            key={node.data.id}
-            group={node.data}
-            children={node.children}
-            level={0}
-            onPartClick={onPartClick}
-            onDuplicate={onDuplicate}
-            onDelete={onDelete}
-          />
-        )
-      )}
-    </ul>
+    <Virtuoso
+      ref={virtuosoRef}
+      className="mx-[-12px] flex-1 min-h-0"
+      data={flatItems}
+      itemContent={itemContent}
+      overscan={200}
+    />
   );
 }

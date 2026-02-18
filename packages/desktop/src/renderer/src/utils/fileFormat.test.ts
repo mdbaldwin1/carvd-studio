@@ -17,7 +17,6 @@ import {
   createTestStock,
   createTestGroup,
   createTestGroupMember,
-  createTestProject,
   createTestAssembly,
   createDefaultStockConstraints,
   createTestCustomShoppingItem
@@ -315,7 +314,7 @@ describe('fileFormat', () => {
     });
 
     it('rejects missing version', () => {
-      const file = { ...createValidCarvdFile() } as any;
+      const file: Record<string, unknown> = { ...createValidCarvdFile() };
       delete file.version;
 
       const result = validateCarvdFile(file);
@@ -326,7 +325,7 @@ describe('fileFormat', () => {
 
     it('rejects future version numbers', () => {
       const file = createValidCarvdFile();
-      (file as any).version = CARVD_FILE_VERSION + 1;
+      (file as Record<string, unknown>).version = CARVD_FILE_VERSION + 1;
 
       const result = validateCarvdFile(file);
 
@@ -335,7 +334,7 @@ describe('fileFormat', () => {
     });
 
     it('rejects missing project metadata', () => {
-      const file = { ...createValidCarvdFile() } as any;
+      const file: Record<string, unknown> = { ...createValidCarvdFile() };
       delete file.project;
 
       const result = validateCarvdFile(file);
@@ -346,7 +345,7 @@ describe('fileFormat', () => {
 
     it('rejects missing project name', () => {
       const file = createValidCarvdFile();
-      (file.project as any).name = undefined;
+      (file.project as Record<string, unknown>).name = undefined;
 
       const result = validateCarvdFile(file);
 
@@ -356,7 +355,7 @@ describe('fileFormat', () => {
 
     it('warns about invalid units', () => {
       const file = createValidCarvdFile();
-      (file.project as any).units = 'invalid';
+      (file.project as Record<string, unknown>).units = 'invalid';
 
       const result = validateCarvdFile(file);
 
@@ -374,7 +373,7 @@ describe('fileFormat', () => {
       ];
 
       for (const { field, error } of testCases) {
-        const testFile = { ...file } as any;
+        const testFile: Record<string, unknown> = { ...file };
         delete testFile[field];
 
         const result = validateCarvdFile(testFile);
@@ -477,7 +476,7 @@ describe('fileFormat', () => {
     it('warns about assembly parts referencing non-existent stocks', () => {
       const file = createValidCarvdFile();
       // Add an assembly with a part that references a non-existent stock
-      (file as any).assemblies = [
+      (file as Record<string, unknown>).assemblies = [
         {
           id: 'assembly-1',
           name: 'Test Assembly',
@@ -551,7 +550,7 @@ describe('fileFormat', () => {
   describe('migration', () => {
     it('adds default kerfWidth if missing', () => {
       const file = createValidCarvdFile();
-      delete (file.project as any).kerfWidth;
+      delete (file.project as Record<string, unknown>).kerfWidth;
 
       const result = validateCarvdFile(file);
 
@@ -561,7 +560,7 @@ describe('fileFormat', () => {
 
     it('adds default overageFactor if missing', () => {
       const file = createValidCarvdFile();
-      delete (file.project as any).overageFactor;
+      delete (file.project as Record<string, unknown>).overageFactor;
 
       const result = validateCarvdFile(file);
 
@@ -571,7 +570,7 @@ describe('fileFormat', () => {
 
     it('adds default stockConstraints if missing', () => {
       const file = createValidCarvdFile();
-      delete (file.project as any).stockConstraints;
+      delete (file.project as Record<string, unknown>).stockConstraints;
 
       const result = validateCarvdFile(file);
 
@@ -582,7 +581,7 @@ describe('fileFormat', () => {
 
     it('adds default grainSensitive to parts if missing', () => {
       const part = createTestPart();
-      delete (part as any).grainSensitive;
+      delete (part as Record<string, unknown>).grainSensitive;
 
       const file = createValidCarvdFile({ parts: [part] });
 
@@ -594,7 +593,7 @@ describe('fileFormat', () => {
 
     it('adds default grainDirection to parts if missing', () => {
       const part = createTestPart();
-      delete (part as any).grainDirection;
+      delete (part as Record<string, unknown>).grainDirection;
 
       const file = createValidCarvdFile({ parts: [part] });
 
@@ -606,7 +605,7 @@ describe('fileFormat', () => {
 
     it('adds default rotation to parts if missing', () => {
       const part = createTestPart();
-      delete (part as any).rotation;
+      delete (part as Record<string, unknown>).rotation;
 
       const file = createValidCarvdFile({ parts: [part] });
 
@@ -618,7 +617,7 @@ describe('fileFormat', () => {
 
     it('adds default pricingUnit to stocks if missing', () => {
       const stock = createTestStock();
-      delete (stock as any).pricingUnit;
+      delete (stock as Record<string, unknown>).pricingUnit;
 
       const file = createValidCarvdFile({ stocks: [stock] });
 
@@ -947,17 +946,17 @@ describe('fileFormat', () => {
 
     it('applies migration during repair', () => {
       const part = createTestPart();
-      delete (part as any).grainSensitive;
-      delete (part as any).rotation;
+      delete (part as Record<string, unknown>).grainSensitive;
+      delete (part as Record<string, unknown>).rotation;
 
       const stock = createTestStock();
-      delete (stock as any).pricingUnit;
+      delete (stock as Record<string, unknown>).pricingUnit;
 
       const file = createValidCarvdFile({
         parts: [part],
         stocks: [stock]
       });
-      delete (file.project as any).kerfWidth;
+      delete (file.project as Record<string, unknown>).kerfWidth;
       const json = stringifyCarvdFile(file);
 
       const result = repairCarvdFile(json);

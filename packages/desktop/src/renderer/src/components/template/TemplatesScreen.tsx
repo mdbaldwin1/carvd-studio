@@ -10,7 +10,6 @@ import { ArrowLeft, Copy, Plus, Pencil, Trash2, Download, Upload } from 'lucide-
 import { v4 as uuidv4 } from 'uuid';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
-import { useProjectStore } from '../../store/projectStore';
 import { useLicenseStore } from '../../store/licenseStore';
 import { useUIStore } from '../../store/uiStore';
 import { getFeatureLimits } from '../../utils/featureLimits';

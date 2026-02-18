@@ -14,7 +14,7 @@ import { CameraController } from './CameraController';
 import { CanvasCaptureHandler } from './CanvasCaptureHandler';
 import { GpuTelemetry } from './GpuTelemetry';
 import { MultiSelectionDimensions } from './MultiSelectionDimensions';
-import { Part } from './Part';
+import { PartsRenderer } from './PartsRenderer';
 import { PerfMonitor } from './PerfMonitor';
 import { ReferenceDistanceIndicators } from './ReferenceDistanceIndicators';
 import { SnapAlignmentLines } from './SnapAlignmentLines';
@@ -543,12 +543,17 @@ export function Workspace() {
       />
 
       {/* Camera controls */}
-      <OrbitControls makeDefault enableDamping dampingFactor={0.05} minDistance={1} maxDistance={600} zoomSpeed={0.5} />
+      <OrbitControls
+        makeDefault
+        enableDamping
+        dampingFactor={0.05}
+        minDistance={0.5}
+        maxDistance={1500}
+        zoomSpeed={0.5}
+      />
 
-      {/* All parts */}
-      {parts.map((part) => (
-        <Part key={part.id} part={part} />
-      ))}
+      {/* All parts — hybrid instanced + individual rendering */}
+      <PartsRenderer />
 
       {/* Multi-selection bounding box dimensions */}
       <MultiSelectionDimensions />

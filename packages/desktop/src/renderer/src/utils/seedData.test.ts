@@ -149,7 +149,7 @@ describe('seedData', () => {
   describe('generateGroups', () => {
     it('creates groups for legs and stretchers', () => {
       const parts = generateParts();
-      const { groups, groupMembers } = generateGroups(parts);
+      const { groups } = generateGroups(parts);
 
       expect(groups.length).toBeGreaterThan(0);
       expect(groups.some((g) => g.name === 'Legs')).toBe(true);

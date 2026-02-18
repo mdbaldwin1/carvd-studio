@@ -34,6 +34,7 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleActivate reads current state via closure; stable identity not needed since deps already cover the changing values
   }, [isOpen, isValidating, licenseKey, onClose]);
 
   const handleActivate = async () => {
@@ -57,7 +58,7 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
       } else {
         setError(result.error || 'Invalid license key');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to validate license key');
     } finally {
       setIsValidating(false);

@@ -199,9 +199,130 @@ export function usePartDrag(
     [camera]
   );
 
+  // Ref for cleanup of intent listeners (so the drag useEffect can remove them when it takes over)
+  const intentListenerCleanup = useRef<(() => void) | null>(null);
+
+  // Drag intent handoff: when this Part mounts because InstancedMesh selected it,
+  // pick up the stored drag intent and watch for drag movement.
+  // Uses a threshold to distinguish clicks from drags and attaches window listeners
+  // synchronously to avoid race conditions with quick clicks.
+  useEffect(() => {
+    const { dragIntent, clearDragIntent, setDraggingPartId } = useSelectionStore.getState();
+    if (!dragIntent || dragIntent.partId !== part.id) return;
+
+    // Keep this part rendered individually, then consume the intent
+    setDraggingPartId(part.id);
+    clearDragIntent();
+
+    // Use the stored world point as the drag start reference
+    let startPoint: THREE.Vector3 | null = null;
+    if (dragIntent.worldPoint) {
+      startPoint = new THREE.Vector3(dragIntent.worldPoint.x, dragIntent.worldPoint.y, dragIntent.worldPoint.z);
+    }
+
+    if (!startPoint) {
+      useSelectionStore.getState().setDraggingPartId(null);
+      return;
+    }
+
+    const startScreenX = dragIntent.screenX;
+    const startScreenY = dragIntent.screenY;
+    const DRAG_THRESHOLD_SQ = 9; // 3px squared
+    let dragStarted = false;
+
+    // Window listener: watch for enough mouse movement to distinguish drag from click
+    const handleIntentMove = (e: PointerEvent) => {
+      if (dragStarted) return; // second useEffect has taken over
+      const dx = e.clientX - startScreenX;
+      const dy = e.clientY - startScreenY;
+      if (dx * dx + dy * dy < DRAG_THRESHOLD_SQ) return;
+
+      // Past threshold — start the actual drag
+      dragStarted = true;
+
+      // Compute proper anchor (group center for multi-part, part position for single)
+      const currentState = useSelectionStore.getState();
+      const currentGroupIds = currentState.selectedGroupIds;
+      const currentPartIds = currentState.selectedPartIds;
+      const currentGroupMembers = useProjectStore.getState().groupMembers;
+      const hasGroup = currentGroupIds.length > 0;
+      const hasMulti = currentPartIds.length > 1;
+
+      let anchorPos: THREE.Vector3;
+      if (hasGroup || hasMulti) {
+        const partIdsToInclude = new Set(currentPartIds);
+        for (const groupId of currentGroupIds) {
+          const ids = getAllDescendantPartIds(groupId, currentGroupMembers);
+          ids.forEach((id) => partIdsToInclude.add(id));
+        }
+        const allParts = useProjectStore.getState().parts;
+        const partsToMeasure = allParts.filter((p) => partIdsToInclude.has(p.id));
+        if (partsToMeasure.length > 0) {
+          const bounds = getCombinedBounds(partsToMeasure);
+          anchorPos = new THREE.Vector3(bounds.centerX, bounds.centerY, bounds.centerZ);
+        } else {
+          anchorPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
+        }
+      } else {
+        anchorPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
+      }
+
+      getDragPlaneInfo(anchorPos);
+
+      setIsDragging(true);
+      dragStart.current = {
+        point: startPoint!.clone(),
+        partPos: anchorPos,
+        partOriginalPos: new THREE.Vector3(part.position.x, part.position.y, part.position.z)
+      };
+      lastDragPosition.current = { x: part.position.x, y: part.position.y, z: part.position.z };
+      if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = false;
+    };
+
+    // Window listener: if pointer released before threshold, it was a click — clean up
+    const handleIntentUp = () => {
+      if (!dragStarted) {
+        // Click without drag — clean up drag intent state
+        removeIntentListeners();
+        useSelectionStore.getState().setDraggingPartId(null);
+      } else {
+        // Safety net: drag was started but second useEffect hasn't attached its listeners yet.
+        // Do minimal cleanup to prevent stuck drag state.
+        removeIntentListeners();
+        setIsDragging(false);
+        dragStart.current = null;
+        lastDragPosition.current = null;
+        wasSnappedByParts.current = { x: false, y: false, z: false };
+        useSelectionStore.getState().setDraggingPartId(null);
+        useSelectionStore.getState().setActiveDragDelta(null);
+        if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = true;
+        useSnapStore.getState().setActiveSnapLines([]);
+      }
+    };
+
+    const removeIntentListeners = () => {
+      window.removeEventListener('pointermove', handleIntentMove);
+      window.removeEventListener('pointerup', handleIntentUp);
+      intentListenerCleanup.current = null;
+    };
+
+    window.addEventListener('pointermove', handleIntentMove);
+    window.addEventListener('pointerup', handleIntentUp);
+    intentListenerCleanup.current = removeIntentListeners;
+
+    return removeIntentListeners;
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Attach/detach window listeners when dragging
   useEffect(() => {
     if (!isDragging) return;
+
+    // Clean up mount effect's intent listeners now that the drag is fully active
+    if (intentListenerCleanup.current) {
+      intentListenerCleanup.current();
+    }
 
     const handleWindowPointerMove = (e: PointerEvent) => {
       // Coalesce pointer events to animation frame rate (prevents redundant
@@ -553,6 +674,7 @@ export function usePartDrag(
               dragStart.current = null;
               lastDragPosition.current = null;
               useSelectionStore.getState().setActiveDragDelta(null);
+              useSelectionStore.getState().setDraggingPartId(null);
               if (isOrbitControls(controls)) controls.enabled = true;
               useSnapStore.getState().setActiveSnapLines([]);
               useSnapStore.getState().updateReferenceDistances();
@@ -589,6 +711,7 @@ export function usePartDrag(
               dragStart.current = null;
               lastDragPosition.current = null;
               wasSnappedByParts.current = { x: false, y: false, z: false };
+              useSelectionStore.getState().setDraggingPartId(null);
               if (isOrbitControls(controls)) controls.enabled = true;
               useSnapStore.getState().setActiveSnapLines([]);
               useSnapStore.getState().updateReferenceDistances();
@@ -606,6 +729,7 @@ export function usePartDrag(
         lastDragPosition.current = null;
         wasSnappedByParts.current = { x: false, y: false, z: false };
         justFinishedDragging.current = true;
+        useSelectionStore.getState().setDraggingPartId(null);
         if (isOrbitControls(controls)) controls.enabled = true;
         useSnapStore.getState().setActiveSnapLines([]);
         useSnapStore.getState().updateReferenceDistances();
