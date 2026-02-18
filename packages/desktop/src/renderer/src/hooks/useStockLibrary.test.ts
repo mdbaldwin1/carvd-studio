@@ -156,5 +156,99 @@ describe('useStockLibrary', () => {
       const found = result.current.findStock('nonexistent');
       expect(found).toBeUndefined();
     });
+
+    it('returns the stock when found by id', async () => {
+      const stock = createTestStock({ id: 's-find-me', name: 'Find Me' });
+
+      const { result } = renderHook(() => useStockLibrary());
+
+      // Add a stock so it's in the singleton state
+      (window.electronAPI.getPreference as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+      await act(async () => {
+        await result.current.addStock(stock);
+      });
+
+      // Now findStock should find it
+      const found = result.current.findStock('s-find-me');
+      expect(found).toBeDefined();
+      expect(found?.name).toBe('Find Me');
+    });
+  });
+
+  describe('saveLibrary error handling', () => {
+    it('logs error when setPreference fails during save', async () => {
+      const { logger } = await import('../utils/logger');
+      (window.electronAPI.getPreference as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+      (window.electronAPI.setPreference as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Save failed'));
+
+      const { result } = renderHook(() => useStockLibrary());
+
+      await act(async () => {
+        await result.current.addStock(createTestStock());
+      });
+
+      expect(logger.error).toHaveBeenCalledWith('Failed to save stock library:', expect.any(Error));
+    });
+  });
+
+  describe('initStockLibrarySingleton error handling', () => {
+    it('handles load error from getPreference', async () => {
+      // Need a fresh module to test init error path
+      vi.resetModules();
+
+      // Set up the mock to reject
+      (window.electronAPI.getPreference as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Load failed'));
+      (window.electronAPI.onSettingsChanged as ReturnType<typeof vi.fn>).mockReturnValue(() => {});
+
+      const { logger: freshLogger } = await import('../utils/logger');
+      const freshModule = await import('./useStockLibrary');
+
+      const { result } = renderHook(() => freshModule.useStockLibrary());
+
+      // Wait for the async init to complete
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 10));
+      });
+
+      expect(freshLogger.error).toHaveBeenCalledWith('Failed to load stock library:', expect.any(Error));
+      // After error, stocks should be empty array and loading should be false
+      expect(result.current.stocks).toEqual([]);
+      expect(result.current.isLoading).toBe(false);
+    });
+  });
+
+  describe('onSettingsChanged cross-instance sync', () => {
+    it('updates stocks when onSettingsChanged fires with stockLibrary', async () => {
+      // Capture the onSettingsChanged callback
+      let settingsChangedCallback: ((changes: Record<string, unknown>) => void) | null = null;
+      (window.electronAPI.onSettingsChanged as ReturnType<typeof vi.fn>).mockImplementation(
+        (cb: (changes: Record<string, unknown>) => void) => {
+          settingsChangedCallback = cb;
+          return () => {};
+        }
+      );
+
+      // We need a fresh module to register the onSettingsChanged listener.
+      // Use dynamic import with resetModules to get a fresh singleton.
+      vi.resetModules();
+      const freshModule = await import('./useStockLibrary');
+
+      const { result } = renderHook(() => freshModule.useStockLibrary());
+
+      // Wait for initialization
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 10));
+      });
+
+      // Simulate cross-instance change
+      const updatedStocks = [createTestStock({ id: 's-synced', name: 'Synced Stock' })];
+      expect(settingsChangedCallback).not.toBeNull();
+
+      await act(async () => {
+        settingsChangedCallback!({ stockLibrary: updatedStocks });
+      });
+
+      expect(result.current.stocks).toEqual(updatedStocks);
+    });
   });
 });

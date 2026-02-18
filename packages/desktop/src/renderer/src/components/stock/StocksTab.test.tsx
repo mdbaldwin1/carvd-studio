@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import type { Stock } from '../../types';
@@ -274,6 +274,295 @@ describe('StocksTab', () => {
       render(<StocksTab {...defaultProps} stocks={[stock]} />);
       fireEvent.click(screen.getByText('Plywood'));
       expect(screen.getByText('Along width')).toBeInTheDocument();
+    });
+  });
+
+  describe('export stock handler', () => {
+    it('exports successfully and shows toast with filename', async () => {
+      const showToastMock = vi.fn();
+      useUIStore.setState({ showToast: showToastMock });
+
+      (window.electronAPI.exportStocks as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        filePath: '/path/to/exported-stocks.json'
+      });
+
+      render(<StocksTab {...defaultProps} />);
+      fireEvent.click(screen.getByText('Plywood'));
+      fireEvent.click(screen.getByText('Export'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.exportStocks).toHaveBeenCalledWith(['s1']);
+      });
+      await waitFor(() => {
+        expect(showToastMock).toHaveBeenCalledWith('Stock exported to exported-stocks.json', 'success');
+      });
+    });
+
+    it('does nothing when dialog is canceled', async () => {
+      const showToastMock = vi.fn();
+      useUIStore.setState({ showToast: showToastMock });
+
+      (window.electronAPI.exportStocks as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: false,
+        canceled: true
+      });
+
+      render(<StocksTab {...defaultProps} />);
+      fireEvent.click(screen.getByText('Plywood'));
+      fireEvent.click(screen.getByText('Export'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.exportStocks).toHaveBeenCalledWith(['s1']);
+      });
+      expect(showToastMock).not.toHaveBeenCalled();
+    });
+
+    it('shows error toast when export returns an error', async () => {
+      const showToastMock = vi.fn();
+      useUIStore.setState({ showToast: showToastMock });
+
+      (window.electronAPI.exportStocks as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: false,
+        canceled: false,
+        error: 'Permission denied'
+      });
+
+      render(<StocksTab {...defaultProps} />);
+      fireEvent.click(screen.getByText('Plywood'));
+      fireEvent.click(screen.getByText('Export'));
+
+      await waitFor(() => {
+        expect(showToastMock).toHaveBeenCalledWith('Permission denied', 'error');
+      });
+    });
+
+    it('shows fallback error toast when export throws an exception', async () => {
+      const showToastMock = vi.fn();
+      useUIStore.setState({ showToast: showToastMock });
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      (window.electronAPI.exportStocks as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Network failure'));
+
+      render(<StocksTab {...defaultProps} />);
+      fireEvent.click(screen.getByText('Plywood'));
+      fireEvent.click(screen.getByText('Export'));
+
+      await waitFor(() => {
+        expect(showToastMock).toHaveBeenCalledWith('Failed to export stock', 'error');
+      });
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+
+    it('does not export when no stock is selected', async () => {
+      render(<StocksTab {...defaultProps} />);
+      // No stock selected, export button is not visible
+      expect(screen.queryByText('Export')).not.toBeInTheDocument();
+      expect(window.electronAPI.exportStocks).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('import stocks handler', () => {
+    it('imports successfully and shows toast with count', async () => {
+      const showToastMock = vi.fn();
+      useUIStore.setState({ showToast: showToastMock });
+
+      (window.electronAPI.importStocks as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        imported: 3
+      });
+
+      render(<StocksTab {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Import stocks'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.importStocks).toHaveBeenCalled();
+      });
+      await waitFor(() => {
+        expect(showToastMock).toHaveBeenCalledWith('Imported 3 stocks', 'success');
+      });
+    });
+
+    it('uses singular "stock" when importing exactly 1', async () => {
+      const showToastMock = vi.fn();
+      useUIStore.setState({ showToast: showToastMock });
+
+      (window.electronAPI.importStocks as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        imported: 1
+      });
+
+      render(<StocksTab {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Import stocks'));
+
+      await waitFor(() => {
+        expect(showToastMock).toHaveBeenCalledWith('Imported 1 stock', 'success');
+      });
+    });
+
+    it('shows skipped count in toast when some stocks are skipped', async () => {
+      const showToastMock = vi.fn();
+      useUIStore.setState({ showToast: showToastMock });
+
+      (window.electronAPI.importStocks as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        imported: 2,
+        skipped: 1
+      });
+
+      render(<StocksTab {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Import stocks'));
+
+      await waitFor(() => {
+        expect(showToastMock).toHaveBeenCalledWith('Imported 2 stocks, 1 skipped', 'success');
+      });
+    });
+
+    it('does nothing when dialog is canceled', async () => {
+      const showToastMock = vi.fn();
+      useUIStore.setState({ showToast: showToastMock });
+
+      (window.electronAPI.importStocks as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: false,
+        canceled: true
+      });
+
+      render(<StocksTab {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Import stocks'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.importStocks).toHaveBeenCalled();
+      });
+      expect(showToastMock).not.toHaveBeenCalled();
+    });
+
+    it('shows error toast when import returns an error', async () => {
+      const showToastMock = vi.fn();
+      useUIStore.setState({ showToast: showToastMock });
+
+      (window.electronAPI.importStocks as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: false,
+        canceled: false,
+        error: 'Invalid file format'
+      });
+
+      render(<StocksTab {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Import stocks'));
+
+      await waitFor(() => {
+        expect(showToastMock).toHaveBeenCalledWith('Invalid file format', 'error');
+      });
+    });
+
+    it('shows fallback error toast when import throws an exception', async () => {
+      const showToastMock = vi.fn();
+      useUIStore.setState({ showToast: showToastMock });
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      (window.electronAPI.importStocks as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Disk read error'));
+
+      render(<StocksTab {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Import stocks'));
+
+      await waitFor(() => {
+        expect(showToastMock).toHaveBeenCalledWith('Failed to import stocks', 'error');
+      });
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('cancel edit restores original data', () => {
+    it('restores original stock values after editing and canceling', () => {
+      render(<StocksTab {...defaultProps} />);
+
+      // Select the stock
+      fireEvent.click(screen.getByText('Plywood'));
+
+      // Enter edit mode
+      fireEvent.click(screen.getByText('Edit'));
+
+      // Change the name
+      const nameInput = screen.getByDisplayValue('Plywood');
+      fireEvent.change(nameInput, { target: { value: 'Modified Name' } });
+      expect(screen.getByDisplayValue('Modified Name')).toBeInTheDocument();
+
+      // Cancel editing
+      fireEvent.click(screen.getByText('Cancel'));
+
+      // Should show the detail view with original values (name appears in sidebar + header)
+      expect(screen.queryByDisplayValue('Modified Name')).not.toBeInTheDocument();
+      expect(screen.getAllByText('Plywood').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('$50.00 / sheet')).toBeInTheDocument();
+    });
+
+    it('restores original values when pressing Escape during edit', () => {
+      render(<StocksTab {...defaultProps} />);
+
+      // Select stock, enter edit mode
+      fireEvent.click(screen.getByText('Plywood'));
+      fireEvent.click(screen.getByText('Edit'));
+
+      // Modify the name
+      const nameInput = screen.getByDisplayValue('Plywood');
+      fireEvent.change(nameInput, { target: { value: 'Escape Test' } });
+
+      // Press Escape to cancel
+      fireEvent.keyDown(window, { key: 'Escape' });
+
+      // Should return to detail view with original data (name appears in sidebar + header)
+      expect(screen.queryByDisplayValue('Escape Test')).not.toBeInTheDocument();
+      expect(screen.getAllByText('Plywood').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('restores form data when re-entering edit mode after cancel', () => {
+      render(<StocksTab {...defaultProps} />);
+
+      // Select stock, enter edit mode, modify, cancel
+      fireEvent.click(screen.getByText('Plywood'));
+      fireEvent.click(screen.getByText('Edit'));
+      const nameInput = screen.getByDisplayValue('Plywood');
+      fireEvent.change(nameInput, { target: { value: 'Changed' } });
+      fireEvent.click(screen.getByText('Cancel'));
+
+      // Re-enter edit mode — should show original values, not 'Changed'
+      fireEvent.click(screen.getByText('Edit'));
+      expect(screen.getByDisplayValue('Plywood')).toBeInTheDocument();
+      expect(screen.queryByDisplayValue('Changed')).not.toBeInTheDocument();
+    });
+
+    it('does not restore when there is no selected stock (create mode cancel)', () => {
+      render(<StocksTab {...defaultProps} />);
+
+      // Enter create mode
+      fireEvent.click(screen.getByLabelText('Create new stock'));
+      expect(screen.getByDisplayValue('New Stock')).toBeInTheDocument();
+
+      // Cancel create mode
+      fireEvent.click(screen.getByText('Cancel'));
+
+      // Should go back to placeholder since no stock is selected
+      expect(screen.getByText('Select a stock to view details')).toBeInTheDocument();
+    });
+
+    it('restores correct stock when multiple stocks exist', () => {
+      const stocks = [
+        createStock({ id: 's1', name: 'Plywood', pricePerUnit: 50 }),
+        createStock({ id: 's2', name: 'Oak Board', pricePerUnit: 100 })
+      ];
+      render(<StocksTab {...defaultProps} stocks={stocks} />);
+
+      // Select Oak Board, edit, modify, cancel
+      fireEvent.click(screen.getByText('Oak Board'));
+      fireEvent.click(screen.getByText('Edit'));
+      const nameInput = screen.getByDisplayValue('Oak Board');
+      fireEvent.change(nameInput, { target: { value: 'Cherry Board' } });
+      fireEvent.click(screen.getByText('Cancel'));
+
+      // Should restore Oak Board values (name appears in sidebar + header)
+      expect(screen.getAllByText('Oak Board').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('$100.00 / sheet')).toBeInTheDocument();
     });
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { TemplatesScreen } from './TemplatesScreen';
+import { useUIStore } from '../../store/uiStore';
 
 // Mock the templates module
 vi.mock('../../templates', () => ({
@@ -92,7 +93,11 @@ beforeAll(() => {
   window.electronAPI = {
     getUserTemplates: vi.fn().mockResolvedValue([]),
     removeUserTemplate: vi.fn().mockResolvedValue(undefined),
-    trackTemplateUsage: vi.fn().mockResolvedValue(undefined)
+    trackTemplateUsage: vi.fn().mockResolvedValue(undefined),
+    exportTemplate: vi.fn().mockResolvedValue({ success: true, filePath: '/tmp/template.carvd-template' }),
+    importTemplate: vi.fn().mockResolvedValue({ success: true, templateId: 'imported-1' }),
+    addUserTemplate: vi.fn().mockResolvedValue(undefined),
+    openExternal: vi.fn()
   } as unknown as typeof window.electronAPI;
 });
 
@@ -491,6 +496,445 @@ describe('TemplatesScreen', () => {
 
       expect(screen.queryByText('Delete this template?')).not.toBeInTheDocument();
       expect(onBack).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('template export', () => {
+    const userTemplate = {
+      id: 'user-1',
+      name: 'My Template',
+      dimensions: { width: 24, depth: 12, height: 18 },
+      partCount: 3,
+      thumbnail: '📐',
+      category: 'other',
+      createdAt: '2024-01-01',
+      project: JSON.stringify({
+        version: '1.0',
+        name: 'My Template',
+        parts: [{ length: 24, width: 12, thickness: 0.75, position: { x: 0, y: 0, z: 0 } }],
+        stocks: [],
+        createdAt: '2024-01-01',
+        modifiedAt: '2024-01-01'
+      })
+    };
+
+    beforeEach(async () => {
+      (window.electronAPI.getUserTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([userTemplate]);
+      useUIStore.setState({ toast: null });
+    });
+
+    it('exports a template successfully and shows success toast', async () => {
+      (window.electronAPI.exportTemplate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        filePath: '/home/user/Documents/my-template.carvd-template'
+      });
+
+      render(<TemplatesScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByTitle('Export template')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTitle('Export template'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.exportTemplate).toHaveBeenCalledWith('user-1');
+      });
+
+      await waitFor(() => {
+        const toast = useUIStore.getState().toast;
+        expect(toast).not.toBeNull();
+        expect(toast!.message).toContain('my-template.carvd-template');
+      });
+    });
+
+    it('does not show toast when export is canceled', async () => {
+      (window.electronAPI.exportTemplate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        canceled: true
+      });
+
+      render(<TemplatesScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByTitle('Export template')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTitle('Export template'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.exportTemplate).toHaveBeenCalledWith('user-1');
+      });
+
+      // Give time for any toast to appear
+      await new Promise((r) => setTimeout(r, 50));
+      expect(useUIStore.getState().toast).toBeNull();
+    });
+
+    it('shows error toast when export returns error', async () => {
+      (window.electronAPI.exportTemplate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: false,
+        canceled: false,
+        error: 'Permission denied'
+      });
+
+      render(<TemplatesScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByTitle('Export template')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTitle('Export template'));
+
+      await waitFor(() => {
+        const toast = useUIStore.getState().toast;
+        expect(toast).not.toBeNull();
+        expect(toast!.message).toBe('Permission denied');
+      });
+    });
+
+    it('shows error toast when export throws an exception', async () => {
+      (window.electronAPI.exportTemplate as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error('Unexpected export error')
+      );
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(<TemplatesScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByTitle('Export template')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTitle('Export template'));
+
+      await waitFor(() => {
+        const toast = useUIStore.getState().toast;
+        expect(toast).not.toBeNull();
+        expect(toast!.message).toBe('Failed to export template');
+      });
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('template import', () => {
+    beforeEach(() => {
+      (window.electronAPI.getUserTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+      useUIStore.setState({ toast: null });
+    });
+
+    it('imports a template successfully and shows success toast', async () => {
+      const importedTemplate = {
+        id: 'imported-1',
+        name: 'Imported Template',
+        dimensions: { width: 30, depth: 18, height: 24 },
+        partCount: 4,
+        thumbnail: '🔧',
+        category: 'furniture',
+        createdAt: '2024-06-01',
+        project: JSON.stringify({ version: '1.0', name: 'Imported', parts: [] })
+      };
+
+      (window.electronAPI.importTemplate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        templateId: 'imported-1'
+      });
+
+      // After import, getUserTemplates is called again to reload
+      let callCount = 0;
+      (window.electronAPI.getUserTemplates as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        callCount++;
+        // First call is on mount (empty), subsequent calls return the imported template
+        if (callCount <= 1) return Promise.resolve([]);
+        return Promise.resolve([importedTemplate]);
+      });
+
+      render(<TemplatesScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Import')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Import'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.importTemplate).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        const toast = useUIStore.getState().toast;
+        expect(toast).not.toBeNull();
+        expect(toast!.message).toBe('Template imported successfully');
+      });
+
+      // Templates should have been reloaded
+      await waitFor(() => {
+        expect(screen.getByText('Imported Template')).toBeInTheDocument();
+      });
+    });
+
+    it('does not show toast when import is canceled', async () => {
+      (window.electronAPI.importTemplate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        canceled: true
+      });
+
+      render(<TemplatesScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Import')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Import'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.importTemplate).toHaveBeenCalled();
+      });
+
+      await new Promise((r) => setTimeout(r, 50));
+      expect(useUIStore.getState().toast).toBeNull();
+    });
+
+    it('shows error toast when import returns error', async () => {
+      (window.electronAPI.importTemplate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: false,
+        canceled: false,
+        error: 'Invalid template file'
+      });
+
+      render(<TemplatesScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Import')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Import'));
+
+      await waitFor(() => {
+        const toast = useUIStore.getState().toast;
+        expect(toast).not.toBeNull();
+        expect(toast!.message).toBe('Invalid template file');
+      });
+    });
+
+    it('shows error toast when import throws an exception', async () => {
+      (window.electronAPI.importTemplate as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('File system error'));
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(<TemplatesScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Import')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Import'));
+
+      await waitFor(() => {
+        const toast = useUIStore.getState().toast;
+        expect(toast).not.toBeNull();
+        expect(toast!.message).toBe('Failed to import template');
+      });
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('template duplication', () => {
+    const userTemplateProject = {
+      version: '1.0',
+      name: 'My User Template',
+      parts: [
+        { length: 24, width: 12, thickness: 0.75, position: { x: 0, y: 0.375, z: 0 } },
+        { length: 36, width: 8, thickness: 0.75, position: { x: 18, y: 0.375, z: 0 } }
+      ],
+      stocks: [],
+      groups: [],
+      groupMembers: [],
+      assemblies: [],
+      units: 'imperial',
+      gridSize: 0.25,
+      kerfWidth: 0.125,
+      overageFactor: 1.1,
+      projectNotes: '',
+      createdAt: '2024-01-01',
+      modifiedAt: '2024-01-01'
+    };
+
+    const userTemplate = {
+      id: 'user-1',
+      name: 'My User Template',
+      description: 'A user template',
+      dimensions: { width: 36, depth: 12, height: 1 },
+      partCount: 2,
+      thumbnail: '📐',
+      category: 'furniture',
+      createdAt: '2024-01-01',
+      project: JSON.stringify(userTemplateProject)
+    };
+
+    it('duplicates a built-in template to My Templates', async () => {
+      const onEditTemplate = vi.fn();
+      (window.electronAPI.addUserTemplate as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+      // After duplication, getUserTemplates is called to reload. Return a template.
+      let callCount = 0;
+      (window.electronAPI.getUserTemplates as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        callCount++;
+        if (callCount <= 1) return Promise.resolve([]);
+        // Return a template that matches the duplicate
+        return Promise.resolve([
+          {
+            id: 'some-uuid', // won't match newTemplateId since uuid is random
+            name: 'Simple Desk (Copy)',
+            dimensions: { width: 0, depth: 0, height: 0 },
+            partCount: 0,
+            thumbnail: '🪵',
+            category: 'furniture',
+            createdAt: '2024-01-01',
+            project: '{}'
+          }
+        ]);
+      });
+
+      render(<TemplatesScreen {...defaultProps} onEditTemplate={onEditTemplate} />);
+
+      await waitFor(() => {
+        // Built-in templates should show a "Duplicate to My Templates" button
+        expect(screen.getAllByTitle('Duplicate to My Templates').length).toBeGreaterThan(0);
+      });
+
+      // Click the first "Duplicate to My Templates" button (on Simple Desk)
+      fireEvent.click(screen.getAllByTitle('Duplicate to My Templates')[0]);
+
+      await waitFor(() => {
+        expect(window.electronAPI.addUserTemplate).toHaveBeenCalled();
+      });
+
+      // Verify the added template has (Copy) suffix
+      const addedTemplate = (window.electronAPI.addUserTemplate as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(addedTemplate.name).toBe('Simple Desk (Copy)');
+    });
+
+    it('duplicates a user template', async () => {
+      const onEditTemplate = vi.fn();
+      (window.electronAPI.addUserTemplate as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+      let callCount = 0;
+      (window.electronAPI.getUserTemplates as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        callCount++;
+        if (callCount <= 1) return Promise.resolve([userTemplate]);
+        return Promise.resolve([
+          userTemplate,
+          {
+            id: 'user-dup',
+            name: 'My User Template (Copy)',
+            dimensions: { width: 36, depth: 12, height: 1 },
+            partCount: 2,
+            thumbnail: '📐',
+            category: 'furniture',
+            createdAt: '2024-06-01',
+            project: JSON.stringify(userTemplateProject)
+          }
+        ]);
+      });
+
+      render(<TemplatesScreen {...defaultProps} onEditTemplate={onEditTemplate} />);
+
+      await waitFor(() => {
+        expect(screen.getByTitle('Duplicate template')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTitle('Duplicate template'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.addUserTemplate).toHaveBeenCalled();
+      });
+
+      const addedTemplate = (window.electronAPI.addUserTemplate as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      expect(addedTemplate.name).toBe('My User Template (Copy)');
+      expect(addedTemplate.partCount).toBe(2);
+    });
+
+    it('calculates bounding box dimensions for duplicated template', async () => {
+      (window.electronAPI.addUserTemplate as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+      (window.electronAPI.getUserTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([userTemplate]);
+
+      render(<TemplatesScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByTitle('Duplicate template')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTitle('Duplicate template'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.addUserTemplate).toHaveBeenCalled();
+      });
+
+      const addedTemplate = (window.electronAPI.addUserTemplate as ReturnType<typeof vi.fn>).mock.calls[0][0];
+      // Verify dimensions are calculated from bounding box
+      expect(addedTemplate.dimensions).toBeDefined();
+      expect(typeof addedTemplate.dimensions.width).toBe('number');
+      expect(typeof addedTemplate.dimensions.depth).toBe('number');
+      expect(typeof addedTemplate.dimensions.height).toBe('number');
+    });
+
+    it('logs error when duplication fails', async () => {
+      (window.electronAPI.addUserTemplate as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Storage full'));
+      (window.electronAPI.getUserTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([userTemplate]);
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      render(<TemplatesScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByTitle('Duplicate template')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTitle('Duplicate template'));
+
+      await waitFor(() => {
+        expect(consoleSpy).toHaveBeenCalledWith('Failed to duplicate template:', expect.any(Error));
+      });
+
+      consoleSpy.mockRestore();
+    });
+
+    it('calls addUserTemplate with copy name when duplicating', async () => {
+      (window.electronAPI.addUserTemplate as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+      (window.electronAPI.getUserTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([userTemplate]);
+
+      render(<TemplatesScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(screen.getByTitle('Duplicate template')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTitle('Duplicate template'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.addUserTemplate).toHaveBeenCalledWith(
+          expect.objectContaining({ name: 'My User Template (Copy)' })
+        );
+      });
+    });
+  });
+
+  describe('learn more link', () => {
+    it('calls openExternal when "Learn more about templates" is clicked', async () => {
+      (window.electronAPI.getUserTemplates as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+      render(<TemplatesScreen {...defaultProps} />);
+
+      // Wait for loading to complete and empty state to show
+      await waitFor(() => {
+        expect(screen.queryByText('Loading templates...')).not.toBeInTheDocument();
+      });
+
+      const link = screen.getByText('Learn more about templates');
+      fireEvent.click(link);
+
+      expect(window.electronAPI.openExternal).toHaveBeenCalledWith('https://carvd-studio.com/docs#templates');
     });
   });
 });

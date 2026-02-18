@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import type { Assembly, AssemblyPart } from '../../types';
@@ -322,6 +322,465 @@ describe('AssembliesTab', () => {
       render(<AssembliesTab {...defaultProps} assemblies={[assembly]} />);
       fireEvent.click(screen.getByText('Test Assembly'));
       expect(screen.queryByText('Export')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('export assembly handler', () => {
+    it('exports assembly successfully and shows success toast', async () => {
+      const mockShowToast = vi.fn();
+      useUIStore.setState({ showToast: mockShowToast });
+      (window.electronAPI.exportAssembly as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        filePath: '/test/export.carvd-assembly'
+      });
+
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      fireEvent.click(screen.getByText('Export'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.exportAssembly).toHaveBeenCalledWith('a1');
+      });
+      await waitFor(() => {
+        expect(mockShowToast).toHaveBeenCalledWith('Assembly exported successfully', 'success');
+      });
+    });
+
+    it('exports assembly with stocks included and shows count in toast', async () => {
+      const mockShowToast = vi.fn();
+      useUIStore.setState({ showToast: mockShowToast });
+      (window.electronAPI.exportAssembly as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        filePath: '/test/export.carvd-assembly',
+        stocksIncluded: 3
+      });
+
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      fireEvent.click(screen.getByText('Export'));
+
+      await waitFor(() => {
+        expect(mockShowToast).toHaveBeenCalledWith('Assembly exported with 3 stocks', 'success');
+      });
+    });
+
+    it('exports assembly with 1 stock and uses singular in toast', async () => {
+      const mockShowToast = vi.fn();
+      useUIStore.setState({ showToast: mockShowToast });
+      (window.electronAPI.exportAssembly as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        filePath: '/test/export.carvd-assembly',
+        stocksIncluded: 1
+      });
+
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      fireEvent.click(screen.getByText('Export'));
+
+      await waitFor(() => {
+        expect(mockShowToast).toHaveBeenCalledWith('Assembly exported with 1 stock', 'success');
+      });
+    });
+
+    it('does nothing when export dialog is canceled', async () => {
+      const mockShowToast = vi.fn();
+      useUIStore.setState({ showToast: mockShowToast });
+      (window.electronAPI.exportAssembly as ReturnType<typeof vi.fn>).mockResolvedValue({
+        canceled: true
+      });
+
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      fireEvent.click(screen.getByText('Export'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.exportAssembly).toHaveBeenCalledWith('a1');
+      });
+      // Should not show any toast when canceled
+      expect(mockShowToast).not.toHaveBeenCalled();
+    });
+
+    it('shows error toast when export returns an error', async () => {
+      const mockShowToast = vi.fn();
+      useUIStore.setState({ showToast: mockShowToast });
+      (window.electronAPI.exportAssembly as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: false,
+        error: 'Disk full'
+      });
+
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      fireEvent.click(screen.getByText('Export'));
+
+      await waitFor(() => {
+        expect(mockShowToast).toHaveBeenCalledWith('Disk full', 'error');
+      });
+    });
+
+    it('shows error toast when export throws an exception', async () => {
+      const mockShowToast = vi.fn();
+      useUIStore.setState({ showToast: mockShowToast });
+      (window.electronAPI.exportAssembly as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Network error'));
+
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      fireEvent.click(screen.getByText('Export'));
+
+      await waitFor(() => {
+        expect(mockShowToast).toHaveBeenCalledWith('Failed to export assembly', 'error');
+      });
+    });
+
+    it('hides export button when canCreateAssemblies is false', () => {
+      render(<AssembliesTab {...defaultProps} canCreateAssemblies={false} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      expect(screen.queryByText('Export')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('import assembly handler', () => {
+    it('imports assembly successfully and shows success toast', async () => {
+      const mockShowToast = vi.fn();
+      useUIStore.setState({ showToast: mockShowToast });
+      (window.electronAPI.importAssembly as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        assemblyId: 'imported-1'
+      });
+
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Import assembly'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.importAssembly).toHaveBeenCalledWith({ importStocks: true });
+      });
+      await waitFor(() => {
+        expect(mockShowToast).toHaveBeenCalledWith('Assembly imported successfully', 'success');
+      });
+    });
+
+    it('imports assembly with stocks and shows count in toast', async () => {
+      const mockShowToast = vi.fn();
+      useUIStore.setState({ showToast: mockShowToast });
+      (window.electronAPI.importAssembly as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        assemblyId: 'imported-1',
+        stocksImported: 2
+      });
+
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Import assembly'));
+
+      await waitFor(() => {
+        expect(mockShowToast).toHaveBeenCalledWith('Assembly imported with 2 stocks', 'success');
+      });
+    });
+
+    it('imports assembly with 1 stock and uses singular in toast', async () => {
+      const mockShowToast = vi.fn();
+      useUIStore.setState({ showToast: mockShowToast });
+      (window.electronAPI.importAssembly as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: true,
+        assemblyId: 'imported-1',
+        stocksImported: 1
+      });
+
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Import assembly'));
+
+      await waitFor(() => {
+        expect(mockShowToast).toHaveBeenCalledWith('Assembly imported with 1 stock', 'success');
+      });
+    });
+
+    it('does nothing when import dialog is canceled', async () => {
+      const mockShowToast = vi.fn();
+      useUIStore.setState({ showToast: mockShowToast });
+      (window.electronAPI.importAssembly as ReturnType<typeof vi.fn>).mockResolvedValue({
+        canceled: true
+      });
+
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Import assembly'));
+
+      await waitFor(() => {
+        expect(window.electronAPI.importAssembly).toHaveBeenCalled();
+      });
+      expect(mockShowToast).not.toHaveBeenCalled();
+    });
+
+    it('shows error toast when import returns an error', async () => {
+      const mockShowToast = vi.fn();
+      useUIStore.setState({ showToast: mockShowToast });
+      (window.electronAPI.importAssembly as ReturnType<typeof vi.fn>).mockResolvedValue({
+        success: false,
+        error: 'Invalid file format'
+      });
+
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Import assembly'));
+
+      await waitFor(() => {
+        expect(mockShowToast).toHaveBeenCalledWith('Invalid file format', 'error');
+      });
+    });
+
+    it('shows error toast when import throws an exception', async () => {
+      const mockShowToast = vi.fn();
+      useUIStore.setState({ showToast: mockShowToast });
+      (window.electronAPI.importAssembly as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('File read error'));
+
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByLabelText('Import assembly'));
+
+      await waitFor(() => {
+        expect(mockShowToast).toHaveBeenCalledWith('Failed to import assembly', 'error');
+      });
+    });
+  });
+
+  describe('duplicate assembly handler', () => {
+    it('hides duplicate button when canCreateAssemblies is false', () => {
+      render(<AssembliesTab {...defaultProps} canCreateAssemblies={false} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      expect(screen.queryByText('Duplicate')).not.toBeInTheDocument();
+    });
+
+    it('hides duplicate button when onDuplicateAssembly is not provided', () => {
+      render(<AssembliesTab {...defaultProps} onDuplicateAssembly={undefined} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      expect(screen.queryByText('Duplicate')).not.toBeInTheDocument();
+    });
+
+    it('shows duplicate button for built-in assemblies when canCreateAssemblies is true', () => {
+      const assembly = createAssembly({ id: 'built-in-drawer' });
+      render(<AssembliesTab {...defaultProps} assemblies={[assembly]} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      expect(screen.getByText('Duplicate')).toBeInTheDocument();
+    });
+
+    it('passes the full assembly object to onDuplicateAssembly', async () => {
+      const onDuplicate = vi.fn().mockResolvedValue(undefined);
+      render(<AssembliesTab {...defaultProps} onDuplicateAssembly={onDuplicate} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      fireEvent.click(screen.getByText('Duplicate'));
+
+      await waitFor(() => {
+        expect(onDuplicate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: 'a1',
+            name: 'Test Assembly',
+            description: 'A test assembly'
+          })
+        );
+      });
+    });
+  });
+
+  describe('drag start handler', () => {
+    it('sets drag data with assembly id and source', () => {
+      render(<AssembliesTab {...defaultProps} />);
+      const assemblyItem = screen.getByText('Test Assembly').closest('li')!;
+
+      const mockDataTransfer = {
+        setData: vi.fn(),
+        effectAllowed: ''
+      };
+
+      fireEvent.dragStart(assemblyItem, { dataTransfer: mockDataTransfer });
+
+      expect(mockDataTransfer.setData).toHaveBeenCalledWith('application/carvd-assembly', 'a1');
+      expect(mockDataTransfer.setData).toHaveBeenCalledWith('application/carvd-assembly-source', 'library');
+    });
+
+    it('sets correct assembly id for different assemblies', () => {
+      const assemblies = [
+        createAssembly({ id: 'a1', name: 'Drawer Box' }),
+        createAssembly({ id: 'a2', name: 'Face Frame' })
+      ];
+      render(<AssembliesTab {...defaultProps} assemblies={assemblies} />);
+
+      const faceFrameItem = screen.getByText('Face Frame').closest('li')!;
+
+      const mockDataTransfer = {
+        setData: vi.fn(),
+        effectAllowed: ''
+      };
+
+      fireEvent.dragStart(faceFrameItem, { dataTransfer: mockDataTransfer });
+
+      expect(mockDataTransfer.setData).toHaveBeenCalledWith('application/carvd-assembly', 'a2');
+      expect(mockDataTransfer.setData).toHaveBeenCalledWith('application/carvd-assembly-source', 'library');
+    });
+
+    it('assembly list items are draggable', () => {
+      render(<AssembliesTab {...defaultProps} />);
+      const assemblyItem = screen.getByText('Test Assembly').closest('li')!;
+      expect(assemblyItem).toHaveAttribute('draggable', 'true');
+    });
+  });
+
+  describe('edit in 3D handler', () => {
+    it('shows Edit in 3D button for non-built-in assembly when onEditAssemblyIn3D is provided', () => {
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      expect(screen.getByText('Edit in 3D')).toBeInTheDocument();
+    });
+
+    it('hides Edit in 3D button for built-in assemblies', () => {
+      const assembly = createAssembly({ id: 'built-in-drawer' });
+      render(<AssembliesTab {...defaultProps} assemblies={[assembly]} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      expect(screen.queryByText('Edit in 3D')).not.toBeInTheDocument();
+    });
+
+    it('hides Edit in 3D button when onEditAssemblyIn3D is not provided', () => {
+      render(<AssembliesTab {...defaultProps} onEditAssemblyIn3D={undefined} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      expect(screen.queryByText('Edit in 3D')).not.toBeInTheDocument();
+    });
+
+    it('calls onClose when Edit in 3D returns true (success)', async () => {
+      const onEditIn3D = vi.fn().mockResolvedValue(true);
+      const onClose = vi.fn();
+      render(<AssembliesTab {...defaultProps} onEditAssemblyIn3D={onEditIn3D} onClose={onClose} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      fireEvent.click(screen.getByText('Edit in 3D'));
+
+      await waitFor(() => {
+        expect(onEditIn3D).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }));
+      });
+      await waitFor(() => {
+        expect(onClose).toHaveBeenCalled();
+      });
+    });
+
+    it('does not call onClose when Edit in 3D returns false (failure)', async () => {
+      const onEditIn3D = vi.fn().mockResolvedValue(false);
+      const onClose = vi.fn();
+      render(<AssembliesTab {...defaultProps} onEditAssemblyIn3D={onEditIn3D} onClose={onClose} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      fireEvent.click(screen.getByText('Edit in 3D'));
+
+      await waitFor(() => {
+        expect(onEditIn3D).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }));
+      });
+      // Give it time to ensure onClose would have been called if it was going to be
+      await new Promise((r) => setTimeout(r, 50));
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('shows Edit Layout in 3D button in edit mode', () => {
+      render(<AssembliesTab {...defaultProps} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      fireEvent.click(screen.getByText('Edit'));
+      expect(screen.getByText('Edit Layout in 3D')).toBeInTheDocument();
+    });
+
+    it('calls onClose when Edit Layout in 3D (in edit mode) returns true', async () => {
+      const onEditIn3D = vi.fn().mockResolvedValue(true);
+      const onClose = vi.fn();
+      render(<AssembliesTab {...defaultProps} onEditAssemblyIn3D={onEditIn3D} onClose={onClose} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      fireEvent.click(screen.getByText('Edit'));
+      fireEvent.click(screen.getByText('Edit Layout in 3D'));
+
+      await waitFor(() => {
+        expect(onEditIn3D).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }));
+      });
+      await waitFor(() => {
+        expect(onClose).toHaveBeenCalled();
+      });
+    });
+
+    it('does not call onClose when Edit Layout in 3D (in edit mode) returns false', async () => {
+      const onEditIn3D = vi.fn().mockResolvedValue(false);
+      const onClose = vi.fn();
+      render(<AssembliesTab {...defaultProps} onEditAssemblyIn3D={onEditIn3D} onClose={onClose} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      fireEvent.click(screen.getByText('Edit'));
+      fireEvent.click(screen.getByText('Edit Layout in 3D'));
+
+      await waitFor(() => {
+        expect(onEditIn3D).toHaveBeenCalledWith(expect.objectContaining({ id: 'a1' }));
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('hides Edit Layout in 3D in edit mode when canCreateAssemblies is false', () => {
+      render(<AssembliesTab {...defaultProps} canCreateAssemblies={false} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      // Cannot enter edit mode when canCreateAssemblies is false (no Edit button)
+      expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+    });
+
+    it('hides Edit in 3D button when canCreateAssemblies is false', () => {
+      render(<AssembliesTab {...defaultProps} canCreateAssemblies={false} />);
+      fireEvent.click(screen.getByText('Test Assembly'));
+      expect(screen.queryByText('Edit in 3D')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('create new assembly handler', () => {
+    it('shows create button when onCreateNewAssembly and canCreateAssemblies are provided', () => {
+      render(<AssembliesTab {...defaultProps} />);
+      expect(screen.getByLabelText('Create new assembly')).toBeInTheDocument();
+    });
+
+    it('hides create button when canCreateAssemblies is false', () => {
+      render(<AssembliesTab {...defaultProps} canCreateAssemblies={false} />);
+      expect(screen.queryByLabelText('Create new assembly')).not.toBeInTheDocument();
+    });
+
+    it('hides create button when onCreateNewAssembly is not provided', () => {
+      render(<AssembliesTab {...defaultProps} onCreateNewAssembly={undefined} />);
+      expect(screen.queryByLabelText('Create new assembly')).not.toBeInTheDocument();
+    });
+
+    it('calls onClose when onCreateNewAssembly returns true (success)', async () => {
+      const onCreate = vi.fn().mockResolvedValue(true);
+      const onClose = vi.fn();
+      render(<AssembliesTab {...defaultProps} onCreateNewAssembly={onCreate} onClose={onClose} />);
+      fireEvent.click(screen.getByLabelText('Create new assembly'));
+
+      await waitFor(() => {
+        expect(onCreate).toHaveBeenCalled();
+      });
+      await waitFor(() => {
+        expect(onClose).toHaveBeenCalled();
+      });
+    });
+
+    it('does not call onClose when onCreateNewAssembly returns false', async () => {
+      const onCreate = vi.fn().mockResolvedValue(false);
+      const onClose = vi.fn();
+      render(<AssembliesTab {...defaultProps} onCreateNewAssembly={onCreate} onClose={onClose} />);
+      fireEvent.click(screen.getByLabelText('Create new assembly'));
+
+      await waitFor(() => {
+        expect(onCreate).toHaveBeenCalled();
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('thumbnail rendering', () => {
+    it('renders thumbnail image when thumbnailData is present', () => {
+      const assembly = createAssembly({
+        thumbnailData: { data: 'data:image/png;base64,abc123', width: 100, height: 75 }
+      });
+      render(<AssembliesTab {...defaultProps} assemblies={[assembly]} />);
+      const img = screen.getByAltText('Test Assembly');
+      expect(img).toBeInTheDocument();
+      expect(img).toHaveAttribute('src', 'data:image/png;base64,abc123');
+    });
+
+    it('renders fallback emoji when no thumbnailData', () => {
+      render(<AssembliesTab {...defaultProps} />);
+      // The default assembly from createAssembly() has no thumbnailData
+      // so it should render the fallback emoji icon
+      expect(screen.getByText('Test Assembly')).toBeInTheDocument();
     });
   });
 });

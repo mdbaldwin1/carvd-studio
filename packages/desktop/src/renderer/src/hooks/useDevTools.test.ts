@@ -249,6 +249,34 @@ describe('useDevTools', () => {
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('No undo history'));
       consoleSpy.mockRestore();
     });
+
+    it('measures snapshot sizes when undo history exists', () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const pastSnapshot1 = { parts: [{ id: 'p1', name: 'Part 1' }], stocks: [] };
+      const pastSnapshot2 = {
+        parts: [
+          { id: 'p1', name: 'Part 1' },
+          { id: 'p2', name: 'Part 2' }
+        ],
+        stocks: []
+      };
+      useProjectStore.temporal = {
+        getState: () => ({
+          pastStates: [pastSnapshot1, pastSnapshot2],
+          futureStates: [{ parts: [] }]
+        })
+      } as never;
+
+      renderHook(() => useDevTools());
+      window.carvdDev!.measureUndoSnapshot();
+
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Undo/Redo Snapshot Analysis'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('History depth: 2 past, 1 future'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Latest snapshot:'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Total history:'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Avg per snapshot:'));
+      consoleSpy.mockRestore();
+    });
   });
 
   describe('perfBaseline', () => {
@@ -262,6 +290,106 @@ describe('useDevTools', () => {
       window.carvdDev!.perfBaseline();
 
       expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Performance Baseline'));
+      consoleSpy.mockRestore();
+    });
+
+    it('prints memory info when performance.memory is available', () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      useProjectStore.temporal = {
+        getState: () => ({ pastStates: [], futureStates: [] })
+      } as never;
+
+      // Mock performance.memory (Chrome-only API)
+      const originalPerformance = globalThis.performance;
+      Object.defineProperty(globalThis, 'performance', {
+        value: {
+          ...originalPerformance,
+          memory: {
+            usedJSHeapSize: 50 * 1024 * 1024,
+            totalJSHeapSize: 100 * 1024 * 1024,
+            jsHeapSizeLimit: 2048 * 1024 * 1024
+          }
+        },
+        writable: true,
+        configurable: true
+      });
+
+      renderHook(() => useDevTools());
+      window.carvdDev!.perfBaseline();
+
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[Memory]'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Used JS heap:'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Total JS heap:'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Heap limit:'));
+
+      // Restore
+      Object.defineProperty(globalThis, 'performance', {
+        value: originalPerformance,
+        writable: true,
+        configurable: true
+      });
+      consoleSpy.mockRestore();
+    });
+
+    it('prints undo history stats when pastStates exist', () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const pastSnapshot = { parts: [{ id: 'p1' }], stocks: [] };
+      useProjectStore.temporal = {
+        getState: () => ({
+          pastStates: [pastSnapshot],
+          futureStates: []
+        })
+      } as never;
+
+      renderHook(() => useDevTools());
+      window.carvdDev!.perfBaseline();
+
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[Undo History]'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Depth: 1 snapshots'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Latest snapshot:'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Total memory:'));
+      consoleSpy.mockRestore();
+    });
+
+    it('prints empty undo history message when no pastStates', () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      useProjectStore.temporal = {
+        getState: () => ({ pastStates: [], futureStates: [] })
+      } as never;
+
+      renderHook(() => useDevTools());
+      window.carvdDev!.perfBaseline();
+
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[Undo History] Empty'));
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('seedStockLibrary error handling', () => {
+    it('logs error when getPreference rejects', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      (window.electronAPI.getPreference as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('IPC error'));
+
+      renderHook(() => useDevTools());
+      await window.carvdDev!.seedStockLibrary();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to seed stock library:', expect.any(Error));
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('logs message when all seed stocks already exist', async () => {
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      // Both seed stocks already exist
+      (window.electronAPI.getPreference as ReturnType<typeof vi.fn>).mockResolvedValue([
+        { name: 'Common Plywood', id: 'existing-1' },
+        { name: 'Oak Board', id: 'existing-2' }
+      ]);
+
+      renderHook(() => useDevTools());
+      await window.carvdDev!.seedStockLibrary();
+
+      expect(consoleSpy).toHaveBeenCalledWith('All seed stocks already exist in library');
+      expect(window.electronAPI.setPreference).not.toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
   });
