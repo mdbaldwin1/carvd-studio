@@ -5,6 +5,17 @@
 
 ---
 
+## Execution Modes
+
+This migration supports two execution modes:
+
+- **Solo mode**: One agent works through beads sequentially. Read `BEAD-EXECUTION-WORKFLOW.md`.
+- **Team mode**: An orchestrator assigns beads to parallel teammates. The orchestrator reads `ORCHESTRATOR-INSTRUCTIONS.md`. Teammates read this file + `BEAD-EXECUTION-WORKFLOW.md`.
+
+If you are a **teammate in team mode**: your orchestrator has assigned you a specific bead. Read sections relevant to your bead (theming, component mapping, testing patterns, constraints) then follow `BEAD-EXECUTION-WORKFLOW.md` to execute it. Message the orchestrator when done or if blocked.
+
+---
+
 ## Table of Contents
 
 1. [Migration Overview](#migration-overview)
@@ -734,6 +745,56 @@ For each bead:
 12. [ ] Verify CI passes
 13. [ ] Squash merge the PR
 14. [ ] Clean up: `git worktree remove ../carvd-studio-<bead-id>`
+
+---
+
+## Team Mode — Coordination Notes
+
+If you are executing this migration using Agent Teams, keep these additional points in mind:
+
+### Develop Branch Drift
+
+Multiple agents merging PRs into `develop` means the branch advances frequently. **Always pull latest develop before creating a worktree**:
+```bash
+cd /Users/mbaldwin/Carvd/carvd-studio
+git checkout develop && git pull origin develop
+git worktree add ../carvd-studio-<bead-id> -b <prefix>/<bead-id> develop
+```
+
+### Merge Conflict Prevention
+
+The orchestrator sequences beads to avoid conflicts, but if you encounter one:
+1. Pull latest develop into your worktree branch: `git merge develop`
+2. Resolve conflicts, favoring the merged code (it's from a completed bead)
+3. If the conflict is complex, message the orchestrator for guidance
+
+### File Ownership Rules
+
+To prevent conflicts, these files have implicit ownership during migration:
+- `tailwind.css` — Only one agent modifies at a time (Foundation and Cleanup beads)
+- `primitives.css` — Only one agent modifies at a time (sequential by bead)
+- `layout.css` — Only modified by Layout epic beads
+- `domain.css` — Only modified by Layout/Cleanup epic beads
+- `packages/website/src/index.css` — Only modified by Website track agents
+
+### Communication with Orchestrator
+
+When messaging the orchestrator upon bead completion, include:
+1. **PR URL** — So the orchestrator can verify CI and merge
+2. **Files changed** — Brief summary (e.g., "Modified 12 components, added Button to ui/, removed .btn from primitives.css")
+3. **Tests status** — Pass/fail and any notes
+4. **Discovered work** — Any new issues found that need separate beads
+5. **Next bead readiness** — "Ready for next assignment" or "Need to resolve X first"
+
+### Key Files Reference
+
+| File | Purpose | Who Reads It |
+|------|---------|-------------|
+| `ORCHESTRATOR-INSTRUCTIONS.md` | How to coordinate the team | Orchestrator only |
+| `BEAD-EXECUTION-WORKFLOW.md` | How to execute a single bead | All teammates |
+| `SHADCN-MIGRATION-SESSION-HANDOFF.md` | Migration context and mappings | All teammates |
+| `CLAUDE.md` | Project conventions | Everyone (loaded automatically) |
+| `.beads/issues.jsonl` | Bead statuses and dependencies | Orchestrator + teammates |
 
 ---
 
