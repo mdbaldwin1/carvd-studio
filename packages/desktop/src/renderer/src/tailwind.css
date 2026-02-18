@@ -1,72 +1,73 @@
-/* Google Fonts - Roboto & Roboto Slab */
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&family=Roboto+Slab:wght@400;500;600;700&display=swap');
+/* Google Fonts - Inter & DM Serif Display for a fresh typographic feel */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap');
 
 @import 'tailwindcss';
 
 /* ===========================================
-   CSS CUSTOM PROPERTIES
-   Dark theme (default) and light theme overrides
+   CSS CUSTOM PROPERTIES — "Twilight Studio" redesign
+   Uses Twilight Indigo backgrounds, Cerulean accents,
+   Bright Amber CTAs, Lilac Ash subtle tones
    =========================================== */
 
 :root {
-  /* Backgrounds - dark greys */
-  --color-bg: #1a1a1a;
-  --color-bg-alt: #222222;
-  --color-bg-hover: #2a2a2a;
-  --color-bg-dark: #1a1a1a;
-  --color-surface: #242424;
-  --color-surface-hover: #2a2a2a;
-  --color-border: #333;
-  --color-selected: #3a3a3a;
-  --color-overlay: rgba(0, 0, 0, 0.6);
-  --color-overlay-heavy: rgba(0, 0, 0, 0.75);
+  /* Backgrounds - rich twilight indigo instead of neutral greys */
+  --color-bg: #090f1b; /* twilight-indigo-950 */
+  --color-bg-alt: #0c1627; /* twilight-indigo-900 */
+  --color-bg-hover: #142040; /* between 900 and 800 */
+  --color-bg-dark: #090f1b; /* twilight-indigo-950 */
+  --color-surface: #0e1a30; /* between 950 and 900, panel surfaces */
+  --color-surface-hover: #142040;
+  --color-border: #1e3460; /* between twilight-indigo-700 and 800 */
+  --color-selected: #1a2d55; /* twilight-indigo-800 ish */
+  --color-overlay: rgba(9, 15, 27, 0.7);
+  --color-overlay-heavy: rgba(9, 15, 27, 0.85);
 
   /* Aliases for semantic naming */
   --color-bg-secondary: var(--color-bg-alt);
-  --color-bg-tertiary: #2e2e2e;
+  --color-bg-tertiary: #111d35;
   --color-bg-sidebar: var(--color-surface);
 
-  /* Text - cream tones */
-  --color-text: #ffeecf;
-  --color-text-muted: #a89f8f;
+  /* Text - warm papaya-whip tones */
+  --color-text: #fff6e5; /* papaya-whip-50 */
+  --color-text-muted: #9488aa; /* lilac-ash-400 — purple-tinted muted */
   --color-text-secondary: var(--color-text-muted);
-  --color-text-tertiary: #7a7265;
+  --color-text-tertiary: #615577; /* lilac-ash-600 */
 
-  /* Accent - lavender (decorative, focus, highlights) */
-  --color-accent: #aea4bf;
-  --color-accent-hover: #c4bcd0;
-  --color-accent-muted: #8d82a3;
-  --color-accent-bg: rgba(174, 164, 191, 0.15);
-  --color-accent-foreground: #1a1a1a; /* Dark text on light lavender */
+  /* Accent - cerulean (vivid cyan for focus, highlights, active states) */
+  --color-accent: #0dccf2; /* cerulean-500 */
+  --color-accent-hover: #3dd6f5; /* cerulean-400 */
+  --color-accent-muted: #087a91; /* cerulean-700 */
+  --color-accent-bg: rgba(13, 204, 242, 0.12);
+  --color-accent-foreground: #090f1b; /* Dark text on bright cyan */
 
-  /* Primary - teal (main CTAs, buttons) */
-  --color-primary: #077187;
-  --color-primary-hover: #09a2bc;
-  --color-primary-muted: #055f70;
-  --color-primary-bg: rgba(7, 113, 135, 0.15);
-  --color-primary-foreground: #ffffff; /* White text on teal */
+  /* Primary - bright amber (golden CTAs that pop) */
+  --color-primary: #ffcc00; /* bright-amber-500 */
+  --color-primary-hover: #ffd633; /* bright-amber-400 */
+  --color-primary-muted: #997a00; /* bright-amber-700 */
+  --color-primary-bg: rgba(255, 204, 0, 0.1);
+  --color-primary-foreground: #090f1b; /* Dark text on gold */
 
-  /* Secondary - deep navy (emphasis, active states) */
-  --color-secondary: #203864;
-  --color-secondary-hover: #2d4a80;
-  --color-secondary-muted: #162749;
-  --color-secondary-foreground: #ffffff; /* White text on navy */
+  /* Secondary - twilight indigo mid-tones (emphasis, active states) */
+  --color-secondary: #31569b; /* twilight-indigo-600 */
+  --color-secondary-hover: #3d6cc2; /* twilight-indigo-500 */
+  --color-secondary-muted: #254174; /* twilight-indigo-700 */
+  --color-secondary-foreground: #fff6e5; /* Light text on blue */
 
   /* Semantic colors */
-  --color-warning: #ffd21f;
-  --color-warning-hover: #ffe566;
-  --color-warning-bg: rgba(255, 210, 31, 0.15);
-  --color-warning-border: #ffd21f;
-  --color-warning-text: #1a1a1a;
+  --color-warning: #ffa600; /* papaya-whip-500 — orange warning */
+  --color-warning-hover: #ffb833; /* papaya-whip-400 */
+  --color-warning-bg: rgba(255, 166, 0, 0.12);
+  --color-warning-border: #ffa600;
+  --color-warning-text: #090f1b;
 
   --color-danger: #c45454;
   --color-danger-hover: #d46b6b;
-  --color-danger-bg: rgba(196, 84, 84, 0.15);
+  --color-danger-bg: rgba(196, 84, 84, 0.12);
   --color-danger-border: #c45454;
 
   --color-success: #2a9d6a;
   --color-success-hover: #34b87d;
-  --color-success-bg: rgba(42, 157, 106, 0.15);
+  --color-success-bg: rgba(42, 157, 106, 0.12);
   --color-success-border: #2a9d6a;
 
   /* Error - alias for danger (commonly used naming) */
@@ -76,88 +77,88 @@
   --color-error-border: var(--color-danger-border);
   --color-error-text: var(--color-danger);
 
-  /* Reference parts - uses teal from palette */
-  --color-reference: #077187;
-  --color-reference-bg: rgba(7, 113, 135, 0.15);
+  /* Reference parts - uses cerulean */
+  --color-reference: #0aa3c2; /* cerulean-600 */
+  --color-reference-bg: rgba(10, 163, 194, 0.12);
 
-  /* Info - uses lavender for informational elements */
-  --color-info: #aea4bf;
-  --color-info-bg: rgba(174, 164, 191, 0.15);
-  --color-info-border: #aea4bf;
-  --color-info-text: #ffeecf;
+  /* Info - uses lilac ash for informational elements */
+  --color-info: #7a6a95; /* lilac-ash-500 */
+  --color-info-bg: rgba(122, 106, 149, 0.12);
+  --color-info-border: #9488aa; /* lilac-ash-400 */
+  --color-info-text: #fff6e5;
 
-  /* Layout */
-  --sidebar-width: 240px;
-  --header-height: 48px;
+  /* Layout — bigger everything */
+  --sidebar-width: 264px;
+  --header-height: 56px;
 
-  /* Spacing & Radii */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  /* Spacing & Radii — rounder, more generous */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 
   color-scheme: dark;
 }
 
-/* Light theme */
+/* Light theme — warm amber-cream with cerulean accents */
 [data-theme='light'] {
-  /* Backgrounds - light cream/neutral tones */
-  --color-bg: #ffeecf;
-  --color-bg-alt: #f5e4bf;
-  --color-bg-hover: #ebe0c0;
-  --color-bg-dark: #1a1a1a;
-  --color-surface: #fff8eb;
-  --color-surface-hover: #f5eddc;
-  --color-border: #d4c9b0;
-  --color-selected: #e8dcc5;
-  --color-overlay: rgba(0, 0, 0, 0.5);
-  --color-overlay-heavy: rgba(0, 0, 0, 0.65);
+  /* Backgrounds - warm golden cream tones */
+  --color-bg: #fffae5; /* bright-amber-50 */
+  --color-bg-alt: #ffedcc; /* papaya-whip-200 */
+  --color-bg-hover: #ffe4b5;
+  --color-bg-dark: #090f1b; /* twilight-indigo-950 */
+  --color-surface: #fffdf5; /* warm white */
+  --color-surface-hover: #fff5d6;
+  --color-border: #cac3d5; /* lilac-ash-200 — subtle purple-grey */
+  --color-selected: #e4e1ea; /* lilac-ash-100 */
+  --color-overlay: rgba(9, 15, 27, 0.5);
+  --color-overlay-heavy: rgba(9, 15, 27, 0.65);
 
   /* Aliases for semantic naming */
   --color-bg-secondary: var(--color-bg-alt);
-  --color-bg-tertiary: #e5d8b5;
+  --color-bg-tertiary: #ffdb99; /* papaya-whip-200 */
   --color-bg-sidebar: var(--color-surface);
 
-  /* Text - dark tones */
-  --color-text: #1a1a1a;
-  --color-text-muted: #5a5247;
+  /* Text - deep twilight indigo tones */
+  --color-text: #090f1b; /* twilight-indigo-950 */
+  --color-text-muted: #254174; /* twilight-indigo-700 */
   --color-text-secondary: var(--color-text-muted);
-  --color-text-tertiary: #8a8275;
+  --color-text-tertiary: #493f5a; /* lilac-ash-700 */
 
-  /* Accent - lavender */
-  --color-accent: #8d82a3;
-  --color-accent-hover: #7a6f91;
-  --color-accent-muted: #aea4bf;
-  --color-accent-bg: rgba(141, 130, 163, 0.15);
-  --color-accent-foreground: #ffffff; /* White text on darker lavender in light mode */
+  /* Accent - cerulean (deeper for light backgrounds) */
+  --color-accent: #0aa3c2; /* cerulean-600 */
+  --color-accent-hover: #087a91; /* cerulean-700 */
+  --color-accent-muted: #0dccf2; /* cerulean-500 */
+  --color-accent-bg: rgba(10, 163, 194, 0.12);
+  --color-accent-foreground: #ffffff;
 
-  /* Primary - teal */
-  --color-primary: #055f70;
-  --color-primary-hover: #044d5b;
-  --color-primary-muted: #077187;
-  --color-primary-bg: rgba(5, 95, 112, 0.12);
-  --color-primary-foreground: #ffffff; /* White text on teal */
+  /* Primary - bright amber (darker for contrast on light bg) */
+  --color-primary: #cca300; /* bright-amber-600 */
+  --color-primary-hover: #997a00; /* bright-amber-700 */
+  --color-primary-muted: #ffcc00; /* bright-amber-500 */
+  --color-primary-bg: rgba(204, 163, 0, 0.1);
+  --color-primary-foreground: #090f1b;
 
-  /* Secondary - deep navy */
-  --color-secondary: #203864;
-  --color-secondary-hover: #162749;
-  --color-secondary-muted: #2d4a80;
-  --color-secondary-foreground: #ffffff; /* White text on navy */
+  /* Secondary - twilight indigo */
+  --color-secondary: #31569b; /* twilight-indigo-600 */
+  --color-secondary-hover: #254174; /* twilight-indigo-700 */
+  --color-secondary-muted: #3d6cc2; /* twilight-indigo-500 */
+  --color-secondary-foreground: #ffffff;
 
   /* Semantic colors */
-  --color-warning: #d9a800;
-  --color-warning-hover: #c49700;
-  --color-warning-bg: rgba(217, 168, 0, 0.15);
-  --color-warning-border: #d9a800;
-  --color-warning-text: #1a1a1a;
+  --color-warning: #cc8500; /* papaya-whip-600 */
+  --color-warning-hover: #996300; /* papaya-whip-700 */
+  --color-warning-bg: rgba(204, 133, 0, 0.12);
+  --color-warning-border: #cc8500;
+  --color-warning-text: #090f1b;
 
   --color-danger: #b84343;
   --color-danger-hover: #a33a3a;
-  --color-danger-bg: rgba(184, 67, 67, 0.15);
+  --color-danger-bg: rgba(184, 67, 67, 0.12);
   --color-danger-border: #b84343;
 
   --color-success: #228055;
   --color-success-hover: #1a6644;
-  --color-success-bg: rgba(34, 128, 85, 0.12);
+  --color-success-bg: rgba(34, 128, 85, 0.1);
   --color-success-border: #228055;
 
   /* Error - alias for danger */
@@ -168,14 +169,14 @@
   --color-error-text: var(--color-danger);
 
   /* Reference parts */
-  --color-reference: #055f70;
-  --color-reference-bg: rgba(5, 95, 112, 0.12);
+  --color-reference: #087a91; /* cerulean-700 */
+  --color-reference-bg: rgba(8, 122, 145, 0.1);
 
-  /* Info - lavender for informational elements */
-  --color-info: #7a6f91;
-  --color-info-bg: rgba(122, 111, 145, 0.12);
-  --color-info-border: #8d82a3;
-  --color-info-text: #1a1a1a;
+  /* Info - lilac ash */
+  --color-info: #615577; /* lilac-ash-600 */
+  --color-info-bg: rgba(97, 85, 119, 0.1);
+  --color-info-border: #9488aa; /* lilac-ash-400 */
+  --color-info-text: #090f1b;
 
   color-scheme: light;
 }
