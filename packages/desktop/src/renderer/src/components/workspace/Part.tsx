@@ -105,7 +105,7 @@ export const Part = memo(function Part({ part }: PartProps) {
         position: { ...part.position, y: worldHalfHeight }
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- using individual rotation axes (x,y,z) as deps is intentional; part.rotation object ref may change without value changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- using individual rotation axes (x,y,z) as deps is intentional; part.rotation object ref may change without value changes
   }, [
     part.rotation.x,
     part.rotation.y,

@@ -71,7 +71,15 @@ export function PartsRenderer() {
     }
 
     return { individualPartIdSet: individualIds, dragAffectedPartIds: dragAffected };
-  }, [selectedPartIds, selectedGroupIds, hoveredPartId, referencePartIds, dragIntentPartId, draggingPartId, groupMembers]);
+  }, [
+    selectedPartIds,
+    selectedGroupIds,
+    hoveredPartId,
+    referencePartIds,
+    dragIntentPartId,
+    draggingPartId,
+    groupMembers
+  ]);
 
   // Split parts into instanced (bulk) vs individual (interactive)
   const { instancedParts, individualParts } = useMemo(() => {

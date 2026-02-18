@@ -19,9 +19,7 @@ vi.mock('react-virtuoso', () => ({
     React.createElement(
       'div',
       { className, 'data-testid': 'virtuoso-list' },
-      data?.map((item: unknown, index: number) =>
-        React.createElement('div', { key: index }, itemContent(index, item))
-      )
+      data?.map((item: unknown, index: number) => React.createElement('div', { key: index }, itemContent(index, item)))
     )
   )
 }));

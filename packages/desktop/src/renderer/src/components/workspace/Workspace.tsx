@@ -543,7 +543,14 @@ export function Workspace() {
       />
 
       {/* Camera controls */}
-      <OrbitControls makeDefault enableDamping dampingFactor={0.05} minDistance={0.5} maxDistance={1500} zoomSpeed={0.5} />
+      <OrbitControls
+        makeDefault
+        enableDamping
+        dampingFactor={0.05}
+        minDistance={0.5}
+        maxDistance={1500}
+        zoomSpeed={0.5}
+      />
 
       {/* All parts — hybrid instanced + individual rendering */}
       <PartsRenderer />

@@ -258,14 +258,11 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
     ]
   );
 
-  const handleClick = useCallback(
-    (e: ThreeEvent<MouseEvent>) => {
-      e.stopPropagation();
-      // Selection is handled in pointerDown; click is a no-op for instanced parts
-      // (the Part component handles click logic after transitioning to individual)
-    },
-    []
-  );
+  const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation();
+    // Selection is handled in pointerDown; click is a no-op for instanced parts
+    // (the Part component handles click logic after transitioning to individual)
+  }, []);
 
   const handleDoubleClick = useCallback(
     (e: ThreeEvent<MouseEvent>) => {
@@ -303,9 +300,7 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
     >
       {displayMode === 'solid' && <meshStandardMaterial />}
       {displayMode === 'wireframe' && <meshBasicMaterial wireframe />}
-      {displayMode === 'translucent' && (
-        <meshStandardMaterial transparent opacity={0.3} depthWrite={false} />
-      )}
+      {displayMode === 'translucent' && <meshStandardMaterial transparent opacity={0.3} depthWrite={false} />}
     </instancedMesh>
   );
 }
