@@ -1729,13 +1729,9 @@ function DisplayToolbar() {
 }
 
 function CanvasWithDrop() {
-  const projectStocks = useProjectStore((s) => s.stocks);
-  const parts = useProjectStore((s) => s.parts);
-  const assemblies = useProjectStore((s) => s.assemblies);
-  const addPart = useProjectStore((s) => s.addPart);
-  const addStock = useProjectStore((s) => s.addStock);
-  const addAssembly = useProjectStore((s) => s.addAssembly);
-  const placeAssembly = useProjectStore((s) => s.placeAssembly);
+  // Only UI state is reactive — project data is read imperatively in handleDrop
+  // to avoid re-rendering the Canvas tree when stocks/parts/assemblies change
+  const partsCount = useProjectStore((s) => s.parts.length);
   const [isDragOver, setIsDragOver] = useState(false);
   const [dropType, setDropType] = useState<'stock' | 'assembly' | null>(null);
   const { settings: appSettings } = useAppSettings();
@@ -1766,6 +1762,10 @@ function CanvasWithDrop() {
     setIsDragOver(false);
     setDropType(null);
 
+    // Read project state imperatively at drop time
+    const projectState = useProjectStore.getState();
+    const { stocks: projectStocks, parts, assemblies } = projectState;
+
     // Check for stock drop
     const stockId = e.dataTransfer.getData('application/carvd-stock');
     if (stockId) {
@@ -1786,7 +1786,7 @@ function CanvasWithDrop() {
       const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
 
       // Create part with stock properties
-      addPart({
+      projectState.addPart({
         name: `Part ${nextNumber}`,
         length: stock.length,
         width: stock.width,
@@ -1817,7 +1817,7 @@ function CanvasWithDrop() {
         assembly = assemblyLibrary.find((c) => c.id === assemblyId);
         if (assembly) {
           // Add library assembly to project before placing
-          addAssembly(assembly);
+          projectState.addAssembly(assembly);
         }
       }
 
@@ -1831,7 +1831,7 @@ function CanvasWithDrop() {
         z: Math.floor(parts.length / 5) * 6
       };
 
-      placeAssembly(assembly.id, position, stockLibrary);
+      projectState.placeAssembly(assembly.id, position, stockLibrary);
     }
   };
 
@@ -1878,7 +1878,7 @@ function CanvasWithDrop() {
         </div>
       )}
       {/* Empty state overlay - rendered outside Canvas so it doesn't move with camera */}
-      {parts.length === 0 && (
+      {partsCount === 0 && (
         <div className="empty-state-overlay absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10 text-center">
           <div className="bg-bg border border-border rounded-lg py-8 px-10 shadow-[0_4px_16px_rgba(0,0,0,0.3)]">
             <div className="text-5xl mb-4">🛠️</div>
