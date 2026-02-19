@@ -2,6 +2,8 @@
  * Dialog prompting user to restore from an auto-recovery file
  */
 
+import { Button } from '@renderer/components/ui/button';
+
 interface RecoveryInfo {
   projectName: string;
   modifiedAt: string;
@@ -50,12 +52,12 @@ export function RecoveryDialog({ isOpen, recoveryInfo, onRestore, onDiscard }: R
         </div>
 
         <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
-          <button className="btn btn-secondary min-w-[90px]" onClick={onDiscard}>
+          <Button size="sm" variant="secondary" className="min-w-[90px]" onClick={onDiscard}>
             Discard
-          </button>
-          <button className="btn btn-primary min-w-[90px]" onClick={onRestore} autoFocus>
+          </Button>
+          <Button size="sm" className="min-w-[90px]" onClick={onRestore} autoFocus>
             Restore
-          </button>
+          </Button>
         </div>
       </div>
     </div>

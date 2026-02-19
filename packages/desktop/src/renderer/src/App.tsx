@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { ChevronDown, ChevronRight, Library, Redo2, Save, Search, Settings, Sun, Undo2, X } from 'lucide-react';
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
+import { Button } from '@renderer/components/ui/button';
 import { AddAssemblyModal } from './components/assembly/AddAssemblyModal';
 import { AssemblyEditingBanner } from './components/assembly/AssemblyEditingBanner';
 import { AssemblyEditingExitDialog } from './components/assembly/AssemblyEditingExitDialog';
@@ -382,8 +383,10 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             {collapsedSections.stock ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
           </span>
           <h2>{isEditingAssembly ? 'Stock Library' : 'Stock'}</h2>
-          <button
-            className={`btn btn-icon-sm btn-ghost btn-secondary ${searchOpen.stock ? 'active' : ''}`}
+          <Button
+            variant="ghost"
+            size="icon"
+            active={searchOpen.stock}
             onClick={(e) => {
               e.stopPropagation();
               // if opening search, also expand section if collapsed
@@ -396,9 +399,10 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             disabled={stocks.length === 0}
           >
             <Search size={12} />
-          </button>
-          <button
-            className="btn btn-icon-sm btn-ghost btn-secondary"
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={(e) => {
               e.stopPropagation();
               if (isEditingAssembly) {
@@ -412,7 +416,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             title={isEditingAssembly ? 'Add New Stock to Library' : 'Add Stock from Library'}
           >
             +
-          </button>
+          </Button>
         </div>
         {searchOpen.stock && (
           <div className="section-search">
@@ -476,8 +480,9 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                           {formatMeasurementWithUnit(stock.thickness, units)}
                         </span>
                         <div className="flex gap-0.5 opacity-0 group-hover/stock:opacity-100 transition-opacity duration-100">
-                          <button
-                            className="btn btn-icon-sm btn-ghost btn-secondary"
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={(e) => {
                               e.stopPropagation();
                               setEditingStock(stock);
@@ -485,9 +490,10 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                             title={isEditingAssembly ? 'Edit library stock' : 'Edit stock'}
                           >
                             ✎
-                          </button>
-                          <button
-                            className="btn btn-icon-sm btn-ghost btn-danger"
+                          </Button>
+                          <Button
+                            variant="destructiveGhost"
+                            size="icon"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteStock(stock);
@@ -495,7 +501,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                             title={isEditingAssembly ? 'Delete from library' : 'Remove from project'}
                           >
                             ×
-                          </button>
+                          </Button>
                         </div>
                       </li>
                     );
@@ -517,8 +523,10 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             {collapsedSections.assemblies ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
           </span>
           <h2>{isEditingAssembly ? 'Assembly Library' : 'Assemblies'}</h2>
-          <button
-            className={`btn btn-icon-sm btn-ghost btn-secondary ${searchOpen.assemblies ? 'active' : ''}`}
+          <Button
+            variant="ghost"
+            size="icon"
+            active={searchOpen.assemblies}
             onClick={(e) => {
               e.stopPropagation();
               // if opening search, also expand section if collapsed
@@ -531,20 +539,22 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             disabled={assemblies.length === 0}
           >
             <Search size={12} />
-          </button>
+          </Button>
           {canUseAssemblies &&
             (isEditingAssembly ? (
-              <button
-                className="btn btn-icon-sm btn-ghost btn-secondary"
+              <Button
+                variant="ghost"
+                size="icon"
                 disabled
                 onClick={(e) => e.stopPropagation()}
                 title="Finish editing current assembly first"
               >
                 +
-              </button>
+              </Button>
             ) : (
-              <button
-                className="btn btn-icon-sm btn-ghost btn-secondary"
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsAddAssemblyModalOpen(true);
@@ -552,7 +562,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                 title="Add Assembly from Library"
               >
                 +
-              </button>
+              </Button>
             ))}
         </div>
         {searchOpen.assemblies && (
@@ -638,8 +648,9 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                       <span className="text-[10px] bg-border text-text py-px px-1.5 rounded-full min-w-4 text-center">
                         {assembly.parts.length}
                       </span>
-                      <button
-                        className="btn btn-icon-sm btn-ghost btn-danger"
+                      <Button
+                        variant="destructiveGhost"
+                        size="icon"
                         onClick={(e) => {
                           e.stopPropagation();
                           deleteAssembly(assembly.id);
@@ -647,7 +658,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                         title={isEditingAssembly ? 'Delete from library' : 'Remove from project'}
                       >
                         ×
-                      </button>
+                      </Button>
                     </li>
                   ))}
               </ul>
@@ -667,8 +678,10 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             {collapsedSections.parts ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
           </span>
           <h2>Parts</h2>
-          <button
-            className={`btn btn-icon-sm btn-ghost btn-secondary ${searchOpen.parts ? 'active' : ''}`}
+          <Button
+            variant="ghost"
+            size="icon"
+            active={searchOpen.parts}
             onClick={(e) => {
               e.stopPropagation();
               // if opening search, also expand section if collapsed
@@ -681,9 +694,10 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             disabled={parts.length === 0}
           >
             <Search size={12} />
-          </button>
-          <button
-            className="btn btn-icon-sm btn-ghost btn-secondary"
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={(e) => {
               e.stopPropagation();
               handleAddPart();
@@ -691,7 +705,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             title="Add Part"
           >
             +
-          </button>
+          </Button>
         </div>
         {searchOpen.parts && (
           <div className="section-search">
@@ -805,12 +819,12 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
       {/* Bottom Section - hidden during assembly editing */}
       {!isEditingAssembly && (
         <section className="sidebar-section sidebar-section-bottom">
-          <button className="btn btn-sm btn-filled btn-primary sidebar-settings-btn" onClick={onOpenCutList}>
+          <Button size="sm" className="sidebar-settings-btn" onClick={onOpenCutList}>
             {!cutList ? 'Generate Cut List' : cutList.isStale ? 'Regenerate Cut List' : 'View Cut List'}
-          </button>
-          <button className="btn btn-sm btn-ghost btn-secondary sidebar-settings-btn" onClick={onOpenProjectSettings}>
+          </Button>
+          <Button variant="ghost" size="sm" className="sidebar-settings-btn" onClick={onOpenProjectSettings}>
             Project Settings
-          </button>
+          </Button>
         </section>
       )}
     </aside>
@@ -1043,19 +1057,13 @@ function PropertiesPanel() {
             </p>
           </div>
 
-          <div className="property-group btn-group">
-            <button
-              className="btn btn-sm btn-filled btn-secondary"
-              onClick={() => deleteGroup(selectedGroup.id, 'ungroup', null)}
-            >
+          <div className="property-group flex gap-1.5">
+            <Button variant="secondary" size="sm" onClick={() => deleteGroup(selectedGroup.id, 'ungroup', null)}>
               Ungroup
-            </button>
-            <button
-              className="btn btn-sm btn-filled btn-danger"
-              onClick={() => deleteGroup(selectedGroup.id, 'recursive', null)}
-            >
+            </Button>
+            <Button variant="destructive" size="sm" onClick={() => deleteGroup(selectedGroup.id, 'recursive', null)}>
               Delete Group
-            </button>
+            </Button>
           </div>
           <p className="text-[11px] text-text-muted mt-1">
             Double-click group to edit individual parts
@@ -1136,13 +1144,13 @@ function PropertiesPanel() {
           </select>
         </div>
 
-        <div className="property-group btn-group">
-          <button className="btn btn-sm btn-filled btn-secondary" onClick={duplicateSelectedParts}>
+        <div className="property-group flex gap-1.5">
+          <Button variant="secondary" size="sm" onClick={duplicateSelectedParts}>
             Duplicate All
-          </button>
-          <button className="btn btn-sm btn-filled btn-danger" onClick={() => requestDeleteParts(selectedPartIds)}>
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => requestDeleteParts(selectedPartIds)}>
             Delete All
-          </button>
+          </Button>
         </div>
 
         {/* Create Stock Modal for assignment */}
@@ -1567,22 +1575,12 @@ function UndoRedoButtons() {
 
   return (
     <div className="undo-redo-buttons">
-      <button
-        className="btn btn-icon-sm btn-outlined btn-secondary"
-        onClick={() => undo()}
-        disabled={!canUndo}
-        title="Undo (Cmd+Z)"
-      >
+      <Button variant="outline" size="icon" onClick={() => undo()} disabled={!canUndo} title="Undo (Cmd+Z)">
         <Undo2 size={18} />
-      </button>
-      <button
-        className="btn btn-icon-sm btn-outlined btn-secondary"
-        onClick={() => redo()}
-        disabled={!canRedo}
-        title="Redo (Cmd+Shift+Z)"
-      >
+      </Button>
+      <Button variant="outline" size="icon" onClick={() => redo()} disabled={!canRedo} title="Redo (Cmd+Shift+Z)">
         <Redo2 size={18} />
-      </button>
+      </Button>
     </div>
   );
 }
@@ -2648,36 +2646,25 @@ function App() {
             <div className="header-actions">
               <div className="header-actions-group">
                 <UndoRedoButtons />
-                <button
-                  className={`btn btn-icon-sm ${isDirty ? 'btn-filled btn-primary' : 'btn-outlined btn-secondary'}`}
-                  onClick={handleSave}
-                  title="Save (Cmd+S)"
-                >
+                <Button variant={isDirty ? 'default' : 'outline'} size="icon" onClick={handleSave} title="Save (Cmd+S)">
                   <Save size={18} />
-                </button>
+                </Button>
               </div>
               <div className="header-divider" />
               <div className="header-actions-group">
-                <button
-                  className="btn btn-icon-sm btn-outlined btn-secondary"
-                  onClick={() => setIsStockLibraryOpen(true)}
-                  title="Stock Library"
-                >
+                <Button variant="outline" size="icon" onClick={() => setIsStockLibraryOpen(true)} title="Stock Library">
                   <Library size={18} />
-                </button>
-                <button
-                  className="btn btn-icon-sm btn-outlined btn-secondary"
-                  onClick={() => setIsAppSettingsOpen(true)}
-                  title="App Settings"
-                >
+                </Button>
+                <Button variant="outline" size="icon" onClick={() => setIsAppSettingsOpen(true)} title="App Settings">
                   <Settings size={18} />
-                </button>
+                </Button>
               </div>
               {licenseMode === 'free' && (
                 <>
                   <div className="header-divider" />
-                  <button
-                    className="btn btn-sm btn-filled btn-primary upgrade-btn"
+                  <Button
+                    size="sm"
+                    className="upgrade-btn"
                     onClick={() => {
                       // Open purchase page in browser
                       window.open('https://carvd-studio.com/pricing', '_blank');
@@ -2686,7 +2673,7 @@ function App() {
                     }}
                   >
                     Upgrade
-                  </button>
+                  </Button>
                 </>
               )}
             </div>

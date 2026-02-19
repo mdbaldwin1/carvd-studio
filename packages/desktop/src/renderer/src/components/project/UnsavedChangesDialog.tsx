@@ -3,6 +3,7 @@
  */
 
 import { useProjectStore } from '../../store/projectStore';
+import { Button } from '@renderer/components/ui/button';
 
 export type UnsavedChangesAction = 'new' | 'open' | 'close' | 'home' | 'custom';
 
@@ -75,18 +76,15 @@ export function UnsavedChangesDialog({
         </div>
 
         <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
-          <button className="btn btn-secondary min-w-22.5" onClick={onCancel}>
+          <Button size="sm" variant="secondary" className="min-w-22.5" onClick={onCancel}>
             Cancel
-          </button>
-          <button
-            className="btn min-w-22.5 bg-transparent border border-border text-danger hover:bg-danger hover:border-danger hover:text-white"
-            onClick={onDiscard}
-          >
+          </Button>
+          <Button size="sm" variant="destructiveOutline" className="min-w-22.5" onClick={onDiscard}>
             {getDiscardLabel()}
-          </button>
-          <button className="btn btn-primary min-w-22.5" onClick={onSave} autoFocus>
+          </Button>
+          <Button size="sm" className="min-w-22.5" onClick={onSave} autoFocus>
             Save
-          </button>
+          </Button>
         </div>
       </div>
     </div>

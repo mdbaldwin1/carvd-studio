@@ -7,6 +7,7 @@
  */
 
 import { ArrowLeft, Copy, Plus, Pencil, Trash2, Download, Upload } from 'lucide-react';
+import { Button } from '@renderer/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
@@ -320,14 +321,10 @@ export function TemplatesScreen({
             <h2 className="text-lg font-semibold text-text-secondary m-0">My Templates</h2>
             {canUseCustomTemplates && (
               <div className="flex items-center gap-2">
-                <button
-                  className="btn btn-sm btn-outlined btn-secondary"
-                  onClick={handleImportTemplate}
-                  title="Import template from file"
-                >
+                <Button variant="outline" size="sm" onClick={handleImportTemplate} title="Import template from file">
                   <Upload size={14} />
                   Import
-                </button>
+                </Button>
                 <button
                   className="flex items-center gap-1.5 py-2 px-3.5 bg-primary border-none rounded-md text-[13px] font-medium text-primary-foreground cursor-pointer transition-all duration-150 hover:bg-primary-hover"
                   onClick={onNewTemplate}
@@ -445,15 +442,12 @@ export function TemplatesScreen({
             <p className="m-0 mb-2 text-text font-medium">Delete this template?</p>
             <p className="text-text-muted text-[13px] mb-5">This action cannot be undone.</p>
             <div className="flex gap-3 justify-center">
-              <button className="btn btn-sm btn-outlined btn-secondary" onClick={() => setDeleteConfirmId(null)}>
+              <Button variant="outline" size="sm" onClick={() => setDeleteConfirmId(null)}>
                 Cancel
-              </button>
-              <button
-                className="btn btn-sm btn-filled btn-danger"
-                onClick={() => handleDeleteTemplate(deleteConfirmId)}
-              >
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => handleDeleteTemplate(deleteConfirmId)}>
                 Delete
-              </button>
+              </Button>
             </div>
           </div>
         </div>

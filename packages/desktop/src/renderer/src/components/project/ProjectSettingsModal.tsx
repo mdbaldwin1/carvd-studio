@@ -6,6 +6,7 @@ import { useUIStore } from '../../store/uiStore';
 import { mmToInches } from '../../utils/fractions';
 import { FractionInput } from '../common/FractionInput';
 import { HelpTooltip } from '../common/HelpTooltip';
+import { Button } from '@renderer/components/ui/button';
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
@@ -145,9 +146,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
             >
               View documentation
             </a>
-            <button className="btn btn-icon-sm btn-ghost btn-secondary" onClick={onClose} aria-label="Close">
+            <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close">
               &times;
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -355,9 +356,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
         </div>
 
         <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
-          <button className="btn btn-sm btn-filled btn-secondary" onClick={onClose}>
+          <Button size="sm" variant="secondary" onClick={onClose}>
             Done
-          </button>
+          </Button>
         </div>
       </div>
     </div>

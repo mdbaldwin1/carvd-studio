@@ -4,6 +4,7 @@
  */
 
 import { Save, X } from 'lucide-react';
+import { Button } from '@renderer/components/ui/button';
 
 interface TemplateEditingBannerProps {
   templateName: string;
@@ -35,22 +36,20 @@ export function TemplateEditingBanner({
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <button
-          className="btn btn-sm btn-ghost btn-secondary text-white border-white/30 hover:bg-white/15 hover:border-white/50"
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-white border-white/30 hover:bg-white/15 hover:border-white/50"
           onClick={onDiscard}
           title="Discard changes"
         >
           <X size={16} />
           Discard
-        </button>
-        <button
-          className="btn btn-sm btn-filled btn-primary !bg-white !text-primary hover:!bg-white/90"
-          onClick={onSave}
-          title="Save template"
-        >
+        </Button>
+        <Button size="sm" className="!bg-white !text-primary hover:!bg-white/90" onClick={onSave} title="Save template">
           <Save size={16} />
           Save Template
-        </button>
+        </Button>
       </div>
     </div>
   );

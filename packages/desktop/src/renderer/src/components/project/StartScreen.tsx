@@ -1,4 +1,5 @@
 import { FolderOpen, Star, Clock, Library, Settings } from 'lucide-react';
+import { Button } from '@renderer/components/ui/button';
 import { useEffect, useState } from 'react';
 import { UserTemplate } from '../../templates';
 import { Project } from '../../types';
@@ -184,12 +185,12 @@ export function StartScreen({
             <h1 className="text-[32px] font-bold text-text m-0">Carvd Studio</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button className="btn btn-icon-sm btn-ghost" onClick={onOpenLibrary} title="Stock & Assembly Library">
+            <Button size="icon" variant="ghost" onClick={onOpenLibrary} title="Stock & Assembly Library">
               <Library size={18} />
-            </button>
-            <button className="btn btn-icon-sm btn-ghost" onClick={onOpenSettings} title="App Settings">
+            </Button>
+            <Button size="icon" variant="ghost" onClick={onOpenSettings} title="App Settings">
               <Settings size={18} />
-            </button>
+            </Button>
             {appVersion && (
               <span className="text-xs text-text-muted bg-bg-secondary py-1 px-2 rounded ml-1">v{appVersion}</span>
             )}

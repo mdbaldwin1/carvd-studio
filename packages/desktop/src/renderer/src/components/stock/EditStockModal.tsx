@@ -4,6 +4,7 @@ import { Stock } from '../../types';
 import { FractionInput } from '../common/FractionInput';
 import { ColorPicker } from '../common/ColorPicker';
 import { Modal } from '../common/Modal';
+import { Button } from '@renderer/components/ui/button';
 import { STOCK_COLORS } from '../../constants';
 
 interface EditStockModalProps {
@@ -83,12 +84,12 @@ export function EditStockModal({
       className="w-[450px]"
       footer={
         <>
-          <button className="btn btn-sm btn-outlined btn-secondary" onClick={onClose}>
+          <Button variant="outline" size="sm" onClick={onClose}>
             Cancel
-          </button>
-          <button className="btn btn-sm btn-filled btn-primary" onClick={handleSubmit}>
+          </Button>
+          <Button size="sm" onClick={handleSubmit}>
             {createMode ? 'Create Stock' : 'Save Changes'}
-          </button>
+          </Button>
         </>
       }
     >

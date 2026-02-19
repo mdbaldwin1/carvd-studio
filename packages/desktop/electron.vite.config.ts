@@ -45,10 +45,11 @@ export default defineConfig({
     root: 'src/renderer',
     resolve: {
       alias: {
+        '@renderer': resolve(__dirname, 'src/renderer/src'),
         // Stub out unused jsPDF optional dependencies (saves ~386 KB)
         // jsPDF only needs these for its .html() method, which we never call —
         // pdfExport.ts draws everything programmatically with .text()/.line()/.rect()
-        'html2canvas': resolve(__dirname, 'src/renderer/src/stubs/empty-module.ts'),
+        html2canvas: resolve(__dirname, 'src/renderer/src/stubs/empty-module.ts'),
         dompurify: resolve(__dirname, 'src/renderer/src/stubs/empty-module.ts')
       }
     },
@@ -70,7 +71,7 @@ export default defineConfig({
       react(),
       ...(process.env.ANALYZE === 'true'
         ? [visualizer({ filename: 'bundle-analysis.html', open: true, gzipSize: true })]
-        : []),
-    ],
-  },
+        : [])
+    ]
+  }
 });

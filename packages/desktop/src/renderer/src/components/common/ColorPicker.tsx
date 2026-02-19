@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { STOCK_COLORS } from '../../constants';
 import { useCustomColors } from '../../hooks/useCustomColors';
+import { Button } from '@renderer/components/ui/button';
 
 interface ColorPickerProps {
   value: string;
@@ -65,14 +66,16 @@ export function ColorPicker({ value, onChange, showCustomColors = true }: ColorP
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] text-text-muted uppercase tracking-wider">Custom Colors</span>
             {canAddCurrentColor && (
-              <button
-                className="btn btn-xs btn-ghost btn-secondary flex items-center gap-1 text-[11px]"
+              <Button
+                size="xs"
+                variant="ghost"
+                className="text-[11px]"
                 onClick={() => setShowAddConfirm(true)}
                 title="Save current color"
               >
                 <Plus size={12} />
                 Save Color
-              </button>
+              </Button>
             )}
           </div>
 
@@ -80,12 +83,12 @@ export function ColorPicker({ value, onChange, showCustomColors = true }: ColorP
             <div className="flex items-center gap-2 p-2 bg-bg rounded text-xs">
               <span className="w-5 h-5 rounded border border-border shrink-0" style={{ backgroundColor: value }} />
               <span>Save this color?</span>
-              <button className="btn btn-xs btn-filled btn-primary" onClick={handleAddCurrentColor}>
+              <Button size="xs" onClick={handleAddCurrentColor}>
                 Save
-              </button>
-              <button className="btn btn-xs btn-ghost btn-secondary" onClick={() => setShowAddConfirm(false)}>
+              </Button>
+              <Button size="xs" variant="ghost" onClick={() => setShowAddConfirm(false)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           )}
 
