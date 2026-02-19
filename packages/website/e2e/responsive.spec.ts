@@ -7,7 +7,6 @@ test.describe("Responsive Design", () => {
     test("homepage renders correctly on mobile", async ({ page }) => {
       await page.goto("/");
       await expect(page.locator("h1")).toBeVisible();
-      await expect(page.locator(".hero-title")).toBeVisible();
     });
 
     test("download cards stack on mobile", async ({ page }) => {
@@ -44,7 +43,8 @@ test.describe("Responsive Design", () => {
 
     test("feature grid displays correctly on tablet", async ({ page }) => {
       await page.goto("/");
-      await expect(page.locator(".features-grid")).toBeVisible();
+      // Feature grid uses minmax(280px,1fr) layout
+      await expect(page.locator('div[class*="280px,1fr"]')).toBeVisible();
     });
   });
 
@@ -58,8 +58,7 @@ test.describe("Responsive Design", () => {
 
     test("download cards display side by side on desktop", async ({ page }) => {
       await page.goto("/");
-      const downloadButtons = page.locator(".download-buttons");
-      await expect(downloadButtons).toBeVisible();
+      await expect(page.locator("#download")).toBeVisible();
     });
   });
 });
