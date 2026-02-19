@@ -1,4 +1,6 @@
 import { Outlet, NavLink } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import BuyButton from "../../components/BuyButton";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
@@ -13,29 +15,40 @@ export default function DocsLayout() {
 
       {/* Main Content */}
       <main id="main-content" className="page-content container">
-        <div className="py-3xl">
+        <div className="py-16 max-md:py-12 max-sm:py-8">
           {/* Page Header */}
-          <div className="text-center mb-2xl">
-            <h1 className="text-6xl font-bold mb-lg">Documentation</h1>
-            <p className="text-xl text-muted max-w-2xl mx-auto">
+          <div className="mb-12 text-center">
+            <h1 className="mb-6 text-6xl font-bold max-md:text-4xl max-sm:text-3xl max-[380px]:text-lg max-[320px]:text-base">
+              Documentation
+            </h1>
+            <p className="mx-auto max-w-2xl text-xl text-text-muted max-md:max-w-full">
               Everything you need to design furniture like a pro.
             </p>
           </div>
 
-          <div className="docs-layout">
+          <div className="mx-auto flex max-w-[1200px] gap-12 max-lg:flex-col max-lg:gap-8">
             {/* Sidebar Navigation (Desktop) */}
-            <aside className="docs-sidebar">
-              <nav className="docs-sidebar-inner" aria-label="Documentation">
+            <aside className="w-[250px] shrink-0 max-lg:hidden">
+              <nav
+                className="sticky top-[100px] max-h-[calc(100vh-120px)] overflow-y-auto pb-8 [&::-webkit-scrollbar-thumb:hover]:bg-text-muted [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1"
+                aria-label="Documentation"
+              >
                 {navSections.map((section) => (
-                  <div key={section.title} className="docs-nav-section">
-                    <p className="docs-nav-title">{section.title}</p>
-                    <ul className="docs-nav-list">
+                  <div key={section.title} className="mb-6">
+                    <p className="mb-2 text-sm font-bold uppercase tracking-[0.05em] text-text">
+                      {section.title}
+                    </p>
+                    <ul className="flex flex-col gap-1">
                       {section.pages.map((page) => (
                         <li key={page.slug}>
                           <NavLink
                             to={`/docs/${page.slug}`}
                             className={({ isActive }) =>
-                              `docs-nav-link${isActive ? " active" : ""}`
+                              cn(
+                                "block rounded-sm px-2 py-1 text-sm text-text-muted transition-all duration-150",
+                                "hover:bg-surface hover:text-text",
+                                isActive && "bg-surface text-accent",
+                              )
                             }
                           >
                             {page.title}
@@ -45,10 +58,13 @@ export default function DocsLayout() {
                     </ul>
                   </div>
                 ))}
-                <div className="docs-nav-section">
-                  <ul className="docs-nav-list">
+                <div className="mb-6">
+                  <ul className="flex flex-col gap-1">
                     <li>
-                      <a href="/changelog" className="docs-nav-link">
+                      <a
+                        href="/changelog"
+                        className="block rounded-sm px-2 py-1 text-sm text-text-muted transition-all duration-150 hover:bg-surface hover:text-text"
+                      >
                         Changelog
                       </a>
                     </li>
@@ -58,25 +74,34 @@ export default function DocsLayout() {
             </aside>
 
             {/* Main Content Area */}
-            <div className="docs-content">
+            <div className="min-w-0 flex-1 max-w-[896px]">
               {/* Mobile TOC */}
-              <nav className="docs-mobile-toc" aria-label="Table of contents">
-                <h2 className="docs-mobile-toc-title">Contents</h2>
-                <div className="docs-mobile-toc-grid">
+              <nav
+                className="mb-12 hidden rounded-lg bg-surface p-6 max-lg:block"
+                aria-label="Table of contents"
+              >
+                <h2 className="mb-4 text-xl font-bold">Contents</h2>
+                <div className="grid grid-cols-2 gap-4 max-[600px]:grid-cols-1">
                   {navSections.map((section) => (
                     <div key={section.title}>
-                      <p className="font-bold mb-sm text-sm">{section.title}</p>
-                      <ul className="text-muted grid gap-xs text-sm">
+                      <p className="mb-2 text-sm font-bold">{section.title}</p>
+                      <ul className="grid gap-1 text-sm text-text-muted">
                         {section.pages.map((page) => (
                           <li key={page.slug}>
-                            <a href={`/docs/${page.slug}`} className="nav-link">
+                            <a
+                              href={`/docs/${page.slug}`}
+                              className="inline-flex min-h-11 items-center px-2 py-1 font-medium text-text transition-colors hover:text-highlight"
+                            >
                               {page.title}
                             </a>
                           </li>
                         ))}
                         {section.title === "Reference" && (
                           <li>
-                            <a href="/changelog" className="nav-link">
+                            <a
+                              href="/changelog"
+                              className="inline-flex min-h-11 items-center px-2 py-1 font-medium text-text transition-colors hover:text-highlight"
+                            >
                               Changelog
                             </a>
                           </li>
@@ -90,37 +115,40 @@ export default function DocsLayout() {
               <Outlet />
 
               {/* Support Section */}
-              <section className="mb-3xl mt-3xl">
-                <div className="cta-section">
-                  <h2 className="cta-title">Still Have Questions?</h2>
-                  <p className="cta-description mb-lg">
+              <section className="mt-16 mb-16 max-md:mt-12 max-md:mb-12 max-sm:mt-8 max-sm:mb-8">
+                <div className="rounded-xl border-2 border-accent bg-gradient-to-br from-surface to-surface-elevated p-16 text-center max-md:p-12 max-sm:p-8">
+                  <h2 className="mb-4 text-4xl font-bold max-md:text-2xl max-sm:text-xl">
+                    Still Have Questions?
+                  </h2>
+                  <p className="mx-auto mb-8 max-w-[600px] text-xl text-text-muted max-md:text-lg max-sm:text-base">
                     Email our support team. You'll get help from actual
                     woodworkers who know the software inside and out.
                   </p>
-                  <a
-                    href="mailto:support@carvd-studio.com"
-                    className="btn btn-primary btn-lg"
-                  >
-                    Email Support
-                  </a>
-                  <p className="text-sm text-muted mt-md">
+                  <Button asChild size="lg">
+                    <a href="mailto:support@carvd-studio.com">Email Support</a>
+                  </Button>
+                  <p className="mt-4 text-sm text-text-muted">
                     Average response time: 24 hours or less
                   </p>
                 </div>
               </section>
 
               {/* CTA */}
-              <div className="accent-box-highlight text-center mt-3xl">
-                <h2 className="text-3xl font-bold mb-md">
+              <div className="mt-16 rounded-lg border border-[rgba(174,164,191,0.4)] bg-gradient-to-br from-[rgba(174,164,191,0.15)] to-[rgba(174,164,191,0.05)] p-8 text-center max-md:mt-12 max-sm:mt-8 max-sm:p-6">
+                <h2 className="mb-4 text-3xl font-bold max-md:text-xl max-sm:text-lg">
                   Ready to Get Started?
                 </h2>
-                <p className="text-lg text-muted mb-lg">
+                <p className="mb-6 text-lg text-text-muted">
                   Download Carvd Studio and design your first project today.
                 </p>
-                <div className="flex gap-md justify-center">
-                  <a href="/download" className="btn btn-highlight btn-lg">
-                    Download Free Trial
-                  </a>
+                <div className="flex justify-center gap-4 max-sm:flex-col max-sm:items-center">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="bg-highlight text-bg hover:bg-highlight/90"
+                  >
+                    <a href="/download">Download Free Trial</a>
+                  </Button>
                   <BuyButton />
                 </div>
               </div>
@@ -130,7 +158,10 @@ export default function DocsLayout() {
           {/* End docs-layout */}
 
           {/* Back Link */}
-          <a href="/" className="back-link mt-3xl block text-center">
+          <a
+            href="/"
+            className="mt-16 block text-center text-accent font-medium hover:text-accent-hover hover:underline max-md:mt-12 max-sm:mt-8"
+          >
             &larr; Back to Home
           </a>
         </div>
