@@ -1,3 +1,5 @@
+import { Progress } from '@renderer/components/ui/progress';
+
 interface ProgressBarProps {
   progress: number; // 0-100
   message?: string;
@@ -46,16 +48,12 @@ export function ProgressBar({
         {message && <span className="text-sm text-text-muted">{message}</span>}
         {showPercentage && <span className="text-sm font-medium text-text">{Math.round(clampedProgress)}%</span>}
       </div>
-      <div className="w-full bg-bg rounded-full overflow-hidden">
-        <div
-          className={`rounded-full transition-[width] duration-300 ease-out ${sizeStyles[size]} ${colorStyles[color]}`}
-          style={{ width: `${clampedProgress}%` }}
-          role="progressbar"
-          aria-valuenow={clampedProgress}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        />
-      </div>
+      <Progress
+        className={sizeStyles[size]}
+        indicatorClassName={colorStyles[color]}
+        value={clampedProgress}
+        aria-label={message || 'Progress'}
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-19 (updated)
 **Branch**: develop
-**Last develop SHA**: `3ef77c6` (after bead 5.1 PR #241 merge)
+**Last develop SHA**: `9dbf5ce` (after bead 5.4 PR #245 merge)
 
 ## Key Instruction Documents
 
@@ -70,35 +70,36 @@ These documents define the migration workflow and must be followed:
 | 5.1  | #241 | Tabs migration (Start/CutList/Library)   |
 | 5.2  | #243 | Table migration (CutList parts table)    |
 | 5.3  | #244 | Card migration (Start/Settings/Template) |
+| 5.4  | #245 | Collapsible/Accordion migration          |
 
-**Total: 26 beads merged across 6 epics (2, 3, 4, 5, 9, 10)**
+**Total: 27 beads merged across 6 epics (2, 3, 4, 5, 9, 10)**
 
 ## Active Worktrees
 
 | Worktree                                 | Branch                | State                    |
 | ---------------------------------------- | --------------------- | ------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-5.4` | feat/carvd-studio-5.4 | **In progress (active)** |
+| `/Users/mbaldwin/Carvd/carvd-studio-5.5` | feat/carvd-studio-5.5 | **In progress (active)** |
 
-All completed worktrees through bead 5.3 have been cleaned up.
+All completed worktrees through bead 5.4 have been cleaned up.
 
-## In-Progress Work: Bead 5.4 (Collapsible/Accordion)
+## In-Progress Work: Bead 5.5 (Progress/Skeleton)
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-5.4`
-**Branch**: `feat/carvd-studio-5.4`
+**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-5.5`
+**Branch**: `feat/carvd-studio-5.5`
 **State**: Implementation complete; PR prep in progress
 
 ### What was done:
 
-1. Added Collapsible primitive at `packages/desktop/src/renderer/src/components/ui/collapsible.tsx`
-2. Added Accordion primitive at `packages/desktop/src/renderer/src/components/ui/accordion.tsx`
-3. Migrated sidebar sections (Stock, Assemblies, Parts) in `App.tsx` to Radix Collapsible
-4. Migrated properties panel sections (Position, Notes, Joinery Adjustments) from `<details>` to Accordion
-5. Removed obsolete collapse/details CSS rules from `layout.css` and `domain.css`
-6. Verified desktop lint/typecheck and targeted/full vitest suites pass locally
+1. Added Progress primitive at `packages/desktop/src/renderer/src/components/ui/progress.tsx`
+2. Added Skeleton primitive at `packages/desktop/src/renderer/src/components/ui/skeleton.tsx`
+3. Migrated `components/common/ProgressBar.tsx` to shadcn/Radix progress composition while preserving public props
+4. Migrated `components/common/LoadingSpinner.tsx` to shadcn skeleton-based loading visuals
+5. Updated `ProgressBar` and `LoadingSpinner` tests for the new primitive structure
+6. Verified desktop lint/typecheck and targeted component tests pass locally
 
 ### Outstanding before merge:
 
-1. Open PR for bead 5.4 and pass CI checks
+1. Open PR for bead 5.5 and pass CI checks
 2. Merge PR (squash) and clean up worktree/branch
 
 ## Remaining Work (Not Started)
@@ -110,8 +111,8 @@ All completed worktrees through bead 5.3 have been cleaned up.
 - 5.1: Tabs — **DONE** (PR #241 merged)
 - 5.2: Table — **DONE** (PR #243 merged)
 - 5.3: Card — **DONE** (PR #244 merged)
-- 5.4: Collapsible/Accordion — **IN PROGRESS**
-- 5.5: Progress/Skeleton — loading states
+- 5.4: Collapsible/Accordion — **DONE** (PR #245 merged)
+- 5.5: Progress/Skeleton — **IN PROGRESS**
 
 **Epic 6: Desktop Modal Migration** (depends on 3.5 ✅ and 3.2 ✅ — ready to start)
 
@@ -159,7 +160,7 @@ All completed worktrees through bead 5.3 have been cleaned up.
 
 ```
 Epics 2, 3, 4, 9, 10 are COMPLETE ✅
-Epic 5 is IN PROGRESS (5.1/5.2/5.3 done, 5.4 active, 5.5 pending)
+Epic 5 is IN PROGRESS (5.1/5.2/5.3/5.4 done, 5.5 active)
 Epic 6 can start NOW (dependencies 3.5 ✅ and 3.2 ✅ are met)
 Epic 7 is BLOCKED on Epic 5 (Epic 4 dependency is met ✅)
 Epic 8 is BLOCKED on Epics 6 and 7
@@ -213,8 +214,7 @@ Bead status state shown here is current as of 2026-02-19.
 
 ## Recommended Next Steps
 
-1. **Complete bead 5.4** — create PR, pass CI, merge, and cleanup.
-2. **Continue Epic 5** sequentially with bead 5.5.
-3. **After Epic 5 completes**, proceed to Epic 7 (currently blocked).
-4. **Run Epic 6 and Epic 11 in parallel where safe** to reduce critical path.
-5. Epic 8 remains final desktop cleanup before Epic 12 integration.
+1. **Complete bead 5.5** — create PR, pass CI, merge, and cleanup.
+2. **After Epic 5 completes**, proceed to Epic 6 and Epic 7 in dependency order.
+3. **Run Epic 6 and Epic 11 in parallel where safe** to reduce critical path.
+4. Epic 8 remains final desktop cleanup before Epic 12 integration.
