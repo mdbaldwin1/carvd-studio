@@ -7,6 +7,14 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@renderer/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription
+} from '@renderer/components/ui/alert-dialog';
 
 const inputClass =
   'w-full bg-bg border border-border rounded-md py-2 px-3 text-sm text-text font-[inherit] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-text-muted';
@@ -33,8 +41,6 @@ export function TemplateSetupDialog({ isOpen, onConfirm, onCancel }: TemplateSet
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const handleConfirm = () => {
     if (name.trim()) {
       onConfirm(name.trim(), description.trim());
@@ -51,19 +57,16 @@ export function TemplateSetupDialog({ isOpen, onConfirm, onCancel }: TemplateSet
   };
 
   return (
-    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]">
-      <div
-        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-120 w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in"
-        onKeyDown={handleKeyDown}
-      >
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 className="m-0 text-base font-semibold text-text">Create New Template</h2>
-        </div>
+    <AlertDialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
+      <AlertDialogContent className="max-w-120 w-[90vw]" onKeyDown={handleKeyDown}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Create New Template</AlertDialogTitle>
+        </AlertDialogHeader>
 
-        <div className="p-5 overflow-y-auto">
-          <p className="text-text-secondary text-sm mb-5">
+        <div className="px-5 py-4">
+          <AlertDialogDescription className="mb-5">
             Templates let you save reusable project layouts. Give your template a name and optional description.
-          </p>
+          </AlertDialogDescription>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="template-setup-name" className="text-[13px] font-medium text-text-secondary">
@@ -95,16 +98,16 @@ export function TemplateSetupDialog({ isOpen, onConfirm, onCancel }: TemplateSet
           </div>
         </div>
 
-        <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
+        <AlertDialogFooter>
           <Button variant="ghost" size="sm" onClick={onCancel}>
             Cancel
           </Button>
           <Button size="sm" onClick={handleConfirm} disabled={!name.trim()}>
             Start Editing
           </Button>
-        </div>
-      </div>
-    </div>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -136,8 +139,6 @@ export function TemplateSaveDialog({
     }
   }, [isOpen, templateName, templateDescription]);
 
-  if (!isOpen) return null;
-
   const handleSave = () => {
     if (name.trim()) {
       onSave(name.trim(), description.trim());
@@ -152,18 +153,13 @@ export function TemplateSaveDialog({
   };
 
   return (
-    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]">
-      <div
-        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-120 w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in"
-        onKeyDown={handleKeyDown}
-      >
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 className="m-0 text-base font-semibold text-text">
-            {isCreatingNew ? 'Save New Template' : 'Save Template'}
-          </h2>
-        </div>
+    <AlertDialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
+      <AlertDialogContent className="max-w-120 w-[90vw]" onKeyDown={handleKeyDown} aria-describedby={undefined}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{isCreatingNew ? 'Save New Template' : 'Save Template'}</AlertDialogTitle>
+        </AlertDialogHeader>
 
-        <div className="p-5 overflow-y-auto">
+        <div className="px-5 py-4">
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="template-name" className="text-[13px] font-medium text-text-secondary">
@@ -195,16 +191,16 @@ export function TemplateSaveDialog({
           </div>
         </div>
 
-        <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
+        <AlertDialogFooter>
           <Button variant="ghost" size="sm" onClick={onCancel}>
             Cancel
           </Button>
           <Button size="sm" onClick={handleSave} disabled={!name.trim()}>
             Save Template
           </Button>
-        </div>
-      </div>
-    </div>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
@@ -226,36 +222,37 @@ export function TemplateDiscardDialog({
   onDiscard,
   onCancel
 }: TemplateDiscardDialogProps) {
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]">
-      <div className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-120 w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in">
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 className="m-0 text-base font-semibold text-text">Discard Changes?</h2>
+    <AlertDialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
+      <AlertDialogContent className="max-w-120 w-[90vw]">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Discard Changes?</AlertDialogTitle>
+        </AlertDialogHeader>
+
+        <div className="px-5 py-4">
+          <AlertDialogDescription asChild>
+            <p>
+              {isCreatingNew ? (
+                <>Are you sure you want to discard this new template? Your changes will be lost.</>
+              ) : (
+                <>
+                  Are you sure you want to discard changes to <strong>{templateName}</strong>? Your changes will be
+                  lost.
+                </>
+              )}
+            </p>
+          </AlertDialogDescription>
         </div>
 
-        <div className="p-5 overflow-y-auto">
-          <p>
-            {isCreatingNew ? (
-              <>Are you sure you want to discard this new template? Your changes will be lost.</>
-            ) : (
-              <>
-                Are you sure you want to discard changes to <strong>{templateName}</strong>? Your changes will be lost.
-              </>
-            )}
-          </p>
-        </div>
-
-        <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
+        <AlertDialogFooter>
           <Button variant="ghost" size="sm" className="mr-auto" onClick={onCancel}>
             Keep Editing
           </Button>
           <Button variant="destructive" size="sm" onClick={onDiscard}>
             Discard Changes
           </Button>
-        </div>
-      </div>
-    </div>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

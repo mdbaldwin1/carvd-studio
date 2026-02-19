@@ -1,4 +1,5 @@
 import { useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { getPrevNext } from "./docsNavConfig";
 
 export default function DocsPrevNext() {
@@ -9,10 +10,20 @@ export default function DocsPrevNext() {
   if (!prev && !next) return null;
 
   return (
-    <nav className="docs-prev-next" aria-label="Documentation pagination">
+    <nav
+      className="mt-16 flex justify-between gap-4 border-t border-border pt-8 max-[600px]:flex-col max-md:mt-12 max-sm:mt-8"
+      aria-label="Documentation pagination"
+    >
       {prev ? (
-        <a href={`/docs/${prev.slug}`} className="docs-prev-next-link">
-          <span className="text-sm text-muted">Previous</span>
+        <a
+          href={`/docs/${prev.slug}`}
+          className={cn(
+            "flex max-w-[45%] flex-col gap-1 rounded-md border border-border p-4 text-text no-underline transition-all duration-150",
+            "hover:border-accent hover:bg-surface",
+            "max-[600px]:max-w-full",
+          )}
+        >
+          <span className="text-sm text-text-muted">Previous</span>
           <span>{prev.title}</span>
         </a>
       ) : (
@@ -21,9 +32,13 @@ export default function DocsPrevNext() {
       {next ? (
         <a
           href={`/docs/${next.slug}`}
-          className="docs-prev-next-link docs-prev-next-link--next"
+          className={cn(
+            "ml-auto flex max-w-[45%] flex-col gap-1 rounded-md border border-border p-4 text-right text-text no-underline transition-all duration-150",
+            "hover:border-accent hover:bg-surface",
+            "max-[600px]:max-w-full max-[600px]:text-left",
+          )}
         >
-          <span className="text-sm text-muted">Next</span>
+          <span className="text-sm text-text-muted">Next</span>
           <span>{next.title}</span>
         </a>
       ) : (
