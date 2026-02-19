@@ -39,17 +39,15 @@ describe("ScreenshotPlaceholder", () => {
   it("applies custom className", () => {
     render(<ScreenshotPlaceholder tooltip="Test" className="custom-class" />);
     const container = screen.getByTitle("Test");
-    expect(container).toHaveClass("screenshot-placeholder");
     expect(container).toHaveClass("custom-class");
   });
 
-  it("has correct base styles", () => {
+  it("has correct base classes", () => {
     render(<ScreenshotPlaceholder tooltip="Test" />);
     const container = screen.getByTitle("Test");
-    expect(container).toHaveStyle({
-      position: "relative",
-      width: "100%",
-    });
+    expect(container).toHaveClass("relative");
+    expect(container).toHaveClass("w-full");
+    expect(container).toHaveClass("overflow-hidden");
   });
 
   it("renders with descriptive text for different screenshot needs", () => {
