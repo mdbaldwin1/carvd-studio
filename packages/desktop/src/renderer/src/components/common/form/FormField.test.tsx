@@ -40,7 +40,7 @@ describe('FormField', () => {
     );
     const error = screen.getByRole('alert');
     expect(error).toHaveTextContent('Name is required');
-    expect(error).toHaveClass('field-error');
+    expect(error).toHaveClass('text-danger');
   });
 
   it('does not show error when null', () => {
@@ -59,7 +59,7 @@ describe('FormField', () => {
       </FormField>
     );
     expect(screen.getByText('Enter your full name')).toBeInTheDocument();
-    expect(screen.getByText('Enter your full name')).toHaveClass('field-help');
+    expect(screen.getByText('Enter your full name')).toHaveClass('text-text-muted');
   });
 
   it('applies custom className', () => {
@@ -68,15 +68,15 @@ describe('FormField', () => {
         <input type="text" />
       </FormField>
     );
-    expect(container.firstChild).toHaveClass('form-group', 'custom-field');
+    expect(container.firstChild).toHaveClass('flex', 'flex-col', 'custom-field');
   });
 
-  it('renders with form-group base class', () => {
+  it('renders with flex-col base layout', () => {
     const { container } = render(
       <FormField label="Name">
         <input type="text" />
       </FormField>
     );
-    expect(container.firstChild).toHaveClass('form-group');
+    expect(container.firstChild).toHaveClass('flex', 'flex-col');
   });
 });

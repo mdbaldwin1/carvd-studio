@@ -6,6 +6,9 @@ import { isBuiltInAssembly } from '../../templates/builtInAssemblies';
 import { Assembly } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { Button } from '@renderer/components/ui/button';
+import { Input } from '@renderer/components/ui/input';
+import { Label } from '@renderer/components/ui/label';
+import { Textarea } from '@renderer/components/ui/textarea';
 import { HelpTooltip } from '../common/HelpTooltip';
 
 interface AssembliesTabProps {
@@ -375,18 +378,18 @@ export function AssembliesTab({
 
             {isEditingAssembly ? (
               <div className="flex-1 p-5 overflow-y-auto">
-                <div className="form-group">
-                  <label>Name</label>
-                  <input
+                <div className="flex flex-col mb-4 gap-2.5">
+                  <Label>Name</Label>
+                  <Input
                     type="text"
                     value={assemblyFormData.name}
                     onChange={(e) => setAssemblyFormData({ ...assemblyFormData, name: e.target.value })}
                   />
                 </div>
 
-                <div className="form-group">
-                  <label>Description</label>
-                  <textarea
+                <div className="flex flex-col mb-4 gap-2.5">
+                  <Label>Description</Label>
+                  <Textarea
                     value={assemblyFormData.description}
                     onChange={(e) => setAssemblyFormData({ ...assemblyFormData, description: e.target.value })}
                     placeholder="Optional description"
@@ -395,7 +398,7 @@ export function AssembliesTab({
                 </div>
 
                 {onEditAssemblyIn3D && !isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
-                  <div className="form-group">
+                  <div className="flex flex-col mb-4 gap-2.5">
                     <Button
                       variant="outline"
                       size="sm"
@@ -417,7 +420,7 @@ export function AssembliesTab({
                   </div>
                 )}
 
-                <div className="form-actions">
+                <div className="flex justify-end gap-3 mt-6 pt-5 border-t border-border">
                   <Button variant="outline" size="sm" onClick={handleCancelEditAssembly}>
                     Cancel
                   </Button>

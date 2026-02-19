@@ -9,6 +9,8 @@ import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { ColorPicker } from '../common/ColorPicker';
 import { FractionInput } from '../common/FractionInput';
 import { Button } from '@renderer/components/ui/button';
+import { Input } from '@renderer/components/ui/input';
+import { Label } from '@renderer/components/ui/label';
 import { IconButton } from '../common/IconButton';
 
 const defaultStock: Omit<Stock, 'id'> = {
@@ -287,17 +289,17 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
 
             {isFormMode ? (
               <div className="flex-1 p-5 overflow-y-auto">
-                <div className="form-group">
-                  <label>Name</label>
-                  <input
+                <div className="flex flex-col mb-4 gap-2.5">
+                  <Label>Name</Label>
+                  <Input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
 
-                <div className="form-group">
-                  <label>Dimensions (L × W × T)</label>
+                <div className="flex flex-col mb-4 gap-2.5">
+                  <Label>Dimensions (L × W × T)</Label>
                   <div className="flex items-center gap-1">
                     <FractionInput
                       value={formData.length}
@@ -319,9 +321,10 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Grain Direction</label>
+                <div className="flex flex-col mb-4 gap-2.5">
+                  <Label>Grain Direction</Label>
                   <select
+                    className="w-full bg-bg border border-border text-text px-3.5 py-2.5 text-sm font-[inherit] rounded-[var(--radius-md)] pr-8 cursor-pointer focus:outline-none focus:border-accent"
                     value={formData.grainDirection}
                     onChange={(e) =>
                       setFormData({
@@ -336,10 +339,11 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
                   </select>
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Pricing Unit</label>
+                <div className="flex gap-4">
+                  <div className="flex flex-col mb-4 gap-2.5 flex-1">
+                    <Label>Pricing Unit</Label>
                     <select
+                      className="w-full bg-bg border border-border text-text px-3.5 py-2.5 text-sm font-[inherit] rounded-[var(--radius-md)] pr-8 cursor-pointer focus:outline-none focus:border-accent"
                       value={formData.pricingUnit}
                       onChange={(e) =>
                         setFormData({
@@ -353,9 +357,9 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
                     </select>
                   </div>
 
-                  <div className="form-group">
-                    <label>Price ($)</label>
-                    <input
+                  <div className="flex flex-col mb-4 gap-2.5 flex-1">
+                    <Label>Price ($)</Label>
+                    <Input
                       type="number"
                       value={formData.pricePerUnit}
                       onChange={(e) => setFormData({ ...formData, pricePerUnit: parseFloat(e.target.value) || 0 })}
@@ -365,12 +369,12 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Display Color</label>
+                <div className="flex flex-col mb-4 gap-2.5">
+                  <Label>Display Color</Label>
                   <ColorPicker value={formData.color} onChange={(color) => setFormData({ ...formData, color })} />
                 </div>
 
-                <div className="form-actions">
+                <div className="flex justify-end gap-3 mt-6 pt-5 border-t border-border">
                   <Button variant="outline" size="sm" onClick={handleCancelEdit}>
                     Cancel
                   </Button>

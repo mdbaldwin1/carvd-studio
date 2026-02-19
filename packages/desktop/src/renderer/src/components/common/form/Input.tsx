@@ -1,5 +1,6 @@
 import React from 'react';
 import { FormField } from './FormField';
+import { Input as InputPrimitive } from '@renderer/components/ui/input';
 
 /** Props for the {@link Input} component. Extends native input attributes. */
 export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
@@ -34,7 +35,7 @@ export function Input({ label, value, onChange, error, helpText, required, id, c
       helpText={helpText}
       className={className}
     >
-      <input
+      <InputPrimitive
         id={inputId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
