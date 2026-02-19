@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useUIStore } from '../../store/uiStore';
 import type { CutList, CutInstruction } from '../../types';
 
@@ -212,31 +213,34 @@ describe('CutListPartsTab', () => {
   });
 
   describe('handleDownloadPDF', () => {
-    it('disables Download PDF item when canExportPDF is false', () => {
+    it('disables Download PDF item when canExportPDF is false', async () => {
+      const user = userEvent.setup();
       render(<CutListPartsTab {...defaultProps} canExportPDF={false} />);
 
-      fireEvent.click(screen.getByText('Download'));
+      await user.click(screen.getByText('Download'));
 
-      const pdfButton = screen.getByText('Download PDF').closest('button');
-      expect(pdfButton).toBeDisabled();
+      const pdfItem = screen.getByRole('menuitem', { name: /download pdf/i });
+      expect(pdfItem).toHaveAttribute('data-disabled');
     });
 
-    it('does not call export when Download PDF is clicked while disabled', () => {
+    it('does not call export when Download PDF is clicked while disabled', async () => {
+      const user = userEvent.setup();
       render(<CutListPartsTab {...defaultProps} canExportPDF={false} />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download PDF'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
 
       expect(mockExportCutListToPdf).not.toHaveBeenCalled();
     });
 
     it('shows success toast on successful PDF export', async () => {
+      const user = userEvent.setup();
       mockExportCutListToPdf.mockResolvedValueOnce({ success: true });
 
       render(<CutListPartsTab {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download PDF'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
 
       await waitFor(() => {
         const toast = useUIStore.getState().toast;
@@ -245,12 +249,13 @@ describe('CutListPartsTab', () => {
     });
 
     it('shows error toast on PDF export error result', async () => {
+      const user = userEvent.setup();
       mockExportCutListToPdf.mockResolvedValueOnce({ success: false, error: 'Save failed' });
 
       render(<CutListPartsTab {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download PDF'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
 
       await waitFor(() => {
         const toast = useUIStore.getState().toast;
@@ -259,12 +264,13 @@ describe('CutListPartsTab', () => {
     });
 
     it('does nothing when PDF export is canceled (no error, no success)', async () => {
+      const user = userEvent.setup();
       mockExportCutListToPdf.mockResolvedValueOnce({ success: false });
 
       render(<CutListPartsTab {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download PDF'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
 
       await waitFor(() => {
         expect(mockExportCutListToPdf).toHaveBeenCalled();
@@ -275,12 +281,13 @@ describe('CutListPartsTab', () => {
     });
 
     it('shows error toast when PDF export throws', async () => {
+      const user = userEvent.setup();
       mockExportCutListToPdf.mockRejectedValueOnce(new Error('Unexpected error'));
 
       render(<CutListPartsTab {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download PDF'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
 
       await waitFor(() => {
         const toast = useUIStore.getState().toast;
@@ -291,12 +298,13 @@ describe('CutListPartsTab', () => {
 
   describe('handleDownloadCSV', () => {
     it('creates CSV download and shows toast', async () => {
+      const user = userEvent.setup();
       const createElementSpy = vi.spyOn(document, 'createElement');
 
       render(<CutListPartsTab {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download CSV'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download csv/i }));
 
       await waitFor(() => {
         expect(mockExportCutListToCsv).toHaveBeenCalled();
@@ -313,6 +321,7 @@ describe('CutListPartsTab', () => {
     });
 
     it('uses project name in CSV filename', async () => {
+      const user = userEvent.setup();
       let capturedDownload = '';
       const originalCreateElement = document.createElement.bind(document);
       const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
@@ -327,8 +336,8 @@ describe('CutListPartsTab', () => {
 
       render(<CutListPartsTab {...defaultProps} projectName="My Project" />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download CSV'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download csv/i }));
 
       await waitFor(() => {
         expect(mockExportCutListToCsv).toHaveBeenCalled();
@@ -339,6 +348,7 @@ describe('CutListPartsTab', () => {
     });
 
     it('uses fallback filename when project name is empty', async () => {
+      const user = userEvent.setup();
       let capturedDownload = '';
       const originalCreateElement = document.createElement.bind(document);
       const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
@@ -353,8 +363,8 @@ describe('CutListPartsTab', () => {
 
       render(<CutListPartsTab {...defaultProps} projectName="" />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download CSV'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download csv/i }));
 
       await waitFor(() => {
         expect(mockExportCutListToCsv).toHaveBeenCalled();

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import type { CutList, StockBoard } from '../../types';
@@ -354,33 +355,34 @@ describe('CutListDiagramsTab', () => {
   });
 
   describe('handleExportPdf', () => {
-    it('disables Download PDF item when canExportPDF is false', () => {
+    it('disables Download PDF item when canExportPDF is false', async () => {
+      const user = userEvent.setup();
       render(<CutListDiagramsTab {...defaultProps} canExportPDF={false} />);
 
-      // Open dropdown
-      fireEvent.click(screen.getByText('Download'));
+      await user.click(screen.getByText('Download'));
 
-      // The Download PDF button should be disabled
-      const pdfButton = screen.getByText('Download PDF').closest('button');
-      expect(pdfButton).toBeDisabled();
+      const pdfItem = screen.getByRole('menuitem', { name: /download pdf/i });
+      expect(pdfItem).toHaveAttribute('data-disabled');
     });
 
-    it('does not call export when Download PDF is clicked while disabled', () => {
+    it('does not call export when Download PDF is clicked while disabled', async () => {
+      const user = userEvent.setup();
       render(<CutListDiagramsTab {...defaultProps} canExportPDF={false} />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download PDF'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
 
       expect(mockExportDiagramsToPdf).not.toHaveBeenCalled();
     });
 
     it('shows success toast on successful PDF export', async () => {
+      const user = userEvent.setup();
       mockExportDiagramsToPdf.mockResolvedValueOnce({ success: true });
 
       render(<CutListDiagramsTab {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download PDF'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
 
       await waitFor(() => {
         const toast = useUIStore.getState().toast;
@@ -389,12 +391,13 @@ describe('CutListDiagramsTab', () => {
     });
 
     it('shows error toast on PDF export error result', async () => {
+      const user = userEvent.setup();
       mockExportDiagramsToPdf.mockResolvedValueOnce({ success: false, error: 'Save failed' });
 
       render(<CutListDiagramsTab {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download PDF'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
 
       await waitFor(() => {
         const toast = useUIStore.getState().toast;
@@ -403,30 +406,30 @@ describe('CutListDiagramsTab', () => {
     });
 
     it('does nothing when export is canceled (no error, no success)', async () => {
+      const user = userEvent.setup();
       mockExportDiagramsToPdf.mockResolvedValueOnce({ success: false });
 
       render(<CutListDiagramsTab {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download PDF'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
 
-      // Wait for the async handler to complete
       await waitFor(() => {
         expect(mockExportDiagramsToPdf).toHaveBeenCalled();
       });
 
-      // Toast should still be null (no message shown for cancel)
       const toast = useUIStore.getState().toast;
       expect(toast).toBeNull();
     });
 
     it('shows error toast when PDF export throws', async () => {
+      const user = userEvent.setup();
       mockExportDiagramsToPdf.mockRejectedValueOnce(new Error('Unexpected error'));
 
       render(<CutListDiagramsTab {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download PDF'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
 
       await waitFor(() => {
         const toast = useUIStore.getState().toast;
@@ -435,12 +438,13 @@ describe('CutListDiagramsTab', () => {
     });
 
     it('passes correct options to exportDiagramsToPdf', async () => {
+      const user = userEvent.setup();
       mockExportDiagramsToPdf.mockResolvedValueOnce({ success: true });
 
       render(<CutListDiagramsTab {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download PDF'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
 
       await waitFor(() => {
         expect(mockExportDiagramsToPdf).toHaveBeenCalledWith(
