@@ -1,5 +1,7 @@
 # Design Patterns
 
+Workflow and policy source of truth: see `AGENTS.md` for branch strategy, commit conventions, PR/changelog rules, security handling, and validation gates. This file is implementation/reference guidance.
+
 ## CSS & Tailwind
 
 Desktop uses **Tailwind CSS 4** with CSS custom properties for theming. Styles are in `packages/desktop/src/renderer/src/`:
@@ -178,15 +180,6 @@ The website uses **lucide-react** for UI icons and custom SVG components in `Bra
 ### Styling
 
 The website uses **Tailwind CSS** independently from the desktop app.
-
-## Commit Messages
-
-```
-feat: add dimension matching snap
-fix: kerf not applied correctly
-perf: hybrid InstancedMesh rendering
-refactor: extract snap detection
-```
 
 ## Code Quality
 

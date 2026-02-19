@@ -1,86 +1,9 @@
 # Carvd Studio — Development Guidelines
 
-## Monorepo Structure
+## Source Of Truth
 
-- `packages/desktop` — Electron desktop app (React + TypeScript + Three.js)
-- `packages/website` — Marketing website (React + TypeScript + Vite)
-
-## Git Workflow
-
-### Branches
-
-- **develop** — Integration branch. All feature work targets here via PRs.
-- **main** — Production branch. Protected. Only receives PRs from develop. Merge commit (not squash).
-- **Feature branches** — Created from develop. Named with prefixes: `feat/`, `fix/`, `perf/`, `chore/`, `docs/`, `test/`, `refactor/`.
-- **Hotfix branches** — Created from **main** (not develop). Named `hotfix/description`. Used for urgent production fixes.
-
-### Branch Protection
-
-Both `develop` and `main` are protected:
-
-- No direct pushes (even for admins)
-- All changes must go through pull requests
-- All CI checks must pass before merging
-
-### Commit Messages
-
-Use conventional commit prefixes:
-
-- `feat:` — New feature or functionality
-- `fix:` — Bug fix
-- `perf:` — Performance improvement
-- `chore:` — Maintenance, dependencies, CI/CD changes
-- `docs:` — Documentation only
-- `test:` — Test additions or modifications
-- `refactor:` — Code restructuring without behavior change
-
-### Merge Strategies
-
-- **Feature branches → develop**: Squash merge (clean history, one commit per feature)
-- **develop → main**: Merge commit (preserves shared ancestry so syncing main back to develop is conflict-free)
-- **Hotfix branches → main**: Squash merge
-
-### Pull Request Workflow
-
-1. Create a feature branch from `develop`
-2. Make changes and commit with conventional prefixes
-3. **Update CHANGELOG.md** under `[Unreleased]` — this is required for PRs to main
-4. Run tests: `npm test` in the relevant package
-5. Run lint: `npm run lint` and typecheck: `npm run typecheck`
-6. Push the branch and create a PR targeting `develop`
-7. Ensure all CI checks pass before requesting merge
-
-### Hotfix Workflow
-
-Hotfixes bypass `develop` to get urgent fixes into production quickly:
-
-1. Create a `hotfix/` branch from **main**
-2. Make the fix and commit
-3. Update CHANGELOG.md
-4. PR into **main** (squash merge) — deploys the fix to production
-5. The `sync-develop` workflow automatically merges main back into develop
-
-### Changelog Format
-
-```markdown
-## [Unreleased]
-
-### Added
-
-- New features go here
-
-### Changed
-
-- Modifications to existing features
-
-### Fixed
-
-- Bug fixes
-
-### Removed
-
-- Removed features or deprecated items
-```
+- `AGENTS.md` is the primary source of truth for agent behavior, branch/PR workflow, commit conventions, changelog expectations, and validation gates.
+- This file is supplemental reference material only (architecture, testing details, performance, and implementation notes).
 
 ## Versioning
 
@@ -182,6 +105,8 @@ The desktop app uses **Tailwind CSS 4** with CSS custom properties for theming. 
 - `domain.css` — Domain-specific styles (3D workspace, cut list, part rendering)
 
 Components use Tailwind utility classes referencing theme tokens (e.g., `bg-bg`, `text-text-muted`, `border-border`). The website uses Tailwind independently.
+
+**shadcn/ui migration (in progress)**: The desktop app is migrating to shadcn/ui primitives built on Radix UI. Shared UI components live in `src/renderer/src/components/ui/` (Button, Input, Select, Dialog, etc.). Use the `cn()` utility from `src/renderer/src/lib/utils.ts` for class merging. See `SHADCN-MIGRATION-SESSION-HANDOFF.md` for full component mappings and testing patterns.
 
 ## Store Architecture
 

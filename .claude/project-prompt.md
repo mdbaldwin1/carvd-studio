@@ -8,31 +8,15 @@ Electron desktop app for designing furniture and cabinetry. Design in 3D → Get
 
 **Status:** Production-ready core. UX polish in progress for 1.0 release.
 
+## Source Of Truth
+
+- `AGENTS.md` is the primary source of truth for workflow, branch strategy, PR rules, changelog expectations, validation gates, security handling, and multi-session safety.
+- This file is supplemental Claude context and should avoid duplicating stable policy from `AGENTS.md`.
+
 ## Roles
 
 - **Claude:** Lead Developer - Make technical decisions, implement features, keep docs current
 - **Michael:** Product Owner - Define requirements, approve major changes, UX direction
-
-## Monorepo Structure
-
-```
-carvd-studio/
-├── packages/
-│   ├── desktop/     → Electron app
-│   └── website/     → Marketing site
-└── package.json     → Root workspace config
-```
-
-**Key Commands:**
-
-```bash
-npm run dev:desktop      # Run Electron app
-npm run build:desktop    # Build production
-npm run package:mac      # Create macOS DMG
-npm run package:win      # Create Windows installer
-npm run test             # Run all tests (2822 tests, ~92% coverage)
-npm run test:coverage    # Run with coverage report
-```
 
 ### Data Constraints
 
@@ -75,59 +59,6 @@ npm run test:coverage    # Run with coverage report
 - **Activation limits** - Enforced by Lemon Squeezy
 - **Purchase flow** - Opens browser to Lemon Squeezy checkout
 
-## Multi-Session Workflow (Git Worktrees)
-
-When multiple Claude Code sessions work on this repo simultaneously, **each session MUST use its own git worktree** to avoid branch-switching conflicts that discard uncommitted changes.
-
-### Setup
-
-```bash
-# From the main repo directory, create a worktree for your branch:
-git worktree add ../carvd-studio-<short-name> <branch-name>
-
-# Examples:
-git worktree add ../carvd-studio-downloads fix/website-download-links
-git worktree add ../carvd-studio-security fix/security-vulnerabilities
-```
-
-### Rules
-
-1. **Never run `git checkout` in a shared worktree** — it wipes other sessions' uncommitted work
-2. **Create a worktree before starting work** if other sessions may be active
-3. **Commit early and often** — uncommitted changes only exist in the working directory
-4. **Clean up when done:** `git worktree remove ../carvd-studio-<short-name>`
-5. **A branch can only be checked out in one worktree at a time** — git enforces this
-
-### Directory Layout
-
-```
-/Users/mbaldwin/Carvd/
-├── carvd-studio/                  # Main repo (keep on develop)
-├── carvd-studio-<feature>/        # Worktree for feature work
-└── carvd-studio-<fix>/            # Worktree for bug fixes
-```
-
-## CI/CD
-
-- **test.yml** — Runs on all PRs to `main`/`develop`: unit tests, E2E tests (3 platforms), lint/typecheck/format (desktop + website), website unit tests, website E2E tests
-- **release.yml** — Triggered by push to `main`: builds macOS (code-signed + notarized) + Windows, creates GitHub Release, bumps desktop patch version on `develop`
-- **changelog-check.yml** — Fails PRs to `main` if CHANGELOG.md wasn't modified
-- **sync-develop.yml** — Triggered by push to `main`: merges main back into develop via PR
-- **website-version-bump.yml** — Triggered by push to `main` when website files change: deploys to Vercel, creates `website-v*` tag, bumps website version on `develop`
-- **Auto-updater** — electron-updater via GitHub Releases
-- **Pre-commit hooks** — husky + lint-staged runs `prettier --check` on staged files
-- **Node version** — Pinned in `.nvmrc` (Node 22), all CI workflows use `node-version-file`
-
-## Branch Protection
-
-Both `develop` and `main` are protected:
-
-- No direct pushes (even for admins — `enforce_admins: true`)
-- All changes must go through pull requests
-- All CI checks must pass before merging
-- `develop` → `main` uses merge commit (preserves shared ancestry for sync-develop)
-- Hotfix branches → `main` use squash merge
-
 ## Documentation
 
 See `.claude/docs/` for:
@@ -139,7 +70,8 @@ See `.claude/docs/` for:
 
 See also:
 
-- `CLAUDE.md` — Git workflow, versioning, commit conventions, changelog format
+- `AGENTS.md` — Primary workflow and quality policy for all agents
+- `CLAUDE.md` — Supplemental deep technical guidance
 - `.github/pull_request_template.md` — PR checklist
 - `.github/ISSUE_TEMPLATE/` — Bug report and feature request forms
 
