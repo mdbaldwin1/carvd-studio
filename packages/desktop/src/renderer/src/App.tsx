@@ -10,6 +10,7 @@ import { ColorPicker } from './components/common/ColorPicker';
 import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { FractionInput } from './components/common/FractionInput';
 import { HelpTooltip } from './components/common/HelpTooltip';
+import { Separator } from './components/ui/separator';
 import { Toaster } from './components/ui/sonner';
 import { TooltipProvider } from './components/ui/tooltip';
 import { ContextMenu } from './components/layout/ContextMenu';
@@ -2657,7 +2658,7 @@ function App() {
                     <Save size={18} />
                   </Button>
                 </div>
-                <div className="header-divider" />
+                <Separator orientation="vertical" className="h-7" />
                 <div className="header-actions-group">
                   <Button
                     variant="outline"
@@ -2673,7 +2674,7 @@ function App() {
                 </div>
                 {licenseMode === 'free' && (
                   <>
-                    <div className="header-divider" />
+                    <Separator orientation="vertical" className="h-7" />
                     <Button
                       size="sm"
                       className="upgrade-btn"
