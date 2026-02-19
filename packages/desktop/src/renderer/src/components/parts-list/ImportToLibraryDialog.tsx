@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { Stock, Assembly } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { useProjectStore } from '../../store/projectStore';
+import { Button } from '@renderer/components/ui/button';
 
 interface ImportToLibraryDialogProps {
   isOpen: boolean;
@@ -98,16 +99,12 @@ export function ImportToLibraryDialog({
           </p>
 
           <div className="flex gap-2 mb-3">
-            <button
-              className="btn btn-sm btn-ghost btn-secondary"
-              onClick={selectAll}
-              disabled={selectedCount === totalItems}
-            >
+            <Button size="sm" variant="ghost" onClick={selectAll} disabled={selectedCount === totalItems}>
               Select All
-            </button>
-            <button className="btn btn-sm btn-ghost btn-secondary" onClick={selectNone} disabled={selectedCount === 0}>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={selectNone} disabled={selectedCount === 0}>
               Select None
-            </button>
+            </Button>
           </div>
 
           <div className="max-h-75 overflow-y-auto border border-border rounded-sm bg-bg-secondary">
@@ -176,12 +173,12 @@ export function ImportToLibraryDialog({
         </div>
 
         <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
-          <button className="btn btn-sm btn-ghost btn-secondary" onClick={onSkip}>
+          <Button size="sm" variant="ghost" onClick={onSkip}>
             Skip
-          </button>
-          <button className="btn btn-sm btn-filled btn-primary" onClick={handleImport} disabled={selectedCount === 0}>
+          </Button>
+          <Button size="sm" onClick={handleImport} disabled={selectedCount === 0}>
             Import {selectedCount > 0 ? `(${selectedCount})` : ''}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

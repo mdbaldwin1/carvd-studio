@@ -55,14 +55,14 @@ describe('ConfirmDialog', () => {
       render(<ConfirmDialog {...defaultProps} variant="danger" />);
 
       const confirmButton = screen.getByText('Confirm');
-      expect(confirmButton).toHaveClass('btn-danger');
+      expect(confirmButton).toHaveClass('bg-danger');
     });
 
     it('applies primary class to confirm button by default', () => {
       render(<ConfirmDialog {...defaultProps} />);
 
       const confirmButton = screen.getByText('Confirm');
-      expect(confirmButton).toHaveClass('btn-primary');
+      expect(confirmButton).toHaveClass('bg-accent');
     });
   });
 

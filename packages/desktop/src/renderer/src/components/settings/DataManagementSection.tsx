@@ -1,5 +1,6 @@
 import { Download, Upload } from 'lucide-react';
 import { HelpTooltip } from '../common/HelpTooltip';
+import { Button } from '@renderer/components/ui/button';
 
 interface DataManagementSectionProps {
   isExporting: boolean;
@@ -22,14 +23,14 @@ export function DataManagementSection({ isExporting, onExport, onImport }: DataM
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="btn btn-sm btn-outlined btn-secondary" onClick={onExport} disabled={isExporting}>
+          <Button variant="outline" size="sm" onClick={onExport} disabled={isExporting}>
             <Download size={14} />
             {isExporting ? 'Exporting...' : 'Export'}
-          </button>
-          <button className="btn btn-sm btn-outlined btn-secondary" onClick={onImport}>
+          </Button>
+          <Button variant="outline" size="sm" onClick={onImport}>
             <Upload size={14} />
             Import
-          </button>
+          </Button>
         </div>
       </div>
     </div>

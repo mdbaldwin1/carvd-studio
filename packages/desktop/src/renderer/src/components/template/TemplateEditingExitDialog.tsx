@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { Button } from '@renderer/components/ui/button';
 
 const inputClass =
   'w-full bg-bg border border-border rounded-md py-2 px-3 text-sm text-text font-[inherit] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-text-muted';
@@ -95,12 +96,12 @@ export function TemplateSetupDialog({ isOpen, onConfirm, onCancel }: TemplateSet
         </div>
 
         <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
-          <button className="btn btn-sm btn-ghost btn-secondary" onClick={onCancel}>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
             Cancel
-          </button>
-          <button className="btn btn-sm btn-filled btn-primary" onClick={handleConfirm} disabled={!name.trim()}>
+          </Button>
+          <Button size="sm" onClick={handleConfirm} disabled={!name.trim()}>
             Start Editing
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -195,12 +196,12 @@ export function TemplateSaveDialog({
         </div>
 
         <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
-          <button className="btn btn-sm btn-ghost btn-secondary" onClick={onCancel}>
+          <Button variant="ghost" size="sm" onClick={onCancel}>
             Cancel
-          </button>
-          <button className="btn btn-sm btn-filled btn-primary" onClick={handleSave} disabled={!name.trim()}>
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={!name.trim()}>
             Save Template
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -247,12 +248,12 @@ export function TemplateDiscardDialog({
         </div>
 
         <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
-          <button className="btn btn-sm btn-ghost btn-secondary mr-auto" onClick={onCancel}>
+          <Button variant="ghost" size="sm" className="mr-auto" onClick={onCancel}>
             Keep Editing
-          </button>
-          <button className="btn btn-sm btn-filled btn-danger" onClick={onDiscard}>
+          </Button>
+          <Button variant="destructive" size="sm" onClick={onDiscard}>
             Discard Changes
-          </button>
+          </Button>
         </div>
       </div>
     </div>

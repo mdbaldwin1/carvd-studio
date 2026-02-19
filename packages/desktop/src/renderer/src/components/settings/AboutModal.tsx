@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
+import { Button } from '@renderer/components/ui/button';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -26,9 +27,9 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
       title="About Carvd Studio"
       className="w-[420px]"
       footer={
-        <button className="btn btn-sm btn-filled btn-secondary" onClick={onClose}>
+        <Button variant="secondary" size="sm" onClick={onClose}>
           Close
-        </button>
+        </Button>
       }
     >
       <div className="p-6 text-center">
@@ -44,33 +45,21 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
         </p>
 
         <div className="flex flex-wrap gap-2 justify-center mb-5">
-          <button
-            className="btn btn-sm btn-ghost btn-secondary"
-            onClick={() => handleOpenLink('https://carvd-studio.com')}
-          >
+          <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com')}>
             Website
-          </button>
-          <button
-            className="btn btn-sm btn-ghost btn-secondary"
-            onClick={() => handleOpenLink('https://carvd-studio.com/docs')}
-          >
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com/docs')}>
             Documentation
-          </button>
-          <button
-            className="btn btn-sm btn-ghost btn-secondary"
-            onClick={() => handleOpenLink('https://carvd-studio.com/privacy')}
-          >
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com/privacy')}>
             Privacy Policy
-          </button>
-          <button
-            className="btn btn-sm btn-ghost btn-secondary"
-            onClick={() => handleOpenLink('https://carvd-studio.com/terms')}
-          >
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com/terms')}>
             Terms of Service
-          </button>
-          <button className="btn btn-sm btn-ghost btn-secondary" onClick={() => window.electronAPI.openLicensesFile()}>
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => window.electronAPI.openLicensesFile()}>
             Open Source Licenses
-          </button>
+          </Button>
         </div>
 
         <div className="p-3 bg-bg rounded-md mb-4">

@@ -1,116 +1,103 @@
 import { Rocket, Lightbulb } from "lucide-react";
 import BuyButton from "../../components/BuyButton";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+const accentBoxHighlightStyle = {
+  background:
+    "linear-gradient(135deg, rgba(174,164,191,0.15) 0%, rgba(174,164,191,0.05) 100%)",
+  borderColor: "rgba(174,164,191,0.4)",
+};
 
 export default function PricingCard() {
   return (
-    <div className="max-w-2xl mx-auto mb-3xl">
-      <div
-        className="card p-3xl"
-        style={{
-          borderColor: "var(--color-primary)",
-          borderWidth: "2px",
-        }}
+    <div className="mx-auto mb-16 max-w-2xl">
+      <Card
+        className="p-16"
+        style={{ borderColor: "var(--color-primary)", borderWidth: "2px" }}
       >
-        <div className="text-center mb-xl">
-          <div className="badge badge-warning mb-md mx-auto">
+        <div className="mb-8 text-center">
+          <Badge
+            variant="outline"
+            className="mx-auto mb-4 gap-1 border-warning bg-[rgba(255,210,31,0.2)] text-warning"
+          >
             <Rocket size={16} /> Launch Special — Price increases to $99 soon
-          </div>
-          <h2 className="text-4xl font-bold mb-md">Carvd Studio</h2>
-          <div className="flex items-center justify-center gap-md mb-md">
+          </Badge>
+          <h2 className="mb-4 text-4xl font-bold">Carvd Studio</h2>
+          <div className="mb-4 flex items-center justify-center gap-4">
             <span className="text-6xl font-bold text-highlight">$59.99</span>
             <div className="text-left">
               <div className="text-lg font-bold">one-time payment</div>
-              <div className="text-sm text-muted">yours forever</div>
+              <div className="text-sm text-text-muted">yours forever</div>
             </div>
           </div>
-          <div className="text-sm text-muted mb-lg">
+          <div className="mb-6 text-sm text-text-muted">
             <span className="line-through">$99</span> — Early adopter pricing
           </div>
-          <p className="text-sm text-success mb-md">
+          <p className="mb-4 flex items-center justify-center gap-1 text-sm text-success">
             <Lightbulb size={16} /> The cut list optimizer alone typically saves
             more than $59 in wasted lumber on a single project
           </p>
-          <div className="accent-box-highlight mb-xl">
-            <p className="text-lg font-semibold text-center">
+          <div
+            className="mb-8 rounded-lg border p-4"
+            style={accentBoxHighlightStyle}
+          >
+            <p className="text-center text-lg font-semibold">
               Lock in launch pricing before it goes up
             </p>
           </div>
         </div>
 
         {/* What's Included */}
-        <div className="mb-xl">
-          <h3 className="text-2xl font-bold mb-md text-center">
+        <div className="mb-8">
+          <h3 className="mb-4 text-center text-2xl font-bold">
             Everything Included
           </h3>
-          <ul className="checklist">
-            <li>
-              <span>
-                Full 3D furniture design studio with real-time rendering
-              </span>
-            </li>
-            <li>
-              <span>Intelligent cut list optimizer that minimizes waste</span>
-            </li>
-            <li>
-              <span>
-                Real-time material cost tracking and project estimating
-              </span>
-            </li>
-            <li>
-              <span>Custom materials library with your supplier prices</span>
-            </li>
-            <li>
-              <span>Reusable assembly library for common components</span>
-            </li>
-            <li>
-              <span>
-                Joinery allowances for extra material on tenons, dados, etc.
-              </span>
-            </li>
-            <li>
-              <span>
-                Professional PDF export for cut sheets and presentations
-              </span>
-            </li>
-            <li>
-              <span>100% offline operation—no internet required ever</span>
-            </li>
-            <li>
-              <span>
-                Complete data privacy—your designs stay on your computer
-              </span>
-            </li>
-            <li>
-              <span>Free lifetime updates with new features</span>
-            </li>
-            <li>
-              <span>Install on up to 3 devices (Mac & Windows)</span>
-            </li>
-            <li>
-              <span>Email support with actual woodworkers</span>
-            </li>
+          <ul className="space-y-4 p-0">
+            {[
+              "Full 3D furniture design studio with real-time rendering",
+              "Intelligent cut list optimizer that minimizes waste",
+              "Real-time material cost tracking and project estimating",
+              "Custom materials library with your supplier prices",
+              "Reusable assembly library for common components",
+              "Joinery allowances for extra material on tenons, dados, etc.",
+              "Professional PDF export for cut sheets and presentations",
+              "100% offline operation—no internet required ever",
+              "Complete data privacy—your designs stay on your computer",
+              "Free lifetime updates with new features",
+              "Install on up to 3 devices (Mac & Windows)",
+              "Email support with actual woodworkers",
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-4">
+                <span className="flex-shrink-0 text-xl font-bold text-success">
+                  ✓
+                </span>
+                <span>{item}</span>
+              </li>
+            ))}
           </ul>
         </div>
 
         {/* CTA Buttons */}
-        <div className="grid gap-md mb-lg">
-          <a href="#download" className="btn btn-highlight btn-lg w-full">
-            Download Free Trial
-          </a>
-          <BuyButton className="btn btn-primary btn-lg w-full" />
+        <div className="mb-6 grid gap-4">
+          <Button size="lg" className="w-full" asChild>
+            <a href="#download">Download Free Trial</a>
+          </Button>
+          <BuyButton className="w-full" />
         </div>
 
         {/* Trust Signals */}
         <div className="text-center">
-          <p className="text-sm text-muted mb-sm">
+          <p className="mb-2 text-sm text-text-muted">
             ✓ 30-day money-back guarantee &nbsp;•&nbsp; ✓ Instant download
             &nbsp;•&nbsp; ✓ Secure checkout
           </p>
-          <p className="text-xs text-muted">
+          <p className="text-xs text-text-muted">
             You'll receive your license key via email within minutes of purchase
           </p>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

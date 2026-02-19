@@ -7,6 +7,7 @@ import { formatMeasurementWithUnit } from '../../utils/fractions';
 // pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { logger } from '../../utils/logger';
 import { CutList, StockSummary, CustomShoppingItem } from '../../types';
+import { Button } from '@renderer/components/ui/button';
 import { DropdownButton, DropdownItem } from '../common/DropdownButton';
 
 export function ShoppingListTab({
@@ -171,9 +172,9 @@ export function ShoppingListTab({
       <div className="flex flex-col">
         <div className="flex items-center justify-between text-[12px] font-semibold text-text-muted uppercase tracking-wider py-2 px-0 border-b border-border mb-2">
           <span>Other Items</span>
-          <button className="btn btn-xs btn-text" onClick={() => setIsAddingItem(true)} disabled={isAddingItem}>
+          <Button variant="ghost" size="xs" onClick={() => setIsAddingItem(true)} disabled={isAddingItem}>
             + Add Item
-          </button>
+          </Button>
         </div>
 
         <div className="custom-items flex flex-col gap-2">
@@ -365,12 +366,12 @@ function CustomShoppingListItem({
       </div>
 
       <div className="flex gap-1 shrink-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-        <button className="btn btn-xs btn-text" onClick={onEdit} title="Edit">
+        <Button variant="ghost" size="xs" onClick={onEdit} title="Edit">
           ✎
-        </button>
-        <button className="btn btn-xs btn-text text-danger" onClick={onDelete} title="Delete">
+        </Button>
+        <Button variant="destructiveGhost" size="xs" onClick={onDelete} title="Delete">
           ×
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -470,12 +471,12 @@ function CustomItemForm({
         </div>
       </div>
       <div className="flex justify-end gap-2 pt-1">
-        <button type="button" className="btn btn-xs btn-text" onClick={onCancel}>
+        <Button type="button" variant="ghost" size="xs" onClick={onCancel}>
           Cancel
-        </button>
-        <button type="submit" className="btn btn-xs btn-primary" disabled={!name.trim()}>
+        </Button>
+        <Button type="submit" size="xs" disabled={!name.trim()}>
           {initialData ? 'Save' : 'Add'}
-        </button>
+        </Button>
       </div>
     </form>
   );

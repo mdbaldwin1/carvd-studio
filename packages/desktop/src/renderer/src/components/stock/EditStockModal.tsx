@@ -4,6 +4,10 @@ import { Stock } from '../../types';
 import { FractionInput } from '../common/FractionInput';
 import { ColorPicker } from '../common/ColorPicker';
 import { Modal } from '../common/Modal';
+import { Button } from '@renderer/components/ui/button';
+import { Input } from '@renderer/components/ui/input';
+import { Label } from '@renderer/components/ui/label';
+import { Select } from '@renderer/components/ui/select';
 import { STOCK_COLORS } from '../../constants';
 
 interface EditStockModalProps {
@@ -83,27 +87,27 @@ export function EditStockModal({
       className="w-[450px]"
       footer={
         <>
-          <button className="btn btn-sm btn-outlined btn-secondary" onClick={onClose}>
+          <Button variant="outline" size="sm" onClick={onClose}>
             Cancel
-          </button>
-          <button className="btn btn-sm btn-filled btn-primary" onClick={handleSubmit}>
+          </Button>
+          <Button size="sm" onClick={handleSubmit}>
             {createMode ? 'Create Stock' : 'Save Changes'}
-          </button>
+          </Button>
         </>
       }
     >
       <div className="p-5 overflow-y-auto">
-        <div className="form-group">
-          <label>Name</label>
-          <input
+        <div className="flex flex-col mb-4 gap-2.5">
+          <Label>Name</Label>
+          <Input
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           />
         </div>
 
-        <div className="form-group">
-          <label>Dimensions (L × W × T)</label>
+        <div className="flex flex-col mb-4 gap-2.5">
+          <Label>Dimensions (L × W × T)</Label>
           <div className="flex items-center gap-1">
             <FractionInput
               value={formData.length}
@@ -121,9 +125,9 @@ export function EditStockModal({
           </div>
         </div>
 
-        <div className="form-group">
-          <label>Grain Direction</label>
-          <select
+        <div className="flex flex-col mb-4 gap-2.5">
+          <Label>Grain Direction</Label>
+          <Select
             value={formData.grainDirection}
             onChange={(e) =>
               setFormData({
@@ -135,13 +139,13 @@ export function EditStockModal({
             <option value="length">Along Length</option>
             <option value="width">Along Width</option>
             <option value="none">No Grain (MDF, etc.)</option>
-          </select>
+          </Select>
         </div>
 
-        <div className="form-row">
-          <div className="form-group">
-            <label>Pricing Unit</label>
-            <select
+        <div className="flex gap-4">
+          <div className="flex flex-col mb-4 gap-2.5 flex-1">
+            <Label>Pricing Unit</Label>
+            <Select
               value={formData.pricingUnit}
               onChange={(e) =>
                 setFormData({
@@ -152,12 +156,12 @@ export function EditStockModal({
             >
               <option value="per_item">Per Sheet/Board</option>
               <option value="board_foot">Per Board Foot</option>
-            </select>
+            </Select>
           </div>
 
-          <div className="form-group">
-            <label>Price ($)</label>
-            <input
+          <div className="flex flex-col mb-4 gap-2.5 flex-1">
+            <Label>Price ($)</Label>
+            <Input
               type="number"
               value={formData.pricePerUnit}
               onChange={(e) => setFormData({ ...formData, pricePerUnit: parseFloat(e.target.value) || 0 })}
@@ -167,8 +171,8 @@ export function EditStockModal({
           </div>
         </div>
 
-        <div className="form-group">
-          <label>Display Color</label>
+        <div className="flex flex-col mb-4 gap-2.5">
+          <Label>Display Color</Label>
           <ColorPicker value={formData.color} onChange={(color) => setFormData({ ...formData, color })} />
         </div>
       </div>

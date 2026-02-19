@@ -6,6 +6,10 @@ import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useProjectStore } from '../../store/projectStore';
 import { Stock } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { Button } from '@renderer/components/ui/button';
+import { Input } from '@renderer/components/ui/input';
+import { Label } from '@renderer/components/ui/label';
+import { Select } from '@renderer/components/ui/select';
 import { ColorPicker } from '../common/ColorPicker';
 import { FractionInput } from '../common/FractionInput';
 
@@ -226,20 +230,21 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
                 <span className="text-xs text-text-muted">{stockLibrary.length} available</span>
                 <div className="flex items-center gap-2">
                   {stockLibrary.length > 0 && (
-                    <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleSelectAll}>
+                    <Button variant="ghost" size="xs" onClick={handleSelectAll}>
                       {filteredStockLibrary.every((s) => selectedIds.has(s.id)) && filteredStockLibrary.length > 0
                         ? 'Deselect All'
                         : 'Select All'}
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    className="btn btn-icon-xs btn-ghost btn-secondary"
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
                     onClick={handleStartCreate}
                     title="Create new stock"
                     aria-label="Create new stock"
                   >
                     <Plus size={14} />
-                  </button>
+                  </Button>
                 </div>
               </div>
               {stockLibrary.length > 0 && (
@@ -309,17 +314,17 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
                 </div>
 
                 <div className="flex flex-col gap-4">
-                  <div className="form-group">
-                    <label>Name</label>
-                    <input
+                  <div className="flex flex-col mb-4 gap-2.5">
+                    <Label>Name</Label>
+                    <Input
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label>Dimensions (L × W × T)</label>
+                  <div className="flex flex-col mb-4 gap-2.5">
+                    <Label>Dimensions (L × W × T)</Label>
                     <div className="flex items-center gap-1">
                       <FractionInput
                         value={formData.length}
@@ -341,9 +346,9 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
                     </div>
                   </div>
 
-                  <div className="form-group">
-                    <label>Grain Direction</label>
-                    <select
+                  <div className="flex flex-col mb-4 gap-2.5">
+                    <Label>Grain Direction</Label>
+                    <Select
                       value={formData.grainDirection}
                       onChange={(e) =>
                         setFormData({
@@ -355,13 +360,13 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
                       <option value="length">Along Length</option>
                       <option value="width">Along Width</option>
                       <option value="none">No Grain (MDF, etc.)</option>
-                    </select>
+                    </Select>
                   </div>
 
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Pricing Unit</label>
-                      <select
+                  <div className="flex gap-4">
+                    <div className="flex flex-col mb-4 gap-2.5 flex-1">
+                      <Label>Pricing Unit</Label>
+                      <Select
                         value={formData.pricingUnit}
                         onChange={(e) =>
                           setFormData({
@@ -372,12 +377,12 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
                       >
                         <option value="per_item">Per Sheet/Board</option>
                         <option value="board_foot">Per Board Foot</option>
-                      </select>
+                      </Select>
                     </div>
 
-                    <div className="form-group">
-                      <label>Price ($)</label>
-                      <input
+                    <div className="flex flex-col mb-4 gap-2.5 flex-1">
+                      <Label>Price ($)</Label>
+                      <Input
                         type="number"
                         value={formData.pricePerUnit}
                         onChange={(e) => setFormData({ ...formData, pricePerUnit: parseFloat(e.target.value) || 0 })}
@@ -387,8 +392,8 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
                     </div>
                   </div>
 
-                  <div className="form-group">
-                    <label>Display Color</label>
+                  <div className="flex flex-col mb-4 gap-2.5">
+                    <Label>Display Color</Label>
                     <ColorPicker value={formData.color} onChange={(color) => setFormData({ ...formData, color })} />
                   </div>
                 </div>
@@ -447,24 +452,17 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
         </div>
 
         <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
-          <button
-            className="btn btn-sm btn-outlined btn-secondary"
-            onClick={isCreatingNew ? handleCancelCreate : onClose}
-          >
+          <Button variant="outline" size="sm" onClick={isCreatingNew ? handleCancelCreate : onClose}>
             {isCreatingNew ? 'Back' : stockLibrary.length === 0 ? 'Close' : 'Cancel'}
-          </button>
+          </Button>
           {isCreatingNew ? (
-            <button className="btn btn-sm btn-filled btn-primary" onClick={handleCreateStock}>
+            <Button size="sm" onClick={handleCreateStock}>
               Create & Add to Project
-            </button>
+            </Button>
           ) : (
-            <button
-              className="btn btn-sm btn-filled btn-primary"
-              onClick={handleAddToProject}
-              disabled={selectedIds.size === 0}
-            >
+            <Button size="sm" onClick={handleAddToProject} disabled={selectedIds.size === 0}>
               Add to Project{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
-            </button>
+            </Button>
           )}
         </div>
       </div>

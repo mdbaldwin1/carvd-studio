@@ -1,4 +1,6 @@
 import { CheckCircle, Key } from 'lucide-react';
+import { Button, buttonVariants } from '@renderer/components/ui/button';
+import { cn } from '@renderer/lib/utils';
 
 interface LicenseSectionProps {
   licenseMode?: 'trial' | 'licensed' | 'free';
@@ -44,8 +46,9 @@ export function LicenseSection({
             </div>
           </div>
           {onDeactivateLicense && (
-            <button
-              className="btn btn-sm btn-outlined btn-danger"
+            <Button
+              variant="destructiveOutline"
+              size="sm"
               onClick={() => {
                 if (
                   confirm(
@@ -57,7 +60,7 @@ export function LicenseSection({
               }}
             >
               Deactivate License
-            </button>
+            </Button>
           )}
         </>
       ) : licenseMode === 'free' ? (
@@ -71,20 +74,21 @@ export function LicenseSection({
               href="https://carvd-studio.com/pricing"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn btn-sm btn-filled btn-primary"
+              className={cn(buttonVariants({ size: 'sm' }))}
             >
               Purchase License
             </a>
             {onShowLicenseModal && (
-              <button
-                className="btn btn-sm btn-outlined btn-secondary"
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   onClose();
                   onShowLicenseModal();
                 }}
               >
                 Enter License Key
-              </button>
+              </Button>
             )}
           </div>
         </div>

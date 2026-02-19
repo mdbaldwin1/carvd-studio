@@ -5,6 +5,8 @@
  * or continue with limited features.
  */
 
+import { Button } from '@renderer/components/ui/button';
+
 interface TrialExpiredModalProps {
   onActivateLicense: () => void;
   onPurchase: () => void;
@@ -49,9 +51,9 @@ export function TrialExpiredModal({ onActivateLicense, onPurchase, onContinueFre
                 Lifetime updates
               </li>
             </ul>
-            <button className="btn btn-primary btn-lg btn-block" onClick={handlePurchase}>
+            <Button size="lg" className="w-full" onClick={handlePurchase}>
               Buy Now
-            </button>
+            </Button>
           </div>
 
           <div className="flex items-center my-4 text-text-muted text-xs uppercase tracking-wider">
@@ -60,14 +62,14 @@ export function TrialExpiredModal({ onActivateLicense, onPurchase, onContinueFre
             <div className="flex-1 h-px bg-border" />
           </div>
 
-          <button className="btn btn-secondary btn-block" onClick={onActivateLicense}>
+          <Button size="default" variant="secondary" className="w-full" onClick={onActivateLicense}>
             I Already Have a License Key
-          </button>
+          </Button>
 
           <div className="mt-6 pt-4 border-t border-border">
-            <button className="btn btn-ghost" onClick={onContinueFree}>
+            <Button variant="ghost" onClick={onContinueFree}>
               Continue with Limited Features
-            </button>
+            </Button>
             <p className="text-[11px] text-text-muted mt-2 m-0">
               Limited: 10 parts, no PDF export, no optimizer, no assemblies
             </p>

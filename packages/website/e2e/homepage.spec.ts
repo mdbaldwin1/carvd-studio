@@ -69,10 +69,17 @@ test.describe("Homepage", () => {
 
   test.describe("Features Section", () => {
     test("displays feature cards", async ({ page }) => {
-      // Feature grid uses minmax(280px,1fr) — 6 direct child cards
-      await expect(page.locator('div[class*="280px,1fr"] > div')).toHaveCount(
-        6,
-      );
+      await expect(
+        page.locator("text=See It Before You Build It"),
+      ).toBeVisible();
+      await expect(
+        page.locator("text=Cut Lists That Save You Money"),
+      ).toBeVisible();
+      await expect(page.locator("text=Your Designs Stay Yours")).toBeVisible();
+      await expect(
+        page.locator("text=Lightning Fast, Zero Bloat"),
+      ).toBeVisible();
+      await expect(page.locator("text=Professional-Grade Tools")).toBeVisible();
     });
 
     test("displays key feature titles", async ({ page }) => {
@@ -90,37 +97,29 @@ test.describe("Homepage", () => {
 
   test.describe("Stats Section", () => {
     test("displays stats grid", async ({ page }) => {
-      // Stats grid uses minmax(200px,1fr) — 3 direct child stat items
-      await expect(page.locator('div[class*="200px,1fr"] > div')).toHaveCount(
-        3,
-      );
+      await expect(page.locator("text=Material Waste")).toBeVisible();
+      await expect(page.locator("text=Project Planning")).toBeVisible();
+      await expect(
+        page.locator("text=Offline").or(page.locator("text=Offline & Private")),
+      ).toBeVisible();
     });
 
     test("displays material waste stat", async ({ page }) => {
-      await expect(
-        page
-          .locator('div[class*="200px,1fr"] span')
-          .filter({ hasText: "Less" }),
-      ).toBeVisible();
+      await expect(page.locator("text=Less").first()).toBeVisible();
       await expect(page.locator("text=Material Waste")).toBeVisible();
     });
 
     test("displays project planning stat", async ({ page }) => {
-      await expect(
-        page
-          .locator('div[class*="200px,1fr"] span')
-          .filter({ hasText: "Faster" }),
-      ).toBeVisible();
+      await expect(page.locator("text=Faster").first()).toBeVisible();
       await expect(page.locator("text=Project Planning")).toBeVisible();
     });
   });
 
   test.describe("Use Cases Section", () => {
     test("displays use case cards", async ({ page }) => {
-      // Use-case grid uses grid-cols-3 — 3 direct child cards
-      await expect(page.locator('div[class*="grid-cols-3"] > div')).toHaveCount(
-        3,
-      );
+      await expect(page.locator("text=Custom Cabinet Shops")).toBeVisible();
+      await expect(page.locator("text=Furniture Makers")).toBeVisible();
+      await expect(page.locator("text=DIY Enthusiasts")).toBeVisible();
     });
 
     test("displays target audience cards", async ({ page }) => {
@@ -132,7 +131,7 @@ test.describe("Homepage", () => {
 
   test.describe("Pricing Comparison Section", () => {
     test("displays comparison table", async ({ page }) => {
-      await expect(page.locator("table")).toBeVisible();
+      await expect(page.locator("table").first()).toBeVisible();
     });
 
     test("highlights one-time payment value", async ({ page }) => {

@@ -8,6 +8,10 @@ import { Stock } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { ColorPicker } from '../common/ColorPicker';
 import { FractionInput } from '../common/FractionInput';
+import { Button } from '@renderer/components/ui/button';
+import { Input } from '@renderer/components/ui/input';
+import { Label } from '@renderer/components/ui/label';
+import { Select } from '@renderer/components/ui/select';
 import { IconButton } from '../common/IconButton';
 
 const defaultStock: Omit<Stock, 'id'> = {
@@ -270,37 +274,33 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
               </h3>
               {!isFormMode && (
                 <div className="flex gap-2">
-                  <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleStartEdit}>
+                  <Button variant="ghost" size="xs" onClick={handleStartEdit}>
                     Edit
-                  </button>
-                  <button
-                    className="btn btn-xs btn-ghost btn-secondary"
-                    onClick={handleExportStock}
-                    title="Export stock to file"
-                  >
+                  </Button>
+                  <Button variant="ghost" size="xs" onClick={handleExportStock} title="Export stock to file">
                     <Download size={12} />
                     Export
-                  </button>
-                  <button className="btn btn-xs btn-outlined btn-danger" onClick={handleDeleteStock}>
+                  </Button>
+                  <Button variant="destructiveOutline" size="xs" onClick={handleDeleteStock}>
                     Delete
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
 
             {isFormMode ? (
               <div className="flex-1 p-5 overflow-y-auto">
-                <div className="form-group">
-                  <label>Name</label>
-                  <input
+                <div className="flex flex-col mb-4 gap-2.5">
+                  <Label>Name</Label>
+                  <Input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
 
-                <div className="form-group">
-                  <label>Dimensions (L × W × T)</label>
+                <div className="flex flex-col mb-4 gap-2.5">
+                  <Label>Dimensions (L × W × T)</Label>
                   <div className="flex items-center gap-1">
                     <FractionInput
                       value={formData.length}
@@ -322,9 +322,9 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Grain Direction</label>
-                  <select
+                <div className="flex flex-col mb-4 gap-2.5">
+                  <Label>Grain Direction</Label>
+                  <Select
                     value={formData.grainDirection}
                     onChange={(e) =>
                       setFormData({
@@ -336,13 +336,13 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
                     <option value="length">Along Length</option>
                     <option value="width">Along Width</option>
                     <option value="none">No Grain (MDF, etc.)</option>
-                  </select>
+                  </Select>
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Pricing Unit</label>
-                    <select
+                <div className="flex gap-4">
+                  <div className="flex flex-col mb-4 gap-2.5 flex-1">
+                    <Label>Pricing Unit</Label>
+                    <Select
                       value={formData.pricingUnit}
                       onChange={(e) =>
                         setFormData({
@@ -353,12 +353,12 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
                     >
                       <option value="per_item">Per Sheet/Board</option>
                       <option value="board_foot">Per Board Foot</option>
-                    </select>
+                    </Select>
                   </div>
 
-                  <div className="form-group">
-                    <label>Price ($)</label>
-                    <input
+                  <div className="flex flex-col mb-4 gap-2.5 flex-1">
+                    <Label>Price ($)</Label>
+                    <Input
                       type="number"
                       value={formData.pricePerUnit}
                       onChange={(e) => setFormData({ ...formData, pricePerUnit: parseFloat(e.target.value) || 0 })}
@@ -368,18 +368,18 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Display Color</label>
+                <div className="flex flex-col mb-4 gap-2.5">
+                  <Label>Display Color</Label>
                   <ColorPicker value={formData.color} onChange={(color) => setFormData({ ...formData, color })} />
                 </div>
 
-                <div className="form-actions">
-                  <button className="btn btn-sm btn-outlined btn-secondary" onClick={handleCancelEdit}>
+                <div className="flex justify-end gap-3 mt-6 pt-5 border-t border-border">
+                  <Button variant="outline" size="sm" onClick={handleCancelEdit}>
                     Cancel
-                  </button>
-                  <button className="btn btn-sm btn-filled btn-primary" onClick={handleSave}>
+                  </Button>
+                  <Button size="sm" onClick={handleSave}>
                     {isCreating ? 'Create' : 'Save'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (

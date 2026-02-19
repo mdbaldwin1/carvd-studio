@@ -6,6 +6,8 @@ import { useUIStore } from '../../store/uiStore';
 import { mmToInches } from '../../utils/fractions';
 import { FractionInput } from '../common/FractionInput';
 import { HelpTooltip } from '../common/HelpTooltip';
+import { Button } from '@renderer/components/ui/button';
+import { Select } from '@renderer/components/ui/select';
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
@@ -145,9 +147,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
             >
               View documentation
             </a>
-            <button className="btn btn-icon-sm btn-ghost btn-secondary" onClick={onClose} aria-label="Close">
+            <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close">
               &times;
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -220,14 +222,14 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
             <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">Units & Grid</h3>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
               <label className="text-[13px] text-text">Units</label>
-              <select
+              <Select
+                variant="sm"
                 value={units}
                 onChange={(e) => handleUnitsChange(e.target.value as 'imperial' | 'metric')}
-                className="w-40 bg-bg border border-border text-text py-1.5 px-2 rounded text-[13px] cursor-pointer outline-none focus:border-accent"
               >
                 <option value="imperial">Imperial (inches)</option>
                 <option value="metric">Metric (mm)</option>
-              </select>
+              </Select>
             </div>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
               <div className="inline-flex items-center gap-1">
@@ -237,17 +239,17 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                   docsSection="project-settings"
                 />
               </div>
-              <select
+              <Select
+                variant="sm"
                 value={displayValue}
                 onChange={(e) => setProjectGridSize(parseFloat(e.target.value))}
-                className="w-40 bg-bg border border-border text-text py-1.5 px-2 rounded text-[13px] cursor-pointer outline-none focus:border-accent"
               >
                 {gridOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 
@@ -271,8 +273,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                   docsSection="project-settings"
                 />
               </div>
-              <div className="input-with-suffix">
+              <div className="flex items-center gap-1.5">
                 <input
+                  className="bg-bg border border-border text-text w-[88px] py-2 px-2.5 text-sm rounded-[var(--radius-sm)] focus:outline-none focus:border-accent"
                   type="number"
                   value={Math.round(overageFactor * 100)}
                   onChange={(e) => setOverageFactor(Math.max(0, Math.min(50, parseInt(e.target.value) || 0)) / 100)}
@@ -280,7 +283,7 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                   max={50}
                   step={5}
                 />
-                <span className="input-suffix">%</span>
+                <span className="text-text-muted text-sm">%</span>
               </div>
             </div>
           </div>
@@ -355,9 +358,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
         </div>
 
         <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
-          <button className="btn btn-sm btn-filled btn-secondary" onClick={onClose}>
+          <Button size="sm" variant="secondary" onClick={onClose}>
             Done
-          </button>
+          </Button>
         </div>
       </div>
     </div>

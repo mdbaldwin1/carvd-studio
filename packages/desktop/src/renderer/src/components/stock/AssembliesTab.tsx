@@ -5,6 +5,10 @@ import { useUIStore } from '../../store/uiStore';
 import { isBuiltInAssembly } from '../../templates/builtInAssemblies';
 import { Assembly } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { Button } from '@renderer/components/ui/button';
+import { Input } from '@renderer/components/ui/input';
+import { Label } from '@renderer/components/ui/label';
+import { Textarea } from '@renderer/components/ui/textarea';
 import { HelpTooltip } from '../common/HelpTooltip';
 
 interface AssembliesTabProps {
@@ -140,18 +144,20 @@ export function AssembliesTab({
           <span>{assemblies.length} available</span>
           <div className="flex items-center gap-1">
             {canCreateAssemblies && (
-              <button
-                className="btn btn-icon-xs btn-ghost btn-secondary"
+              <Button
+                variant="ghost"
+                size="icon-xs"
                 onClick={handleImportAssembly}
                 title="Import assembly from file"
                 aria-label="Import assembly"
               >
                 <Upload size={14} />
-              </button>
+              </Button>
             )}
             {onCreateNewAssembly && canCreateAssemblies && (
-              <button
-                className="btn btn-icon-xs btn-ghost btn-secondary"
+              <Button
+                variant="ghost"
+                size="icon-xs"
                 onClick={async () => {
                   const success = await onCreateNewAssembly();
                   if (success) {
@@ -162,7 +168,7 @@ export function AssembliesTab({
                 aria-label="Create new assembly"
               >
                 <Plus size={14} />
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -323,12 +329,13 @@ export function AssembliesTab({
                 <div className="flex gap-2">
                   {!isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
                     <>
-                      <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleStartEditAssembly}>
+                      <Button variant="ghost" size="xs" onClick={handleStartEditAssembly}>
                         Edit
-                      </button>
+                      </Button>
                       {onEditAssemblyIn3D && (
-                        <button
-                          className="btn btn-xs btn-ghost btn-secondary"
+                        <Button
+                          variant="ghost"
+                          size="xs"
                           onClick={async () => {
                             const success = await onEditAssemblyIn3D(selectedAssembly);
                             if (success) {
@@ -337,13 +344,14 @@ export function AssembliesTab({
                           }}
                         >
                           Edit in 3D
-                        </button>
+                        </Button>
                       )}
                     </>
                   )}
                   {onDuplicateAssembly && canCreateAssemblies && (
-                    <button
-                      className="btn btn-xs btn-ghost btn-secondary"
+                    <Button
+                      variant="ghost"
+                      size="xs"
                       onClick={async () => {
                         await onDuplicateAssembly(selectedAssembly);
                       }}
@@ -351,22 +359,18 @@ export function AssembliesTab({
                     >
                       <Copy size={12} />
                       Duplicate
-                    </button>
+                    </Button>
                   )}
                   {!isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
-                    <button
-                      className="btn btn-xs btn-ghost btn-secondary"
-                      onClick={handleExportAssembly}
-                      title="Export assembly to file"
-                    >
+                    <Button variant="ghost" size="xs" onClick={handleExportAssembly} title="Export assembly to file">
                       <Download size={12} />
                       Export
-                    </button>
+                    </Button>
                   )}
                   {!isBuiltInAssembly(selectedAssembly.id) && (
-                    <button className="btn btn-xs btn-outlined btn-danger" onClick={handleDeleteAssembly}>
+                    <Button variant="destructiveOutline" size="xs" onClick={handleDeleteAssembly}>
                       Delete
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
@@ -374,18 +378,18 @@ export function AssembliesTab({
 
             {isEditingAssembly ? (
               <div className="flex-1 p-5 overflow-y-auto">
-                <div className="form-group">
-                  <label>Name</label>
-                  <input
+                <div className="flex flex-col mb-4 gap-2.5">
+                  <Label>Name</Label>
+                  <Input
                     type="text"
                     value={assemblyFormData.name}
                     onChange={(e) => setAssemblyFormData({ ...assemblyFormData, name: e.target.value })}
                   />
                 </div>
 
-                <div className="form-group">
-                  <label>Description</label>
-                  <textarea
+                <div className="flex flex-col mb-4 gap-2.5">
+                  <Label>Description</Label>
+                  <Textarea
                     value={assemblyFormData.description}
                     onChange={(e) => setAssemblyFormData({ ...assemblyFormData, description: e.target.value })}
                     placeholder="Optional description"
@@ -394,9 +398,11 @@ export function AssembliesTab({
                 </div>
 
                 {onEditAssemblyIn3D && !isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
-                  <div className="form-group">
-                    <button
-                      className="btn btn-sm btn-outlined btn-secondary w-full"
+                  <div className="flex flex-col mb-4 gap-2.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
                       onClick={async () => {
                         const success = await onEditAssemblyIn3D(selectedAssembly);
                         if (success) {
@@ -410,17 +416,17 @@ export function AssembliesTab({
                         docsSection="assemblies"
                         inline
                       />
-                    </button>
+                    </Button>
                   </div>
                 )}
 
-                <div className="form-actions">
-                  <button className="btn btn-sm btn-outlined btn-secondary" onClick={handleCancelEditAssembly}>
+                <div className="flex justify-end gap-3 mt-6 pt-5 border-t border-border">
+                  <Button variant="outline" size="sm" onClick={handleCancelEditAssembly}>
                     Cancel
-                  </button>
-                  <button className="btn btn-sm btn-filled btn-primary" onClick={handleSaveAssembly}>
+                  </Button>
+                  <Button size="sm" onClick={handleSaveAssembly}>
                     Save
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (

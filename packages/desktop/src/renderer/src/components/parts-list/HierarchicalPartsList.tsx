@@ -8,6 +8,7 @@ import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { Group, GroupMember, Part, PartValidationIssue } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { Button } from '@renderer/components/ui/button';
 import { IconButton } from '../common/IconButton';
 
 // ── Tree types ──────────────────────────────────────────────────────────
@@ -306,8 +307,11 @@ const GroupItem = React.memo(function GroupItem({
         onContextMenu={(e) => onGroupContextMenu(group.id, e)}
         title={`${group.name} (${childCount} part${childCount === 1 ? '' : 's'})${hasChildError || hasChildWarning ? '\n\n⚠ Contains parts with validation issues' : ''}`}
       >
-        <button
-          className={`group-expand-btn btn btn-icon-sm btn-ghost btn-secondary ${isExpanded ? 'active' : ''}`}
+        <Button
+          variant="ghost"
+          size="icon"
+          active={isExpanded}
+          className="group-expand-btn"
           onClick={(e) => {
             e.stopPropagation();
             onExpandToggle(group.id);
@@ -317,7 +321,7 @@ const GroupItem = React.memo(function GroupItem({
           aria-expanded={isExpanded}
         >
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </button>
+        </Button>
         {(hasChildError || hasChildWarning) && (
           <span
             className={`group-warning-icon inline-flex items-center justify-center shrink-0 ${hasChildError ? 'error text-danger' : 'warning text-warning'}`}

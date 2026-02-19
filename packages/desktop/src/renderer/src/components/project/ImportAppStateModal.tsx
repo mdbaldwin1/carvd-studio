@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Upload, CheckCircle, AlertTriangle, Package, Palette, FileBox, LayoutTemplate } from 'lucide-react';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useUIStore } from '../../store/uiStore';
+import { Button } from '@renderer/components/ui/button';
 
 interface ImportPreview {
   valid: boolean;
@@ -196,9 +197,9 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
                   <span className="text-[13px] text-text-secondary leading-relaxed">{error}</span>
                 </div>
               )}
-              <button className="btn btn-md btn-filled btn-primary" onClick={handleSelectFile} disabled={isLoading}>
+              <Button size="default" onClick={handleSelectFile} disabled={isLoading}>
                 {isLoading ? 'Loading...' : 'Select Backup File'}
-              </button>
+              </Button>
             </div>
           )}
 
@@ -387,21 +388,17 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
 
         <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
           {step === 'select' && (
-            <button className="btn btn-sm btn-outlined btn-secondary" onClick={onClose}>
+            <Button size="sm" variant="outline" onClick={onClose}>
               Cancel
-            </button>
+            </Button>
           )}
           {step === 'options' && (
             <>
-              <button
-                className="btn btn-sm btn-outlined btn-secondary"
-                onClick={() => setStep('select')}
-                disabled={isLoading}
-              >
+              <Button size="sm" variant="outline" onClick={() => setStep('select')} disabled={isLoading}>
                 Back
-              </button>
-              <button
-                className="btn btn-sm btn-filled btn-primary"
+              </Button>
+              <Button
+                size="sm"
                 onClick={handleImport}
                 disabled={
                   isLoading ||
@@ -410,13 +407,13 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
                 }
               >
                 {isLoading ? 'Importing...' : 'Import'}
-              </button>
+              </Button>
             </>
           )}
           {step === 'result' && (
-            <button className="btn btn-sm btn-filled btn-primary" onClick={handleDone}>
+            <Button size="sm" onClick={handleDone}>
               Done
-            </button>
+            </Button>
           )}
         </div>
       </div>

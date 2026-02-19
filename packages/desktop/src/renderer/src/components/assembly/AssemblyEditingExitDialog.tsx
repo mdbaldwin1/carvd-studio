@@ -3,6 +3,8 @@
  * Offers options to save, discard, or cancel.
  */
 
+import { Button } from '@renderer/components/ui/button';
+
 interface AssemblyEditingExitDialogProps {
   isOpen: boolean;
   assemblyName: string;
@@ -49,15 +51,15 @@ export function AssemblyEditingExitDialog({
         </div>
 
         <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
-          <button className="btn btn-sm btn-ghost btn-secondary mr-auto" onClick={onCancel}>
+          <Button variant="ghost" size="sm" className="mr-auto" onClick={onCancel}>
             Keep Editing
-          </button>
-          <button className="btn btn-sm btn-outlined btn-danger" onClick={onDiscard}>
+          </Button>
+          <Button variant="destructiveOutline" size="sm" onClick={onDiscard}>
             {isCreatingNew ? 'Discard' : 'Discard Changes'}
-          </button>
-          <button className="btn btn-sm btn-filled btn-primary" onClick={onSave} autoFocus>
+          </Button>
+          <Button size="sm" onClick={onSave} autoFocus>
             Save to Library
-          </button>
+          </Button>
         </div>
       </div>
     </div>

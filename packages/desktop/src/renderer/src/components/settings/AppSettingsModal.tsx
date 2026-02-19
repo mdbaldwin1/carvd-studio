@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
+import { Button } from '@renderer/components/ui/button';
 import { AppSettings } from '../../types';
 import { mmToInches } from '../../utils/fractions';
 import { useUIStore } from '../../store/uiStore';
@@ -159,9 +160,9 @@ export function AppSettingsModal({
             >
               View documentation
             </a>
-            <button className="btn btn-icon-sm btn-ghost btn-secondary" onClick={onClose} aria-label="Close">
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
               &times;
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -203,9 +204,9 @@ export function AppSettingsModal({
         </div>
 
         <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
-          <button className="btn btn-sm btn-filled btn-secondary" onClick={onClose}>
+          <Button variant="secondary" size="sm" onClick={onClose}>
             Done
-          </button>
+          </Button>
         </div>
       </div>
     </div>

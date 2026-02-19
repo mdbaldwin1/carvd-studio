@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Modal } from './Modal';
+import { Button } from '@renderer/components/ui/button';
 
 /** Props for the {@link ConfirmDialog} component. */
 interface ConfirmDialogProps {
@@ -52,17 +53,18 @@ export function ConfirmDialog({
       role="alertdialog"
       footer={
         <>
-          <button className="btn btn-sm btn-outlined btn-secondary" onClick={onCancel} title="Press Escape to cancel">
+          <Button size="sm" variant="outline" onClick={onCancel} title="Press Escape to cancel">
             {cancelLabel}
-          </button>
-          <button
-            className={`btn btn-sm btn-filled ${variant === 'danger' ? 'btn-danger' : 'btn-primary'}`}
+          </Button>
+          <Button
+            size="sm"
+            variant={variant === 'danger' ? 'destructive' : 'default'}
             onClick={onConfirm}
             autoFocus
             title="Press Enter to confirm"
           >
             {confirmLabel}
-          </button>
+          </Button>
         </>
       }
     >
