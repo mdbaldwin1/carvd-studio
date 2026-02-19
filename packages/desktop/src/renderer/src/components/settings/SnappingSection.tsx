@@ -1,4 +1,5 @@
 import { HelpTooltip } from '../common/HelpTooltip';
+import { Select } from '@renderer/components/ui/select';
 import { AppSettings, SnapSensitivity } from '../../types';
 
 interface SnappingSectionProps {
@@ -25,15 +26,15 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
             docsSection="snapping"
           />
         </div>
-        <select
+        <Select
+          variant="sm"
           value={formData.snapSensitivity ?? 'normal'}
           onChange={(e) => onSettingChange('snapSensitivity', e.target.value as SnapSensitivity)}
-          className="w-40 bg-bg border border-border text-text py-1.5 px-2 rounded text-[13px] cursor-pointer outline-none focus:border-accent"
         >
           <option value="tight">Tight (precise)</option>
           <option value="normal">Normal</option>
           <option value="loose">Loose (easier)</option>
-        </select>
+        </Select>
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <div className="inline-flex items-center gap-1">

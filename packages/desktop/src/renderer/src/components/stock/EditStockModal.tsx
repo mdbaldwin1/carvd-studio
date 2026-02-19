@@ -7,6 +7,7 @@ import { Modal } from '../common/Modal';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
+import { Select } from '@renderer/components/ui/select';
 import { STOCK_COLORS } from '../../constants';
 
 interface EditStockModalProps {
@@ -126,8 +127,7 @@ export function EditStockModal({
 
         <div className="flex flex-col mb-4 gap-2.5">
           <Label>Grain Direction</Label>
-          <select
-            className="w-full bg-bg border border-border text-text px-3.5 py-2.5 text-sm font-[inherit] rounded-[var(--radius-md)] pr-8 cursor-pointer focus:outline-none focus:border-accent"
+          <Select
             value={formData.grainDirection}
             onChange={(e) =>
               setFormData({
@@ -139,14 +139,13 @@ export function EditStockModal({
             <option value="length">Along Length</option>
             <option value="width">Along Width</option>
             <option value="none">No Grain (MDF, etc.)</option>
-          </select>
+          </Select>
         </div>
 
         <div className="flex gap-4">
           <div className="flex flex-col mb-4 gap-2.5 flex-1">
             <Label>Pricing Unit</Label>
-            <select
-              className="w-full bg-bg border border-border text-text px-3.5 py-2.5 text-sm font-[inherit] rounded-[var(--radius-md)] pr-8 cursor-pointer focus:outline-none focus:border-accent"
+            <Select
               value={formData.pricingUnit}
               onChange={(e) =>
                 setFormData({
@@ -157,7 +156,7 @@ export function EditStockModal({
             >
               <option value="per_item">Per Sheet/Board</option>
               <option value="board_foot">Per Board Foot</option>
-            </select>
+            </Select>
           </div>
 
           <div className="flex flex-col mb-4 gap-2.5 flex-1">

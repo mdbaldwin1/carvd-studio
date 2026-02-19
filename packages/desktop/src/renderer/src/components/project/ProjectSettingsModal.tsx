@@ -7,6 +7,7 @@ import { mmToInches } from '../../utils/fractions';
 import { FractionInput } from '../common/FractionInput';
 import { HelpTooltip } from '../common/HelpTooltip';
 import { Button } from '@renderer/components/ui/button';
+import { Select } from '@renderer/components/ui/select';
 
 interface ProjectSettingsModalProps {
   isOpen: boolean;
@@ -221,14 +222,14 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
             <h3 className="text-sm font-semibold m-0 mb-3 text-text flex items-center gap-1.5">Units & Grid</h3>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
               <label className="text-[13px] text-text">Units</label>
-              <select
+              <Select
+                variant="sm"
                 value={units}
                 onChange={(e) => handleUnitsChange(e.target.value as 'imperial' | 'metric')}
-                className="w-40 bg-bg border border-border text-text py-1.5 px-2 rounded text-[13px] cursor-pointer outline-none focus:border-accent"
               >
                 <option value="imperial">Imperial (inches)</option>
                 <option value="metric">Metric (mm)</option>
-              </select>
+              </Select>
             </div>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
               <div className="inline-flex items-center gap-1">
@@ -238,17 +239,17 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                   docsSection="project-settings"
                 />
               </div>
-              <select
+              <Select
+                variant="sm"
                 value={displayValue}
                 onChange={(e) => setProjectGridSize(parseFloat(e.target.value))}
-                className="w-40 bg-bg border border-border text-text py-1.5 px-2 rounded text-[13px] cursor-pointer outline-none focus:border-accent"
               >
                 {gridOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 

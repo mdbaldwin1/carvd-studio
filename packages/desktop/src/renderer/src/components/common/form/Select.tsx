@@ -1,5 +1,6 @@
 import React from 'react';
 import { FormField } from './FormField';
+import { Select as SelectPrimitive } from '@renderer/components/ui/select';
 
 /** A single option in a {@link Select} dropdown. */
 export interface SelectOption {
@@ -64,7 +65,7 @@ export function Select({
       helpText={helpText}
       className={className}
     >
-      <select
+      <SelectPrimitive
         id={selectId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -77,7 +78,7 @@ export function Select({
             {opt.label}
           </option>
         ))}
-      </select>
+      </SelectPrimitive>
     </FormField>
   );
 }
