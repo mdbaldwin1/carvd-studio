@@ -17,9 +17,11 @@ export default function TroubleshootingPage() {
       <h2 className="text-4xl font-bold mb-xl">Troubleshooting</h2>
 
       <div className="grid gap-xl">
-        <div className="card">
-          <h3 className="card-title">License Activation Issues</h3>
-          <p className="card-description mb-md">
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">
+            License Activation Issues
+          </h3>
+          <p className="text-text-muted leading-[var(--line-height-relaxed)] mb-md">
             <strong>Problem:</strong> License key not accepted or activation
             fails.
           </p>
@@ -41,9 +43,11 @@ export default function TroubleshootingPage() {
           </ul>
         </div>
 
-        <div className="card">
-          <h3 className="card-title">App Won't Launch</h3>
-          <p className="card-description mb-md">
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">
+            App Won't Launch
+          </h3>
+          <p className="text-text-muted leading-[var(--line-height-relaxed)] mb-md">
             <strong>Problem:</strong> Application doesn't open or crashes
             immediately.
           </p>
@@ -62,9 +66,11 @@ export default function TroubleshootingPage() {
           </ul>
         </div>
 
-        <div className="card">
-          <h3 className="card-title">Recovering Lost Work</h3>
-          <p className="card-description mb-md">
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">
+            Recovering Lost Work
+          </h3>
+          <p className="text-text-muted leading-[var(--line-height-relaxed)] mb-md">
             <strong>Problem:</strong> Application crashed or closed
             unexpectedly.
           </p>
@@ -81,9 +87,11 @@ export default function TroubleshootingPage() {
           </ul>
         </div>
 
-        <div className="card">
-          <h3 className="card-title">Performance Issues</h3>
-          <p className="card-description mb-md">
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">
+            Performance Issues
+          </h3>
+          <p className="text-text-muted leading-[var(--line-height-relaxed)] mb-md">
             <strong>Problem:</strong> Application running slowly or lagging.
           </p>
           <ul className="text-muted text-sm grid gap-sm">
@@ -100,9 +108,11 @@ export default function TroubleshootingPage() {
           </ul>
         </div>
 
-        <div className="card">
-          <h3 className="card-title">Cut List Generation Errors</h3>
-          <p className="card-description mb-md">
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">
+            Cut List Generation Errors
+          </h3>
+          <p className="text-text-muted leading-[var(--line-height-relaxed)] mb-md">
             <strong>Problem:</strong> Cut list shows warnings or won't generate.
           </p>
           <ul className="text-muted text-sm grid gap-sm">
@@ -126,9 +136,11 @@ export default function TroubleshootingPage() {
           </ul>
         </div>
 
-        <div className="card">
-          <h3 className="card-title">File Won't Open</h3>
-          <p className="card-description mb-md">
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">
+            File Won't Open
+          </h3>
+          <p className="text-text-muted leading-[var(--line-height-relaxed)] mb-md">
             <strong>Problem:</strong> Project file (.carvd) won't open or shows
             errors.
           </p>
@@ -157,9 +169,11 @@ export default function TroubleshootingPage() {
           </ul>
         </div>
 
-        <div className="card">
-          <h3 className="card-title">Missing or Moved File</h3>
-          <p className="card-description mb-md">
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">
+            Missing or Moved File
+          </h3>
+          <p className="text-text-muted leading-[var(--line-height-relaxed)] mb-md">
             <strong>Problem:</strong> A project in your recent or favorites list
             shows "Click to locate" or a warning icon.
           </p>

@@ -17,8 +17,10 @@ export default function ShortcutsPage() {
       <h2 className="text-4xl font-bold mb-xl">Keyboard Shortcuts</h2>
 
       <div className="grid grid-cols-2 gap-xl">
-        <div className="card">
-          <h3 className="card-title">File Operations</h3>
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">
+            File Operations
+          </h3>
           <div className="grid gap-sm text-sm">
             <div className="flex justify-between">
               <span className="text-muted">New Project</span>
@@ -39,8 +41,10 @@ export default function ShortcutsPage() {
           </div>
         </div>
 
-        <div className="card">
-          <h3 className="card-title">Edit Operations</h3>
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">
+            Edit Operations
+          </h3>
           <div className="grid gap-sm text-sm">
             <div className="flex justify-between">
               <span className="text-muted">Undo</span>
@@ -73,8 +77,10 @@ export default function ShortcutsPage() {
           </div>
         </div>
 
-        <div className="card">
-          <h3 className="card-title">Part Operations</h3>
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">
+            Part Operations
+          </h3>
           <div className="grid gap-sm text-sm">
             <div className="flex justify-between">
               <span className="text-muted">New Part</span>
@@ -95,8 +101,10 @@ export default function ShortcutsPage() {
           </div>
         </div>
 
-        <div className="card">
-          <h3 className="card-title">View Controls</h3>
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">
+            View Controls
+          </h3>
           <div className="grid gap-sm text-sm">
             <div className="flex justify-between">
               <span className="text-muted">Reset Camera</span>
@@ -113,8 +121,8 @@ export default function ShortcutsPage() {
           </div>
         </div>
 
-        <div className="card">
-          <h3 className="card-title">Tools</h3>
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">Tools</h3>
           <div className="grid gap-sm text-sm">
             <div className="flex justify-between">
               <span className="text-muted">App Settings</span>
@@ -123,8 +131,8 @@ export default function ShortcutsPage() {
           </div>
         </div>
 
-        <div className="card">
-          <h3 className="card-title">Movement</h3>
+        <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
+          <h3 className="text-xl font-bold mb-[var(--space-sm)]">Movement</h3>
           <div className="grid gap-sm text-sm">
             <div className="flex justify-between">
               <span className="text-muted">Nudge</span>

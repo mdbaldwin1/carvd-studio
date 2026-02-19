@@ -23,7 +23,7 @@ export default function GroupsPage() {
       </p>
 
       <div className="grid gap-xl">
-        <div className="accent-box">
+        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <FolderOpen size={20} className="inline-block" /> Creating Groups
           </h3>
@@ -53,7 +53,7 @@ export default function GroupsPage() {
           </div>
         </div>
 
-        <div className="accent-box">
+        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <Pencil size={20} className="inline-block" /> Editing Groups
           </h3>
@@ -101,7 +101,7 @@ export default function GroupsPage() {
           </div>
         </div>
 
-        <div className="accent-box">
+        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <MousePointer size={20} className="inline-block" /> 3D Selection &
             Groups
@@ -122,7 +122,7 @@ export default function GroupsPage() {
           </div>
         </div>
 
-        <div className="accent-box-highlight">
+        <div className="rounded-lg border border-[rgba(174,164,191,0.4)] bg-linear-to-br from-[rgba(174,164,191,0.15)] to-[rgba(174,164,191,0.05)] p-[var(--space-xl)]">
           <p className="text-lg font-bold mb-sm">
             Pro Tip: Use Groups for Repeated Components
           </p>
