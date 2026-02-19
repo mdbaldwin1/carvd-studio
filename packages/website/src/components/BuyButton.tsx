@@ -1,8 +1,11 @@
+import { Button } from "@/components/ui/button";
 import { getCheckoutUrl } from "../utils/lemonSqueezy";
+import { cn } from "@/lib/utils";
 
 interface BuyButtonProps {
   className?: string;
   children?: React.ReactNode;
+  size?: "sm" | "default" | "lg" | "icon";
 }
 
 /**
@@ -10,8 +13,9 @@ interface BuyButtonProps {
  * Single product - license works on both Mac and Windows.
  */
 export default function BuyButton({
-  className = "btn btn-primary btn-lg",
+  className,
   children,
+  size = "lg",
 }: BuyButtonProps) {
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     const url = getCheckoutUrl();
@@ -24,8 +28,10 @@ export default function BuyButton({
   };
 
   return (
-    <a href="/pricing" onClick={handleClick} className={className}>
-      {children || `Buy License - $59.99`}
-    </a>
+    <Button asChild size={size} className={cn(className)}>
+      <a href="/pricing" onClick={handleClick}>
+        {children || `Buy License - $59.99`}
+      </a>
+    </Button>
   );
 }
