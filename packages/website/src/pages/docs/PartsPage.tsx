@@ -23,7 +23,7 @@ export default function PartsPage() {
       </p>
 
       <div className="grid gap-xl">
-        <div className="accent-box">
+        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <Package size={20} className="inline-block" /> Part Properties
           </h3>
@@ -75,7 +75,7 @@ export default function PartsPage() {
           </div>
         </div>
 
-        <div className="accent-box">
+        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <RefreshCw size={20} className="inline-block" /> Part Operations
           </h3>
@@ -111,7 +111,7 @@ export default function PartsPage() {
           </div>
         </div>
 
-        <div className="accent-box">
+        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <Layers size={20} className="inline-block" /> Glue-Up Panels
           </h3>

@@ -24,7 +24,7 @@ export default function TemplatesPage() {
       </p>
 
       <div className="grid gap-xl">
-        <div className="accent-box">
+        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <ClipboardList size={20} /> Using Templates
           </h3>
@@ -38,7 +38,7 @@ export default function TemplatesPage() {
           </div>
         </div>
 
-        <div className="accent-box">
+        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <Save size={20} /> Creating Custom Templates
           </h3>
