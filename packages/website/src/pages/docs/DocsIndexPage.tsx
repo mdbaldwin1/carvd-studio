@@ -1,3 +1,4 @@
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import SEO from "../../components/SEO";
 import { getNavSections } from "./docsNavConfig";
 
@@ -11,19 +12,29 @@ export default function DocsIndexPage() {
         description="Comprehensive documentation for Carvd Studio. Guides, tutorials, and reference for all features."
         path="/docs"
       />
-      <h2 className="text-3xl font-bold mb-xl">Welcome to the Docs</h2>
-      <p className="text-muted mb-2xl">
+      <h2 className="mb-8 text-3xl font-bold max-md:text-xl max-sm:text-lg">
+        Welcome to the Docs
+      </h2>
+      <p className="mb-12 text-text-muted">
         Browse the sections below or use the sidebar to jump to a specific
         topic.
       </p>
-      <div className="grid gap-xl">
+      <div className="grid gap-8">
         {navSections.map((section) => (
           <div key={section.title}>
-            <h3 className="text-xl font-bold mb-md">{section.title}</h3>
-            <div className="grid grid-cols-2 gap-md">
+            <h3 className="mb-4 text-xl font-bold">{section.title}</h3>
+            <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1">
               {section.pages.map((page) => (
-                <a key={page.slug} href={`/docs/${page.slug}`} className="card">
-                  <h4 className="card-title">{page.title}</h4>
+                <a
+                  key={page.slug}
+                  href={`/docs/${page.slug}`}
+                  className="no-underline"
+                >
+                  <Card className="transition-all hover:border-accent hover:shadow-md">
+                    <CardHeader>
+                      <CardTitle className="text-xl">{page.title}</CardTitle>
+                    </CardHeader>
+                  </Card>
                 </a>
               ))}
             </div>
