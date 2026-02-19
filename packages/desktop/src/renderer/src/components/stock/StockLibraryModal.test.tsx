@@ -310,7 +310,7 @@ describe('StockLibraryModal', () => {
     it('switches to assemblies tab', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
 
       expect(screen.getByText('Drawer Assembly')).toBeInTheDocument();
     });
@@ -318,7 +318,7 @@ describe('StockLibraryModal', () => {
     it('shows assembly list', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
 
       expect(screen.getByText('2 parts')).toBeInTheDocument();
     });
@@ -326,7 +326,7 @@ describe('StockLibraryModal', () => {
     it('shows empty state when no assemblies', () => {
       render(<StockLibraryModal {...defaultProps} assemblies={[]} />);
 
-      fireEvent.click(screen.getByText('Assemblies (0)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
 
       expect(screen.getByText('No assemblies in library yet')).toBeInTheDocument();
     });
@@ -336,7 +336,7 @@ describe('StockLibraryModal', () => {
     it('selects assembly when clicked', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
 
       // Should show details with Edit button
@@ -346,7 +346,7 @@ describe('StockLibraryModal', () => {
     it('shows assembly parts when selected', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
 
       expect(screen.getByText('Parts in this assembly:')).toBeInTheDocument();
@@ -357,7 +357,7 @@ describe('StockLibraryModal', () => {
     it('shows description when assembly has one', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
 
       expect(screen.getByText('Standard drawer with dovetails')).toBeInTheDocument();
@@ -368,7 +368,7 @@ describe('StockLibraryModal', () => {
     it('enters edit mode when Edit clicked', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
       fireEvent.click(screen.getByText('Edit'));
 
@@ -379,7 +379,7 @@ describe('StockLibraryModal', () => {
       const onUpdateAssembly = vi.fn();
       render(<StockLibraryModal {...defaultProps} onUpdateAssembly={onUpdateAssembly} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
       fireEvent.click(screen.getByText('Edit'));
       fireEvent.click(screen.getByText('Save'));
@@ -393,7 +393,7 @@ describe('StockLibraryModal', () => {
       const onDeleteAssembly = vi.fn();
       render(<StockLibraryModal {...defaultProps} onDeleteAssembly={onDeleteAssembly} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
       fireEvent.click(screen.getByText('Delete'));
 
@@ -428,7 +428,7 @@ describe('StockLibraryModal', () => {
     it('shows search input when assemblies exist', () => {
       render(<StockLibraryModal {...defaultProps} assemblies={multiAssemblies} />);
 
-      fireEvent.click(screen.getByText('Assemblies (2)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
 
       expect(screen.getByPlaceholderText('Search assemblies...')).toBeInTheDocument();
     });
@@ -436,7 +436,7 @@ describe('StockLibraryModal', () => {
     it('filters assemblies by search term', () => {
       render(<StockLibraryModal {...defaultProps} assemblies={multiAssemblies} />);
 
-      fireEvent.click(screen.getByText('Assemblies (2)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.change(screen.getByPlaceholderText('Search assemblies...'), {
         target: { value: 'Cabinet' }
       });
@@ -448,7 +448,7 @@ describe('StockLibraryModal', () => {
     it('shows no results message when search has no matches', () => {
       render(<StockLibraryModal {...defaultProps} assemblies={multiAssemblies} />);
 
-      fireEvent.click(screen.getByText('Assemblies (2)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.change(screen.getByPlaceholderText('Search assemblies...'), {
         target: { value: 'nonexistent' }
       });
@@ -459,7 +459,7 @@ describe('StockLibraryModal', () => {
     it('shows clear button when search has text', () => {
       render(<StockLibraryModal {...defaultProps} assemblies={multiAssemblies} />);
 
-      fireEvent.click(screen.getByText('Assemblies (2)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.change(screen.getByPlaceholderText('Search assemblies...'), {
         target: { value: 'test' }
       });
@@ -470,7 +470,7 @@ describe('StockLibraryModal', () => {
     it('clears search when clear button clicked', () => {
       render(<StockLibraryModal {...defaultProps} assemblies={multiAssemblies} />);
 
-      fireEvent.click(screen.getByText('Assemblies (2)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.change(screen.getByPlaceholderText('Search assemblies...'), {
         target: { value: 'Cabinet' }
       });
@@ -485,7 +485,7 @@ describe('StockLibraryModal', () => {
     it('does not show search when no assemblies', () => {
       render(<StockLibraryModal {...defaultProps} assemblies={[]} />);
 
-      fireEvent.click(screen.getByText('Assemblies (0)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
 
       expect(screen.queryByPlaceholderText('Search assemblies...')).not.toBeInTheDocument();
     });
@@ -495,7 +495,7 @@ describe('StockLibraryModal', () => {
     it('shows create button when onCreateNewAssembly provided', () => {
       render(<StockLibraryModal {...defaultProps} onCreateNewAssembly={vi.fn()} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
 
       expect(screen.getByTitle('Create new assembly')).toBeInTheDocument();
     });
@@ -503,7 +503,7 @@ describe('StockLibraryModal', () => {
     it('does not show create button when onCreateNewAssembly not provided', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
 
       expect(screen.queryByTitle('Create new assembly')).not.toBeInTheDocument();
     });
@@ -513,7 +513,7 @@ describe('StockLibraryModal', () => {
       const onClose = vi.fn();
       render(<StockLibraryModal {...defaultProps} onCreateNewAssembly={onCreateNewAssembly} onClose={onClose} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByTitle('Create new assembly'));
 
       expect(onCreateNewAssembly).toHaveBeenCalled();
@@ -524,7 +524,7 @@ describe('StockLibraryModal', () => {
       const onClose = vi.fn();
       render(<StockLibraryModal {...defaultProps} onCreateNewAssembly={onCreateNewAssembly} onClose={onClose} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       await fireEvent.click(screen.getByTitle('Create new assembly'));
 
       // Wait for async operation
@@ -538,7 +538,7 @@ describe('StockLibraryModal', () => {
     it('shows Edit in 3D button when onEditAssemblyIn3D provided', () => {
       render(<StockLibraryModal {...defaultProps} onEditAssemblyIn3D={vi.fn()} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
 
       expect(screen.getByText('Edit in 3D')).toBeInTheDocument();
@@ -547,7 +547,7 @@ describe('StockLibraryModal', () => {
     it('does not show Edit in 3D button when onEditAssemblyIn3D not provided', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
 
       expect(screen.queryByText('Edit in 3D')).not.toBeInTheDocument();
@@ -557,7 +557,7 @@ describe('StockLibraryModal', () => {
       const onEditAssemblyIn3D = vi.fn().mockResolvedValue(true);
       render(<StockLibraryModal {...defaultProps} onEditAssemblyIn3D={onEditAssemblyIn3D} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
       fireEvent.click(screen.getByText('Edit in 3D'));
 
@@ -569,7 +569,7 @@ describe('StockLibraryModal', () => {
       const onClose = vi.fn();
       render(<StockLibraryModal {...defaultProps} onEditAssemblyIn3D={onEditAssemblyIn3D} onClose={onClose} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
       await fireEvent.click(screen.getByText('Edit in 3D'));
 
@@ -583,7 +583,7 @@ describe('StockLibraryModal', () => {
     it('shows Edit Layout in 3D button in edit mode when onEditAssemblyIn3D provided', () => {
       render(<StockLibraryModal {...defaultProps} onEditAssemblyIn3D={vi.fn()} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
       fireEvent.click(screen.getByText('Edit'));
 
@@ -593,7 +593,7 @@ describe('StockLibraryModal', () => {
     it('shows description textarea in edit mode', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
       fireEvent.click(screen.getByText('Edit'));
 
@@ -603,7 +603,7 @@ describe('StockLibraryModal', () => {
     it('updates assembly form when description changed', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
       fireEvent.click(screen.getByText('Drawer Assembly'));
       fireEvent.click(screen.getByText('Edit'));
 
@@ -633,7 +633,7 @@ describe('StockLibraryModal', () => {
     it('shows groups count when assembly has groups', () => {
       render(<StockLibraryModal {...defaultProps} assemblies={assemblyWithGroups} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
 
       expect(screen.getByText('1 part, 2 groups')).toBeInTheDocument();
     });
@@ -643,7 +643,7 @@ describe('StockLibraryModal', () => {
     it('sets assembly item as draggable', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Assemblies (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Assemblies/i }));
 
       const assemblyItem = screen.getByText('Drawer Assembly').closest('li');
       expect(assemblyItem).toHaveAttribute('draggable', 'true');

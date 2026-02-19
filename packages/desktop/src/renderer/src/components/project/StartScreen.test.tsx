@@ -166,8 +166,7 @@ describe('StartScreen', () => {
       render(<StartScreen {...defaultProps} />);
 
       await waitFor(() => {
-        const recentsTab = screen.getByText('Recents').closest('button');
-        expect(recentsTab).toHaveClass('active');
+        expect(screen.getByRole('tab', { name: 'Recents' })).toHaveAttribute('data-state', 'active');
       });
     });
 
@@ -178,10 +177,11 @@ describe('StartScreen', () => {
         expect(screen.getByText('Favorites')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Favorites'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: 'Favorites' }));
 
-      const favoritesTab = screen.getByText('Favorites').closest('button');
-      expect(favoritesTab).toHaveClass('active');
+      await waitFor(() => {
+        expect(screen.getByRole('tab', { name: 'Favorites' })).toHaveAttribute('data-state', 'active');
+      });
     });
   });
 
@@ -231,9 +231,11 @@ describe('StartScreen', () => {
         expect(screen.getByText('Favorites')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Favorites'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: 'Favorites' }));
 
-      expect(screen.getByText(/No favorites yet/)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(/No favorites yet/)).toBeInTheDocument();
+      });
     });
 
     it('shows favorite projects in Favorites tab', async () => {
@@ -243,7 +245,7 @@ describe('StartScreen', () => {
         expect(screen.getByText('Favorites')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Favorites'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: 'Favorites' }));
 
       await waitFor(() => {
         expect(screen.getByText('project2')).toBeInTheDocument();
@@ -402,7 +404,7 @@ describe('StartScreen', () => {
         expect(screen.getByText('Favorites')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Favorites'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: 'Favorites' }));
 
       await waitFor(() => {
         expect(screen.getByText('missing')).toBeInTheDocument();
@@ -622,7 +624,7 @@ describe('StartScreen', () => {
         expect(screen.getByText('Favorites')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Favorites'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: 'Favorites' }));
 
       await waitFor(() => {
         expect(screen.getByText('project2')).toBeInTheDocument();
@@ -640,7 +642,7 @@ describe('StartScreen', () => {
         expect(screen.getByText('Favorites')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Favorites'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: 'Favorites' }));
 
       await waitFor(() => {
         expect(screen.getByText('project2')).toBeInTheDocument();
@@ -666,7 +668,7 @@ describe('StartScreen', () => {
         expect(screen.getByText('Favorites')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Favorites'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: 'Favorites' }));
 
       await waitFor(() => {
         expect(screen.getByText('project1')).toBeInTheDocument();

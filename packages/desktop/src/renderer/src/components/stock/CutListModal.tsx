@@ -1,6 +1,7 @@
 import { Download } from 'lucide-react';
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Button } from '@renderer/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@renderer/components/ui/tabs';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useProjectStore, validatePartsForCutList, generateThumbnail } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
@@ -15,16 +16,13 @@ import { CutListDiagramsTab } from './CutListDiagramsTab';
 import { CutListStatistics } from './CutListStatistics';
 import { ShoppingListTab } from './ShoppingListTab';
 
-type CutListTab = 'parts' | 'diagrams' | 'shopping';
-
 interface CutListModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
 export function CutListModal({ isOpen, onClose }: CutListModalProps) {
-  const [activeTab, setActiveTab] = useState<CutListTab>('parts');
-  const [validationIssues, setValidationIssues] = useState<PartValidationIssue[]>([]);
+  const [validationIssues, setValidationIssues] = React.useState<PartValidationIssue[]>([]);
 
   const parts = useProjectStore((s) => s.parts);
   const stocks = useProjectStore((s) => s.stocks);
@@ -230,49 +228,40 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
               </div>
             )}
 
-            {/* Tab bar */}
-            <div className="cut-list-tabs flex border-b border-border px-6 gap-0 bg-bg">
-              <button
-                className={`cut-list-tab py-2.5 px-4 bg-transparent border-none text-[13px] cursor-pointer transition-colors duration-150 border-b-2 hover:text-text ${activeTab === 'parts' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
-                onClick={() => setActiveTab('parts')}
-              >
-                Parts List ({cutList.instructions.length})
-              </button>
-              <button
-                className={`cut-list-tab py-2.5 px-4 bg-transparent border-none text-[13px] cursor-pointer transition-colors duration-150 border-b-2 hover:text-text ${activeTab === 'diagrams' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
-                onClick={() => setActiveTab('diagrams')}
-              >
-                Cutting Diagrams ({cutList.stockBoards.length})
-              </button>
-              <button
-                className={`cut-list-tab py-2.5 px-4 bg-transparent border-none text-[13px] cursor-pointer transition-colors duration-150 border-b-2 hover:text-text ${activeTab === 'shopping' ? 'border-accent text-text' : 'border-transparent text-text-muted'}`}
-                onClick={() => setActiveTab('shopping')}
-              >
-                Shopping List ({cutList.statistics.byStock.length})
-              </button>
-            </div>
+            {/* Tab bar + content */}
+            <Tabs defaultValue="parts" className="cut-list-tabs flex-1 flex flex-col min-h-0">
+              <TabsList className="cut-list-tab-list">
+                <TabsTrigger value="parts" className="cut-list-tab">
+                  Parts List ({cutList.instructions.length})
+                </TabsTrigger>
+                <TabsTrigger value="diagrams" className="cut-list-tab">
+                  Cutting Diagrams ({cutList.stockBoards.length})
+                </TabsTrigger>
+                <TabsTrigger value="shopping" className="cut-list-tab">
+                  Shopping List ({cutList.statistics.byStock.length})
+                </TabsTrigger>
+              </TabsList>
 
-            <div className="cut-list-content flex-1 flex flex-col overflow-hidden py-5 px-6 bg-bg-alt min-h-0">
-              {activeTab === 'parts' && (
+              <TabsContent value="parts" className="cut-list-content overflow-hidden py-5 px-6 bg-bg-alt">
                 <CutListPartsTab
                   cutList={cutList}
                   units={units}
                   projectName={projectName || 'Untitled Project'}
                   canExportPDF={limits.canExportPDF}
                 />
-              )}
-              {activeTab === 'diagrams' && (
+              </TabsContent>
+              <TabsContent value="diagrams" className="cut-list-content overflow-hidden py-5 px-6 bg-bg-alt">
                 <CutListDiagramsTab cutList={cutList} units={units} canExportPDF={limits.canExportPDF} />
-              )}
-              {activeTab === 'shopping' && (
+              </TabsContent>
+              <TabsContent value="shopping" className="cut-list-content overflow-hidden py-5 px-6 bg-bg-alt">
                 <ShoppingListTab
                   cutList={cutList}
                   units={units}
                   projectName={projectName || 'Untitled Project'}
                   canExportPDF={limits.canExportPDF}
                 />
-              )}
-            </div>
+              </TabsContent>
+            </Tabs>
 
             {/* Statistics */}
             <CutListStatistics cutList={cutList} />

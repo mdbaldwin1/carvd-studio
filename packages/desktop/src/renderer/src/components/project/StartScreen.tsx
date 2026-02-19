@@ -1,5 +1,6 @@
 import { FolderOpen, Star, Clock, Library, Settings } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@renderer/components/ui/tabs';
 import { useEffect, useState } from 'react';
 import { UserTemplate } from '../../templates';
 import { Project } from '../../types';
@@ -73,7 +74,7 @@ export function StartScreen({
   const [userTemplates, setUserTemplates] = useState<UserTemplate[]>([]);
   const [, setIsLoading] = useState(true);
   const [appVersion, setAppVersion] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'recents' | 'favorites'>('recents');
+
 
   // Load recent and favorite projects on mount
   useEffect(() => {
@@ -206,24 +207,24 @@ export function StartScreen({
         />
 
         {/* Projects Section with Tabs */}
-        <div className="flex flex-col gap-3 min-h-0 max-h-[50vh]">
+        <Tabs defaultValue="recents" className="flex flex-col gap-3 min-h-0 max-h-[50vh]">
           <div className="flex items-stretch justify-between relative m-0 p-0 cursor-default rounded-none bg-transparent after:content-[''] after:absolute after:left-0 after:right-0 after:bottom-0 after:h-px after:bg-border after:z-0">
-            <div className="flex gap-0 relative z-1">
-              <button
-                className={`section-tab flex items-center gap-1.5 py-2.5 px-4 bg-transparent border border-transparent border-b-border rounded-t-md -mb-px text-sm font-medium text-text-muted cursor-pointer transition-[color,background-color] duration-100 hover:text-text hover:bg-bg-secondary ${activeTab === 'recents' ? 'active text-text !bg-bg !border-border !border-b-bg' : ''}`}
-                onClick={() => setActiveTab('recents')}
+            <TabsList className="flex gap-0 relative z-1 border-none bg-transparent px-0">
+              <TabsTrigger
+                value="recents"
+                className="section-tab flex items-center gap-1.5 py-2.5 px-4 border border-transparent border-b-border rounded-t-md -mb-px text-sm font-medium text-text-muted cursor-pointer transition-[color,background-color] duration-100 hover:text-text hover:bg-bg-secondary data-[state=active]:text-text data-[state=active]:!bg-bg data-[state=active]:!border-border data-[state=active]:!border-b-bg"
               >
                 <Clock size={16} />
                 Recents
-              </button>
-              <button
-                className={`section-tab flex items-center gap-1.5 py-2.5 px-4 bg-transparent border border-transparent border-b-border rounded-t-md -mb-px text-sm font-medium text-text-muted cursor-pointer transition-[color,background-color] duration-100 hover:text-text hover:bg-bg-secondary ${activeTab === 'favorites' ? 'active text-text !bg-bg !border-border !border-b-bg' : ''}`}
-                onClick={() => setActiveTab('favorites')}
+              </TabsTrigger>
+              <TabsTrigger
+                value="favorites"
+                className="section-tab flex items-center gap-1.5 py-2.5 px-4 border border-transparent border-b-border rounded-t-md -mb-px text-sm font-medium text-text-muted cursor-pointer transition-[color,background-color] duration-100 hover:text-text hover:bg-bg-secondary data-[state=active]:text-text data-[state=active]:!bg-bg data-[state=active]:!border-border data-[state=active]:!border-b-bg"
               >
                 <Star size={16} />
                 Favorites
-              </button>
-            </div>
+              </TabsTrigger>
+            </TabsList>
             <button
               className="flex items-center gap-1.5 py-1.5 px-3 my-auto bg-transparent border-none rounded text-[13px] text-accent cursor-pointer transition-all duration-100 relative z-1 hover:text-primary hover:bg-bg-secondary"
               onClick={onOpenFile}
@@ -233,7 +234,7 @@ export function StartScreen({
             </button>
           </div>
 
-          {activeTab === 'recents' && (
+          <TabsContent value="recents">
             <RecentsTab
               projects={recentProjects}
               onOpenProject={onOpenProject}
@@ -241,9 +242,9 @@ export function StartScreen({
               onToggleFavorite={handleToggleFavorite}
               onRemoveRecent={handleRemoveRecent}
             />
-          )}
+          </TabsContent>
 
-          {activeTab === 'favorites' && (
+          <TabsContent value="favorites">
             <FavoritesTab
               projects={favoriteProjects}
               onOpenProject={onOpenProject}
@@ -251,8 +252,8 @@ export function StartScreen({
               onToggleFavorite={handleToggleFavorite}
               onReorder={handleReorderFavorites}
             />
-          )}
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

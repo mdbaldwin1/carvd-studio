@@ -318,7 +318,7 @@ describe('CutListModal', () => {
     it('switches to Cutting Diagrams tab', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Cutting Diagrams (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Cutting Diagrams/i }));
 
       expect(screen.getByText('1 board needed')).toBeInTheDocument();
     });
@@ -326,7 +326,7 @@ describe('CutListModal', () => {
     it('switches to Shopping List tab', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       expect(screen.getByText('Lumber & Sheet Goods')).toBeInTheDocument();
     });
@@ -365,7 +365,7 @@ describe('CutListModal', () => {
       const user = userEvent.setup();
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Cutting Diagrams (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Cutting Diagrams/i }));
 
       // Click the Download dropdown to reveal options
       await user.click(screen.getByText('Download'));
@@ -376,7 +376,7 @@ describe('CutListModal', () => {
     it('shows board diagram', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Cutting Diagrams (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Cutting Diagrams/i }));
 
       expect(screen.getByText('Board #1')).toBeInTheDocument();
     });
@@ -384,7 +384,7 @@ describe('CutListModal', () => {
     it('shows utilization percentage', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Cutting Diagrams (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Cutting Diagrams/i }));
 
       expect(screen.getByText('65.5% used')).toBeInTheDocument();
     });
@@ -398,7 +398,7 @@ describe('CutListModal', () => {
     it('shows stock items', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       expect(screen.getByText('Plywood 3/4"')).toBeInTheDocument();
     });
@@ -406,7 +406,7 @@ describe('CutListModal', () => {
     it('shows Other Items section', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       expect(screen.getByText('Other Items')).toBeInTheDocument();
     });
@@ -414,7 +414,7 @@ describe('CutListModal', () => {
     it('shows Add Item button', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       expect(screen.getByText('+ Add Item')).toBeInTheDocument();
     });
@@ -422,7 +422,7 @@ describe('CutListModal', () => {
     it('shows estimated total', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       expect(screen.getByText('Est. Total:')).toBeInTheDocument();
       // Multiple $50.00 may appear (line total, grand total, etc.) - just check one exists
@@ -434,7 +434,7 @@ describe('CutListModal', () => {
       const user = userEvent.setup();
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       // Click the Download dropdown to reveal options
       await user.click(screen.getByText('Download'));
@@ -451,7 +451,7 @@ describe('CutListModal', () => {
     it('shows add item form when Add Item clicked', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
       fireEvent.click(screen.getByText('+ Add Item'));
 
       expect(screen.getByPlaceholderText(/Item name/)).toBeInTheDocument();
@@ -460,7 +460,7 @@ describe('CutListModal', () => {
     it('shows cancel button in add form', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
       fireEvent.click(screen.getByText('+ Add Item'));
 
       // Find Cancel in the form (there may be multiple)
@@ -474,7 +474,7 @@ describe('CutListModal', () => {
 
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
       fireEvent.click(screen.getByText('+ Add Item'));
 
       fireEvent.change(screen.getByPlaceholderText(/Item name/), {
@@ -491,7 +491,7 @@ describe('CutListModal', () => {
     it('shows empty state message when no custom items', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       expect(screen.getByText(/Add hardware, fasteners, glue/)).toBeInTheDocument();
     });
@@ -721,7 +721,7 @@ describe('CutListModal', () => {
     it('shows existing custom items', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       expect(screen.getByText('Wood Screws')).toBeInTheDocument();
       expect(screen.getByText('#8 x 1-1/4')).toBeInTheDocument();
@@ -730,7 +730,7 @@ describe('CutListModal', () => {
     it('shows edit button on custom items', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       expect(screen.getByTitle('Edit')).toBeInTheDocument();
     });
@@ -738,7 +738,7 @@ describe('CutListModal', () => {
     it('shows delete button on custom items', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       expect(screen.getByTitle('Delete')).toBeInTheDocument();
     });
@@ -749,7 +749,7 @@ describe('CutListModal', () => {
 
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
       fireEvent.click(screen.getByTitle('Delete'));
 
       expect(deleteCustomShoppingItem).toHaveBeenCalledWith('item-1');
@@ -758,7 +758,7 @@ describe('CutListModal', () => {
     it('enters edit mode when edit clicked', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
       fireEvent.click(screen.getByTitle('Edit'));
 
       // Should show form with existing data
@@ -771,7 +771,7 @@ describe('CutListModal', () => {
 
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
       fireEvent.click(screen.getByTitle('Edit'));
 
       // Change the name
@@ -794,7 +794,7 @@ describe('CutListModal', () => {
     it('shows subtotals when custom items exist', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       expect(screen.getByText('Lumber & Sheet Goods:')).toBeInTheDocument();
       expect(screen.getByText('Other Items:')).toBeInTheDocument();
@@ -803,7 +803,7 @@ describe('CutListModal', () => {
     it('calculates custom items total', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       // 50 screws at $0.10 = $5.00 - use class selector as prices appear in multiple places
       const lineTotal = document.querySelector('.custom-items .line-total');
@@ -819,7 +819,7 @@ describe('CutListModal', () => {
     it('shows checkboxes on shopping items', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       const checkboxes = screen.getAllByRole('checkbox');
       expect(checkboxes.length).toBeGreaterThan(0);
@@ -828,7 +828,7 @@ describe('CutListModal', () => {
     it('toggles checkbox when clicked', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       const checkbox = screen.getAllByRole('checkbox')[0];
       expect(checkbox).not.toBeChecked();
@@ -902,7 +902,7 @@ describe('CutListModal', () => {
 
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
       expect(screen.getByText(/consider an extra board/)).toBeInTheDocument();
     });
@@ -959,7 +959,7 @@ describe('CutListModal', () => {
       const user = userEvent.setup();
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText(/Shopping List/));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
       // Click the Download dropdown, then the Download CSV option
       await user.click(screen.getByText('Download'));
       await user.click(screen.getByRole('menuitem', { name: /download csv/i }));
@@ -978,7 +978,7 @@ describe('CutListModal', () => {
     it('shows stock name in diagrams tab', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Cutting Diagrams (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Cutting Diagrams/i }));
 
       expect(screen.getByText('Plywood 3/4"')).toBeInTheDocument();
     });
@@ -986,7 +986,7 @@ describe('CutListModal', () => {
     it('shows board dimensions', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Cutting Diagrams (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Cutting Diagrams/i }));
 
       // Should show the stock dimensions
       const boardDiagram = document.querySelector('.board-dims');
@@ -996,7 +996,7 @@ describe('CutListModal', () => {
     it('renders SVG for board diagram', () => {
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Cutting Diagrams (1)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Cutting Diagrams/i }));
 
       const svg = document.querySelector('.board-svg');
       expect(svg).toBeInTheDocument();
@@ -1014,7 +1014,7 @@ describe('CutListModal', () => {
 
       render(<CutListModal {...defaultProps} />);
 
-      fireEvent.click(screen.getByText('Cutting Diagrams (0)'));
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Cutting Diagrams/i }));
 
       expect(screen.getByText('No cutting diagrams to display.')).toBeInTheDocument();
     });
