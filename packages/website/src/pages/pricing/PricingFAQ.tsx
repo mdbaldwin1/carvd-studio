@@ -120,10 +120,7 @@ export default function PricingFAQ() {
           </AccordionContent>
         </AccordionItem>
 
-        <AccordionItem
-          value="team"
-          className="rounded-lg border bg-card px-6"
-        >
+        <AccordionItem value="team" className="rounded-lg border bg-card px-6">
           <AccordionTrigger className="text-left text-xl font-bold">
             What if my business grows and I need more licenses?
           </AccordionTrigger>

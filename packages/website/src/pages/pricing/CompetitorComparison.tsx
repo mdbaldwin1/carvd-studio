@@ -142,10 +142,7 @@ export default function CompetitorComparison() {
         </table>
       </div>
       <div className="mt-8 grid grid-cols-2 gap-6 max-md:grid-cols-1">
-        <div
-          className="rounded-lg border p-6"
-          style={accentBoxStyle}
-        >
+        <div className="rounded-lg border p-6" style={accentBoxStyle}>
           <h3 className="mb-2 text-xl font-bold">
             Why pay $399-680/year for general CAD?
           </h3>
@@ -156,10 +153,7 @@ export default function CompetitorComparison() {
             cut lists.
           </p>
         </div>
-        <div
-          className="rounded-lg border p-6"
-          style={accentBoxStyle}
-        >
+        <div className="rounded-lg border p-6" style={accentBoxStyle}>
           <h3 className="mb-2 text-xl font-bold">
             Why pay $80-100/month for niche tools?
           </h3>
