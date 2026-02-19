@@ -1,3 +1,10 @@
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+
 export const pricingFAQs = [
   {
     question: "Is this really a one-time payment?",
@@ -27,76 +34,106 @@ export const pricingFAQs = [
 
 export default function PricingFAQ() {
   return (
-    <div className="mb-3xl mt-3xl">
-      <h2 className="text-4xl font-bold mb-xl text-center">
+    <div className="mb-16 mt-16">
+      <h2 className="mb-8 text-center text-4xl font-bold">
         Your Questions, Answered
       </h2>
-      <div className="grid gap-xl">
-        <div className="card">
-          <h3 className="card-title">Is this really a one-time payment?</h3>
-          <p className="card-description">
+      <Accordion type="multiple" className="grid gap-4">
+        <AccordionItem
+          value="payment"
+          className="rounded-lg border bg-card px-6"
+        >
+          <AccordionTrigger className="text-left text-xl font-bold">
+            Is this really a one-time payment?
+          </AccordionTrigger>
+          <AccordionContent className="text-text-muted">
             Yes. $59.99 once, and you own Carvd Studio forever. No monthly fees,
             no annual renewals, no surprise charges. We hate subscriptions as
             much as you do.
-          </p>
-        </div>
+          </AccordionContent>
+        </AccordionItem>
 
-        <div className="card">
-          <h3 className="card-title">Do I get future updates?</h3>
-          <p className="card-description">
+        <AccordionItem
+          value="updates"
+          className="rounded-lg border bg-card px-6"
+        >
+          <AccordionTrigger className="text-left text-xl font-bold">
+            Do I get future updates?
+          </AccordionTrigger>
+          <AccordionContent className="text-text-muted">
             All future updates are included free forever. New features,
             improvements, bug fixes— you get them all automatically. No
             "upgrade" fees, no "pro" tiers, no games.
-          </p>
-        </div>
+          </AccordionContent>
+        </AccordionItem>
 
-        <div className="card">
-          <h3 className="card-title">What if I'm not satisfied?</h3>
-          <p className="card-description">
+        <AccordionItem
+          value="satisfaction"
+          className="rounded-lg border bg-card px-6"
+        >
+          <AccordionTrigger className="text-left text-xl font-bold">
+            What if I'm not satisfied?
+          </AccordionTrigger>
+          <AccordionContent className="text-text-muted">
             We offer a 30-day, no-questions-asked money-back guarantee. If Carvd
             Studio doesn't save you time and money, email us for a full refund.
             You risk nothing.
-          </p>
-        </div>
+          </AccordionContent>
+        </AccordionItem>
 
-        <div className="card">
-          <h3 className="card-title">Can I use it on multiple computers?</h3>
-          <p className="card-description">
+        <AccordionItem
+          value="devices"
+          className="rounded-lg border bg-card px-6"
+        >
+          <AccordionTrigger className="text-left text-xl font-bold">
+            Can I use it on multiple computers?
+          </AccordionTrigger>
+          <AccordionContent className="text-text-muted">
             Your license works on up to 3 devices—any combination of Mac and
             Windows. Use it in your shop, office, and on your laptop. All three
             at the same time if you want.
-          </p>
-        </div>
+          </AccordionContent>
+        </AccordionItem>
 
-        <div className="card">
-          <h3 className="card-title">Will it work offline?</h3>
-          <p className="card-description">
+        <AccordionItem
+          value="offline"
+          className="rounded-lg border bg-card px-6"
+        >
+          <AccordionTrigger className="text-left text-xl font-bold">
+            Will it work offline?
+          </AccordionTrigger>
+          <AccordionContent className="text-text-muted">
             Yes. Carvd Studio works 100% offline. Take your laptop to job sites,
             work in your shop without WiFi, design anywhere. No internet
             required, ever.
-          </p>
-        </div>
+          </AccordionContent>
+        </AccordionItem>
 
-        <div className="card">
-          <h3 className="card-title">What if I need help?</h3>
-          <p className="card-description">
+        <AccordionItem value="help" className="rounded-lg border bg-card px-6">
+          <AccordionTrigger className="text-left text-xl font-bold">
+            What if I need help?
+          </AccordionTrigger>
+          <AccordionContent className="text-text-muted">
             Email us anytime at support@carvd-studio.com. You'll get help from
             actual woodworkers who know the software inside and out. Most
             questions answered within 24 hours.
-          </p>
-        </div>
+          </AccordionContent>
+        </AccordionItem>
 
-        <div className="card">
-          <h3 className="card-title">
+        <AccordionItem
+          value="team"
+          className="rounded-lg border bg-card px-6"
+        >
+          <AccordionTrigger className="text-left text-xl font-bold">
             What if my business grows and I need more licenses?
-          </h3>
-          <p className="card-description">
+          </AccordionTrigger>
+          <AccordionContent className="text-text-muted">
             Great question. Contact us at support@carvd-studio.com for team
             pricing on 5+ licenses. We offer volume discounts for shops and
             schools.
-          </p>
-        </div>
-      </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 }
