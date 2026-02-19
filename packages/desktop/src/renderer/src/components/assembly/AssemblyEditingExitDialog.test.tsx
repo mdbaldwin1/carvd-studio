@@ -47,6 +47,12 @@ describe('AssemblyEditingExitDialog', () => {
 
       expect(screen.getByText(/unsaved changes to/)).toBeInTheDocument();
     });
+
+    it('renders with alertdialog role', () => {
+      render(<AssemblyEditingExitDialog {...defaultProps} />);
+
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    });
   });
 
   describe('button labels', () => {
@@ -115,20 +121,6 @@ describe('AssemblyEditingExitDialog', () => {
       render(<AssemblyEditingExitDialog {...defaultProps} isCreatingNew={false} />);
 
       expect(screen.getByText(/save your changes to the library/)).toBeInTheDocument();
-    });
-  });
-
-  describe('styling', () => {
-    it('has modal-overlay class on container', () => {
-      const { container } = render(<AssemblyEditingExitDialog {...defaultProps} />);
-
-      expect(container.querySelector('.modal-overlay')).toBeInTheDocument();
-    });
-
-    it('has modal class on dialog', () => {
-      const { container } = render(<AssemblyEditingExitDialog {...defaultProps} />);
-
-      expect(container.querySelector('.modal')).toBeInTheDocument();
     });
   });
 });

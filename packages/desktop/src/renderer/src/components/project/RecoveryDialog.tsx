@@ -3,6 +3,14 @@
  */
 
 import { Button } from '@renderer/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription
+} from '@renderer/components/ui/alert-dialog';
 
 interface RecoveryInfo {
   projectName: string;
@@ -18,7 +26,7 @@ interface RecoveryDialogProps {
 }
 
 export function RecoveryDialog({ isOpen, recoveryInfo, onRestore, onDiscard }: RecoveryDialogProps) {
-  if (!isOpen || !recoveryInfo) return null;
+  if (!recoveryInfo) return null;
 
   const formatDate = (isoString: string) => {
     const date = new Date(isoString);
@@ -26,16 +34,16 @@ export function RecoveryDialog({ isOpen, recoveryInfo, onRestore, onDiscard }: R
   };
 
   return (
-    <div className="modal-overlay fixed inset-0 bg-overlay flex items-center justify-center z-[1001]">
-      <div className="modal bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[450px] max-h-[85vh] flex flex-col animate-modal-fade-in">
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 className="m-0 text-base font-semibold text-text">Recover Unsaved Work</h2>
-        </div>
+    <AlertDialog open={isOpen}>
+      <AlertDialogContent className="max-w-[450px]">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Recover Unsaved Work</AlertDialogTitle>
+        </AlertDialogHeader>
 
-        <div className="p-5 overflow-y-auto">
-          <p className="m-0 mb-4 text-sm text-text leading-relaxed">
+        <div className="px-5 py-4">
+          <AlertDialogDescription className="mb-4">
             A recovery file was found from a previous session that may not have been saved properly.
-          </p>
+          </AlertDialogDescription>
 
           <div className="bg-surface-hover rounded-md px-4 py-3 mb-4">
             <div className="flex gap-2 mb-2">
@@ -51,15 +59,15 @@ export function RecoveryDialog({ isOpen, recoveryInfo, onRestore, onDiscard }: R
           <p className="m-0 text-sm text-text">Would you like to restore this work?</p>
         </div>
 
-        <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
+        <AlertDialogFooter>
           <Button size="sm" variant="secondary" className="min-w-[90px]" onClick={onDiscard}>
             Discard
           </Button>
           <Button size="sm" className="min-w-[90px]" onClick={onRestore} autoFocus>
             Restore
           </Button>
-        </div>
-      </div>
-    </div>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

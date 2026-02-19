@@ -1,6 +1,16 @@
 import { useEffect } from 'react';
-import { Modal } from './Modal';
-import { Button } from '@renderer/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel
+} from '@renderer/components/ui/alert-dialog';
+import { buttonVariants } from '@renderer/components/ui/button';
+import { cn } from '@renderer/lib/utils';
 
 /** Props for the {@link ConfirmDialog} component. */
 interface ConfirmDialogProps {
@@ -17,7 +27,7 @@ interface ConfirmDialogProps {
 /**
  * Confirmation dialog for destructive or significant actions.
  *
- * Uses {@link Modal} with `role="alertdialog"`. Supports Enter to confirm
+ * Built on shadcn AlertDialog (Radix). Supports Enter to confirm
  * and Escape to cancel. Set `variant="danger"` for destructive actions.
  */
 export function ConfirmDialog({
@@ -30,7 +40,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel
 }: ConfirmDialogProps) {
-  // Handle Enter key to confirm (Escape is handled by Modal)
+  // Handle Enter key to confirm
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
@@ -45,33 +55,30 @@ export function ConfirmDialog({
   }, [isOpen, onConfirm]);
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onCancel}
-      title={title}
-      className="w-[400px]"
-      role="alertdialog"
-      footer={
-        <>
-          <Button size="sm" variant="outline" onClick={onCancel} title="Press Escape to cancel">
-            {cancelLabel}
-          </Button>
-          <Button
-            size="sm"
-            variant={variant === 'danger' ? 'destructive' : 'default'}
+    <AlertDialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
+      <AlertDialogContent className="w-[400px]">
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+        </AlertDialogHeader>
+        <div className="px-5 py-4">
+          {variant === 'danger' && <div className="text-4xl mb-3">⚠️</div>}
+          <AlertDialogDescription className="m-0">{message}</AlertDialogDescription>
+        </div>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
+          <AlertDialogAction
             onClick={onConfirm}
             autoFocus
-            title="Press Enter to confirm"
+            className={cn(
+              variant === 'danger'
+                ? buttonVariants({ variant: 'destructive', size: 'sm' })
+                : buttonVariants({ size: 'sm' })
+            )}
           >
             {confirmLabel}
-          </Button>
-        </>
-      }
-    >
-      <div className="p-5">
-        {variant === 'danger' && <div className="text-4xl mb-3">⚠️</div>}
-        <p className="m-0 leading-relaxed">{message}</p>
-      </div>
-    </Modal>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
