@@ -38,6 +38,7 @@ export default [
         HTMLLabelElement: 'readonly',
         HTMLSelectElement: 'readonly',
         HTMLFormElement: 'readonly',
+        HTMLSpanElement: 'readonly',
         HTMLHeadingElement: 'readonly',
         HTMLParagraphElement: 'readonly',
         HTMLSpanElement: 'readonly',

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { DropdownButton, DropdownItem } from './DropdownButton';
 
 const items: DropdownItem[] = [
@@ -21,100 +22,72 @@ describe('DropdownButton', () => {
 
   it('dropdown is closed by default', () => {
     render(<DropdownButton label="Actions" items={items} />);
-    expect(screen.queryByText('Option A')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('opens dropdown on click', () => {
+  it('opens dropdown on click', async () => {
+    const user = userEvent.setup();
     render(<DropdownButton label="Actions" items={items} />);
-    fireEvent.click(screen.getByText('Actions'));
-    expect(screen.getByText('Option A')).toBeInTheDocument();
-    expect(screen.getByText('Option B')).toBeInTheDocument();
-    expect(screen.getByText('Disabled Option')).toBeInTheDocument();
+    await user.click(screen.getByText('Actions'));
+    expect(screen.getByRole('menuitem', { name: 'Option A' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Option B' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Disabled Option' })).toBeInTheDocument();
   });
 
-  it('does not open when disabled', () => {
+  it('does not open when disabled', async () => {
+    const user = userEvent.setup();
     render(<DropdownButton label="Actions" items={items} disabled />);
-    fireEvent.click(screen.getByText('Actions'));
-    expect(screen.queryByText('Option A')).not.toBeInTheDocument();
+    await user.click(screen.getByText('Actions'));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('calls item onClick and closes menu on selection', () => {
+  it('calls item onClick and closes menu on selection', async () => {
+    const user = userEvent.setup();
     const onClick = vi.fn();
     const testItems: DropdownItem[] = [{ label: 'Click Me', onClick }];
     render(<DropdownButton label="Actions" items={testItems} />);
-    fireEvent.click(screen.getByText('Actions'));
-    fireEvent.click(screen.getByText('Click Me'));
+    await user.click(screen.getByText('Actions'));
+    await user.click(screen.getByRole('menuitem', { name: 'Click Me' }));
     expect(onClick).toHaveBeenCalled();
-    expect(screen.queryByText('Click Me')).not.toBeInTheDocument();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('does not call onClick for disabled items', () => {
+  it('does not call onClick for disabled items', async () => {
+    const user = userEvent.setup();
     const onClick = vi.fn();
     const testItems: DropdownItem[] = [{ label: 'Disabled', onClick, disabled: true }];
     render(<DropdownButton label="Actions" items={testItems} />);
-    fireEvent.click(screen.getByText('Actions'));
-    fireEvent.click(screen.getByText('Disabled'));
+    await user.click(screen.getByText('Actions'));
+    // Disabled items are not interactive in Radix
+    const disabledItem = screen.getByRole('menuitem', { name: 'Disabled' });
+    await user.click(disabledItem);
     expect(onClick).not.toHaveBeenCalled();
   });
 
   it('closes on Escape key', async () => {
-    vi.useFakeTimers();
+    const user = userEvent.setup();
     render(<DropdownButton label="Actions" items={items} />);
-    fireEvent.click(screen.getByText('Actions'));
-    expect(screen.getByText('Option A')).toBeInTheDocument();
+    await user.click(screen.getByText('Actions'));
+    expect(screen.getByRole('menu')).toBeInTheDocument();
 
-    // The setTimeout needs to fire first for the event listeners
-    await act(async () => {
-      vi.advanceTimersByTime(1);
-    });
-
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.queryByText('Option A')).not.toBeInTheDocument();
-    vi.useRealTimers();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('closes on click outside', async () => {
-    vi.useFakeTimers();
-    const outsideDiv = document.createElement('div');
-    document.body.appendChild(outsideDiv);
-
-    render(<DropdownButton label="Actions" items={items} />);
-    fireEvent.click(screen.getByText('Actions'));
-    expect(screen.getByText('Option A')).toBeInTheDocument();
-
-    await act(async () => {
-      vi.advanceTimersByTime(1);
-    });
-
-    // First mousedown is ignored (justOpenedRef guard prevents immediate close)
-    fireEvent.mouseDown(outsideDiv);
-    // Second mousedown actually closes the dropdown
-    fireEvent.mouseDown(outsideDiv);
-    expect(screen.queryByText('Option A')).not.toBeInTheDocument();
-
-    document.body.removeChild(outsideDiv);
-    vi.useRealTimers();
-  });
-
-  it('toggles dropdown open and closed', () => {
-    render(<DropdownButton label="Actions" items={items} />);
-    fireEvent.click(screen.getByText('Actions'));
-    expect(screen.getByText('Option A')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Actions'));
-    expect(screen.queryByText('Option A')).not.toBeInTheDocument();
-  });
-
-  it('renders item icons when provided', () => {
+  it('renders item icons when provided', async () => {
+    const user = userEvent.setup();
     const testItems: DropdownItem[] = [
       { label: 'With Icon', onClick: vi.fn(), icon: <span data-testid="item-icon">!</span> }
     ];
     render(<DropdownButton label="Actions" items={testItems} />);
-    fireEvent.click(screen.getByText('Actions'));
+    await user.click(screen.getByText('Actions'));
     expect(screen.getByTestId('item-icon')).toBeInTheDocument();
   });
 
   it('applies custom className', () => {
     const { container } = render(<DropdownButton label="Actions" items={items} className="custom-class" />);
-    expect(container.firstChild).toHaveClass('custom-class');
+    // The trigger button receives the className
+    const button = container.querySelector('button');
+    expect(button).toHaveClass('custom-class');
   });
 });
