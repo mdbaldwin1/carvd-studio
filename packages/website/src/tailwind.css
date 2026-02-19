@@ -1,1 +1,251 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+/* ==========================================================================
+   Carvd Studio Website — Twilight Studio Design System
+   Theming: CSS custom properties + shadcn/ui vars + Tailwind @theme inline
+   ========================================================================== */
+
+:root {
+  /* ============================================================
+   * PALETTE
+   *   #203864  Twilight Indigo
+   *   #077187  Cerulean
+   *   #AEA4BF  Lilac Ash
+   *   #FFD21F  Gold
+   *   #FFEECF  Papaya Whip
+   * ============================================================ */
+
+  /* Backgrounds */
+  --color-bg: #1a1a1a;
+  --color-bg-alt: #222222;
+  --color-surface: #242424;
+  --color-surface-elevated: #2d2d2d;
+  --color-border: #333333;
+
+  /* Text — Papaya Whip */
+  --color-text: #ffeecf;
+  --color-text-muted: #a89f8f;
+
+  /* Accent — Lilac Ash (secondary actions, links, decorative) */
+  --color-accent: #aea4bf;
+  --color-accent-hover: #c4bcd0;
+  --color-accent-muted: #8d82a3;
+
+  /* Primary — Cerulean (main interactive color) */
+  --color-primary: #077187;
+  --color-primary-hover: #09a2bc;
+  --color-primary-text: #09a2bc; /* AA-compliant on dark bg (5.97:1) */
+
+  /* Semantic */
+  --color-success: #2a9d6a;
+  --color-warning: #ffd21f;
+  --color-error: #c45454;
+  --color-highlight: #ffd21f;
+
+  /* ============================================================
+   * SPACING SCALE
+   * ============================================================ */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+
+  /* ============================================================
+   * TYPOGRAPHY
+   * ============================================================ */
+  --font-sans:
+    "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", "Oxygen", "Ubuntu",
+    "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  --font-heading: "Roboto Slab", Georgia, "Times New Roman", serif;
+  --font-mono: "Monaco", "Courier New", monospace;
+
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-2xl: 24px;
+  --font-size-3xl: 32px;
+  --font-size-4xl: 40px;
+  --font-size-5xl: 48px;
+  --font-size-6xl: 64px;
+
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ============================================================
+   * BORDER RADIUS
+   * ============================================================ */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* ============================================================
+   * SHADOWS
+   * ============================================================ */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+
+  /* ============================================================
+   * TRANSITIONS
+   * ============================================================ */
+  --transition-fast: 150ms ease-in-out;
+  --transition-base: 250ms ease-in-out;
+  --transition-slow: 400ms ease-in-out;
+
+  /* ============================================================
+   * LAYOUT
+   * ============================================================ */
+  --container-max-width: 1200px;
+  --container-padding: var(--space-lg);
+
+  /* ============================================================
+   * SHADCN/UI CSS VARIABLE CONVENTION
+   * Maps to website --color-* vars above for use in shadcn components.
+   * See: https://ui.shadcn.com/docs/theming
+   * ============================================================ */
+  --background: var(--color-bg);
+  --foreground: var(--color-text);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-text);
+  --primary: var(--color-primary);
+  --primary-foreground: #ffffff;
+  --secondary: var(--color-accent);
+  --secondary-foreground: var(--color-bg);
+  --muted: var(--color-bg-alt);
+  --muted-foreground: var(--color-text-muted);
+  --accent: var(--color-surface-elevated);
+  --accent-foreground: var(--color-text);
+  --destructive: var(--color-error);
+  --destructive-foreground: #ffffff;
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --ring: var(--color-primary);
+  --radius: var(--radius-md);
+
+  color-scheme: dark;
+}
+
+/* ============================================================
+ * LIGHT THEME
+ * Papaya Whip backgrounds, Twilight Indigo text, Cerulean accents.
+ * Applied when data-theme="light" is set on <html>.
+ * ============================================================ */
+[data-theme="light"] {
+  /* Backgrounds — warm cream tones from Papaya Whip */
+  --color-bg: #ffeecf;
+  --color-bg-alt: #ffe4b5;
+  --color-surface: #fff8e8;
+  --color-surface-elevated: #fff0d4;
+  --color-border: #d4c8b0;
+
+  /* Text — Twilight Indigo */
+  --color-text: #203864;
+  --color-text-muted: #756b82;
+
+  /* Accent — Lilac Ash (darkened for light bg contrast) */
+  --color-accent: #8d82a3;
+  --color-accent-hover: #756b82;
+  --color-accent-muted: #aea4bf;
+
+  /* Primary — Cerulean (darkened for light bg contrast) */
+  --color-primary: #055a6c;
+  --color-primary-hover: #077187;
+  --color-primary-text: #077187;
+
+  /* Semantic */
+  --color-success: #228055;
+  --color-warning: #cc8500;
+  --color-error: #b84343;
+  --color-highlight: #cc8500;
+
+  /* Shadows — lighter on warm backgrounds */
+  --shadow-sm: 0 1px 2px rgba(32, 56, 100, 0.15);
+  --shadow-md: 0 4px 6px rgba(32, 56, 100, 0.2);
+  --shadow-lg: 0 10px 15px rgba(32, 56, 100, 0.25);
+
+  color-scheme: light;
+}
+
+/*
+ * Map CSS custom properties to Tailwind theme tokens.
+ * Uses @theme inline to avoid generating duplicate CSS custom properties —
+ * actual values come from :root and [data-theme='light'] above.
+ */
+@theme inline {
+  /* Color tokens — available as bg-*, text-*, border-* Tailwind utilities */
+  --color-bg: var(--color-bg);
+  --color-bg-alt: var(--color-bg-alt);
+  --color-surface: var(--color-surface);
+  --color-surface-elevated: var(--color-surface-elevated);
+  --color-border: var(--color-border);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-muted: var(--color-accent-muted);
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-text: var(--color-primary-text);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
+  --color-highlight: var(--color-highlight);
+
+  /* shadcn token aliases — available as bg-background, text-foreground, etc. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ring: var(--ring);
+
+  /* Font families */
+  --font-family-sans: var(--font-sans);
+  --font-family-serif: var(--font-heading);
+  --font-family-mono: var(--font-mono);
+
+  /* Border radius */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-full: var(--radius-full);
+
+  /* Accordion animations */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
