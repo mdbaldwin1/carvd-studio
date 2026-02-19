@@ -32,9 +32,9 @@ describe("BuyButton", () => {
     it("applies default className", () => {
       renderWithRouter(<BuyButton />);
       const button = screen.getByRole("link");
-      expect(button).toHaveClass("btn");
-      expect(button).toHaveClass("btn-primary");
-      expect(button).toHaveClass("btn-lg");
+      // Uses shadcn Button styles (inline-flex, rounded-md, etc.)
+      expect(button).toHaveClass("inline-flex");
+      expect(button).toHaveClass("rounded-md");
     });
 
     it("applies custom className", () => {
