@@ -59,7 +59,10 @@ export function RadioGroup({
         {options.map((opt) => (
           <label
             key={opt.value}
-            className={cn('flex items-center gap-2 cursor-pointer text-[13px]', opt.disabled && 'opacity-50 cursor-not-allowed')}
+            className={cn(
+              'flex items-center gap-2 cursor-pointer text-[13px]',
+              opt.disabled && 'opacity-50 cursor-not-allowed'
+            )}
           >
             <input
               type="radio"

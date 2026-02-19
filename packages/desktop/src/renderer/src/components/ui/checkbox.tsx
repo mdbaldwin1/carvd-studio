@@ -3,10 +3,7 @@ import { cn } from '@renderer/lib/utils';
 
 type CheckboxProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>;
 
-const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Checkbox(
-  { className, ...props },
-  ref
-) {
+const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(function Checkbox({ className, ...props }, ref) {
   return (
     <input
       ref={ref}

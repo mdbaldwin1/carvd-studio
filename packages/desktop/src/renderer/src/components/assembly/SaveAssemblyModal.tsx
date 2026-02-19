@@ -138,7 +138,11 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
 
             <div className="property-group">
               <label className="flex items-center gap-2.5 cursor-pointer text-sm">
-                <Checkbox className="w-4 h-4" checked={addToLibrary} onChange={(e) => setAddToLibrary(e.target.checked)} />
+                <Checkbox
+                  className="w-4 h-4"
+                  checked={addToLibrary}
+                  onChange={(e) => setAddToLibrary(e.target.checked)}
+                />
                 Also add to my Assembly Library
                 <HelpTooltip
                   text="If checked, this assembly will be available in all projects via the Stock/Assembly Library."
