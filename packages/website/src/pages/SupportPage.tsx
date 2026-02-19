@@ -4,7 +4,6 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { createFAQSchema } from "../utils/jsonLd";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import TroubleshootingSection from "./support/TroubleshootingSection";
 import FAQSection, { supportFAQs } from "./support/FAQSection";
 import ContactSection from "./support/ContactSection";
