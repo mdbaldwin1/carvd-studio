@@ -9,10 +9,17 @@ import ValueComparison from "./pricing/ValueComparison";
 import ROISection from "./pricing/ROISection";
 import CompetitorComparison from "./pricing/CompetitorComparison";
 import PricingFAQ, { pricingFAQs } from "./pricing/PricingFAQ";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+
+const surfaceGradientStyle = {
+  background:
+    "linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-elevated) 100%)",
+};
 
 export default function PricingPage() {
   return (
-    <div className="page bg-gradient-radial">
+    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
       <SEO
         title="Pricing"
         description="One-time purchase, no subscription. Carvd Studio woodworking design software for $59.99. Own it forever with free updates."
@@ -21,19 +28,21 @@ export default function PricingPage() {
       />
       <Header />
 
-      {/* Main Content */}
-      <main id="main-content" className="page-content container">
-        <div className="py-3xl">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="badge badge-highlight mb-lg">
+      <main id="main-content" className="container flex-1">
+        <div className="py-16">
+          <div className="mx-auto max-w-4xl text-center">
+            <Badge
+              variant="outline"
+              className="mx-auto mb-6 gap-1 border-accent bg-[rgba(174,164,191,0.2)] text-accent"
+            >
               <Coins size={16} /> Less Than 6 Months of Subscription Software
-            </div>
-            <h1 className="text-6xl font-bold mb-lg">
+            </Badge>
+            <h1 className="mb-6 text-6xl font-bold">
               Pay Once.
               <br />
-              <span className="text-primary">Own It Forever.</span>
+              <span className="text-primary-text">Own It Forever.</span>
             </h1>
-            <p className="text-xl text-muted text-center mb-3xl max-w-2xl mx-auto">
+            <p className="mx-auto mb-16 max-w-2xl text-center text-xl text-text-muted">
               Even the cheapest furniture design subscriptions start at
               $10/month. That's $60 after 6 months. Carvd Studio costs $59.99
               once—and you own it forever.
@@ -46,25 +55,33 @@ export default function PricingPage() {
             <PricingFAQ />
 
             {/* Final CTA */}
-            <div className="cta-section mt-3xl">
-              <h2 className="cta-title">Stop Wasting Money on Subscriptions</h2>
-              <p className="cta-description">
+            <div
+              className="my-16 rounded-xl border-2 border-accent p-16 text-center max-md:p-12 max-sm:my-8 max-sm:p-8"
+              style={surfaceGradientStyle}
+            >
+              <h2 className="mb-4 text-4xl font-bold max-md:text-2xl max-sm:text-xl">
+                Stop Wasting Money on Subscriptions
+              </h2>
+              <p className="mx-auto mb-8 max-w-[600px] text-xl text-text-muted max-md:text-lg max-sm:text-base">
                 Buy once. Use forever. Save thousands.
               </p>
-              <div className="flex gap-md justify-center mb-lg">
-                <a href="#download" className="btn btn-highlight btn-lg">
-                  Download Free Trial
-                </a>
+              <div className="mb-6 flex justify-center gap-4 max-sm:flex-col max-sm:items-center">
+                <Button size="lg" asChild>
+                  <a href="#download">Download Free Trial</a>
+                </Button>
                 <BuyButton />
               </div>
-              <p className="text-sm text-muted">
+              <p className="text-sm text-text-muted">
                 ✓ 30-day money-back guarantee &nbsp;•&nbsp; ✓ 3-device license
                 &nbsp;•&nbsp; ✓ Free updates forever
               </p>
             </div>
 
             {/* Back Link */}
-            <a href="/" className="back-link mt-3xl block">
+            <a
+              href="/"
+              className="mt-16 block inline-flex items-center gap-1 font-medium text-accent transition-colors hover:text-accent-hover hover:underline"
+            >
               ← Back to Home
             </a>
           </div>

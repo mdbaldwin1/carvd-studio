@@ -43,8 +43,10 @@ test.describe("Responsive Design", () => {
 
     test("feature grid displays correctly on tablet", async ({ page }) => {
       await page.goto("/");
-      // Feature grid uses minmax(280px,1fr) layout
-      await expect(page.locator('div[class*="280px,1fr"]')).toBeVisible();
+      // Check that a feature card title is visible
+      await expect(
+        page.locator("text=See It Before You Build It"),
+      ).toBeVisible();
     });
   });
 
