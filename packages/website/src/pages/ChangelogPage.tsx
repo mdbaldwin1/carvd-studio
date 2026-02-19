@@ -3,6 +3,7 @@ import { parseChangelog } from "../utils/changelogParser";
 import SEO from "../components/SEO";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { Badge } from "@/components/ui/badge";
 
 const versions = parseChangelog(changelogRaw);
 
@@ -16,20 +17,20 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function getCategoryBadgeClass(name: string): string {
+function getCategoryBadgeClasses(name: string): string {
   switch (name.toLowerCase()) {
     case "added":
-      return "badge-success";
+      return "border-success bg-[rgba(76,175,80,0.2)] text-success";
     case "changed":
-      return "badge-primary";
+      return "border-primary bg-[rgba(7,113,135,0.2)] text-primary-text";
     case "fixed":
-      return "badge-warning";
+      return "border-warning bg-[rgba(255,210,31,0.2)] text-warning";
     case "removed":
-      return "badge-highlight";
+      return "border-accent bg-[rgba(174,164,191,0.2)] text-accent";
     case "deprecated":
-      return "badge-warning";
+      return "border-warning bg-[rgba(255,210,31,0.2)] text-warning";
     case "security":
-      return "badge-primary";
+      return "border-primary bg-[rgba(7,113,135,0.2)] text-primary-text";
     default:
       return "";
   }
@@ -37,7 +38,7 @@ function getCategoryBadgeClass(name: string): string {
 
 export default function ChangelogPage() {
   return (
-    <div className="page bg-gradient-radial">
+    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
       <SEO
         title="Changelog"
         description="Latest updates and release notes for Carvd Studio. See what's new in each version."
@@ -46,56 +47,64 @@ export default function ChangelogPage() {
       <Header />
 
       {/* Main Content */}
-      <main id="main-content" className="page-content container">
-        <div className="py-3xl">
-          <div className="max-w-3xl mx-auto">
-            <h1 className="text-5xl font-bold mb-lg">Changelog</h1>
-            <p className="text-muted mb-3xl">
+      <main id="main-content" className="container flex-1">
+        <div className="py-16">
+          <div className="mx-auto max-w-3xl">
+            <h1 className="mb-6 text-5xl font-bold max-md:text-4xl max-sm:text-3xl">
+              Changelog
+            </h1>
+            <p className="mb-16 text-text-muted">
               All notable changes to Carvd Studio are documented here. This
               project follows{" "}
               <a
                 href="https://semver.org/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-accent"
+                className="text-accent transition-colors hover:text-accent-hover hover:underline"
               >
                 Semantic Versioning
               </a>
               .
             </p>
 
-            <div className="grid gap-3xl">
+            <div className="grid gap-16">
               {versions.map((version) => (
                 <section
                   key={version.version}
                   id={`v${version.version}`}
-                  className="changelog-version"
+                  className="border-l-[3px] border-accent pl-6"
                 >
-                  <div className="flex items-center gap-md mb-lg">
-                    <span className="badge badge-highlight">
+                  <div className="mb-6 flex items-center gap-4">
+                    <Badge
+                      variant="outline"
+                      className="border-accent bg-[rgba(174,164,191,0.2)] text-accent"
+                    >
                       v{version.version}
-                    </span>
-                    <span className="text-muted text-sm">
+                    </Badge>
+                    <span className="text-sm text-text-muted">
                       {formatDate(version.date)}
                     </span>
                   </div>
 
                   {version.categories.map((category) => (
-                    <div key={category.name} className="mb-xl">
-                      <div className="mb-md">
-                        <span
-                          className={`badge ${getCategoryBadgeClass(category.name)}`}
+                    <div key={category.name} className="mb-8">
+                      <div className="mb-4">
+                        <Badge
+                          variant="outline"
+                          className={getCategoryBadgeClasses(category.name)}
                         >
                           {category.name}
-                        </span>
+                        </Badge>
                       </div>
-                      <ul className="changelog-entries">
+                      <ul className="m-0 flex list-none flex-col gap-2 p-0">
                         {category.entries.map((entry, i) => (
-                          <li key={i} className="changelog-entry">
+                          <li key={i} className="py-1 text-sm leading-relaxed">
                             {entry.description ? (
                               <>
-                                <strong>{entry.text}</strong>
-                                <span className="text-muted">
+                                <strong className="text-text">
+                                  {entry.text}
+                                </strong>
+                                <span className="text-text-muted">
                                   {" "}
                                   — {entry.description}
                                 </span>
@@ -113,7 +122,10 @@ export default function ChangelogPage() {
             </div>
 
             {/* Back Link */}
-            <a href="/docs" className="back-link mt-3xl block">
+            <a
+              href="/docs"
+              className="mt-16 block inline-flex items-center gap-1 font-medium text-accent transition-colors hover:text-accent-hover hover:underline"
+            >
               ← Back to Documentation
             </a>
           </div>

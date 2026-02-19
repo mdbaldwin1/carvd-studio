@@ -3,15 +3,21 @@ import SEO from "../components/SEO";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { createFAQSchema } from "../utils/jsonLd";
+import { Button } from "@/components/ui/button";
 import TroubleshootingSection from "./support/TroubleshootingSection";
 import FAQSection, { supportFAQs } from "./support/FAQSection";
 import ContactSection from "./support/ContactSection";
 
 const supportEmail = "support@carvd-studio.com";
 
+const surfaceGradientStyle = {
+  background:
+    "linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-elevated) 100%)",
+};
+
 export default function SupportPage() {
   return (
-    <div className="page bg-gradient-radial">
+    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
       <SEO
         title="Support"
         description="Get help with Carvd Studio. Troubleshooting guides, frequently asked questions, and contact information for our support team."
@@ -21,39 +27,58 @@ export default function SupportPage() {
       <Header />
 
       {/* Main Content */}
-      <main id="main-content" className="page-content container">
-        <div className="py-3xl">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-5xl font-bold mb-lg text-center">
+      <main id="main-content" className="container flex-1">
+        <div className="py-16">
+          <div className="mx-auto max-w-4xl">
+            <h1 className="mb-6 text-center text-5xl font-bold max-md:text-4xl max-sm:text-3xl">
               How Can We Help?
             </h1>
-            <p className="text-xl text-muted text-center mb-3xl max-w-2xl mx-auto">
+            <p className="mx-auto mb-16 max-w-2xl text-center text-xl text-text-muted max-md:text-lg max-sm:text-base">
               Find answers to common questions, troubleshoot issues, or get in
               touch with our support team.
             </p>
 
             {/* Quick Links */}
-            <div className="grid grid-cols-3 gap-lg mb-3xl">
-              <a href="#troubleshooting" className="support-card">
-                <span className="support-card-icon">
+            <div className="mb-16 grid grid-cols-3 gap-6 max-md:grid-cols-1">
+              <a
+                href="#troubleshooting"
+                className="flex flex-col items-center rounded-lg border border-border bg-card p-8 text-center text-text no-underline transition-all hover:-translate-y-1 hover:border-accent hover:text-text hover:shadow-lg max-md:p-6 max-sm:p-4"
+              >
+                <span className="mb-4 max-md:mb-3 max-sm:mb-2">
                   <Wrench size={24} />
                 </span>
-                <span className="support-card-title">Troubleshooting</span>
-                <span className="support-card-desc">Fix common issues</span>
+                <span className="mb-1 text-xl font-bold max-md:text-lg max-sm:text-base">
+                  Troubleshooting
+                </span>
+                <span className="text-sm text-text-muted">
+                  Fix common issues
+                </span>
               </a>
-              <a href="#faq" className="support-card">
-                <span className="support-card-icon">
+              <a
+                href="#faq"
+                className="flex flex-col items-center rounded-lg border border-border bg-card p-8 text-center text-text no-underline transition-all hover:-translate-y-1 hover:border-accent hover:text-text hover:shadow-lg max-md:p-6 max-sm:p-4"
+              >
+                <span className="mb-4 max-md:mb-3 max-sm:mb-2">
                   <HelpCircle size={24} />
                 </span>
-                <span className="support-card-title">FAQ</span>
-                <span className="support-card-desc">Quick answers</span>
+                <span className="mb-1 text-xl font-bold max-md:text-lg max-sm:text-base">
+                  FAQ
+                </span>
+                <span className="text-sm text-text-muted">Quick answers</span>
               </a>
-              <a href="#contact" className="support-card">
-                <span className="support-card-icon">
+              <a
+                href="#contact"
+                className="flex flex-col items-center rounded-lg border border-border bg-card p-8 text-center text-text no-underline transition-all hover:-translate-y-1 hover:border-accent hover:text-text hover:shadow-lg max-md:p-6 max-sm:p-4"
+              >
+                <span className="mb-4 max-md:mb-3 max-sm:mb-2">
                   <Mail size={24} />
                 </span>
-                <span className="support-card-title">Contact Us</span>
-                <span className="support-card-desc">Get personal help</span>
+                <span className="mb-1 text-xl font-bold max-md:text-lg max-sm:text-base">
+                  Contact Us
+                </span>
+                <span className="text-sm text-text-muted">
+                  Get personal help
+                </span>
               </a>
             </div>
 
@@ -62,19 +87,21 @@ export default function SupportPage() {
             <ContactSection />
 
             {/* CTA */}
-            <section className="cta-section">
-              <h2 className="cta-title">Didn't find what you need?</h2>
-              <p className="cta-description">
+            <div
+              className="my-16 rounded-xl border-2 border-accent p-16 text-center max-md:p-12 max-sm:my-8 max-sm:p-8"
+              style={surfaceGradientStyle}
+            >
+              <h2 className="mb-4 text-4xl font-bold max-md:text-2xl max-sm:text-xl">
+                Didn't find what you need?
+              </h2>
+              <p className="mx-auto mb-8 max-w-[600px] text-xl text-text-muted max-md:text-lg max-sm:text-base">
                 Our support team is here to help. Reach out and we'll get back
                 to you as soon as possible.
               </p>
-              <a
-                href={`mailto:${supportEmail}`}
-                className="btn btn-highlight btn-lg"
-              >
-                Contact Support
-              </a>
-            </section>
+              <Button size="lg" asChild>
+                <a href={`mailto:${supportEmail}`}>Contact Support</a>
+              </Button>
+            </div>
           </div>
         </div>
       </main>
