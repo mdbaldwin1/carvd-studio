@@ -16,7 +16,7 @@ export default function QuickStartPage() {
       />
       <h2 className="text-4xl font-bold mb-xl">Quick Start Guide</h2>
 
-      <div className="accent-box mb-xl">
+      <div className="mb-xl rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
         <p className="font-bold mb-sm">Get building in 5 minutes:</p>
         <ol className="grid gap-md text-sm">
           <li>
@@ -48,7 +48,7 @@ export default function QuickStartPage() {
         </ol>
       </div>
 
-      <div className="accent-box-highlight">
+      <div className="rounded-lg border border-[rgba(174,164,191,0.4)] bg-linear-to-br from-[rgba(174,164,191,0.15)] to-[rgba(174,164,191,0.05)] p-[var(--space-xl)]">
         <p className="text-lg font-bold mb-sm">
           Your 14-Day Trial Includes Everything
         </p>

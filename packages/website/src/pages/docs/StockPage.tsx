@@ -24,7 +24,7 @@ export default function StockPage() {
       </p>
 
       <div className="grid gap-xl">
-        <div className="accent-box">
+        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <Layers size={20} className="inline-block" /> Managing Your Stock
             Library
@@ -55,7 +55,7 @@ export default function StockPage() {
           </div>
         </div>
 
-        <div className="accent-box">
+        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <Lock size={20} className="inline-block" /> Stock Constraints
           </h3>
