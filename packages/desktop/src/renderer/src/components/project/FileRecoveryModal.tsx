@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle, XCircle, FileWarning } from 'lucide-react';
 import { FileRepairResult, getFileSummary } from '../../utils/fileFormat';
+import { Button } from '@renderer/components/ui/button';
 
 interface FileRecoveryModalProps {
   isOpen: boolean;
@@ -167,32 +168,32 @@ export function FileRecoveryModal({
           {/* Initial state buttons */}
           {!hasRepairResult && !isRepairing && (
             <>
-              <button className="btn btn-secondary" onClick={onReject}>
+              <Button size="sm" variant="secondary" onClick={onReject}>
                 Cancel
-              </button>
-              <button className="btn btn-primary" onClick={onAttemptRepair}>
+              </Button>
+              <Button size="sm" onClick={onAttemptRepair}>
                 Attempt Recovery
-              </button>
+              </Button>
             </>
           )}
 
           {/* Repair successful buttons */}
           {hasRepairResult && repairSuccessful && (
             <>
-              <button className="btn btn-secondary" onClick={onReject}>
+              <Button size="sm" variant="secondary" onClick={onReject}>
                 Reject & Cancel
-              </button>
-              <button className="btn btn-primary" onClick={onAcceptRepair}>
+              </Button>
+              <Button size="sm" onClick={onAcceptRepair}>
                 Accept & Open
-              </button>
+              </Button>
             </>
           )}
 
           {/* Repair failed buttons */}
           {hasRepairResult && !repairSuccessful && (
-            <button className="btn btn-secondary" onClick={onReject}>
+            <Button size="sm" variant="secondary" onClick={onReject}>
               Close
-            </button>
+            </Button>
           )}
         </div>
       </div>

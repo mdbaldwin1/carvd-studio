@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, Key, X } from 'lucide-react';
 import { HelpTooltip } from '../common/HelpTooltip';
+import { Button } from '@renderer/components/ui/button';
 
 interface LicenseActivationModalProps {
   isOpen: boolean;
@@ -143,13 +144,14 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
             </div>
 
             {/* Activate Button */}
-            <button
+            <Button
+              size="default"
+              className="w-full"
               onClick={handleActivate}
               disabled={isValidating || !licenseKey.trim()}
-              className="btn btn-md btn-filled btn-primary btn-block"
             >
               {isValidating ? 'Validating...' : 'Activate License'}
-            </button>
+            </Button>
           </>
         )}
 

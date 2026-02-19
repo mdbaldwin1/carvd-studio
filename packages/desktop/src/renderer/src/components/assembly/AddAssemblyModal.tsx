@@ -6,6 +6,7 @@ import { useLicenseStore } from '../../store/licenseStore';
 import { Assembly } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { getFeatureLimits } from '../../utils/featureLimits';
+import { Button } from '@renderer/components/ui/button';
 
 interface AddAssemblyModalProps {
   isOpen: boolean;
@@ -169,15 +170,16 @@ export function AddAssemblyModal({
               <span>{availableAssemblies.length} available</span>
               <div className="flex gap-1 items-center">
                 {availableAssemblies.length > 0 && (
-                  <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleSelectAll}>
+                  <Button variant="ghost" size="xs" onClick={handleSelectAll}>
                     {filteredAssemblies.every((a) => selectedIds.has(a.id)) && filteredAssemblies.length > 0
                       ? 'Deselect All'
                       : 'Select All'}
-                  </button>
+                  </Button>
                 )}
                 {onCreateNew && canCreateAssemblies && (
-                  <button
-                    className="btn btn-icon-xs btn-ghost btn-secondary"
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
                     onClick={() => {
                       onClose();
                       onCreateNew();
@@ -186,7 +188,7 @@ export function AddAssemblyModal({
                     aria-label="Create new assembly"
                   >
                     <Plus size={14} />
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -327,12 +329,12 @@ export function AddAssemblyModal({
         </div>
 
         <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
-          <button className="btn btn-sm btn-outlined btn-secondary" onClick={onClose}>
+          <Button variant="outline" size="sm" onClick={onClose}>
             Cancel
-          </button>
-          <button className="btn btn-sm btn-filled btn-primary" onClick={handleAdd} disabled={selectedIds.size === 0}>
+          </Button>
+          <Button size="sm" onClick={handleAdd} disabled={selectedIds.size === 0}>
             Add to Project{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

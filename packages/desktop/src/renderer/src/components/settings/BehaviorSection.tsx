@@ -1,4 +1,5 @@
 import { HelpTooltip } from '../common/HelpTooltip';
+import { Button } from '@renderer/components/ui/button';
 import { AppSettings } from '../../types';
 
 interface BehaviorSectionProps {
@@ -43,8 +44,9 @@ export function BehaviorSection({ formData, onSettingChange }: BehaviorSectionPr
           <label className="text-[13px] text-text">Welcome Tutorial</label>
           <HelpTooltip text="Reset the welcome tutorial to show it again on next launch." docsSection="quick-start" />
         </div>
-        <button
-          className="btn btn-sm btn-outlined btn-secondary"
+        <Button
+          variant="outline"
+          size="sm"
           onClick={async () => {
             if (confirm('Reset the welcome tutorial? The tutorial will show again next time you launch the app.')) {
               await window.electronAPI.resetWelcomeTutorial();
@@ -53,7 +55,7 @@ export function BehaviorSection({ formData, onSettingChange }: BehaviorSectionPr
           }}
         >
           Reset Tutorial
-        </button>
+        </Button>
       </div>
     </div>
   );

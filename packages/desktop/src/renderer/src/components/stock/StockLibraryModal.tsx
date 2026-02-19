@@ -3,6 +3,7 @@ import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useLicenseStore } from '../../store/licenseStore';
 import { Assembly, Stock } from '../../types';
 import { getFeatureLimits } from '../../utils/featureLimits';
+import { Button } from '@renderer/components/ui/button';
 import { StocksTab } from './StocksTab';
 import { AssembliesTab } from './AssembliesTab';
 
@@ -118,9 +119,9 @@ export function StockLibraryModal({
         </div>
 
         <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
-          <button className="btn btn-sm btn-filled btn-secondary" onClick={onClose}>
+          <Button variant="secondary" size="sm" onClick={onClose}>
             Done
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@
 
 import { Check, Pencil, Save, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '@renderer/components/ui/button';
 
 interface AssemblyEditingBannerProps {
   assemblyName: string;
@@ -90,22 +91,25 @@ export function AssemblyEditingBanner({
         )}
       </div>
       <div className="flex items-center gap-2">
-        <button
-          className="btn btn-sm btn-ghost btn-secondary text-accent-foreground border-black/20 hover:bg-black/10 hover:border-black/30"
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-accent-foreground border-black/20 hover:bg-black/10 hover:border-black/30"
           onClick={onCancel}
           title="Cancel editing"
         >
           <X size={16} />
           Cancel
-        </button>
-        <button
-          className="btn btn-sm btn-filled btn-primary !bg-bg-dark !text-text hover:!bg-border"
+        </Button>
+        <Button
+          size="sm"
+          className="!bg-bg-dark !text-text hover:!bg-border"
           onClick={onSave}
           title="Save changes to library"
         >
           <Save size={16} />
           Save to Library
-        </button>
+        </Button>
       </div>
     </div>
   );

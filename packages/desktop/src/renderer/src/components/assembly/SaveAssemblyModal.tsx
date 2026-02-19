@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { Assembly } from '../../types';
+import { Button } from '@renderer/components/ui/button';
 import { HelpTooltip } from '../common/HelpTooltip';
 
 interface SaveAssemblyModalProps {
@@ -91,9 +92,9 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
           <h2 id="save-assembly-modal-title" className="text-base font-semibold text-text m-0">
             Save as Assembly
           </h2>
-          <button className="btn btn-icon-sm btn-ghost btn-secondary" onClick={onClose} aria-label="Close">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
             ×
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -154,12 +155,12 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
           </div>
 
           <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
-            <button type="button" className="btn btn-sm btn-ghost btn-secondary" onClick={onClose}>
+            <Button type="button" variant="ghost" size="sm" onClick={onClose}>
               Cancel
-            </button>
-            <button type="submit" className="btn btn-sm btn-filled btn-primary" disabled={!hasSelection}>
+            </Button>
+            <Button type="submit" size="sm" disabled={!hasSelection}>
               Save Assembly
-            </button>
+            </Button>
           </div>
         </form>
       </div>
