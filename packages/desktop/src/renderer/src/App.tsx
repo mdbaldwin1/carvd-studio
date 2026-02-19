@@ -388,6 +388,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
               variant="ghost"
               size="icon"
               active={searchOpen.stock}
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 // if opening search, also expand section if collapsed
@@ -404,6 +405,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             <Button
               variant="ghost"
               size="icon"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 if (isEditingAssembly) {
@@ -536,6 +538,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
               variant="ghost"
               size="icon"
               active={searchOpen.assemblies}
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 // if opening search, also expand section if collapsed
@@ -555,6 +558,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                   variant="ghost"
                   size="icon"
                   disabled
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                   title="Finish editing current assembly first"
                 >
@@ -564,6 +568,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                 <Button
                   variant="ghost"
                   size="icon"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsAddAssemblyModalOpen(true);
@@ -699,6 +704,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
               variant="ghost"
               size="icon"
               active={searchOpen.parts}
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 // if opening search, also expand section if collapsed
@@ -715,6 +721,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             <Button
               variant="ghost"
               size="icon"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 handleAddPart();
