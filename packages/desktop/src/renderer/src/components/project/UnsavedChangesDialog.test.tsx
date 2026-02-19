@@ -43,6 +43,12 @@ describe('UnsavedChangesDialog', () => {
       expect(screen.getByText("Don't Save")).toBeInTheDocument();
       expect(screen.getByText('Save')).toBeInTheDocument();
     });
+
+    it('renders with alertdialog role', () => {
+      render(<UnsavedChangesDialog {...defaultProps} />);
+
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    });
   });
 
   describe('action messages', () => {
@@ -131,22 +137,12 @@ describe('UnsavedChangesDialog', () => {
       expect(onCancel).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onCancel when clicking the overlay', () => {
+    it('does not close when clicking inside dialog content', () => {
       const onCancel = vi.fn();
       render(<UnsavedChangesDialog {...defaultProps} onCancel={onCancel} />);
 
-      const overlay = document.querySelector('.modal-overlay')!;
-      fireEvent.click(overlay);
-
-      expect(onCancel).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not call onCancel when clicking the modal content', () => {
-      const onCancel = vi.fn();
-      render(<UnsavedChangesDialog {...defaultProps} onCancel={onCancel} />);
-
-      const modal = document.querySelector('.modal')!;
-      fireEvent.click(modal);
+      const dialog = screen.getByRole('alertdialog');
+      fireEvent.click(dialog);
 
       expect(onCancel).not.toHaveBeenCalled();
     });
