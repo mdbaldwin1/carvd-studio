@@ -1,4 +1,5 @@
 import { FileText, Star, Trash2, AlertTriangle } from 'lucide-react';
+import { Card } from '@renderer/components/ui/card';
 import { RecentProject, formatRelativeDate } from './StartScreen';
 
 interface RecentsTabProps {
@@ -29,7 +30,7 @@ export function RecentsTab({
   return (
     <div className="flex flex-col gap-1 flex-auto min-h-0 max-h-full overflow-y-auto">
       {projects.map((project) => (
-        <div
+        <Card
           key={project.path}
           className={`project-item group relative flex items-center gap-3 py-3 px-4 bg-transparent border border-transparent rounded-lg cursor-pointer transition-all duration-100 text-left w-full hover:bg-bg-secondary hover:border-border ${!project.exists ? 'missing opacity-60 !cursor-default hover:!bg-transparent hover:!border-transparent' : ''}`}
           onClick={() => {
@@ -97,7 +98,7 @@ export function RecentsTab({
               <Trash2 size={16} />
             </button>
           </div>
-        </div>
+        </Card>
       ))}
     </div>
   );
