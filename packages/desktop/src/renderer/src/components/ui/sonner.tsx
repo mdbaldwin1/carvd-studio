@@ -18,7 +18,7 @@ function Toaster() {
       richColors
       duration={2000}
       toastOptions={{
-        className: 'text-[13px] font-medium',
+        className: 'text-[13px] font-medium'
       }}
     />
   );

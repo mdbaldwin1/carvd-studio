@@ -31,9 +31,7 @@ describe('Toaster', () => {
 
     render(<Toaster />);
 
-    expect(MockSonnerToaster).toHaveBeenCalledWith(
-      expect.objectContaining({ theme: 'dark' })
-    );
+    expect(MockSonnerToaster).toHaveBeenCalledWith(expect.objectContaining({ theme: 'dark' }));
   });
 
   it('passes light theme from app settings', () => {
@@ -41,9 +39,7 @@ describe('Toaster', () => {
 
     render(<Toaster />);
 
-    expect(MockSonnerToaster).toHaveBeenCalledWith(
-      expect.objectContaining({ theme: 'light' })
-    );
+    expect(MockSonnerToaster).toHaveBeenCalledWith(expect.objectContaining({ theme: 'light' }));
   });
 
   it('uses bottom-center position with offset', () => {
