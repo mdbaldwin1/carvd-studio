@@ -62,8 +62,8 @@ describe('ProgressBar', () => {
     it('sets width style based on progress', () => {
       render(<ProgressBar progress={60} />);
 
-      const progressbar = screen.getByRole('progressbar');
-      expect(progressbar).toHaveStyle({ width: '60%' });
+      const indicator = screen.getByRole('progressbar').querySelector('[data-slot="progress-indicator"]');
+      expect(indicator).toHaveStyle({ width: '60%' });
     });
   });
 
@@ -94,29 +94,29 @@ describe('ProgressBar', () => {
     it('applies blue color class by default', () => {
       render(<ProgressBar progress={50} />);
 
-      const progressbar = screen.getByRole('progressbar');
-      expect(progressbar).toHaveClass('bg-primary');
+      const indicator = screen.getByRole('progressbar').querySelector('[data-slot="progress-indicator"]');
+      expect(indicator).toHaveClass('bg-primary');
     });
 
     it('applies green color class', () => {
       render(<ProgressBar progress={50} color="green" />);
 
-      const progressbar = screen.getByRole('progressbar');
-      expect(progressbar).toHaveClass('bg-success');
+      const indicator = screen.getByRole('progressbar').querySelector('[data-slot="progress-indicator"]');
+      expect(indicator).toHaveClass('bg-success');
     });
 
     it('applies yellow color class', () => {
       render(<ProgressBar progress={50} color="yellow" />);
 
-      const progressbar = screen.getByRole('progressbar');
-      expect(progressbar).toHaveClass('bg-accent');
+      const indicator = screen.getByRole('progressbar').querySelector('[data-slot="progress-indicator"]');
+      expect(indicator).toHaveClass('bg-accent');
     });
 
     it('applies red color class', () => {
       render(<ProgressBar progress={50} color="red" />);
 
-      const progressbar = screen.getByRole('progressbar');
-      expect(progressbar).toHaveClass('bg-danger');
+      const indicator = screen.getByRole('progressbar').querySelector('[data-slot="progress-indicator"]');
+      expect(indicator).toHaveClass('bg-danger');
     });
   });
 

@@ -15,22 +15,22 @@ describe('LoadingSpinner', () => {
     it('renders with small size', () => {
       render(<LoadingSpinner size="small" />);
 
-      const spinner = screen.getByRole('status');
-      expect(spinner).toHaveClass('w-4');
+      const spinnerDot = screen.getByRole('status').querySelector('.w-4');
+      expect(spinnerDot).toBeInTheDocument();
     });
 
     it('renders with medium size by default', () => {
       render(<LoadingSpinner />);
 
-      const spinner = screen.getByRole('status');
-      expect(spinner).toHaveClass('w-8');
+      const spinnerDot = screen.getByRole('status').querySelector('.w-8');
+      expect(spinnerDot).toBeInTheDocument();
     });
 
     it('renders with large size', () => {
       render(<LoadingSpinner size="large" />);
 
-      const spinner = screen.getByRole('status');
-      expect(spinner).toHaveClass('w-12');
+      const spinnerDot = screen.getByRole('status').querySelector('.w-12');
+      expect(spinnerDot).toBeInTheDocument();
     });
 
     it('displays message when provided', () => {
@@ -48,7 +48,7 @@ describe('LoadingSpinner', () => {
     it('applies custom className', () => {
       render(<LoadingSpinner className="custom-class" />);
 
-      const container = screen.getByRole('status').parentElement;
+      const container = screen.getByRole('status');
       expect(container).toHaveClass('custom-class');
     });
   });
@@ -70,8 +70,8 @@ describe('LoadingOverlay', () => {
   it('renders large spinner', () => {
     render(<LoadingOverlay />);
 
-    const spinner = screen.getByRole('status');
-    expect(spinner).toHaveClass('w-12');
+    const spinnerDot = screen.getByRole('status').querySelector('.w-12');
+    expect(spinnerDot).toBeInTheDocument();
   });
 
   it('has overlay class for styling', () => {
