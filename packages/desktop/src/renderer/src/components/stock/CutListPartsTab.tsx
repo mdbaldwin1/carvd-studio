@@ -8,6 +8,7 @@ import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { logger } from '../../utils/logger';
 import { CutList, CutInstruction } from '../../types';
 import { DropdownButton, DropdownItem } from '../common/DropdownButton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@renderer/components/ui/table';
 
 // Grouped cut instruction for parts with identical dimensions
 interface GroupedCutInstruction {
@@ -144,20 +145,20 @@ export function CutListPartsTab({
         <DropdownButton label="Download" icon={<Download size={14} />} items={downloadItems} />
       </div>
       <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 border border-border rounded bg-surface">
-        <table className="w-full border-collapse text-[13px] [&_th]:py-2 [&_th]:px-3 [&_th]:text-left [&_th]:border-b [&_th]:border-border [&_td]:py-2 [&_td]:px-3 [&_td]:text-left [&_td]:border-b [&_td]:border-border [&_th]:bg-bg [&_th]:text-text-muted [&_th]:font-medium [&_th]:text-[11px] [&_th]:uppercase [&_th]:tracking-wider [&_th]:sticky [&_th]:top-0 [&_th]:z-[1]">
-          <thead>
-            <tr>
-              <th className="col-expand w-6 text-center"></th>
-              <th className="col-qty w-12 text-center">Qty</th>
-              <th>Part Name</th>
-              <th>Cut Length</th>
-              <th>Cut Width</th>
-              <th>Thickness</th>
-              <th>Stock</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="col-expand sticky top-0 z-[1] w-6 text-center"></TableHead>
+              <TableHead className="col-qty sticky top-0 z-[1] w-12 text-center">Qty</TableHead>
+              <TableHead className="sticky top-0 z-[1]">Part Name</TableHead>
+              <TableHead className="sticky top-0 z-[1]">Cut Length</TableHead>
+              <TableHead className="sticky top-0 z-[1]">Cut Width</TableHead>
+              <TableHead className="sticky top-0 z-[1]">Thickness</TableHead>
+              <TableHead className="sticky top-0 z-[1]">Stock</TableHead>
+              <TableHead className="sticky top-0 z-[1]">Notes</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {groupedInstructions.map((group) => {
               const isExpanded = expandedGroups.has(group.key);
               const hasMultiple = group.quantity > 1;
@@ -165,15 +166,15 @@ export function CutListPartsTab({
               return (
                 <React.Fragment key={group.key}>
                   {/* Group row */}
-                  <tr
+                  <TableRow
                     className={`${group.isGlueUp ? 'glue-up-row' : ''} ${hasMultiple ? 'cursor-pointer hover:bg-bg-hover' : ''}`}
                     onClick={hasMultiple ? () => toggleGroup(group.key) : undefined}
                   >
-                    <td className="col-expand w-6 text-center">
+                    <TableCell className="col-expand w-6 text-center">
                       {hasMultiple && (isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
-                    </td>
-                    <td className="col-qty w-12 text-center">{group.quantity}</td>
-                    <td className="col-part-name">
+                    </TableCell>
+                    <TableCell className="col-qty w-12 text-center">{group.quantity}</TableCell>
+                    <TableCell className="col-part-name">
                       {hasMultiple ? (
                         <span className="text-[11px] text-text-muted italic">
                           {isExpanded ? 'Click to collapse' : 'Click to expand'}
@@ -181,12 +182,12 @@ export function CutListPartsTab({
                       ) : (
                         group.items[0].partName
                       )}
-                    </td>
-                    <td>{formatMeasurementWithUnit(group.cutLength, units)}</td>
-                    <td>{formatMeasurementWithUnit(group.cutWidth, units)}</td>
-                    <td>{formatMeasurementWithUnit(group.thickness, units)}</td>
-                    <td>{group.stockName}</td>
-                    <td>
+                    </TableCell>
+                    <TableCell>{formatMeasurementWithUnit(group.cutLength, units)}</TableCell>
+                    <TableCell>{formatMeasurementWithUnit(group.cutWidth, units)}</TableCell>
+                    <TableCell>{formatMeasurementWithUnit(group.thickness, units)}</TableCell>
+                    <TableCell>{group.stockName}</TableCell>
+                    <TableCell>
                       {group.isGlueUp && (
                         <Badge
                           variant="outline"
@@ -206,27 +207,29 @@ export function CutListPartsTab({
                       {!hasMultiple && group.items[0].notes && (
                         <span className="text-[11px] text-text-muted italic">{group.items[0].notes}</span>
                       )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
 
                   {/* Expanded item rows */}
                   {isExpanded &&
                     group.items.map((item) => (
-                      <tr key={item.partId} className="bg-bg-alt [&>td]:border-[rgba(255,255,255,0.05)]">
-                        <td className="col-expand w-6 text-center"></td>
-                        <td className="col-qty w-12 text-center"></td>
-                        <td className="col-part-name pl-2 text-text-muted text-[12px]">{item.partName}</td>
-                        <td colSpan={4}></td>
-                        <td>
+                      <TableRow key={item.partId} className="bg-bg-alt">
+                        <TableCell className="col-expand w-6 border-[rgba(255,255,255,0.05)] text-center"></TableCell>
+                        <TableCell className="col-qty w-12 border-[rgba(255,255,255,0.05)] text-center"></TableCell>
+                        <TableCell className="col-part-name border-[rgba(255,255,255,0.05)] pl-2 text-[12px] text-text-muted">
+                          {item.partName}
+                        </TableCell>
+                        <TableCell className="border-[rgba(255,255,255,0.05)]" colSpan={4}></TableCell>
+                        <TableCell className="border-[rgba(255,255,255,0.05)]">
                           {item.notes && <span className="text-[11px] text-text-muted italic">{item.notes}</span>}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
                 </React.Fragment>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

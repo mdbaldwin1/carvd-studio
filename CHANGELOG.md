@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Desktop Tabs migration (bead carvd-studio-5.1)** — Added shadcn/Radix Tabs primitive (`components/ui/tabs.tsx`) and migrated tabbed flows in StartScreen, CutListModal, and StockLibraryModal from local `activeTab` state to semantic `Tabs`/`TabsTrigger`/`TabsContent` patterns; updated affected component tests to role-based tab assertions compatible with Radix `data-state`.
+- **Desktop Table migration (bead carvd-studio-5.2)** — Added shadcn-style table primitives (`components/ui/table.tsx`) and migrated cut-list parts rendering in `CutListPartsTab` from native table markup to `Table`/`TableHeader`/`TableBody`/`TableRow`/`TableHead`/`TableCell` while preserving existing column selectors (`col-*`) and Twilight Studio styling semantics.
 - **Aesthetic redesign ("Twilight Studio" theme)** — Refreshed dark/light color palette with Twilight Indigo (#203864), Cerulean (#077187), Lilac Ash (#AEA4BF), Gold (#FFD21F), and Papaya Whip (#FFEECF); updated backgrounds, borders, text tones, sidebar, header, and button styles
 - **Font update** — Switched to Nunito Sans for improved readability and warmth
 - **Splash screen theming** — Splash screen now respects light/dark mode with theme-aware colors and font

@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-19 (updated)
 **Branch**: develop
-**Last develop SHA**: `cf2a303` (after bead status PR #238 merge)
+**Last develop SHA**: `3ef77c6` (after bead 5.1 PR #241 merge)
 
 ## Key Instruction Documents
 
@@ -63,61 +63,39 @@ These documents define the migration workflow and must be followed:
 | 10.6 | #232 | Docs content pages                       |
 | 10.7 | #231 | Legal pages + 404                        |
 
-**Total: 24 beads merged across 5 epics (2, 3, 4, 9, 10)**
+### Epic 5: Desktop Complex Components (in progress)
+
+| Bead | PR   | Description                            |
+| ---- | ---- | -------------------------------------- |
+| 5.1  | #241 | Tabs migration (Start/CutList/Library) |
+
+**Total: 25 beads merged across 6 epics (2, 3, 4, 5, 9, 10)**
 
 ## Active Worktrees
 
-| Worktree                                 | Branch                | State                                    |
-| ---------------------------------------- | --------------------- | ---------------------------------------- |
-| `/Users/mbaldwin/Carvd/carvd-studio-5.1` | feat/carvd-studio-5.1 | **In-progress work stashed** (see below) |
+| Worktree                                 | Branch                | State                    |
+| ---------------------------------------- | --------------------- | ------------------------ |
+| `/Users/mbaldwin/Carvd/carvd-studio-5.2` | feat/carvd-studio-5.2 | **In progress (active)** |
 
-All other worktrees (4.1–4.5, 10.6, 10.7) have been cleaned up.
+All completed worktrees through bead 5.1 have been cleaned up.
 
-## In-Progress Work: Bead 5.1 (Tabs)
+## In-Progress Work: Bead 5.2 (Table)
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-5.1`
-**Branch**: `feat/carvd-studio-5.1`
-**State**: Work is stashed (`git stash pop` to restore)
+**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-5.2`
+**Branch**: `feat/carvd-studio-5.2`
+**State**: Implementation complete; PR prep in progress
 
 ### What was done:
 
-1. `@radix-ui/react-tabs` installed via npm
-2. `components/ui/tabs.tsx` created — shadcn Tabs wrapper with Radix primitives
-3. `CutListModal.tsx` — Tabs migration complete (replaced manual `activeTab` state with `<Tabs defaultValue="parts">`)
-4. `StartScreen.tsx` — Tabs migration complete (replaced manual `activeTab` state with `<Tabs defaultValue="recents">`)
-5. `StockLibraryModal.tsx` — Tabs migration complete (replaced manual `activeTab` state with `<Tabs defaultValue="stocks">`)
+1. Added table primitive at `packages/desktop/src/renderer/src/components/ui/table.tsx`
+2. Migrated `CutListPartsTab.tsx` from native table elements to Table primitives
+3. Preserved legacy column selectors (`col-qty`, `col-expand`, etc.) for tests/styles
+4. Verified desktop lint/typecheck and vitest suites pass locally
 
-### What still needs to be done for 5.1:
+### Outstanding before merge:
 
-1. **Run tests** — `cd packages/desktop && npm test` to verify all tests pass
-2. **Fix any test failures** — Tests that click tabs will need to use Radix's `data-state` attributes. Tab buttons now have `role="tab"` via Radix. Tab switching tests may need `getByRole('tab', { name: /Parts List/i })` instead of `getByText`.
-3. **Run lint and typecheck** — `npm run lint && npm run typecheck`
-4. **Remove CSS** — The `.cut-list-tabs` class in `domain.css` print styles needs review. The `section-tab` CSS class may have been defined in primitives.css (check if removed already).
-5. **Commit, push, create PR**
-
-### Tab consumers found (3 total):
-
-- **CutListModal** (`components/stock/CutListModal.tsx`) — 3 tabs: Parts, Diagrams, Shopping
-- **StartScreen** (`components/project/StartScreen.tsx`) — 2 tabs: Recents, Favorites
-- **StockLibraryModal** (`components/stock/StockLibraryModal.tsx`) — 2 tabs: Stocks, Assemblies
-
-### Radix Tabs testing pattern:
-
-```typescript
-// Click a tab
-fireEvent.click(screen.getByRole("tab", { name: /Diagrams/i }));
-// Or with userEvent
-await user.click(screen.getByRole("tab", { name: /Diagrams/i }));
-
-// Verify active tab
-expect(screen.getByRole("tab", { name: /Parts List/i })).toHaveAttribute(
-  "data-state",
-  "active",
-);
-
-// Tab content uses role="tabpanel"
-expect(screen.getByRole("tabpanel")).toBeInTheDocument();
-```
+1. Open PR for bead 5.2 and pass CI checks
+2. Merge PR (squash) and clean up worktree/branch
 
 ## Remaining Work (Not Started)
 
@@ -125,8 +103,8 @@ expect(screen.getByRole("tabpanel")).toBeInTheDocument();
 
 **Epic 5: Desktop Complex Components** (depends on Epic 3 ✅)
 
-- 5.1: Tabs — **IN PROGRESS** (see above)
-- 5.2: Table — cut list tables and data displays
+- 5.1: Tabs — **DONE** (PR #241 merged)
+- 5.2: Table — **IN PROGRESS**
 - 5.3: Card — StartScreen, Settings sections
 - 5.4: Collapsible/Accordion — sidebar sections, joinery
 - 5.5: Progress/Skeleton — loading states
@@ -177,7 +155,7 @@ expect(screen.getByRole("tabpanel")).toBeInTheDocument();
 
 ```
 Epics 2, 3, 4, 9, 10 are COMPLETE ✅
-Epic 5 is IN PROGRESS (5.1 partially done, 5.2–5.5 not started)
+Epic 5 is IN PROGRESS (5.1 done, 5.2 active, 5.3–5.5 pending)
 Epic 6 can start NOW (dependencies 3.5 ✅ and 3.2 ✅ are met)
 Epic 7 is BLOCKED on Epic 5 (Epic 4 dependency is met ✅)
 Epic 8 is BLOCKED on Epics 6 and 7
@@ -227,13 +205,12 @@ Update `.beads/issues.jsonl` after each merge using:
 bd update carvd-studio-{bead-id} --status done
 ```
 
-All bead statuses are current as of 2026-02-19.
+Bead status state shown here is current as of 2026-02-19.
 
 ## Recommended Next Steps
 
-1. **Finish bead 5.1** — Restore stash in the 5.1 worktree, run tests, fix failures, lint, typecheck, commit, push, create PR.
-2. **Continue Epic 5** beads (5.2–5.5) sequentially.
-3. **Start Epic 6** in parallel with Epic 5 (both dependencies are met). Epic 6 beads are independent of each other.
-4. **Start Epic 11** (website cleanup) — dependency Epic 10 is complete.
-5. **After Epic 5 completes**, Epic 7 is unblocked (Epic 4 already done).
-6. Epic 8 is last desktop epic (cleanup), Epic 12 is final integration.
+1. **Complete bead 5.2** — create PR, pass CI, merge, and cleanup.
+2. **Continue Epic 5** beads sequentially (5.3, 5.4, 5.5).
+3. **After Epic 5 completes**, proceed to Epic 7 (currently blocked).
+4. **Run Epic 6 and Epic 11 in parallel where safe** to reduce critical path.
+5. Epic 8 remains final desktop cleanup before Epic 12 integration.
