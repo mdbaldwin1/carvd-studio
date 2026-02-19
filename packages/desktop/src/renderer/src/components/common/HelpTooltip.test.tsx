@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { HelpTooltip } from './HelpTooltip';
 
 // Mock electronAPI
@@ -46,7 +46,8 @@ describe('HelpTooltip', () => {
       expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
     });
 
-    it('hides tooltip when clicking outside', () => {
+    it('hides tooltip when clicking outside', async () => {
+      vi.useFakeTimers();
       render(
         <div>
           <HelpTooltip text="Test help text" />
@@ -58,10 +59,17 @@ describe('HelpTooltip', () => {
       fireEvent.click(helpButton);
       expect(screen.getByRole('tooltip')).toBeInTheDocument();
 
+      // Radix DismissableLayer registers its pointerdown listener via setTimeout(fn, 0).
+      // Flush the timer so the listener is active before we dispatch the outside click.
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+      });
+
       const outsideButton = screen.getByRole('button', { name: 'Outside' });
-      fireEvent.mouseDown(outsideButton);
+      fireEvent.pointerDown(outsideButton, { pointerId: 1, pointerType: 'mouse' });
 
       expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+      vi.useRealTimers();
     });
 
     it('hides tooltip on Escape key', () => {
@@ -123,14 +131,14 @@ describe('HelpTooltip', () => {
       render(<HelpTooltip text="Test help text" inline />);
 
       const wrapper = screen.getByRole('button', { name: 'Show help' }).parentElement;
-      expect(wrapper).toHaveClass('help-tooltip-inline');
+      expect(wrapper).toHaveClass('ml-1');
     });
 
     it('does not apply inline class when inline prop is false', () => {
       render(<HelpTooltip text="Test help text" />);
 
       const wrapper = screen.getByRole('button', { name: 'Show help' }).parentElement;
-      expect(wrapper).not.toHaveClass('help-tooltip-inline');
+      expect(wrapper).not.toHaveClass('ml-1');
     });
   });
 });

@@ -7,6 +7,7 @@
  */
 
 import { ArrowLeft, Copy, Plus, Pencil, Trash2, Download, Upload } from 'lucide-react';
+import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -293,9 +294,12 @@ export function TemplatesScreen({
                     {formatDimensions(template.dimensions)} • {template.partCount} parts
                   </span>
                 </div>
-                <span className="absolute top-2.5 left-2.5 text-[10px] py-[3px] px-2 rounded font-medium bg-bg-tertiary text-text-muted border border-border">
+                <Badge
+                  variant="outline"
+                  className="absolute top-2.5 left-2.5 rounded py-[3px] px-2 text-[10px] bg-bg-tertiary"
+                >
                   Built-in
-                </span>
+                </Badge>
                 {canUseCustomTemplates && (
                   <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                     <button
