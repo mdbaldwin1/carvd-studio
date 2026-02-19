@@ -3,6 +3,8 @@ import { ChevronDown, ChevronRight, Library, Redo2, Save, Search, Settings, Sun,
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { Button } from '@renderer/components/ui/button';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@renderer/components/ui/accordion';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@renderer/components/ui/collapsible';
 import { AddAssemblyModal } from './components/assembly/AddAssemblyModal';
 import { AssemblyEditingBanner } from './components/assembly/AssemblyEditingBanner';
 import { AssemblyEditingExitDialog } from './components/assembly/AssemblyEditingExitDialog';
@@ -264,19 +266,9 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
   // Collapsed sections state (assemblies collapsed by default, stock open)
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     stock: false,
-    assemblies: true
+    assemblies: true,
+    parts: false
   });
-  const toggleSection = (section: string) => {
-    setCollapsedSections((prev) => {
-      const isCollapsing = !prev[section];
-      // Clear search when collapsing
-      if (isCollapsing) {
-        setSearchOpen((s) => ({ ...s, [section]: false }));
-        setSearchTerms((t) => ({ ...t, [section]: '' }));
-      }
-      return { ...prev, [section]: !prev[section] };
-    });
-  };
 
   // Search state for sidebar sections
   const [searchOpen, setSearchOpen] = useState<Record<string, boolean>>({});
@@ -375,51 +367,61 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
   return (
     <aside className="sidebar">
       {/* Stock Section */}
-      <section className={`sidebar-section ${collapsedSections.stock ? 'collapsed' : ''}`}>
-        <div
-          className="section-header"
-          onClick={() => toggleSection('stock')}
-          title={collapsedSections.stock ? 'Expand' : 'Collapse'}
-        >
-          <span className="section-collapse-btn">
-            {collapsedSections.stock ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
-          </span>
-          <h2>{isEditingAssembly ? 'Stock Library' : 'Stock'}</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            active={searchOpen.stock}
-            onClick={(e) => {
-              e.stopPropagation();
-              // if opening search, also expand section if collapsed
-              if (!searchOpen.stock && collapsedSections.stock) {
-                setCollapsedSections((prev) => ({ ...prev, stock: false }));
-              }
-              toggleSearch('stock');
-            }}
-            title="Search"
-            disabled={stocks.length === 0}
-          >
-            <Search size={12} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (isEditingAssembly) {
-                // Open create stock modal for library
-                setIsCreateStockModalOpen(true);
-              } else {
-                // Open add-from-library modal for project
-                setIsAddStockModalOpen(true);
-              }
-            }}
-            title={isEditingAssembly ? 'Add New Stock to Library' : 'Add Stock from Library'}
-          >
-            +
-          </Button>
-        </div>
+      <Collapsible
+        className="sidebar-section"
+        open={!collapsedSections.stock}
+        onOpenChange={(open) => {
+          setCollapsedSections((prev) => ({ ...prev, stock: !open }));
+          if (!open) {
+            setSearchOpen((s) => ({ ...s, stock: false }));
+            setSearchTerms((t) => ({ ...t, stock: '' }));
+          }
+        }}
+      >
+        <CollapsibleTrigger asChild>
+          <div className="section-header" title={collapsedSections.stock ? 'Expand' : 'Collapse'}>
+            <span className="section-collapse-btn">
+              {collapsedSections.stock ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
+            </span>
+            <h2>{isEditingAssembly ? 'Stock Library' : 'Stock'}</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              active={searchOpen.stock}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                // if opening search, also expand section if collapsed
+                if (!searchOpen.stock && collapsedSections.stock) {
+                  setCollapsedSections((prev) => ({ ...prev, stock: false }));
+                }
+                toggleSearch('stock');
+              }}
+              title="Search"
+              disabled={stocks.length === 0}
+            >
+              <Search size={12} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isEditingAssembly) {
+                  // Open create stock modal for library
+                  setIsCreateStockModalOpen(true);
+                } else {
+                  // Open add-from-library modal for project
+                  setIsAddStockModalOpen(true);
+                }
+              }}
+              title={isEditingAssembly ? 'Add New Stock to Library' : 'Add Stock from Library'}
+            >
+              +
+            </Button>
+          </div>
+        </CollapsibleTrigger>
         {searchOpen.stock && (
           <div className="section-search">
             <div className="section-search-inner">
@@ -446,7 +448,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             </div>
           </div>
         )}
-        <div className="section-content">
+        <CollapsibleContent forceMount className="section-content">
           <div className="section-content-inner">
             {stocks.length === 0 ? (
               <p className="text-text-muted text-xs italic px-4">
@@ -511,62 +513,73 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
               </ul>
             )}
           </div>
-        </div>
-      </section>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Assemblies Section */}
-      <section className={`sidebar-section ${collapsedSections.assemblies ? 'collapsed' : ''}`}>
-        <div
-          className="section-header"
-          onClick={() => toggleSection('assemblies')}
-          title={collapsedSections.assemblies ? 'Expand' : 'Collapse'}
-        >
-          <span className="section-collapse-btn">
-            {collapsedSections.assemblies ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
-          </span>
-          <h2>{isEditingAssembly ? 'Assembly Library' : 'Assemblies'}</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            active={searchOpen.assemblies}
-            onClick={(e) => {
-              e.stopPropagation();
-              // if opening search, also expand section if collapsed
-              if (!searchOpen.assemblies && collapsedSections.assemblies) {
-                setCollapsedSections((prev) => ({ ...prev, assemblies: false }));
-              }
-              toggleSearch('assemblies');
-            }}
-            title="Search"
-            disabled={assemblies.length === 0}
-          >
-            <Search size={12} />
-          </Button>
-          {canUseAssemblies &&
-            (isEditingAssembly ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                disabled
-                onClick={(e) => e.stopPropagation()}
-                title="Finish editing current assembly first"
-              >
-                +
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsAddAssemblyModalOpen(true);
-                }}
-                title="Add Assembly from Library"
-              >
-                +
-              </Button>
-            ))}
-        </div>
+      <Collapsible
+        className="sidebar-section"
+        open={!collapsedSections.assemblies}
+        onOpenChange={(open) => {
+          setCollapsedSections((prev) => ({ ...prev, assemblies: !open }));
+          if (!open) {
+            setSearchOpen((s) => ({ ...s, assemblies: false }));
+            setSearchTerms((t) => ({ ...t, assemblies: '' }));
+          }
+        }}
+      >
+        <CollapsibleTrigger asChild>
+          <div className="section-header" title={collapsedSections.assemblies ? 'Expand' : 'Collapse'}>
+            <span className="section-collapse-btn">
+              {collapsedSections.assemblies ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
+            </span>
+            <h2>{isEditingAssembly ? 'Assembly Library' : 'Assemblies'}</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              active={searchOpen.assemblies}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                // if opening search, also expand section if collapsed
+                if (!searchOpen.assemblies && collapsedSections.assemblies) {
+                  setCollapsedSections((prev) => ({ ...prev, assemblies: false }));
+                }
+                toggleSearch('assemblies');
+              }}
+              title="Search"
+              disabled={assemblies.length === 0}
+            >
+              <Search size={12} />
+            </Button>
+            {canUseAssemblies &&
+              (isEditingAssembly ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                  title="Finish editing current assembly first"
+                >
+                  +
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsAddAssemblyModalOpen(true);
+                  }}
+                  title="Add Assembly from Library"
+                >
+                  +
+                </Button>
+              ))}
+          </div>
+        </CollapsibleTrigger>
         {searchOpen.assemblies && (
           <div className="section-search">
             <div className="section-search-inner">
@@ -593,7 +606,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             </div>
           </div>
         )}
-        <div className="section-content">
+        <CollapsibleContent forceMount className="section-content">
           <div className="section-content-inner">
             {!canUseAssemblies ? (
               <p className="text-text-muted text-xs italic px-4">
@@ -666,49 +679,59 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
               </ul>
             )}
           </div>
-        </div>
-      </section>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Parts Section */}
-      <section className={`sidebar-section ${collapsedSections.parts ? 'collapsed' : ''}`}>
-        <div
-          className="section-header"
-          onClick={() => toggleSection('parts')}
-          title={collapsedSections.parts ? 'Expand' : 'Collapse'}
-        >
-          <span className="section-collapse-btn">
-            {collapsedSections.parts ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
-          </span>
-          <h2>Parts</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            active={searchOpen.parts}
-            onClick={(e) => {
-              e.stopPropagation();
-              // if opening search, also expand section if collapsed
-              if (!searchOpen.parts && collapsedSections.parts) {
-                setCollapsedSections((prev) => ({ ...prev, parts: false }));
-              }
-              toggleSearch('parts');
-            }}
-            title="Search"
-            disabled={parts.length === 0}
-          >
-            <Search size={12} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleAddPart();
-            }}
-            title="Add Part"
-          >
-            +
-          </Button>
-        </div>
+      <Collapsible
+        className="sidebar-section"
+        open={!collapsedSections.parts}
+        onOpenChange={(open) => {
+          setCollapsedSections((prev) => ({ ...prev, parts: !open }));
+          if (!open) {
+            setSearchOpen((s) => ({ ...s, parts: false }));
+            setSearchTerms((t) => ({ ...t, parts: '' }));
+          }
+        }}
+      >
+        <CollapsibleTrigger asChild>
+          <div className="section-header" title={collapsedSections.parts ? 'Expand' : 'Collapse'}>
+            <span className="section-collapse-btn">
+              {collapsedSections.parts ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
+            </span>
+            <h2>Parts</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              active={searchOpen.parts}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                // if opening search, also expand section if collapsed
+                if (!searchOpen.parts && collapsedSections.parts) {
+                  setCollapsedSections((prev) => ({ ...prev, parts: false }));
+                }
+                toggleSearch('parts');
+              }}
+              title="Search"
+              disabled={parts.length === 0}
+            >
+              <Search size={12} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddPart();
+              }}
+              title="Add Part"
+            >
+              +
+            </Button>
+          </div>
+        </CollapsibleTrigger>
         {searchOpen.parts && (
           <div className="section-search">
             <div className="section-search-inner">
@@ -735,7 +758,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             </div>
           </div>
         )}
-        <div className="section-content">
+        <CollapsibleContent forceMount className="section-content">
           <div className="section-content-inner">
             <HierarchicalPartsList
               onPartClick={handlePartClick}
@@ -744,8 +767,8 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
               onDelete={handleDeletePart}
             />
           </div>
-        </div>
-      </section>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Add Stock from Library Modal (for project mode) */}
       <AddStockModal
@@ -1312,37 +1335,39 @@ function PropertiesPanel() {
         )}
       </div>
 
-      <details className="property-group collapsible-section">
-        <summary>
-          Position (X, Y, Z)
-          <HelpTooltip
-            text="Use arrow keys to nudge selected parts. Hold Shift for 1 inch increments."
-            docsSection="shortcuts"
-            inline
-          />
-        </summary>
-        <div className="collapsible-content">
-          <div className="flex items-center gap-1">
-            <FractionInput
-              key={`${selectedPart.id}-posX`}
-              value={selectedPart.position.x}
-              onChange={handlePositionXChange}
-            />
-            <span>,</span>
-            <FractionInput
-              key={`${selectedPart.id}-posY`}
-              value={selectedPart.position.y}
-              onChange={handlePositionYChange}
-            />
-            <span>,</span>
-            <FractionInput
-              key={`${selectedPart.id}-posZ`}
-              value={selectedPart.position.z}
-              onChange={handlePositionZChange}
+      <Accordion type="single" collapsible className="property-group">
+        <AccordionItem value="position" className="collapsible-section mt-0">
+          <div className="flex items-center">
+            <AccordionTrigger>Position (X, Y, Z)</AccordionTrigger>
+            <HelpTooltip
+              text="Use arrow keys to nudge selected parts. Hold Shift for 1 inch increments."
+              docsSection="shortcuts"
+              inline
             />
           </div>
-        </div>
-      </details>
+          <AccordionContent className="collapsible-content">
+            <div className="flex items-center gap-1">
+              <FractionInput
+                key={`${selectedPart.id}-posX`}
+                value={selectedPart.position.x}
+                onChange={handlePositionXChange}
+              />
+              <span>,</span>
+              <FractionInput
+                key={`${selectedPart.id}-posY`}
+                value={selectedPart.position.y}
+                onChange={handlePositionYChange}
+              />
+              <span>,</span>
+              <FractionInput
+                key={`${selectedPart.id}-posZ`}
+                value={selectedPart.position.z}
+                onChange={handlePositionZChange}
+              />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <div className="property-group">
         <div className="flex items-center gap-1">
@@ -1488,53 +1513,61 @@ function PropertiesPanel() {
         </div>
       )}
 
-      <details className="property-group collapsible-section">
-        <summary>
-          Notes
-          {selectedPart.notes && <span className="has-content-indicator">●</span>}
-        </summary>
-        <div className="collapsible-content">
-          <textarea
-            className="part-notes-textarea"
-            value={selectedPart.notes || ''}
-            onChange={(e) => updatePart(selectedPart.id, { notes: e.target.value })}
-            placeholder="Fabrication notes (edge banding, joinery, etc.)"
-            rows={3}
-          />
-        </div>
-      </details>
+      <Accordion type="single" collapsible className="property-group">
+        <AccordionItem value="notes" className="collapsible-section mt-0">
+          <AccordionTrigger>
+            Notes
+            {selectedPart.notes && <span className="has-content-indicator ml-1">●</span>}
+          </AccordionTrigger>
+          <AccordionContent className="collapsible-content">
+            <textarea
+              className="part-notes-textarea"
+              value={selectedPart.notes || ''}
+              onChange={(e) => updatePart(selectedPart.id, { notes: e.target.value })}
+              placeholder="Fabrication notes (edge banding, joinery, etc.)"
+              rows={3}
+            />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
-      <details className="property-group joinery-adjustments">
-        <summary>
-          Joinery Adjustments
-          {(selectedPart.extraLength || selectedPart.extraWidth) && <span className="joinery-indicator">●</span>}
-          <HelpTooltip
-            text="Add extra material for joinery (tenons, dado insertions, etc.). These values affect the cut list dimensions but not the 3D visualization."
-            docsSection="joinery"
-            inline
-          />
-        </summary>
-        <div className="joinery-inputs">
-          <div className="joinery-input-row">
-            <label>Extra Length</label>
-            <FractionInput
-              key={`${selectedPart.id}-extraLength`}
-              value={selectedPart.extraLength || 0}
-              onChange={(extraLength) => updatePart(selectedPart.id, { extraLength: extraLength || undefined })}
-              min={0}
+      <Accordion type="single" collapsible className="property-group">
+        <AccordionItem value="joinery" className="joinery-adjustments mt-0">
+          <div className="flex items-center">
+            <AccordionTrigger>
+              Joinery Adjustments
+              {(selectedPart.extraLength || selectedPart.extraWidth) && (
+                <span className="joinery-indicator ml-1">●</span>
+              )}
+            </AccordionTrigger>
+            <HelpTooltip
+              text="Add extra material for joinery (tenons, dado insertions, etc.). These values affect the cut list dimensions but not the 3D visualization."
+              docsSection="joinery"
+              inline
             />
           </div>
-          <div className="joinery-input-row">
-            <label>Extra Width</label>
-            <FractionInput
-              key={`${selectedPart.id}-extraWidth`}
-              value={selectedPart.extraWidth || 0}
-              onChange={(extraWidth) => updatePart(selectedPart.id, { extraWidth: extraWidth || undefined })}
-              min={0}
-            />
-          </div>
-        </div>
-      </details>
+          <AccordionContent className="joinery-inputs">
+            <div className="joinery-input-row">
+              <label>Extra Length</label>
+              <FractionInput
+                key={`${selectedPart.id}-extraLength`}
+                value={selectedPart.extraLength || 0}
+                onChange={(extraLength) => updatePart(selectedPart.id, { extraLength: extraLength || undefined })}
+                min={0}
+              />
+            </div>
+            <div className="joinery-input-row">
+              <label>Extra Width</label>
+              <FractionInput
+                key={`${selectedPart.id}-extraWidth`}
+                value={selectedPart.extraWidth || 0}
+                onChange={(extraWidth) => updatePart(selectedPart.id, { extraWidth: extraWidth || undefined })}
+                min={0}
+              />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <div className="property-group properties-learn-more">
         <a
