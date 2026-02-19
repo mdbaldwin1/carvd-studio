@@ -10,7 +10,7 @@ import { ColorPicker } from './components/common/ColorPicker';
 import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { FractionInput } from './components/common/FractionInput';
 import { HelpTooltip } from './components/common/HelpTooltip';
-import { Toast } from './components/common/Toast';
+import { Toaster } from './components/ui/sonner';
 import { ContextMenu } from './components/layout/ContextMenu';
 import { TrialBanner } from './components/licensing/TrialBanner';
 import { TrialExpiredModal } from './components/licensing/TrialExpiredModal';
@@ -2719,7 +2719,7 @@ function App() {
       )}
       <ContextMenu />
       <SelectionBox />
-      <Toast />
+      <Toaster />
       {isStockLibraryOpen && (
         <Suspense fallback={null}>
           <LazyStockLibraryModal
