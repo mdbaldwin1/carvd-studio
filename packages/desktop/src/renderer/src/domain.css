@@ -3,7 +3,7 @@
  *
  * "Twilight Studio" redesign — adjusted sizing to match bigger base font
  * and rounder radii. Complex selectors (:has(), vendor pseudo-elements,
- * <details> styling, @media print).
+ * accordion/collapsible styling, @media print).
  */
 
 /* ===========================================
@@ -108,8 +108,7 @@
 
 /* ===========================================
    JOINERY ADJUSTMENTS
-   <details> collapsible with animated marker
-   Uses ::-webkit-details-marker, summary::before
+   Accordion-based section in Properties panel
    =========================================== */
 
 @layer components {
@@ -118,36 +117,6 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     padding: 0;
-  }
-
-  .joinery-adjustments summary {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    cursor: pointer;
-    font-size: 13px;
-    color: var(--color-text-muted);
-    user-select: none;
-    list-style: none;
-  }
-
-  .joinery-adjustments summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .joinery-adjustments summary::before {
-    content: '\25B6';
-    font-size: 9px;
-    transition: transform 0.15s ease;
-  }
-
-  .joinery-adjustments[open] summary::before {
-    transform: rotate(90deg);
-  }
-
-  .joinery-adjustments summary:hover {
-    color: var(--color-text);
   }
 
   .joinery-indicator {
@@ -182,8 +151,7 @@
 
 /* ===========================================
    COLLAPSIBLE SECTIONS
-   Generic <details> styling (Position, Notes)
-   Uses ::-webkit-details-marker, summary::before
+   Generic accordion styling (Position, Notes)
    =========================================== */
 
 @layer components {
@@ -192,37 +160,6 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     padding: 0;
-  }
-
-  .collapsible-section summary {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--color-text-muted);
-    user-select: none;
-    list-style: none;
-  }
-
-  .collapsible-section summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .collapsible-section summary::before {
-    content: '\25B6';
-    font-size: 9px;
-    transition: transform 0.15s ease;
-  }
-
-  .collapsible-section[open] summary::before {
-    transform: rotate(90deg);
-  }
-
-  .collapsible-section summary:hover {
-    color: var(--color-text);
   }
 
   .collapsible-content {

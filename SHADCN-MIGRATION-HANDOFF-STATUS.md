@@ -65,38 +65,40 @@ These documents define the migration workflow and must be followed:
 
 ### Epic 5: Desktop Complex Components (in progress)
 
-| Bead | PR   | Description                            |
-| ---- | ---- | -------------------------------------- |
-| 5.1  | #241 | Tabs migration (Start/CutList/Library) |
-| 5.2  | #243 | Table migration (CutList parts table)  |
+| Bead | PR   | Description                              |
+| ---- | ---- | ---------------------------------------- |
+| 5.1  | #241 | Tabs migration (Start/CutList/Library)   |
+| 5.2  | #243 | Table migration (CutList parts table)    |
+| 5.3  | #244 | Card migration (Start/Settings/Template) |
 
-**Total: 25 beads merged across 6 epics (2, 3, 4, 5, 9, 10)**
+**Total: 26 beads merged across 6 epics (2, 3, 4, 5, 9, 10)**
 
 ## Active Worktrees
 
 | Worktree                                 | Branch                | State                    |
 | ---------------------------------------- | --------------------- | ------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-5.3` | feat/carvd-studio-5.3 | **In progress (active)** |
+| `/Users/mbaldwin/Carvd/carvd-studio-5.4` | feat/carvd-studio-5.4 | **In progress (active)** |
 
-All completed worktrees through bead 5.2 have been cleaned up.
+All completed worktrees through bead 5.3 have been cleaned up.
 
-## In-Progress Work: Bead 5.3 (Card)
+## In-Progress Work: Bead 5.4 (Collapsible/Accordion)
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-5.3`
-**Branch**: `feat/carvd-studio-5.3`
+**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-5.4`
+**Branch**: `feat/carvd-studio-5.4`
 **State**: Implementation complete; PR prep in progress
 
 ### What was done:
 
-1. Added Card primitive at `packages/desktop/src/renderer/src/components/ui/card.tsx`
-2. Migrated start-screen project rows in `RecentsTab.tsx` and `FavoritesTab.tsx` to Card containers
-3. Migrated settings section containers to Card composition in App Settings sections
-4. Migrated `TemplateBrowserModal.tsx` template tiles and details panel to Card primitives
-5. Verified desktop lint/typecheck and targeted vitest suites pass locally
+1. Added Collapsible primitive at `packages/desktop/src/renderer/src/components/ui/collapsible.tsx`
+2. Added Accordion primitive at `packages/desktop/src/renderer/src/components/ui/accordion.tsx`
+3. Migrated sidebar sections (Stock, Assemblies, Parts) in `App.tsx` to Radix Collapsible
+4. Migrated properties panel sections (Position, Notes, Joinery Adjustments) from `<details>` to Accordion
+5. Removed obsolete collapse/details CSS rules from `layout.css` and `domain.css`
+6. Verified desktop lint/typecheck and targeted/full vitest suites pass locally
 
 ### Outstanding before merge:
 
-1. Open PR for bead 5.3 and pass CI checks
+1. Open PR for bead 5.4 and pass CI checks
 2. Merge PR (squash) and clean up worktree/branch
 
 ## Remaining Work (Not Started)
@@ -107,8 +109,8 @@ All completed worktrees through bead 5.2 have been cleaned up.
 
 - 5.1: Tabs — **DONE** (PR #241 merged)
 - 5.2: Table — **DONE** (PR #243 merged)
-- 5.3: Card — **IN PROGRESS**
-- 5.4: Collapsible/Accordion — sidebar sections, joinery
+- 5.3: Card — **DONE** (PR #244 merged)
+- 5.4: Collapsible/Accordion — **IN PROGRESS**
 - 5.5: Progress/Skeleton — loading states
 
 **Epic 6: Desktop Modal Migration** (depends on 3.5 ✅ and 3.2 ✅ — ready to start)
@@ -157,7 +159,7 @@ All completed worktrees through bead 5.2 have been cleaned up.
 
 ```
 Epics 2, 3, 4, 9, 10 are COMPLETE ✅
-Epic 5 is IN PROGRESS (5.1/5.2 done, 5.3 active, 5.4–5.5 pending)
+Epic 5 is IN PROGRESS (5.1/5.2/5.3 done, 5.4 active, 5.5 pending)
 Epic 6 can start NOW (dependencies 3.5 ✅ and 3.2 ✅ are met)
 Epic 7 is BLOCKED on Epic 5 (Epic 4 dependency is met ✅)
 Epic 8 is BLOCKED on Epics 6 and 7
@@ -211,8 +213,8 @@ Bead status state shown here is current as of 2026-02-19.
 
 ## Recommended Next Steps
 
-1. **Complete bead 5.3** — create PR, pass CI, merge, and cleanup.
-2. **Continue Epic 5** beads sequentially (5.4, 5.5).
+1. **Complete bead 5.4** — create PR, pass CI, merge, and cleanup.
+2. **Continue Epic 5** sequentially with bead 5.5.
 3. **After Epic 5 completes**, proceed to Epic 7 (currently blocked).
 4. **Run Epic 6 and Epic 11 in parallel where safe** to reduce critical path.
 5. Epic 8 remains final desktop cleanup before Epic 12 integration.

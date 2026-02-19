@@ -215,11 +215,15 @@
     height: 12px;
   }
 
-  /* Section content animation (grid-row collapse) */
+  /* Section content animation (grid-row collapse via Radix data-state) */
   .section-content {
     @apply grid flex-1 min-h-0 overflow-hidden;
     grid-template-rows: 1fr;
     transition: grid-template-rows 0.2s ease-out;
+  }
+
+  .section-content[data-state='closed'] {
+    grid-template-rows: 0fr;
   }
 
   .section-content-inner {
@@ -242,20 +246,6 @@
 
   .group-header:hover {
     @apply bg-surface-hover;
-  }
-
-  /* Collapsed section */
-  .sidebar-section.collapsed {
-    @apply overflow-visible pb-0;
-    flex: 0 0 auto;
-  }
-
-  .sidebar-section.collapsed .section-content {
-    grid-template-rows: 0fr;
-  }
-
-  .sidebar-section.collapsed .section-header {
-    @apply mb-0;
   }
 
   /* Section typography — slightly bigger, still subtle */
