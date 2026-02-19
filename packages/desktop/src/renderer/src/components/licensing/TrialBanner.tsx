@@ -5,6 +5,8 @@
  * license activation and purchase.
  */
 
+import { Button } from '@renderer/components/ui/button';
+
 interface TrialBannerProps {
   daysRemaining: number;
   onActivateLicense: () => void;
@@ -30,12 +32,12 @@ export function TrialBanner({ daysRemaining, onActivateLicense, onPurchase }: Tr
         {daysRemaining === 1 ? '1 day left in your trial' : `${daysRemaining} days left in your trial`}
       </span>
       <div className="flex gap-2">
-        <button className="btn btn-small btn-ghost" onClick={onActivateLicense}>
+        <Button size="sm" variant="ghost" onClick={onActivateLicense}>
           Enter License
-        </button>
-        <button className="btn btn-small btn-primary" onClick={handlePurchase}>
+        </Button>
+        <Button size="sm" onClick={handlePurchase}>
           Buy Now
-        </button>
+        </Button>
       </div>
     </div>
   );

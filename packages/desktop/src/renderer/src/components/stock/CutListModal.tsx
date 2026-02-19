@@ -1,5 +1,6 @@
 import { Download } from 'lucide-react';
 import React, { useState, useCallback, useMemo } from 'react';
+import { Button } from '@renderer/components/ui/button';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useProjectStore, validatePartsForCutList, generateThumbnail } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
@@ -173,13 +174,9 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
               </div>
             ) : (
               <>
-                <button
-                  className="btn btn-md btn-filled btn-primary"
-                  onClick={handleGenerate}
-                  disabled={parts.length === 0}
-                >
+                <Button size="default" onClick={handleGenerate} disabled={parts.length === 0}>
                   Generate Cut List
-                </button>
+                </Button>
 
                 {validationIssues.length > 0 && (
                   <div className="cut-list-issues mt-4 bg-bg border border-border rounded p-4 text-left w-full max-w-[500px]">
@@ -214,9 +211,9 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
             {cutList.isStale && (
               <div className="cut-list-stale-warning flex items-center gap-3 py-2.5 px-6 bg-warning-bg text-warning text-[13px]">
                 <span>Project changed since cut list was generated.</span>
-                <button className="btn btn-sm btn-filled btn-primary" onClick={handleGenerate}>
+                <Button size="sm" onClick={handleGenerate}>
                   Regenerate
-                </button>
+                </Button>
               </div>
             )}
 
@@ -285,21 +282,21 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
         <div className="cut-list-footer flex items-center justify-end gap-2 py-4 px-6 border-t border-border bg-bg rounded-b-lg">
           {cutList && (
             <>
-              <button
-                className="btn btn-sm btn-filled btn-primary"
+              <Button
+                size="sm"
                 onClick={handleDownloadProjectReport}
                 disabled={!limits.canExportPDF}
                 title={!limits.canExportPDF ? 'Upgrade to export PDFs' : 'Download comprehensive project report'}
               >
                 <Download size={14} />
                 Download Project Report
-              </button>
+              </Button>
               <div style={{ flex: 1 }} />
             </>
           )}
-          <button className="btn btn-sm btn-filled btn-secondary" onClick={onClose}>
+          <Button variant="secondary" size="sm" onClick={onClose}>
             {cutList ? 'Done' : 'Cancel'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

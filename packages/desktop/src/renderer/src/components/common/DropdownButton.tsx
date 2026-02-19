@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { Button } from '@renderer/components/ui/button';
 
 /** A single item in a {@link DropdownButton} menu. */
 export interface DropdownItem {
@@ -83,8 +84,10 @@ export function DropdownButton({
 
   return (
     <div className={`relative inline-block ${className}`} ref={containerRef}>
-      <button
-        className={`btn btn-sm btn-filled btn-secondary inline-flex items-center gap-1.5 ${isOpen ? 'bg-surface-hover' : ''}`}
+      <Button
+        variant="secondary"
+        size="sm"
+        className={`inline-flex items-center gap-1.5 ${isOpen ? 'bg-surface-hover' : ''}`}
         onClick={handleToggle}
         disabled={disabled}
         type="button"
@@ -92,7 +95,7 @@ export function DropdownButton({
         {icon && <span className="flex items-center">{icon}</span>}
         <span>{label}</span>
         <ChevronDown size={14} className={`transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
+      </Button>
 
       {isOpen && (
         <div className="absolute top-full right-0 mt-1 min-w-40 bg-surface border border-border rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.15)] z-1000 p-1">

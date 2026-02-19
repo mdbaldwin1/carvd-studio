@@ -6,6 +6,7 @@ import { ChevronDown, File, FolderOpen, Save, FilePlus } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { openProjectFromPath } from '../../utils/fileOperations';
 import { useUIStore } from '../../store/uiStore';
+import { Button } from '@renderer/components/ui/button';
 
 interface FileMenuProps {
   onNew: () => void;
@@ -75,8 +76,9 @@ export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRe
 
   return (
     <div className="relative" ref={menuRef}>
-      <button
-        className="btn btn-ghost btn-secondary flex items-center gap-1.5 py-1.5 px-2.5 text-[13px] font-medium"
+      <Button
+        variant="ghost"
+        className="py-1.5 px-2.5 text-[13px] font-medium"
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="true"
@@ -84,7 +86,7 @@ export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRe
         <File size={16} />
         <span>File</span>
         <ChevronDown size={14} className={`transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
+      </Button>
 
       {isOpen && (
         <div className={dropdownClass}>

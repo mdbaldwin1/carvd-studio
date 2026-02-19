@@ -5,6 +5,8 @@
  * a feature that requires a license.
  */
 
+import { Button } from '@renderer/components/ui/button';
+
 interface UpgradePromptProps {
   message: string;
   onUpgrade?: () => void;
@@ -22,13 +24,13 @@ export function UpgradePrompt({ message, onUpgrade, onDismiss }: UpgradePromptPr
     <div className="flex items-center justify-between px-4 py-3 bg-surface border border-primary rounded-md my-2">
       <p className="m-0 text-[13px] text-text">{message}</p>
       <div className="flex gap-2 flex-shrink-0">
-        <button className="btn btn-primary btn-small" onClick={handleUpgrade}>
+        <Button size="sm" onClick={handleUpgrade}>
           Upgrade
-        </button>
+        </Button>
         {onDismiss && (
-          <button className="btn btn-ghost btn-small" onClick={onDismiss}>
+          <Button size="sm" variant="ghost" onClick={onDismiss}>
             Dismiss
-          </button>
+          </Button>
         )}
       </div>
     </div>

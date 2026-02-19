@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Trash2 } from 'lucide-react';
+import { Button } from '@renderer/components/ui/button';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
 import { Project } from '../../types';
@@ -250,9 +251,9 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
               <div className="flex justify-between items-center mb-3">
                 <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider m-0">My Templates</h4>
                 {parts.length > 0 && canUseCustomTemplates && (
-                  <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleSaveCurrentAsTemplate}>
+                  <Button variant="ghost" size="xs" onClick={handleSaveCurrentAsTemplate}>
                     + Save Current
-                  </button>
+                  </Button>
                 )}
               </div>
               {userTemplates.length === 0 ? (
@@ -350,16 +351,12 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
         </div>
 
         <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
-          <button className="btn btn-sm btn-outlined btn-secondary" onClick={onClose}>
+          <Button variant="outline" size="sm" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            className="btn btn-sm btn-filled btn-primary"
-            onClick={handleCreateProject}
-            disabled={!selectedTemplate || isLoading}
-          >
+          </Button>
+          <Button size="sm" onClick={handleCreateProject} disabled={!selectedTemplate || isLoading}>
             {isLoading ? 'Creating...' : 'Create Project'}
-          </button>
+          </Button>
         </div>
 
         {/* Delete confirmation overlay */}
@@ -369,15 +366,12 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
               <p className="m-0 mb-2 text-sm text-text">Delete this template?</p>
               <p className="text-xs text-text-muted mb-4">This action cannot be undone.</p>
               <div className="flex gap-2 justify-center">
-                <button className="btn btn-sm btn-outlined btn-secondary" onClick={() => setDeleteConfirmId(null)}>
+                <Button variant="outline" size="sm" onClick={() => setDeleteConfirmId(null)}>
                   Cancel
-                </button>
-                <button
-                  className="btn btn-sm btn-filled btn-danger"
-                  onClick={() => handleDeleteTemplate(deleteConfirmId)}
-                >
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => handleDeleteTemplate(deleteConfirmId)}>
                   Delete
-                </button>
+                </Button>
               </div>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { Button } from '@renderer/components/ui/button';
 
 interface Props {
   children: ReactNode;
@@ -82,16 +83,13 @@ export class ErrorBoundary extends Component<Props, State> {
               </details>
             )}
             <div className="flex gap-3 justify-center">
-              <button onClick={this.handleRecover} className="btn btn-md btn-outline btn-secondary">
+              <Button size="default" variant="outline" onClick={this.handleRecover}>
                 Try Again
-              </button>
-              <button
-                onClick={this.handleReload}
-                className="btn btn-md btn-filled btn-primary inline-flex items-center gap-2"
-              >
+              </Button>
+              <Button size="default" onClick={this.handleReload}>
                 <RefreshCw size={16} />
                 Reload App
-              </button>
+              </Button>
             </div>
           </div>
         </div>

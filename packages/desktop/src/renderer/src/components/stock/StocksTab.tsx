@@ -8,6 +8,7 @@ import { Stock } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { ColorPicker } from '../common/ColorPicker';
 import { FractionInput } from '../common/FractionInput';
+import { Button } from '@renderer/components/ui/button';
 import { IconButton } from '../common/IconButton';
 
 const defaultStock: Omit<Stock, 'id'> = {
@@ -270,20 +271,16 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
               </h3>
               {!isFormMode && (
                 <div className="flex gap-2">
-                  <button className="btn btn-xs btn-ghost btn-secondary" onClick={handleStartEdit}>
+                  <Button variant="ghost" size="xs" onClick={handleStartEdit}>
                     Edit
-                  </button>
-                  <button
-                    className="btn btn-xs btn-ghost btn-secondary"
-                    onClick={handleExportStock}
-                    title="Export stock to file"
-                  >
+                  </Button>
+                  <Button variant="ghost" size="xs" onClick={handleExportStock} title="Export stock to file">
                     <Download size={12} />
                     Export
-                  </button>
-                  <button className="btn btn-xs btn-outlined btn-danger" onClick={handleDeleteStock}>
+                  </Button>
+                  <Button variant="destructiveOutline" size="xs" onClick={handleDeleteStock}>
                     Delete
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -374,12 +371,12 @@ export function StocksTab({ stocks, onAddStock, onUpdateStock, onDeleteStock, on
                 </div>
 
                 <div className="form-actions">
-                  <button className="btn btn-sm btn-outlined btn-secondary" onClick={handleCancelEdit}>
+                  <Button variant="outline" size="sm" onClick={handleCancelEdit}>
                     Cancel
-                  </button>
-                  <button className="btn btn-sm btn-filled btn-primary" onClick={handleSave}>
+                  </Button>
+                  <Button size="sm" onClick={handleSave}>
                     {isCreating ? 'Create' : 'Save'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
