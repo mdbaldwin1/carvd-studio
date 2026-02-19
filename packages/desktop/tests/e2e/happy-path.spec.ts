@@ -202,7 +202,17 @@ test.describe('Happy Path Workflow', () => {
     const state = await waitForAppReady(window);
     expect(['start-screen', 'editor']).toContain(state);
 
-    if (state === 'start-screen') {
+    // Startup can briefly report "editor" while the start screen is still
+    // visible as an overlay; check the DOM directly to avoid skipping project
+    // creation and cascading failures in subsequent tests.
+    const startScreenVisible = await window.evaluate(() => {
+      const el = document.querySelector('.start-screen');
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    });
+
+    if (state === 'start-screen' || startScreenVisible) {
       // Verify start screen elements
       await expect(window.locator('.blank-template')).toBeVisible();
 
