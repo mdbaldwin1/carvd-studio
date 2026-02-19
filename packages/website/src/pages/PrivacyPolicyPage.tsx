@@ -1,56 +1,50 @@
 import SEO from "../components/SEO";
+import Header from "../components/Header";
+import Footer from "../components/Footer";
+
+const highlightBoxStyle = {
+  background:
+    "linear-gradient(135deg, rgba(174,164,191,0.15) 0%, rgba(174,164,191,0.05) 100%)",
+  borderColor: "rgba(174,164,191,0.4)",
+};
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="page bg-gradient-radial">
+    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
       <SEO
         title="Privacy Policy"
         description="Carvd Studio privacy policy. Learn how we handle your data — spoiler: your designs stay on your computer."
         path="/privacy"
       />
-      {/* Header */}
-      <header className="header">
-        <nav className="nav container">
-          <a href="/" className="nav-brand">
-            Carvd Studio
-          </a>
-          <div className="nav-links">
-            <a href="/features" className="nav-link">
-              Features
-            </a>
-            <a href="/pricing" className="nav-link">
-              Pricing
-            </a>
-            <a href="/docs" className="nav-link">
-              Docs
-            </a>
-            <a href="/download" className="btn btn-highlight btn-sm">
-              Download
-            </a>
-          </div>
-        </nav>
-      </header>
+      <Header />
 
       {/* Main Content */}
-      <main id="main-content" className="page-content container">
-        <div className="py-3xl">
-          <div className="max-w-3xl mx-auto">
-            <h1 className="text-5xl font-bold mb-lg">Privacy Policy</h1>
-            <p className="text-muted mb-3xl">Last updated: February 2026</p>
+      <main id="main-content" className="container flex-1">
+        <div className="py-16 max-md:py-12 max-sm:py-8">
+          <div className="mx-auto max-w-3xl">
+            <h1 className="mb-6 text-5xl font-bold max-md:text-3xl max-sm:text-2xl">
+              Privacy Policy
+            </h1>
+            <p className="mb-16 text-text-muted max-md:mb-12 max-sm:mb-8">
+              Last updated: February 2026
+            </p>
 
-            <div className="grid gap-2xl">
+            <div className="grid gap-12 max-md:gap-8">
               {/* Introduction */}
               <section>
-                <h2 className="text-2xl font-bold mb-md">
+                <h2 className="mb-4 text-2xl font-bold">
                   Our Commitment to Your Privacy
                 </h2>
-                <p className="text-muted mb-md">
+                <p className="mb-4 text-text-muted">
                   Carvd Studio is designed with privacy as a core principle.
                   Unlike most modern software, we don't collect your data, track
                   your usage, or require an internet connection to function.
                   Your designs, your data, and your privacy belong to you.
                 </p>
-                <div className="accent-box-highlight">
+                <div
+                  className="rounded-lg border p-8 max-sm:p-6"
+                  style={highlightBoxStyle}
+                >
                   <p className="font-semibold">
                     TL;DR: We don't collect your data. Carvd Studio runs
                     entirely on your computer. We can't see your designs, and we
@@ -61,14 +55,14 @@ export default function PrivacyPolicyPage() {
 
               {/* Data Collection */}
               <section>
-                <h2 className="text-2xl font-bold mb-md">
+                <h2 className="mb-4 text-2xl font-bold">
                   Data We Don't Collect
                 </h2>
-                <p className="text-muted mb-md">
+                <p className="mb-4 text-text-muted">
                   Carvd Studio is an offline-first desktop application. We do
                   not collect:
                 </p>
-                <ul className="grid gap-sm text-muted">
+                <ul className="grid gap-2 text-text-muted">
                   <li>- Your furniture designs or project files</li>
                   <li>- Usage analytics or telemetry data</li>
                   <li>
@@ -82,13 +76,13 @@ export default function PrivacyPolicyPage() {
 
               {/* Local Storage */}
               <section>
-                <h2 className="text-2xl font-bold mb-md">
+                <h2 className="mb-4 text-2xl font-bold">
                   Data Stored on Your Computer
                 </h2>
-                <p className="text-muted mb-md">
+                <p className="mb-4 text-text-muted">
                   All Carvd Studio data is stored locally on your computer:
                 </p>
-                <ul className="grid gap-sm text-muted">
+                <ul className="grid gap-2 text-text-muted">
                   <li>
                     <strong>Project files (.carvd):</strong> Saved wherever you
                     choose on your filesystem. These files contain your designs
@@ -112,14 +106,14 @@ export default function PrivacyPolicyPage() {
 
               {/* License Verification */}
               <section>
-                <h2 className="text-2xl font-bold mb-md">
+                <h2 className="mb-4 text-2xl font-bold">
                   License Verification
                 </h2>
-                <p className="text-muted mb-md">
+                <p className="mb-4 text-text-muted">
                   The only time Carvd Studio connects to the internet is for
                   license verification:
                 </p>
-                <ul className="grid gap-sm text-muted">
+                <ul className="grid gap-2 text-text-muted">
                   <li>
                     <strong>Initial activation:</strong> When you first activate
                     your license, we verify it with our licensing provider
@@ -138,7 +132,7 @@ export default function PrivacyPolicyPage() {
                     the internet once to re-validate.
                   </li>
                 </ul>
-                <p className="text-muted mt-md">
+                <p className="mt-4 text-text-muted">
                   During license verification, we transmit only your license
                   key. We do not transmit any information about your designs or
                   how you use the software.
@@ -147,16 +141,16 @@ export default function PrivacyPolicyPage() {
 
               {/* Purchase Information */}
               <section>
-                <h2 className="text-2xl font-bold mb-md">
+                <h2 className="mb-4 text-2xl font-bold">
                   Purchase Information
                 </h2>
-                <p className="text-muted mb-md">
+                <p className="mb-4 text-text-muted">
                   When you purchase Carvd Studio, your payment is processed by
                   Lemon Squeezy, our payment processor. They collect standard
                   purchase information (name, email, payment details) as
                   necessary to complete your transaction.
                 </p>
-                <p className="text-muted">
+                <p className="text-text-muted">
                   We receive your email address and name from Lemon Squeezy to
                   provide customer support and deliver your license key. We do
                   not receive or store your payment card details.
@@ -165,19 +159,19 @@ export default function PrivacyPolicyPage() {
 
               {/* Third Parties */}
               <section>
-                <h2 className="text-2xl font-bold mb-md">
+                <h2 className="mb-4 text-2xl font-bold">
                   Third-Party Services
                 </h2>
-                <p className="text-muted mb-md">
+                <p className="mb-4 text-text-muted">
                   Carvd Studio uses the following third-party services:
                 </p>
-                <ul className="grid gap-sm text-muted">
+                <ul className="grid gap-2 text-text-muted">
                   <li>
                     <strong>Lemon Squeezy:</strong> Payment processing and
                     license management.
                     <a
                       href="https://www.lemonsqueezy.com/privacy"
-                      className="text-accent ml-sm"
+                      className="ml-2 text-accent"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -185,7 +179,7 @@ export default function PrivacyPolicyPage() {
                     </a>
                   </li>
                 </ul>
-                <p className="text-muted mt-md">
+                <p className="mt-4 text-text-muted">
                   We do not use analytics services, advertising networks, or any
                   other third-party tracking within the Carvd Studio
                   application.
@@ -194,12 +188,12 @@ export default function PrivacyPolicyPage() {
 
               {/* Your Rights */}
               <section>
-                <h2 className="text-2xl font-bold mb-md">Your Rights</h2>
-                <p className="text-muted mb-md">
+                <h2 className="mb-4 text-2xl font-bold">Your Rights</h2>
+                <p className="mb-4 text-text-muted">
                   Since we don't collect your data, there's not much to manage.
                   However, you have the right to:
                 </p>
-                <ul className="grid gap-sm text-muted">
+                <ul className="grid gap-2 text-text-muted">
                   <li>
                     - Request information about any data we hold about you
                     (purchase records)
@@ -214,8 +208,8 @@ export default function PrivacyPolicyPage() {
 
               {/* Contact */}
               <section>
-                <h2 className="text-2xl font-bold mb-md">Contact Us</h2>
-                <p className="text-muted">
+                <h2 className="mb-4 text-2xl font-bold">Contact Us</h2>
+                <p className="text-text-muted">
                   If you have any questions about this privacy policy or our
                   privacy practices, please contact us at{" "}
                   <a
@@ -229,10 +223,10 @@ export default function PrivacyPolicyPage() {
 
               {/* Changes */}
               <section>
-                <h2 className="text-2xl font-bold mb-md">
+                <h2 className="mb-4 text-2xl font-bold">
                   Changes to This Policy
                 </h2>
-                <p className="text-muted">
+                <p className="text-text-muted">
                   We may update this privacy policy from time to time. We will
                   notify you of any significant changes by posting the new
                   policy on this page and updating the "Last updated" date. We
@@ -242,44 +236,17 @@ export default function PrivacyPolicyPage() {
             </div>
 
             {/* Back Link */}
-            <a href="/" className="back-link mt-3xl block">
+            <a
+              href="/"
+              className="mt-16 inline-flex items-center gap-1 font-medium text-accent transition-colors hover:text-accent-hover hover:underline max-md:mt-12 max-sm:mt-8"
+            >
               ← Back to Home
             </a>
           </div>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="footer container">
-        <div className="mb-lg">
-          <div className="flex justify-center gap-2xl mb-md">
-            <a href="/features" className="nav-link">
-              Features
-            </a>
-            <a href="/pricing" className="nav-link">
-              Pricing
-            </a>
-            <a href="/docs" className="nav-link">
-              Documentation
-            </a>
-            <a href="/support" className="nav-link">
-              Support
-            </a>
-          </div>
-          <div className="flex justify-center gap-xl text-sm text-muted">
-            <a href="/privacy" className="nav-link">
-              Privacy Policy
-            </a>
-            <a href="/terms" className="nav-link">
-              Terms of Service
-            </a>
-            <a href="/changelog" className="nav-link">
-              Changelog
-            </a>
-          </div>
-        </div>
-        <p>&copy; 2026 Carvd Studio. All rights reserved.</p>
-      </footer>
+      <Footer />
     </div>
   );
 }
