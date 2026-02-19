@@ -301,7 +301,9 @@ test.describe('Happy Path Workflow', () => {
   test('opens cut list modal', async () => {
     // Click the "Generate Cut List" button at the bottom of the sidebar
     await window.evaluate(() => {
-      const btn = document.querySelector('.sidebar-section-bottom .btn-filled.btn-primary') as HTMLElement;
+      const btn = Array.from(document.querySelectorAll('.sidebar-section-bottom button')).find((b) =>
+        b.textContent?.includes('Cut List')
+      ) as HTMLElement;
       if (btn) btn.click();
     });
 
