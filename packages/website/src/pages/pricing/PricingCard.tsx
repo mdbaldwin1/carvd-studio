@@ -84,7 +84,7 @@ export default function PricingCard() {
           <Button size="lg" className="w-full" asChild>
             <a href="#download">Download Free Trial</a>
           </Button>
-          <BuyButton className="w-full" size="lg" />
+          <BuyButton className="w-full" />
         </div>
 
         {/* Trust Signals */}
