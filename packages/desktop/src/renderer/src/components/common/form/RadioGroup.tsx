@@ -1,5 +1,6 @@
 import React from 'react';
 import { FormField } from './FormField';
+import { cn } from '@renderer/lib/utils';
 
 /** A single option in a {@link RadioGroup}. */
 export interface RadioOption {
@@ -54,9 +55,15 @@ export function RadioGroup({
 }: RadioGroupProps) {
   return (
     <FormField label={label} required={required} error={error} helpText={helpText} className={className}>
-      <div className="radio-group" role="radiogroup" aria-label={label}>
+      <div className="flex flex-col gap-2" role="radiogroup" aria-label={label}>
         {options.map((opt) => (
-          <label key={opt.value} className={opt.disabled ? 'disabled' : undefined}>
+          <label
+            key={opt.value}
+            className={cn(
+              'flex items-center gap-2 cursor-pointer text-[13px]',
+              opt.disabled && 'opacity-50 cursor-not-allowed'
+            )}
+          >
             <input
               type="radio"
               name={name}

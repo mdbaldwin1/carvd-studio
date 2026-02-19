@@ -38,14 +38,14 @@ describe('Checkbox', () => {
     expect(screen.getByRole('checkbox')).toBeDisabled();
   });
 
-  it('applies checkbox-label class', () => {
+  it('applies flex layout classes', () => {
     const { container } = render(<Checkbox label="Agree" checked={false} onChange={() => {}} />);
-    expect(container.firstChild).toHaveClass('checkbox-label');
+    expect(container.firstChild).toHaveClass('flex', 'items-center');
   });
 
   it('applies custom className', () => {
     const { container } = render(<Checkbox label="Agree" checked={false} onChange={() => {}} className="extra" />);
-    expect(container.firstChild).toHaveClass('checkbox-label', 'extra');
+    expect(container.firstChild).toHaveClass('flex', 'items-center', 'extra');
   });
 
   it('supports ReactNode label', () => {

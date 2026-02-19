@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
+import { toast as sonnerToast } from 'sonner';
 import { generateThumbnail } from './projectStore';
 import { useLicenseStore } from './licenseStore';
 import { getFeatureLimits, getBlockedMessage } from '../utils/featureLimits';
@@ -47,7 +48,7 @@ interface UIState {
   closeContextMenu: () => void;
 
   // Actions - Toast
-  showToast: (message: string) => void;
+  showToast: (message: string, type?: 'success' | 'error') => void;
   clearToast: () => void;
 
   // Actions - Delete confirmation
@@ -76,7 +77,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   openContextMenu: (menu) => set({ contextMenu: menu }),
   closeContextMenu: () => set({ contextMenu: null }),
 
-  showToast: (message) => {
+  showToast: (message, type?) => {
     // Clear any existing toast timer to prevent timer accumulation
     if (toastTimeoutId !== null) {
       clearTimeout(toastTimeoutId);
@@ -84,7 +85,17 @@ export const useUIStore = create<UIState>((set, get) => ({
     }
     const id = uuidv4();
     set({ toast: { message, id } });
-    // Auto-clear after 2 seconds
+
+    // Render via Sonner
+    if (type === 'error') {
+      sonnerToast.error(message);
+    } else if (type === 'success') {
+      sonnerToast.success(message);
+    } else {
+      sonnerToast(message);
+    }
+
+    // Auto-clear store state after 2 seconds
     toastTimeoutId = setTimeout(() => {
       const current = get().toast;
       if (current?.id === id) {

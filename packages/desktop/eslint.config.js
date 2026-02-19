@@ -38,6 +38,8 @@ export default [
         HTMLLabelElement: 'readonly',
         HTMLSelectElement: 'readonly',
         HTMLFormElement: 'readonly',
+        HTMLHeadingElement: 'readonly',
+        HTMLParagraphElement: 'readonly',
         PointerEvent: 'readonly',
         MouseEvent: 'readonly',
         KeyboardEvent: 'readonly',

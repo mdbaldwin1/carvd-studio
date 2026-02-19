@@ -2,6 +2,18 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useUIStore } from './uiStore';
 import { useLicenseStore } from './licenseStore';
 
+// Mock sonner (vi.hoisted ensures the variable is available when vi.mock is hoisted)
+const { mockSonnerToast } = vi.hoisted(() => {
+  const fn = Object.assign(vi.fn(), {
+    success: vi.fn(),
+    error: vi.fn()
+  });
+  return { mockSonnerToast: fn };
+});
+vi.mock('sonner', () => ({
+  toast: mockSonnerToast
+}));
+
 // Mock generateThumbnail from projectStore
 vi.mock('./projectStore', async () => {
   const actual = await vi.importActual('./projectStore');
@@ -30,6 +42,9 @@ const resetStore = () => {
 describe('uiStore', () => {
   beforeEach(() => {
     resetStore();
+    mockSonnerToast.mockClear();
+    mockSonnerToast.success.mockClear();
+    mockSonnerToast.error.mockClear();
   });
 
   // ============================================================
@@ -110,6 +125,28 @@ describe('uiStore', () => {
         const toast = useUIStore.getState().toast;
         expect(toast?.message).toBe('Second message');
         expect(toast?.id).not.toBe(firstToastId);
+      });
+
+      it('calls sonner toast for default type', () => {
+        useUIStore.getState().showToast('Default message');
+
+        expect(mockSonnerToast).toHaveBeenCalledWith('Default message');
+        expect(mockSonnerToast.success).not.toHaveBeenCalled();
+        expect(mockSonnerToast.error).not.toHaveBeenCalled();
+      });
+
+      it('calls sonner toast.success for success type', () => {
+        useUIStore.getState().showToast('Saved!', 'success');
+
+        expect(mockSonnerToast.success).toHaveBeenCalledWith('Saved!');
+        expect(mockSonnerToast).not.toHaveBeenCalledWith('Saved!');
+      });
+
+      it('calls sonner toast.error for error type', () => {
+        useUIStore.getState().showToast('Failed!', 'error');
+
+        expect(mockSonnerToast.error).toHaveBeenCalledWith('Failed!');
+        expect(mockSonnerToast).not.toHaveBeenCalledWith('Failed!');
       });
     });
 

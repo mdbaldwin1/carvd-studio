@@ -1,5 +1,6 @@
 import { HelpTooltip } from '../common/HelpTooltip';
 import { Button } from '@renderer/components/ui/button';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 import { AppSettings } from '../../types';
 
 interface BehaviorSectionProps {
@@ -19,11 +20,9 @@ export function BehaviorSection({ formData, onSettingChange }: BehaviorSectionPr
             docsSection="app-settings"
           />
         </div>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={formData.autoSave ?? false}
           onChange={(e) => onSettingChange('autoSave', e.target.checked)}
-          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
@@ -31,11 +30,9 @@ export function BehaviorSection({ formData, onSettingChange }: BehaviorSectionPr
           <label className="text-[13px] text-text">Confirm Before Delete</label>
           <HelpTooltip text="Show a confirmation dialog when deleting parts or stocks." docsSection="app-settings" />
         </div>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={formData.confirmBeforeDelete}
           onChange={(e) => onSettingChange('confirmBeforeDelete', e.target.checked)}
-          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
 

@@ -1,4 +1,5 @@
 import { HelpTooltip } from '../common/HelpTooltip';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 import { Select } from '@renderer/components/ui/select';
 import { AppSettings, LightingMode } from '../../types';
 
@@ -25,11 +26,9 @@ export function AppearanceSection({ formData, onSettingChange }: AppearanceSecti
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
         <label className="text-[13px] text-text">Show Hotkey Hints</label>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={formData.showHotkeyHints}
           onChange={(e) => onSettingChange('showHotkeyHints', e.target.checked)}
-          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">

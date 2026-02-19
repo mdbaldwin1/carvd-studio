@@ -8,6 +8,7 @@ import { Stock, Assembly } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { useProjectStore } from '../../store/projectStore';
 import { Button } from '@renderer/components/ui/button';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 
 interface ImportToLibraryDialogProps {
   isOpen: boolean;
@@ -119,11 +120,10 @@ export function ImportToLibraryDialog({
                     key={stock.id}
                     className="flex items-center gap-2 p-2 rounded-sm cursor-pointer transition-colors duration-150 hover:bg-bg-hover"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
+                      className="w-4 h-4 shrink-0"
                       checked={selectedStockIds.has(stock.id)}
                       onChange={() => toggleStock(stock.id)}
-                      className="shrink-0"
                     />
                     <span
                       className="w-4 h-4 rounded-sm shrink-0 border border-border"
@@ -152,11 +152,10 @@ export function ImportToLibraryDialog({
                     key={assembly.id}
                     className="flex items-center gap-2 p-2 rounded-sm cursor-pointer transition-colors duration-150 hover:bg-bg-hover"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
+                      className="w-4 h-4 shrink-0"
                       checked={selectedAssemblyIds.has(assembly.id)}
                       onChange={() => toggleAssembly(assembly.id)}
-                      className="shrink-0"
                     />
                     <span className="shrink-0 text-base">📦</span>
                     <span className="flex-1 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
