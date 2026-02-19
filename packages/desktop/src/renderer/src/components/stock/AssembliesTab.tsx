@@ -5,6 +5,7 @@ import { useUIStore } from '../../store/uiStore';
 import { isBuiltInAssembly } from '../../templates/builtInAssemblies';
 import { Assembly } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
@@ -280,9 +281,12 @@ export function AssembliesTab({
                   <span className="text-xs whitespace-nowrap overflow-hidden text-ellipsis">
                     {assembly.name}
                     {isBuiltInAssembly(assembly.id) && (
-                      <span className="inline-flex items-center ml-1.5 py-px px-1 text-[9px] font-medium text-text-secondary bg-bg-tertiary rounded uppercase tracking-wide">
+                      <Badge
+                        variant="secondary"
+                        className="ml-1.5 rounded py-px px-1 text-[9px] uppercase tracking-wide"
+                      >
                         Built-in
-                      </span>
+                      </Badge>
                     )}
                   </span>
                   <span className="text-[10px] text-text-muted">
@@ -320,9 +324,9 @@ export function AssembliesTab({
               <h3 className="text-base font-semibold m-0 flex items-center gap-2">
                 {isEditingAssembly ? 'Edit Assembly' : selectedAssembly.name}
                 {!isEditingAssembly && isBuiltInAssembly(selectedAssembly.id) && (
-                  <span className="inline-flex items-center py-0.5 px-1.5 text-[10px] font-medium text-text-secondary bg-bg-tertiary rounded uppercase tracking-wide">
+                  <Badge variant="secondary" className="rounded py-0.5 px-1.5 text-[10px] uppercase tracking-wide">
                     Built-in
-                  </span>
+                  </Badge>
                 )}
               </h3>
               {!isEditingAssembly && (

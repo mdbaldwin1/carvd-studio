@@ -326,13 +326,14 @@ describe('ProjectSettingsModal', () => {
       render(<ProjectSettingsModal {...defaultProps} />);
 
       // Help icon should be visible in the Favorite row when project is not saved
-      // Find the favorite row and then the help button within it
-      const favoriteButton = screen.getByText('Add to favorites').closest('.settings-row');
-      const helpButton = favoriteButton?.querySelector('.help-tooltip-trigger');
+      // The HelpTooltip renders a button with aria-label="Show help"
+      const helpButtons = screen.getAllByRole('button', { name: 'Show help' });
+      // The first "Show help" button in the Favorite section
+      const helpButton = helpButtons[0];
       expect(helpButton).toBeInTheDocument();
 
       // Click the help button to show the tooltip
-      fireEvent.click(helpButton!);
+      fireEvent.click(helpButton);
       expect(screen.getByText('Save this project to add it to favorites.')).toBeInTheDocument();
     });
 

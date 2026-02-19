@@ -10,7 +10,9 @@ import { ColorPicker } from './components/common/ColorPicker';
 import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { FractionInput } from './components/common/FractionInput';
 import { HelpTooltip } from './components/common/HelpTooltip';
+import { Separator } from './components/ui/separator';
 import { Toaster } from './components/ui/sonner';
+import { TooltipProvider } from './components/ui/tooltip';
 import { ContextMenu } from './components/layout/ContextMenu';
 import { TrialBanner } from './components/licensing/TrialBanner';
 import { TrialExpiredModal } from './components/licensing/TrialExpiredModal';
@@ -2624,346 +2626,358 @@ function App() {
   const showMainEditor = canUseApp && !showStartScreen && !isLicenseLoading;
 
   return (
-    <div className="app">
-      {/* Update notifications — banner for updates, toast for post-update */}
-      <UpdateNotificationBanner />
-      {/* Only show header and main content when not on start screen */}
-      {showMainEditor && (
-        <>
-          <header className={`app-header ${platform ? `platform-${platform}` : ''}`}>
-            <div className="header-left">
-              <div className="header-title">
-                <button className="app-name-btn" onClick={handleGoHome} title="Return to start screen">
-                  Carvd Studio
-                </button>
-                <span className="title-separator">/</span>
-                <span className="project-name">
-                  {projectName}
-                  {isDirty && <span className="dirty-indicator"> •</span>}
-                </span>
+    <TooltipProvider>
+      <div className="app">
+        {/* Update notifications — banner for updates, toast for post-update */}
+        <UpdateNotificationBanner />
+        {/* Only show header and main content when not on start screen */}
+        {showMainEditor && (
+          <>
+            <header className={`app-header ${platform ? `platform-${platform}` : ''}`}>
+              <div className="header-left">
+                <div className="header-title">
+                  <button className="app-name-btn" onClick={handleGoHome} title="Return to start screen">
+                    Carvd Studio
+                  </button>
+                  <span className="title-separator">/</span>
+                  <span className="project-name">
+                    {projectName}
+                    {isDirty && <span className="dirty-indicator"> •</span>}
+                  </span>
+                </div>
               </div>
-            </div>
-            <div className="header-actions">
-              <div className="header-actions-group">
-                <UndoRedoButtons />
-                <Button variant={isDirty ? 'default' : 'outline'} size="icon" onClick={handleSave} title="Save (Cmd+S)">
-                  <Save size={18} />
-                </Button>
-              </div>
-              <div className="header-divider" />
-              <div className="header-actions-group">
-                <Button variant="outline" size="icon" onClick={() => setIsStockLibraryOpen(true)} title="Stock Library">
-                  <Library size={18} />
-                </Button>
-                <Button variant="outline" size="icon" onClick={() => setIsAppSettingsOpen(true)} title="App Settings">
-                  <Settings size={18} />
-                </Button>
-              </div>
-              {licenseMode === 'free' && (
-                <>
-                  <div className="header-divider" />
+              <div className="header-actions">
+                <div className="header-actions-group">
+                  <UndoRedoButtons />
                   <Button
-                    size="sm"
-                    className="upgrade-btn"
-                    onClick={() => {
-                      // Open purchase page in browser
-                      window.open('https://carvd-studio.com/pricing', '_blank');
-                      // Also open license modal to enter key
-                      setShowLicenseModal(true);
-                    }}
+                    variant={isDirty ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={handleSave}
+                    title="Save (Cmd+S)"
                   >
-                    Upgrade
+                    <Save size={18} />
                   </Button>
-                </>
-              )}
-            </div>
-          </header>
-          {/* Trial Banner (shown days 7-14 of trial) */}
-          {shouldShowTrialBanner && trialStatus && (
-            <TrialBanner
-              daysRemaining={trialStatus.daysRemaining}
-              onActivateLicense={() => setShowLicenseModal(true)}
-              onPurchase={() => {}}
+                </div>
+                <Separator orientation="vertical" className="h-7" />
+                <div className="header-actions-group">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsStockLibraryOpen(true)}
+                    title="Stock Library"
+                  >
+                    <Library size={18} />
+                  </Button>
+                  <Button variant="outline" size="icon" onClick={() => setIsAppSettingsOpen(true)} title="App Settings">
+                    <Settings size={18} />
+                  </Button>
+                </div>
+                {licenseMode === 'free' && (
+                  <>
+                    <Separator orientation="vertical" className="h-7" />
+                    <Button
+                      size="sm"
+                      className="upgrade-btn"
+                      onClick={() => {
+                        // Open purchase page in browser
+                        window.open('https://carvd-studio.com/pricing', '_blank');
+                        // Also open license modal to enter key
+                        setShowLicenseModal(true);
+                      }}
+                    >
+                      Upgrade
+                    </Button>
+                  </>
+                )}
+              </div>
+            </header>
+            {/* Trial Banner (shown days 7-14 of trial) */}
+            {shouldShowTrialBanner && trialStatus && (
+              <TrialBanner
+                daysRemaining={trialStatus.daysRemaining}
+                onActivateLicense={() => setShowLicenseModal(true)}
+                onPurchase={() => {}}
+              />
+            )}
+            {/* Assembly Editing Banner */}
+            {isEditingAssembly && (
+              <AssemblyEditingBanner
+                assemblyName={editingAssemblyName}
+                isCreatingNew={isCreatingNewAssembly}
+                onSave={saveAssemblyAndExit}
+                onCancel={requestAssemblyExit}
+                onRename={(name) => useAssemblyEditingStore.setState({ editingAssemblyName: name })}
+              />
+            )}
+            {/* Template Editing Banner */}
+            {isEditingTemplate && (
+              <TemplateEditingBanner
+                templateName={editingTemplateName}
+                isCreatingNew={isCreatingNewTemplate}
+                onSave={saveTemplateDirectly}
+                onDiscard={requestTemplateDiscard}
+              />
+            )}
+            <main className="app-main">
+              <Sidebar
+                onOpenProjectSettings={() => setIsProjectSettingsOpen(true)}
+                onOpenCutList={openCutListModal}
+                onCreateNewAssembly={startCreatingNewAssembly}
+                onShowLicenseModal={() => setShowLicenseModal(true)}
+              />
+              <CanvasWithDrop />
+              <PropertiesPanel />
+            </main>
+          </>
+        )}
+        <ContextMenu />
+        <SelectionBox />
+        <Toaster />
+        {isStockLibraryOpen && (
+          <Suspense fallback={null}>
+            <LazyStockLibraryModal
+              isOpen={isStockLibraryOpen}
+              onClose={() => setIsStockLibraryOpen(false)}
+              stocks={stockLibrary}
+              onAddStock={addToLibrary}
+              onUpdateStock={updateLibraryStock}
+              onDeleteStock={deleteLibraryStock}
+              assemblies={assemblyLibrary}
+              onUpdateAssembly={updateLibraryAssembly}
+              onDeleteAssembly={deleteLibraryAssembly}
+              onDuplicateAssembly={duplicateLibraryAssembly}
+              onEditAssemblyIn3D={async (assembly) => {
+                const success = await startAssemblyEditing(assembly);
+                if (success && showStartScreen) {
+                  assemblyEditingFromStartScreen.current = true;
+                  setShowStartScreen(false);
+                }
+                return success;
+              }}
+              onCreateNewAssembly={async () => {
+                const success = await startCreatingNewAssembly();
+                if (success && showStartScreen) {
+                  assemblyEditingFromStartScreen.current = true;
+                  setShowStartScreen(false);
+                }
+                return success;
+              }}
             />
-          )}
-          {/* Assembly Editing Banner */}
-          {isEditingAssembly && (
-            <AssemblyEditingBanner
-              assemblyName={editingAssemblyName}
-              isCreatingNew={isCreatingNewAssembly}
-              onSave={saveAssemblyAndExit}
-              onCancel={requestAssemblyExit}
-              onRename={(name) => useAssemblyEditingStore.setState({ editingAssemblyName: name })}
-            />
-          )}
-          {/* Template Editing Banner */}
-          {isEditingTemplate && (
-            <TemplateEditingBanner
-              templateName={editingTemplateName}
-              isCreatingNew={isCreatingNewTemplate}
-              onSave={saveTemplateDirectly}
-              onDiscard={requestTemplateDiscard}
-            />
-          )}
-          <main className="app-main">
-            <Sidebar
-              onOpenProjectSettings={() => setIsProjectSettingsOpen(true)}
-              onOpenCutList={openCutListModal}
-              onCreateNewAssembly={startCreatingNewAssembly}
-              onShowLicenseModal={() => setShowLicenseModal(true)}
-            />
-            <CanvasWithDrop />
-            <PropertiesPanel />
-          </main>
-        </>
-      )}
-      <ContextMenu />
-      <SelectionBox />
-      <Toaster />
-      {isStockLibraryOpen && (
-        <Suspense fallback={null}>
-          <LazyStockLibraryModal
-            isOpen={isStockLibraryOpen}
-            onClose={() => setIsStockLibraryOpen(false)}
-            stocks={stockLibrary}
-            onAddStock={addToLibrary}
-            onUpdateStock={updateLibraryStock}
-            onDeleteStock={deleteLibraryStock}
-            assemblies={assemblyLibrary}
-            onUpdateAssembly={updateLibraryAssembly}
-            onDeleteAssembly={deleteLibraryAssembly}
-            onDuplicateAssembly={duplicateLibraryAssembly}
-            onEditAssemblyIn3D={async (assembly) => {
-              const success = await startAssemblyEditing(assembly);
-              if (success && showStartScreen) {
-                assemblyEditingFromStartScreen.current = true;
-                setShowStartScreen(false);
-              }
-              return success;
-            }}
-            onCreateNewAssembly={async () => {
-              const success = await startCreatingNewAssembly();
-              if (success && showStartScreen) {
-                assemblyEditingFromStartScreen.current = true;
-                setShowStartScreen(false);
-              }
-              return success;
-            }}
-          />
-        </Suspense>
-      )}
+          </Suspense>
+        )}
 
-      {/* Delete Part(s) Confirmation - only shown when confirmBeforeDelete is enabled */}
-      <ConfirmDialog
-        isOpen={pendingDeletePartIds !== null && appSettings.confirmBeforeDelete}
-        title={pendingDeletePartIds?.length === 1 ? 'Delete Part?' : 'Delete Parts?'}
-        message={
-          pendingDeletePartIds?.length === 1
-            ? `Are you sure you want to delete "${pendingDeletePartNames[0]}"?`
-            : `Are you sure you want to delete ${pendingDeletePartIds?.length} parts?`
-        }
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-        variant="danger"
-        onConfirm={confirmDeleteParts}
-        onCancel={cancelDeleteParts}
-      />
-
-      {/* Trial Expired Modal */}
-      {shouldShowExpiredModal && (
-        <TrialExpiredModal
-          onActivateLicense={() => {
-            acknowledgeExpired();
-            setShowLicenseModal(true);
-          }}
-          onPurchase={acknowledgeExpired}
-          onContinueFree={acknowledgeExpired}
-        />
-      )}
-
-      {/* License Activation Modal */}
-      {showLicenseModal && (
-        <Suspense fallback={null}>
-          <LazyLicenseActivationModal
-            isOpen={showLicenseModal}
-            onActivate={handleLicenseActivate}
-            onClose={() => setShowLicenseModal(false)}
-          />
-        </Suspense>
-      )}
-
-      {/* App Settings Modal */}
-      {isAppSettingsOpen && (
-        <Suspense fallback={null}>
-          <LazyAppSettingsModal
-            isOpen={isAppSettingsOpen}
-            onClose={() => setIsAppSettingsOpen(false)}
-            settings={appSettings}
-            onUpdateSettings={updateAppSettings}
-            licenseMode={licenseMode}
-            licenseData={licenseData}
-            onDeactivateLicense={handleLicenseDeactivate}
-            onShowLicenseModal={() => setShowLicenseModal(true)}
-            onShowImportModal={() => setIsImportAppStateOpen(true)}
-          />
-        </Suspense>
-      )}
-
-      {/* Import App State Modal */}
-      {isImportAppStateOpen && (
-        <Suspense fallback={null}>
-          <LazyImportAppStateModal isOpen={isImportAppStateOpen} onClose={() => setIsImportAppStateOpen(false)} />
-        </Suspense>
-      )}
-
-      {/* About Modal */}
-      {isAboutModalOpen && (
-        <Suspense fallback={null}>
-          <LazyAboutModal isOpen={isAboutModalOpen} onClose={() => setIsAboutModalOpen(false)} />
-        </Suspense>
-      )}
-
-      {/* Project Settings Modal */}
-      {isProjectSettingsOpen && (
-        <Suspense fallback={null}>
-          <LazyProjectSettingsModal
-            isOpen={isProjectSettingsOpen}
-            onClose={() => setIsProjectSettingsOpen(false)}
-            isEditingTemplate={isEditingTemplate}
-          />
-        </Suspense>
-      )}
-
-      {/* Template Browser Modal */}
-      {isTemplateBrowserOpen && (
-        <Suspense fallback={null}>
-          <LazyTemplateBrowserModal
-            isOpen={isTemplateBrowserOpen}
-            onClose={() => setIsTemplateBrowserOpen(false)}
-            onCreateProject={handleCreateFromTemplate}
-          />
-        </Suspense>
-      )}
-
-      {/* Save Assembly Modal */}
-      {saveAssemblyModalOpen && (
-        <Suspense fallback={null}>
-          <LazySaveAssemblyModalWrapper />
-        </Suspense>
-      )}
-
-      {/* Cut List Modal */}
-      {cutListModalOpen && (
-        <Suspense fallback={null}>
-          <LazyCutListModalWrapper />
-        </Suspense>
-      )}
-
-      {/* Unsaved Changes Dialog */}
-      <UnsavedChangesDialogComponent />
-      <FileRecoveryModalComponent />
-
-      {/* Auto-Recovery Dialog */}
-      <RecoveryDialog
-        isOpen={hasRecovery}
-        recoveryInfo={recoveryInfo}
-        onRestore={handleRecoveryRestore}
-        onDiscard={discardRecovery}
-      />
-
-      {/* Import to Library Dialog */}
-      <ImportToLibraryDialog
-        isOpen={showImportDialog}
-        missingStocks={missingStocks}
-        missingAssemblies={missingAssemblies}
-        onImport={handleLibraryImport}
-        onSkip={handleLibraryImportSkip}
-      />
-
-      {/* Assembly Editing Exit Dialog */}
-      <AssemblyEditingExitDialog
-        isOpen={showAssemblyExitDialog}
-        assemblyName={editingAssemblyName}
-        isCreatingNew={isCreatingNewAssembly}
-        onSave={saveAssemblyAndExit}
-        onDiscard={discardAssemblyAndExit}
-        onCancel={cancelAssemblyExit}
-      />
-
-      {/* Template Save Dialog */}
-      <TemplateSaveDialog
-        isOpen={showTemplateSaveDialog}
-        templateName={editingTemplateName}
-        templateDescription={editingTemplateDescription}
-        isCreatingNew={isCreatingNewTemplate}
-        onSave={saveTemplateAndExit}
-        onCancel={cancelTemplateDialog}
-      />
-
-      {/* Template Discard Confirmation Dialog */}
-      <TemplateDiscardDialog
-        isOpen={showTemplateDiscardDialog}
-        templateName={editingTemplateName}
-        isCreatingNew={isCreatingNewTemplate}
-        onDiscard={discardTemplateAndExit}
-        onCancel={cancelTemplateDialog}
-      />
-
-      {/* Template Setup Dialog (shown before entering edit mode for new templates) */}
-      <TemplateSetupDialog
-        isOpen={showNewTemplateSetupDialog}
-        onConfirm={async (name, description) => {
-          const success = await confirmNewTemplateSetup(name, description);
-          if (success) {
-            setShowTemplatesScreen(false);
-            setShowStartScreen(false);
+        {/* Delete Part(s) Confirmation - only shown when confirmBeforeDelete is enabled */}
+        <ConfirmDialog
+          isOpen={pendingDeletePartIds !== null && appSettings.confirmBeforeDelete}
+          title={pendingDeletePartIds?.length === 1 ? 'Delete Part?' : 'Delete Parts?'}
+          message={
+            pendingDeletePartIds?.length === 1
+              ? `Are you sure you want to delete "${pendingDeletePartNames[0]}"?`
+              : `Are you sure you want to delete ${pendingDeletePartIds?.length} parts?`
           }
-        }}
-        onCancel={cancelNewTemplateSetup}
-      />
-
-      {/* Welcome Tutorial (first-run experience) */}
-      {showTutorial && (
-        <Suspense fallback={null}>
-          <LazyWelcomeTutorial onComplete={handleTutorialComplete} />
-        </Suspense>
-      )}
-
-      {/* Start Screen (shown when no project is loaded, or while checking license/trial) */}
-      {showStartScreen && canUseApp && !showTutorial && !isLicenseLoading && (
-        <StartScreen
-          onNewProject={handleStartScreenNewProject}
-          onOpenFile={handleStartScreenOpenProject}
-          onOpenProject={handleStartScreenOpenRecent}
-          onRelocateFile={handleRelocateFile}
-          onSelectTemplate={handleStartScreenSelectTemplate}
-          onStartTutorial={handleStartScreenStartTutorial}
-          onViewAllTemplates={handleStartScreenViewAllTemplates}
-          onOpenSettings={() => setIsAppSettingsOpen(true)}
-          onOpenLibrary={() => setIsStockLibraryOpen(true)}
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={confirmDeleteParts}
+          onCancel={cancelDeleteParts}
         />
-      )}
 
-      {/* Templates Screen (full-screen view of all templates) */}
-      {showTemplatesScreen && (
-        <Suspense fallback={null}>
-          <LazyTemplatesScreen
-            onBack={handleTemplatesScreenBack}
-            onSelectTemplate={handleTemplatesScreenSelectTemplate}
-            onStartTutorial={handleTemplatesScreenStartTutorial}
-            onEditTemplate={handleTemplatesScreenEditTemplate}
-            onNewTemplate={handleTemplatesScreenNewTemplate}
+        {/* Trial Expired Modal */}
+        {shouldShowExpiredModal && (
+          <TrialExpiredModal
+            onActivateLicense={() => {
+              acknowledgeExpired();
+              setShowLicenseModal(true);
+            }}
+            onPurchase={acknowledgeExpired}
+            onContinueFree={acknowledgeExpired}
           />
-        </Suspense>
-      )}
+        )}
 
-      {/* New Project Dialog */}
-      <NewProjectDialog
-        isOpen={showNewProjectDialog}
-        onClose={handleNewProjectCancel}
-        onCreateProject={handleNewProjectDialogCreate}
-      />
-    </div>
+        {/* License Activation Modal */}
+        {showLicenseModal && (
+          <Suspense fallback={null}>
+            <LazyLicenseActivationModal
+              isOpen={showLicenseModal}
+              onActivate={handleLicenseActivate}
+              onClose={() => setShowLicenseModal(false)}
+            />
+          </Suspense>
+        )}
+
+        {/* App Settings Modal */}
+        {isAppSettingsOpen && (
+          <Suspense fallback={null}>
+            <LazyAppSettingsModal
+              isOpen={isAppSettingsOpen}
+              onClose={() => setIsAppSettingsOpen(false)}
+              settings={appSettings}
+              onUpdateSettings={updateAppSettings}
+              licenseMode={licenseMode}
+              licenseData={licenseData}
+              onDeactivateLicense={handleLicenseDeactivate}
+              onShowLicenseModal={() => setShowLicenseModal(true)}
+              onShowImportModal={() => setIsImportAppStateOpen(true)}
+            />
+          </Suspense>
+        )}
+
+        {/* Import App State Modal */}
+        {isImportAppStateOpen && (
+          <Suspense fallback={null}>
+            <LazyImportAppStateModal isOpen={isImportAppStateOpen} onClose={() => setIsImportAppStateOpen(false)} />
+          </Suspense>
+        )}
+
+        {/* About Modal */}
+        {isAboutModalOpen && (
+          <Suspense fallback={null}>
+            <LazyAboutModal isOpen={isAboutModalOpen} onClose={() => setIsAboutModalOpen(false)} />
+          </Suspense>
+        )}
+
+        {/* Project Settings Modal */}
+        {isProjectSettingsOpen && (
+          <Suspense fallback={null}>
+            <LazyProjectSettingsModal
+              isOpen={isProjectSettingsOpen}
+              onClose={() => setIsProjectSettingsOpen(false)}
+              isEditingTemplate={isEditingTemplate}
+            />
+          </Suspense>
+        )}
+
+        {/* Template Browser Modal */}
+        {isTemplateBrowserOpen && (
+          <Suspense fallback={null}>
+            <LazyTemplateBrowserModal
+              isOpen={isTemplateBrowserOpen}
+              onClose={() => setIsTemplateBrowserOpen(false)}
+              onCreateProject={handleCreateFromTemplate}
+            />
+          </Suspense>
+        )}
+
+        {/* Save Assembly Modal */}
+        {saveAssemblyModalOpen && (
+          <Suspense fallback={null}>
+            <LazySaveAssemblyModalWrapper />
+          </Suspense>
+        )}
+
+        {/* Cut List Modal */}
+        {cutListModalOpen && (
+          <Suspense fallback={null}>
+            <LazyCutListModalWrapper />
+          </Suspense>
+        )}
+
+        {/* Unsaved Changes Dialog */}
+        <UnsavedChangesDialogComponent />
+        <FileRecoveryModalComponent />
+
+        {/* Auto-Recovery Dialog */}
+        <RecoveryDialog
+          isOpen={hasRecovery}
+          recoveryInfo={recoveryInfo}
+          onRestore={handleRecoveryRestore}
+          onDiscard={discardRecovery}
+        />
+
+        {/* Import to Library Dialog */}
+        <ImportToLibraryDialog
+          isOpen={showImportDialog}
+          missingStocks={missingStocks}
+          missingAssemblies={missingAssemblies}
+          onImport={handleLibraryImport}
+          onSkip={handleLibraryImportSkip}
+        />
+
+        {/* Assembly Editing Exit Dialog */}
+        <AssemblyEditingExitDialog
+          isOpen={showAssemblyExitDialog}
+          assemblyName={editingAssemblyName}
+          isCreatingNew={isCreatingNewAssembly}
+          onSave={saveAssemblyAndExit}
+          onDiscard={discardAssemblyAndExit}
+          onCancel={cancelAssemblyExit}
+        />
+
+        {/* Template Save Dialog */}
+        <TemplateSaveDialog
+          isOpen={showTemplateSaveDialog}
+          templateName={editingTemplateName}
+          templateDescription={editingTemplateDescription}
+          isCreatingNew={isCreatingNewTemplate}
+          onSave={saveTemplateAndExit}
+          onCancel={cancelTemplateDialog}
+        />
+
+        {/* Template Discard Confirmation Dialog */}
+        <TemplateDiscardDialog
+          isOpen={showTemplateDiscardDialog}
+          templateName={editingTemplateName}
+          isCreatingNew={isCreatingNewTemplate}
+          onDiscard={discardTemplateAndExit}
+          onCancel={cancelTemplateDialog}
+        />
+
+        {/* Template Setup Dialog (shown before entering edit mode for new templates) */}
+        <TemplateSetupDialog
+          isOpen={showNewTemplateSetupDialog}
+          onConfirm={async (name, description) => {
+            const success = await confirmNewTemplateSetup(name, description);
+            if (success) {
+              setShowTemplatesScreen(false);
+              setShowStartScreen(false);
+            }
+          }}
+          onCancel={cancelNewTemplateSetup}
+        />
+
+        {/* Welcome Tutorial (first-run experience) */}
+        {showTutorial && (
+          <Suspense fallback={null}>
+            <LazyWelcomeTutorial onComplete={handleTutorialComplete} />
+          </Suspense>
+        )}
+
+        {/* Start Screen (shown when no project is loaded, or while checking license/trial) */}
+        {showStartScreen && canUseApp && !showTutorial && !isLicenseLoading && (
+          <StartScreen
+            onNewProject={handleStartScreenNewProject}
+            onOpenFile={handleStartScreenOpenProject}
+            onOpenProject={handleStartScreenOpenRecent}
+            onRelocateFile={handleRelocateFile}
+            onSelectTemplate={handleStartScreenSelectTemplate}
+            onStartTutorial={handleStartScreenStartTutorial}
+            onViewAllTemplates={handleStartScreenViewAllTemplates}
+            onOpenSettings={() => setIsAppSettingsOpen(true)}
+            onOpenLibrary={() => setIsStockLibraryOpen(true)}
+          />
+        )}
+
+        {/* Templates Screen (full-screen view of all templates) */}
+        {showTemplatesScreen && (
+          <Suspense fallback={null}>
+            <LazyTemplatesScreen
+              onBack={handleTemplatesScreenBack}
+              onSelectTemplate={handleTemplatesScreenSelectTemplate}
+              onStartTutorial={handleTemplatesScreenStartTutorial}
+              onEditTemplate={handleTemplatesScreenEditTemplate}
+              onNewTemplate={handleTemplatesScreenNewTemplate}
+            />
+          </Suspense>
+        )}
+
+        {/* New Project Dialog */}
+        <NewProjectDialog
+          isOpen={showNewProjectDialog}
+          onClose={handleNewProjectCancel}
+          onCreateProject={handleNewProjectDialogCreate}
+        />
+      </div>
+    </TooltipProvider>
   );
 }
 

@@ -1,3 +1,4 @@
+import { Badge } from '@renderer/components/ui/badge';
 import { ChevronDown, ChevronRight, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import React, { useState, useCallback, useMemo } from 'react';
 import { useUIStore } from '../../store/uiStore';
@@ -187,14 +188,20 @@ export function CutListPartsTab({
                     <td>{group.stockName}</td>
                     <td>
                       {group.isGlueUp && (
-                        <span className="inline-block text-[10px] bg-[rgba(147,112,219,0.15)] text-[#9370db] py-0.5 px-1.5 rounded-sm font-medium">
+                        <Badge
+                          variant="outline"
+                          className="rounded-sm border-transparent bg-[rgba(147,112,219,0.15)] text-[#9370db] py-0.5 px-1.5 text-[10px]"
+                        >
                           Glue-up strip
-                        </span>
+                        </Badge>
                       )}
                       {group.grainSensitive && !group.isGlueUp && (
-                        <span className="grain-badge inline-block text-[10px] bg-[rgba(76,175,80,0.15)] text-[#4caf50] py-0.5 px-1.5 rounded-sm font-medium">
+                        <Badge
+                          variant="outline"
+                          className="grain-badge rounded-sm border-transparent bg-[rgba(76,175,80,0.15)] text-[#4caf50] py-0.5 px-1.5 text-[10px]"
+                        >
                           Grain
-                        </span>
+                        </Badge>
                       )}
                       {!hasMultiple && group.items[0].notes && (
                         <span className="text-[11px] text-text-muted italic">{group.items[0].notes}</span>
