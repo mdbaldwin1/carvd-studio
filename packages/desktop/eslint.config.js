@@ -40,6 +40,7 @@ export default [
         HTMLFormElement: 'readonly',
         HTMLHeadingElement: 'readonly',
         HTMLParagraphElement: 'readonly',
+        HTMLSpanElement: 'readonly',
         PointerEvent: 'readonly',
         MouseEvent: 'readonly',
         KeyboardEvent: 'readonly',
