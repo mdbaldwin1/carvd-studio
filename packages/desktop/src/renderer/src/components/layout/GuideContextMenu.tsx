@@ -1,7 +1,5 @@
 import { useProjectStore } from '../../store/projectStore';
-
-const menuItemDanger =
-  'block w-full py-2 px-3 bg-transparent border-none text-danger text-[13px] text-left cursor-pointer transition-colors duration-100 enabled:hover:bg-danger enabled:hover:text-white disabled:text-text-muted disabled:cursor-not-allowed';
+import { MenuPanel, MenuItemButton, MenuLabel } from '../ui/context-menu';
 
 interface GuideContextMenuProps {
   menuRef: React.RefObject<HTMLDivElement>;
@@ -32,27 +30,18 @@ export function GuideContextMenu({ menuRef, x, y, onClose, guideId }: GuideConte
   };
 
   return (
-    <div
-      ref={menuRef}
-      className="context-menu bg-surface border border-border rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.3)] min-w-[160px] py-1 overflow-visible"
-      style={{
-        position: 'fixed',
-        left: x,
-        top: y,
-        zIndex: 1000
-      }}
-    >
-      <div className="py-2 px-3 text-[11px] text-text-muted border-b border-border mb-1">
-        {axisLabels[guide.axis]} Guide at {guide.position.toFixed(2)}"
-      </div>
-      <button className={menuItemDanger} onClick={handleDeleteGuide}>
+    <MenuPanel ref={menuRef} x={x} y={y}>
+      <MenuLabel>
+        {axisLabels[guide.axis]} Guide at {guide.position.toFixed(2)}&quot;
+      </MenuLabel>
+      <MenuItemButton variant="danger" onClick={handleDeleteGuide}>
         Delete This Guide
-      </button>
+      </MenuItemButton>
       {snapGuides.length > 1 && (
-        <button className={menuItemDanger} onClick={handleClearAllGuides}>
+        <MenuItemButton variant="danger" onClick={handleClearAllGuides}>
           Clear All Guides ({snapGuides.length})
-        </button>
+        </MenuItemButton>
       )}
-    </div>
+    </MenuPanel>
   );
 }

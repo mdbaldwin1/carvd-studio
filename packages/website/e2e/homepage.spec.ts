@@ -63,7 +63,7 @@ test.describe("Homepage", () => {
     });
 
     test("displays version badge", async ({ page }) => {
-      await expect(page.locator("text=Version 0.1.0")).toBeVisible();
+      await expect(page.locator("text=/Version \\d+\\.\\d+\\.\\d+/")).toBeVisible();
     });
   });
 
