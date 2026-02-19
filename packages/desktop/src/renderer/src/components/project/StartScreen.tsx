@@ -75,7 +75,6 @@ export function StartScreen({
   const [, setIsLoading] = useState(true);
   const [appVersion, setAppVersion] = useState<string>('');
 
-
   // Load recent and favorite projects on mount
   useEffect(() => {
     const loadData = async () => {

@@ -9,10 +9,7 @@ const TabsList = forwardRef<ElementRef<typeof TabsPrimitive.List>, ComponentProp
     return (
       <TabsPrimitive.List
         ref={ref}
-        className={cn(
-          'flex border-b border-border bg-bg px-6 gap-0',
-          className
-        )}
+        className={cn('flex border-b border-border bg-bg px-6 gap-0', className)}
         {...props}
       />
     );
@@ -43,13 +40,7 @@ const TabsContent = forwardRef<
   ElementRef<typeof TabsPrimitive.Content>,
   ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
 >(function TabsContent({ className, ...props }, ref) {
-  return (
-    <TabsPrimitive.Content
-      ref={ref}
-      className={cn('flex-1 flex flex-col min-h-0', className)}
-      {...props}
-    />
-  );
+  return <TabsPrimitive.Content ref={ref} className={cn('flex-1 flex flex-col min-h-0', className)} {...props} />;
 });
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };
