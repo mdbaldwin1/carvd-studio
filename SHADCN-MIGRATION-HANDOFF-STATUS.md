@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-19 (updated)
 **Branch**: develop
-**Last develop SHA**: `b524283` (after 4.4 merge)
+**Last develop SHA**: `cf2a303` (after bead status PR #238 merge)
 
 ## Key Instruction Documents
 
@@ -14,69 +14,64 @@ These documents define the migration workflow and must be followed:
 
 ## Completed Beads (Merged to develop)
 
+### Epic 2: Desktop Foundation (complete)
+
+| Bead | PR   | Description                        |
+| ---- | ---- | ---------------------------------- |
+| 2.1  | #213 | Install shadcn/ui dependencies     |
+| 2.2  | #215 | Theming bridge                     |
+| 2.3  | #216 | cn() utility + component directory |
+
+### Epic 3: Desktop Core Primitives (complete)
+
+| Bead | PR   | Description            |
+| ---- | ---- | ---------------------- |
+| 3.1  | #221 | Button migration       |
+| 3.2  | #223 | Input, Textarea, Label |
+| 3.3  | #225 | Select                 |
+| 3.4  | #226 | Checkbox, RadioGroup   |
+| 3.5  | #227 | Dialog (Modal base)    |
+| 3.6  | #228 | Toast/Sonner           |
+
+### Epic 4: Desktop Overlay & Navigation (complete)
+
+| Bead | PR   | Description                   |
+| ---- | ---- | ----------------------------- |
+| 4.1  | #233 | AlertDialog (ConfirmDialog)   |
+| 4.2  | #234 | ContextMenu                   |
+| 4.3  | #236 | DropdownMenu                  |
+| 4.4  | #237 | Tooltip/Popover + HelpTooltip |
+| 4.5  | #235 | Badge, Separator, ScrollArea  |
+
+### Epic 9: Website Foundation (complete)
+
+| Bead | PR   | Description                    |
+| ---- | ---- | ------------------------------ |
+| 9.1  | #214 | Website Tailwind foundation    |
+| 9.2  | #217 | Website theming                |
+| 9.3  | #218 | Website core shadcn components |
+
+### Epic 10: Website Page Migration (complete)
+
 | Bead | PR   | Description                              |
 | ---- | ---- | ---------------------------------------- |
-| 2.1  | #213 | Install shadcn/ui dependencies           |
-| 2.2  | #215 | Theming bridge                           |
-| 2.3  | #216 | cn() utility + component directory       |
-| 3.1  | #221 | Button migration                         |
-| 3.2  | #223 | Input, Textarea, Label                   |
-| 3.3  | #225 | Select                                   |
-| 3.4  | #226 | Checkbox, RadioGroup                     |
-| 3.5  | #227 | Dialog (Modal base)                      |
-| 3.6  | #228 | Toast/Sonner                             |
-| 4.1  | #233 | AlertDialog (ConfirmDialog)              |
-| 4.4  | #237 | Tooltip/Popover + HelpTooltip refactor   |
-| 9.1  | #214 | Website Tailwind foundation              |
-| 9.2  | #217 | Website theming                          |
-| 9.3  | #218 | Website core shadcn components           |
 | 10.1 | #219 | Header, Footer, shared components        |
 | 10.2 | #220 | HomePage, FeaturesPage                   |
 | 10.3 | #222 | PricingPage                              |
 | 10.4 | #229 | DownloadPage, SupportPage, ChangelogPage |
 | 10.5 | #230 | Docs layout, sidebar, navigation         |
+| 10.6 | #232 | Docs content pages                       |
+| 10.7 | #231 | Legal pages + 404                        |
 
-## Open PRs (CI re-running after fixes)
-
-| Bead | PR   | Status                            | Notes                                                                                                            |
-| ---- | ---- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| 4.2  | #234 | CI re-running after fix           | ContextMenu migration. Fixed E2E test (version-agnostic regex)                                                   |
-| 4.3  | #236 | CI re-running after fix           | DropdownMenu migration. Fixed lint: added `HTMLSpanElement` to eslint globals, removed unused `fireEvent` import |
-| 4.5  | #235 | CI re-running after rebase        | Badge, Separator, ScrollArea. Rebased on develop (resolved App.tsx + package.json conflicts)                     |
-| 10.6 | #232 | CI re-running after branch update | Docs content pages                                                                                               |
-| 10.7 | #231 | CI re-running after branch update | Legal pages + 404                                                                                                |
-
-### Merge Order for Open PRs
-
-**Desktop (Epic 4 beads are independent — any order):**
-
-- Merge whichever goes green first → update other branches → merge next → repeat
-- After each merge, the other PRs will need branch updates (use `gh api repos/mdbaldwin1/carvd-studio/pulls/{number}/update-branch -X PUT -f update_method=merge`)
-- If update-branch gives a merge conflict (usually package.json/package-lock.json), rebase locally:
-  1. `cd /Users/mbaldwin/Carvd/carvd-studio-{bead}` (worktree)
-  2. `git fetch origin && git rebase origin/develop`
-  3. Resolve package.json conflict (keep both radix dependencies), regenerate package-lock with `git checkout --theirs package-lock.json && npm install --package-lock-only`
-  4. `git add -A && git rebase --continue`
-  5. `git push --force-with-lease origin feat/carvd-studio-{bead}`
-
-**Website (10.6 and 10.7 are independent — any order):**
-
-- These should merge cleanly after branch updates
+**Total: 24 beads merged across 5 epics (2, 3, 4, 9, 10)**
 
 ## Active Worktrees
 
-| Worktree                                  | Branch                 | State                                    |
-| ----------------------------------------- | ---------------------- | ---------------------------------------- |
-| `/Users/mbaldwin/Carvd/carvd-studio-4.1`  | feat/carvd-studio-4.1  | **Can be removed** (PR merged)           |
-| `/Users/mbaldwin/Carvd/carvd-studio-4.2`  | feat/carvd-studio-4.2  | PR open, CI running                      |
-| `/Users/mbaldwin/Carvd/carvd-studio-4.3`  | feat/carvd-studio-4.3  | PR open, CI running                      |
-| `/Users/mbaldwin/Carvd/carvd-studio-4.4`  | feat/carvd-studio-4.4  | **Can be removed** (PR merged)           |
-| `/Users/mbaldwin/Carvd/carvd-studio-4.5`  | feat/carvd-studio-4.5  | PR open, CI running                      |
-| `/Users/mbaldwin/Carvd/carvd-studio-5.1`  | feat/carvd-studio-5.1  | **In-progress work stashed** (see below) |
-| `/Users/mbaldwin/Carvd/carvd-studio-10.6` | feat/carvd-studio-10.6 | PR open, CI running                      |
-| `/Users/mbaldwin/Carvd/carvd-studio-10.7` | feat/carvd-studio-10.7 | PR open, CI running                      |
+| Worktree                                 | Branch                | State                                    |
+| ---------------------------------------- | --------------------- | ---------------------------------------- |
+| `/Users/mbaldwin/Carvd/carvd-studio-5.1` | feat/carvd-studio-5.1 | **In-progress work stashed** (see below) |
 
-**Cleanup after merging**: `git worktree remove --force /Users/mbaldwin/Carvd/carvd-studio-{bead} && git branch -D feat/carvd-studio-{bead}`
+All other worktrees (4.1–4.5, 10.6, 10.7) have been cleaned up.
 
 ## In-Progress Work: Bead 5.1 (Tabs)
 
@@ -136,7 +131,7 @@ expect(screen.getByRole("tabpanel")).toBeInTheDocument();
 - 5.4: Collapsible/Accordion — sidebar sections, joinery
 - 5.5: Progress/Skeleton — loading states
 
-**Epic 6: Desktop Modal Migration** (depends on 3.5 ✅ and 3.2 ✅)
+**Epic 6: Desktop Modal Migration** (depends on 3.5 ✅ and 3.2 ✅ — ready to start)
 
 - 6.1: Stock modals (AddStock, EditStock, StockLibrary)
 - 6.2: Assembly modals (AddAssembly, SaveAssembly)
@@ -146,7 +141,7 @@ expect(screen.getByRole("tabpanel")).toBeInTheDocument();
 - 6.6: TemplateBrowserModal
 - 6.7: License/trial/utility dialogs
 
-**Epic 7: Desktop Layout & Specialized** (depends on Epics 4 and 5)
+**Epic 7: Desktop Layout & Specialized** (depends on Epics 4 ✅ and 5)
 
 - 7.1: Sidebar → shadcn Sidebar + Collapsible
 - 7.2: Header/Toolbar buttons
@@ -166,7 +161,7 @@ expect(screen.getByRole("tabpanel")).toBeInTheDocument();
 
 ### Website Epic 11
 
-**Epic 11: Website CSS Cleanup** (depends on Epic 10)
+**Epic 11: Website CSS Cleanup** (depends on Epic 10 ✅ — ready to start)
 
 - 11.1: Remove old index.css
 - 11.2: Update tests, verify build
@@ -181,11 +176,13 @@ expect(screen.getByRole("tabpanel")).toBeInTheDocument();
 ## Dependency Graph Summary
 
 ```
-Epics 5 & 6 can start NOW (both depend on Epic 3 which is complete)
-Epic 7 depends on Epics 4 (almost done) and 5
-Epic 8 depends on Epics 6 and 7
-Epic 11 depends on Epic 10 (almost done — 10.6, 10.7 in PR)
-Epic 12 depends on Epics 8 and 11
+Epics 2, 3, 4, 9, 10 are COMPLETE ✅
+Epic 5 is IN PROGRESS (5.1 partially done, 5.2–5.5 not started)
+Epic 6 can start NOW (dependencies 3.5 ✅ and 3.2 ✅ are met)
+Epic 7 is BLOCKED on Epic 5 (Epic 4 dependency is met ✅)
+Epic 8 is BLOCKED on Epics 6 and 7
+Epic 11 can start NOW (dependency Epic 10 ✅ is met)
+Epic 12 is BLOCKED on Epics 8 and 11
 ```
 
 ## Key Technical Notes
@@ -230,14 +227,13 @@ Update `.beads/issues.jsonl` after each merge using:
 bd update carvd-studio-{bead-id} --status done
 ```
 
-Note: Many completed beads may not be updated in the JSONL yet. The issue statuses in the file are partially stale.
+All bead statuses are current as of 2026-02-19.
 
 ## Recommended Next Steps
 
-1. **Monitor CI** on all 5 open PRs. Merge as they go green (update branches between merges).
-2. **Finish bead 5.1** — Restore stash in the 5.1 worktree, run tests, fix failures, lint, typecheck, commit, push, create PR.
-3. **Continue Epic 5** beads (5.2–5.5) sequentially.
-4. **Start Epic 6** in parallel with Epic 5 (both dependencies are met). Epic 6 beads are independent of each other.
-5. **Merge 10.6 and 10.7** to complete website Epic 10, then start Epic 11.
-6. **After Epic 4 merges**, can start Epic 7 (once Epic 5 also done).
-7. Epic 8 is last desktop epic (cleanup), Epic 12 is final integration.
+1. **Finish bead 5.1** — Restore stash in the 5.1 worktree, run tests, fix failures, lint, typecheck, commit, push, create PR.
+2. **Continue Epic 5** beads (5.2–5.5) sequentially.
+3. **Start Epic 6** in parallel with Epic 5 (both dependencies are met). Epic 6 beads are independent of each other.
+4. **Start Epic 11** (website cleanup) — dependency Epic 10 is complete.
+5. **After Epic 5 completes**, Epic 7 is unblocked (Epic 4 already done).
+6. Epic 8 is last desktop epic (cleanup), Epic 12 is final integration.

@@ -70,14 +70,14 @@ carvd-studio-6  carvd-studio-7               │
 
 The Desktop and Website tracks are **fully independent** and should always run in parallel.
 
-| Phase | Desktop Agent(s) | Website Agent | Max Agents |
-|-------|-----------------|---------------|------------|
-| **1** | Epic 2: Foundation (sequential sub-beads) | Epic 9: Foundation (sequential) | 2 |
-| **2** | Epic 3: Core Primitives (sequential — high overlap) | Epic 10: Component Migration | 2 |
-| **3** | Epic 4: Overlays + Epic 5: Complex (2 agents) | Epic 10: (continued) | 3 |
-| **4** | Epic 6: Modals + Epic 7: Layout (2 agents) | Epic 11: Cleanup | 3 |
-| **5** | Epic 8: Desktop Cleanup | — | 1 |
-| **6** | Epic 12: Final Integration | — | 1 |
+| Phase | Desktop Agent(s)                                    | Website Agent                   | Max Agents |
+| ----- | --------------------------------------------------- | ------------------------------- | ---------- |
+| **1** | Epic 2: Foundation (sequential sub-beads)           | Epic 9: Foundation (sequential) | 2          |
+| **2** | Epic 3: Core Primitives (sequential — high overlap) | Epic 10: Component Migration    | 2          |
+| **3** | Epic 4: Overlays + Epic 5: Complex (2 agents)       | Epic 10: (continued)            | 3          |
+| **4** | Epic 6: Modals + Epic 7: Layout (2 agents)          | Epic 11: Cleanup                | 3          |
+| **5** | Epic 8: Desktop Cleanup                             | —                               | 1          |
+| **6** | Epic 12: Final Integration                          | —                               | 1          |
 
 ### Rules for Parallel Execution
 
@@ -110,11 +110,11 @@ Include this instruction when assigning each bead.
 
 Spawn teammates with descriptive names and clear bead assignments:
 
-| Name | Role | Handles |
-|------|------|---------|
-| `desktop-worker-1` | Desktop implementation | Desktop beads (sequential) |
+| Name               | Role                              | Handles                               |
+| ------------------ | --------------------------------- | ------------------------------------- |
+| `desktop-worker-1` | Desktop implementation            | Desktop beads (sequential)            |
 | `desktop-worker-2` | Desktop implementation (parallel) | Parallel desktop beads when available |
-| `website-worker` | Website implementation | All website beads |
+| `website-worker`   | Website implementation            | All website beads                     |
 
 ### Spawn Prompt Template
 
@@ -180,30 +180,30 @@ If you encounter a blocker or need a design decision, message me immediately —
 After each bead completes, update `.beads/issues.jsonl` and mentally track:
 
 ```
-[ ] Phase 1: Foundation (Desktop + Website)
-  [ ] carvd-studio-2 (Desktop Foundation)
-    [ ] carvd-studio-2.1
-    [ ] carvd-studio-2.2
-    [ ] carvd-studio-2.3
-  [ ] carvd-studio-9 (Website Foundation)
-    [ ] carvd-studio-9.1
-    [ ] carvd-studio-9.2
-    [ ] carvd-studio-9.3
+[x] Phase 1: Foundation (Desktop + Website) ✅
+  [x] carvd-studio-2 (Desktop Foundation)
+    [x] carvd-studio-2.1
+    [x] carvd-studio-2.2
+    [x] carvd-studio-2.3
+  [x] carvd-studio-9 (Website Foundation)
+    [x] carvd-studio-9.1
+    [x] carvd-studio-9.2
+    [x] carvd-studio-9.3
 
-[ ] Phase 2: Core Primitives + Website Migration
-  [ ] carvd-studio-3 (Desktop Core Primitives)
-    [ ] carvd-studio-3.1 (Button)
-    [ ] carvd-studio-3.2 (Input/Textarea/Label)
-    [ ] carvd-studio-3.3 (Select)
-    [ ] carvd-studio-3.4 (Checkbox/RadioGroup)
-    [ ] carvd-studio-3.5 (Dialog)
-    [ ] carvd-studio-3.6 (Toast/Sonner)
-  [ ] carvd-studio-10 (Website Migration)
-    [ ] carvd-studio-10.1 through 10.7
+[x] Phase 2: Core Primitives + Website Migration ✅
+  [x] carvd-studio-3 (Desktop Core Primitives)
+    [x] carvd-studio-3.1 (Button)
+    [x] carvd-studio-3.2 (Input/Textarea/Label)
+    [x] carvd-studio-3.3 (Select)
+    [x] carvd-studio-3.4 (Checkbox/RadioGroup)
+    [x] carvd-studio-3.5 (Dialog)
+    [x] carvd-studio-3.6 (Toast/Sonner)
+  [x] carvd-studio-10 (Website Migration)
+    [x] carvd-studio-10.1 through 10.7
 
-[ ] Phase 3: Overlays + Complex Components
-  [ ] carvd-studio-4 (Overlays) — can parallel with 5
-  [ ] carvd-studio-5 (Complex Components) — can parallel with 4
+[~] Phase 3: Overlays + Complex Components (partially complete)
+  [x] carvd-studio-4 (Overlays) ✅
+  [ ] carvd-studio-5 (Complex Components) — 5.1 in progress, 5.2–5.5 not started
 
 [ ] Phase 4: Modals + Layout
   [ ] carvd-studio-6 (Modals) — can parallel with 7
