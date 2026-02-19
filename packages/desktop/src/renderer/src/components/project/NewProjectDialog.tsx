@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 
 // Stock item from the app-level stock library
 interface StockLibraryItem {
@@ -273,11 +274,10 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
                     <span className="text-xs font-semibold text-text-muted uppercase tracking-wide">{category}</span>
                     {materialsByCategory[category].map((stock) => (
                       <label key={stock.id} className="flex items-center gap-2.5 cursor-pointer py-1">
-                        <input
-                          type="checkbox"
+                        <Checkbox
+                          className="w-4 h-4"
                           checked={selectedMaterials.includes(stock.id)}
                           onChange={() => handleToggleMaterial(stock.id)}
-                          className="w-4 h-4 m-0 accent-accent cursor-pointer"
                         />
                         <span className="text-sm text-text">{stock.name}</span>
                       </label>
@@ -290,11 +290,10 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
 
           {/* Remember Choices */}
           <label className="flex items-center gap-2.5 cursor-pointer py-3 px-4 bg-bg-tertiary rounded-lg mt-1">
-            <input
-              type="checkbox"
+            <Checkbox
+              className="w-4 h-4"
               checked={rememberChoices}
               onChange={(e) => setRememberChoices(e.target.checked)}
-              className="w-4 h-4 m-0 accent-accent cursor-pointer"
             />
             <span className="text-[13px] text-text-secondary">Remember these choices (skip this dialog next time)</span>
           </label>

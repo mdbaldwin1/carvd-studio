@@ -44,14 +44,14 @@ describe('RadioGroup', () => {
     expect(screen.getAllByRole('radio')[1]).toBeDisabled();
   });
 
-  it('applies disabled class to label of disabled option', () => {
+  it('applies disabled styling to label of disabled option', () => {
     const opts = [
       { value: 'a', label: 'Option A' },
       { value: 'b', label: 'Option B', disabled: true }
     ];
     render(<RadioGroup label="Choice" name="choice" value="a" onChange={() => {}} options={opts} />);
     const disabledLabel = screen.getByText('Option B').closest('label');
-    expect(disabledLabel).toHaveClass('disabled');
+    expect(disabledLabel).toHaveClass('opacity-50', 'cursor-not-allowed');
   });
 
   it('shows error message', () => {

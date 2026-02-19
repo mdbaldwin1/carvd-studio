@@ -7,6 +7,7 @@ import { mmToInches } from '../../utils/fractions';
 import { FractionInput } from '../common/FractionInput';
 import { HelpTooltip } from '../common/HelpTooltip';
 import { Button } from '@renderer/components/ui/button';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 import { Select } from '@renderer/components/ui/select';
 
 interface ProjectSettingsModalProps {
@@ -305,11 +306,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                   docsSection="project-settings"
                 />
               </div>
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={stockConstraints.constrainDimensions}
                 onChange={(e) => setStockConstraints({ ...stockConstraints, constrainDimensions: e.target.checked })}
-                className="w-[18px] h-[18px] cursor-pointer accent-accent"
               />
             </div>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
@@ -320,11 +319,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                   docsSection="project-settings"
                 />
               </div>
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={stockConstraints.constrainGrain}
                 onChange={(e) => setStockConstraints({ ...stockConstraints, constrainGrain: e.target.checked })}
-                className="w-[18px] h-[18px] cursor-pointer accent-accent"
               />
             </div>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
@@ -335,11 +332,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                   docsSection="project-settings"
                 />
               </div>
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={stockConstraints.constrainColor}
                 onChange={(e) => setStockConstraints({ ...stockConstraints, constrainColor: e.target.checked })}
-                className="w-[18px] h-[18px] cursor-pointer accent-accent"
               />
             </div>
             <div className="settings-row flex items-center justify-between gap-4 mb-3">
@@ -347,11 +342,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                 <label className="text-[13px] text-text">Prevent Overlap</label>
                 <HelpTooltip text="Prevent parts from occupying the same space." docsSection="project-settings" />
               </div>
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={stockConstraints.preventOverlap}
                 onChange={(e) => setStockConstraints({ ...stockConstraints, preventOverlap: e.target.checked })}
-                className="w-[18px] h-[18px] cursor-pointer accent-accent"
               />
             </div>
           </div>
