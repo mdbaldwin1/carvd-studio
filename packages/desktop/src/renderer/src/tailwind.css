@@ -381,7 +381,7 @@
 
 /* ===========================================
    CUSTOM ANIMATIONS
-   Used by migrated components (Toast, LoadingSpinner, etc.)
+   Used by migrated components (Dialog, UpdateNotificationBanner, etc.)
    =========================================== */
 
 @layer utilities {
