@@ -48,11 +48,7 @@ export function Modal({
 
   return (
     <Dialog open={isOpen} onOpenChange={closeOnEscape ? handleOpenChange : () => {}}>
-      <DialogContent
-        className={className}
-        onClose={closeOnBackdrop ? onClose : () => {}}
-        role={role}
-      >
+      <DialogContent className={className} onClose={closeOnBackdrop ? onClose : () => {}} role={role}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {showCloseButton && <DialogClose onClose={onClose} />}
