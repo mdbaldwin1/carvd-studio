@@ -1,4 +1,6 @@
 import React from 'react';
+import { Label } from '@renderer/components/ui/label';
+import { cn } from '@renderer/lib/utils';
 
 /** Props for the {@link FormField} wrapper component. */
 export interface FormFieldProps {
@@ -14,25 +16,25 @@ export interface FormFieldProps {
 /**
  * Foundation wrapper for labeled form fields.
  *
- * Renders a `.form-group` container with a `<label>`, the wrapped input,
+ * Renders a flex-column container with a Label, the wrapped input,
  * an optional error message (`role="alert"`), and optional help text.
  * Use the higher-level {@link Input}, {@link Select}, etc. for standard
  * inputs — use `FormField` directly only for custom or composite inputs.
  */
 export function FormField({ label, htmlFor, required, error, helpText, className, children }: FormFieldProps) {
   return (
-    <div className={`form-group${className ? ` ${className}` : ''}`}>
-      <label htmlFor={htmlFor}>
+    <div className={cn('flex flex-col mb-4 gap-2.5', className)}>
+      <Label htmlFor={htmlFor}>
         {label}
         {required && ' *'}
-      </label>
+      </Label>
       {children}
       {error && (
-        <div className="field-error" role="alert">
+        <div className="mt-1 text-[12px] text-danger" role="alert">
           {error}
         </div>
       )}
-      {helpText && <div className="field-help">{helpText}</div>}
+      {helpText && <div className="text-text-muted mt-1 text-[12px]">{helpText}</div>}
     </div>
   );
 }

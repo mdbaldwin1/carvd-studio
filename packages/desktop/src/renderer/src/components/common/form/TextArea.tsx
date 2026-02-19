@@ -1,5 +1,6 @@
 import React from 'react';
 import { FormField } from './FormField';
+import { Textarea as TextareaPrimitive } from '@renderer/components/ui/textarea';
 
 /** Props for the {@link TextArea} component. Extends native textarea attributes. */
 export interface TextAreaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'onChange'> {
@@ -34,7 +35,7 @@ export function TextArea({ label, value, onChange, error, helpText, required, id
       helpText={helpText}
       className={className}
     >
-      <textarea
+      <TextareaPrimitive
         id={textareaId}
         value={value}
         onChange={(e) => onChange(e.target.value)}

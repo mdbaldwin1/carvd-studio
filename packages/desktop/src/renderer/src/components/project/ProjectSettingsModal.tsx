@@ -272,8 +272,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                   docsSection="project-settings"
                 />
               </div>
-              <div className="input-with-suffix">
+              <div className="flex items-center gap-1.5">
                 <input
+                  className="bg-bg border border-border text-text w-[88px] py-2 px-2.5 text-sm rounded-[var(--radius-sm)] focus:outline-none focus:border-accent"
                   type="number"
                   value={Math.round(overageFactor * 100)}
                   onChange={(e) => setOverageFactor(Math.max(0, Math.min(50, parseInt(e.target.value) || 0)) / 100)}
@@ -281,7 +282,7 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
                   max={50}
                   step={5}
                 />
-                <span className="input-suffix">%</span>
+                <span className="text-text-muted text-sm">%</span>
               </div>
             </div>
           </div>
