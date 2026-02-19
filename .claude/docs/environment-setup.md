@@ -1,6 +1,7 @@
 # Environment Configuration Guide
 
 This document lists all environment variables and secrets needed for each deployment target.
+Workflow/policy source of truth: see `AGENTS.md` for branch/PR/changelog/validation rules.
 
 ---
 

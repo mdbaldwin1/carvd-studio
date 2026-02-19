@@ -1,5 +1,7 @@
 # Features & Roadmap
 
+Workflow/policy source of truth: see `AGENTS.md`. This file tracks product capabilities, status, and roadmap context.
+
 ## Status: Production-Ready
 
 Core features complete. UX polish in progress for 1.0 release.

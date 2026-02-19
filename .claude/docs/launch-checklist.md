@@ -1,6 +1,7 @@
 # Carvd Studio Launch Checklist
 
 Last updated: 2026-02-14
+Workflow/policy source of truth: see `AGENTS.md`. This checklist is operational launch guidance.
 
 ## Priority Order
 
