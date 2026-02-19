@@ -17,7 +17,10 @@ export default function SettingsPage() {
       <h2 className="text-4xl font-bold mb-xl">Settings & Preferences</h2>
 
       <div className="grid gap-xl">
-        <div id="app-settings" className="accent-box">
+        <div
+          id="app-settings"
+          className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]"
+        >
           <h3 className="text-2xl font-bold mb-md">App Settings</h3>
           <p className="text-muted mb-md text-sm">
             Access via the gear icon or <code>Cmd/Ctrl + ,</code>
@@ -59,7 +62,10 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div id="backup-sync" className="accent-box">
+        <div
+          id="backup-sync"
+          className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]"
+        >
           <h3 className="text-2xl font-bold mb-md">Backup & Sync</h3>
           <p className="text-muted mb-md text-sm">
             Access via Settings → Backup & Sync
@@ -94,7 +100,10 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div id="project-settings" className="accent-box">
+        <div
+          id="project-settings"
+          className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]"
+        >
           <h3 className="text-2xl font-bold mb-md">Project Settings</h3>
           <p className="text-muted mb-md text-sm">
             Access via File &rarr; Project Settings
