@@ -4,6 +4,14 @@
 
 import { useProjectStore } from '../../store/projectStore';
 import { Button } from '@renderer/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription
+} from '@renderer/components/ui/alert-dialog';
 
 export type UnsavedChangesAction = 'new' | 'open' | 'close' | 'home' | 'custom';
 
@@ -25,8 +33,6 @@ export function UnsavedChangesDialog({
   onCancel
 }: UnsavedChangesDialogProps) {
   const projectName = useProjectStore((s) => s.projectName);
-
-  if (!isOpen) return null;
 
   const getMessage = () => {
     if (customMessage) return customMessage;
@@ -58,24 +64,18 @@ export function UnsavedChangesDialog({
   };
 
   return (
-    <div
-      className="modal-overlay fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
-      onClick={onCancel}
-    >
-      <div
-        className="modal bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[420px] max-h-[85vh] flex flex-col animate-modal-fade-in"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 className="m-0 text-base font-semibold text-text">Unsaved Changes</h2>
-        </div>
+    <AlertDialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
+      <AlertDialogContent className="max-w-[420px]">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+        </AlertDialogHeader>
 
-        <div className="p-5 overflow-y-auto">
-          <p className="mb-2 text-sm text-text leading-relaxed">{getMessage()}</p>
+        <div className="px-5 py-4">
+          <AlertDialogDescription className="mb-2">{getMessage()}</AlertDialogDescription>
           <p className="m-0 text-[13px] text-text-muted">Your changes will be lost if you don&apos;t save them.</p>
         </div>
 
-        <div className="py-3 px-5 border-t border-border flex gap-2 justify-end">
+        <AlertDialogFooter>
           <Button size="sm" variant="secondary" className="min-w-22.5" onClick={onCancel}>
             Cancel
           </Button>
@@ -85,8 +85,8 @@ export function UnsavedChangesDialog({
           <Button size="sm" className="min-w-22.5" onClick={onSave} autoFocus>
             Save
           </Button>
-        </div>
-      </div>
-    </div>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

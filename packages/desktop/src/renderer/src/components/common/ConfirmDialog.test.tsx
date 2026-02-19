@@ -64,6 +64,12 @@ describe('ConfirmDialog', () => {
       const confirmButton = screen.getByText('Confirm');
       expect(confirmButton).toHaveClass('bg-accent');
     });
+
+    it('renders with alertdialog role', () => {
+      render(<ConfirmDialog {...defaultProps} />);
+
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    });
   });
 
   describe('button interactions', () => {
@@ -84,23 +90,15 @@ describe('ConfirmDialog', () => {
 
       expect(onCancel).toHaveBeenCalledTimes(1);
     });
-
-    it('calls onCancel when close button is clicked', () => {
-      const onCancel = vi.fn();
-      render(<ConfirmDialog {...defaultProps} onCancel={onCancel} />);
-
-      fireEvent.click(screen.getByText('×'));
-
-      expect(onCancel).toHaveBeenCalledTimes(1);
-    });
   });
 
   describe('keyboard interactions', () => {
-    it('calls onCancel when Escape is pressed', () => {
+    it('calls onCancel when Escape is pressed on the dialog', () => {
       const onCancel = vi.fn();
       render(<ConfirmDialog {...defaultProps} onCancel={onCancel} />);
 
-      fireEvent.keyDown(window, { key: 'Escape' });
+      const dialog = screen.getByRole('alertdialog');
+      fireEvent.keyDown(dialog, { key: 'Escape' });
 
       expect(onCancel).toHaveBeenCalledTimes(1);
     });
@@ -128,24 +126,11 @@ describe('ConfirmDialog', () => {
   });
 
   describe('backdrop interactions', () => {
-    it('calls onCancel when backdrop is clicked (mousedown + click on same element)', () => {
-      const onCancel = vi.fn();
-      render(<ConfirmDialog {...defaultProps} onCancel={onCancel} />);
-
-      const backdrop = screen.getByRole('alertdialog').parentElement!;
-      // Simulate proper backdrop click (mousedown then click on backdrop)
-      fireEvent.mouseDown(backdrop);
-      fireEvent.click(backdrop);
-
-      expect(onCancel).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not close when clicking inside modal content', () => {
+    it('does not close when clicking inside dialog content', () => {
       const onCancel = vi.fn();
       render(<ConfirmDialog {...defaultProps} onCancel={onCancel} />);
 
       const modalContent = screen.getByRole('alertdialog');
-      fireEvent.mouseDown(modalContent);
       fireEvent.click(modalContent);
 
       expect(onCancel).not.toHaveBeenCalled();

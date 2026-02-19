@@ -72,6 +72,12 @@ describe('RecoveryDialog', () => {
 
       expect(screen.getByText('Discard')).toBeInTheDocument();
     });
+
+    it('renders with alertdialog role', () => {
+      render(<RecoveryDialog {...defaultProps} />);
+
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    });
   });
 
   describe('button interactions', () => {
@@ -91,20 +97,6 @@ describe('RecoveryDialog', () => {
       fireEvent.click(screen.getByText('Discard'));
 
       expect(onDiscard).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('styling', () => {
-    it('has modal-overlay class on container', () => {
-      const { container } = render(<RecoveryDialog {...defaultProps} />);
-
-      expect(container.querySelector('.modal-overlay')).toBeInTheDocument();
-    });
-
-    it('has modal class on dialog', () => {
-      const { container } = render(<RecoveryDialog {...defaultProps} />);
-
-      expect(container.querySelector('.modal')).toBeInTheDocument();
     });
   });
 });
