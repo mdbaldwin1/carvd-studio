@@ -1,4 +1,5 @@
 import { FileText, Star, AlertTriangle } from 'lucide-react';
+import { Card } from '@renderer/components/ui/card';
 import { useState } from 'react';
 import { RecentProject, formatRelativeDate } from './StartScreen';
 
@@ -73,7 +74,7 @@ export function FavoritesTab({
   return (
     <div className="flex flex-col gap-1 flex-auto min-h-0 max-h-full overflow-y-auto">
       {projects.map((project, index) => (
-        <div
+        <Card
           key={project.path}
           className={`project-item group relative flex items-center gap-3 py-3 px-4 bg-transparent border border-transparent rounded-lg cursor-pointer transition-all duration-100 text-left w-full hover:bg-bg-secondary hover:border-border ${!project.exists ? 'missing opacity-60 !cursor-default hover:!bg-transparent hover:!border-transparent' : ''} ${dragOverIndex === index ? 'drag-over !border-primary !bg-bg-secondary before:content-[""] before:absolute before:top-[-2px] before:left-0 before:right-0 before:h-0.5 before:bg-primary before:rounded-sm' : ''} ${draggedIndex === index ? 'dragging opacity-50' : ''}`}
           onClick={() => {
@@ -137,7 +138,7 @@ export function FavoritesTab({
           >
             <Star size={16} fill="currentColor" />
           </button>
-        </div>
+        </Card>
       ))}
     </div>
   );

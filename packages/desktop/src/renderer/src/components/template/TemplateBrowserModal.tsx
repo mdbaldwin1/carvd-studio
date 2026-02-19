@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
 import { Project } from '../../types';
@@ -229,7 +230,7 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
               </h4>
               <div className="grid grid-cols-2 gap-2.5">
                 {builtInTemplates.map((template) => (
-                  <div
+                  <Card
                     key={template.id}
                     className={`relative flex items-center gap-3 p-3 bg-bg border rounded-lg cursor-pointer transition-all duration-150 hover:border-border-hover hover:bg-bg-secondary ${selectedTemplate?.id === template.id ? 'border-accent bg-accent-bg' : 'border-border'}`}
                     onClick={() => handleSelectTemplate(template)}
@@ -241,7 +242,7 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
                       <span className="text-[13px] font-medium text-text truncate">{template.name}</span>
                       <span className="text-[11px] text-text-muted">{formatDimensions(template.dimensions)}</span>
                     </div>
-                  </div>
+                  </Card>
                 ))}
               </div>
             </div>
@@ -263,7 +264,7 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
               ) : (
                 <div className="grid grid-cols-2 gap-2.5">
                   {userTemplates.map((template) => (
-                    <div
+                    <Card
                       key={template.id}
                       className={`group relative flex items-center gap-3 p-3 bg-bg border border-dashed rounded-lg cursor-pointer transition-all duration-150 hover:border-border-hover hover:bg-bg-secondary ${selectedTemplate?.id === template.id ? '!border-solid border-accent bg-accent-bg' : 'border-border'}`}
                       onClick={() => handleSelectTemplate(template)}
@@ -286,7 +287,7 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
                       >
                         <Trash2 size={14} />
                       </button>
-                    </div>
+                    </Card>
                   ))}
                 </div>
               )}
@@ -294,24 +295,26 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
           </div>
 
           {/* Template details */}
-          <div className="w-[280px] p-5 flex flex-col">
+          <Card className="w-[280px] m-5 ml-0 flex flex-col border-border bg-bg">
             {selectedTemplate ? (
               <>
-                <div className="flex items-center gap-4 mb-5">
-                  <span className="text-5xl w-[72px] h-[72px] flex items-center justify-center bg-bg-tertiary rounded-xl">
-                    {selectedTemplate.thumbnail}
-                  </span>
-                  <div>
-                    <h3 className="text-lg font-semibold text-text m-0 mb-1">{selectedTemplate.name}</h3>
-                    {selectedTemplate.type === 'user' && (
-                      <span className="inline-block text-[10px] font-semibold text-accent bg-accent-bg py-0.5 px-2 rounded-full uppercase tracking-wider">
-                        Custom
-                      </span>
-                    )}
+                <CardHeader className="pb-4">
+                  <div className="flex items-center gap-4">
+                    <span className="text-5xl w-[72px] h-[72px] flex items-center justify-center bg-bg-tertiary rounded-xl">
+                      {selectedTemplate.thumbnail}
+                    </span>
+                    <div>
+                      <CardTitle className="text-lg">{selectedTemplate.name}</CardTitle>
+                      {selectedTemplate.type === 'user' && (
+                        <span className="inline-block text-[10px] font-semibold text-accent bg-accent-bg py-0.5 px-2 rounded-full uppercase tracking-wider">
+                          Custom
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
+                </CardHeader>
 
-                <div className="flex-1">
+                <CardContent className="flex-1">
                   <p className="text-[13px] text-text-secondary leading-relaxed m-0 mb-5">
                     {selectedTemplate.description}
                   </p>
@@ -340,14 +343,14 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
                       </div>
                     )}
                   </div>
-                </div>
+                </CardContent>
               </>
             ) : (
               <div className="flex-1 flex items-center justify-center">
                 <p className="text-text-muted text-[13px]">Select a template to view details</p>
               </div>
             )}
-          </div>
+          </Card>
         </div>
 
         <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
