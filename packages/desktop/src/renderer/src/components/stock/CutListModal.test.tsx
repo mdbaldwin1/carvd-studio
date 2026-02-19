@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { CutListModal } from './CutListModal';
 import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
@@ -273,13 +274,14 @@ describe('CutListModal', () => {
       expect(screen.getByText('Done')).toBeInTheDocument();
     });
 
-    it('shows Download dropdown with CSV option', () => {
+    it('shows Download dropdown with CSV option', async () => {
+      const user = userEvent.setup();
       render(<CutListModal {...defaultProps} />);
 
       // Click the Download dropdown to reveal options
-      fireEvent.click(screen.getByText('Download'));
+      await user.click(screen.getByText('Download'));
 
-      expect(screen.getByText('Download CSV')).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /download csv/i })).toBeInTheDocument();
     });
 
     it('shows statistics', () => {
@@ -359,15 +361,16 @@ describe('CutListModal', () => {
       useProjectStore.setState({ cutList: mockCutList });
     });
 
-    it('shows Download dropdown with PDF option', () => {
+    it('shows Download dropdown with PDF option', async () => {
+      const user = userEvent.setup();
       render(<CutListModal {...defaultProps} />);
 
       fireEvent.click(screen.getByText('Cutting Diagrams (1)'));
 
       // Click the Download dropdown to reveal options
-      fireEvent.click(screen.getByText('Download'));
+      await user.click(screen.getByText('Download'));
 
-      expect(screen.getByText('Download PDF')).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /download pdf/i })).toBeInTheDocument();
     });
 
     it('shows board diagram', () => {
@@ -427,15 +430,16 @@ describe('CutListModal', () => {
       expect(priceElements.length).toBeGreaterThan(0);
     });
 
-    it('shows Download dropdown with CSV option in shopping list tab', () => {
+    it('shows Download dropdown with CSV option in shopping list tab', async () => {
+      const user = userEvent.setup();
       render(<CutListModal {...defaultProps} />);
 
       fireEvent.click(screen.getByText(/Shopping List/));
 
       // Click the Download dropdown to reveal options
-      fireEvent.click(screen.getByText('Download'));
+      await user.click(screen.getByText('Download'));
 
-      expect(screen.getByText('Download CSV')).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: /download csv/i })).toBeInTheDocument();
     });
   });
 
@@ -938,11 +942,12 @@ describe('CutListModal', () => {
     });
 
     it('creates CSV when Download CSV clicked', async () => {
+      const user = userEvent.setup();
       render(<CutListModal {...defaultProps} />);
 
       // Click the Download dropdown, then the Download CSV option
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download CSV'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download csv/i }));
 
       await waitFor(() => {
         expect(createObjectURLSpy).toHaveBeenCalled();
@@ -951,12 +956,13 @@ describe('CutListModal', () => {
     });
 
     it('creates shopping list CSV when Download CSV clicked in shopping tab', async () => {
+      const user = userEvent.setup();
       render(<CutListModal {...defaultProps} />);
 
       fireEvent.click(screen.getByText(/Shopping List/));
       // Click the Download dropdown, then the Download CSV option
-      fireEvent.click(screen.getByText('Download'));
-      fireEvent.click(screen.getByText('Download CSV'));
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download csv/i }));
 
       await waitFor(() => {
         expect(createObjectURLSpy).toHaveBeenCalled();

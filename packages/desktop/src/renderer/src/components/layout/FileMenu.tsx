@@ -3,10 +3,20 @@
  */
 
 import { ChevronDown, File, FolderOpen, Save, FilePlus } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
 import { openProjectFromPath } from '../../utils/fileOperations';
 import { useUIStore } from '../../store/uiStore';
 import { Button } from '@renderer/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger
+} from '@renderer/components/ui/dropdown-menu';
 
 interface FileMenuProps {
   onNew: () => void;
@@ -18,35 +28,12 @@ interface FileMenuProps {
 }
 
 export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRefreshRecent }: FileMenuProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [showRecent, setShowRecent] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const showToast = useUIStore((s) => s.showToast);
 
   const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
-  const modKey = isMac ? '⌘' : 'Ctrl+';
-
-  // Close menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-        setShowRecent(false);
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen]);
+  const modKey = isMac ? '\u2318' : 'Ctrl+';
 
   const handleOpenRecent = async (filePath: string) => {
-    setIsOpen(false);
-    setShowRecent(false);
     const result = await openProjectFromPath(filePath);
     if (result.success) {
       showToast('Project opened');
@@ -56,95 +43,72 @@ export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRe
     }
   };
 
-  const handleMenuAction = (action: () => void) => {
-    setIsOpen(false);
-    setShowRecent(false);
-    action();
-  };
-
   // Extract filename from path
   const getFileName = (filePath: string) => {
     const parts = filePath.split(/[/\\]/);
     return parts[parts.length - 1]?.replace(/\.carvd$/i, '') || filePath;
   };
 
-  const menuItemClass =
-    'flex items-center gap-2.5 w-full py-2 px-3 bg-transparent border-none rounded text-text text-[13px] cursor-pointer text-left hover:bg-surface-hover';
-
-  const dropdownClass =
-    'absolute top-full left-0 mt-1 min-w-50 bg-surface border border-border rounded-md shadow-[0_4px_16px_rgba(0,0,0,0.2)] z-1000 p-1';
-
   return (
-    <div className="relative" ref={menuRef}>
-      <Button
-        variant="ghost"
-        className="py-1.5 px-2.5 text-[13px] font-medium"
-        onClick={() => setIsOpen(!isOpen)}
-        aria-expanded={isOpen}
-        aria-haspopup="true"
-      >
-        <File size={16} />
-        <span>File</span>
-        <ChevronDown size={14} className={`transition-transform duration-150 ${isOpen ? 'rotate-180' : ''}`} />
-      </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="py-1.5 px-2.5 text-[13px] font-medium">
+          <File size={16} />
+          <span>File</span>
+          <ChevronDown size={14} className="transition-transform duration-150" />
+        </Button>
+      </DropdownMenuTrigger>
 
-      {isOpen && (
-        <div className={dropdownClass}>
-          <button className={menuItemClass} onClick={() => handleMenuAction(onNew)}>
-            <FilePlus size={16} />
-            <span className="flex-1">New Project</span>
-            <span className="ml-auto text-xs text-text-muted">{modKey}N</span>
-          </button>
+      <DropdownMenuContent align="start" className="min-w-[12.5rem]">
+        <DropdownMenuItem onSelect={onNew}>
+          <FilePlus size={16} />
+          <span className="flex-1">New Project</span>
+          <DropdownMenuShortcut>{modKey}N</DropdownMenuShortcut>
+        </DropdownMenuItem>
 
-          <button className={menuItemClass} onClick={() => handleMenuAction(onOpen)}>
-            <FolderOpen size={16} />
-            <span className="flex-1">Open...</span>
-            <span className="ml-auto text-xs text-text-muted">{modKey}O</span>
-          </button>
+        <DropdownMenuItem onSelect={onOpen}>
+          <FolderOpen size={16} />
+          <span className="flex-1">Open...</span>
+          <DropdownMenuShortcut>{modKey}O</DropdownMenuShortcut>
+        </DropdownMenuItem>
 
-          <div
-            className={`${menuItemClass} relative`}
-            onMouseEnter={() => setShowRecent(true)}
-            onMouseLeave={() => setShowRecent(false)}
-          >
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
             <FolderOpen size={16} />
             <span className="flex-1">Open Recent</span>
-            <ChevronDown size={14} className="ml-auto -rotate-90" />
-
-            {showRecent && (
-              <div className={`${dropdownClass} left-full -top-1 max-w-75 z-1001`}>
-                {recentProjects.length === 0 ? (
-                  <div className={`${menuItemClass} opacity-50 cursor-default`}>
-                    <span>No recent projects</span>
-                  </div>
-                ) : (
-                  recentProjects.map((path) => (
-                    <button key={path} className={menuItemClass} onClick={() => handleOpenRecent(path)} title={path}>
-                      <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-                        {getFileName(path)}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="max-w-[18.75rem]">
+            {recentProjects.length === 0 ? (
+              <DropdownMenuItem disabled>
+                <span>No recent projects</span>
+              </DropdownMenuItem>
+            ) : (
+              recentProjects.map((path) => (
+                <DropdownMenuItem key={path} onSelect={() => handleOpenRecent(path)} title={path}>
+                  <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{getFileName(path)}</span>
+                </DropdownMenuItem>
+              ))
             )}
-          </div>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
 
-          <div className="h-px bg-border my-1" />
+        <DropdownMenuSeparator />
 
-          <button className={menuItemClass} onClick={() => handleMenuAction(onSave)}>
-            <Save size={16} />
-            <span className="flex-1">Save</span>
-            <span className="ml-auto text-xs text-text-muted">{modKey}S</span>
-          </button>
+        <DropdownMenuItem onSelect={onSave}>
+          <Save size={16} />
+          <span className="flex-1">Save</span>
+          <DropdownMenuShortcut>{modKey}S</DropdownMenuShortcut>
+        </DropdownMenuItem>
 
-          <button className={menuItemClass} onClick={() => handleMenuAction(onSaveAs)}>
-            <Save size={16} />
-            <span className="flex-1">Save As...</span>
-            <span className="ml-auto text-xs text-text-muted">{modKey}⇧S</span>
-          </button>
-        </div>
-      )}
-    </div>
+        <DropdownMenuItem onSelect={onSaveAs}>
+          <Save size={16} />
+          <span className="flex-1">Save As...</span>
+          <DropdownMenuShortcut>
+            {modKey}
+            {'\u21E7'}S
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
