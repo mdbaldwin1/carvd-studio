@@ -7,13 +7,7 @@ import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { getFeatureLimits } from '../../utils/featureLimits';
-
-const menuItem =
-  'block w-full py-2 px-3 bg-transparent border-none text-text text-[13px] text-left cursor-pointer transition-colors duration-100 enabled:hover:bg-surface-hover disabled:text-text-muted disabled:cursor-not-allowed';
-const menuItemDanger = `${menuItem} !text-danger enabled:hover:!bg-danger enabled:hover:!text-white`;
-const submenuTrigger = `${menuItem} flex justify-between items-center`;
-const submenuPanel =
-  'hidden group-hover/submenu:block absolute left-[calc(100%-4px)] top-[-4px] min-w-[180px] bg-surface border border-border rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.15)] py-1 z-[1001] before:content-[""] before:absolute before:left-[-10px] before:top-0 before:w-[14px] before:h-full';
+import { MenuPanel, MenuItemButton, MenuSeparator, MenuLabel, MenuSub } from '../ui/context-menu';
 
 interface PartContextMenuProps {
   menuRef: React.RefObject<HTMLDivElement>;
@@ -193,17 +187,8 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   };
 
   return (
-    <div
-      ref={menuRef}
-      className="context-menu bg-surface border border-border rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.3)] min-w-[160px] py-1 overflow-visible"
-      style={{
-        position: 'fixed',
-        left: x,
-        top: y,
-        zIndex: 1000
-      }}
-    >
-      <div className="py-2 px-3 text-[11px] text-text-muted border-b border-border mb-1">
+    <MenuPanel ref={menuRef} x={x} y={y}>
+      <MenuLabel>
         {selectedGroupIds.length > 0 && selectedPartIds.length > 0
           ? `${selectedPartIds.length} part${selectedPartIds.length === 1 ? '' : 's'}, ${selectedGroupIds.length} group${selectedGroupIds.length === 1 ? '' : 's'}`
           : selectedGroupIds.length > 0
@@ -211,107 +196,81 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
             : isMultiSelect
               ? `${effectiveSelectedPartIds.length} parts selected`
               : '1 part selected'}
-      </div>
-      <button className={menuItem} onClick={handleCenter}>
-        Center View
-      </button>
-      <button className={menuItem} onClick={handleCopy}>
-        Copy
-      </button>
-      <button
-        className={menuItem}
+      </MenuLabel>
+      <MenuItemButton onClick={handleCenter}>Center View</MenuItemButton>
+      <MenuItemButton onClick={handleCopy}>Copy</MenuItemButton>
+      <MenuItemButton
         onClick={handleSaveAsAssembly}
         disabled={!canUseAssemblies}
         title={!canUseAssemblies ? 'Upgrade to use assemblies' : undefined}
       >
         Save as Assembly
-      </button>
-      <button
-        className={menuItem}
+      </MenuItemButton>
+      <MenuItemButton
         onClick={handleResetToStock}
         disabled={!hasStockAssigned}
         title={hasStockAssigned ? undefined : 'No stock assigned to selected parts'}
       >
         Reset to Stock
-      </button>
-      <div className="h-px bg-border my-1" />
-      <button className={menuItem} onClick={handleToggleReference}>
+      </MenuItemButton>
+      <MenuSeparator />
+      <MenuItemButton onClick={handleToggleReference}>
         {allAreReferences ? 'Clear Reference' : someAreReferences ? 'Set All as Reference' : 'Set as Reference'} (R)
-      </button>
-      {hasOtherReferences && (
-        <button className={menuItem} onClick={handleClearAllReferences}>
-          Clear All References
-        </button>
-      )}
+      </MenuItemButton>
+      {hasOtherReferences && <MenuItemButton onClick={handleClearAllReferences}>Clear All References</MenuItemButton>}
       {canCreateGroup && (
-        <button
-          className={menuItem}
+        <MenuItemButton
           onClick={handleGroup}
           disabled={!canUseGroups}
           title={!canUseGroups ? 'Upgrade to use groups' : undefined}
         >
           Create Group (G)
-        </button>
+        </MenuItemButton>
       )}
       {isInEditMode && (partsInGroups.length > 0 || selectedGroupIds.length > 0) && (
-        <button className={menuItem} onClick={handleRemoveFromGroup}>
+        <MenuItemButton onClick={handleRemoveFromGroup}>
           Remove from Group ({partsInGroups.length + selectedGroupIds.length})
-        </button>
+        </MenuItemButton>
       )}
       {groupToUngroupObj && (
-        <button className={menuItem} onClick={handleUngroup}>
-          Ungroup "{groupToUngroupObj.name}"
-        </button>
+        <MenuItemButton onClick={handleUngroup}>Ungroup &quot;{groupToUngroupObj.name}&quot;</MenuItemButton>
       )}
       {canAddToGroup && (
         <>
           {targetGroupsForAdd.length === 1 ? (
-            <button className={menuItem} onClick={() => handleAddToGroup(targetGroupsForAdd[0]!.id)}>
-              Add to "{targetGroupsForAdd[0]!.name}" ({ungroupedPartIds.length})
-            </button>
+            <MenuItemButton onClick={() => handleAddToGroup(targetGroupsForAdd[0]!.id)}>
+              Add to &quot;{targetGroupsForAdd[0]!.name}&quot; ({ungroupedPartIds.length})
+            </MenuItemButton>
           ) : (
-            <div className="group/submenu relative">
-              <button className={submenuTrigger}>Add to Group ({ungroupedPartIds.length}) ▸</button>
-              <div className={submenuPanel}>
-                {targetGroupsForAdd.map((group) => (
-                  <button key={group!.id} className={menuItem} onClick={() => handleAddToGroup(group!.id)}>
-                    {group!.name}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <MenuSub label={`Add to Group (${ungroupedPartIds.length}) \u25B8`}>
+              {targetGroupsForAdd.map((group) => (
+                <MenuItemButton key={group!.id} onClick={() => handleAddToGroup(group!.id)}>
+                  {group!.name}
+                </MenuItemButton>
+              ))}
+            </MenuSub>
           )}
         </>
       )}
       {canMergeGroups && (
-        <div className="group/submenu relative">
-          <button className={submenuTrigger}>Merge Groups ({selectedGroupIds.length}) ▸</button>
-          <div className={submenuPanel}>
-            <button className={menuItem} onClick={() => handleMergeGroups('top-level')}>
-              Top Level (Preserve Structure)
-            </button>
-            <button className={menuItem} onClick={() => handleMergeGroups('deep')}>
-              Deep (Flatten to Parts)
-            </button>
-          </div>
-        </div>
+        <MenuSub label={`Merge Groups (${selectedGroupIds.length}) \u25B8`}>
+          <MenuItemButton onClick={() => handleMergeGroups('top-level')}>Top Level (Preserve Structure)</MenuItemButton>
+          <MenuItemButton onClick={() => handleMergeGroups('deep')}>Deep (Flatten to Parts)</MenuItemButton>
+        </MenuSub>
       )}
       {canAddGroupsToGroup && targetGroupsForGroupAdd.length > 0 && (
-        <div className="group/submenu relative">
-          <button className={submenuTrigger}>Add to Group ▸</button>
-          <div className={submenuPanel}>
-            {targetGroupsForGroupAdd.map((group) => (
-              <button key={group.id} className={menuItem} onClick={() => handleAddGroupsToGroup(group.id)}>
-                Add to "{group.name}"
-              </button>
-            ))}
-          </div>
-        </div>
+        <MenuSub label="Add to Group &#9656;">
+          {targetGroupsForGroupAdd.map((group) => (
+            <MenuItemButton key={group.id} onClick={() => handleAddGroupsToGroup(group.id)}>
+              Add to &quot;{group.name}&quot;
+            </MenuItemButton>
+          ))}
+        </MenuSub>
       )}
-      <div className="h-px bg-border my-1" />
-      <button className={menuItemDanger} onClick={handleDelete}>
+      <MenuSeparator />
+      <MenuItemButton variant="danger" onClick={handleDelete}>
         Delete
-      </button>
-    </div>
+      </MenuItemButton>
+    </MenuPanel>
   );
 }
