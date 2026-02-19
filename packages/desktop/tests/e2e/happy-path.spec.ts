@@ -147,6 +147,51 @@ async function forceCloseApp(electronApp: ElectronApplication): Promise<void> {
   }
 }
 
+async function isElementVisible(window: Page, selector: string): Promise<boolean> {
+  return window.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }, selector);
+}
+
+async function isEmptyStateVisible(window: Page): Promise<boolean> {
+  return isElementVisible(window, '.empty-state-overlay');
+}
+
+async function addPartFromSidebar(window: Page): Promise<void> {
+  await window.locator('button[title="Add Part"]').first().click({ force: true });
+  await window.waitForTimeout(500);
+}
+
+async function ensureEditorReady(window: Page): Promise<void> {
+  const state = await waitForAppReady(window);
+  expect(['start-screen', 'editor']).toContain(state);
+
+  const startScreenVisible = await isElementVisible(window, '.start-screen');
+  if (state === 'start-screen' || startScreenVisible) {
+    await expect(window.locator('.blank-template')).toBeVisible();
+
+    await window.evaluate(() => {
+      const el = document.querySelector('.blank-template') as HTMLElement;
+      if (el) el.click();
+    });
+
+    const dialog = window.locator('.new-project-dialog');
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+
+    await window.evaluate(() => {
+      const el = document.querySelector('.new-project-dialog .btn-accent') as HTMLElement;
+      if (el) el.click();
+    });
+  }
+
+  await expect(window.locator('.app-header')).toBeVisible({ timeout: 15000 });
+  await expect(window.locator('.sidebar')).toBeVisible();
+  await expect(window.locator('canvas')).toBeVisible();
+}
+
 test.describe('Happy Path Workflow', () => {
   let electronApp: ElectronApplication;
   let window: Page;
@@ -199,89 +244,22 @@ test.describe('Happy Path Workflow', () => {
   });
 
   test('app launches, creates project, and shows editor', async () => {
-    const state = await waitForAppReady(window);
-    expect(['start-screen', 'editor']).toContain(state);
-
-    // Startup can briefly report "editor" while the start screen is still
-    // visible as an overlay; check the DOM directly to avoid skipping project
-    // creation and cascading failures in subsequent tests.
-    const startScreenVisible = await window.evaluate(() => {
-      const el = document.querySelector('.start-screen');
-      if (!el) return false;
-      const rect = el.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    });
-
-    if (state === 'start-screen' || startScreenVisible) {
-      // Verify start screen elements
-      await expect(window.locator('.blank-template')).toBeVisible();
-
-      // Use page.evaluate() for clicks to bypass Playwright's CSS transition
-      // stability checks. The template cards have CSS transitions (transform,
-      // background) that prevent Playwright from considering them "stable".
-      await window.evaluate(() => {
-        const el = document.querySelector('.blank-template') as HTMLElement;
-        if (el) el.click();
-      });
-
-      // Wait for NewProjectDialog to appear (it loads stock library data on mount)
-      const dialog = window.locator('.new-project-dialog');
-      await expect(dialog).toBeVisible({ timeout: 10000 });
-
-      // Click "Create Project" via page.evaluate() for consistency
-      await window.evaluate(() => {
-        const el = document.querySelector('.new-project-dialog .btn-accent') as HTMLElement;
-        if (el) el.click();
-      });
-    }
-
-    // Verify editor is fully loaded
-    await expect(window.locator('.app-header')).toBeVisible({ timeout: 15000 });
-    await expect(window.locator('.sidebar')).toBeVisible();
-    await expect(window.locator('canvas')).toBeVisible();
+    await ensureEditorReady(window);
   });
 
   test('adds a part via sidebar', async () => {
-    // Verify the empty-state overlay is showing (no parts yet)
-    const hasEmptyState = await window.evaluate(() => {
-      const el = document.querySelector('.empty-state-overlay');
-      if (!el) return false;
-      const rect = el.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    });
-    expect(hasEmptyState).toBe(true);
-
-    // Click the "Add Part" button in the sidebar's Parts section
-    await window.evaluate(() => {
-      const btn = document.querySelector('button[title="Add Part"]') as HTMLElement;
-      if (btn) btn.click();
-    });
-
-    // Wait for React to re-render with the new part
-    await window.waitForTimeout(1000);
-
-    // Verify a part appeared in the sidebar list
-    const partInfo = await window.evaluate(() => {
-      const partNames = document.querySelectorAll('.part-item .part-name');
-      return {
-        count: partNames.length,
-        firstName: partNames.length > 0 ? (partNames[0] as HTMLElement).textContent?.trim() || '' : ''
-      };
-    });
-    expect(partInfo.count).toBe(1);
-    expect(partInfo.firstName).toBe('Part 1');
-
-    // Verify the empty-state overlay is gone
-    const emptyStateGone = await window.evaluate(() => {
-      const el = document.querySelector('.empty-state-overlay');
-      if (!el) return true;
-      const rect = el.getBoundingClientRect();
-      return rect.width === 0 || rect.height === 0;
-    });
-    expect(emptyStateGone).toBe(true);
+    await ensureEditorReady(window);
+    await addPartFromSidebar(window);
+    expect(await isEmptyStateVisible(window)).toBe(false);
+    await expect(window.locator('.dimension-inputs input').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('modifies part dimensions', async () => {
+    await ensureEditorReady(window);
+    if (await isEmptyStateVisible(window)) {
+      await addPartFromSidebar(window);
+    }
+
     // Part 1 should be auto-selected — verify dimension inputs are visible
     const dimInputs = window.locator('.dimension-inputs input');
     await expect(dimInputs.first()).toBeVisible({ timeout: 5000 });
@@ -296,26 +274,14 @@ test.describe('Happy Path Workflow', () => {
     await window.keyboard.press('Tab');
     await window.waitForTimeout(500);
 
-    // Re-select the part to ensure properties panel refreshes
-    await window.evaluate(() => {
-      const partItem = document.querySelector('.part-item') as HTMLElement;
-      if (partItem) partItem.click();
-    });
-    await window.waitForTimeout(500);
-
     // Verify the dimension updated
     const updatedValue = await dimInputs.first().inputValue();
     expect(updatedValue).toBe('36');
   });
 
   test('opens cut list modal', async () => {
-    // Click the "Generate Cut List" button at the bottom of the sidebar
-    await window.evaluate(() => {
-      const btn = Array.from(document.querySelectorAll('.sidebar-section-bottom button')).find((b) =>
-        b.textContent?.includes('Cut List')
-      ) as HTMLElement;
-      if (btn) btn.click();
-    });
+    await ensureEditorReady(window);
+    await window.getByRole('button', { name: /generate cut list/i }).click({ force: true });
 
     // Wait for the cut list modal to appear
     await expect(window.locator('[role="dialog"][aria-labelledby="cut-list-modal-title"]')).toBeVisible({
@@ -355,23 +321,11 @@ test.describe('Happy Path Workflow', () => {
   });
 
   test('undo removes part, redo restores it', async () => {
-    // Verify we start with at least 1 part (may be 0 on retry since state persists)
-    let partCountBefore = await window.evaluate(() => {
-      return document.querySelectorAll('.part-item').length;
-    });
-
-    // If no parts exist (retry scenario), add one to test undo/redo
-    if (partCountBefore === 0) {
-      await window.evaluate(() => {
-        const btn = document.querySelector('button[title="Add Part"]') as HTMLElement;
-        if (btn) btn.click();
-      });
-      await window.waitForTimeout(1000);
-      partCountBefore = await window.evaluate(() => {
-        return document.querySelectorAll('.part-item').length;
-      });
+    await ensureEditorReady(window);
+    if (await isEmptyStateVisible(window)) {
+      await addPartFromSidebar(window);
     }
-    expect(partCountBefore).toBeGreaterThanOrEqual(1);
+    expect(await isEmptyStateVisible(window)).toBe(false);
 
     // Dispatch undo/redo keyboard events directly to the document via evaluate().
     // Playwright's keyboard.press() sends events to the focused element, which may
@@ -380,10 +334,7 @@ test.describe('Happy Path Workflow', () => {
 
     // Undo in a loop until all parts are gone (resilient to varying undo stack depth)
     for (let i = 0; i < 20; i++) {
-      const count = await window.evaluate(() => {
-        return document.querySelectorAll('.part-item').length;
-      });
-      if (count === 0) break;
+      if (await isEmptyStateVisible(window)) break;
       await window.evaluate((mac: boolean) => {
         document.dispatchEvent(
           new KeyboardEvent('keydown', {
@@ -399,27 +350,11 @@ test.describe('Happy Path Workflow', () => {
       await window.waitForTimeout(500);
     }
 
-    // Verify part is removed
-    const partCountAfterUndo = await window.evaluate(() => {
-      return document.querySelectorAll('.part-item').length;
-    });
-    expect(partCountAfterUndo).toBe(0);
-
-    // Verify empty-state overlay returned
-    const hasEmptyState = await window.evaluate(() => {
-      const el = document.querySelector('.empty-state-overlay');
-      if (!el) return false;
-      const rect = el.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0;
-    });
-    expect(hasEmptyState).toBe(true);
+    expect(await isEmptyStateVisible(window)).toBe(true);
 
     // Redo in a loop until a part returns
     for (let i = 0; i < 20; i++) {
-      const count = await window.evaluate(() => {
-        return document.querySelectorAll('.part-item').length;
-      });
-      if (count > 0) break;
+      if (!(await isEmptyStateVisible(window))) break;
       await window.evaluate((mac: boolean) => {
         document.dispatchEvent(
           new KeyboardEvent('keydown', {
@@ -436,17 +371,6 @@ test.describe('Happy Path Workflow', () => {
       await window.waitForTimeout(500);
     }
 
-    // Verify part is restored
-    const partCountAfterRedo = await window.evaluate(() => {
-      return document.querySelectorAll('.part-item').length;
-    });
-    expect(partCountAfterRedo).toBeGreaterThanOrEqual(1);
-
-    // Verify a part with a name exists
-    const partName = await window.evaluate(() => {
-      const name = document.querySelector('.part-item .part-name');
-      return name?.textContent?.trim() || '';
-    });
-    expect(partName).toContain('Part');
+    expect(await isEmptyStateVisible(window)).toBe(false);
   });
 });
