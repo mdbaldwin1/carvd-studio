@@ -3,6 +3,7 @@ import { Upload, CheckCircle, AlertTriangle, Package, Palette, FileBox, LayoutTe
 import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useUIStore } from '../../store/uiStore';
 import { Button } from '@renderer/components/ui/button';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 
 interface ImportPreview {
   valid: boolean;
@@ -235,12 +236,11 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
                 <h3 className="text-[13px] font-semibold text-text m-0 mb-3">What to Import</h3>
                 <div className="flex flex-col gap-2">
                   <label className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded-md cursor-pointer text-[13px] text-text hover:border-border-hover">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={includeTemplates}
                       onChange={(e) => setIncludeTemplates(e.target.checked)}
                       disabled={preview.counts.templates === 0}
-                      className="w-4 h-4 accent-accent disabled:opacity-50"
+                      className="w-4 h-4"
                     />
                     <span className="disabled:opacity-50">Templates ({preview.counts.templates})</span>
                     {preview.duplicates.templates.length > 0 && (
@@ -250,12 +250,11 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
                     )}
                   </label>
                   <label className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded-md cursor-pointer text-[13px] text-text hover:border-border-hover">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={includeAssemblies}
                       onChange={(e) => setIncludeAssemblies(e.target.checked)}
                       disabled={preview.counts.assemblies === 0}
-                      className="w-4 h-4 accent-accent disabled:opacity-50"
+                      className="w-4 h-4"
                     />
                     <span>Assemblies ({preview.counts.assemblies})</span>
                     {preview.duplicates.assemblies.length > 0 && (
@@ -265,12 +264,11 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
                     )}
                   </label>
                   <label className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded-md cursor-pointer text-[13px] text-text hover:border-border-hover">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={includeStocks}
                       onChange={(e) => setIncludeStocks(e.target.checked)}
                       disabled={preview.counts.stocks === 0}
-                      className="w-4 h-4 accent-accent disabled:opacity-50"
+                      className="w-4 h-4"
                     />
                     <span>Stock Materials ({preview.counts.stocks})</span>
                     {preview.duplicates.stocks.length > 0 && (
@@ -280,12 +278,11 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
                     )}
                   </label>
                   <label className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded-md cursor-pointer text-[13px] text-text hover:border-border-hover">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={includeColors}
                       onChange={(e) => setIncludeColors(e.target.checked)}
                       disabled={preview.counts.colors === 0}
-                      className="w-4 h-4 accent-accent disabled:opacity-50"
+                      className="w-4 h-4"
                     />
                     <span>Custom Colors ({preview.counts.colors})</span>
                   </label>

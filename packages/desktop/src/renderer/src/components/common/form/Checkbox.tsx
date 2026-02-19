@@ -1,4 +1,6 @@
 import React from 'react';
+import { Checkbox as CheckboxPrimitive } from '@renderer/components/ui/checkbox';
+import { cn } from '@renderer/lib/utils';
 
 /** Props for the {@link Checkbox} component. */
 export interface CheckboxProps {
@@ -14,7 +16,6 @@ export interface CheckboxProps {
  *
  * Unlike other form components, this does **not** use {@link FormField}
  * because checkboxes have a different layout pattern (label beside input).
- * Uses the `.checkbox-label` CSS class from `primitives.css`.
  *
  * @example
  * ```tsx
@@ -23,8 +24,13 @@ export interface CheckboxProps {
  */
 export function Checkbox({ label, checked, onChange, disabled, className }: CheckboxProps) {
   return (
-    <label className={`checkbox-label${className ? ` ${className}` : ''}`}>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} disabled={disabled} />
+    <label className={cn('flex items-center gap-2.5 cursor-pointer text-sm', className)}>
+      <CheckboxPrimitive
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disabled={disabled}
+        className="w-4 h-4"
+      />
       {label}
     </label>
   );

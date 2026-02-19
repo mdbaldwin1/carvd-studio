@@ -1,4 +1,5 @@
 import { HelpTooltip } from '../common/HelpTooltip';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 import { AppSettings } from '../../types';
 
 interface StockConstraintsSectionProps {
@@ -25,8 +26,7 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
             docsSection="stock"
           />
         </div>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={formData.stockConstraints?.constrainDimensions ?? true}
           onChange={(e) =>
             onSettingChange('stockConstraints', {
@@ -34,7 +34,6 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
               constrainDimensions: e.target.checked
             })
           }
-          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
@@ -45,8 +44,7 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
             docsSection="stock"
           />
         </div>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={formData.stockConstraints?.constrainGrain ?? true}
           onChange={(e) =>
             onSettingChange('stockConstraints', {
@@ -54,7 +52,6 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
               constrainGrain: e.target.checked
             })
           }
-          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
@@ -62,8 +59,7 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
           <label className="text-[13px] text-text">Auto-sync Color</label>
           <HelpTooltip text="Automatically update part color when stock is assigned." docsSection="stock" />
         </div>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={formData.stockConstraints?.constrainColor ?? true}
           onChange={(e) =>
             onSettingChange('stockConstraints', {
@@ -71,7 +67,6 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
               constrainColor: e.target.checked
             })
           }
-          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
@@ -82,8 +77,7 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
             docsSection="parts"
           />
         </div>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={formData.stockConstraints?.preventOverlap ?? true}
           onChange={(e) =>
             onSettingChange('stockConstraints', {
@@ -91,7 +85,6 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
               preventOverlap: e.target.checked
             })
           }
-          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
     </div>

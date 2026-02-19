@@ -3,6 +3,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { Assembly } from '../../types';
 import { Button } from '@renderer/components/ui/button';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 import { HelpTooltip } from '../common/HelpTooltip';
 
 interface SaveAssemblyModalProps {
@@ -136,8 +137,8 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
             </div>
 
             <div className="property-group">
-              <label className="checkbox-label">
-                <input type="checkbox" checked={addToLibrary} onChange={(e) => setAddToLibrary(e.target.checked)} />
+              <label className="flex items-center gap-2.5 cursor-pointer text-sm">
+                <Checkbox className="w-4 h-4" checked={addToLibrary} onChange={(e) => setAddToLibrary(e.target.checked)} />
                 Also add to my Assembly Library
                 <HelpTooltip
                   text="If checked, this assembly will be available in all projects via the Stock/Assembly Library."

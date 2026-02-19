@@ -8,6 +8,7 @@ import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { logger } from '../../utils/logger';
 import { CutList, StockSummary, CustomShoppingItem } from '../../types';
 import { Button } from '@renderer/components/ui/button';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 import { DropdownButton, DropdownItem } from '../common/DropdownButton';
 
 export function ShoppingListTab({
@@ -284,11 +285,9 @@ function ShoppingListItem({
       className={`flex items-start gap-3 py-3 px-4 bg-surface border border-border rounded transition-colors duration-150 ${checked ? 'opacity-50 bg-bg-alt' : ''}`}
     >
       <label className="flex items-center pt-0.5 shrink-0 cursor-pointer">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={checked}
           onChange={onToggle}
-          className="w-[18px] h-[18px] cursor-pointer accent-primary"
         />
       </label>
 
@@ -341,11 +340,9 @@ function CustomShoppingListItem({
       className={`group flex items-start gap-3 py-3 px-4 bg-surface border border-border rounded transition-colors duration-150 ${checked ? 'opacity-50 bg-bg-alt' : ''}`}
     >
       <label className="flex items-center pt-0.5 shrink-0 cursor-pointer">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={checked}
           onChange={onToggle}
-          className="w-[18px] h-[18px] cursor-pointer accent-primary"
         />
       </label>
 

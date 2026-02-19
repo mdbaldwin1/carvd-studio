@@ -1,4 +1,5 @@
 import { HelpTooltip } from '../common/HelpTooltip';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 import { Select } from '@renderer/components/ui/select';
 import { AppSettings, SnapSensitivity } from '../../types';
 
@@ -44,11 +45,9 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
             docsSection="snapping"
           />
         </div>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={formData.liveGridSnap ?? false}
           onChange={(e) => onSettingChange('liveGridSnap', e.target.checked)}
-          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
@@ -56,11 +55,9 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
           <label className="text-[13px] text-text">Snap to Origin</label>
           <HelpTooltip text="Snap parts to workspace origin planes (X=0, Y=0, Z=0)." docsSection="snapping" />
         </div>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={formData.snapToOrigin ?? true}
           onChange={(e) => onSettingChange('snapToOrigin', e.target.checked)}
-          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
       <div className="settings-row flex items-center justify-between gap-4 mb-3">
@@ -71,11 +68,9 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
             docsSection="snapping"
           />
         </div>
-        <input
-          type="checkbox"
+        <Checkbox
           checked={formData.dimensionSnapSameTypeOnly ?? false}
           onChange={(e) => onSettingChange('dimensionSnapSameTypeOnly', e.target.checked)}
-          className="w-[18px] h-[18px] cursor-pointer accent-accent"
         />
       </div>
     </div>
