@@ -87,7 +87,6 @@ const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(function Di
           'bg-surface border border-border rounded-lg',
           'shadow-[0_8px_32px_var(--color-overlay)]',
           'max-w-[90vw] max-h-[85vh] flex flex-col',
-          'animate-modal-fade-in',
           className
         )}
         role={role}

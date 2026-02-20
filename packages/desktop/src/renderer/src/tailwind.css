@@ -107,40 +107,6 @@
   --radius-md: 8px;
   --radius-lg: 12px;
 
-  /* === shadcn/ui convention aliases (bridge for migration) ===
-   * These map shadcn's expected variable names to existing Twilight Studio vars.
-   * Both conventions coexist during migration.
-   *
-   * NAMING COLLISION NOTE:
-   *   Project --color-primary = Gold (#ffd21f) — used for CTAs
-   *   shadcn --primary = main interactive color → mapped to Cerulean (--color-accent)
-   */
-  --background: var(--color-bg);
-  --foreground: var(--color-text);
-  --card: var(--color-surface);
-  --card-foreground: var(--color-text);
-  --popover: var(--color-surface);
-  --popover-foreground: var(--color-text);
-  --primary: var(--color-accent);
-  --primary-foreground: var(--color-accent-foreground);
-  --secondary: var(--color-secondary);
-  --secondary-foreground: var(--color-secondary-foreground);
-  --muted: var(--color-bg-alt);
-  --muted-foreground: var(--color-text-muted);
-  --accent: var(--color-surface-hover);
-  --accent-foreground: var(--color-text);
-  --destructive: var(--color-danger);
-  --destructive-foreground: #ffffff;
-  --border: var(--color-border);
-  --input: var(--color-border);
-  --ring: var(--color-accent);
-  --radius: var(--radius-md);
-  --chart-1: var(--color-accent);
-  --chart-2: var(--color-primary);
-  --chart-3: var(--color-success);
-  --chart-4: var(--color-warning);
-  --chart-5: var(--color-danger);
-
   color-scheme: dark;
 }
 
@@ -224,33 +190,6 @@
   --color-info-bg: rgba(117, 107, 130, 0.1);
   --color-info-border: #aea4bf; /* ← exact Lilac Ash */
   --color-info-text: #203864;
-
-  /* === shadcn/ui convention aliases (light theme) === */
-  --background: var(--color-bg);
-  --foreground: var(--color-text);
-  --card: var(--color-surface);
-  --card-foreground: var(--color-text);
-  --popover: var(--color-surface);
-  --popover-foreground: var(--color-text);
-  --primary: var(--color-accent);
-  --primary-foreground: var(--color-accent-foreground);
-  --secondary: var(--color-secondary);
-  --secondary-foreground: var(--color-secondary-foreground);
-  --muted: var(--color-bg-alt);
-  --muted-foreground: var(--color-text-muted);
-  --accent: var(--color-surface-hover);
-  --accent-foreground: var(--color-text);
-  --destructive: var(--color-danger);
-  --destructive-foreground: #ffffff;
-  --border: var(--color-border);
-  --input: var(--color-border);
-  --ring: var(--color-accent);
-  --radius: var(--radius-md);
-  --chart-1: var(--color-accent);
-  --chart-2: var(--color-primary);
-  --chart-3: var(--color-success);
-  --chart-4: var(--color-warning);
-  --chart-5: var(--color-danger);
 
   color-scheme: light;
 }
@@ -343,36 +282,25 @@
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
 
-  /* === shadcn/ui convention tokens (non-conflicting) ===
-   * Maps shadcn-convention CSS vars to Tailwind utility classes.
-   * e.g. bg-background, text-foreground, bg-card, bg-muted, etc.
-   *
-   * NOTE: --color-primary, --color-secondary, --color-accent already exist
-   * above with project-specific meanings (Gold, Indigo, Cerulean). Those
-   * Tailwind utilities (bg-primary, bg-accent, etc.) keep their existing
-   * meanings during migration. shadcn components will be adapted to use
-   * the project token names when added in later beads.
-   * The unprefixed CSS vars (--primary, --background, etc.) are still
-   * available via var() for any component that needs them directly.
-   */
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius: var(--radius);
+  /* shadcn token utilities mapped directly to project --color-* vars */
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-text);
+  --color-popover: var(--color-surface);
+  --color-popover-foreground: var(--color-text);
+  --color-muted: var(--color-bg-alt);
+  --color-muted-foreground: var(--color-text-muted);
+  --color-destructive: var(--color-danger);
+  --color-destructive-foreground: #ffffff;
+  --color-input: var(--color-border);
+  --color-ring: var(--color-accent);
+  --color-chart-1: var(--color-accent);
+  --color-chart-2: var(--color-primary);
+  --color-chart-3: var(--color-success);
+  --color-chart-4: var(--color-warning);
+  --color-chart-5: var(--color-danger);
+  --radius: var(--radius-md);
 }
 
 /* ===========================================
@@ -568,39 +496,3 @@
 
 @import './layout.css';
 @import './domain.css';
-
-/* ===========================================
-   CUSTOM ANIMATIONS
-   Used by migrated components (Dialog, UpdateNotificationBanner, etc.)
-   =========================================== */
-
-@layer utilities {
-  .animate-toast-in {
-    animation: toast-fade-in 0.2s ease-out;
-  }
-  .animate-modal-fade-in {
-    animation: modal-fade-in 0.15s ease-out;
-  }
-}
-
-@keyframes toast-fade-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-}
-
-@keyframes modal-fade-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
