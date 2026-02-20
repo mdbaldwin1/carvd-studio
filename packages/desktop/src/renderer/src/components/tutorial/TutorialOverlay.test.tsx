@@ -192,15 +192,6 @@ describe('TutorialOverlay', () => {
   });
 
   describe('keyboard navigation', () => {
-    it('calls onSkip on Escape', () => {
-      const onSkip = vi.fn();
-      render(<TutorialOverlay {...defaultProps} onSkip={onSkip} />);
-
-      fireEvent.keyDown(window, { key: 'Escape' });
-
-      expect(onSkip).toHaveBeenCalledTimes(1);
-    });
-
     it('calls onNext on ArrowRight', () => {
       const onNext = vi.fn();
       render(<TutorialOverlay {...defaultProps} onNext={onNext} />);

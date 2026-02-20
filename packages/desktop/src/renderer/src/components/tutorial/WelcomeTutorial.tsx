@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useTutorial, TutorialStep } from '../../hooks/useTutorial';
 import { TutorialOverlay } from './TutorialOverlay';
 import { useCameraStore } from '../../store/cameraStore';
+import { Dialog, DialogOverlay } from '@renderer/components/ui/dialog';
 
 interface WelcomeTutorialProps {
   onComplete: () => void;
@@ -67,16 +68,24 @@ export function WelcomeTutorial({ onComplete }: WelcomeTutorialProps) {
   }
 
   return (
-    <TutorialOverlay
-      step={tutorial.currentStep}
-      stepNumber={tutorial.currentStepIndex + 1}
-      totalSteps={tutorial.steps.length}
-      progress={tutorial.progress}
-      isFirstStep={tutorial.isFirstStep}
-      isLastStep={tutorial.isLastStep}
-      onNext={handleNext}
-      onPrevious={tutorial.previous}
-      onSkip={handleSkip}
-    />
+    <Dialog
+      open={tutorial.isActive}
+      onOpenChange={(open) => {
+        if (!open) handleSkip();
+      }}
+    >
+      <DialogOverlay className="bg-transparent" />
+      <TutorialOverlay
+        step={tutorial.currentStep}
+        stepNumber={tutorial.currentStepIndex + 1}
+        totalSteps={tutorial.steps.length}
+        progress={tutorial.progress}
+        isFirstStep={tutorial.isFirstStep}
+        isLastStep={tutorial.isLastStep}
+        onNext={handleNext}
+        onPrevious={tutorial.previous}
+        onSkip={handleSkip}
+      />
+    </Dialog>
   );
 }
