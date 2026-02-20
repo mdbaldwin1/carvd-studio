@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Desktop bundle audit + performance verification (bead carvd-studio-8.6)** — Completed renderer/main/preload bundle audit against pre-Epic-8 baseline (`b459b9a`) and documented results in `packages/desktop/BUNDLE-SIZE-AUDIT.md`; net renderer assets improved slightly (`-2,515` raw bytes, `-283` gzip), CSS bundle reduced (`-6,732` raw), lazy modal code-splitting remains intact, and Three.js/R3F chunks are unchanged.
 - **Desktop test suite coverage hardening (bead carvd-studio-8.5)** — Added focused shadcn/Radix-compatible tests for `components/ui/context-menu` wrappers and standalone menu primitives, restoring desktop coverage thresholds to passing levels (`Statements 91.7%`, `Branches 82.02%`, `Functions 90.06%`, `Lines 91.98%`).
 - **Desktop tailwind.css bridge cleanup (bead carvd-studio-8.4)** — Removed dual shadcn alias vars (`--background`, `--foreground`, etc.) from desktop theme roots and mapped shadcn token utilities directly to project `--color-*` variables in `tailwind.css`; removed obsolete custom toast/modal keyframes and animation utility classes no longer needed by migrated dialog components.
 - **Desktop domain.css simplification (bead carvd-studio-8.3)** — Removed obsolete accordion/joinery styling from `packages/desktop/src/renderer/src/domain.css`, moved those styles to shadcn/Tailwind class composition in `App.tsx`, and kept only cut-list print-specific domain CSS rules.
