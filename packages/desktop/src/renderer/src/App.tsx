@@ -3,8 +3,12 @@ import { ChevronDown, ChevronRight, Library, Redo2, Save, Search, Settings, Sun,
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { Button } from '@renderer/components/ui/button';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@renderer/components/ui/accordion';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@renderer/components/ui/collapsible';
+import { Input } from '@renderer/components/ui/input';
+import { Label } from '@renderer/components/ui/label';
+import { Select } from '@renderer/components/ui/select';
 import {
   Sidebar as SidebarShell,
   SidebarContent,
@@ -22,6 +26,7 @@ import { FractionInput } from './components/common/FractionInput';
 import { HelpTooltip } from './components/common/HelpTooltip';
 import { Separator } from './components/ui/separator';
 import { Toaster } from './components/ui/sonner';
+import { Textarea } from './components/ui/textarea';
 import { TooltipProvider } from './components/ui/tooltip';
 import { ContextMenu } from './components/layout/ContextMenu';
 import { TrialBanner } from './components/licensing/TrialBanner';
@@ -1085,8 +1090,8 @@ function PropertiesPanel() {
           <h2>Group Properties</h2>
 
           <div className="property-group">
-            <label>Name</label>
-            <input
+            <Label>Name</Label>
+            <Input
               type="text"
               value={selectedGroup.name}
               onChange={(e) => renameGroup(selectedGroup.id, e.target.value)}
@@ -1164,8 +1169,8 @@ function PropertiesPanel() {
         <p className="text-sm mb-3 text-text">{selectedPartIds.length} parts selected</p>
 
         <div className="property-group">
-          <label>Assign Stock to All</label>
-          <select
+          <Label>Assign Stock to All</Label>
+          <Select
             value={allSameStock ? commonStockId || '' : ''}
             onChange={(e) => {
               const value = e.target.value;
@@ -1183,7 +1188,7 @@ function PropertiesPanel() {
               </option>
             ))}
             <option value="___create___">+ Add New Stock...</option>
-          </select>
+          </Select>
         </div>
 
         <div className="property-group flex gap-1.5">
@@ -1311,8 +1316,8 @@ function PropertiesPanel() {
       <h2>Properties</h2>
 
       <div className="property-group">
-        <label>Name</label>
-        <input
+        <Label>Name</Label>
+        <Input
           type="text"
           value={selectedPart.name}
           onChange={(e) => updatePart(selectedPart.id, { name: e.target.value })}
@@ -1388,13 +1393,13 @@ function PropertiesPanel() {
 
       <div className="property-group">
         <div className="flex items-center gap-1">
-          <label>Stock</label>
+          <Label className="m-0">Stock</Label>
           <HelpTooltip
             text="Assign a stock material to this part. Color and grain direction are inherited from the assigned stock."
             docsSection="stock"
           />
         </div>
-        <select
+        <Select
           value={selectedPart.stockId || ''}
           onChange={(e) => handleStockAssignment(selectedPart.id, e.target.value || null)}
         >
@@ -1405,7 +1410,7 @@ function PropertiesPanel() {
             </option>
           ))}
           <option value="___create___">+ Add New Stock...</option>
-        </select>
+        </Select>
         {(() => {
           const warnings = getConstraintWarnings(selectedPart);
           if (warnings.length === 0) return null;
@@ -1433,26 +1438,28 @@ function PropertiesPanel() {
                 </p>
               </div>
             )}
-            <label>
-              <input
-                type="checkbox"
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="allow-overlap-checkbox"
                 checked={selectedPart.ignoreOverlap || false}
                 onChange={(e) => updatePart(selectedPart.id, { ignoreOverlap: e.target.checked })}
-              />{' '}
-              Allow Overlap
+              />
+              <Label htmlFor="allow-overlap-checkbox" className="m-0 cursor-pointer">
+                Allow Overlap
+              </Label>
               <HelpTooltip
                 text="If checked, this part can overlap with other parts without showing warnings. Useful for intentional overlaps like notched shelves."
                 docsSection="parts"
                 inline
               />
-            </label>
+            </div>
           </div>
         );
       })()}
 
       <div className="property-group">
         <div className="flex items-center gap-1">
-          <label>Color</label>
+          <Label className="m-0">Color</Label>
           {isColorConstrained && (
             <HelpTooltip
               text={`Color is locked to the assigned stock (${assignedStock?.name}). Disable "Constrain Color" in Project Settings to customize.`}
@@ -1469,7 +1476,7 @@ function PropertiesPanel() {
 
       <div className="property-group">
         <div className="flex items-center gap-1">
-          <label>Grain Direction</label>
+          <Label className="m-0">Grain Direction</Label>
           <HelpTooltip
             text={
               isGrainConstrained
@@ -1479,7 +1486,7 @@ function PropertiesPanel() {
             docsSection="cut-lists"
           />
         </div>
-        <select
+        <Select
           value={selectedPart.grainSensitive ? selectedPart.grainDirection : 'none'}
           onChange={(e) => {
             const value = e.target.value;
@@ -1493,30 +1500,31 @@ function PropertiesPanel() {
             }
           }}
           disabled={isGrainConstrained}
-          className={isGrainConstrained ? 'disabled' : ''}
         >
           <option value="length">Along Length ({formatMeasurementWithUnit(selectedPart.length, units)})</option>
           <option value="width">Along Width ({formatMeasurementWithUnit(selectedPart.width, units)})</option>
           <option value="none">N/A (can rotate)</option>
-        </select>
+        </Select>
       </div>
 
       {/* Glue-Up Panel option - for wide panels that exceed stock width */}
       {assignedStock && (
         <div className="property-group">
-          <label>
-            <input
-              type="checkbox"
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="glue-up-panel-checkbox"
               checked={selectedPart.glueUpPanel || false}
               onChange={(e) => updatePart(selectedPart.id, { glueUpPanel: e.target.checked })}
-            />{' '}
-            Glue-Up Panel
+            />
+            <Label htmlFor="glue-up-panel-checkbox" className="m-0 cursor-pointer">
+              Glue-Up Panel
+            </Label>
             <HelpTooltip
               text="Wide panel made by edge-gluing multiple narrower boards. The cut list will calculate how many boards are needed."
               docsSection="cut-lists"
               inline
             />
-          </label>
+          </div>
           {selectedPart.glueUpPanel &&
             (() => {
               const cutWidth = selectedPart.width + (selectedPart.extraWidth || 0);
@@ -1537,8 +1545,7 @@ function PropertiesPanel() {
             {selectedPart.notes && <span className="has-content-indicator ml-1">●</span>}
           </AccordionTrigger>
           <AccordionContent className="collapsible-content">
-            <textarea
-              className="part-notes-textarea"
+            <Textarea
               value={selectedPart.notes || ''}
               onChange={(e) => updatePart(selectedPart.id, { notes: e.target.value })}
               placeholder="Fabrication notes (edge banding, joinery, etc.)"
