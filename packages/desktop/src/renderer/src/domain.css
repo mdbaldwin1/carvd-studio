@@ -1,76 +1,8 @@
 /*
  * Domain-Specific CSS
  *
- * "Twilight Studio" redesign — adjusted sizing to match bigger base font
- * and rounder radii. Complex selectors (:has(), vendor pseudo-elements,
- * accordion/collapsible styling, @media print).
+ * Domain-specific print selectors for cut list diagram output.
  */
-
-/* ===========================================
-   JOINERY ADJUSTMENTS
-   Accordion-based section in Properties panel
-   =========================================== */
-
-@layer components {
-  .joinery-adjustments {
-    margin-top: 16px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    padding: 0;
-  }
-
-  .joinery-indicator {
-    color: var(--color-accent);
-    font-size: 9px;
-  }
-
-  .joinery-inputs {
-    padding: 0 14px 14px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .joinery-input-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .joinery-input-row label {
-    flex: 0 0 88px;
-    font-size: 13px;
-    color: var(--color-text-muted);
-  }
-
-  .joinery-input-row input {
-    flex: 1;
-    width: auto;
-  }
-}
-
-/* ===========================================
-   COLLAPSIBLE SECTIONS
-   Generic accordion styling (Position, Notes)
-   =========================================== */
-
-@layer components {
-  .collapsible-section {
-    margin-top: 10px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    padding: 0;
-  }
-
-  .collapsible-content {
-    padding: 0 14px 14px 14px;
-  }
-
-  .has-content-indicator {
-    color: var(--color-accent);
-    font-size: 9px;
-  }
-}
 
 /* ===========================================
    PRINT STYLES

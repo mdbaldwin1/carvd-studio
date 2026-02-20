@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Desktop domain.css simplification (bead carvd-studio-8.3)** — Removed obsolete accordion/joinery styling from `packages/desktop/src/renderer/src/domain.css`, moved those styles to shadcn/Tailwind class composition in `App.tsx`, and kept only cut-list print-specific domain CSS rules.
 - **Desktop layout.css simplification (bead carvd-studio-8.2)** — Removed migrated generic sidebar/search/canvas layout rules from `layout.css`, and moved those styles into shadcn component composition (`components/ui/sidebar.tsx`) plus `App.tsx` utility classes while preserving Electron shell layout behavior.
 - **Desktop primitives.css removal (bead carvd-studio-8.1)** — Removed `packages/desktop/src/renderer/src/primitives.css`, moved remaining global base/scrollbar/color-picker/hotkey styles into `tailwind.css` (`@layer base/components`), and updated renderer component docs to reflect the 3-file desktop CSS architecture.
 - **Desktop Tabs migration (bead carvd-studio-5.1)** — Added shadcn/Radix Tabs primitive (`components/ui/tabs.tsx`) and migrated tabbed flows in StartScreen, CutListModal, and StockLibraryModal from local `activeTab` state to semantic `Tabs`/`TabsTrigger`/`TabsContent` patterns; updated affected component tests to role-based tab assertions compatible with Radix `data-state`.
