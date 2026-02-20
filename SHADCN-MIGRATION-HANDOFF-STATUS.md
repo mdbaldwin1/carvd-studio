@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-20 (updated)
 **Branch**: develop
-**Last develop SHA**: `3db4a30` (after bead 7.3 PR #256 merge)
+**Last develop SHA**: `c5c2cd3` (after bead 7.4 PR #257 merge)
 
 ## Key Instruction Documents
 
@@ -73,33 +73,33 @@ These documents define the migration workflow and must be followed:
 | 5.4  | #245 | Collapsible/Accordion migration          |
 | 5.5  | #246 | Progress/Skeleton migration              |
 
-**Total: 39 beads merged across 8 epics (2, 3, 4, 5, 6, 7, 9, 10)**
+**Total: 40 beads merged across 8 epics (2, 3, 4, 5, 6, 7, 9, 10)**
 
 ## Active Worktrees
 
 | Worktree                                 | Branch                | State                    |
 | ---------------------------------------- | --------------------- | ------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-7.4` | feat/carvd-studio-7.4 | **In progress (active)** |
+| `/Users/mbaldwin/Carvd/carvd-studio-7.5` | feat/carvd-studio-7.5 | **In progress (active)** |
 
-All completed worktrees through bead 7.3 have been cleaned up.
+All completed worktrees through bead 7.4 have been cleaned up.
 
-## In-Progress Work: Bead 7.4 (Banner Migration to shadcn Alert)
+## In-Progress Work: Bead 7.5 (Tutorial Component Migration)
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-7.4`
-**Branch**: `feat/carvd-studio-7.4`
+**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-7.5`
+**Branch**: `feat/carvd-studio-7.5`
 **State**: Implementation complete; PR prep in progress
 
 ### What was done:
 
-1. Added new shadcn `Alert` primitive at `components/ui/alert.tsx` with `Alert`, `AlertTitle`, and `AlertDescription`, including `default` and `destructive` variants.
-2. Migrated `AssemblyEditingBanner` and `TemplateEditingBanner` to `Alert` composition while preserving inline assembly rename behavior and save/cancel/discard flows.
-3. Migrated `TrialBanner`, `UpdateNotificationBanner`, and `UpgradePrompt` to `Alert` composition while preserving trial CTA, updater download/install/changelog actions, dismiss behavior, and upgrade flow.
-4. Updated banner/prompt tests to use semantic alert assertions (`role="alert"`, `data-variant`) and validated behavior parity.
+1. Wrapped `WelcomeTutorial` in shadcn `Dialog` primitives for full-screen tutorial session handling, preserving auto-start and camera centering behavior.
+2. Migrated `TutorialTooltip` to shadcn composition using `Card`, `Progress`, and `Button` primitives while preserving navigation controls, progress state, and docs-link behavior.
+3. Kept `TutorialOverlay` spotlight SVG/backdrop custom behavior and aligned keyboard handling so Escape is managed by dialog close semantics while Arrow/Enter navigation remains explicit.
+4. Updated tutorial component tests (`WelcomeTutorial`, `TutorialOverlay`, `TutorialTooltip`) to match new shadcn-based structure and progress indicator assertions.
 5. Verified desktop lint/typecheck/unit tests and format check pass locally.
 
 ### Outstanding before merge:
 
-1. Open PR for bead 7.4 and pass CI checks
+1. Open PR for bead 7.5 and pass CI checks
 2. Merge PR (squash) and clean up worktree/branch
 
 ## Remaining Work (Not Started)
@@ -129,8 +129,8 @@ All completed worktrees through bead 7.3 have been cleaned up.
 - 7.1: Sidebar → shadcn Sidebar + Collapsible — **DONE** (PR #254 merged)
 - 7.2: Header/Toolbar buttons — **DONE** (PR #255 merged)
 - 7.3: Properties Panel form controls — **DONE** (PR #256 merged)
-- 7.4: Banners → shadcn Alert — **IN PROGRESS**
-- 7.5: Tutorial components
+- 7.4: Banners → shadcn Alert — **DONE** (PR #257 merged)
+- 7.5: Tutorial components — **IN PROGRESS**
 - 7.6: StartScreen layout → Card + Tabs
 
 **Epic 8: Desktop CSS Cleanup** (depends on Epics 6 and 7)
@@ -160,7 +160,7 @@ All completed worktrees through bead 7.3 have been cleaned up.
 
 ```
 Epics 2, 3, 4, 5, 6, 9, 10 are COMPLETE ✅
-Epic 7 is IN PROGRESS (7.4 active)
+Epic 7 is IN PROGRESS (7.5 active)
 Epic 8 is BLOCKED on Epic 7
 Epic 11 can start NOW (dependency Epic 10 ✅ is met)
 Epic 12 is BLOCKED on Epics 8 and 11
@@ -212,7 +212,7 @@ Bead status state shown here is current as of 2026-02-20.
 
 ## Recommended Next Steps
 
-1. **Complete bead 7.4** — create PR, pass CI, merge, and cleanup.
-2. Continue Epic 7 sequence (7.5 next) while Epic 11 proceeds in parallel when possible.
+1. **Complete bead 7.5** — create PR, pass CI, merge, and cleanup.
+2. Continue Epic 7 sequence (7.6 next) while Epic 11 proceeds in parallel when possible.
 3. Start Epic 8 after Epic 7 completes.
 4. Complete Epic 12 integration after Epics 8 and 11.

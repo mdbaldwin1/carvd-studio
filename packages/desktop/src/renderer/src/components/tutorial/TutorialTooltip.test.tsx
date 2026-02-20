@@ -48,7 +48,7 @@ describe('TutorialTooltip', () => {
       render(<TutorialTooltip {...defaultProps} progress={60} />);
 
       const progressBar = screen.getByTestId('tutorial-progress-bar');
-      expect(progressBar.style.width).toBe('60%');
+      expect(progressBar.querySelector('[data-slot="progress-indicator"]')).toHaveStyle({ width: '60%' });
     });
 
     it('renders Skip Tutorial button', () => {

@@ -101,11 +101,7 @@ export function TutorialOverlay({
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopPropagation();
-        onSkip();
-      } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
+      if (e.key === 'ArrowRight' || e.key === 'Enter') {
         e.preventDefault();
         e.stopPropagation();
         onNext();
@@ -118,7 +114,7 @@ export function TutorialOverlay({
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [isFirstStep, onNext, onPrevious, onSkip]);
+  }, [isFirstStep, onNext, onPrevious]);
 
   return (
     <div data-testid="tutorial-overlay" className="fixed inset-0 w-screen h-screen z-[10000] pointer-events-none">
