@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-20 (updated)
 **Branch**: develop
-**Last develop SHA**: `92f80c2` (after bead 6.2 PR #248 merge)
+**Last develop SHA**: `2e59633` (after bead 6.3 PR #249 merge)
 
 ## Key Instruction Documents
 
@@ -73,32 +73,32 @@ These documents define the migration workflow and must be followed:
 | 5.4  | #245 | Collapsible/Accordion migration          |
 | 5.5  | #246 | Progress/Skeleton migration              |
 
-**Total: 30 beads merged across 7 epics (2, 3, 4, 5, 6, 9, 10)**
+**Total: 31 beads merged across 7 epics (2, 3, 4, 5, 6, 9, 10)**
 
 ## Active Worktrees
 
 | Worktree                                 | Branch                | State                    |
 | ---------------------------------------- | --------------------- | ------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-6.3` | feat/carvd-studio-6.3 | **In progress (active)** |
+| `/Users/mbaldwin/Carvd/carvd-studio-6.4` | feat/carvd-studio-6.4 | **In progress (active)** |
 
-All completed worktrees through bead 6.2 have been cleaned up.
+All completed worktrees through bead 6.3 have been cleaned up.
 
-## In-Progress Work: Bead 6.3 (Project Modals)
+## In-Progress Work: Bead 6.4 (App Settings Modal)
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-6.3`
-**Branch**: `feat/carvd-studio-6.3`
-**State**: Implementation complete; PR prep in progress
+**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-6.4`
+**Branch**: `feat/carvd-studio-6.4`
+**State**: Implementation complete; verification and PR prep in progress
 
 ### What was done:
 
-1. Migrated `NewProjectDialog`, `ProjectSettingsModal`, and `ImportAppStateModal` to `ui/dialog` primitives.
-2. Removed legacy custom backdrop/escape handling from those modals while preserving existing form flows and close semantics.
-3. Updated related modal tests where needed for Dialog backdrop structure (`ProjectSettingsModal` backdrop selector).
-4. Verified desktop lint/typecheck and targeted project-modal tests pass locally.
+1. Migrated `AppSettingsModal` from custom overlay/backdrop/escape handling to `ui/dialog` primitives.
+2. Preserved all settings section integrations (`Appearance`, `License`, `Defaults`, `Behavior`, `Snapping`, `Stock Constraints`, `Data Management`) and auto-save behavior.
+3. Verified desktop lint/typecheck and targeted `AppSettingsModal` tests pass locally.
+4. Verified full desktop renderer/main vitest suites pass locally; local Playwright E2E remains blocked by known environment launch issue.
 
 ### Outstanding before merge:
 
-1. Open PR for bead 6.3 and pass CI checks
+1. Open PR for bead 6.4 and pass CI checks
 2. Merge PR (squash) and clean up worktree/branch
 
 ## Remaining Work (Not Started)
@@ -117,8 +117,8 @@ All completed worktrees through bead 6.2 have been cleaned up.
 
 - 6.1: Stock modals (AddStock, EditStock, StockLibrary) — **DONE** (PR #247 merged)
 - 6.2: Assembly modals (AddAssembly, SaveAssembly) — **DONE** (PR #248 merged)
-- 6.3: Project modals (NewProject, ProjectSettings, ImportAppState) — **IN PROGRESS (implementation done, PR pending)**
-- 6.4: AppSettingsModal (largest, 7+ sections)
+- 6.3: Project modals (NewProject, ProjectSettings, ImportAppState) — **DONE** (PR #249 merged)
+- 6.4: AppSettingsModal (largest, 7+ sections) — **IN PROGRESS**
 - 6.5: CutListModal (complex: 4 tabs, tables, diagrams)
 - 6.6: TemplateBrowserModal
 - 6.7: License/trial/utility dialogs
@@ -159,7 +159,7 @@ All completed worktrees through bead 6.2 have been cleaned up.
 
 ```
 Epics 2, 3, 4, 5, 9, 10 are COMPLETE ✅
-Epic 6 is IN PROGRESS (6.3 active; 6.1/6.2 complete)
+Epic 6 is IN PROGRESS (6.4 active; 6.1/6.2/6.3 complete)
 Epic 7 can start NOW (dependencies Epics 4 ✅ and 5 ✅ are met)
 Epic 8 is BLOCKED on Epics 6 and 7
 Epic 11 can start NOW (dependency Epic 10 ✅ is met)
@@ -212,7 +212,7 @@ Bead status state shown here is current as of 2026-02-20.
 
 ## Recommended Next Steps
 
-1. **Complete bead 6.3** — create PR, pass CI, merge, and cleanup.
-2. Continue Epic 6 in sequence (6.4 → 6.7) while starting Epic 7 in parallel when feasible.
+1. **Complete bead 6.4** — create PR, pass CI, merge, and cleanup.
+2. Continue Epic 6 in sequence (6.5 → 6.7) while starting Epic 7 in parallel when feasible.
 3. Run Epic 6 and Epic 11 in parallel where safe to reduce critical path.
 4. Epic 8 remains final desktop cleanup before Epic 12 integration.
