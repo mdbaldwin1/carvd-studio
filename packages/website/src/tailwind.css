@@ -249,3 +249,102 @@
     height: 0;
   }
 }
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    min-height: 100vh;
+    overflow-x: hidden;
+    font-family: var(--font-sans);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+    color: var(--color-text);
+    background-color: var(--color-bg);
+  }
+}
+
+@layer utilities {
+  .container {
+    width: 100%;
+    max-width: var(--container-max-width);
+    margin-inline: auto;
+    padding-inline: var(--container-padding);
+  }
+
+  @media (max-width: 768px) {
+    .container {
+      padding-inline: var(--space-md);
+    }
+  }
+
+  .page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page-content {
+    flex: 1;
+  }
+
+  .bg-gradient-radial {
+    background: radial-gradient(
+      circle at top,
+      rgba(174, 164, 191, 0.2) 0%,
+      transparent 40%
+    );
+  }
+
+  /* Temporary compatibility utilities for docs pages pending full utility migration. */
+  .text-muted {
+    color: var(--color-text-muted);
+  }
+
+  .mb-xs {
+    margin-bottom: var(--space-xs);
+  }
+
+  .mb-sm {
+    margin-bottom: var(--space-sm);
+  }
+
+  .mb-md {
+    margin-bottom: var(--space-md);
+  }
+
+  .mb-xl {
+    margin-bottom: var(--space-xl);
+  }
+
+  .mt-sm {
+    margin-top: var(--space-sm);
+  }
+
+  .mt-md {
+    margin-top: var(--space-md);
+  }
+
+  .ml-lg {
+    margin-left: var(--space-lg);
+  }
+
+  .gap-sm {
+    gap: var(--space-sm);
+  }
+
+  .gap-md {
+    gap: var(--space-md);
+  }
+
+  .gap-xl {
+    gap: var(--space-xl);
+  }
+
+  .gap-2xl {
+    gap: var(--space-2xl);
+  }
+}

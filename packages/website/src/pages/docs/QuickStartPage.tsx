@@ -1,6 +1,7 @@
 import SEO from "../../components/SEO";
 import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
+import { Button } from "@/components/ui/button";
 
 export default function QuickStartPage() {
   return (
@@ -14,11 +15,11 @@ export default function QuickStartPage() {
           { name: "Quick Start Guide", path: "/docs/quick-start" },
         ])}
       />
-      <h2 className="text-4xl font-bold mb-xl">Quick Start Guide</h2>
+      <h2 className="mb-8 text-4xl font-bold">Quick Start Guide</h2>
 
-      <div className="mb-xl rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
-        <p className="font-bold mb-sm">Get building in 5 minutes:</p>
-        <ol className="grid gap-md text-sm">
+      <div className="mb-8 rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <p className="mb-2 font-bold">Get building in 5 minutes:</p>
+        <ol className="grid gap-4 text-sm">
           <li>
             <strong>1. Download & Install</strong> — Get Carvd Studio from the{" "}
             <a href="/download" className="text-accent">
@@ -49,20 +50,24 @@ export default function QuickStartPage() {
       </div>
 
       <div className="rounded-lg border border-[rgba(174,164,191,0.4)] bg-linear-to-br from-[rgba(174,164,191,0.15)] to-[rgba(174,164,191,0.05)] p-[var(--space-xl)]">
-        <p className="text-lg font-bold mb-sm">
+        <p className="mb-2 text-lg font-bold">
           Your 14-Day Trial Includes Everything
         </p>
-        <p className="text-sm text-muted mb-md">
+        <p className="mb-4 text-sm text-text-muted">
           Unlimited parts, cut list optimizer, PDF export, assemblies, groups,
           and custom templates. No credit card required.
         </p>
-        <div className="flex gap-md">
-          <a href="/download" className="btn btn-highlight btn-sm">
-            Download Free Trial
-          </a>
-          <a href="/pricing" className="btn btn-outline btn-sm">
-            See Pricing
-          </a>
+        <div className="flex gap-4">
+          <Button
+            asChild
+            size="sm"
+            className="bg-highlight text-bg hover:bg-highlight/90"
+          >
+            <a href="/download">Download Free Trial</a>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <a href="/pricing">See Pricing</a>
+          </Button>
         </div>
       </div>
 
