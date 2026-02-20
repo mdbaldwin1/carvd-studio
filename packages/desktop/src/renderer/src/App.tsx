@@ -5,6 +5,14 @@ import { useStore } from 'zustand';
 import { Button } from '@renderer/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@renderer/components/ui/accordion';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@renderer/components/ui/collapsible';
+import {
+  Sidebar as SidebarShell,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarProvider
+} from '@renderer/components/ui/sidebar';
 import { AddAssemblyModal } from './components/assembly/AddAssemblyModal';
 import { AssemblyEditingBanner } from './components/assembly/AssemblyEditingBanner';
 import { AssemblyEditingExitDialog } from './components/assembly/AssemblyEditingExitDialog';
@@ -365,10 +373,11 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
   );
 
   return (
-    <aside className="sidebar">
+    <SidebarShell className="sidebar">
+      <SidebarContent>
       {/* Stock Section */}
       <Collapsible
-        className="sidebar-section"
+        asChild
         open={!collapsedSections.stock}
         onOpenChange={(open) => {
           setCollapsedSections((prev) => ({ ...prev, stock: !open }));
@@ -378,12 +387,13 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
           }
         }}
       >
+        <SidebarGroup>
         <CollapsibleTrigger asChild>
           <div className="section-header" title={collapsedSections.stock ? 'Expand' : 'Collapse'}>
             <span className="section-collapse-btn">
               {collapsedSections.stock ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
             </span>
-            <h2>{isEditingAssembly ? 'Stock Library' : 'Stock'}</h2>
+            <SidebarGroupLabel>{isEditingAssembly ? 'Stock Library' : 'Stock'}</SidebarGroupLabel>
             <Button
               variant="ghost"
               size="icon"
@@ -514,11 +524,12 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             )}
           </div>
         </CollapsibleContent>
+        </SidebarGroup>
       </Collapsible>
 
       {/* Assemblies Section */}
       <Collapsible
-        className="sidebar-section"
+        asChild
         open={!collapsedSections.assemblies}
         onOpenChange={(open) => {
           setCollapsedSections((prev) => ({ ...prev, assemblies: !open }));
@@ -528,12 +539,13 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
           }
         }}
       >
+        <SidebarGroup>
         <CollapsibleTrigger asChild>
           <div className="section-header" title={collapsedSections.assemblies ? 'Expand' : 'Collapse'}>
             <span className="section-collapse-btn">
               {collapsedSections.assemblies ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
             </span>
-            <h2>{isEditingAssembly ? 'Assembly Library' : 'Assemblies'}</h2>
+            <SidebarGroupLabel>{isEditingAssembly ? 'Assembly Library' : 'Assemblies'}</SidebarGroupLabel>
             <Button
               variant="ghost"
               size="icon"
@@ -680,11 +692,12 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             )}
           </div>
         </CollapsibleContent>
+        </SidebarGroup>
       </Collapsible>
 
       {/* Parts Section */}
       <Collapsible
-        className="sidebar-section"
+        asChild
         open={!collapsedSections.parts}
         onOpenChange={(open) => {
           setCollapsedSections((prev) => ({ ...prev, parts: !open }));
@@ -694,12 +707,13 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
           }
         }}
       >
+        <SidebarGroup>
         <CollapsibleTrigger asChild>
           <div className="section-header" title={collapsedSections.parts ? 'Expand' : 'Collapse'}>
             <span className="section-collapse-btn">
               {collapsedSections.parts ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
             </span>
-            <h2>Parts</h2>
+            <SidebarGroupLabel>Parts</SidebarGroupLabel>
             <Button
               variant="ghost"
               size="icon"
@@ -768,7 +782,9 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
             />
           </div>
         </CollapsibleContent>
+        </SidebarGroup>
       </Collapsible>
+      </SidebarContent>
 
       {/* Add Stock from Library Modal (for project mode) */}
       <AddStockModal
@@ -843,16 +859,16 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
 
       {/* Bottom Section - hidden during assembly editing */}
       {!isEditingAssembly && (
-        <section className="sidebar-section sidebar-section-bottom">
+        <SidebarFooter className="sidebar-section-bottom">
           <Button size="sm" className="sidebar-settings-btn" onClick={onOpenCutList}>
             {!cutList ? 'Generate Cut List' : cutList.isStale ? 'Regenerate Cut List' : 'View Cut List'}
           </Button>
           <Button variant="ghost" size="sm" className="sidebar-settings-btn" onClick={onOpenProjectSettings}>
             Project Settings
           </Button>
-        </section>
+        </SidebarFooter>
       )}
-    </aside>
+    </SidebarShell>
   );
 }
 
@@ -2751,7 +2767,7 @@ function App() {
                 onDiscard={requestTemplateDiscard}
               />
             )}
-            <main className="app-main">
+            <SidebarProvider className="app-main">
               <Sidebar
                 onOpenProjectSettings={() => setIsProjectSettingsOpen(true)}
                 onOpenCutList={openCutListModal}
@@ -2760,7 +2776,7 @@ function App() {
               />
               <CanvasWithDrop />
               <PropertiesPanel />
-            </main>
+            </SidebarProvider>
           </>
         )}
         <ContextMenu />
