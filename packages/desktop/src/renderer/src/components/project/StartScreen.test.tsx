@@ -129,7 +129,7 @@ describe('StartScreen', () => {
         expect(screen.getByText('Blank')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Blank').closest('button')!);
+      fireEvent.click(screen.getByText('Blank').closest('[role="button"]')!);
 
       expect(onNewProject).toHaveBeenCalledTimes(1);
     });
@@ -327,7 +327,7 @@ describe('StartScreen', () => {
         expect(screen.getByText('Learn Carvd')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Learn Carvd').closest('button')!);
+      fireEvent.click(screen.getByText('Learn Carvd').closest('[role="button"]')!);
 
       expect(onStartTutorial).toHaveBeenCalled();
     });
@@ -341,7 +341,7 @@ describe('StartScreen', () => {
         expect(screen.getByText('Simple Writing Desk')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('Simple Writing Desk').closest('button')!);
+      fireEvent.click(screen.getByText('Simple Writing Desk').closest('[role="button"]')!);
 
       expect(onSelectTemplate).toHaveBeenCalled();
     });
@@ -560,7 +560,7 @@ describe('StartScreen', () => {
         expect(screen.getByText('My Custom Template')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByText('My Custom Template').closest('button')!);
+      fireEvent.click(screen.getByText('My Custom Template').closest('[role="button"]')!);
 
       expect(window.electronAPI.trackTemplateUsage).toHaveBeenCalledWith('user-1');
     });

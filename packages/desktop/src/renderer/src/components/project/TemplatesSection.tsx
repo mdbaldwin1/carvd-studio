@@ -1,5 +1,7 @@
 import { Plus, ChevronRight } from 'lucide-react';
 import { useMemo } from 'react';
+import { Button } from '@renderer/components/ui/button';
+import { Card } from '@renderer/components/ui/card';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
 import { Project } from '../../types';
 
@@ -84,20 +86,24 @@ export function TemplatesSection({
     <div className="flex flex-col gap-3 min-h-0 max-h-[50vh] mt-2">
       <div className="flex items-center justify-between pb-3 border-b border-border mb-3">
         <h2 className="text-sm font-semibold text-text-secondary m-0 p-0">Templates</h2>
-        <button
-          className="flex items-center gap-1 py-1.5 px-3 bg-transparent border-none text-[13px] font-medium text-accent cursor-pointer transition-all duration-100 rounded hover:text-primary hover:bg-bg-secondary"
-          onClick={onViewAllTemplates}
-        >
+        <Button variant="ghost" size="xs" className="text-accent hover:text-primary" onClick={onViewAllTemplates}>
           View All
           <ChevronRight size={14} />
-        </button>
+        </Button>
       </div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         {/* Blank Project - always first */}
-        <button
+        <Card
           className={`blank-template ${templateCardBase} border-dashed`}
           onClick={onNewProject}
           title="Start with a blank project"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              onNewProject();
+            }
+          }}
         >
           <span className="text-[32px] leading-none w-full max-w-30 h-[90px] flex items-center justify-center bg-bg-tertiary rounded-md text-primary">
             <Plus size={32} />
@@ -106,13 +112,20 @@ export function TemplatesSection({
             <span className="text-sm font-medium text-text">Blank</span>
             <span className="text-[11px] text-text-muted">Start from scratch</span>
           </div>
-        </button>
+        </Card>
         {/* Tutorial - always second */}
         {tutorialTemplate && (
-          <button
+          <Card
             className={`${templateCardBase} !border-primary bg-[linear-gradient(135deg,var(--color-bg-secondary)_0%,rgba(7,113,135,0.1)_100%)] hover:!border-primary-hover hover:bg-[linear-gradient(135deg,var(--color-bg-tertiary)_0%,rgba(7,113,135,0.15)_100%)]`}
             onClick={() => handleSelectTemplate(tutorialTemplate)}
             title={tutorialTemplate.description}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                void handleSelectTemplate(tutorialTemplate);
+              }
+            }}
           >
             <span className="text-[32px] leading-none w-full max-w-30 h-[90px] flex items-center justify-center bg-bg-tertiary rounded-md text-text-muted">
               {tutorialTemplate.thumbnail}
@@ -121,15 +134,22 @@ export function TemplatesSection({
               <span className="text-sm font-medium text-text">{tutorialTemplate.name}</span>
               <span className="text-[11px] text-text-muted">Guided walkthrough</span>
             </div>
-          </button>
+          </Card>
         )}
         {/* Top 4 most recently used templates */}
         {previewTemplates.map((template) => (
-          <button
+          <Card
             key={template.id}
             className={templateCardBase}
             onClick={() => handleSelectTemplate(template)}
             title={template.description}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                void handleSelectTemplate(template);
+              }
+            }}
           >
             {template.thumbnailData ? (
               <img
@@ -153,7 +173,7 @@ export function TemplatesSection({
                 Custom
               </span>
             )}
-          </button>
+          </Card>
         ))}
       </div>
     </div>

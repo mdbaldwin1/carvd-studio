@@ -128,7 +128,7 @@ describe('TemplatesSection', () => {
   it('calls onSelectTemplate when built-in template clicked', () => {
     const onSelectTemplate = vi.fn();
     render(<TemplatesSection {...defaultProps} onSelectTemplate={onSelectTemplate} />);
-    fireEvent.click(screen.getByText('Simple Shelf').closest('button')!);
+    fireEvent.click(screen.getByText('Simple Shelf').closest('[role="button"]')!);
     expect(onSelectTemplate).toHaveBeenCalled();
   });
 
@@ -194,7 +194,7 @@ describe('TemplatesSection', () => {
       }
     ];
     render(<TemplatesSection {...defaultProps} userTemplates={userTemplates} />);
-    fireEvent.click(screen.getByText('User Template').closest('button')!);
+    fireEvent.click(screen.getByText('User Template').closest('[role="button"]')!);
     expect(window.electronAPI.trackTemplateUsage).toHaveBeenCalledWith('user-1');
   });
 
