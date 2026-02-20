@@ -201,17 +201,17 @@ After each bead completes, update `.beads/issues.jsonl` and mentally track:
   [x] carvd-studio-10 (Website Migration)
     [x] carvd-studio-10.1 through 10.7
 
-[~] Phase 3: Overlays + Complex Components (partially complete)
-  [x] carvd-studio-4 (Overlays) ✅
-  [ ] carvd-studio-5 (Complex Components) — 5.1 in progress, 5.2–5.5 not started
+[x] Phase 3: Overlays + Complex Components ✅
+  [x] carvd-studio-4 (Overlays)
+  [x] carvd-studio-5 (Complex Components)
 
-[ ] Phase 4: Modals + Layout
-  [ ] carvd-studio-6 (Modals) — can parallel with 7
-  [ ] carvd-studio-7 (Layout) — can parallel with 6
+[x] Phase 4: Modals + Layout ✅
+  [x] carvd-studio-6 (Modals)
+  [x] carvd-studio-7 (Layout)
 
 [ ] Phase 5: Cleanup
-  [ ] carvd-studio-8 (Desktop Cleanup)
-  [ ] carvd-studio-11 (Website Cleanup)
+  [ ] carvd-studio-8 (Desktop Cleanup) — ready to start
+  [ ] carvd-studio-11 (Website Cleanup) — ready to start
 
 [ ] Phase 6: Final Integration
   [ ] carvd-studio-12
