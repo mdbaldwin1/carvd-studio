@@ -6,6 +6,7 @@
  */
 
 import { Button } from '@renderer/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@renderer/components/ui/dialog';
 
 interface TrialExpiredModalProps {
   onActivateLicense: () => void;
@@ -21,11 +22,11 @@ export function TrialExpiredModal({ onActivateLicense, onPurchase, onContinueFre
   };
 
   return (
-    <div className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]">
-      <div className="modal bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[400px] max-h-[85vh] flex flex-col animate-modal-fade-in">
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 className="m-0 text-base font-semibold text-text">Your 14-Day Trial Has Ended</h2>
-        </div>
+    <Dialog open={true} onOpenChange={() => {}}>
+      <DialogContent className="max-w-[400px]" onClose={() => {}}>
+        <DialogHeader>
+          <DialogTitle>Your 14-Day Trial Has Ended</DialogTitle>
+        </DialogHeader>
 
         <div className="p-5 overflow-y-auto text-center">
           <p className="text-text-secondary text-sm leading-relaxed m-0 mb-5">
@@ -75,7 +76,7 @@ export function TrialExpiredModal({ onActivateLicense, onPurchase, onContinueFre
             </p>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

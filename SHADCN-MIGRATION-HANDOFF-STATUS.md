@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-20 (updated)
 **Branch**: develop
-**Last develop SHA**: `896ddf2` (after bead 6.5 PR #251 merge)
+**Last develop SHA**: `e6f56a3` (after bead 6.6 PR #252 merge)
 
 ## Key Instruction Documents
 
@@ -73,32 +73,32 @@ These documents define the migration workflow and must be followed:
 | 5.4  | #245 | Collapsible/Accordion migration          |
 | 5.5  | #246 | Progress/Skeleton migration              |
 
-**Total: 33 beads merged across 7 epics (2, 3, 4, 5, 6, 9, 10)**
+**Total: 34 beads merged across 7 epics (2, 3, 4, 5, 6, 9, 10)**
 
 ## Active Worktrees
 
 | Worktree                                 | Branch                | State                    |
 | ---------------------------------------- | --------------------- | ------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-6.6` | feat/carvd-studio-6.6 | **In progress (active)** |
+| `/Users/mbaldwin/Carvd/carvd-studio-6.7` | feat/carvd-studio-6.7 | **In progress (active)** |
 
-All completed worktrees through bead 6.5 have been cleaned up.
+All completed worktrees through bead 6.6 have been cleaned up.
 
-## In-Progress Work: Bead 6.6 (Template Browser Modal)
+## In-Progress Work: Bead 6.7 (License/Trial/Utility Dialogs)
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-6.6`
-**Branch**: `feat/carvd-studio-6.6`
+**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-6.7`
+**Branch**: `feat/carvd-studio-6.7`
 **State**: Implementation complete; verification and PR prep in progress
 
 ### What was done:
 
-1. Migrated `TemplateBrowserModal` from custom overlay/backdrop/escape handling to `ui/dialog` primitives.
-2. Preserved template loading, built-in/user template selection, create-project flow, save-current-as-template flow, and delete-confirm overlay behavior (Escape cancels confirm before closing modal).
-3. Verified desktop lint/typecheck and targeted `TemplateBrowserModal` tests pass locally.
+1. Migrated remaining custom-shell dialogs in this bead to `ui/dialog` primitives: `LicenseActivationModal`, `TrialExpiredModal`, `FileRecoveryModal`, and `ImportToLibraryDialog`.
+2. Preserved existing behavior for activation/validation states, trial upgrade CTAs, file recovery decision flows, and import-to-library selection/import flows.
+3. Verified desktop lint/typecheck and targeted dialog tests pass locally for all touched components.
 4. Verified full desktop renderer/main vitest suites pass locally; local Playwright E2E remains blocked by known environment launch issue.
 
 ### Outstanding before merge:
 
-1. Open PR for bead 6.6 and pass CI checks
+1. Open PR for bead 6.7 and pass CI checks
 2. Merge PR (squash) and clean up worktree/branch
 
 ## Remaining Work (Not Started)
@@ -120,8 +120,8 @@ All completed worktrees through bead 6.5 have been cleaned up.
 - 6.3: Project modals (NewProject, ProjectSettings, ImportAppState) — **DONE** (PR #249 merged)
 - 6.4: AppSettingsModal (largest, 7+ sections) — **DONE** (PR #250 merged)
 - 6.5: CutListModal (complex: 4 tabs, tables, diagrams) — **DONE** (PR #251 merged)
-- 6.6: TemplateBrowserModal — **IN PROGRESS**
-- 6.7: License/trial/utility dialogs
+- 6.6: TemplateBrowserModal — **DONE** (PR #252 merged)
+- 6.7: License/trial/utility dialogs — **IN PROGRESS**
 
 **Epic 7: Desktop Layout & Specialized** (depends on Epics 4 ✅ and 5)
 
@@ -159,7 +159,7 @@ All completed worktrees through bead 6.5 have been cleaned up.
 
 ```
 Epics 2, 3, 4, 5, 9, 10 are COMPLETE ✅
-Epic 6 is IN PROGRESS (6.6 active; 6.1/6.2/6.3/6.4/6.5 complete)
+Epic 6 is IN PROGRESS (6.7 active; 6.1/6.2/6.3/6.4/6.5/6.6 complete)
 Epic 7 can start NOW (dependencies Epics 4 ✅ and 5 ✅ are met)
 Epic 8 is BLOCKED on Epics 6 and 7
 Epic 11 can start NOW (dependency Epic 10 ✅ is met)
@@ -212,7 +212,7 @@ Bead status state shown here is current as of 2026-02-20.
 
 ## Recommended Next Steps
 
-1. **Complete bead 6.6** — create PR, pass CI, merge, and cleanup.
-2. Continue Epic 6 in sequence (6.7 next) while starting Epic 7 in parallel when feasible.
+1. **Complete bead 6.7** — create PR, pass CI, merge, and cleanup.
+2. Begin Epic 7 sequence while preparing final Epic 6/8 cleanup validation.
 3. Run Epic 6 and Epic 11 in parallel where safe to reduce critical path.
 4. Epic 8 remains final desktop cleanup before Epic 12 integration.
