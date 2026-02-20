@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, Key, X } from 'lucide-react';
 import { HelpTooltip } from '../common/HelpTooltip';
 import { Button } from '@renderer/components/ui/button';
+import { Dialog, DialogContent } from '@renderer/components/ui/dialog';
 
 interface LicenseActivationModalProps {
   isOpen: boolean;
@@ -66,16 +67,11 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-overlay-heavy flex items-center justify-center z-[9999]" onClick={onClose}>
-      <div
-        className="relative bg-surface rounded-xl p-8 max-w-[500px] w-[90%] shadow-[0_20px_60px_var(--color-overlay)] border border-border"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="license-modal-title"
-        onClick={(e) => e.stopPropagation()}
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose?.()}>
+      <DialogContent
+        className="bg-surface rounded-xl p-8 max-w-[500px] w-[90%] shadow-[0_20px_60px_var(--color-overlay)] border border-border"
+        onClose={() => onClose?.()}
       >
         {/* Close button */}
         {onClose && (
@@ -198,7 +194,7 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
             </p>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

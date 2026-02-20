@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle, XCircle, FileWarning } from 'lucide-react';
 import { FileRepairResult, getFileSummary } from '../../utils/fileFormat';
 import { Button } from '@renderer/components/ui/button';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@renderer/components/ui/dialog';
 
 interface FileRecoveryModalProps {
   isOpen: boolean;
@@ -23,8 +24,6 @@ export function FileRecoveryModal({
   onReject,
   isRepairing
 }: FileRecoveryModalProps) {
-  if (!isOpen) return null;
-
   const hasRepairResult = repairResult !== null;
   const repairSuccessful = repairResult?.success ?? false;
 
@@ -32,12 +31,12 @@ export function FileRecoveryModal({
   const summary = repairResult?.repairedData ? getFileSummary(repairResult.repairedData) : null;
 
   return (
-    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]">
-      <div className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] w-[90%] max-w-[500px] max-h-[85vh] flex flex-col animate-modal-fade-in">
-        <div className="flex items-center gap-3 py-4 px-5 border-b border-border">
+    <Dialog open={isOpen} onOpenChange={() => {}}>
+      <DialogContent className="w-[90%] max-w-[500px]" onClose={() => {}}>
+        <DialogHeader className="items-center justify-start gap-3">
           <FileWarning size={24} className="text-warning" />
-          <h2 className="text-base font-semibold text-text m-0">File Recovery Required</h2>
-        </div>
+          <DialogTitle>File Recovery Required</DialogTitle>
+        </DialogHeader>
 
         <div className="p-5 overflow-y-auto">
           <p className="text-[14px] font-semibold text-text mb-4">
@@ -164,7 +163,7 @@ export function FileRecoveryModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
+        <DialogFooter>
           {/* Initial state buttons */}
           {!hasRepairResult && !isRepairing && (
             <>
@@ -195,8 +194,8 @@ export function FileRecoveryModal({
               Close
             </Button>
           )}
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

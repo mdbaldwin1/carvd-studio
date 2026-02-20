@@ -9,6 +9,7 @@ import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { useProjectStore } from '../../store/projectStore';
 import { Button } from '@renderer/components/ui/button';
 import { Checkbox } from '@renderer/components/ui/checkbox';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@renderer/components/ui/dialog';
 
 interface ImportToLibraryDialogProps {
   isOpen: boolean;
@@ -38,8 +39,6 @@ export function ImportToLibraryDialog({
     setSelectedStockIds(new Set(missingStocks.map((s) => s.id)));
     setSelectedAssemblyIds(new Set(missingAssemblies.map((a) => a.id)));
   }, [missingStocks, missingAssemblies]);
-
-  if (!isOpen) return null;
 
   const totalItems = missingStocks.length + missingAssemblies.length;
   const selectedCount = selectedStockIds.size + selectedAssemblyIds.size;
@@ -87,11 +86,11 @@ export function ImportToLibraryDialog({
   const hasStocks = missingStocks.length > 0;
 
   return (
-    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]">
-      <div className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-120 w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in">
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 className="text-base font-semibold text-text m-0">Import to Library</h2>
-        </div>
+    <Dialog open={isOpen} onOpenChange={() => {}}>
+      <DialogContent className="max-w-120 w-[90vw]" onClose={() => {}}>
+        <DialogHeader>
+          <DialogTitle>Import to Library</DialogTitle>
+        </DialogHeader>
 
         <div className="p-5 overflow-y-auto">
           <p className="mb-4 text-text-secondary leading-relaxed">
@@ -171,15 +170,15 @@ export function ImportToLibraryDialog({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
+        <DialogFooter>
           <Button size="sm" variant="ghost" onClick={onSkip}>
             Skip
           </Button>
           <Button size="sm" onClick={handleImport} disabled={selectedCount === 0}>
             Import {selectedCount > 0 ? `(${selectedCount})` : ''}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
