@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-20 (updated)
 **Branch**: develop
-**Last develop SHA**: `b97951e` (after bead 8.4 PR #264 merge)
+**Last develop SHA**: `3164109` (after bead 8.5 PR #265 merge)
 
 ## Key Instruction Documents
 
@@ -104,20 +104,21 @@ These documents define the migration workflow and must be followed:
 | 8.2  | #262 | Simplify layout.css             |
 | 8.3  | #263 | Simplify domain.css             |
 | 8.4  | #264 | Finalize tailwind.css theme map |
-| 8.5  | —    | Update tests + verify coverage  |
+| 8.5  | #265 | Update tests + verify coverage  |
+| 8.6  | —    | Bundle size audit               |
 
-**Total: 45 beads merged across 9 epics (2, 3, 4, 5, 6, 7, 8-partial, 9, 10)**
+**Total: 46 beads merged across 9 epics (2, 3, 4, 5, 6, 7, 8-partial, 9, 10)**
 
 ## Active Worktrees
 
-| Worktree                                 | Branch                  | State                          |
-| ---------------------------------------- | ----------------------- | ------------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-8-5` | `test/carvd-studio-8.5` | Active (coverage/test updates) |
+| Worktree                                 | Branch                  | State                 |
+| ---------------------------------------- | ----------------------- | --------------------- |
+| `/Users/mbaldwin/Carvd/carvd-studio-8-6` | `test/carvd-studio-8.6` | Active (bundle audit) |
 
 ## Current Position
 
-- **Current bead**: Epic 8.5 (`Update all desktop tests and verify coverage thresholds`) in progress on branch `test/carvd-studio-8.5`.
-- **Coverage status**: Desktop thresholds now pass after new ui/context-menu tests (`Statements 91.7%`, `Branches 82.02%`, `Functions 90.06%`, `Lines 91.98%`).
+- **Current bead**: Epic 8.6 (`Bundle size audit and performance verification`) in progress on branch `test/carvd-studio-8.6`.
+- **Coverage status**: Desktop thresholds pass after bead 8.5 (`Statements 91.7%`, `Branches 82.02%`, `Functions 90.06%`, `Lines 91.98%`).
 - **Parallel website work available**: Epic 11.1 (`Remove old index.css`).
 
 ## Remaining Work (Not Started)
@@ -157,7 +158,7 @@ These documents define the migration workflow and must be followed:
 - 8.2: Simplify layout.css — **DONE** (PR #262 merged)
 - 8.3: Simplify domain.css — **DONE** (PR #263 merged)
 - 8.4: Finalize tailwind.css (clean theming bridge) — **DONE** (PR #264 merged)
-- 8.5: Update all tests, verify coverage thresholds — **IN PROGRESS**
+- 8.5: Update all tests, verify coverage thresholds — **DONE** (PR #265 merged)
 - 8.6: Bundle size audit
 
 ### Website Epic 11
@@ -178,7 +179,7 @@ These documents define the migration workflow and must be followed:
 
 ```
 Epics 2, 3, 4, 5, 6, 7, 9, 10 are COMPLETE ✅
-Epic 8 is IN PROGRESS (8.1–8.4 complete; 8.5 active)
+Epic 8 is IN PROGRESS (8.1–8.5 complete; 8.6 active)
 Epic 11 can start NOW (dependency Epic 10 ✅ is met)
 Epic 12 is BLOCKED on Epics 8 and 11
 ```
@@ -229,7 +230,7 @@ Bead status state shown here is current as of 2026-02-20.
 
 ## Recommended Next Steps
 
-1. Complete merge for **Epic 8.5** (tests + coverage verification).
-2. Execute **Epic 8.6** (desktop bundle size audit).
-3. Start **Epic 11.1** in parallel (website cleanup): remove old `index.css`.
+1. Complete merge for **Epic 8.6** (desktop bundle size audit).
+2. Start **Epic 11.1** in parallel (website cleanup): remove old `index.css`.
+3. Continue remaining Epic 8 / Epic 11 beads, then complete Epic 12 integration.
 4. Complete Epic 12 integration after Epics 8 and 11.
