@@ -1,6 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { Button } from '@renderer/components/ui/button';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@renderer/components/ui/dialog';
 import { AppSettings } from '../../types';
 import { mmToInches } from '../../utils/fractions';
 import { useUIStore } from '../../store/uiStore';
@@ -71,9 +78,6 @@ export function AppSettingsModal({
   onShowLicenseModal,
   onShowImportModal
 }: AppSettingsModalProps) {
-  // Handle backdrop click (only close if mousedown AND mouseup both on backdrop)
-  const { handleMouseDown, handleClick } = useBackdropClose(onClose);
-
   // Local form state
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [isExporting, setIsExporting] = useState(false);
@@ -101,19 +105,6 @@ export function AppSettingsModal({
     setFormData(settings);
   }, [settings]);
 
-  // Close on escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
   const gridOptions = formData.defaultUnits === 'metric' ? METRIC_GRID_OPTIONS : IMPERIAL_GRID_OPTIONS;
   const displayGridValue = findClosestGridValue(formData.defaultGridSize, gridOptions);
 
@@ -133,22 +124,17 @@ export function AppSettingsModal({
     onUpdateSettings({ defaultUnits: newUnits, defaultGridSize: newGridSize });
   };
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  };
+
   return (
-    <div
-      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
-      onMouseDown={handleMouseDown}
-      onClick={handleClick}
-    >
-      <div
-        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in w-[480px]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="app-settings-modal-title"
-      >
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 id="app-settings-modal-title" className="text-base font-semibold text-text m-0">
-            App Settings
-          </h2>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="w-[480px]" onClose={onClose}>
+        <DialogHeader>
+          <DialogTitle>App Settings</DialogTitle>
           <div className="flex items-center gap-4">
             <a
               href="#"
@@ -160,11 +146,9 @@ export function AppSettingsModal({
             >
               View documentation
             </a>
-            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
-              &times;
-            </Button>
+            <DialogClose onClose={onClose} />
           </div>
-        </div>
+        </DialogHeader>
 
         <div className="p-5 overflow-y-auto max-h-[60vh]">
           <AppearanceSection formData={formData} onSettingChange={handleChange} />
@@ -203,12 +187,12 @@ export function AppSettingsModal({
           />
         </div>
 
-        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
+        <DialogFooter>
           <Button variant="secondary" size="sm" onClick={onClose}>
             Done
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
