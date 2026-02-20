@@ -1,8 +1,8 @@
 # shadcn/ui Migration — Handoff Status
 
-**Date**: 2026-02-19 (updated)
+**Date**: 2026-02-20 (updated)
 **Branch**: develop
-**Last develop SHA**: `9dbf5ce` (after bead 5.4 PR #245 merge)
+**Last develop SHA**: `2a2a1b2` (after bead 5.5 PR #246 merge)
 
 ## Key Instruction Documents
 
@@ -71,35 +71,34 @@ These documents define the migration workflow and must be followed:
 | 5.2  | #243 | Table migration (CutList parts table)    |
 | 5.3  | #244 | Card migration (Start/Settings/Template) |
 | 5.4  | #245 | Collapsible/Accordion migration          |
+| 5.5  | #246 | Progress/Skeleton migration              |
 
-**Total: 27 beads merged across 6 epics (2, 3, 4, 5, 9, 10)**
+**Total: 28 beads merged across 6 epics (2, 3, 4, 5, 9, 10)**
 
 ## Active Worktrees
 
 | Worktree                                 | Branch                | State                    |
 | ---------------------------------------- | --------------------- | ------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-5.5` | feat/carvd-studio-5.5 | **In progress (active)** |
+| `/Users/mbaldwin/Carvd/carvd-studio-6.1` | feat/carvd-studio-6.1 | **In progress (active)** |
 
-All completed worktrees through bead 5.4 have been cleaned up.
+All completed worktrees through bead 5.5 have been cleaned up.
 
-## In-Progress Work: Bead 5.5 (Progress/Skeleton)
+## In-Progress Work: Bead 6.1 (Stock Modals)
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-5.5`
-**Branch**: `feat/carvd-studio-5.5`
+**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-6.1`
+**Branch**: `feat/carvd-studio-6.1`
 **State**: Implementation complete; PR prep in progress
 
 ### What was done:
 
-1. Added Progress primitive at `packages/desktop/src/renderer/src/components/ui/progress.tsx`
-2. Added Skeleton primitive at `packages/desktop/src/renderer/src/components/ui/skeleton.tsx`
-3. Migrated `components/common/ProgressBar.tsx` to shadcn/Radix progress composition while preserving public props
-4. Migrated `components/common/LoadingSpinner.tsx` to shadcn skeleton-based loading visuals
-5. Updated `ProgressBar` and `LoadingSpinner` tests for the new primitive structure
-6. Verified desktop lint/typecheck and targeted component tests pass locally
+1. Migrated `AddStockModal`, `EditStockModal`, and `StockLibraryModal` to `ui/dialog` primitives.
+2. Removed legacy custom-overlay/modal wrapping from those components while preserving existing form and store interactions.
+3. Kept `StockLibraryModal` Escape behavior aligned with tab-level handlers (`StocksTab`/`AssembliesTab`) to avoid behavior regression while editing forms.
+4. Verified desktop lint/typecheck and targeted modal tests pass locally.
 
 ### Outstanding before merge:
 
-1. Open PR for bead 5.5 and pass CI checks
+1. Open PR for bead 6.1 and pass CI checks
 2. Merge PR (squash) and clean up worktree/branch
 
 ## Remaining Work (Not Started)
@@ -112,11 +111,11 @@ All completed worktrees through bead 5.4 have been cleaned up.
 - 5.2: Table — **DONE** (PR #243 merged)
 - 5.3: Card — **DONE** (PR #244 merged)
 - 5.4: Collapsible/Accordion — **DONE** (PR #245 merged)
-- 5.5: Progress/Skeleton — **IN PROGRESS**
+- 5.5: Progress/Skeleton — **DONE** (PR #246 merged)
 
 **Epic 6: Desktop Modal Migration** (depends on 3.5 ✅ and 3.2 ✅ — ready to start)
 
-- 6.1: Stock modals (AddStock, EditStock, StockLibrary)
+- 6.1: Stock modals (AddStock, EditStock, StockLibrary) — **IN PROGRESS (implementation done, PR pending)**
 - 6.2: Assembly modals (AddAssembly, SaveAssembly)
 - 6.3: Project modals (NewProject, ProjectSettings, ImportAppState)
 - 6.4: AppSettingsModal (largest, 7+ sections)
@@ -159,10 +158,9 @@ All completed worktrees through bead 5.4 have been cleaned up.
 ## Dependency Graph Summary
 
 ```
-Epics 2, 3, 4, 9, 10 are COMPLETE ✅
-Epic 5 is IN PROGRESS (5.1/5.2/5.3/5.4 done, 5.5 active)
-Epic 6 can start NOW (dependencies 3.5 ✅ and 3.2 ✅ are met)
-Epic 7 is BLOCKED on Epic 5 (Epic 4 dependency is met ✅)
+Epics 2, 3, 4, 5, 9, 10 are COMPLETE ✅
+Epic 6 is IN PROGRESS (6.1 active)
+Epic 7 can start NOW (dependencies Epics 4 ✅ and 5 ✅ are met)
 Epic 8 is BLOCKED on Epics 6 and 7
 Epic 11 can start NOW (dependency Epic 10 ✅ is met)
 Epic 12 is BLOCKED on Epics 8 and 11

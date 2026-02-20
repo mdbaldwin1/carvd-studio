@@ -2,11 +2,18 @@ import { Plus, Search, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { STOCK_COLORS } from '../../constants';
-import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useProjectStore } from '../../store/projectStore';
 import { Stock } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { Button } from '@renderer/components/ui/button';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@renderer/components/ui/dialog';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { Select } from '@renderer/components/ui/select';
@@ -158,21 +165,6 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
     onClose();
   }, [selectedIds, stockLibrary, onAddStock, onClose]);
 
-  const { handleMouseDown, handleClick } = useBackdropClose(onClose);
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
   const grainDirectionLabel = (direction: string) => {
     switch (direction) {
       case 'length':
@@ -197,30 +189,19 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
     }
   };
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  };
+
   return (
-    <div
-      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
-      onMouseDown={handleMouseDown}
-      onClick={handleClick}
-    >
-      <div
-        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in w-[700px]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-stock-modal-title"
-      >
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 id="add-stock-modal-title" className="text-base font-semibold text-text m-0">
-            Add Stock to Project
-          </h2>
-          <button
-            className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            &times;
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="w-[700px]" onClose={onClose}>
+        <DialogHeader>
+          <DialogTitle>Add Stock to Project</DialogTitle>
+          <DialogClose onClose={onClose} />
+        </DialogHeader>
 
         <div className="flex flex-1 overflow-hidden">
           {/* Library list */}
@@ -451,7 +432,7 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
+        <DialogFooter>
           <Button variant="outline" size="sm" onClick={isCreatingNew ? handleCancelCreate : onClose}>
             {isCreatingNew ? 'Back' : stockLibrary.length === 0 ? 'Close' : 'Cancel'}
           </Button>
@@ -464,8 +445,8 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
               Add to Project{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
             </Button>
           )}
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
