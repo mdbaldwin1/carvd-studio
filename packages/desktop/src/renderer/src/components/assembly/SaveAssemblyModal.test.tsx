@@ -220,6 +220,7 @@ describe('SaveAssemblyModal', () => {
       const { container } = render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
 
       const overlay = container.firstChild as HTMLElement;
+      fireEvent.mouseDown(overlay);
       fireEvent.click(overlay);
 
       expect(onClose).toHaveBeenCalled();
@@ -237,10 +238,8 @@ describe('SaveAssemblyModal', () => {
 
     it('calls onClose when Escape is pressed', () => {
       const onClose = vi.fn();
-      const { container } = render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
-
-      const overlay = container.firstChild as HTMLElement;
-      fireEvent.keyDown(overlay, { key: 'Escape' });
+      render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
+      fireEvent.keyDown(window, { key: 'Escape' });
 
       expect(onClose).toHaveBeenCalled();
     });

@@ -4,6 +4,17 @@ import { useSelectionStore } from '../../store/selectionStore';
 import { Assembly } from '../../types';
 import { Button } from '@renderer/components/ui/button';
 import { Checkbox } from '@renderer/components/ui/checkbox';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@renderer/components/ui/dialog';
+import { Input } from '@renderer/components/ui/input';
+import { Label } from '@renderer/components/ui/label';
+import { Textarea } from '@renderer/components/ui/textarea';
 import { HelpTooltip } from '../common/HelpTooltip';
 
 interface SaveAssemblyModalProps {
@@ -63,40 +74,21 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
     [name, description, addToLibrary, createAssemblyFromSelection, onSave, onClose]
   );
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    },
-    [onClose]
-  );
-
-  if (!isOpen) return null;
-
   const hasSelection = selectedPartIds.length > 0 || selectedGroupIds.length > 0;
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  };
+
   return (
-    <div
-      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
-      onClick={onClose}
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in w-[450px]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="save-assembly-modal-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 id="save-assembly-modal-title" className="text-base font-semibold text-text m-0">
-            Save as Assembly
-          </h2>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
-            ×
-          </Button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="w-[450px]" onClose={onClose}>
+        <DialogHeader>
+          <DialogTitle>Save as Assembly</DialogTitle>
+          <DialogClose onClose={onClose} />
+        </DialogHeader>
 
         <form onSubmit={handleSubmit}>
           <div className="p-5 overflow-y-auto">
@@ -111,9 +103,9 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
               </div>
             )}
 
-            <div className="property-group">
-              <label>Name *</label>
-              <input
+            <div className="flex flex-col mb-4 gap-2.5">
+              <Label>Name *</Label>
+              <Input
                 type="text"
                 value={name}
                 onChange={(e) => {
@@ -125,10 +117,9 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
               />
             </div>
 
-            <div className="property-group">
-              <label>Description (optional)</label>
-              <textarea
-                className="w-full min-h-[60px] bg-bg border border-border text-text p-2 rounded text-[13px] font-[inherit] resize-y leading-snug focus:outline-none focus:border-accent placeholder:text-text-muted"
+            <div className="flex flex-col mb-4 gap-2.5">
+              <Label>Description (optional)</Label>
+              <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder='e.g., Standard drawer with 1/2" bottom, pocket screw joinery'
@@ -136,8 +127,8 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
               />
             </div>
 
-            <div className="property-group">
-              <label className="flex items-center gap-2.5 cursor-pointer text-sm">
+            <div className="flex flex-col mb-4 gap-2.5">
+              <Label className="flex items-center gap-2.5 cursor-pointer text-sm">
                 <Checkbox
                   className="w-4 h-4"
                   checked={addToLibrary}
@@ -149,7 +140,7 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
                   docsSection="assemblies"
                   inline
                 />
-              </label>
+              </Label>
             </div>
 
             {error && (
@@ -159,16 +150,16 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
             )}
           </div>
 
-          <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
+          <DialogFooter>
             <Button type="button" variant="ghost" size="sm" onClick={onClose}>
               Cancel
             </Button>
             <Button type="submit" size="sm" disabled={!hasSelection}>
               Save Assembly
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
