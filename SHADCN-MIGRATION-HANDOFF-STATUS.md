@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-20 (updated)
 **Branch**: develop
-**Last develop SHA**: `470f7a2` (after bead 7.5 PR #258 merge)
+**Last develop SHA**: `b459b9a` (after bead 7.6 PR #259 merge)
 
 ## Key Instruction Documents
 
@@ -73,33 +73,44 @@ These documents define the migration workflow and must be followed:
 | 5.4  | #245 | Collapsible/Accordion migration          |
 | 5.5  | #246 | Progress/Skeleton migration              |
 
+### Epic 6: Desktop Modal Migration (complete)
+
+| Bead | PR   | Description                   |
+| ---- | ---- | ----------------------------- |
+| 6.1  | #247 | Stock modals                  |
+| 6.2  | #248 | Assembly modals               |
+| 6.3  | #249 | Project modals                |
+| 6.4  | #250 | AppSettingsModal              |
+| 6.5  | #251 | CutListModal                  |
+| 6.6  | #252 | TemplateBrowserModal          |
+| 6.7  | #253 | License/trial/utility dialogs |
+
+### Epic 7: Desktop Layout & Specialized Components (complete)
+
+| Bead | PR   | Description                             |
+| ---- | ---- | --------------------------------------- |
+| 7.1  | #254 | Sidebar migration                       |
+| 7.2  | #255 | Header/Toolbar button migration         |
+| 7.3  | #256 | Properties panel form-control migration |
+| 7.4  | #257 | Banner migration to shadcn Alert        |
+| 7.5  | #258 | Tutorial component migration            |
+| 7.6  | #259 | StartScreen Card/navigation migration   |
+
 **Total: 41 beads merged across 8 epics (2, 3, 4, 5, 6, 7, 9, 10)**
 
 ## Active Worktrees
 
-| Worktree                                 | Branch                | State                    |
-| ---------------------------------------- | --------------------- | ------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-7.6` | feat/carvd-studio-7.6 | **In progress (active)** |
+| Worktree | Branch | State                              |
+| -------- | ------ | ---------------------------------- |
+| _None_   | —      | All migration worktrees cleaned up |
 
-All completed worktrees through bead 7.5 have been cleaned up.
+All completed worktrees through bead 7.6 have been cleaned up.
 
-## In-Progress Work: Bead 7.6 (StartScreen Layout Migration)
+## Current Position
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-7.6`
-**Branch**: `feat/carvd-studio-7.6`
-**State**: Implementation complete; PR prep in progress
-
-### What was done:
-
-1. Completed StartScreen action migration by converting remaining custom action controls (`Open file...`, template section `View All`) to shadcn `Button`.
-2. Migrated `TemplatesSection` template preview interactions (blank/tutorial/preview cards) to shadcn `Card`-based clickable surfaces with keyboard activation support.
-3. Preserved existing StartScreen tabs/project-list behavior and updated affected tests (`StartScreen`, `TemplatesSection`) from button-ancestor assumptions to role-based interactive-card selectors.
-4. Verified desktop lint/typecheck/unit tests and format check pass locally.
-
-### Outstanding before merge:
-
-1. Open PR for bead 7.6 and pass CI checks
-2. Merge PR (squash) and clean up worktree/branch
+- **Between epics**: Epic 7 is complete and merged.
+- **Next desktop work**: Epic 8.1 (`Remove primitives.css`).
+- **Parallel website work available**: Epic 11.1 (`Remove old index.css`).
 
 ## Remaining Work (Not Started)
 
@@ -130,7 +141,7 @@ All completed worktrees through bead 7.5 have been cleaned up.
 - 7.3: Properties Panel form controls — **DONE** (PR #256 merged)
 - 7.4: Banners → shadcn Alert — **DONE** (PR #257 merged)
 - 7.5: Tutorial components — **DONE** (PR #258 merged)
-- 7.6: StartScreen layout → Card + Tabs — **IN PROGRESS**
+- 7.6: StartScreen layout → Card + Tabs — **DONE** (PR #259 merged)
 
 **Epic 8: Desktop CSS Cleanup** (depends on Epics 6 and 7)
 
@@ -158,9 +169,8 @@ All completed worktrees through bead 7.5 have been cleaned up.
 ## Dependency Graph Summary
 
 ```
-Epics 2, 3, 4, 5, 6, 9, 10 are COMPLETE ✅
-Epic 7 is IN PROGRESS (7.6 active)
-Epic 8 is BLOCKED on Epic 7
+Epics 2, 3, 4, 5, 6, 7, 9, 10 are COMPLETE ✅
+Epic 8 is OPEN and READY (dependency Epic 7 ✅)
 Epic 11 can start NOW (dependency Epic 10 ✅ is met)
 Epic 12 is BLOCKED on Epics 8 and 11
 ```
@@ -211,7 +221,7 @@ Bead status state shown here is current as of 2026-02-20.
 
 ## Recommended Next Steps
 
-1. **Complete bead 7.6** — create PR, pass CI, merge, and cleanup.
-2. Start Epic 8 (`8.1` next) after Epic 7 completes.
-3. Continue Epic 11 in parallel where capacity allows.
+1. Start **Epic 8.1** (desktop cleanup): remove/simplify `primitives.css`.
+2. Start **Epic 11.1** in parallel (website cleanup): remove old `index.css`.
+3. Continue remaining Epic 8 / Epic 11 beads, then complete Epic 12 integration.
 4. Complete Epic 12 integration after Epics 8 and 11.
