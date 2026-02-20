@@ -1,8 +1,15 @@
 import { Download } from 'lucide-react';
 import React, { useCallback, useMemo } from 'react';
 import { Button } from '@renderer/components/ui/button';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@renderer/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@renderer/components/ui/tabs';
-import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useProjectStore, validatePartsForCutList, generateThumbnail } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import { useLicenseStore } from '../../store/licenseStore';
@@ -40,20 +47,6 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
   // Get feature limits based on license mode
   const limits = useMemo(() => getFeatureLimits(licenseMode), [licenseMode]);
-
-  // Handle backdrop click (only close if mousedown AND mouseup both on backdrop)
-  const { handleMouseDown, handleClick } = useBackdropClose(onClose);
-
-  // Handle escape key
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   // Generate cut list
   const handleGenerate = useCallback(() => {
@@ -115,34 +108,20 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
     }
   }, [cutList, projectName, projectNotes, units, customShoppingItems, limits.canExportPDF, showToast]);
 
-  if (!isOpen) return null;
-
   const hasBlockingIssues = validationIssues.some((i) => i.severity === 'error' && !i.canBypass);
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  };
 
   return (
-    <div
-      className="cut-list-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
-      onMouseDown={handleMouseDown}
-      onClick={handleClick}
-    >
-      <div
-        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] flex flex-col animate-modal-fade-in max-h-[85vh] min-h-[500px] w-[900px] max-w-[95vw]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="cut-list-modal-title"
-      >
-        <div className="modal-header py-5 px-6 bg-bg border-b border-border flex justify-between items-center rounded-t-lg">
-          <h2 id="cut-list-modal-title" className="text-lg font-semibold text-text m-0">
-            Cut List
-          </h2>
-          <button
-            className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            &times;
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-h-[85vh] min-h-[500px] w-[900px] max-w-[95vw] rounded-lg" onClose={onClose}>
+        <DialogHeader className="py-5 px-6 bg-bg rounded-t-lg">
+          <DialogTitle className="text-lg">Cut List</DialogTitle>
+          <DialogClose onClose={onClose} />
+        </DialogHeader>
 
         {/* No cut list - show generate UI */}
         {!cutList && (
@@ -268,7 +247,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
           </>
         )}
 
-        <div className="cut-list-footer flex items-center justify-end gap-2 py-4 px-6 border-t border-border bg-bg rounded-b-lg">
+        <DialogFooter className="cut-list-footer bg-bg rounded-b-lg py-4 px-6">
           {cutList && (
             <>
               <Button
@@ -286,8 +265,8 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
           <Button variant="secondary" size="sm" onClick={onClose}>
             {cutList ? 'Done' : 'Cancel'}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
