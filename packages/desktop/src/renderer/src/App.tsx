@@ -1707,13 +1707,15 @@ function BrightnessPopup({ isOpen, onClose }: BrightnessPopupProps) {
       <div className="h-px bg-border my-2.5" />
       <div className="flex gap-1.5">
         {presets.map((p) => (
-          <button
+          <Button
             key={p.key}
-            className={`flex-1 py-1.5 px-2 text-[11px] rounded bg-bg border border-border text-text-muted cursor-pointer transition-all duration-100 hover:bg-surface-hover hover:text-text ${lightingMode === p.key ? '!bg-accent !text-accent-foreground !border-accent' : ''}`}
+            size="xs"
+            variant={lightingMode === p.key ? 'default' : 'outline'}
+            className="flex-1 h-7 px-2 text-[11px]"
             onClick={() => updateSettings({ lightingMode: p.key })}
           >
             {p.label}
-          </button>
+          </Button>
         ))}
       </div>
     </div>
@@ -1732,79 +1734,90 @@ function DisplayToolbar() {
   const setSnapToPartsEnabled = useSnapStore((s) => s.setSnapToPartsEnabled);
   const clearReferences = useSnapStore((s) => s.clearReferences);
   const [brightnessOpen, setBrightnessOpen] = useState(false);
-
-  const toolbarBtn =
-    'py-1.5 px-2.5 text-xs rounded bg-transparent border-none text-text-muted cursor-pointer transition-all duration-100 hover:bg-surface-hover hover:text-text';
-  const activeBtn = `${toolbarBtn} !bg-accent !text-accent-foreground`;
-  const toggleActiveBtn = `${toolbarBtn} !bg-accent !text-accent-foreground`;
+  const toolbarTextButtonClass = 'h-7 px-2.5 text-xs';
 
   return (
     <div className="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface border border-border rounded-md p-1 z-10">
       <div className="flex items-center gap-0.5">
-        <button
-          className={displayMode === 'solid' ? activeBtn : toolbarBtn}
+        <Button
+          size="xs"
+          variant={displayMode === 'solid' ? 'default' : 'ghost'}
+          className={toolbarTextButtonClass}
           onClick={() => setDisplayMode('solid')}
           title="Solid view"
         >
           Solid
-        </button>
-        <button
-          className={displayMode === 'wireframe' ? activeBtn : toolbarBtn}
+        </Button>
+        <Button
+          size="xs"
+          variant={displayMode === 'wireframe' ? 'default' : 'ghost'}
+          className={toolbarTextButtonClass}
           onClick={() => setDisplayMode('wireframe')}
           title="Wireframe view"
         >
           Wire
-        </button>
-        <button
-          className={displayMode === 'translucent' ? activeBtn : toolbarBtn}
+        </Button>
+        <Button
+          size="xs"
+          variant={displayMode === 'translucent' ? 'default' : 'ghost'}
+          className={toolbarTextButtonClass}
           onClick={() => setDisplayMode('translucent')}
           title="Translucent view"
         >
           Ghost
-        </button>
+        </Button>
       </div>
       <div className="w-px h-6 bg-border mx-1" />
       <div className="flex items-center gap-0.5 relative">
-        <button
-          className={brightnessOpen ? toggleActiveBtn : toolbarBtn}
+        <Button
+          size="icon-xs"
+          variant={brightnessOpen ? 'default' : 'ghost'}
           onClick={() => setBrightnessOpen(!brightnessOpen)}
           title="Adjust lighting"
         >
           <Sun size={14} />
-        </button>
+        </Button>
         <BrightnessPopup isOpen={brightnessOpen} onClose={() => setBrightnessOpen(false)} />
       </div>
       <div className="w-px h-6 bg-border mx-1" />
       <div className="flex items-center gap-0.5">
-        <button
-          className={showGrid ? toggleActiveBtn : toolbarBtn}
+        <Button
+          size="xs"
+          variant={showGrid ? 'default' : 'ghost'}
+          className={toolbarTextButtonClass}
           onClick={() => setShowGrid(!showGrid)}
           title="Toggle grid"
         >
           Grid
-        </button>
-        <button
-          className={showGrainDirection ? toggleActiveBtn : toolbarBtn}
+        </Button>
+        <Button
+          size="xs"
+          variant={showGrainDirection ? 'default' : 'ghost'}
+          className={toolbarTextButtonClass}
           onClick={toggleGrainDirection}
           title="Toggle grain direction arrows"
         >
           Grain
-        </button>
-        <button
-          className={snapToPartsEnabled ? toggleActiveBtn : toolbarBtn}
+        </Button>
+        <Button
+          size="xs"
+          variant={snapToPartsEnabled ? 'default' : 'ghost'}
+          className={toolbarTextButtonClass}
           onClick={() => setSnapToPartsEnabled(!snapToPartsEnabled)}
           title="Snap to parts (align edges and centers)"
         >
           Snap
-        </button>
+        </Button>
         {referencePartIds.length > 0 && (
-          <button
-            className="py-1.5 px-2.5 text-xs rounded bg-reference-bg text-primary border border-primary font-medium cursor-pointer transition-all duration-100 hover:bg-primary-bg"
+          <Button
+            size="xs"
+            variant="outline"
+            className="h-7 px-2.5 text-xs font-medium border-primary bg-reference-bg text-primary hover:bg-primary-bg"
             onClick={clearReferences}
             title={`${referencePartIds.length} reference part${referencePartIds.length === 1 ? '' : 's'} - Click to clear (Esc)`}
           >
             Ref: {referencePartIds.length}
-          </button>
+          </Button>
         )}
       </div>
     </div>
