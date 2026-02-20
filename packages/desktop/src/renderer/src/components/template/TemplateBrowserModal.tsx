@@ -3,7 +3,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
-import { useBackdropClose } from '../../hooks/useBackdropClose';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@renderer/components/ui/dialog';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
 import { Project } from '../../types';
 import { useProjectStore } from '../../store/projectStore';
@@ -176,49 +183,23 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
     }
   }, [parts, projectName]);
 
-  const { handleMouseDown, handleClick } = useBackdropClose(onClose);
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        if (deleteConfirmId) {
-          setDeleteConfirmId(null);
-        } else {
-          onClose();
-        }
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      if (deleteConfirmId) {
+        setDeleteConfirmId(null);
+      } else {
+        onClose();
       }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose, deleteConfirmId]);
-
-  if (!isOpen) return null;
+    }
+  };
 
   return (
-    <div
-      className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
-      onMouseDown={handleMouseDown}
-      onClick={handleClick}
-    >
-      <div
-        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] flex flex-col animate-modal-fade-in w-[800px] max-h-[80vh] relative"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="template-browser-modal-title"
-      >
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 id="template-browser-modal-title" className="text-base font-semibold text-text m-0">
-            New from Template
-          </h2>
-          <button
-            className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            &times;
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="w-[800px] max-h-[80vh] relative rounded-lg" onClose={onClose}>
+        <DialogHeader>
+          <DialogTitle>New from Template</DialogTitle>
+          <DialogClose onClose={onClose} />
+        </DialogHeader>
 
         <div className="flex min-h-[400px] max-h-[60vh]">
           {/* Templates list */}
@@ -353,14 +334,14 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
           </Card>
         </div>
 
-        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
+        <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>
             Cancel
           </Button>
           <Button size="sm" onClick={handleCreateProject} disabled={!selectedTemplate || isLoading}>
             {isLoading ? 'Creating...' : 'Create Project'}
           </Button>
-        </div>
+        </DialogFooter>
 
         {/* Delete confirmation overlay */}
         {deleteConfirmId && (
@@ -379,7 +360,7 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
