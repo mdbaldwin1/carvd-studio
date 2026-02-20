@@ -42,7 +42,6 @@ const AlertDialogContent = forwardRef<
           'bg-surface border border-border rounded-lg',
           'shadow-[0_8px_32px_var(--color-overlay)]',
           'flex flex-col',
-          'animate-modal-fade-in',
           className
         )}
         {...props}
