@@ -3,8 +3,15 @@ import { v4 as uuidv4 } from 'uuid';
 import { Stock } from '../../types';
 import { FractionInput } from '../common/FractionInput';
 import { ColorPicker } from '../common/ColorPicker';
-import { Modal } from '../common/Modal';
 import { Button } from '@renderer/components/ui/button';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@renderer/components/ui/dialog';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { Select } from '@renderer/components/ui/select';
@@ -79,103 +86,108 @@ export function EditStockModal({
 
   if (!stock && !createMode) return null;
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  };
+
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={createMode ? 'Create New Stock' : 'Edit Stock'}
-      className="w-[450px]"
-      footer={
-        <>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="w-[450px]" onClose={onClose}>
+        <DialogHeader>
+          <DialogTitle>{createMode ? 'Create New Stock' : 'Edit Stock'}</DialogTitle>
+          <DialogClose onClose={onClose} />
+        </DialogHeader>
+        <div className="p-5 overflow-y-auto">
+          <div className="flex flex-col mb-4 gap-2.5">
+            <Label>Name</Label>
+            <Input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+          </div>
+
+          <div className="flex flex-col mb-4 gap-2.5">
+            <Label>Dimensions (L × W × T)</Label>
+            <div className="flex items-center gap-1">
+              <FractionInput
+                value={formData.length}
+                onChange={(length) => setFormData({ ...formData, length })}
+                min={1}
+              />
+              <span>×</span>
+              <FractionInput value={formData.width} onChange={(width) => setFormData({ ...formData, width })} min={1} />
+              <span>×</span>
+              <FractionInput
+                value={formData.thickness}
+                onChange={(thickness) => setFormData({ ...formData, thickness })}
+                min={0.25}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col mb-4 gap-2.5">
+            <Label>Grain Direction</Label>
+            <Select
+              value={formData.grainDirection}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  grainDirection: e.target.value as 'length' | 'width' | 'none'
+                })
+              }
+            >
+              <option value="length">Along Length</option>
+              <option value="width">Along Width</option>
+              <option value="none">No Grain (MDF, etc.)</option>
+            </Select>
+          </div>
+
+          <div className="flex gap-4">
+            <div className="flex flex-col mb-4 gap-2.5 flex-1">
+              <Label>Pricing Unit</Label>
+              <Select
+                value={formData.pricingUnit}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    pricingUnit: e.target.value as 'board_foot' | 'per_item'
+                  })
+                }
+              >
+                <option value="per_item">Per Sheet/Board</option>
+                <option value="board_foot">Per Board Foot</option>
+              </Select>
+            </div>
+
+            <div className="flex flex-col mb-4 gap-2.5 flex-1">
+              <Label>Price ($)</Label>
+              <Input
+                type="number"
+                value={formData.pricePerUnit}
+                onChange={(e) => setFormData({ ...formData, pricePerUnit: parseFloat(e.target.value) || 0 })}
+                min={0}
+                step={0.01}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col mb-4 gap-2.5">
+            <Label>Display Color</Label>
+            <ColorPicker value={formData.color} onChange={(color) => setFormData({ ...formData, color })} />
+          </div>
+        </div>
+        <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>
             Cancel
           </Button>
           <Button size="sm" onClick={handleSubmit}>
             {createMode ? 'Create Stock' : 'Save Changes'}
           </Button>
-        </>
-      }
-    >
-      <div className="p-5 overflow-y-auto">
-        <div className="flex flex-col mb-4 gap-2.5">
-          <Label>Name</Label>
-          <Input
-            type="text"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          />
-        </div>
-
-        <div className="flex flex-col mb-4 gap-2.5">
-          <Label>Dimensions (L × W × T)</Label>
-          <div className="flex items-center gap-1">
-            <FractionInput
-              value={formData.length}
-              onChange={(length) => setFormData({ ...formData, length })}
-              min={1}
-            />
-            <span>×</span>
-            <FractionInput value={formData.width} onChange={(width) => setFormData({ ...formData, width })} min={1} />
-            <span>×</span>
-            <FractionInput
-              value={formData.thickness}
-              onChange={(thickness) => setFormData({ ...formData, thickness })}
-              min={0.25}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-col mb-4 gap-2.5">
-          <Label>Grain Direction</Label>
-          <Select
-            value={formData.grainDirection}
-            onChange={(e) =>
-              setFormData({
-                ...formData,
-                grainDirection: e.target.value as 'length' | 'width' | 'none'
-              })
-            }
-          >
-            <option value="length">Along Length</option>
-            <option value="width">Along Width</option>
-            <option value="none">No Grain (MDF, etc.)</option>
-          </Select>
-        </div>
-
-        <div className="flex gap-4">
-          <div className="flex flex-col mb-4 gap-2.5 flex-1">
-            <Label>Pricing Unit</Label>
-            <Select
-              value={formData.pricingUnit}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  pricingUnit: e.target.value as 'board_foot' | 'per_item'
-                })
-              }
-            >
-              <option value="per_item">Per Sheet/Board</option>
-              <option value="board_foot">Per Board Foot</option>
-            </Select>
-          </div>
-
-          <div className="flex flex-col mb-4 gap-2.5 flex-1">
-            <Label>Price ($)</Label>
-            <Input
-              type="number"
-              value={formData.pricePerUnit}
-              onChange={(e) => setFormData({ ...formData, pricePerUnit: parseFloat(e.target.value) || 0 })}
-              min={0}
-              step={0.01}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-col mb-4 gap-2.5">
-          <Label>Display Color</Label>
-          <ColorPicker value={formData.color} onChange={(color) => setFormData({ ...formData, color })} />
-        </div>
-      </div>
-    </Modal>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
