@@ -181,10 +181,7 @@ async function ensureEditorReady(window: Page): Promise<void> {
     const dialog = window.locator('.new-project-dialog');
     await expect(dialog).toBeVisible({ timeout: 10000 });
 
-    await window.evaluate(() => {
-      const el = document.querySelector('.new-project-dialog .btn-accent') as HTMLElement;
-      if (el) el.click();
-    });
+    await dialog.getByRole('button', { name: 'Create Project' }).click();
   }
 
   await expect(window.locator('.app-header')).toBeVisible({ timeout: 15000 });
