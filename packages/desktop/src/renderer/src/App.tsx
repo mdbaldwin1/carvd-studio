@@ -1376,7 +1376,7 @@ function PropertiesPanel() {
       </div>
 
       <Accordion type="single" collapsible className="property-group">
-        <AccordionItem value="position" className="collapsible-section mt-0">
+        <AccordionItem value="position" className="mt-0 rounded-[var(--radius-sm)] border border-border">
           <div className="flex items-center">
             <AccordionTrigger>Position (X, Y, Z)</AccordionTrigger>
             <HelpTooltip
@@ -1385,7 +1385,7 @@ function PropertiesPanel() {
               inline
             />
           </div>
-          <AccordionContent className="collapsible-content">
+          <AccordionContent className="px-[14px] pb-[14px]">
             <div className="flex items-center gap-1">
               <FractionInput
                 key={`${selectedPart.id}-posX`}
@@ -1557,12 +1557,12 @@ function PropertiesPanel() {
       )}
 
       <Accordion type="single" collapsible className="property-group">
-        <AccordionItem value="notes" className="collapsible-section mt-0">
+        <AccordionItem value="notes" className="mt-0 rounded-[var(--radius-sm)] border border-border">
           <AccordionTrigger>
             Notes
-            {selectedPart.notes && <span className="has-content-indicator ml-1">●</span>}
+            {selectedPart.notes && <span className="ml-1 text-[9px] text-accent">●</span>}
           </AccordionTrigger>
-          <AccordionContent className="collapsible-content">
+          <AccordionContent className="px-[14px] pb-[14px]">
             <Textarea
               value={selectedPart.notes || ''}
               onChange={(e) => updatePart(selectedPart.id, { notes: e.target.value })}
@@ -1574,12 +1574,12 @@ function PropertiesPanel() {
       </Accordion>
 
       <Accordion type="single" collapsible className="property-group">
-        <AccordionItem value="joinery" className="joinery-adjustments mt-0">
+        <AccordionItem value="joinery" className="mt-0 rounded-[var(--radius-sm)] border border-border">
           <div className="flex items-center">
             <AccordionTrigger>
               Joinery Adjustments
               {(selectedPart.extraLength || selectedPart.extraWidth) && (
-                <span className="joinery-indicator ml-1">●</span>
+                <span className="ml-1 text-[9px] text-accent">●</span>
               )}
             </AccordionTrigger>
             <HelpTooltip
@@ -1588,9 +1588,9 @@ function PropertiesPanel() {
               inline
             />
           </div>
-          <AccordionContent className="joinery-inputs">
-            <div className="joinery-input-row">
-              <label>Extra Length</label>
+          <AccordionContent className="flex flex-col gap-[10px] px-[14px] pb-[14px]">
+            <div className="flex items-center gap-[10px]">
+              <Label className="w-[88px] shrink-0 text-[13px] text-text-muted">Extra Length</Label>
               <FractionInput
                 key={`${selectedPart.id}-extraLength`}
                 value={selectedPart.extraLength || 0}
@@ -1598,8 +1598,8 @@ function PropertiesPanel() {
                 min={0}
               />
             </div>
-            <div className="joinery-input-row">
-              <label>Extra Width</label>
+            <div className="flex items-center gap-[10px]">
+              <Label className="w-[88px] shrink-0 text-[13px] text-text-muted">Extra Width</Label>
               <FractionInput
                 key={`${selectedPart.id}-extraWidth`}
                 value={selectedPart.extraWidth || 0}
