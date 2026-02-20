@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Cross-app theme consistency alignment (bead carvd-studio-12.1)** — Aligned website typography and core theme semantics with desktop Twilight Studio conventions: website now uses Nunito Sans, maps `primary` to Gold CTA tokens, maps `accent`/`ring` to Cerulean interaction tokens, and maps `secondary` to Twilight Indigo to match desktop shadcn usage.
 - **Migrated UI component library to shadcn/ui with Radix UI primitives** across both desktop and website surfaces.
 - **Desktop migration completion** — Replaced custom button/form/overlay/layout primitives with shadcn components (`Button`, `Input`, `Select`, `Dialog`, `AlertDialog`, `Tabs`, `Table`, `Card`, `Accordion`, `Sidebar`, `Alert`, etc.), removed obsolete `primitives.css`, and simplified `layout.css`/`domain.css` to keep only Electron/domain-specific rules.
 - **Website migration completion** — Migrated all shared/page/docs/legal views to Tailwind + shadcn, removed legacy `packages/website/src/index.css`, and consolidated styling into `tailwind.css` with Twilight Studio dark/light theme token mapping.
