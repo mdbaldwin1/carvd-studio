@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Website bundle audit (bead carvd-studio-11.3)** — Added `packages/website/BUNDLE-SIZE-AUDIT.md` comparing pre-cleanup baseline (`23ceaf5`) with post-cleanup build (`a5b4cc7`); main CSS dropped `-16,272` bytes raw (`-25.5%`) and `-2,629` bytes gzip (`-22.6%`), while main JS stayed effectively flat and total website assets improved (`-15,519` raw / `-2,370` gzip).
 - **Website test/build/responsive verification (bead carvd-studio-11.2)** — Re-ran website quality gates post-`index.css` removal and verified passing results for unit/integration tests (`npm test`), production build (`npm run build`), and full Playwright matrix including responsive mobile/tablet/desktop checks (`npm run test:e2e`).
 - **Website index.css cleanup (bead carvd-studio-11.1)** — Removed `packages/website/src/index.css` and consolidated required global/base + residual docs compatibility utilities into `tailwind.css`; updated website entrypoint imports and migrated `QuickStartPage` CTA buttons from legacy `.btn*` classes to shadcn `Button`.
 - **Desktop bundle audit + performance verification (bead carvd-studio-8.6)** — Completed renderer/main/preload bundle audit against pre-Epic-8 baseline (`b459b9a`) and documented results in `packages/desktop/BUNDLE-SIZE-AUDIT.md`; net renderer assets improved slightly (`-2,515` raw bytes, `-283` gzip), CSS bundle reduced (`-6,732` raw), lazy modal code-splitting remains intact, and Three.js/R3F chunks are unchanged.
