@@ -89,7 +89,14 @@ const SidebarFooter = React.forwardRef<HTMLElement, React.ComponentProps<'sectio
   { className, ...props },
   ref
 ) {
-  return <section ref={ref} data-sidebar-footer="" className={cn('sidebar-section sidebar-section-bottom', className)} {...props} />;
+  return (
+    <section
+      ref={ref}
+      data-sidebar-footer=""
+      className={cn('sidebar-section sidebar-section-bottom', className)}
+      {...props}
+    />
+  );
 });
 
 export { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarProvider, useSidebar };

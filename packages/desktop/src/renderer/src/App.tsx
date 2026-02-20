@@ -375,415 +375,416 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
   return (
     <SidebarShell className="sidebar">
       <SidebarContent>
-      {/* Stock Section */}
-      <Collapsible
-        asChild
-        open={!collapsedSections.stock}
-        onOpenChange={(open) => {
-          setCollapsedSections((prev) => ({ ...prev, stock: !open }));
-          if (!open) {
-            setSearchOpen((s) => ({ ...s, stock: false }));
-            setSearchTerms((t) => ({ ...t, stock: '' }));
-          }
-        }}
-      >
-        <SidebarGroup>
-        <CollapsibleTrigger asChild>
-          <div className="section-header" title={collapsedSections.stock ? 'Expand' : 'Collapse'}>
-            <span className="section-collapse-btn">
-              {collapsedSections.stock ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
-            </span>
-            <SidebarGroupLabel>{isEditingAssembly ? 'Stock Library' : 'Stock'}</SidebarGroupLabel>
-            <Button
-              variant="ghost"
-              size="icon"
-              active={searchOpen.stock}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                // if opening search, also expand section if collapsed
-                if (!searchOpen.stock && collapsedSections.stock) {
-                  setCollapsedSections((prev) => ({ ...prev, stock: false }));
-                }
-                toggleSearch('stock');
-              }}
-              title="Search"
-              disabled={stocks.length === 0}
-            >
-              <Search size={12} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isEditingAssembly) {
-                  // Open create stock modal for library
-                  setIsCreateStockModalOpen(true);
-                } else {
-                  // Open add-from-library modal for project
-                  setIsAddStockModalOpen(true);
-                }
-              }}
-              title={isEditingAssembly ? 'Add New Stock to Library' : 'Add Stock from Library'}
-            >
-              +
-            </Button>
-          </div>
-        </CollapsibleTrigger>
-        {searchOpen.stock && (
-          <div className="section-search">
-            <div className="section-search-inner">
-              <Search size={12} className="text-text-muted" />
-              <input
-                type="text"
-                placeholder="Search stock..."
-                value={searchTerms.stock || ''}
-                onChange={(e) => setSearchTerms((t) => ({ ...t, stock: e.target.value }))}
-                onClick={(e) => e.stopPropagation()}
-                autoFocus
-              />
-              {searchTerms.stock && (
-                <button
-                  className="section-search-clear"
+        {/* Stock Section */}
+        <Collapsible
+          asChild
+          open={!collapsedSections.stock}
+          onOpenChange={(open) => {
+            setCollapsedSections((prev) => ({ ...prev, stock: !open }));
+            if (!open) {
+              setSearchOpen((s) => ({ ...s, stock: false }));
+              setSearchTerms((t) => ({ ...t, stock: '' }));
+            }
+          }}
+        >
+          <SidebarGroup>
+            <CollapsibleTrigger asChild>
+              <div className="section-header" title={collapsedSections.stock ? 'Expand' : 'Collapse'}>
+                <span className="section-collapse-btn">
+                  {collapsedSections.stock ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
+                </span>
+                <SidebarGroupLabel>{isEditingAssembly ? 'Stock Library' : 'Stock'}</SidebarGroupLabel>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  active={searchOpen.stock}
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSearchTerms((t) => ({ ...t, stock: '' }));
+                    // if opening search, also expand section if collapsed
+                    if (!searchOpen.stock && collapsedSections.stock) {
+                      setCollapsedSections((prev) => ({ ...prev, stock: false }));
+                    }
+                    toggleSearch('stock');
                   }}
+                  title="Search"
+                  disabled={stocks.length === 0}
                 >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-        <CollapsibleContent forceMount className="section-content">
-          <div className="section-content-inner">
-            {stocks.length === 0 ? (
-              <p className="text-text-muted text-xs italic px-4">
-                {isEditingAssembly ? 'No stock in library. Click + to create.' : 'No stock yet. Click + to add.'}
-              </p>
-            ) : (
-              <ul className="stock-list list-none my-0 flex-1 overflow-y-auto min-h-0">
-                {stocks
-                  .filter(
-                    (stock) => !searchTerms.stock || stock.name.toLowerCase().includes(searchTerms.stock.toLowerCase())
-                  )
-                  .map((stock) => {
-                    const partCount = parts.filter((p) => p.stockId === stock.id).length;
-                    return (
-                      <li
-                        key={stock.id}
-                        className="group/stock flex items-center gap-2 py-2 px-3 cursor-grab transition-colors duration-100 select-none hover:bg-surface-hover active:cursor-grabbing"
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData('application/carvd-stock', stock.id);
-                          e.dataTransfer.effectAllowed = 'copy';
-                        }}
-                        title={`Drag onto canvas to create part\n${formatMeasurementWithUnit(stock.length, units)} × ${formatMeasurementWithUnit(stock.width, units)} × ${formatMeasurementWithUnit(stock.thickness, units)}${!isEditingAssembly ? `\n${partCount} part${partCount !== 1 ? 's' : ''} assigned` : ''}`}
-                      >
-                        <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: stock.color }} />
-                        <span className="flex-1 text-xs truncate">{stock.name}</span>
-                        {!isEditingAssembly && partCount > 0 && (
-                          <span className="text-[10px] bg-border text-text py-px px-1.5 rounded-full min-w-4 text-center">
-                            {partCount}
-                          </span>
-                        )}
-                        <span className="text-[10px] text-text-muted">
-                          {formatMeasurementWithUnit(stock.thickness, units)}
-                        </span>
-                        <div className="flex gap-0.5 opacity-0 group-hover/stock:opacity-100 transition-opacity duration-100">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingStock(stock);
+                  <Search size={12} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isEditingAssembly) {
+                      // Open create stock modal for library
+                      setIsCreateStockModalOpen(true);
+                    } else {
+                      // Open add-from-library modal for project
+                      setIsAddStockModalOpen(true);
+                    }
+                  }}
+                  title={isEditingAssembly ? 'Add New Stock to Library' : 'Add Stock from Library'}
+                >
+                  +
+                </Button>
+              </div>
+            </CollapsibleTrigger>
+            {searchOpen.stock && (
+              <div className="section-search">
+                <div className="section-search-inner">
+                  <Search size={12} className="text-text-muted" />
+                  <input
+                    type="text"
+                    placeholder="Search stock..."
+                    value={searchTerms.stock || ''}
+                    onChange={(e) => setSearchTerms((t) => ({ ...t, stock: e.target.value }))}
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                  />
+                  {searchTerms.stock && (
+                    <button
+                      className="section-search-clear"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSearchTerms((t) => ({ ...t, stock: '' }));
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            <CollapsibleContent forceMount className="section-content">
+              <div className="section-content-inner">
+                {stocks.length === 0 ? (
+                  <p className="text-text-muted text-xs italic px-4">
+                    {isEditingAssembly ? 'No stock in library. Click + to create.' : 'No stock yet. Click + to add.'}
+                  </p>
+                ) : (
+                  <ul className="stock-list list-none my-0 flex-1 overflow-y-auto min-h-0">
+                    {stocks
+                      .filter(
+                        (stock) =>
+                          !searchTerms.stock || stock.name.toLowerCase().includes(searchTerms.stock.toLowerCase())
+                      )
+                      .map((stock) => {
+                        const partCount = parts.filter((p) => p.stockId === stock.id).length;
+                        return (
+                          <li
+                            key={stock.id}
+                            className="group/stock flex items-center gap-2 py-2 px-3 cursor-grab transition-colors duration-100 select-none hover:bg-surface-hover active:cursor-grabbing"
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/carvd-stock', stock.id);
+                              e.dataTransfer.effectAllowed = 'copy';
                             }}
-                            title={isEditingAssembly ? 'Edit library stock' : 'Edit stock'}
+                            title={`Drag onto canvas to create part\n${formatMeasurementWithUnit(stock.length, units)} × ${formatMeasurementWithUnit(stock.width, units)} × ${formatMeasurementWithUnit(stock.thickness, units)}${!isEditingAssembly ? `\n${partCount} part${partCount !== 1 ? 's' : ''} assigned` : ''}`}
                           >
-                            ✎
-                          </Button>
+                            <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: stock.color }} />
+                            <span className="flex-1 text-xs truncate">{stock.name}</span>
+                            {!isEditingAssembly && partCount > 0 && (
+                              <span className="text-[10px] bg-border text-text py-px px-1.5 rounded-full min-w-4 text-center">
+                                {partCount}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-text-muted">
+                              {formatMeasurementWithUnit(stock.thickness, units)}
+                            </span>
+                            <div className="flex gap-0.5 opacity-0 group-hover/stock:opacity-100 transition-opacity duration-100">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingStock(stock);
+                                }}
+                                title={isEditingAssembly ? 'Edit library stock' : 'Edit stock'}
+                              >
+                                ✎
+                              </Button>
+                              <Button
+                                variant="destructiveGhost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteStock(stock);
+                                }}
+                                title={isEditingAssembly ? 'Delete from library' : 'Remove from project'}
+                              >
+                                ×
+                              </Button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                  </ul>
+                )}
+              </div>
+            </CollapsibleContent>
+          </SidebarGroup>
+        </Collapsible>
+
+        {/* Assemblies Section */}
+        <Collapsible
+          asChild
+          open={!collapsedSections.assemblies}
+          onOpenChange={(open) => {
+            setCollapsedSections((prev) => ({ ...prev, assemblies: !open }));
+            if (!open) {
+              setSearchOpen((s) => ({ ...s, assemblies: false }));
+              setSearchTerms((t) => ({ ...t, assemblies: '' }));
+            }
+          }}
+        >
+          <SidebarGroup>
+            <CollapsibleTrigger asChild>
+              <div className="section-header" title={collapsedSections.assemblies ? 'Expand' : 'Collapse'}>
+                <span className="section-collapse-btn">
+                  {collapsedSections.assemblies ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
+                </span>
+                <SidebarGroupLabel>{isEditingAssembly ? 'Assembly Library' : 'Assemblies'}</SidebarGroupLabel>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  active={searchOpen.assemblies}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // if opening search, also expand section if collapsed
+                    if (!searchOpen.assemblies && collapsedSections.assemblies) {
+                      setCollapsedSections((prev) => ({ ...prev, assemblies: false }));
+                    }
+                    toggleSearch('assemblies');
+                  }}
+                  title="Search"
+                  disabled={assemblies.length === 0}
+                >
+                  <Search size={12} />
+                </Button>
+                {canUseAssemblies &&
+                  (isEditingAssembly ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Finish editing current assembly first"
+                    >
+                      +
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsAddAssemblyModalOpen(true);
+                      }}
+                      title="Add Assembly from Library"
+                    >
+                      +
+                    </Button>
+                  ))}
+              </div>
+            </CollapsibleTrigger>
+            {searchOpen.assemblies && (
+              <div className="section-search">
+                <div className="section-search-inner">
+                  <Search size={12} className="text-text-muted" />
+                  <input
+                    type="text"
+                    placeholder="Search assemblies..."
+                    value={searchTerms.assemblies || ''}
+                    onChange={(e) => setSearchTerms((t) => ({ ...t, assemblies: e.target.value }))}
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                  />
+                  {searchTerms.assemblies && (
+                    <button
+                      className="section-search-clear"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSearchTerms((t) => ({ ...t, assemblies: '' }));
+                      }}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            <CollapsibleContent forceMount className="section-content">
+              <div className="section-content-inner">
+                {!canUseAssemblies ? (
+                  <p className="text-text-muted text-xs italic px-4">
+                    Assemblies require a license.{' '}
+                    <a
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        onShowLicenseModal?.();
+                      }}
+                    >
+                      Upgrade
+                    </a>
+                  </p>
+                ) : assemblies.length === 0 ? (
+                  <p className="text-text-muted text-xs italic px-4">
+                    {isEditingAssembly
+                      ? 'No assemblies in library yet.'
+                      : 'No assemblies yet. Click + to add from library.'}
+                  </p>
+                ) : (
+                  <ul className="assembly-list list-none my-0 flex-1 overflow-y-auto min-h-0">
+                    {assemblies
+                      .filter(
+                        (assembly) =>
+                          !searchTerms.assemblies ||
+                          assembly.name.toLowerCase().includes(searchTerms.assemblies.toLowerCase())
+                      )
+                      .map((assembly) => (
+                        <li
+                          key={assembly.id}
+                          className="flex items-center gap-2 py-2 px-3 cursor-grab transition-colors duration-100 select-none hover:bg-surface-hover active:cursor-grabbing"
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('application/carvd-assembly', assembly.id);
+                            e.dataTransfer.setData(
+                              'application/carvd-assembly-source',
+                              isEditingAssembly ? 'library' : 'project'
+                            );
+                            e.dataTransfer.effectAllowed = 'copy';
+                          }}
+                          title={`Drag onto canvas to place\n${assembly.parts.length} part${assembly.parts.length !== 1 ? 's' : ''}${assembly.description ? `\n${assembly.description}` : ''}`}
+                        >
+                          {assembly.thumbnailData ? (
+                            <img
+                              src={`data:image/png;base64,${assembly.thumbnailData.data}`}
+                              alt=""
+                              className="w-8 h-6 object-cover rounded-sm shrink-0 bg-bg-tertiary"
+                            />
+                          ) : (
+                            <span className="text-sm shrink-0">{assembly.thumbnail || '📦'}</span>
+                          )}
+                          <span className="flex-1 text-xs truncate">{assembly.name}</span>
+                          <span className="text-[10px] bg-border text-text py-px px-1.5 rounded-full min-w-4 text-center">
+                            {assembly.parts.length}
+                          </span>
                           <Button
                             variant="destructiveGhost"
                             size="icon"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleDeleteStock(stock);
+                              deleteAssembly(assembly.id);
                             }}
                             title={isEditingAssembly ? 'Delete from library' : 'Remove from project'}
                           >
                             ×
                           </Button>
-                        </div>
-                      </li>
-                    );
-                  })}
-              </ul>
-            )}
-          </div>
-        </CollapsibleContent>
-        </SidebarGroup>
-      </Collapsible>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+            </CollapsibleContent>
+          </SidebarGroup>
+        </Collapsible>
 
-      {/* Assemblies Section */}
-      <Collapsible
-        asChild
-        open={!collapsedSections.assemblies}
-        onOpenChange={(open) => {
-          setCollapsedSections((prev) => ({ ...prev, assemblies: !open }));
-          if (!open) {
-            setSearchOpen((s) => ({ ...s, assemblies: false }));
-            setSearchTerms((t) => ({ ...t, assemblies: '' }));
-          }
-        }}
-      >
-        <SidebarGroup>
-        <CollapsibleTrigger asChild>
-          <div className="section-header" title={collapsedSections.assemblies ? 'Expand' : 'Collapse'}>
-            <span className="section-collapse-btn">
-              {collapsedSections.assemblies ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
-            </span>
-            <SidebarGroupLabel>{isEditingAssembly ? 'Assembly Library' : 'Assemblies'}</SidebarGroupLabel>
-            <Button
-              variant="ghost"
-              size="icon"
-              active={searchOpen.assemblies}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                // if opening search, also expand section if collapsed
-                if (!searchOpen.assemblies && collapsedSections.assemblies) {
-                  setCollapsedSections((prev) => ({ ...prev, assemblies: false }));
-                }
-                toggleSearch('assemblies');
-              }}
-              title="Search"
-              disabled={assemblies.length === 0}
-            >
-              <Search size={12} />
-            </Button>
-            {canUseAssemblies &&
-              (isEditingAssembly ? (
+        {/* Parts Section */}
+        <Collapsible
+          asChild
+          open={!collapsedSections.parts}
+          onOpenChange={(open) => {
+            setCollapsedSections((prev) => ({ ...prev, parts: !open }));
+            if (!open) {
+              setSearchOpen((s) => ({ ...s, parts: false }));
+              setSearchTerms((t) => ({ ...t, parts: '' }));
+            }
+          }}
+        >
+          <SidebarGroup>
+            <CollapsibleTrigger asChild>
+              <div className="section-header" title={collapsedSections.parts ? 'Expand' : 'Collapse'}>
+                <span className="section-collapse-btn">
+                  {collapsedSections.parts ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
+                </span>
+                <SidebarGroupLabel>Parts</SidebarGroupLabel>
                 <Button
                   variant="ghost"
                   size="icon"
-                  disabled
+                  active={searchOpen.parts}
                   onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                  title="Finish editing current assembly first"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // if opening search, also expand section if collapsed
+                    if (!searchOpen.parts && collapsedSections.parts) {
+                      setCollapsedSections((prev) => ({ ...prev, parts: false }));
+                    }
+                    toggleSearch('parts');
+                  }}
+                  title="Search"
+                  disabled={parts.length === 0}
                 >
-                  +
+                  <Search size={12} />
                 </Button>
-              ) : (
                 <Button
                   variant="ghost"
                   size="icon"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIsAddAssemblyModalOpen(true);
+                    handleAddPart();
                   }}
-                  title="Add Assembly from Library"
+                  title="Add Part"
                 >
                   +
                 </Button>
-              ))}
-          </div>
-        </CollapsibleTrigger>
-        {searchOpen.assemblies && (
-          <div className="section-search">
-            <div className="section-search-inner">
-              <Search size={12} className="text-text-muted" />
-              <input
-                type="text"
-                placeholder="Search assemblies..."
-                value={searchTerms.assemblies || ''}
-                onChange={(e) => setSearchTerms((t) => ({ ...t, assemblies: e.target.value }))}
-                onClick={(e) => e.stopPropagation()}
-                autoFocus
-              />
-              {searchTerms.assemblies && (
-                <button
-                  className="section-search-clear"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSearchTerms((t) => ({ ...t, assemblies: '' }));
-                  }}
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-        <CollapsibleContent forceMount className="section-content">
-          <div className="section-content-inner">
-            {!canUseAssemblies ? (
-              <p className="text-text-muted text-xs italic px-4">
-                Assemblies require a license.{' '}
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onShowLicenseModal?.();
-                  }}
-                >
-                  Upgrade
-                </a>
-              </p>
-            ) : assemblies.length === 0 ? (
-              <p className="text-text-muted text-xs italic px-4">
-                {isEditingAssembly
-                  ? 'No assemblies in library yet.'
-                  : 'No assemblies yet. Click + to add from library.'}
-              </p>
-            ) : (
-              <ul className="assembly-list list-none my-0 flex-1 overflow-y-auto min-h-0">
-                {assemblies
-                  .filter(
-                    (assembly) =>
-                      !searchTerms.assemblies ||
-                      assembly.name.toLowerCase().includes(searchTerms.assemblies.toLowerCase())
-                  )
-                  .map((assembly) => (
-                    <li
-                      key={assembly.id}
-                      className="flex items-center gap-2 py-2 px-3 cursor-grab transition-colors duration-100 select-none hover:bg-surface-hover active:cursor-grabbing"
-                      draggable
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData('application/carvd-assembly', assembly.id);
-                        e.dataTransfer.setData(
-                          'application/carvd-assembly-source',
-                          isEditingAssembly ? 'library' : 'project'
-                        );
-                        e.dataTransfer.effectAllowed = 'copy';
+              </div>
+            </CollapsibleTrigger>
+            {searchOpen.parts && (
+              <div className="section-search">
+                <div className="section-search-inner">
+                  <Search size={12} className="text-text-muted" />
+                  <input
+                    type="text"
+                    placeholder="Search parts..."
+                    value={searchTerms.parts || ''}
+                    onChange={(e) => setSearchTerms((t) => ({ ...t, parts: e.target.value }))}
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                  />
+                  {searchTerms.parts && (
+                    <button
+                      className="section-search-clear"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSearchTerms((t) => ({ ...t, parts: '' }));
                       }}
-                      title={`Drag onto canvas to place\n${assembly.parts.length} part${assembly.parts.length !== 1 ? 's' : ''}${assembly.description ? `\n${assembly.description}` : ''}`}
                     >
-                      {assembly.thumbnailData ? (
-                        <img
-                          src={`data:image/png;base64,${assembly.thumbnailData.data}`}
-                          alt=""
-                          className="w-8 h-6 object-cover rounded-sm shrink-0 bg-bg-tertiary"
-                        />
-                      ) : (
-                        <span className="text-sm shrink-0">{assembly.thumbnail || '📦'}</span>
-                      )}
-                      <span className="flex-1 text-xs truncate">{assembly.name}</span>
-                      <span className="text-[10px] bg-border text-text py-px px-1.5 rounded-full min-w-4 text-center">
-                        {assembly.parts.length}
-                      </span>
-                      <Button
-                        variant="destructiveGhost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteAssembly(assembly.id);
-                        }}
-                        title={isEditingAssembly ? 'Delete from library' : 'Remove from project'}
-                      >
-                        ×
-                      </Button>
-                    </li>
-                  ))}
-              </ul>
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
-          </div>
-        </CollapsibleContent>
-        </SidebarGroup>
-      </Collapsible>
-
-      {/* Parts Section */}
-      <Collapsible
-        asChild
-        open={!collapsedSections.parts}
-        onOpenChange={(open) => {
-          setCollapsedSections((prev) => ({ ...prev, parts: !open }));
-          if (!open) {
-            setSearchOpen((s) => ({ ...s, parts: false }));
-            setSearchTerms((t) => ({ ...t, parts: '' }));
-          }
-        }}
-      >
-        <SidebarGroup>
-        <CollapsibleTrigger asChild>
-          <div className="section-header" title={collapsedSections.parts ? 'Expand' : 'Collapse'}>
-            <span className="section-collapse-btn">
-              {collapsedSections.parts ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
-            </span>
-            <SidebarGroupLabel>Parts</SidebarGroupLabel>
-            <Button
-              variant="ghost"
-              size="icon"
-              active={searchOpen.parts}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                // if opening search, also expand section if collapsed
-                if (!searchOpen.parts && collapsedSections.parts) {
-                  setCollapsedSections((prev) => ({ ...prev, parts: false }));
-                }
-                toggleSearch('parts');
-              }}
-              title="Search"
-              disabled={parts.length === 0}
-            >
-              <Search size={12} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAddPart();
-              }}
-              title="Add Part"
-            >
-              +
-            </Button>
-          </div>
-        </CollapsibleTrigger>
-        {searchOpen.parts && (
-          <div className="section-search">
-            <div className="section-search-inner">
-              <Search size={12} className="text-text-muted" />
-              <input
-                type="text"
-                placeholder="Search parts..."
-                value={searchTerms.parts || ''}
-                onChange={(e) => setSearchTerms((t) => ({ ...t, parts: e.target.value }))}
-                onClick={(e) => e.stopPropagation()}
-                autoFocus
-              />
-              {searchTerms.parts && (
-                <button
-                  className="section-search-clear"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSearchTerms((t) => ({ ...t, parts: '' }));
-                  }}
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-        <CollapsibleContent forceMount className="section-content">
-          <div className="section-content-inner">
-            <HierarchicalPartsList
-              onPartClick={handlePartClick}
-              searchFilter={searchTerms.parts}
-              onDuplicate={duplicatePart}
-              onDelete={handleDeletePart}
-            />
-          </div>
-        </CollapsibleContent>
-        </SidebarGroup>
-      </Collapsible>
+            <CollapsibleContent forceMount className="section-content">
+              <div className="section-content-inner">
+                <HierarchicalPartsList
+                  onPartClick={handlePartClick}
+                  searchFilter={searchTerms.parts}
+                  onDuplicate={duplicatePart}
+                  onDelete={handleDeletePart}
+                />
+              </div>
+            </CollapsibleContent>
+          </SidebarGroup>
+        </Collapsible>
       </SidebarContent>
 
       {/* Add Stock from Library Modal (for project mode) */}
