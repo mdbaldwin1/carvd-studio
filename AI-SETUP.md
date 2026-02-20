@@ -13,7 +13,6 @@
 - Primary file: `AGENTS.md`
 - Supporting references:
 - `CLAUDE.md` for workflow and quality gates
-- shadcn migration handoff docs for current migration status
 
 ### 2) MCP local config
 

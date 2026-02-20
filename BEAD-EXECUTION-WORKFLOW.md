@@ -15,7 +15,7 @@ This document defines how to execute a single bead. It is used in two modes:
 
 ### Session Start (Team Mode)
 
-- Read `SHADCN-MIGRATION-SESSION-HANDOFF.md` for full migration context
+- Read the appropriate handoff markdown file for full migration context
 - Read `CLAUDE.md` for project conventions
 - Your assigned bead will be given to you by the orchestrator
 - Do NOT pick your own bead — wait for assignment
@@ -39,15 +39,18 @@ This document defines how to execute a single bead. It is used in two modes:
    orchestrator.
 
 2. **Pull latest develop** — Before creating a worktree, ensure develop is current:
+
    ```bash
    cd /Users/mbaldwin/Carvd/carvd-studio
    git checkout develop && git pull origin develop
    ```
 
 3. **Create a worktree from develop**:
+
    ```bash
    git worktree add ../carvd-studio-<bead-id> -b <prefix>/<bead-id> develop
    ```
+
    Use conventional branch prefixes (feat/, fix/, refactor/, etc.)
 
 4. **Plan the implementation** — Review affected files, understand current
@@ -58,6 +61,7 @@ This document defines how to execute a single bead. It is used in two modes:
    what the bead requires.
 
 6. **Update bead status** to closed in `.beads/issues.jsonl`:
+
    ```bash
    bd update <bead-id> --status done
    ```
@@ -69,6 +73,7 @@ This document defines how to execute a single bead. It is used in two modes:
    (`packages/website`). Include in the same PR.
 
 9. **Run quality checks locally** — Fix any failures before proceeding:
+
    ```bash
    # For desktop beads:
    cd packages/desktop && npm test && npm run lint && npm run typecheck
@@ -85,6 +90,7 @@ This document defines how to execute a single bead. It is used in two modes:
 12. **Merge the PR** (squash merge).
 
 13. **Clean up**:
+
     ```bash
     git worktree remove ../carvd-studio-<bead-id>
     git branch -D <prefix>/<bead-id>
