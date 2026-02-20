@@ -1,9 +1,16 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Upload, CheckCircle, AlertTriangle, Package, Palette, FileBox, LayoutTemplate } from 'lucide-react';
-import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useUIStore } from '../../store/uiStore';
 import { Button } from '@renderer/components/ui/button';
 import { Checkbox } from '@renderer/components/ui/checkbox';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@renderer/components/ui/dialog';
 
 interface ImportPreview {
   valid: boolean;
@@ -29,7 +36,6 @@ interface ImportAppStateModalProps {
 type ImportStep = 'select' | 'options' | 'result';
 
 export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProps) {
-  const { handleMouseDown, handleClick } = useBackdropClose(onClose);
   const showToast = useUIStore((s) => s.showToast);
 
   const [step, setStep] = useState<ImportStep>('select');
@@ -66,17 +72,6 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
       setImportResult(null);
     }
   }, [isOpen]);
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   const handleSelectFile = useCallback(async () => {
     setIsLoading(true);
@@ -148,8 +143,6 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
     onClose();
   }, [importResult, showToast, onClose]);
 
-  if (!isOpen) return null;
-
   const totalItems = preview
     ? preview.counts.templates + preview.counts.assemblies + preview.counts.stocks + preview.counts.colors
     : 0;
@@ -158,30 +151,19 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
     ? preview.duplicates.templates.length + preview.duplicates.assemblies.length + preview.duplicates.stocks.length
     : 0;
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  };
+
   return (
-    <div
-      className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
-      onMouseDown={handleMouseDown}
-      onClick={handleClick}
-    >
-      <div
-        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in w-[480px]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="import-app-state-modal-title"
-      >
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 id="import-app-state-modal-title" className="text-base font-semibold text-text m-0">
-            Import App State
-          </h2>
-          <button
-            className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            &times;
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="w-[480px]" onClose={onClose}>
+        <DialogHeader>
+          <DialogTitle>Import App State</DialogTitle>
+          <DialogClose onClose={onClose} />
+        </DialogHeader>
 
         <div className="p-6 min-h-[300px]">
           {step === 'select' && (
@@ -383,7 +365,7 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
           )}
         </div>
 
-        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
+        <DialogFooter>
           {step === 'select' && (
             <Button size="sm" variant="outline" onClick={onClose}>
               Cancel
@@ -412,8 +394,8 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
               Done
             </Button>
           )}
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
-import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import { mmToInches } from '../../utils/fractions';
@@ -8,6 +7,14 @@ import { FractionInput } from '../common/FractionInput';
 import { HelpTooltip } from '../common/HelpTooltip';
 import { Button } from '@renderer/components/ui/button';
 import { Checkbox } from '@renderer/components/ui/checkbox';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@renderer/components/ui/dialog';
 import { Select } from '@renderer/components/ui/select';
 
 interface ProjectSettingsModalProps {
@@ -35,8 +42,6 @@ const METRIC_GRID_OPTIONS = [
 ];
 
 export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = false }: ProjectSettingsModalProps) {
-  const { handleMouseDown, handleClick } = useBackdropClose(onClose);
-
   const projectName = useProjectStore((s) => s.projectName);
   const units = useProjectStore((s) => s.units);
   const gridSize = useProjectStore((s) => s.gridSize);
@@ -105,38 +110,20 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
     setProjectGridSize(newGridSize);
   };
 
-  // Close on escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
   // Get the display value - find closest match in current options
   const displayValue = findClosestGridValue(gridSize, gridOptions);
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  };
+
   return (
-    <div
-      className="modal-backdrop fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
-      onMouseDown={handleMouseDown}
-      onClick={handleClick}
-    >
-      <div
-        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[85vh] flex flex-col animate-modal-fade-in w-[450px]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="project-settings-modal-title"
-      >
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 id="project-settings-modal-title" className="text-base font-semibold text-text m-0">
-            {isEditingTemplate ? 'Template Settings' : 'Project Settings'}
-          </h2>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="w-[450px]" onClose={onClose}>
+        <DialogHeader>
+          <DialogTitle>{isEditingTemplate ? 'Template Settings' : 'Project Settings'}</DialogTitle>
           <div className="flex items-center gap-4">
             <a
               href="#"
@@ -148,11 +135,9 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
             >
               View documentation
             </a>
-            <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close">
-              &times;
-            </Button>
+            <DialogClose onClose={onClose} />
           </div>
-        </div>
+        </DialogHeader>
 
         <div className="p-5 overflow-y-auto max-h-[60vh]">
           <div className="mb-6 last:mb-0">
@@ -350,12 +335,12 @@ export function ProjectSettingsModal({ isOpen, onClose, isEditingTemplate = fals
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
+        <DialogFooter>
           <Button size="sm" variant="secondary" onClick={onClose}>
             Done
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

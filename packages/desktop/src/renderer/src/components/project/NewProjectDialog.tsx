@@ -1,6 +1,15 @@
 import { X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Checkbox } from '@renderer/components/ui/checkbox';
+import { Button } from '@renderer/components/ui/button';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@renderer/components/ui/dialog';
 
 // Stock item from the app-level stock library
 interface StockLibraryItem {
@@ -42,9 +51,6 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
   const [hasLoadedDefaults, setHasLoadedDefaults] = useState(false);
   const [stockLibrary, setStockLibrary] = useState<StockLibraryItem[]>([]);
   const [isLoadingStocks, setIsLoadingStocks] = useState(true);
-
-  // Track if mousedown started on overlay (to prevent closing when dragging from inside modal)
-  const mouseDownOnOverlay = useRef(false);
 
   // Load stock library and saved defaults on mount
   useEffect(() => {
@@ -134,8 +140,6 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
     });
   };
 
-  if (!isOpen) return null;
-
   // Group materials by category
   const materialsByCategory = stockLibrary.reduce(
     (acc, stock) => {
@@ -156,39 +160,27 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
     return a.localeCompare(b);
   });
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  };
+
   return (
-    <div
-      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
-      onMouseDown={(e) => {
-        // Only track if mousedown is directly on the overlay (not bubbled from children)
-        mouseDownOnOverlay.current = e.target === e.currentTarget;
-      }}
-      onClick={(e) => {
-        // Only close if both mousedown and click were on the overlay
-        if (e.target === e.currentTarget && mouseDownOnOverlay.current) {
-          onClose();
-        }
-        mouseDownOnOverlay.current = false;
-      }}
-    >
-      <div
-        className="new-project-dialog bg-bg rounded-lg w-[480px] max-h-[90vh] flex flex-col shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] border border-border"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="new-project-dialog-title"
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent
+        className="new-project-dialog bg-bg w-[480px] max-h-[90vh] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]"
+        onClose={onClose}
       >
-        <div className="flex items-center justify-between py-5 px-6 border-b border-border">
-          <h2 id="new-project-dialog-title" className="m-0 text-lg font-semibold text-text">
-            New Project
-          </h2>
-          <button
-            className="w-8 h-8 flex items-center justify-center bg-transparent border-none rounded-md text-text-muted cursor-pointer transition-all duration-100 hover:bg-bg-secondary hover:text-text"
-            onClick={onClose}
-            aria-label="Close"
+        <DialogHeader className="py-5 px-6">
+          <DialogTitle className="text-lg">New Project</DialogTitle>
+          <DialogClose
+            onClose={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-md text-text-muted hover:bg-bg-secondary hover:text-text"
           >
             <X size={20} />
-          </button>
-        </div>
+          </DialogClose>
+        </DialogHeader>
 
         <div className="p-6 overflow-y-auto flex flex-col gap-5">
           {/* Project Name */}
@@ -299,21 +291,13 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
           </label>
         </div>
 
-        <div className="flex justify-end gap-3 py-4 px-6 border-t border-border">
-          <button
-            className="py-2.5 px-5 text-sm font-medium rounded-md cursor-pointer transition-all duration-100 bg-bg-secondary border border-border text-text hover:bg-bg-tertiary"
-            onClick={onClose}
-          >
+        <DialogFooter className="gap-3 py-4 px-6">
+          <Button variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            className="btn-accent py-2.5 px-5 text-sm font-medium rounded-md cursor-pointer transition-all duration-100 bg-accent border border-accent text-accent-foreground hover:bg-accent-hover hover:border-accent-hover"
-            onClick={handleCreate}
-          >
-            Create Project
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+          <Button onClick={handleCreate}>Create Project</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

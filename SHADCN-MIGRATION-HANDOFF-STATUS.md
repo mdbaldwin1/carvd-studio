@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-20 (updated)
 **Branch**: develop
-**Last develop SHA**: `bd783f7` (after bead 6.1 PR #247 merge)
+**Last develop SHA**: `92f80c2` (after bead 6.2 PR #248 merge)
 
 ## Key Instruction Documents
 
@@ -63,7 +63,7 @@ These documents define the migration workflow and must be followed:
 | 10.6 | #232 | Docs content pages                       |
 | 10.7 | #231 | Legal pages + 404                        |
 
-### Epic 5: Desktop Complex Components (in progress)
+### Epic 5: Desktop Complex Components (complete)
 
 | Bead | PR   | Description                              |
 | ---- | ---- | ---------------------------------------- |
@@ -73,32 +73,32 @@ These documents define the migration workflow and must be followed:
 | 5.4  | #245 | Collapsible/Accordion migration          |
 | 5.5  | #246 | Progress/Skeleton migration              |
 
-**Total: 29 beads merged across 7 epics (2, 3, 4, 5, 6, 9, 10)**
+**Total: 30 beads merged across 7 epics (2, 3, 4, 5, 6, 9, 10)**
 
 ## Active Worktrees
 
 | Worktree                                 | Branch                | State                    |
 | ---------------------------------------- | --------------------- | ------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-6.2` | feat/carvd-studio-6.2 | **In progress (active)** |
+| `/Users/mbaldwin/Carvd/carvd-studio-6.3` | feat/carvd-studio-6.3 | **In progress (active)** |
 
-All completed worktrees through bead 6.1 have been cleaned up.
+All completed worktrees through bead 6.2 have been cleaned up.
 
-## In-Progress Work: Bead 6.2 (Assembly Modals)
+## In-Progress Work: Bead 6.3 (Project Modals)
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-6.2`
-**Branch**: `feat/carvd-studio-6.2`
+**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-6.3`
+**Branch**: `feat/carvd-studio-6.3`
 **State**: Implementation complete; PR prep in progress
 
 ### What was done:
 
-1. Migrated `AddAssemblyModal` and `SaveAssemblyModal` to `ui/dialog` primitives.
-2. Removed legacy custom overlay/modal wrappers and switched `SaveAssemblyModal` form fields to shadcn controls (`Input`, `Textarea`, `Label`, `Checkbox`).
-3. Preserved assembly selection/add-to-project behavior and save-assembly flow (`createAssemblyFromSelection`, add-to-library toggle, default name generation).
-4. Verified desktop lint/typecheck and targeted modal tests pass locally.
+1. Migrated `NewProjectDialog`, `ProjectSettingsModal`, and `ImportAppStateModal` to `ui/dialog` primitives.
+2. Removed legacy custom backdrop/escape handling from those modals while preserving existing form flows and close semantics.
+3. Updated related modal tests where needed for Dialog backdrop structure (`ProjectSettingsModal` backdrop selector).
+4. Verified desktop lint/typecheck and targeted project-modal tests pass locally.
 
 ### Outstanding before merge:
 
-1. Open PR for bead 6.2 and pass CI checks
+1. Open PR for bead 6.3 and pass CI checks
 2. Merge PR (squash) and clean up worktree/branch
 
 ## Remaining Work (Not Started)
@@ -116,8 +116,8 @@ All completed worktrees through bead 6.1 have been cleaned up.
 **Epic 6: Desktop Modal Migration** (depends on 3.5 ✅ and 3.2 ✅ — ready to start)
 
 - 6.1: Stock modals (AddStock, EditStock, StockLibrary) — **DONE** (PR #247 merged)
-- 6.2: Assembly modals (AddAssembly, SaveAssembly) — **IN PROGRESS (implementation done, PR pending)**
-- 6.3: Project modals (NewProject, ProjectSettings, ImportAppState)
+- 6.2: Assembly modals (AddAssembly, SaveAssembly) — **DONE** (PR #248 merged)
+- 6.3: Project modals (NewProject, ProjectSettings, ImportAppState) — **IN PROGRESS (implementation done, PR pending)**
 - 6.4: AppSettingsModal (largest, 7+ sections)
 - 6.5: CutListModal (complex: 4 tabs, tables, diagrams)
 - 6.6: TemplateBrowserModal
@@ -159,7 +159,7 @@ All completed worktrees through bead 6.1 have been cleaned up.
 
 ```
 Epics 2, 3, 4, 5, 9, 10 are COMPLETE ✅
-Epic 6 is IN PROGRESS (6.2 active; 6.1 complete)
+Epic 6 is IN PROGRESS (6.3 active; 6.1/6.2 complete)
 Epic 7 can start NOW (dependencies Epics 4 ✅ and 5 ✅ are met)
 Epic 8 is BLOCKED on Epics 6 and 7
 Epic 11 can start NOW (dependency Epic 10 ✅ is met)
@@ -212,7 +212,7 @@ Bead status state shown here is current as of 2026-02-20.
 
 ## Recommended Next Steps
 
-1. **Complete bead 6.2** — create PR, pass CI, merge, and cleanup.
-2. Continue Epic 6 in sequence (6.3 → 6.7) while starting Epic 7 in parallel when feasible.
+1. **Complete bead 6.3** — create PR, pass CI, merge, and cleanup.
+2. Continue Epic 6 in sequence (6.4 → 6.7) while starting Epic 7 in parallel when feasible.
 3. Run Epic 6 and Epic 11 in parallel where safe to reduce critical path.
 4. Epic 8 remains final desktop cleanup before Epic 12 integration.
