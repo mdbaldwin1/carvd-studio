@@ -224,13 +224,10 @@ export function StartScreen({
                 Favorites
               </TabsTrigger>
             </TabsList>
-            <button
-              className="flex items-center gap-1.5 py-1.5 px-3 my-auto bg-transparent border-none rounded text-[13px] text-accent cursor-pointer transition-all duration-100 relative z-1 hover:text-primary hover:bg-bg-secondary"
-              onClick={onOpenFile}
-            >
+            <Button variant="ghost" size="xs" className="my-auto text-accent hover:text-primary" onClick={onOpenFile}>
               <FolderOpen size={14} />
               Open file...
-            </button>
+            </Button>
           </div>
 
           <TabsContent value="recents">

@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-20 (updated)
 **Branch**: develop
-**Last develop SHA**: `c5c2cd3` (after bead 7.4 PR #257 merge)
+**Last develop SHA**: `470f7a2` (after bead 7.5 PR #258 merge)
 
 ## Key Instruction Documents
 
@@ -73,33 +73,32 @@ These documents define the migration workflow and must be followed:
 | 5.4  | #245 | Collapsible/Accordion migration          |
 | 5.5  | #246 | Progress/Skeleton migration              |
 
-**Total: 40 beads merged across 8 epics (2, 3, 4, 5, 6, 7, 9, 10)**
+**Total: 41 beads merged across 8 epics (2, 3, 4, 5, 6, 7, 9, 10)**
 
 ## Active Worktrees
 
 | Worktree                                 | Branch                | State                    |
 | ---------------------------------------- | --------------------- | ------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-7.5` | feat/carvd-studio-7.5 | **In progress (active)** |
+| `/Users/mbaldwin/Carvd/carvd-studio-7.6` | feat/carvd-studio-7.6 | **In progress (active)** |
 
-All completed worktrees through bead 7.4 have been cleaned up.
+All completed worktrees through bead 7.5 have been cleaned up.
 
-## In-Progress Work: Bead 7.5 (Tutorial Component Migration)
+## In-Progress Work: Bead 7.6 (StartScreen Layout Migration)
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-7.5`
-**Branch**: `feat/carvd-studio-7.5`
+**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-7.6`
+**Branch**: `feat/carvd-studio-7.6`
 **State**: Implementation complete; PR prep in progress
 
 ### What was done:
 
-1. Wrapped `WelcomeTutorial` in shadcn `Dialog` primitives for full-screen tutorial session handling, preserving auto-start and camera centering behavior.
-2. Migrated `TutorialTooltip` to shadcn composition using `Card`, `Progress`, and `Button` primitives while preserving navigation controls, progress state, and docs-link behavior.
-3. Kept `TutorialOverlay` spotlight SVG/backdrop custom behavior and aligned keyboard handling so Escape is managed by dialog close semantics while Arrow/Enter navigation remains explicit.
-4. Updated tutorial component tests (`WelcomeTutorial`, `TutorialOverlay`, `TutorialTooltip`) to match new shadcn-based structure and progress indicator assertions.
-5. Verified desktop lint/typecheck/unit tests and format check pass locally.
+1. Completed StartScreen action migration by converting remaining custom action controls (`Open file...`, template section `View All`) to shadcn `Button`.
+2. Migrated `TemplatesSection` template preview interactions (blank/tutorial/preview cards) to shadcn `Card`-based clickable surfaces with keyboard activation support.
+3. Preserved existing StartScreen tabs/project-list behavior and updated affected tests (`StartScreen`, `TemplatesSection`) from button-ancestor assumptions to role-based interactive-card selectors.
+4. Verified desktop lint/typecheck/unit tests and format check pass locally.
 
 ### Outstanding before merge:
 
-1. Open PR for bead 7.5 and pass CI checks
+1. Open PR for bead 7.6 and pass CI checks
 2. Merge PR (squash) and clean up worktree/branch
 
 ## Remaining Work (Not Started)
@@ -130,8 +129,8 @@ All completed worktrees through bead 7.4 have been cleaned up.
 - 7.2: Header/Toolbar buttons — **DONE** (PR #255 merged)
 - 7.3: Properties Panel form controls — **DONE** (PR #256 merged)
 - 7.4: Banners → shadcn Alert — **DONE** (PR #257 merged)
-- 7.5: Tutorial components — **IN PROGRESS**
-- 7.6: StartScreen layout → Card + Tabs
+- 7.5: Tutorial components — **DONE** (PR #258 merged)
+- 7.6: StartScreen layout → Card + Tabs — **IN PROGRESS**
 
 **Epic 8: Desktop CSS Cleanup** (depends on Epics 6 and 7)
 
@@ -160,7 +159,7 @@ All completed worktrees through bead 7.4 have been cleaned up.
 
 ```
 Epics 2, 3, 4, 5, 6, 9, 10 are COMPLETE ✅
-Epic 7 is IN PROGRESS (7.5 active)
+Epic 7 is IN PROGRESS (7.6 active)
 Epic 8 is BLOCKED on Epic 7
 Epic 11 can start NOW (dependency Epic 10 ✅ is met)
 Epic 12 is BLOCKED on Epics 8 and 11
@@ -212,7 +211,7 @@ Bead status state shown here is current as of 2026-02-20.
 
 ## Recommended Next Steps
 
-1. **Complete bead 7.5** — create PR, pass CI, merge, and cleanup.
-2. Continue Epic 7 sequence (7.6 next) while Epic 11 proceeds in parallel when possible.
-3. Start Epic 8 after Epic 7 completes.
+1. **Complete bead 7.6** — create PR, pass CI, merge, and cleanup.
+2. Start Epic 8 (`8.1` next) after Epic 7 completes.
+3. Continue Epic 11 in parallel where capacity allows.
 4. Complete Epic 12 integration after Epics 8 and 11.
