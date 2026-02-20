@@ -1,12 +1,19 @@
 import { Plus, Search, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useBackdropClose } from '../../hooks/useBackdropClose';
 import { useProjectStore } from '../../store/projectStore';
 import { useLicenseStore } from '../../store/licenseStore';
 import { Assembly } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { getFeatureLimits } from '../../utils/featureLimits';
 import { Button } from '@renderer/components/ui/button';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@renderer/components/ui/dialog';
 
 interface AddAssemblyModalProps {
   isOpen: boolean;
@@ -108,19 +115,6 @@ export function AddAssemblyModal({
     }
   }, [filteredAssemblies, selectedIds]);
 
-  const { handleMouseDown, handleClick } = useBackdropClose(onClose);
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
   const handleAdd = useCallback(() => {
     // Add all selected assemblies to the project
     for (const assemblyId of selectedIds) {
@@ -136,32 +130,19 @@ export function AddAssemblyModal({
     onClose();
   }, [selectedIds, assemblyLibrary, onAddToProject, onClose]);
 
-  if (!isOpen) return null;
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  };
 
   return (
-    <div
-      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
-      onMouseDown={handleMouseDown}
-      onClick={handleClick}
-    >
-      <div
-        className="bg-surface border border-border rounded-lg shadow-[0_8px_32px_var(--color-overlay)] max-w-[90vw] max-h-[80vh] flex flex-col animate-modal-fade-in w-[700px]"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-assembly-modal-title"
-      >
-        <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-          <h2 id="add-assembly-modal-title" className="text-base font-semibold text-text m-0">
-            Add Assembly to Project
-          </h2>
-          <button
-            className="bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none transition-colors duration-150 hover:text-text"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            &times;
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="w-[700px] max-h-[80vh]" onClose={onClose}>
+        <DialogHeader>
+          <DialogTitle>Add Assembly to Project</DialogTitle>
+          <DialogClose onClose={onClose} />
+        </DialogHeader>
 
         <div className="flex flex-1 overflow-hidden min-h-[300px]">
           {/* Library list sidebar */}
@@ -328,15 +309,15 @@ export function AddAssemblyModal({
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 py-4 px-5 border-t border-border">
+        <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>
             Cancel
           </Button>
           <Button size="sm" onClick={handleAdd} disabled={selectedIds.size === 0}>
             Add to Project{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
