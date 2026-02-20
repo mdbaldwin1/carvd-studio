@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-20 (updated)
 **Branch**: develop
-**Last develop SHA**: `a5b4cc7` (after bead 11.2 PR #268 merge)
+**Last develop SHA**: `14f1127` (after bead 11.3 PR #269 merge)
 
 ## Key Instruction Documents
 
@@ -107,20 +107,20 @@ These documents define the migration workflow and must be followed:
 | 8.5  | #265 | Update tests + verify coverage  |
 | 8.6  | #266 | Bundle size audit               |
 
-**Total: 48 beads merged across 10 epics (2, 3, 4, 5, 6, 7, 8, 9, 10, 11-partial)**
+**Total: 49 beads merged across 10 epics (2, 3, 4, 5, 6, 7, 8, 9, 10, 11)**
 
 ## Active Worktrees
 
-| Worktree                                  | Branch                   | State                         |
-| ----------------------------------------- | ------------------------ | ----------------------------- |
-| `/Users/mbaldwin/Carvd/carvd-studio-11-3` | `test/carvd-studio-11.3` | Active (website bundle audit) |
+| Worktree                                  | Branch                   | State                           |
+| ----------------------------------------- | ------------------------ | ------------------------------- |
+| `/Users/mbaldwin/Carvd/carvd-studio-12-2` | `test/carvd-studio-12.2` | Active (final integration/docs) |
 
 ## Current Position
 
-- **Current bead**: Epic 11.3 (`Website bundle size audit`) complete on branch `test/carvd-studio-11.3` and ready for PR.
+- **Current bead**: Epic 12.2 (`Update CLAUDE.md with shadcn patterns and conventions`) complete on branch `test/carvd-studio-12.2` and ready for PR.
 - **Coverage status**: Desktop thresholds pass after bead 8.5 (`Statements 91.7%`, `Branches 82.02%`, `Functions 90.06%`, `Lines 91.98%`).
 - **Desktop CSS cleanup status**: Epic 8 is complete (8.1–8.6 merged).
-- **Website cleanup status**: 11.1 merged in PR #267; 11.2 merged in PR #268; 11.3 bundle audit completed locally with net reduced website payload.
+- **Website cleanup status**: Epic 11 is complete (`11.1` PR #267, `11.2` PR #268, `11.3` PR #269 merged).
 
 ## Remaining Work (Not Started)
 
@@ -168,12 +168,12 @@ These documents define the migration workflow and must be followed:
 
 - 11.1: Remove old index.css — **DONE** (PR #267 merged)
 - 11.2: Update tests, verify build — **DONE** (PR #268 merged)
-- 11.3: Bundle size audit — **DONE** (pending PR)
+- 11.3: Bundle size audit — **DONE** (PR #269 merged)
 
 ### Epic 12: Final Integration
 
 - 12.1: Cross-app theme consistency check
-- 12.2: Update CLAUDE.md with shadcn patterns
+- 12.2: Update CLAUDE.md with shadcn patterns — **DONE** (pending PR)
 - 12.3: Final CHANGELOG.md update
 
 ## Dependency Graph Summary
@@ -181,8 +181,8 @@ These documents define the migration workflow and must be followed:
 ```
 Epics 2, 3, 4, 5, 6, 7, 8, 9, 10 are COMPLETE ✅
 Epic 8 is COMPLETE ✅
-Epic 11 is IN PROGRESS (11.1 + 11.2 merged, 11.3 done pending PR)
-Epic 12 is BLOCKED on Epics 8 and 11
+Epic 11 is COMPLETE ✅
+Epic 12 is IN PROGRESS (12.2 done pending PR, 12.1 + 12.3 remaining)
 ```
 
 ## Key Technical Notes

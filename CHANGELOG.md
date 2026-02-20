@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Migration documentation refresh (bead carvd-studio-12.2)** — Updated `CLAUDE.md` to reflect post-migration shadcn/Radix conventions: replaced legacy styling guidance with current Tailwind+shadcn architecture, added explicit component inventory for desktop/website UI primitives, documented Radix portal/`data-state` testing patterns, and added bundle-impact guidance for Radix-based UI changes.
 - **Website bundle audit (bead carvd-studio-11.3)** — Added `packages/website/BUNDLE-SIZE-AUDIT.md` comparing pre-cleanup baseline (`23ceaf5`) with post-cleanup build (`a5b4cc7`); main CSS dropped `-16,272` bytes raw (`-25.5%`) and `-2,629` bytes gzip (`-22.6%`), while main JS stayed effectively flat and total website assets improved (`-15,519` raw / `-2,370` gzip).
 - **Website test/build/responsive verification (bead carvd-studio-11.2)** — Re-ran website quality gates post-`index.css` removal and verified passing results for unit/integration tests (`npm test`), production build (`npm run build`), and full Playwright matrix including responsive mobile/tablet/desktop checks (`npm run test:e2e`).
 - **Website index.css cleanup (bead carvd-studio-11.1)** — Removed `packages/website/src/index.css` and consolidated required global/base + residual docs compatibility utilities into `tailwind.css`; updated website entrypoint imports and migrated `QuickStartPage` CTA buttons from legacy `.btn*` classes to shadcn `Button`.

@@ -67,6 +67,13 @@ beforeAll(() => {
 
 **Factory functions**: Use helpers from `tests/helpers/factories.ts` — e.g., `createTestPart()`, `createTestStock()`, `createTestProject()`.
 
+**shadcn/Radix component tests**:
+
+- Prefer semantic queries (`getByRole`, `findByRole`, `getByLabelText`) over class selectors.
+- Radix overlays (Dialog, AlertDialog, DropdownMenu, ContextMenu, Popover, Select content) render via portals; query from `screen`, not a local container.
+- Use `data-state` / `data-disabled` attributes for Radix state assertions where needed.
+- Do not assert legacy `.btn*` classes; assert behavior/roles and shadcn props (`variant`, `size`) indirectly via rendered semantics.
+
 ### Common Gotchas
 
 - Use `toBeCloseTo()` for floating-point position assertions
@@ -97,16 +104,26 @@ npm run build        # Build for production
 
 ## Styling
 
-The desktop app uses **Tailwind CSS 4** with CSS custom properties for theming. Styles are split across:
+The app uses **Tailwind CSS 4** with CSS custom properties + shadcn/ui primitives.
 
-- `tailwind.css` — Tailwind import, CSS custom properties (`:root` dark theme + `[data-theme='light']`), `@theme inline` mappings, custom animations
-- `primitives.css` — Base component styles (buttons, inputs, modals, scrollbars, fonts)
-- `layout.css` — Layout-specific styles (sidebar, header, panels)
-- `domain.css` — Domain-specific styles (3D workspace, cut list, part rendering)
+Desktop styles are split across:
 
-Components use Tailwind utility classes referencing theme tokens (e.g., `bg-bg`, `text-text-muted`, `border-border`). The website uses Tailwind independently.
+- `tailwind.css` — Tailwind import, theme tokens, global base styles, and token mappings
+- `layout.css` — Electron shell/layout-specific rules
+- `domain.css` — Domain-specific rendering/print rules
 
-**shadcn/ui migration (in progress)**: The desktop app is migrating to shadcn/ui primitives built on Radix UI. Shared UI components live in `src/renderer/src/components/ui/` (Button, Input, Select, Dialog, etc.). Use the `cn()` utility from `src/renderer/src/lib/utils.ts` for class merging. See `SHADCN-MIGRATION-SESSION-HANDOFF.md` for full component mappings and testing patterns.
+Website styles are in:
+
+- `packages/website/src/tailwind.css` — theme tokens, base rules, and compatibility utilities
+
+Use shadcn components from `src/renderer/src/components/ui/` and pass `variant` / `size` props rather than legacy utility-class systems (for example, old `.btn*` patterns). Use `cn()` from `src/renderer/src/lib/utils.ts` for conditional class merging.
+
+## Components
+
+Primary shadcn component sets currently in use:
+
+- **Desktop UI** (`packages/desktop/src/renderer/src/components/ui/`): `button`, `input`, `textarea`, `label`, `select`, `checkbox`, `dialog`, `alert-dialog`, `tabs`, `table`, `card`, `accordion`, `collapsible`, `dropdown-menu`, `context-menu`, `popover`, `tooltip`, `sidebar`, `scroll-area`, `separator`, `badge`, `progress`, `skeleton`, `sonner`.
+- **Website UI** (`packages/website/src/components/ui/`): `button`, `card`, `badge`, `accordion`, `navigation-menu`, `separator`.
 
 ## Store Architecture
 
@@ -144,6 +161,7 @@ Zustand stores are split by concern:
 - Use dynamic `await import()` for heavy optional features triggered by user action (PDF export, CSV download)
 - Audit `optionalDependencies` when adding large libraries — stub unused optional deps via `resolve.alias` in `electron.vite.config.ts`
 - Run `npm run analyze` before and after changes that add dependencies to verify bundle impact
+- Radix/shadcn primitives can add JS/runtime cost; offset by reducing custom CSS and monitor deltas with bundle audits (`packages/desktop/BUNDLE-SIZE-AUDIT.md`, `packages/website/BUNDLE-SIZE-AUDIT.md`)
 
 ### State Management
 
