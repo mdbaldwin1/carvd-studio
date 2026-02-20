@@ -89,9 +89,9 @@ All interactive components must include:
 
 The codebase uses Tailwind CSS 4 with CSS custom properties for theming:
 
-- **Shared primitives** are defined in `primitives.css` (buttons, forms, scrollbars)
+- **Shared primitives** are defined in `tailwind.css` `@layer base/components` and `components/ui/*` shadcn primitives
 - **Components** use Tailwind utility classes with theme tokens (e.g., `bg-surface`, `text-text-muted`, `border-border`)
-- **Theme styles** are in four CSS files: `tailwind.css`, `primitives.css`, `layout.css`, `domain.css`
+- **Theme styles** are in three CSS files: `tailwind.css`, `layout.css`, `domain.css`
 - Avoid creating new `.css` files — use existing primitive classes or inline Tailwind
 
 ### Testing
