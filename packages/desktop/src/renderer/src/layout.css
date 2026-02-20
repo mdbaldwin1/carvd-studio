@@ -114,88 +114,13 @@
    =========================================== */
 
 @layer components {
-  .sidebar {
-    @apply flex-shrink-0 bg-surface border-r border-border flex flex-col overflow-hidden;
-    width: var(--sidebar-width);
-    min-width: var(--sidebar-width);
-  }
-
-  .sidebar-section {
-    @apply border-b border-border flex flex-col flex-1 min-h-0 overflow-hidden;
-    transition:
-      flex 0.2s ease-out,
-      padding 0.2s ease-out;
-  }
-
-  .sidebar-section-bottom {
-    @apply px-4 py-2 mt-auto border-b-0 border-t border-border flex flex-col gap-2.5 bg-surface overflow-visible;
-    flex: 0 0 auto;
-  }
-
-  .sidebar-settings-btn {
-    @apply w-full flex justify-center;
-  }
-
-  /* Section header (clickable collapse toggle) */
-  .section-header {
-    @apply flex items-center gap-1.5 cursor-pointer;
-    /* margin: -16px 0 10px 0; */
-    padding: 16px;
-    padding-right: 10px;
-    border-radius: 0;
-    transition:
-      background-color 0.15s,
-      margin 0.2s ease-out;
-  }
-
-  .section-header:hover {
-    @apply bg-bg-hover;
-  }
-
-  .section-header:hover .section-collapse-btn {
-    @apply text-text;
-  }
-
-  .section-header h2 {
-    @apply flex-1 leading-none;
-    margin-bottom: 0 !important;
-  }
-
-  .section-collapse-btn {
-    @apply bg-transparent border-none p-0 m-0 text-text-muted inline-flex items-center justify-center flex-shrink-0;
-    border-radius: 3px;
-    transition: color 0.15s;
-    width: 12px;
-    height: 12px;
-  }
-
-  .section-collapse-btn svg {
-    width: 12px;
-    height: 12px;
-  }
-
-  /* Section content animation (grid-row collapse via Radix data-state) */
-  .section-content {
-    @apply grid flex-1 min-h-0 overflow-hidden;
-    grid-template-rows: 1fr;
-    transition: grid-template-rows 0.2s ease-out;
-  }
-
-  .section-content[data-state='closed'] {
-    grid-template-rows: 0fr;
-  }
-
-  .section-content-inner {
-    @apply min-h-0 overflow-hidden flex flex-col;
-  }
-
-  .section-content-inner > .stock-list,
-  .section-content-inner > .assembly-list,
-  .section-content-inner > .parts-list {
+  .stock-list,
+  .assembly-list,
+  .parts-list {
     @apply flex-1 overflow-y-auto min-h-0;
   }
 
-  /* Sidebar list items — full-width hover, internal padding */
+  /* Sidebar list items — full-width hover */
   .stock-list > li,
   .assembly-list > li,
   .parts-list .part-item,
@@ -205,63 +130,6 @@
 
   .group-header:hover {
     @apply bg-surface-hover;
-  }
-
-  /* Section typography — slightly bigger, still subtle */
-  .sidebar-section h2 {
-    @apply text-text-muted font-semibold uppercase mb-2;
-    font-size: 12px;
-    letter-spacing: 0.8px;
-  }
-
-  /* Section search bar */
-  .section-search {
-    @apply flex items-center px-2 py-2;
-  }
-
-  .section-search-inner {
-    @apply flex flex-1 items-center gap-1.5 px-2 py-1 sticky top-0 z-[1] bg-bg rounded-md;
-  }
-
-  .section-search-inner:hover {
-    @apply bg-bg;
-  }
-
-  .section-search-inner input {
-    @apply flex-1 text-text outline-none;
-    padding: 6px 10px;
-    border: 0px;
-    border-radius: 0px;
-    font-size: 13px;
-  }
-
-  .section-search-inner input:focus {
-    @apply border-primary;
-  }
-
-  .section-search-inner input::placeholder {
-    @apply text-text-muted;
-  }
-
-  .section-search-clear {
-    @apply flex items-center justify-center border-none bg-transparent text-text-muted cursor-pointer p-0;
-    width: 22px;
-    height: 22px;
-    border-radius: 3px;
-  }
-
-  .section-search-clear:hover {
-    @apply text-text bg-bg-hover;
-  }
-}
-
-/* ===========================================
-   CANVAS CONTAINER
-   =========================================== */
-
-@layer components {
-  .canvas-container {
-    @apply flex-1 min-w-0 overflow-hidden bg-bg relative;
   }
 }
 

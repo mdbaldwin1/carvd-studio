@@ -61,7 +61,17 @@ const Sidebar = React.forwardRef<HTMLElement, React.ComponentProps<'aside'>>(fun
   { className, ...props },
   ref
 ) {
-  return <aside ref={ref} data-sidebar="" className={cn('sidebar', className)} {...props} />;
+  return (
+    <aside
+      ref={ref}
+      data-sidebar=""
+      className={cn(
+        'sidebar flex w-[var(--sidebar-width)] min-w-[var(--sidebar-width)] shrink-0 flex-col overflow-hidden border-r border-border bg-surface',
+        className
+      )}
+      {...props}
+    />
+  );
 });
 
 const SidebarContent = React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(function SidebarContent(
@@ -75,14 +85,31 @@ const SidebarGroup = React.forwardRef<HTMLDivElement, React.ComponentProps<'div'
   { className, ...props },
   ref
 ) {
-  return <div ref={ref} data-sidebar-group="" className={cn('sidebar-section', className)} {...props} />;
+  return (
+    <div
+      ref={ref}
+      data-sidebar-group=""
+      className={cn('sidebar-section flex min-h-0 flex-1 flex-col overflow-hidden border-b border-border', className)}
+      {...props}
+    />
+  );
 });
 
 const SidebarGroupLabel = React.forwardRef<HTMLHeadingElement, React.ComponentProps<'h2'>>(function SidebarGroupLabel(
   { className, ...props },
   ref
 ) {
-  return <h2 ref={ref} data-sidebar-group-label="" className={cn(className)} {...props} />;
+  return (
+    <h2
+      ref={ref}
+      data-sidebar-group-label=""
+      className={cn(
+        'mb-2 flex-1 text-[12px] leading-none font-semibold uppercase tracking-[0.8px] text-text-muted',
+        className
+      )}
+      {...props}
+    />
+  );
 });
 
 const SidebarFooter = React.forwardRef<HTMLElement, React.ComponentProps<'section'>>(function SidebarFooter(
@@ -93,7 +120,10 @@ const SidebarFooter = React.forwardRef<HTMLElement, React.ComponentProps<'sectio
     <section
       ref={ref}
       data-sidebar-footer=""
-      className={cn('sidebar-section sidebar-section-bottom', className)}
+      className={cn(
+        'sidebar-section sidebar-section-bottom mt-auto flex flex-col gap-2.5 overflow-visible border-t border-border bg-surface px-4 py-2',
+        className
+      )}
       {...props}
     />
   );
