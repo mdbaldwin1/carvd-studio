@@ -1,139 +1,96 @@
 THIRD-PARTY SOFTWARE LICENSES
 
-Carvd Studio includes the following third-party open source software:
+Carvd Studio Desktop includes the following third-party runtime packages.
+This inventory is based on:
+- packages/desktop/package.json (direct dependencies)
+- package-lock.json (resolved versions and declared license fields)
 
 ================================================================================
-ELECTRON
-================================================================================
-Copyright (c) Electron contributors
-Copyright (c) GitHub Inc.
-License: MIT
-https://github.com/electron/electron
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-================================================================================
-REACT
-================================================================================
-Copyright (c) Meta Platforms, Inc. and affiliates.
-License: MIT
-https://github.com/facebook/react
-
-================================================================================
-THREE.JS
-================================================================================
-Copyright (c) 2010-2024 three.js authors
-License: MIT
-https://github.com/mrdoob/three.js
-
-================================================================================
-REACT THREE FIBER (@react-three/fiber)
-================================================================================
-Copyright (c) 2019 Paul Henschel
-License: MIT
-https://github.com/pmndrs/react-three-fiber
-
-================================================================================
-REACT THREE DREI (@react-three/drei)
-================================================================================
-Copyright (c) 2019 Paul Henschel
-License: MIT
-https://github.com/pmndrs/drei
-
-================================================================================
-ZUSTAND
-================================================================================
-Copyright (c) 2019 Paul Henschel
-License: MIT
-https://github.com/pmndrs/zustand
-
-================================================================================
-ZUNDO
-================================================================================
-Copyright (c) Charles Charbonneau
-License: MIT
-https://github.com/charkour/zundo
-
-================================================================================
-LUCIDE REACT
-================================================================================
-Copyright (c) 2022 Lucide Contributors
-License: ISC
-https://github.com/lucide-icons/lucide
-
-================================================================================
-JSPDF
-================================================================================
-Copyright (c) 2010-2021 James Hall, yWorks GmbH
-License: MIT
-https://github.com/parallax/jsPDF
-
-================================================================================
-ELECTRON-STORE
-================================================================================
-Copyright (c) Sindre Sorhus
-License: MIT
-https://github.com/sindresorhus/electron-store
-
-================================================================================
-ELECTRON-LOG
-================================================================================
-Copyright (c) Alexey Pasyukov
-License: MIT
-https://github.com/megahertz/electron-log
-
-================================================================================
-ELECTRON-UPDATER
-================================================================================
-Copyright (c) 2015 Loopline Systems
-License: MIT
-https://github.com/electron-userland/electron-builder
-
-================================================================================
-UUID
-================================================================================
-Copyright (c) 2010-2020 Robert Kieffer and other contributors
-License: MIT
-https://github.com/uuidjs/uuid
-
+DIRECT RUNTIME PACKAGE INVENTORY
 ================================================================================
 
-SUMMARY OF LICENSES
--------------------
-The majority of dependencies use the MIT License, which permits:
-- Commercial use
-- Modification
-- Distribution
-- Private use
+Name                                 Version    License      Source
+--------------------------------------------------------------------------------
+@radix-ui/react-accordion            1.2.12     MIT          dependency
+@radix-ui/react-alert-dialog         1.1.15     MIT          dependency
+@radix-ui/react-collapsible          1.1.12     MIT          dependency
+@radix-ui/react-context-menu         2.2.16     MIT          dependency
+@radix-ui/react-dropdown-menu        2.1.16     MIT          dependency
+@radix-ui/react-popover              1.1.15     MIT          dependency
+@radix-ui/react-progress             1.1.8      MIT          dependency
+@radix-ui/react-scroll-area          1.2.10     MIT          dependency
+@radix-ui/react-separator            1.1.8      MIT          dependency
+@radix-ui/react-tabs                 1.1.13     MIT          dependency
+@radix-ui/react-tooltip              1.2.8      MIT          dependency
+@react-three/drei                    10.7.7     MIT          dependency
+@react-three/fiber                   9.5.0      MIT          dependency
+class-variance-authority             0.7.1      Apache-2.0   dependency
+clsx                                 2.1.1      MIT          dependency
+electron                             40.4.1     MIT          devDependency (runtime binary)
+electron-log                         5.4.3      MIT          dependency
+electron-store                       11.0.2     MIT          dependency
+electron-updater                     6.7.3      MIT          dependency
+jspdf                                4.1.0      MIT          dependency
+lucide-react                         0.564.0    ISC          dependency
+react                                19.2.4     MIT          dependency
+react-dom                            19.2.4     MIT          dependency
+react-virtuoso                       4.18.1     MIT          dependency
+sonner                               2.0.7      MIT          dependency
+tailwind-merge                       3.4.1      MIT          dependency
+three                                0.182.0    MIT          dependency
+uuid                                 13.0.0     MIT          dependency
+zundo                                2.3.0      MIT          dependency
+zustand                              5.0.11     MIT          dependency
 
-Other licenses used include:
-- ISC (similar to MIT)
-- Apache-2.0 (permissive, requires attribution)
-- BSD-2-Clause / BSD-3-Clause (permissive)
-
-Full license information for all 700+ dependencies can be generated using:
-  npx license-checker --json
+Package pages:
+- https://www.npmjs.com/package/@radix-ui/react-accordion
+- https://www.npmjs.com/package/@radix-ui/react-alert-dialog
+- https://www.npmjs.com/package/@radix-ui/react-collapsible
+- https://www.npmjs.com/package/@radix-ui/react-context-menu
+- https://www.npmjs.com/package/@radix-ui/react-dropdown-menu
+- https://www.npmjs.com/package/@radix-ui/react-popover
+- https://www.npmjs.com/package/@radix-ui/react-progress
+- https://www.npmjs.com/package/@radix-ui/react-scroll-area
+- https://www.npmjs.com/package/@radix-ui/react-separator
+- https://www.npmjs.com/package/@radix-ui/react-tabs
+- https://www.npmjs.com/package/@radix-ui/react-tooltip
+- https://www.npmjs.com/package/@react-three/drei
+- https://www.npmjs.com/package/@react-three/fiber
+- https://www.npmjs.com/package/class-variance-authority
+- https://www.npmjs.com/package/clsx
+- https://www.npmjs.com/package/electron
+- https://www.npmjs.com/package/electron-log
+- https://www.npmjs.com/package/electron-store
+- https://www.npmjs.com/package/electron-updater
+- https://www.npmjs.com/package/jspdf
+- https://www.npmjs.com/package/lucide-react
+- https://www.npmjs.com/package/react
+- https://www.npmjs.com/package/react-dom
+- https://www.npmjs.com/package/react-virtuoso
+- https://www.npmjs.com/package/sonner
+- https://www.npmjs.com/package/tailwind-merge
+- https://www.npmjs.com/package/three
+- https://www.npmjs.com/package/uuid
+- https://www.npmjs.com/package/zundo
+- https://www.npmjs.com/package/zustand
 
 ================================================================================
+LICENSE SUMMARY (DIRECT RUNTIME PACKAGES)
+================================================================================
+MIT: 28
+Apache-2.0: 1
+ISC: 1
 
-MIT License (used by most dependencies)
----------------------------------------
+Notes:
+- This file lists direct runtime packages for the desktop application.
+- Transitive dependencies are not expanded here.
+- For a full dependency tree license report, run from repo root:
+    npm --workspace=@carvd/desktop ls --all --json
+    npx license-checker --production --json
+
+================================================================================
+MIT LICENSE (REFERENCE TEXT)
+================================================================================
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights

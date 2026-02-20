@@ -10,15 +10,13 @@
 - Read `CLAUDE.md` for supplemental project context and deeper technical notes.
 - Beads issue tracker reference: `https://github.com/steveyegge/beads` (when you mention "beads", treat this as the canonical system/workflow).
 - For shadcn migration work, read:
-- `SHADCN-MIGRATION-SESSION-HANDOFF.md`
-- `SHADCN-MIGRATION-HANDOFF-STATUS.md`
 - `ORCHESTRATOR-INSTRUCTIONS.md`
 - `BEAD-EXECUTION-WORKFLOW.md`
 
 ## Docs Taxonomy
 
 - `policy` docs (stable): `AGENTS.md` is the source of truth for workflow, quality gates, security handling, and collaboration rules.
-- `status` docs (volatile): migration handoffs/status trackers (for example, `SHADCN-MIGRATION-SESSION-HANDOFF.md`, `SHADCN-MIGRATION-HANDOFF-STATUS.md`) track current state and may change frequently.
+- `status` docs (volatile): migration handoffs/status trackers track current state and may change frequently.
 - `reference` docs (technical): `CLAUDE.md` and `.claude/docs/*.md` provide architecture, implementation, environment, and operational context.
 - When policy conflicts with status/reference text, follow `AGENTS.md` and update the other file to remove drift.
 - Avoid duplicating stable policy text into status/reference docs; link back to `AGENTS.md` instead.

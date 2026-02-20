@@ -1,6 +1,6 @@
-# shadcn Migration — Orchestrator Instructions
+# Orchestrator Instructions
 
-> **You are the team lead** for the shadcn/ui migration of Carvd Studio.
+> **You are the team lead** for the assigned work on of Carvd Studio.
 > Your job is to coordinate teammates, not to implement code yourself.
 
 ---
@@ -21,8 +21,8 @@
 ## Startup Sequence
 
 1. Read these files to understand the project and migration plan:
-   - `CLAUDE.md` — Project conventions (loaded automatically)
-   - `SHADCN-MIGRATION-SESSION-HANDOFF.md` — Full migration context
+   - `CLAUDE.md` — Claude specific project conventions (loaded automatically)
+   - `AGENTS.md` - Project conventions (loaded automatically)
    - `BEAD-EXECUTION-WORKFLOW.md` — Per-bead workflow for teammates
    - `.beads/issues.jsonl` — Current bead statuses and dependencies
 
@@ -37,57 +37,11 @@
 
 ## Parallelism Strategy
 
-### Dependency Graph (Epics)
-
-```
-DESKTOP TRACK                          WEBSITE TRACK
-─────────────                          ─────────────
-carvd-studio-2  (Foundation)           carvd-studio-9  (Foundation)
-       │                                      │
-       ▼                                      ▼
-carvd-studio-3  (Core Primitives)      carvd-studio-10 (Migration)
-       │                                      │
-       ├───────────┐                          ▼
-       ▼           ▼                   carvd-studio-11 (Cleanup)
-carvd-studio-4  carvd-studio-5                │
-(Overlays)      (Complex)                     │
-       │           │                          │
-       ├───────────┤                          │
-       ▼           ▼                          │
-carvd-studio-6  carvd-studio-7               │
-(Modals)        (Layout)                      │
-       │           │                          │
-       └─────┬─────┘                          │
-             ▼                                │
-      carvd-studio-8  (Desktop Cleanup)       │
-             │                                │
-             └────────────┬───────────────────┘
-                          ▼
-                   carvd-studio-12 (Final Integration)
-```
-
-### Phase Plan
-
-The Desktop and Website tracks are **fully independent** and should always run in parallel.
-
-| Phase | Desktop Agent(s)                                    | Website Agent                   | Max Agents |
-| ----- | --------------------------------------------------- | ------------------------------- | ---------- |
-| **1** | Epic 2: Foundation (sequential sub-beads)           | Epic 9: Foundation (sequential) | 2          |
-| **2** | Epic 3: Core Primitives (sequential — high overlap) | Epic 10: Component Migration    | 2          |
-| **3** | Epic 4: Overlays + Epic 5: Complex (2 agents)       | Epic 10: (continued)            | 3          |
-| **4** | Epic 6: Modals + Epic 7: Layout (2 agents)          | Epic 11: Cleanup                | 3          |
-| **5** | Epic 8: Desktop Cleanup                             | —                               | 1          |
-| **6** | Epic 12: Final Integration                          | —                               | 1          |
-
 ### Rules for Parallel Execution
 
 1. **Between tracks**: Desktop and Website agents always run in parallel (no shared files)
 2. **Within an epic**: Sub-beads run **sequentially by default** (they often touch overlapping files like CSS, shared components, or test utilities)
-3. **Exception — Modal sub-beads**: Beads within Epic 6 (Modals) touch different modal files and CAN run in parallel via 2 agents, as long as:
-   - Agent A takes odd-numbered modal beads (6.1, 6.3, 6.5, 6.7)
-   - Agent B takes even-numbered modal beads (6.2, 6.4, 6.6)
-   - Neither agent modifies the base Dialog component (already done in Epic 3)
-4. **Never run simultaneously**: Two beads that both modify `tailwind.css`, `primitives.css`, `layout.css`, or `domain.css`
+3. **Never run simultaneously**: Two beads that both modify `tailwind.css`, `layout.css`, or `domain.css`
 
 ### Develop Branch Drift
 
@@ -121,10 +75,10 @@ Spawn teammates with descriptive names and clear bead assignments:
 When spawning a teammate, include this in their prompt:
 
 ```
-You are a team member executing shadcn/ui migration beads for Carvd Studio.
+You are a team member executing code change beads for Carvd Studio.
 
 BEFORE doing any work, read these files thoroughly:
-1. SHADCN-MIGRATION-SESSION-HANDOFF.md — Full migration context, component mappings, theming bridge, testing patterns
+1. Full relevant context handoff markdown file, component mappings, theming bridge, testing patterns
 2. BEAD-EXECUTION-WORKFLOW.md — Step-by-step workflow for each bead
 3. CLAUDE.md — Project conventions (loaded automatically)
 
@@ -160,7 +114,7 @@ If you encounter a blocker or need a design decision, message me immediately —
 
 - **Merge conflict**: Tell the teammate to rebase on latest develop and resolve
 - **Test failure unrelated to their bead**: Flag it but tell them to skip (create a new bead for it)
-- **Design decision needed**: Make the decision based on CLAUDE.md guidelines and the handoff doc. If truly ambiguous, stop and ask the user.
+- **Design decision needed**: Make the decision based on CLAUDE.md and AGENTS.md guidelines and the handoff doc. If truly ambiguous, stop and ask the user.
 - **Scope creep**: Tell the teammate to stay within the bead scope. Create a new bead for additional work discovered.
 
 ### When CI Fails on a PR
@@ -180,41 +134,7 @@ If you encounter a blocker or need a design decision, message me immediately —
 After each bead completes, update `.beads/issues.jsonl` and mentally track:
 
 ```
-[x] Phase 1: Foundation (Desktop + Website) ✅
-  [x] carvd-studio-2 (Desktop Foundation)
-    [x] carvd-studio-2.1
-    [x] carvd-studio-2.2
-    [x] carvd-studio-2.3
-  [x] carvd-studio-9 (Website Foundation)
-    [x] carvd-studio-9.1
-    [x] carvd-studio-9.2
-    [x] carvd-studio-9.3
 
-[x] Phase 2: Core Primitives + Website Migration ✅
-  [x] carvd-studio-3 (Desktop Core Primitives)
-    [x] carvd-studio-3.1 (Button)
-    [x] carvd-studio-3.2 (Input/Textarea/Label)
-    [x] carvd-studio-3.3 (Select)
-    [x] carvd-studio-3.4 (Checkbox/RadioGroup)
-    [x] carvd-studio-3.5 (Dialog)
-    [x] carvd-studio-3.6 (Toast/Sonner)
-  [x] carvd-studio-10 (Website Migration)
-    [x] carvd-studio-10.1 through 10.7
-
-[x] Phase 3: Overlays + Complex Components ✅
-  [x] carvd-studio-4 (Overlays)
-  [x] carvd-studio-5 (Complex Components)
-
-[x] Phase 4: Modals + Layout ✅
-  [x] carvd-studio-6 (Modals)
-  [x] carvd-studio-7 (Layout)
-
-[ ] Phase 5: Cleanup
-  [ ] carvd-studio-8 (Desktop Cleanup) — ready to start
-  [ ] carvd-studio-11 (Website Cleanup) — ready to start
-
-[ ] Phase 6: Final Integration
-  [ ] carvd-studio-12
 ```
 
 ---
