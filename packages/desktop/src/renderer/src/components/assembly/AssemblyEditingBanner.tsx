@@ -5,7 +5,9 @@
 
 import { Check, Pencil, Save, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert';
 import { Button } from '@renderer/components/ui/button';
+import { Input } from '@renderer/components/ui/input';
 
 interface AssemblyEditingBannerProps {
   assemblyName: string;
@@ -56,61 +58,69 @@ export function AssemblyEditingBanner({
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 bg-accent text-accent-foreground text-sm gap-4">
-      <div className="flex items-center gap-2">
-        <span className="text-base">📦</span>
-        <span>{isCreatingNew ? 'Creating new assembly:' : 'Editing assembly:'}</span>
-        {isEditing ? (
-          <span className="flex items-center gap-1">
-            <input
-              ref={inputRef}
-              type="text"
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onBlur={handleConfirm}
-              className="bg-black/20 border border-black/30 rounded px-2 py-0.5 text-sm text-accent-foreground font-semibold outline-none focus:border-accent-foreground/50 w-48"
-            />
-            <button
-              className="p-0.5 rounded hover:bg-black/10 cursor-pointer bg-transparent border-none text-accent-foreground"
-              onClick={handleConfirm}
-              title="Confirm name"
-            >
-              <Check size={14} />
-            </button>
-          </span>
-        ) : (
-          <button
-            className="flex items-center gap-1.5 bg-transparent border-none cursor-pointer text-accent-foreground font-semibold text-sm p-0 hover:opacity-80"
-            onClick={handleStartEditing}
-            title="Click to rename"
+    <Alert className="rounded-none border-x-0 border-t-0 border-b-border bg-accent py-2 text-accent-foreground">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <AlertTitle className="flex items-center gap-2 text-accent-foreground">
+            <span className="text-base">📦</span>
+            <span>{isCreatingNew ? 'Creating new assembly:' : 'Editing assembly:'}</span>
+          </AlertTitle>
+          <AlertDescription className="mt-1 text-accent-foreground">
+            {isEditing ? (
+              <span className="flex items-center gap-1">
+                <Input
+                  ref={inputRef}
+                  type="text"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleConfirm}
+                  className="h-7 w-48 border-black/30 bg-black/20 px-2 py-0.5 font-semibold text-accent-foreground focus-visible:outline-accent-foreground"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="text-accent-foreground hover:bg-black/10"
+                  onClick={handleConfirm}
+                  title="Confirm name"
+                >
+                  <Check size={14} />
+                </Button>
+              </span>
+            ) : (
+              <button
+                className="flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 text-sm font-semibold text-accent-foreground hover:opacity-80"
+                onClick={handleStartEditing}
+                title="Click to rename"
+              >
+                <strong>{assemblyName}</strong>
+                <Pencil size={12} className="opacity-60" />
+              </button>
+            )}
+          </AlertDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-accent-foreground hover:bg-black/10"
+            onClick={onCancel}
+            title="Cancel editing"
           >
-            <strong>{assemblyName}</strong>
-            <Pencil size={12} className="opacity-60" />
-          </button>
-        )}
+            <X size={16} />
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            className="!bg-bg-dark !text-text hover:!bg-border"
+            onClick={onSave}
+            title="Save changes to library"
+          >
+            <Save size={16} />
+            Save to Library
+          </Button>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-accent-foreground border-black/20 hover:bg-black/10 hover:border-black/30"
-          onClick={onCancel}
-          title="Cancel editing"
-        >
-          <X size={16} />
-          Cancel
-        </Button>
-        <Button
-          size="sm"
-          className="!bg-bg-dark !text-text hover:!bg-border"
-          onClick={onSave}
-          title="Save changes to library"
-        >
-          <Save size={16} />
-          Save to Library
-        </Button>
-      </div>
-    </div>
+    </Alert>
   );
 }

@@ -5,6 +5,7 @@
  * a feature that requires a license.
  */
 
+import { Alert, AlertDescription } from '@renderer/components/ui/alert';
 import { Button } from '@renderer/components/ui/button';
 
 interface UpgradePromptProps {
@@ -21,18 +22,20 @@ export function UpgradePrompt({ message, onUpgrade, onDismiss }: UpgradePromptPr
   };
 
   return (
-    <div className="flex items-center justify-between px-4 py-3 bg-surface border border-primary rounded-md my-2">
-      <p className="m-0 text-[13px] text-text">{message}</p>
-      <div className="flex gap-2 flex-shrink-0">
-        <Button size="sm" onClick={handleUpgrade}>
-          Upgrade
-        </Button>
-        {onDismiss && (
-          <Button size="sm" variant="ghost" onClick={onDismiss}>
-            Dismiss
+    <Alert className="my-2 border-primary">
+      <AlertDescription className="mt-0 flex items-center justify-between gap-4">
+        <p className="m-0 text-[13px] text-text">{message}</p>
+        <div className="flex flex-shrink-0 gap-2">
+          <Button size="sm" onClick={handleUpgrade}>
+            Upgrade
           </Button>
-        )}
-      </div>
-    </div>
+          {onDismiss && (
+            <Button size="sm" variant="ghost" onClick={onDismiss}>
+              Dismiss
+            </Button>
+          )}
+        </div>
+      </AlertDescription>
+    </Alert>
   );
 }

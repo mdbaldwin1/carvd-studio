@@ -54,17 +54,17 @@ describe('TrialBanner', () => {
   });
 
   it('applies normal styling when days > 3', () => {
-    const { container } = render(<TrialBanner {...defaultProps} daysRemaining={7} />);
-    expect(container.querySelector('.bg-warning-bg')).toBeInTheDocument();
+    render(<TrialBanner {...defaultProps} daysRemaining={7} />);
+    expect(screen.getByRole('alert')).toHaveAttribute('data-variant', 'default');
   });
 
   it('applies urgent styling when days <= 3', () => {
-    const { container } = render(<TrialBanner {...defaultProps} daysRemaining={3} />);
-    expect(container.querySelector('.bg-error-bg')).toBeInTheDocument();
+    render(<TrialBanner {...defaultProps} daysRemaining={3} />);
+    expect(screen.getByRole('alert')).toHaveAttribute('data-variant', 'destructive');
   });
 
   it('applies urgent styling when 1 day remaining', () => {
-    const { container } = render(<TrialBanner {...defaultProps} daysRemaining={1} />);
-    expect(container.querySelector('.bg-error-bg')).toBeInTheDocument();
+    render(<TrialBanner {...defaultProps} daysRemaining={1} />);
+    expect(screen.getByRole('alert')).toHaveAttribute('data-variant', 'destructive');
   });
 });

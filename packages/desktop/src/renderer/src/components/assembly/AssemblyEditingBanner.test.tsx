@@ -11,9 +11,8 @@ describe('AssemblyEditingBanner', () => {
 
   describe('rendering', () => {
     it('renders the banner', () => {
-      const { container } = render(<AssemblyEditingBanner {...defaultProps} />);
-
-      expect(container.querySelector('.bg-accent')).toBeInTheDocument();
+      render(<AssemblyEditingBanner {...defaultProps} />);
+      expect(screen.getByRole('alert')).toBeInTheDocument();
     });
 
     it('displays assembly name when editing', () => {

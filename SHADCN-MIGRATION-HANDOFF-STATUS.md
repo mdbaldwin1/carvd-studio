@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-20 (updated)
 **Branch**: develop
-**Last develop SHA**: `aaf263e` (after bead 6.7 PR #253 merge)
+**Last develop SHA**: `3db4a30` (after bead 7.3 PR #256 merge)
 
 ## Key Instruction Documents
 
@@ -73,32 +73,33 @@ These documents define the migration workflow and must be followed:
 | 5.4  | #245 | Collapsible/Accordion migration          |
 | 5.5  | #246 | Progress/Skeleton migration              |
 
-**Total: 35 beads merged across 8 epics (2, 3, 4, 5, 6, 7, 9, 10)**
+**Total: 39 beads merged across 8 epics (2, 3, 4, 5, 6, 7, 9, 10)**
 
 ## Active Worktrees
 
 | Worktree                                 | Branch                | State                    |
 | ---------------------------------------- | --------------------- | ------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-7.3` | feat/carvd-studio-7.3 | **In progress (active)** |
+| `/Users/mbaldwin/Carvd/carvd-studio-7.4` | feat/carvd-studio-7.4 | **In progress (active)** |
 
-All completed worktrees through bead 7.2 have been cleaned up.
+All completed worktrees through bead 7.3 have been cleaned up.
 
-## In-Progress Work: Bead 7.3 (Properties Panel Form-Control Migration)
+## In-Progress Work: Bead 7.4 (Banner Migration to shadcn Alert)
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-7.3`
-**Branch**: `feat/carvd-studio-7.3`
+**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-7.4`
+**Branch**: `feat/carvd-studio-7.4`
 **State**: Implementation complete; PR prep in progress
 
 ### What was done:
 
-1. Migrated `PropertiesPanel` controls in `App.tsx` from native form elements to shadcn form primitives (`Input`, `Select`, `Label`, `Checkbox`, `Textarea`) while preserving existing state/update behavior.
-2. Preserved `FractionInput` and `ColorPicker` flows and existing constraint/help messaging.
-3. Removed legacy `.property-group` form-control CSS rules (text/number inputs, select, checkbox-label styling, textarea styling) from `domain.css`.
-4. Verified desktop format/lint/typecheck and full desktop unit suites (`test:unit`) pass locally.
+1. Added new shadcn `Alert` primitive at `components/ui/alert.tsx` with `Alert`, `AlertTitle`, and `AlertDescription`, including `default` and `destructive` variants.
+2. Migrated `AssemblyEditingBanner` and `TemplateEditingBanner` to `Alert` composition while preserving inline assembly rename behavior and save/cancel/discard flows.
+3. Migrated `TrialBanner`, `UpdateNotificationBanner`, and `UpgradePrompt` to `Alert` composition while preserving trial CTA, updater download/install/changelog actions, dismiss behavior, and upgrade flow.
+4. Updated banner/prompt tests to use semantic alert assertions (`role="alert"`, `data-variant`) and validated behavior parity.
+5. Verified desktop lint/typecheck/unit tests and format check pass locally.
 
 ### Outstanding before merge:
 
-1. Open PR for bead 7.3 and pass CI checks
+1. Open PR for bead 7.4 and pass CI checks
 2. Merge PR (squash) and clean up worktree/branch
 
 ## Remaining Work (Not Started)
@@ -127,8 +128,8 @@ All completed worktrees through bead 7.2 have been cleaned up.
 
 - 7.1: Sidebar → shadcn Sidebar + Collapsible — **DONE** (PR #254 merged)
 - 7.2: Header/Toolbar buttons — **DONE** (PR #255 merged)
-- 7.3: Properties Panel form controls — **IN PROGRESS**
-- 7.4: Banners → shadcn Alert
+- 7.3: Properties Panel form controls — **DONE** (PR #256 merged)
+- 7.4: Banners → shadcn Alert — **IN PROGRESS**
 - 7.5: Tutorial components
 - 7.6: StartScreen layout → Card + Tabs
 
@@ -159,7 +160,7 @@ All completed worktrees through bead 7.2 have been cleaned up.
 
 ```
 Epics 2, 3, 4, 5, 6, 9, 10 are COMPLETE ✅
-Epic 7 is IN PROGRESS (7.3 active)
+Epic 7 is IN PROGRESS (7.4 active)
 Epic 8 is BLOCKED on Epic 7
 Epic 11 can start NOW (dependency Epic 10 ✅ is met)
 Epic 12 is BLOCKED on Epics 8 and 11
@@ -211,7 +212,7 @@ Bead status state shown here is current as of 2026-02-20.
 
 ## Recommended Next Steps
 
-1. **Complete bead 7.3** — create PR, pass CI, merge, and cleanup.
-2. Continue Epic 7 sequence (7.4 next) while Epic 11 proceeds in parallel when possible.
+1. **Complete bead 7.4** — create PR, pass CI, merge, and cleanup.
+2. Continue Epic 7 sequence (7.5 next) while Epic 11 proceeds in parallel when possible.
 3. Start Epic 8 after Epic 7 completes.
 4. Complete Epic 12 integration after Epics 8 and 11.

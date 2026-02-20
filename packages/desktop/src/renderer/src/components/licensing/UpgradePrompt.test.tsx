@@ -52,8 +52,8 @@ describe('UpgradePrompt', () => {
   });
 
   it('has border-primary styling', () => {
-    const { container } = render(<UpgradePrompt {...defaultProps} />);
-    expect(container.querySelector('.border-primary')).toBeInTheDocument();
+    render(<UpgradePrompt {...defaultProps} />);
+    expect(screen.getByRole('alert')).toHaveClass('border-primary');
   });
 
   it('displays custom messages correctly', () => {
