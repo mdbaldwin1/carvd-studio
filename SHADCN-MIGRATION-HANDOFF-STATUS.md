@@ -79,26 +79,26 @@ These documents define the migration workflow and must be followed:
 
 | Worktree                                 | Branch                | State                    |
 | ---------------------------------------- | --------------------- | ------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-7.2` | feat/carvd-studio-7.2 | **In progress (active)** |
+| `/Users/mbaldwin/Carvd/carvd-studio-7.3` | feat/carvd-studio-7.3 | **In progress (active)** |
 
-All completed worktrees through bead 7.1 have been cleaned up.
+All completed worktrees through bead 7.2 have been cleaned up.
 
-## In-Progress Work: Bead 7.2 (Header/Toolbar Button Migration)
+## In-Progress Work: Bead 7.3 (Properties Panel Form-Control Migration)
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-7.2`
-**Branch**: `feat/carvd-studio-7.2`
+**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-7.3`
+**Branch**: `feat/carvd-studio-7.3`
 **State**: Implementation complete; PR prep in progress
 
 ### What was done:
 
-1. Migrated display toolbar controls in `App.tsx` from custom class-based `<button>` elements to shadcn `Button` variants/sizes with preserved active toggle states.
-2. Preserved header drag/no-drag behavior and existing header action layout semantics.
-3. Removed obsolete `.toolbar*` and `.header-divider` CSS rules from `layout.css` after migration.
-4. Verified desktop lint/typecheck and full desktop unit suites (`test:unit`) pass locally.
+1. Migrated `PropertiesPanel` controls in `App.tsx` from native form elements to shadcn form primitives (`Input`, `Select`, `Label`, `Checkbox`, `Textarea`) while preserving existing state/update behavior.
+2. Preserved `FractionInput` and `ColorPicker` flows and existing constraint/help messaging.
+3. Removed legacy `.property-group` form-control CSS rules (text/number inputs, select, checkbox-label styling, textarea styling) from `domain.css`.
+4. Verified desktop format/lint/typecheck and full desktop unit suites (`test:unit`) pass locally.
 
 ### Outstanding before merge:
 
-1. Open PR for bead 7.2 and pass CI checks
+1. Open PR for bead 7.3 and pass CI checks
 2. Merge PR (squash) and clean up worktree/branch
 
 ## Remaining Work (Not Started)
@@ -126,8 +126,8 @@ All completed worktrees through bead 7.1 have been cleaned up.
 **Epic 7: Desktop Layout & Specialized** (depends on Epics 4 ✅ and 5)
 
 - 7.1: Sidebar → shadcn Sidebar + Collapsible — **DONE** (PR #254 merged)
-- 7.2: Header/Toolbar buttons — **IN PROGRESS**
-- 7.3: Properties Panel form controls
+- 7.2: Header/Toolbar buttons — **DONE** (PR #255 merged)
+- 7.3: Properties Panel form controls — **IN PROGRESS**
 - 7.4: Banners → shadcn Alert
 - 7.5: Tutorial components
 - 7.6: StartScreen layout → Card + Tabs
@@ -159,7 +159,7 @@ All completed worktrees through bead 7.1 have been cleaned up.
 
 ```
 Epics 2, 3, 4, 5, 6, 9, 10 are COMPLETE ✅
-Epic 7 is IN PROGRESS (7.2 active)
+Epic 7 is IN PROGRESS (7.3 active)
 Epic 8 is BLOCKED on Epic 7
 Epic 11 can start NOW (dependency Epic 10 ✅ is met)
 Epic 12 is BLOCKED on Epics 8 and 11
@@ -211,7 +211,7 @@ Bead status state shown here is current as of 2026-02-20.
 
 ## Recommended Next Steps
 
-1. **Complete bead 7.2** — create PR, pass CI, merge, and cleanup.
-2. Continue Epic 7 sequence (7.3 next) while Epic 11 proceeds in parallel when possible.
+1. **Complete bead 7.3** — create PR, pass CI, merge, and cleanup.
+2. Continue Epic 7 sequence (7.4 next) while Epic 11 proceeds in parallel when possible.
 3. Start Epic 8 after Epic 7 completes.
 4. Complete Epic 12 integration after Epics 8 and 11.
