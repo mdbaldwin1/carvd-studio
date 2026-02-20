@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-20 (updated)
 **Branch**: develop
-**Last develop SHA**: `e6f56a3` (after bead 6.6 PR #252 merge)
+**Last develop SHA**: `aaf263e` (after bead 6.7 PR #253 merge)
 
 ## Key Instruction Documents
 
@@ -79,26 +79,26 @@ These documents define the migration workflow and must be followed:
 
 | Worktree                                 | Branch                | State                    |
 | ---------------------------------------- | --------------------- | ------------------------ |
-| `/Users/mbaldwin/Carvd/carvd-studio-6.7` | feat/carvd-studio-6.7 | **In progress (active)** |
+| `/Users/mbaldwin/Carvd/carvd-studio-7.1` | feat/carvd-studio-7.1 | **In progress (active)** |
 
-All completed worktrees through bead 6.6 have been cleaned up.
+All completed worktrees through bead 6.7 have been cleaned up.
 
-## In-Progress Work: Bead 6.7 (License/Trial/Utility Dialogs)
+## In-Progress Work: Bead 7.1 (Sidebar Migration)
 
-**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-6.7`
-**Branch**: `feat/carvd-studio-6.7`
-**State**: Implementation complete; verification and PR prep in progress
+**Worktree**: `/Users/mbaldwin/Carvd/carvd-studio-7.1`
+**Branch**: `feat/carvd-studio-7.1`
+**State**: Implementation complete; PR prep in progress
 
 ### What was done:
 
-1. Migrated remaining custom-shell dialogs in this bead to `ui/dialog` primitives: `LicenseActivationModal`, `TrialExpiredModal`, `FileRecoveryModal`, and `ImportToLibraryDialog`.
-2. Preserved existing behavior for activation/validation states, trial upgrade CTAs, file recovery decision flows, and import-to-library selection/import flows.
-3. Verified desktop lint/typecheck and targeted dialog tests pass locally for all touched components.
-4. Verified full desktop renderer/main vitest suites pass locally; local Playwright E2E remains blocked by known environment launch issue.
+1. Added sidebar primitives in `components/ui/sidebar.tsx` and migrated app shell usage in `App.tsx` to `SidebarProvider`, `Sidebar`, `SidebarContent`, `SidebarGroup`, `SidebarGroupLabel`, and `SidebarFooter`.
+2. Preserved existing collapsible section behavior (Stock, Assemblies, Parts), section search flows, drag/drop list interactions, and bottom settings actions.
+3. Preserved layout constraints including the 264px sidebar width and existing shell spacing classes.
+4. Verified desktop lint/typecheck plus full renderer/main Vitest suites pass locally; local Playwright E2E remains blocked by known environment launch issue.
 
 ### Outstanding before merge:
 
-1. Open PR for bead 6.7 and pass CI checks
+1. Open PR for bead 7.1 and pass CI checks
 2. Merge PR (squash) and clean up worktree/branch
 
 ## Remaining Work (Not Started)
@@ -113,7 +113,7 @@ All completed worktrees through bead 6.6 have been cleaned up.
 - 5.4: Collapsible/Accordion — **DONE** (PR #245 merged)
 - 5.5: Progress/Skeleton — **DONE** (PR #246 merged)
 
-**Epic 6: Desktop Modal Migration** (depends on 3.5 ✅ and 3.2 ✅ — ready to start)
+**Epic 6: Desktop Modal Migration** (depends on 3.5 ✅ and 3.2 ✅ — complete)
 
 - 6.1: Stock modals (AddStock, EditStock, StockLibrary) — **DONE** (PR #247 merged)
 - 6.2: Assembly modals (AddAssembly, SaveAssembly) — **DONE** (PR #248 merged)
@@ -121,11 +121,11 @@ All completed worktrees through bead 6.6 have been cleaned up.
 - 6.4: AppSettingsModal (largest, 7+ sections) — **DONE** (PR #250 merged)
 - 6.5: CutListModal (complex: 4 tabs, tables, diagrams) — **DONE** (PR #251 merged)
 - 6.6: TemplateBrowserModal — **DONE** (PR #252 merged)
-- 6.7: License/trial/utility dialogs — **IN PROGRESS**
+- 6.7: License/trial/utility dialogs — **DONE** (PR #253 merged)
 
 **Epic 7: Desktop Layout & Specialized** (depends on Epics 4 ✅ and 5)
 
-- 7.1: Sidebar → shadcn Sidebar + Collapsible
+- 7.1: Sidebar → shadcn Sidebar + Collapsible — **IN PROGRESS**
 - 7.2: Header/Toolbar buttons
 - 7.3: Properties Panel form controls
 - 7.4: Banners → shadcn Alert
@@ -158,10 +158,9 @@ All completed worktrees through bead 6.6 have been cleaned up.
 ## Dependency Graph Summary
 
 ```
-Epics 2, 3, 4, 5, 9, 10 are COMPLETE ✅
-Epic 6 is IN PROGRESS (6.7 active; 6.1/6.2/6.3/6.4/6.5/6.6 complete)
-Epic 7 can start NOW (dependencies Epics 4 ✅ and 5 ✅ are met)
-Epic 8 is BLOCKED on Epics 6 and 7
+Epics 2, 3, 4, 5, 6, 9, 10 are COMPLETE ✅
+Epic 7 is IN PROGRESS (7.1 active)
+Epic 8 is BLOCKED on Epic 7
 Epic 11 can start NOW (dependency Epic 10 ✅ is met)
 Epic 12 is BLOCKED on Epics 8 and 11
 ```
@@ -212,7 +211,7 @@ Bead status state shown here is current as of 2026-02-20.
 
 ## Recommended Next Steps
 
-1. **Complete bead 6.7** — create PR, pass CI, merge, and cleanup.
-2. Begin Epic 7 sequence while preparing final Epic 6/8 cleanup validation.
-3. Run Epic 6 and Epic 11 in parallel where safe to reduce critical path.
-4. Epic 8 remains final desktop cleanup before Epic 12 integration.
+1. **Complete bead 7.1** — create PR, pass CI, merge, and cleanup.
+2. Continue Epic 7 sequence (7.2 next) while Epic 11 proceeds in parallel when possible.
+3. Start Epic 8 after Epic 7 completes.
+4. Complete Epic 12 integration after Epics 8 and 11.
