@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-20 (updated)
 **Branch**: develop
-**Last develop SHA**: `34cf62b` (after bead 12.2 PR #270 merge)
+**Last develop SHA**: `704f7c8` (after bead 12.3 PR #271 merge)
 
 ## Key Instruction Documents
 
@@ -107,17 +107,17 @@ These documents define the migration workflow and must be followed:
 | 8.5  | #265 | Update tests + verify coverage  |
 | 8.6  | #266 | Bundle size audit               |
 
-**Total: 50 beads merged across 10 epics (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, plus 12.2)**
+**Total: 51 beads merged across 10 epics (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, plus 12.2/12.3)**
 
 ## Active Worktrees
 
 | Worktree                                  | Branch                   | State                           |
 | ----------------------------------------- | ------------------------ | ------------------------------- |
-| `/Users/mbaldwin/Carvd/carvd-studio-12-2` | `test/carvd-studio-12.2` | Active (final integration/docs) |
+| `/Users/mbaldwin/Carvd/carvd-studio-12-1` | `test/carvd-studio-12.1` | Active (final integration/docs) |
 
 ## Current Position
 
-- **Current bead**: Epic 12.3 (`Final CHANGELOG.md update and migration summary`) in progress on branch `test/carvd-studio-12.3`.
+- **Current bead**: Epic 12.1 (`Cross-app theme consistency check`) complete on branch `test/carvd-studio-12.1` and ready for PR.
 - **Coverage status**: Desktop thresholds pass after bead 8.5 (`Statements 91.7%`, `Branches 82.02%`, `Functions 90.06%`, `Lines 91.98%`).
 - **Desktop CSS cleanup status**: Epic 8 is complete (8.1–8.6 merged).
 - **Website cleanup status**: Epic 11 is complete (`11.1` PR #267, `11.2` PR #268, `11.3` PR #269 merged).
@@ -172,9 +172,9 @@ These documents define the migration workflow and must be followed:
 
 ### Epic 12: Final Integration
 
-- 12.1: Cross-app theme consistency check
+- 12.1: Cross-app theme consistency check — **DONE** (pending PR)
 - 12.2: Update CLAUDE.md with shadcn patterns — **DONE** (PR #270 merged)
-- 12.3: Final CHANGELOG.md update — **IN PROGRESS**
+- 12.3: Final CHANGELOG.md update — **DONE** (PR #271 merged)
 
 ## Dependency Graph Summary
 
@@ -182,7 +182,7 @@ These documents define the migration workflow and must be followed:
 Epics 2, 3, 4, 5, 6, 7, 8, 9, 10 are COMPLETE ✅
 Epic 8 is COMPLETE ✅
 Epic 11 is COMPLETE ✅
-Epic 12 is IN PROGRESS (12.2 merged, 12.1 + 12.3 remaining)
+Epic 12 is COMPLETE (12.1 done pending PR; 12.2/12.3 merged)
 ```
 
 ## Key Technical Notes
