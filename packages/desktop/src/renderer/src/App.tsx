@@ -394,8 +394,11 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
         >
           <SidebarGroup>
             <CollapsibleTrigger asChild>
-              <div className="section-header" title={collapsedSections.stock ? 'Expand' : 'Collapse'}>
-                <span className="section-collapse-btn">
+              <div
+                className="flex cursor-pointer items-center gap-1.5 rounded-none p-4 pr-2.5 transition-[background-color,margin] duration-150 hover:bg-bg-hover"
+                title={collapsedSections.stock ? 'Expand' : 'Collapse'}
+              >
+                <span className="inline-flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border-none bg-transparent p-0 text-text-muted transition-colors duration-150">
                   {collapsedSections.stock ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
                 </span>
                 <SidebarGroupLabel>{isEditingAssembly ? 'Stock Library' : 'Stock'}</SidebarGroupLabel>
@@ -438,8 +441,8 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
               </div>
             </CollapsibleTrigger>
             {searchOpen.stock && (
-              <div className="section-search">
-                <div className="section-search-inner">
+              <div className="flex items-center px-2 py-2">
+                <div className="sticky top-0 z-[1] flex flex-1 items-center gap-1.5 rounded-md bg-bg px-2 py-1">
                   <Search size={12} className="text-text-muted" />
                   <input
                     type="text"
@@ -451,7 +454,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                   />
                   {searchTerms.stock && (
                     <button
-                      className="section-search-clear"
+                      className="flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-[3px] border-none bg-transparent p-0 text-text-muted hover:bg-bg-hover hover:text-text"
                       onClick={(e) => {
                         e.stopPropagation();
                         setSearchTerms((t) => ({ ...t, stock: '' }));
@@ -463,8 +466,11 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                 </div>
               </div>
             )}
-            <CollapsibleContent forceMount className="section-content">
-              <div className="section-content-inner">
+            <CollapsibleContent
+              forceMount
+              className="grid min-h-0 flex-1 overflow-hidden transition-[grid-template-rows] duration-200 ease-out data-[state=closed]:grid-rows-[0fr] data-[state=open]:grid-rows-[1fr]"
+            >
+              <div className="flex min-h-0 flex-col overflow-hidden">
                 {stocks.length === 0 ? (
                   <p className="text-text-muted text-xs italic px-4">
                     {isEditingAssembly ? 'No stock in library. Click + to create.' : 'No stock yet. Click + to add.'}
@@ -547,8 +553,11 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
         >
           <SidebarGroup>
             <CollapsibleTrigger asChild>
-              <div className="section-header" title={collapsedSections.assemblies ? 'Expand' : 'Collapse'}>
-                <span className="section-collapse-btn">
+              <div
+                className="flex cursor-pointer items-center gap-1.5 rounded-none p-4 pr-2.5 transition-[background-color,margin] duration-150 hover:bg-bg-hover"
+                title={collapsedSections.assemblies ? 'Expand' : 'Collapse'}
+              >
+                <span className="inline-flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border-none bg-transparent p-0 text-text-muted transition-colors duration-150">
                   {collapsedSections.assemblies ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
                 </span>
                 <SidebarGroupLabel>{isEditingAssembly ? 'Assembly Library' : 'Assemblies'}</SidebarGroupLabel>
@@ -599,8 +608,8 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
               </div>
             </CollapsibleTrigger>
             {searchOpen.assemblies && (
-              <div className="section-search">
-                <div className="section-search-inner">
+              <div className="flex items-center px-2 py-2">
+                <div className="sticky top-0 z-[1] flex flex-1 items-center gap-1.5 rounded-md bg-bg px-2 py-1">
                   <Search size={12} className="text-text-muted" />
                   <input
                     type="text"
@@ -612,7 +621,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                   />
                   {searchTerms.assemblies && (
                     <button
-                      className="section-search-clear"
+                      className="flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-[3px] border-none bg-transparent p-0 text-text-muted hover:bg-bg-hover hover:text-text"
                       onClick={(e) => {
                         e.stopPropagation();
                         setSearchTerms((t) => ({ ...t, assemblies: '' }));
@@ -624,8 +633,11 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                 </div>
               </div>
             )}
-            <CollapsibleContent forceMount className="section-content">
-              <div className="section-content-inner">
+            <CollapsibleContent
+              forceMount
+              className="grid min-h-0 flex-1 overflow-hidden transition-[grid-template-rows] duration-200 ease-out data-[state=closed]:grid-rows-[0fr] data-[state=open]:grid-rows-[1fr]"
+            >
+              <div className="flex min-h-0 flex-col overflow-hidden">
                 {!canUseAssemblies ? (
                   <p className="text-text-muted text-xs italic px-4">
                     Assemblies require a license.{' '}
@@ -715,8 +727,11 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
         >
           <SidebarGroup>
             <CollapsibleTrigger asChild>
-              <div className="section-header" title={collapsedSections.parts ? 'Expand' : 'Collapse'}>
-                <span className="section-collapse-btn">
+              <div
+                className="flex cursor-pointer items-center gap-1.5 rounded-none p-4 pr-2.5 transition-[background-color,margin] duration-150 hover:bg-bg-hover"
+                title={collapsedSections.parts ? 'Expand' : 'Collapse'}
+              >
+                <span className="inline-flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border-none bg-transparent p-0 text-text-muted transition-colors duration-150">
                   {collapsedSections.parts ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
                 </span>
                 <SidebarGroupLabel>Parts</SidebarGroupLabel>
@@ -753,8 +768,8 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
               </div>
             </CollapsibleTrigger>
             {searchOpen.parts && (
-              <div className="section-search">
-                <div className="section-search-inner">
+              <div className="flex items-center px-2 py-2">
+                <div className="sticky top-0 z-[1] flex flex-1 items-center gap-1.5 rounded-md bg-bg px-2 py-1">
                   <Search size={12} className="text-text-muted" />
                   <input
                     type="text"
@@ -766,7 +781,7 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                   />
                   {searchTerms.parts && (
                     <button
-                      className="section-search-clear"
+                      className="flex h-[22px] w-[22px] cursor-pointer items-center justify-center rounded-[3px] border-none bg-transparent p-0 text-text-muted hover:bg-bg-hover hover:text-text"
                       onClick={(e) => {
                         e.stopPropagation();
                         setSearchTerms((t) => ({ ...t, parts: '' }));
@@ -778,8 +793,11 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
                 </div>
               </div>
             )}
-            <CollapsibleContent forceMount className="section-content">
-              <div className="section-content-inner">
+            <CollapsibleContent
+              forceMount
+              className="grid min-h-0 flex-1 overflow-hidden transition-[grid-template-rows] duration-200 ease-out data-[state=closed]:grid-rows-[0fr] data-[state=open]:grid-rows-[1fr]"
+            >
+              <div className="flex min-h-0 flex-col overflow-hidden">
                 <HierarchicalPartsList
                   onPartClick={handlePartClick}
                   searchFilter={searchTerms.parts}
@@ -865,11 +883,11 @@ function Sidebar({ onOpenProjectSettings, onOpenCutList, onCreateNewAssembly, on
 
       {/* Bottom Section - hidden during assembly editing */}
       {!isEditingAssembly && (
-        <SidebarFooter className="sidebar-section-bottom">
-          <Button size="sm" className="sidebar-settings-btn" onClick={onOpenCutList}>
+        <SidebarFooter>
+          <Button size="sm" className="flex w-full justify-center" onClick={onOpenCutList}>
             {!cutList ? 'Generate Cut List' : cutList.isStale ? 'Regenerate Cut List' : 'View Cut List'}
           </Button>
-          <Button variant="ghost" size="sm" className="sidebar-settings-btn" onClick={onOpenProjectSettings}>
+          <Button variant="ghost" size="sm" className="flex w-full justify-center" onClick={onOpenProjectSettings}>
             Project Settings
           </Button>
         </SidebarFooter>
@@ -1940,7 +1958,7 @@ function CanvasWithDrop() {
 
   return (
     <div
-      className={`canvas-container ${isDragOver ? 'outline-2 outline-dashed outline-accent -outline-offset-2' : ''}`}
+      className={`canvas-container relative min-w-0 flex-1 overflow-hidden bg-bg ${isDragOver ? 'outline-2 outline-dashed outline-accent -outline-offset-2' : ''}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
