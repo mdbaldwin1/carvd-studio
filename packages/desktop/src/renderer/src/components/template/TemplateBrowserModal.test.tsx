@@ -506,7 +506,7 @@ describe('TemplateBrowserModal', () => {
       const onClose = vi.fn();
       const { container } = render(<TemplateBrowserModal {...defaultProps} onClose={onClose} />);
 
-      const backdrop = container.querySelector('.modal-backdrop');
+      const backdrop = container.firstChild as HTMLElement;
       fireEvent.mouseDown(backdrop!);
       fireEvent.click(backdrop!);
 
