@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Desktop test suite coverage hardening (bead carvd-studio-8.5)** — Added focused shadcn/Radix-compatible tests for `components/ui/context-menu` wrappers and standalone menu primitives, restoring desktop coverage thresholds to passing levels (`Statements 91.7%`, `Branches 82.02%`, `Functions 90.06%`, `Lines 91.98%`).
 - **Desktop tailwind.css bridge cleanup (bead carvd-studio-8.4)** — Removed dual shadcn alias vars (`--background`, `--foreground`, etc.) from desktop theme roots and mapped shadcn token utilities directly to project `--color-*` variables in `tailwind.css`; removed obsolete custom toast/modal keyframes and animation utility classes no longer needed by migrated dialog components.
 - **Desktop domain.css simplification (bead carvd-studio-8.3)** — Removed obsolete accordion/joinery styling from `packages/desktop/src/renderer/src/domain.css`, moved those styles to shadcn/Tailwind class composition in `App.tsx`, and kept only cut-list print-specific domain CSS rules.
 - **Desktop layout.css simplification (bead carvd-studio-8.2)** — Removed migrated generic sidebar/search/canvas layout rules from `layout.css`, and moved those styles into shadcn component composition (`components/ui/sidebar.tsx`) plus `App.tsx` utility classes while preserving Electron shell layout behavior.
