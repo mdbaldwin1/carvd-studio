@@ -281,14 +281,19 @@ test.describe('Happy Path Workflow', () => {
     await window.getByRole('button', { name: /generate cut list/i }).click({ force: true });
 
     // Wait for the cut list modal to appear
-    await expect(window.locator('[role="dialog"][aria-labelledby="cut-list-modal-title"]')).toBeVisible({
+    await expect(
+      window.getByRole('dialog').filter({ has: window.getByRole('heading', { name: 'Cut List' }) })
+    ).toBeVisible({
       timeout: 10000
     });
 
     // The modal should show meaningful content — either a generate button,
     // validation issues (part has no stock), or tabs (if auto-generated)
     const modalContent = await window.evaluate(() => {
-      const modal = document.querySelector('[role="dialog"][aria-labelledby="cut-list-modal-title"]');
+      const heading = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6')).find(
+        (el) => el.textContent?.trim() === 'Cut List'
+      );
+      const modal = heading?.closest('[role="dialog"]');
       if (!modal) return { hasGenerate: false, hasIssues: false, hasTabs: false };
       return {
         hasGenerate: !!modal.querySelector('.cut-list-generate'),
@@ -300,16 +305,21 @@ test.describe('Happy Path Workflow', () => {
 
     // Close the modal
     await window.evaluate(() => {
-      const closeBtn = document.querySelector(
-        '[role="dialog"][aria-labelledby="cut-list-modal-title"] [aria-label="Close"]'
-      ) as HTMLElement;
+      const heading = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6')).find(
+        (el) => el.textContent?.trim() === 'Cut List'
+      );
+      const modal = heading?.closest('[role="dialog"]');
+      const closeBtn = modal?.querySelector('[aria-label="Close"]') as HTMLElement | null;
       if (closeBtn) closeBtn.click();
     });
     await window.waitForTimeout(500);
 
     // Verify modal is closed
     const modalGone = await window.evaluate(() => {
-      const modal = document.querySelector('[role="dialog"][aria-labelledby="cut-list-modal-title"]');
+      const heading = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6')).find(
+        (el) => el.textContent?.trim() === 'Cut List'
+      );
+      const modal = heading?.closest('[role="dialog"]');
       if (!modal) return true;
       const rect = modal.getBoundingClientRect();
       return rect.width === 0 || rect.height === 0;
