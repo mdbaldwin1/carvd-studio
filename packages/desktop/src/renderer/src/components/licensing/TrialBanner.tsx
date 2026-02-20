@@ -5,6 +5,7 @@
  * license activation and purchase.
  */
 
+import { Alert, AlertDescription } from '@renderer/components/ui/alert';
 import { Button } from '@renderer/components/ui/button';
 
 interface TrialBannerProps {
@@ -23,22 +24,23 @@ export function TrialBanner({ daysRemaining, onActivateLicense, onPurchase }: Tr
   };
 
   return (
-    <div
-      className={`flex items-center justify-between px-4 py-2 text-[13px] flex-shrink-0 border-b ${
-        isUrgent ? 'bg-error-bg border-error-border' : 'bg-warning-bg border-warning-border'
-      }`}
+    <Alert
+      variant={isUrgent ? 'destructive' : 'default'}
+      className="rounded-none border-x-0 border-t-0 py-2 text-[13px] data-[variant=default]:bg-warning-bg data-[variant=default]:text-warning"
     >
-      <span className={`font-medium ${isUrgent ? 'text-error' : 'text-warning'}`}>
-        {daysRemaining === 1 ? '1 day left in your trial' : `${daysRemaining} days left in your trial`}
-      </span>
-      <div className="flex gap-2">
-        <Button size="sm" variant="ghost" onClick={onActivateLicense}>
-          Enter License
-        </Button>
-        <Button size="sm" onClick={handlePurchase}>
-          Buy Now
-        </Button>
-      </div>
-    </div>
+      <AlertDescription className="mt-0 flex items-center justify-between gap-4 text-inherit">
+        <span className="font-medium">
+          {daysRemaining === 1 ? '1 day left in your trial' : `${daysRemaining} days left in your trial`}
+        </span>
+        <div className="flex gap-2">
+          <Button size="sm" variant="ghost" onClick={onActivateLicense}>
+            Enter License
+          </Button>
+          <Button size="sm" onClick={handlePurchase}>
+            Buy Now
+          </Button>
+        </div>
+      </AlertDescription>
+    </Alert>
   );
 }
