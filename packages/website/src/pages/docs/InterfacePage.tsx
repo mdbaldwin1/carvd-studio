@@ -17,7 +17,7 @@ export default function InterfacePage() {
       <h2 className="text-4xl font-bold mb-xl">Interface Overview</h2>
 
       <div className="grid gap-xl mb-xl">
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">Main Workspace</h3>
           <div className="grid gap-md text-sm">
             <p>
@@ -35,13 +35,13 @@ export default function InterfacePage() {
               selected part.
             </p>
             <p>
-              <strong>Toolbar</strong> — Top bar with common actions: add part,
-              undo/redo, view controls, and project settings.
+              <strong>Header</strong> — Top bar with project/template/assembly
+              name, undo/redo, save, library, and app settings.
             </p>
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">Camera Controls</h3>
           <div className="grid grid-cols-2 gap-md text-sm">
             <div>
@@ -68,7 +68,7 @@ export default function InterfacePage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">Selection</h3>
           <div className="grid gap-md text-sm">
             <div>

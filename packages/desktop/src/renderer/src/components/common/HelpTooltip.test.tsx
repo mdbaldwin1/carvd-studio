@@ -113,7 +113,7 @@ describe('HelpTooltip', () => {
       const link = screen.getByText(/Learn more in docs/);
       fireEvent.click(link);
 
-      expect(window.electronAPI?.openExternal).toHaveBeenCalledWith('https://carvd-studio.com/docs#parts');
+      expect(window.electronAPI?.openExternal).toHaveBeenCalledWith('https://carvd-studio.com/docs/parts');
     });
 
     it('uses custom link text when provided', () => {

@@ -217,9 +217,9 @@ describe('SaveAssemblyModal', () => {
 
     it('calls onClose when overlay is clicked', () => {
       const onClose = vi.fn();
-      const { container } = render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
+      render(<SaveAssemblyModal {...defaultProps} onClose={onClose} />);
 
-      const overlay = container.firstChild as HTMLElement;
+      const overlay = document.querySelector('[data-state="open"][class*="bg-overlay"]') as HTMLElement;
       fireEvent.mouseDown(overlay);
       fireEvent.click(overlay);
 

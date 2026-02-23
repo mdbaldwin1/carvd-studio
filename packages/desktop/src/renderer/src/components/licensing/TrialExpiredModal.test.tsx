@@ -76,8 +76,8 @@ describe('TrialExpiredModal', () => {
   });
 
   it('has modal backdrop', () => {
-    const { container } = render(<TrialExpiredModal {...defaultProps} />);
-    expect(container.firstChild).toBeInTheDocument();
+    render(<TrialExpiredModal {...defaultProps} />);
+    expect(document.querySelector('[data-state="open"][class*="bg-overlay"]')).toBeInTheDocument();
   });
 
   it('has modal class', () => {

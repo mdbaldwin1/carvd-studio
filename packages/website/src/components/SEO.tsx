@@ -2,7 +2,7 @@ const SITE_NAME = "Carvd Studio";
 const SITE_URL = "https://carvd-studio.com";
 const DEFAULT_DESCRIPTION =
   "Design furniture in 3D, generate optimized cut lists, and track material costs. One-time purchase, no subscription. Works offline.";
-const OG_IMAGE = `${SITE_URL}/og-image.png`;
+const OG_IMAGE = `${SITE_URL}/branding/CarvdStudio-Horizontal.svg`;
 
 interface SEOProps {
   /** Page-specific title. Will be appended with "| Carvd Studio" unless it already contains it. */

@@ -264,12 +264,12 @@ export function useKeyboardShortcuts() {
               e.preventDefault();
               // Find the containing group of selected parts
               const selectedPartsGroupIds = selectedPartIds.map((id) => getContainingGroupId(id, groupMembers));
-              const uniqueGroupIds = [...new Set(selectedPartsGroupIds.filter((id) => id !== null))];
+              const uniqueGroupIds = [
+                ...new Set([...selectedPartsGroupIds.filter((id): id is string => id !== null), ...selectedGroupIds])
+              ];
               // Ungroup each containing group
               for (const groupId of uniqueGroupIds) {
-                if (groupId) {
-                  deleteGroup(groupId, 'ungroup');
-                }
+                deleteGroup(groupId, 'ungroup');
               }
             }
             return;

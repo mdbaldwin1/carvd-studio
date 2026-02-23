@@ -213,7 +213,7 @@ describe('useLibraryImportCheck', () => {
 
       expect(mockAddStock).toHaveBeenCalledTimes(1);
       expect(mockAddAssembly).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenCalledWith('Added 2 items to library');
+      expect(showToast).toHaveBeenCalledWith('Added 2 items to library', 'success');
       expect(result.current.showImportDialog).toBe(false);
     });
 
@@ -239,7 +239,7 @@ describe('useLibraryImportCheck', () => {
         await result.current.handleImport([{ id: 's1' }] as Stock[], []);
       });
 
-      expect(showToast).toHaveBeenCalledWith('Added 1 item to library');
+      expect(showToast).toHaveBeenCalledWith('Added 1 item to library', 'success');
     });
 
     it('handles import errors gracefully', async () => {

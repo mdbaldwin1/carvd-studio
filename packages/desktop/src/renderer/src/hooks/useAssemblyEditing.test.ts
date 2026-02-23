@@ -171,7 +171,7 @@ describe('useAssemblyEditing', () => {
       });
 
       expect(success!).toBe(false);
-      expect(showToast).toHaveBeenCalledWith('Save or discard your project first');
+      expect(showToast).toHaveBeenCalledWith('Save or discard your project first', 'warning');
     });
   });
 
@@ -216,7 +216,7 @@ describe('useAssemblyEditing', () => {
       });
 
       expect(success!).toBe(false);
-      expect(showToast).toHaveBeenCalledWith('Save or discard your project first');
+      expect(showToast).toHaveBeenCalledWith('Save or discard your project first', 'warning');
     });
   });
 
@@ -299,7 +299,7 @@ describe('useAssemblyEditing', () => {
         await result.current.saveAndExit();
       });
 
-      expect(showToast).toHaveBeenCalledWith('No assembly to save');
+      expect(showToast).toHaveBeenCalledWith('No assembly to save', 'warning');
     });
 
     it('shows toast when saveEditingAssembly returns null', async () => {
@@ -316,7 +316,7 @@ describe('useAssemblyEditing', () => {
         await result.current.saveAndExit();
       });
 
-      expect(showToast).toHaveBeenCalledWith('Failed to save assembly');
+      expect(showToast).toHaveBeenCalledWith('Failed to save assembly', 'error');
     });
 
     it('shows toast when assembly has no parts', async () => {
@@ -339,7 +339,7 @@ describe('useAssemblyEditing', () => {
         await result.current.saveAndExit();
       });
 
-      expect(showToast).toHaveBeenCalledWith('Cannot save empty assembly - add at least one part');
+      expect(showToast).toHaveBeenCalledWith('Cannot save empty assembly - add at least one part', 'warning');
     });
 
     it('creates new assembly when not in library', async () => {
@@ -373,7 +373,7 @@ describe('useAssemblyEditing', () => {
       });
 
       expect(mockAddAssembly).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Created "New Assembly" in library');
+      expect(showToast).toHaveBeenCalledWith('Created "New Assembly" in library', 'success');
     });
 
     it('updates existing assembly when in library', async () => {
@@ -407,7 +407,7 @@ describe('useAssemblyEditing', () => {
       });
 
       expect(mockUpdateAssembly).toHaveBeenCalledWith('a1', expect.objectContaining({ name: 'Updated Assembly' }));
-      expect(showToast).toHaveBeenCalledWith('Saved "Updated Assembly" to library');
+      expect(showToast).toHaveBeenCalledWith('Saved "Updated Assembly" to library', 'success');
     });
 
     it('shows error toast when addAssembly throws', async () => {
@@ -440,7 +440,7 @@ describe('useAssemblyEditing', () => {
         await result.current.saveAndExit();
       });
 
-      expect(showToast).toHaveBeenCalledWith('Failed to save assembly to library');
+      expect(showToast).toHaveBeenCalledWith('Failed to save assembly to library', 'error');
     });
 
     it('uses manual thumbnail when available', async () => {

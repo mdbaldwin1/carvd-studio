@@ -120,8 +120,8 @@ describe('NewProjectDialog', () => {
       render(<NewProjectDialog {...defaultProps} />);
 
       await waitFor(() => {
-        const imperialRadio = screen.getByDisplayValue('imperial') as HTMLInputElement;
-        expect(imperialRadio.checked).toBe(true);
+        const unitsSelect = screen.getByLabelText('Units') as HTMLSelectElement;
+        expect(unitsSelect.value).toBe('imperial');
       });
     });
 
@@ -132,10 +132,10 @@ describe('NewProjectDialog', () => {
         expect(screen.getByText('Metric (mm)')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByDisplayValue('metric'));
+      const unitsSelect = screen.getByLabelText('Units') as HTMLSelectElement;
+      fireEvent.change(unitsSelect, { target: { value: 'metric' } });
 
-      const metricRadio = screen.getByDisplayValue('metric') as HTMLInputElement;
-      expect(metricRadio.checked).toBe(true);
+      expect(unitsSelect.value).toBe('metric');
     });
   });
 
@@ -222,10 +222,10 @@ describe('NewProjectDialog', () => {
       render(<NewProjectDialog {...defaultProps} onCreateProject={onCreateProject} />);
 
       await waitFor(() => {
-        expect(screen.getByDisplayValue('metric')).toBeInTheDocument();
+        expect(screen.getByLabelText('Units')).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByDisplayValue('metric'));
+      fireEvent.change(screen.getByLabelText('Units'), { target: { value: 'metric' } });
       fireEvent.click(screen.getByText('Create Project'));
 
       expect(onCreateProject).toHaveBeenCalledWith(

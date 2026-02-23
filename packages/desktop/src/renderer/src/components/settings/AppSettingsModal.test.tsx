@@ -3,15 +3,12 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { AppSettingsModal } from './AppSettingsModal';
 import { AppSettings } from '../../types';
 
-// Mock window.electronAPI and window.confirm/alert
+// Mock window.electronAPI and window.confirm
 beforeAll(() => {
-  window.electronAPI = {
-    resetWelcomeTutorial: vi.fn().mockResolvedValue(undefined)
-  } as unknown as typeof window.electronAPI;
+  window.electronAPI = {} as typeof window.electronAPI;
 
-  // Define confirm and alert for testing
+  // Define confirm for testing
   window.confirm = vi.fn();
-  window.alert = vi.fn();
 });
 
 describe('AppSettingsModal', () => {
@@ -38,6 +35,10 @@ describe('AppSettingsModal', () => {
     onClose: vi.fn(),
     settings: defaultSettings,
     onUpdateSettings: vi.fn()
+  };
+
+  const openTab = (name: string) => {
+    fireEvent.click(screen.getByRole('tab', { name }));
   };
 
   beforeEach(() => {
@@ -69,6 +70,7 @@ describe('AppSettingsModal', () => {
 
     it('shows Defaults for New Projects section', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('New Project Defaults');
 
       expect(screen.getByText('Defaults for New Projects')).toBeInTheDocument();
     });
@@ -81,12 +83,14 @@ describe('AppSettingsModal', () => {
 
     it('shows Snapping section', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('General');
 
       expect(screen.getByText('Snapping')).toBeInTheDocument();
     });
 
     it('shows Stock Constraints section', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('New Project Defaults');
 
       expect(screen.getByText('Stock Constraints (Defaults)')).toBeInTheDocument();
     });
@@ -154,18 +158,21 @@ describe('AppSettingsModal', () => {
   describe('default units', () => {
     it('shows units selector', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('New Project Defaults');
 
       expect(screen.getByText('Units')).toBeInTheDocument();
     });
 
     it('displays current units', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('New Project Defaults');
 
       expect(screen.getByDisplayValue('Imperial (inches)')).toBeInTheDocument();
     });
 
     it('shows imperial grid options when imperial selected', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('New Project Defaults');
 
       expect(screen.getByRole('option', { name: '1/4"' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: '1/2"' })).toBeInTheDocument();
@@ -173,6 +180,7 @@ describe('AppSettingsModal', () => {
 
     it('shows metric grid options when metric selected', () => {
       render(<AppSettingsModal {...defaultProps} settings={{ ...defaultSettings, defaultUnits: 'metric' }} />);
+      openTab('New Project Defaults');
 
       expect(screen.getByRole('option', { name: '5mm' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: '10mm' })).toBeInTheDocument();
@@ -206,12 +214,14 @@ describe('AppSettingsModal', () => {
   describe('snap settings', () => {
     it('shows snap sensitivity selector', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('General');
 
       expect(screen.getByText('Snap Sensitivity')).toBeInTheDocument();
     });
 
     it('shows snap sensitivity options', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('General');
 
       expect(screen.getByRole('option', { name: 'Tight (precise)' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: 'Normal' })).toBeInTheDocument();
@@ -220,18 +230,21 @@ describe('AppSettingsModal', () => {
 
     it('shows live grid snapping checkbox', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('General');
 
       expect(screen.getByText('Live Grid Snapping')).toBeInTheDocument();
     });
 
     it('shows snap to origin checkbox', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('General');
 
       expect(screen.getByText('Snap to Origin')).toBeInTheDocument();
     });
 
     it('shows match same dimensions checkbox', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('General');
 
       expect(screen.getByText('Match Same Dimensions Only')).toBeInTheDocument();
     });
@@ -240,24 +253,28 @@ describe('AppSettingsModal', () => {
   describe('stock constraints defaults', () => {
     it('shows constrain dimensions checkbox', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('New Project Defaults');
 
       expect(screen.getByText('Constrain Dimensions')).toBeInTheDocument();
     });
 
     it('shows constrain grain checkbox', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('New Project Defaults');
 
       expect(screen.getByText('Constrain Grain Direction')).toBeInTheDocument();
     });
 
     it('shows auto-sync color checkbox', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('New Project Defaults');
 
       expect(screen.getByText('Auto-sync Color')).toBeInTheDocument();
     });
 
     it('shows prevent overlap checkbox', () => {
       render(<AppSettingsModal {...defaultProps} />);
+      openTab('New Project Defaults');
 
       expect(screen.getByText('Prevent Overlap')).toBeInTheDocument();
     });
@@ -281,6 +298,7 @@ describe('AppSettingsModal', () => {
           }}
         />
       );
+      openTab('Data & License');
 
       expect(screen.getByText('License')).toBeInTheDocument();
     });
@@ -296,6 +314,7 @@ describe('AppSettingsModal', () => {
           }}
         />
       );
+      openTab('Data & License');
 
       expect(screen.getByText('License Active')).toBeInTheDocument();
       expect(screen.getByText('test@example.com')).toBeInTheDocument();
@@ -314,6 +333,7 @@ describe('AppSettingsModal', () => {
           }}
         />
       );
+      openTab('Data & License');
 
       expect(screen.getByText('Trial mode active')).toBeInTheDocument();
     });
@@ -332,6 +352,7 @@ describe('AppSettingsModal', () => {
           onShowLicenseModal={mockOnShowLicenseModal}
         />
       );
+      openTab('Data & License');
 
       expect(screen.getByText(/You're using the free version/)).toBeInTheDocument();
       expect(screen.getByText('Purchase License')).toBeInTheDocument();
@@ -350,40 +371,9 @@ describe('AppSettingsModal', () => {
           onDeactivateLicense={vi.fn()}
         />
       );
+      openTab('Data & License');
 
       expect(screen.getByText('Deactivate License')).toBeInTheDocument();
-    });
-  });
-
-  describe('reset tutorial', () => {
-    it('shows reset tutorial button', () => {
-      render(<AppSettingsModal {...defaultProps} />);
-
-      expect(screen.getByText('Reset Tutorial')).toBeInTheDocument();
-    });
-
-    it('calls resetWelcomeTutorial when confirmed', async () => {
-      (window.confirm as ReturnType<typeof vi.fn>).mockReturnValue(true);
-
-      render(<AppSettingsModal {...defaultProps} />);
-
-      fireEvent.click(screen.getByText('Reset Tutorial'));
-
-      expect(window.confirm).toHaveBeenCalled();
-      await vi.waitFor(() => {
-        expect(window.electronAPI.resetWelcomeTutorial).toHaveBeenCalled();
-      });
-      expect(window.alert).toHaveBeenCalled();
-    });
-
-    it('does not reset tutorial when cancelled', () => {
-      (window.confirm as ReturnType<typeof vi.fn>).mockReturnValue(false);
-
-      render(<AppSettingsModal {...defaultProps} />);
-
-      fireEvent.click(screen.getByText('Reset Tutorial'));
-
-      expect(window.electronAPI.resetWelcomeTutorial).not.toHaveBeenCalled();
     });
   });
 
@@ -391,6 +381,7 @@ describe('AppSettingsModal', () => {
     it('calls onUpdateSettings with both units and grid when units change', () => {
       const onUpdateSettings = vi.fn();
       render(<AppSettingsModal {...defaultProps} onUpdateSettings={onUpdateSettings} />);
+      openTab('New Project Defaults');
 
       fireEvent.change(screen.getByDisplayValue('Imperial (inches)'), {
         target: { value: 'metric' }
@@ -408,6 +399,7 @@ describe('AppSettingsModal', () => {
       const onUpdateSettings = vi.fn();
       // Start with 0.25" (1/4")
       render(<AppSettingsModal {...defaultProps} onUpdateSettings={onUpdateSettings} />);
+      openTab('New Project Defaults');
 
       fireEvent.change(screen.getByDisplayValue('Imperial (inches)'), {
         target: { value: 'metric' }
@@ -424,6 +416,7 @@ describe('AppSettingsModal', () => {
     it('calls onUpdateSettings when grid size changes', () => {
       const onUpdateSettings = vi.fn();
       render(<AppSettingsModal {...defaultProps} onUpdateSettings={onUpdateSettings} />);
+      openTab('New Project Defaults');
 
       // Find the grid size select (second select after units)
       const selects = screen.getAllByRole('combobox');
@@ -436,6 +429,7 @@ describe('AppSettingsModal', () => {
 
     it('shows correct grid options for metric', () => {
       render(<AppSettingsModal {...defaultProps} settings={{ ...defaultSettings, defaultUnits: 'metric' }} />);
+      openTab('New Project Defaults');
 
       expect(screen.getByRole('option', { name: '1mm' })).toBeInTheDocument();
       expect(screen.getByRole('option', { name: '2mm' })).toBeInTheDocument();
@@ -447,6 +441,7 @@ describe('AppSettingsModal', () => {
     it('calls onUpdateSettings when snap sensitivity changes', () => {
       const onUpdateSettings = vi.fn();
       render(<AppSettingsModal {...defaultProps} onUpdateSettings={onUpdateSettings} />);
+      openTab('General');
 
       fireEvent.change(screen.getByDisplayValue('Normal'), {
         target: { value: 'tight' }
@@ -458,6 +453,7 @@ describe('AppSettingsModal', () => {
     it('changes to loose sensitivity', () => {
       const onUpdateSettings = vi.fn();
       render(<AppSettingsModal {...defaultProps} onUpdateSettings={onUpdateSettings} />);
+      openTab('General');
 
       fireEvent.change(screen.getByDisplayValue('Normal'), {
         target: { value: 'loose' }
@@ -471,6 +467,7 @@ describe('AppSettingsModal', () => {
     it('calls onUpdateSettings when toggled', () => {
       const onUpdateSettings = vi.fn();
       render(<AppSettingsModal {...defaultProps} onUpdateSettings={onUpdateSettings} />);
+      openTab('General');
 
       // Find Live Grid Snapping checkbox
       const checkboxes = screen.getAllByRole('checkbox');
@@ -489,6 +486,7 @@ describe('AppSettingsModal', () => {
     it('calls onUpdateSettings when toggled', () => {
       const onUpdateSettings = vi.fn();
       render(<AppSettingsModal {...defaultProps} onUpdateSettings={onUpdateSettings} />);
+      openTab('General');
 
       // Find Snap to Origin checkbox
       const checkboxes = screen.getAllByRole('checkbox');
@@ -507,6 +505,7 @@ describe('AppSettingsModal', () => {
     it('calls onUpdateSettings when toggled', () => {
       const onUpdateSettings = vi.fn();
       render(<AppSettingsModal {...defaultProps} onUpdateSettings={onUpdateSettings} />);
+      openTab('General');
 
       // Find Match Same Dimensions Only checkbox
       const checkboxes = screen.getAllByRole('checkbox');
@@ -525,6 +524,7 @@ describe('AppSettingsModal', () => {
     it('calls onUpdateSettings when constrain dimensions toggled', () => {
       const onUpdateSettings = vi.fn();
       render(<AppSettingsModal {...defaultProps} onUpdateSettings={onUpdateSettings} />);
+      openTab('New Project Defaults');
 
       // Find Constrain Dimensions checkbox
       const checkboxes = screen.getAllByRole('checkbox');
@@ -545,6 +545,7 @@ describe('AppSettingsModal', () => {
     it('calls onUpdateSettings when constrain grain toggled', () => {
       const onUpdateSettings = vi.fn();
       render(<AppSettingsModal {...defaultProps} onUpdateSettings={onUpdateSettings} />);
+      openTab('New Project Defaults');
 
       // Find Constrain Grain Direction checkbox
       const checkboxes = screen.getAllByRole('checkbox');
@@ -565,6 +566,7 @@ describe('AppSettingsModal', () => {
     it('calls onUpdateSettings when auto-sync color toggled', () => {
       const onUpdateSettings = vi.fn();
       render(<AppSettingsModal {...defaultProps} onUpdateSettings={onUpdateSettings} />);
+      openTab('New Project Defaults');
 
       // Find Auto-sync Color checkbox
       const checkboxes = screen.getAllByRole('checkbox');
@@ -585,6 +587,7 @@ describe('AppSettingsModal', () => {
     it('calls onUpdateSettings when prevent overlap toggled', () => {
       const onUpdateSettings = vi.fn();
       render(<AppSettingsModal {...defaultProps} onUpdateSettings={onUpdateSettings} />);
+      openTab('New Project Defaults');
 
       // Find Prevent Overlap checkbox
       const checkboxes = screen.getAllByRole('checkbox');
@@ -619,6 +622,7 @@ describe('AppSettingsModal', () => {
           onDeactivateLicense={onDeactivateLicense}
         />
       );
+      openTab('Data & License');
 
       fireEvent.click(screen.getByText('Deactivate License'));
 
@@ -641,6 +645,7 @@ describe('AppSettingsModal', () => {
           onDeactivateLicense={onDeactivateLicense}
         />
       );
+      openTab('Data & License');
 
       fireEvent.click(screen.getByText('Deactivate License'));
 
@@ -658,6 +663,7 @@ describe('AppSettingsModal', () => {
           }}
         />
       );
+      openTab('Data & License');
 
       // Should show the formatted date
       expect(screen.getByText(/Activated:/)).toBeInTheDocument();
@@ -694,9 +700,9 @@ describe('AppSettingsModal', () => {
 
     it('calls onClose when backdrop is clicked', () => {
       const onClose = vi.fn();
-      const { container } = render(<AppSettingsModal {...defaultProps} onClose={onClose} />);
+      render(<AppSettingsModal {...defaultProps} onClose={onClose} />);
 
-      const backdrop = container.firstChild as HTMLElement;
+      const backdrop = document.querySelector('[data-state="open"][class*="bg-overlay"]') as HTMLElement;
       fireEvent.mouseDown(backdrop);
       fireEvent.click(backdrop);
 

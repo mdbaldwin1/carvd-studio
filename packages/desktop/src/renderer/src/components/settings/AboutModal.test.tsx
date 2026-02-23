@@ -40,7 +40,7 @@ describe('AboutModal', () => {
     it('displays app name', () => {
       render(<AboutModal isOpen={true} onClose={mockOnClose} />);
 
-      expect(screen.getByText('Carvd Studio')).toBeInTheDocument();
+      expect(screen.getByAltText('Carvd Studio')).toBeInTheDocument();
     });
 
     it('displays app description', () => {
@@ -153,7 +153,7 @@ describe('AboutModal', () => {
     it('calls onClose when backdrop is clicked', () => {
       render(<AboutModal isOpen={true} onClose={mockOnClose} />);
 
-      const backdrop = document.querySelector('[aria-modal="true"]')!.parentElement!;
+      const backdrop = document.querySelector('[data-state="open"][class*="bg-overlay"]') as HTMLElement;
       fireEvent.mouseDown(backdrop);
       fireEvent.click(backdrop);
 

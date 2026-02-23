@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 
 export default function NotFoundPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
+    <div className="site-shell">
       <SEO
         title="Page Not Found"
         description="The page you're looking for doesn't exist."

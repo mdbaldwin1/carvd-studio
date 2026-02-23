@@ -5,8 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 const accentBoxHighlightStyle = {
-  background:
-    "linear-gradient(135deg, rgba(174,164,191,0.15) 0%, rgba(174,164,191,0.05) 100%)",
+  background: "rgba(174,164,191,0.12)",
   borderColor: "rgba(174,164,191,0.4)",
 };
 
@@ -82,7 +81,7 @@ export default function PricingCard() {
         {/* CTA Buttons */}
         <div className="mb-6 grid gap-4">
           <Button size="lg" className="w-full" asChild>
-            <a href="#download">Download Free Trial</a>
+            <a href="/download">Download Free Trial</a>
           </Button>
           <BuyButton className="w-full" />
         </div>

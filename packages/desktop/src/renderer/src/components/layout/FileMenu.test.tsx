@@ -201,7 +201,7 @@ describe('FileMenu', () => {
       clickSubMenuItem(proj1!);
 
       await vi.waitFor(() => {
-        expect(useUIStore.getState().showToast).toHaveBeenCalledWith('Project opened');
+        expect(useUIStore.getState().showToast).toHaveBeenCalledWith('Project opened', 'success');
       });
     });
 
@@ -216,7 +216,7 @@ describe('FileMenu', () => {
       clickSubMenuItem(proj1!);
 
       await vi.waitFor(() => {
-        expect(useUIStore.getState().showToast).toHaveBeenCalledWith('Error: File not found');
+        expect(useUIStore.getState().showToast).toHaveBeenCalledWith('Error: File not found', 'error');
       });
     });
 

@@ -370,9 +370,9 @@ describe('AddAssemblyModal', () => {
 
     it('calls onClose when backdrop is clicked', () => {
       const onClose = vi.fn();
-      const { container } = render(<AddAssemblyModal {...defaultProps} onClose={onClose} />);
+      render(<AddAssemblyModal {...defaultProps} onClose={onClose} />);
 
-      const backdrop = container.firstChild as HTMLElement;
+      const backdrop = document.querySelector('[data-state="open"][class*="bg-overlay"]') as HTMLElement;
       fireEvent.mouseDown(backdrop);
       fireEvent.click(backdrop);
 

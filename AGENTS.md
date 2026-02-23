@@ -9,14 +9,14 @@
 
 - Read `CLAUDE.md` for supplemental project context and deeper technical notes.
 - Beads issue tracker reference: `https://github.com/steveyegge/beads` (when you mention "beads", treat this as the canonical system/workflow).
-- For shadcn migration work, read:
+- For beads-driven orchestration/execution work, read:
 - `ORCHESTRATOR-INSTRUCTIONS.md`
 - `BEAD-EXECUTION-WORKFLOW.md`
 
 ## Docs Taxonomy
 
 - `policy` docs (stable): `AGENTS.md` is the source of truth for workflow, quality gates, security handling, and collaboration rules.
-- `status` docs (volatile): migration handoffs/status trackers track current state and may change frequently.
+- `status` docs (volatile): status trackers and handoff notes track current state and may change frequently.
 - `reference` docs (technical): `CLAUDE.md` and `.claude/docs/*.md` provide architecture, implementation, environment, and operational context.
 - When policy conflicts with status/reference text, follow `AGENTS.md` and update the other file to remove drift.
 - Avoid duplicating stable policy text into status/reference docs; link back to `AGENTS.md` instead.
@@ -47,7 +47,7 @@
 - Desktop: `npm run lint --workspace=@carvd/desktop`, `npm run typecheck --workspace=@carvd/desktop`, `npm test --workspace=@carvd/desktop`
 - Website: `npm run lint --workspace=@carvd/website`, `npm run typecheck --workspace=@carvd/website`, `npm test --workspace=@carvd/website`
 
-## UI Migration Notes
+## UI Notes
 
 - Prefer shadcn/ui primitives in `packages/desktop/src/renderer/src/components/ui/`.
 - For Radix-based tests, use semantic queries (`getByRole(...)`) and `data-state`; avoid class-based selectors.

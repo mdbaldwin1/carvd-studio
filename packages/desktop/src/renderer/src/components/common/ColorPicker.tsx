@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react';
 import { STOCK_COLORS } from '../../constants';
 import { useCustomColors } from '../../hooks/useCustomColors';
 import { Button } from '@renderer/components/ui/button';
+import { Input } from '@renderer/components/ui/input';
 
 interface ColorPickerProps {
   value: string;
@@ -40,22 +41,27 @@ export function ColorPicker({ value, onChange, showCustomColors = true }: ColorP
   return (
     <div className="flex flex-col gap-3">
       <div className="color-picker-row">
-        <input
+        <Input
           type="color"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="hover:border-text-muted focus:outline-none focus:border-accent"
+          aria-label="Choose custom color"
+          className="h-9 w-12 p-1 hover:border-text-muted"
         />
         <div className="flex gap-1 flex-wrap">
           {STOCK_COLORS.map((color) => (
-            <button
+            <Button
               key={color}
+              type="button"
+              variant="ghost"
+              size="icon-xs"
               className={`w-6 h-6 border-2 rounded cursor-pointer transition-all duration-100 hover:scale-110 ${
                 value.toLowerCase() === color.toLowerCase() ? 'border-text' : 'border-transparent'
               }`}
               style={{ backgroundColor: color }}
               onClick={() => onChange(color)}
               title={color}
+              aria-label={`Select color ${color}`}
             />
           ))}
         </div>
@@ -96,22 +102,29 @@ export function ColorPicker({ value, onChange, showCustomColors = true }: ColorP
             <div className="flex gap-1 flex-wrap relative">
               {customColors.map((color) => (
                 <div key={color} className="relative inline-block group">
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
                     className={`w-5 h-5 border-2 rounded cursor-pointer transition-all duration-100 hover:scale-110 ${
                       value.toLowerCase() === color ? 'border-text' : 'border-transparent'
                     }`}
                     style={{ backgroundColor: color }}
                     onClick={() => onChange(color)}
                     title={color}
+                    aria-label={`Select custom color ${color}`}
                   />
-                  <button
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon-xs"
                     className="absolute -top-1 -right-1 w-3.5 h-3.5 p-0 border-none rounded-full bg-danger text-white cursor-pointer hidden group-hover:flex items-center justify-center text-[8px]"
                     onClick={(e) => handleRemoveColor(color, e)}
                     title="Remove color"
                     aria-label={`Remove color ${color}`}
                   >
                     <X size={8} />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>

@@ -934,7 +934,7 @@ describe('TemplatesScreen', () => {
       const link = screen.getByText('Learn more about templates');
       fireEvent.click(link);
 
-      expect(window.electronAPI.openExternal).toHaveBeenCalledWith('https://carvd-studio.com/docs#templates');
+      expect(window.electronAPI.openExternal).toHaveBeenCalledWith('https://carvd-studio.com/docs/templates');
     });
   });
 });

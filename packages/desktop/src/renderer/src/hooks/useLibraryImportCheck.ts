@@ -112,7 +112,7 @@ export function useLibraryImportCheck(): UseLibraryImportCheckResult {
       setMissingAssemblies([]);
 
       if (importedCount > 0) {
-        showToast(`Added ${importedCount} item${importedCount !== 1 ? 's' : ''} to library`);
+        showToast(`Added ${importedCount} item${importedCount !== 1 ? 's' : ''} to library`, 'success');
       }
     },
     [addStockToLibrary, addAssemblyToLibrary, showToast]

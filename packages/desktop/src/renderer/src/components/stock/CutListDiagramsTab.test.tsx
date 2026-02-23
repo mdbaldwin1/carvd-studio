@@ -16,7 +16,7 @@ vi.mock('../../utils/featureLimits', () => ({
 }));
 
 // Mock pdfExport (dynamic import)
-const mockExportDiagramsToPdf = vi.fn().mockResolvedValue({ success: true });
+const mockExportDiagramsToPdf = vi.fn().mockResolvedValue({ success: true, filePath: '/tmp/diagrams.pdf' });
 vi.mock('../../utils/pdfExport', () => ({
   exportDiagramsToPdf: (...args: unknown[]) => mockExportDiagramsToPdf(...args)
 }));
@@ -88,6 +88,7 @@ beforeAll(() => {
     writeBinaryFile: vi.fn(),
     readFile: vi.fn(),
     writeFile: vi.fn(),
+    showItemInFolder: vi.fn(),
     addRecentProject: vi.fn(),
     getRecentProjects: vi.fn(),
     clearRecentProjects: vi.fn(),
@@ -136,6 +137,16 @@ describe('CutListDiagramsTab', () => {
     it('renders board number', () => {
       render(<CutListDiagramsTab {...defaultProps} />);
       expect(screen.getByText('Board #1')).toBeInTheDocument();
+    });
+
+    it('opens board detail modal when a diagram is clicked', async () => {
+      const user = userEvent.setup();
+      render(<CutListDiagramsTab {...defaultProps} />);
+
+      await user.click(screen.getByText('Board #1'));
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByText('Plywood - Board #1')).toBeInTheDocument();
     });
 
     it('renders utilization percentage', () => {
@@ -377,7 +388,7 @@ describe('CutListDiagramsTab', () => {
 
     it('shows success toast on successful PDF export', async () => {
       const user = userEvent.setup();
-      mockExportDiagramsToPdf.mockResolvedValueOnce({ success: true });
+      mockExportDiagramsToPdf.mockResolvedValueOnce({ success: true, filePath: '/tmp/diagrams.pdf' });
 
       render(<CutListDiagramsTab {...defaultProps} />);
 

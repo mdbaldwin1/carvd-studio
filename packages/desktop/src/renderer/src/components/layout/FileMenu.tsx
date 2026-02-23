@@ -36,10 +36,10 @@ export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRe
   const handleOpenRecent = async (filePath: string) => {
     const result = await openProjectFromPath(filePath);
     if (result.success) {
-      showToast('Project opened');
+      showToast('Project opened', 'success');
       onRefreshRecent();
     } else if (result.error) {
-      showToast(`Error: ${result.error}`);
+      showToast(`Error: ${result.error}`, 'error');
     }
   };
 
@@ -52,7 +52,7 @@ export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRe
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="py-1.5 px-2.5 text-[13px] font-medium">
+        <Button variant="ghost" size="xs">
           <File size={16} />
           <span>File</span>
           <ChevronDown size={14} className="transition-transform duration-150" />

@@ -10,11 +10,14 @@ import {
   DialogTitle
 } from '@renderer/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@renderer/components/ui/tabs';
+import { UNTITLED_PROJECT_NAME } from '@renderer/constants/appDefaults';
 import { useProjectStore, validatePartsForCutList, generateThumbnail } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import { useLicenseStore } from '../../store/licenseStore';
 import { generateOptimizedCutList } from '../../utils/cutListOptimizer';
 import { getFeatureLimits, getBlockedMessage } from '../../utils/featureLimits';
+import { getDocsUrl } from '../../utils/docsLinks';
+import { showSavedFileToast } from '../../utils/fileToast';
 // pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { logger } from '../../utils/logger';
 import { PartValidationIssue } from '../../types';
@@ -52,7 +55,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
   const handleGenerate = useCallback(() => {
     // Check license limits for optimizer
     if (!limits.canUseOptimizer) {
-      showToast(getBlockedMessage('useOptimizer'));
+      showToast(getBlockedMessage('useOptimizer'), 'warning');
       return;
     }
 
@@ -79,7 +82,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
     // Check license limits for PDF export
     if (!limits.canExportPDF) {
-      showToast(getBlockedMessage('exportPDF'));
+      showToast(getBlockedMessage('exportPDF'), 'warning');
       return;
     }
 
@@ -89,22 +92,22 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
       const { exportProjectReportToPdf } = await import('../../utils/pdfExport');
       const result = await exportProjectReportToPdf(cutList, {
-        projectName: projectName || 'Untitled Project',
+        projectName: projectName || UNTITLED_PROJECT_NAME,
         projectNotes: projectNotes || undefined,
         thumbnailData: thumbnailData || undefined,
         units,
         customShoppingItems: customShoppingItems || []
       });
 
-      if (result.success) {
-        showToast('Project report saved to PDF');
+      if (result.success && result.filePath) {
+        showSavedFileToast('Project report saved to PDF', result.filePath);
       } else if (result.error) {
-        showToast('Failed to save PDF');
+        showToast('Failed to save PDF', 'error');
         logger.error('Project report PDF export error:', result.error);
       }
     } catch (error) {
       logger.error('Project report PDF export error:', error);
-      showToast('Failed to export project report');
+      showToast('Failed to export project report', 'error');
     }
   }, [cutList, projectName, projectNotes, units, customShoppingItems, limits.canExportPDF, showToast]);
 
@@ -117,8 +120,8 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[85vh] min-h-[500px] w-[900px] max-w-[95vw] rounded-lg" onClose={onClose}>
-        <DialogHeader className="py-5 px-6 bg-bg rounded-t-lg">
+      <DialogContent className="max-h-[85vh] min-h-[500px] w-[900px] max-w-[95vw]" onClose={onClose}>
+        <DialogHeader className="px-6 py-5">
           <DialogTitle className="text-lg">Cut List</DialogTitle>
           <DialogClose onClose={onClose} />
         </DialogHeader>
@@ -134,7 +137,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
                 className="text-accent no-underline hover:underline hover:text-accent-hover transition-colors duration-150"
                 onClick={(e) => {
                   e.preventDefault();
-                  window.electronAPI.openExternal('https://carvd-studio.com/docs#cut-lists');
+                  window.electronAPI.openExternal(getDocsUrl('cut-lists'));
                 }}
               >
                 Learn more
@@ -156,7 +159,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
                 </Button>
 
                 {validationIssues.length > 0 && (
-                  <div className="cut-list-issues mt-4 bg-bg border border-border rounded p-4 text-left w-full max-w-[500px]">
+                  <div className="cut-list-issues mt-4 w-full max-w-[500px] rounded border border-border bg-surface p-4 text-left">
                     <h3 className="text-[14px] font-semibold text-text m-0 mb-2">Issues Found</h3>
                     {hasBlockingIssues && (
                       <p className="text-[12px] text-text-muted mb-2 m-0">
@@ -208,35 +211,29 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
             )}
 
             {/* Tab bar + content */}
-            <Tabs defaultValue="parts" className="cut-list-tabs flex-1 flex flex-col min-h-0">
-              <TabsList className="cut-list-tab-list">
-                <TabsTrigger value="parts" className="cut-list-tab">
-                  Parts List ({cutList.instructions.length})
-                </TabsTrigger>
-                <TabsTrigger value="diagrams" className="cut-list-tab">
-                  Cutting Diagrams ({cutList.stockBoards.length})
-                </TabsTrigger>
-                <TabsTrigger value="shopping" className="cut-list-tab">
-                  Shopping List ({cutList.statistics.byStock.length})
-                </TabsTrigger>
+            <Tabs defaultValue="parts" className="cut-list-tabs flex min-h-0 flex-1 flex-col">
+              <TabsList className="mx-6 my-2 border-b border-border">
+                <TabsTrigger value="parts">Parts List ({cutList.instructions.length})</TabsTrigger>
+                <TabsTrigger value="diagrams">Cutting Diagrams ({cutList.stockBoards.length})</TabsTrigger>
+                <TabsTrigger value="shopping">Shopping List ({cutList.statistics.byStock.length})</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="parts" className="cut-list-content overflow-hidden py-5 px-6 bg-bg-alt">
+              <TabsContent value="parts" className="cut-list-content overflow-hidden px-6 pt-4 pb-5">
                 <CutListPartsTab
                   cutList={cutList}
                   units={units}
-                  projectName={projectName || 'Untitled Project'}
+                  projectName={projectName || UNTITLED_PROJECT_NAME}
                   canExportPDF={limits.canExportPDF}
                 />
               </TabsContent>
-              <TabsContent value="diagrams" className="cut-list-content overflow-hidden py-5 px-6 bg-bg-alt">
+              <TabsContent value="diagrams" className="cut-list-content overflow-hidden px-6 pt-4 pb-5">
                 <CutListDiagramsTab cutList={cutList} units={units} canExportPDF={limits.canExportPDF} />
               </TabsContent>
-              <TabsContent value="shopping" className="cut-list-content overflow-hidden py-5 px-6 bg-bg-alt">
+              <TabsContent value="shopping" className="cut-list-content overflow-hidden px-6 pt-4 pb-5">
                 <ShoppingListTab
                   cutList={cutList}
                   units={units}
-                  projectName={projectName || 'Untitled Project'}
+                  projectName={projectName || UNTITLED_PROJECT_NAME}
                   canExportPDF={limits.canExportPDF}
                 />
               </TabsContent>
@@ -247,7 +244,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
           </>
         )}
 
-        <DialogFooter className="cut-list-footer bg-bg rounded-b-lg py-4 px-6">
+        <DialogFooter className="cut-list-footer px-6 py-4">
           {cutList && (
             <>
               <Button
@@ -259,7 +256,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
                 <Download size={14} />
                 Download Project Report
               </Button>
-              <div style={{ flex: 1 }} />
+              <div className="flex-1" />
             </>
           )}
           <Button variant="secondary" size="sm" onClick={onClose}>

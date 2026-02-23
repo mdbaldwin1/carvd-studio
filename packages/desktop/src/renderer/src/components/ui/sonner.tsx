@@ -15,10 +15,19 @@ function Toaster() {
       theme={theme}
       position="bottom-center"
       offset={60}
-      richColors
       duration={2000}
+      closeButton
       toastOptions={{
-        className: 'text-[13px] font-medium'
+        className: 'carvd-toast text-[13px] font-medium',
+        classNames: {
+          toast: 'carvd-toast',
+          title: 'text-[13px] font-semibold text-text',
+          description: 'text-[12px] text-text-muted',
+          actionButton:
+            'carvd-toast-action !border !border-primary/40 !bg-primary/20 !text-primary !hover:bg-primary/30 !font-medium',
+          cancelButton:
+            'carvd-toast-cancel !border !border-border !bg-surface-hover !text-text !hover:bg-bg-hover !font-medium'
+        }
       }}
     />
   );

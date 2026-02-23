@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle, XCircle, FileWarning } from 'lucide-react';
 import { FileRepairResult, getFileSummary } from '../../utils/fileFormat';
 import { Button } from '@renderer/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@renderer/components/ui/dialog';
 
 interface FileRecoveryModalProps {
@@ -32,7 +33,7 @@ export function FileRecoveryModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="w-[90%] max-w-[500px]" onClose={() => {}}>
+      <DialogContent className="w-[620px] max-w-[92vw] max-h-[86vh]" onClose={() => {}}>
         <DialogHeader className="items-center justify-start gap-3">
           <FileWarning size={24} className="text-warning" />
           <DialogTitle>File Recovery Required</DialogTitle>
@@ -46,20 +47,24 @@ export function FileRecoveryModal({
           {/* Initial state - show errors and offer repair */}
           {!hasRepairResult && (
             <>
-              <div className="mb-5">
-                <h3 className="text-[15px] font-semibold text-text m-0 mb-2">Issues Found</h3>
-                <p className="text-[13px] text-text-secondary leading-relaxed mb-3">
-                  This file contains data integrity issues that prevent it from being opened normally.
-                </p>
-                <ul className="list-none p-0 m-0 flex flex-col gap-1.5">
-                  {errors.map((error, index) => (
-                    <li key={index} className="flex items-start gap-2 text-[13px] py-1 text-danger">
-                      <XCircle size={14} className="shrink-0 mt-0.5" />
-                      <span>{error}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <Card className="mb-5 border-border bg-bg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Issues Found</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-[13px] text-text-secondary leading-relaxed mb-3">
+                    This file contains data integrity issues that prevent it from being opened normally.
+                  </p>
+                  <ul className="list-none p-0 m-0 flex flex-col gap-1.5">
+                    {errors.map((error, index) => (
+                      <li key={index} className="flex items-start gap-2 text-[13px] py-1 text-danger">
+                        <XCircle size={14} className="shrink-0 mt-0.5" />
+                        <span>{error}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
 
               <div className="flex gap-3 p-3 bg-warning-bg border border-warning rounded text-[13px] text-warning mt-4">
                 <AlertTriangle size={16} className="shrink-0 mt-0.5" />

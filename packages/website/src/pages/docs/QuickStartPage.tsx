@@ -17,7 +17,7 @@ export default function QuickStartPage() {
       />
       <h2 className="mb-8 text-4xl font-bold">Quick Start Guide</h2>
 
-      <div className="mb-8 rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+      <div className="site-section mb-8 p-[var(--space-xl)]">
         <p className="mb-2 font-bold">Get building in 5 minutes:</p>
         <ol className="grid gap-4 text-sm">
           <li>
@@ -31,8 +31,8 @@ export default function QuickStartPage() {
             Project"
           </li>
           <li>
-            <strong>3. Add Parts</strong> — Click the + button or press{" "}
-            <code>N</code> to add your first piece of wood
+            <strong>3. Add Parts</strong> — Press <code>P</code> (or use the add
+            controls in the editor) to add your first piece of wood
           </li>
           <li>
             <strong>4. Set Dimensions</strong> — Enter width, height, and depth
@@ -49,7 +49,7 @@ export default function QuickStartPage() {
         </ol>
       </div>
 
-      <div className="rounded-lg border border-[rgba(174,164,191,0.4)] bg-linear-to-br from-[rgba(174,164,191,0.15)] to-[rgba(174,164,191,0.05)] p-[var(--space-xl)]">
+      <div className="site-section p-[var(--space-xl)]">
         <p className="mb-2 text-lg font-bold">
           Your 14-Day Trial Includes Everything
         </p>
@@ -61,7 +61,7 @@ export default function QuickStartPage() {
           <Button
             asChild
             size="sm"
-            className="bg-highlight text-bg hover:bg-highlight/90"
+            className="bg-primary text-primary-foreground hover:bg-primary-hover"
           >
             <a href="/download">Download Free Trial</a>
           </Button>

@@ -1,6 +1,5 @@
 const accentBoxStyle = {
-  background:
-    "linear-gradient(135deg, rgba(74,144,226,0.1) 0%, rgba(74,144,226,0.05) 100%)",
+  background: "rgba(74,144,226,0.10)",
   borderColor: "rgba(74,144,226,0.3)",
 };
 
@@ -44,10 +43,10 @@ export default function CompetitorComparison() {
                 $399/year
               </td>
               <td className="border-b border-border p-4 text-center text-text-muted max-md:p-2 max-md:text-sm">
-                Limited
+                Yes (desktop)
               </td>
               <td className="border-b border-border p-4 text-center text-text-muted max-md:p-2 max-md:text-sm">
-                No
+                Via 3rd-party extensions
               </td>
               <td className="border-b border-border p-4 text-center text-text-muted max-md:p-2 max-md:text-sm">
                 Moderate
@@ -64,7 +63,7 @@ export default function CompetitorComparison() {
                 Limited
               </td>
               <td className="border-b border-border p-4 text-center text-text-muted max-md:p-2 max-md:text-sm">
-                No
+                Via add-ins/workarounds
               </td>
               <td className="border-b border-border p-4 text-center text-text-muted max-md:p-2 max-md:text-sm">
                 Moderate
@@ -75,10 +74,10 @@ export default function CompetitorComparison() {
                 Cabinet Vision
               </td>
               <td className="border-b border-border p-4 text-center text-text-muted max-md:p-2 max-md:text-sm">
-                $99+/month
+                Quote-based (contact sales)
               </td>
               <td className="border-b border-border p-4 text-center text-text-muted max-md:p-2 max-md:text-sm">
-                Unknown
+                Varies
               </td>
               <td className="border-b border-border p-4 text-center text-text-muted max-md:p-2 max-md:text-sm">
                 ✓ Yes
@@ -95,7 +94,7 @@ export default function CompetitorComparison() {
                 $79.99/month
               </td>
               <td className="border-b border-border p-4 text-center text-text-muted max-md:p-2 max-md:text-sm">
-                Unknown
+                Yes
               </td>
               <td className="border-b border-border p-4 text-center text-text-muted max-md:p-2 max-md:text-sm">
                 ✓ Yes
@@ -122,10 +121,10 @@ export default function CompetitorComparison() {
               </td>
             </tr>
             <tr className="bg-surface-elevated">
-              <td className="border-b border-border p-4 font-bold text-primary-text max-md:p-2 max-md:text-sm">
+              <td className="border-b border-border p-4 font-bold text-primary max-md:p-2 max-md:text-sm">
                 Carvd Studio
               </td>
-              <td className="border-b border-border p-4 text-center font-bold text-primary-text max-md:p-2 max-md:text-sm">
+              <td className="border-b border-border p-4 text-center font-bold text-primary max-md:p-2 max-md:text-sm">
                 $59.99 once
               </td>
               <td className="border-b border-border p-4 text-center font-bold text-success max-md:p-2 max-md:text-sm">
@@ -141,6 +140,12 @@ export default function CompetitorComparison() {
           </tbody>
         </table>
       </div>
+      <p className="mx-auto -mt-3 mb-8 max-w-4xl text-center text-xs text-text-muted">
+        Pricing shown in USD as of February 22, 2026 based on publicly listed
+        plan prices. Regional pricing, taxes, promos, and reseller quotes may
+        vary. Some competitors support cut lists through third-party extensions
+        or add-ins rather than built-in tools.
+      </p>
       <div className="mt-8 grid grid-cols-2 gap-6 max-md:grid-cols-1">
         <div className="rounded-lg border p-6" style={accentBoxStyle}>
           <h3 className="mb-2 text-xl font-bold">
@@ -150,7 +155,7 @@ export default function CompetitorComparison() {
             SketchUp and Fusion 360 are powerful, but they're designed for
             architects and engineers—not woodworkers. You'll spend hours
             learning features you don't need, and you still won't get optimized
-            cut lists.
+            built-in cut lists.
           </p>
         </div>
         <div className="rounded-lg border p-6" style={accentBoxStyle}>

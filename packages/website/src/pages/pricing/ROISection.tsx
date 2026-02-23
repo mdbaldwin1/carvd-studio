@@ -1,8 +1,7 @@
 import { TreePine, Clock, Scissors } from "lucide-react";
 
 const accentBoxStyle = {
-  background:
-    "linear-gradient(135deg, rgba(74,144,226,0.1) 0%, rgba(74,144,226,0.05) 100%)",
+  background: "rgba(74,144,226,0.10)",
   borderColor: "rgba(74,144,226,0.3)",
 };
 

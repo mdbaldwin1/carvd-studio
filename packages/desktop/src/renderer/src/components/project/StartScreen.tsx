@@ -4,6 +4,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@renderer/components/u
 import { useEffect, useState } from 'react';
 import { UserTemplate } from '../../templates';
 import { Project } from '../../types';
+import { AppHorizontalLogo } from '../common/AppHorizontalLogo';
 import { TemplatesSection } from './TemplatesSection';
 import { RecentsTab } from './RecentsTab';
 import { FavoritesTab } from './FavoritesTab';
@@ -180,9 +181,8 @@ export function StartScreen({
       <div className="max-w-[700px] w-full px-12 pb-12 flex-1 min-h-0 flex flex-col gap-8 overflow-hidden [&>:first-child]:mt-auto [&>:last-child]:mb-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-4">
-            <span className="text-5xl">🪵</span>
-            <h1 className="text-[32px] font-bold text-text m-0">Carvd Studio</h1>
+          <div className="flex items-center">
+            <AppHorizontalLogo className="h-28 w-auto max-w-[78vw]" />
           </div>
           <div className="flex items-center gap-2">
             <Button size="icon" variant="ghost" onClick={onOpenLibrary} title="Stock & Assembly Library">
@@ -207,24 +207,18 @@ export function StartScreen({
 
         {/* Projects Section with Tabs */}
         <Tabs defaultValue="recents" className="flex flex-col gap-3 min-h-0 max-h-[50vh]">
-          <div className="flex items-stretch justify-between relative m-0 p-0 cursor-default rounded-none bg-transparent after:content-[''] after:absolute after:left-0 after:right-0 after:bottom-0 after:h-px after:bg-border after:z-0">
-            <TabsList className="flex gap-0 relative z-1 border-none bg-transparent px-0">
-              <TabsTrigger
-                value="recents"
-                className="section-tab flex items-center gap-1.5 py-2.5 px-4 border border-transparent border-b-border rounded-t-md -mb-px text-sm font-medium text-text-muted cursor-pointer transition-[color,background-color] duration-100 hover:text-text hover:bg-bg-secondary data-[state=active]:text-text data-[state=active]:!bg-bg data-[state=active]:!border-border data-[state=active]:!border-b-bg"
-              >
+          <div className="flex items-stretch justify-between">
+            <TabsList className="px-0 bg-transparent">
+              <TabsTrigger value="recents" className="flex items-center gap-1.5">
                 <Clock size={16} />
                 Recents
               </TabsTrigger>
-              <TabsTrigger
-                value="favorites"
-                className="section-tab flex items-center gap-1.5 py-2.5 px-4 border border-transparent border-b-border rounded-t-md -mb-px text-sm font-medium text-text-muted cursor-pointer transition-[color,background-color] duration-100 hover:text-text hover:bg-bg-secondary data-[state=active]:text-text data-[state=active]:!bg-bg data-[state=active]:!border-border data-[state=active]:!border-b-bg"
-              >
+              <TabsTrigger value="favorites" className="flex items-center gap-1.5">
                 <Star size={16} />
                 Favorites
               </TabsTrigger>
             </TabsList>
-            <Button variant="ghost" size="xs" className="my-auto text-accent hover:text-primary" onClick={onOpenFile}>
+            <Button variant="ghost" size="xs" className="my-auto" onClick={onOpenFile}>
               <FolderOpen size={14} />
               Open file...
             </Button>

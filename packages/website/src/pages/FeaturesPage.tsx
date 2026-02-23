@@ -1,43 +1,36 @@
-import ScreenshotPlaceholder from "../components/ScreenshotPlaceholder";
-import BuyButton from "../components/BuyButton";
-import SEO from "../components/SEO";
-import Header from "../components/Header";
-import Footer from "../components/Footer";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import {
-  Palette,
-  Ruler,
   DollarSign,
   Lock,
-  Zap,
-  Wrench,
+  Palette,
+  RefreshCw,
+  Ruler,
+  Shield,
   Target,
   Upload,
-  RefreshCw,
-  Shield,
+  Wrench,
+  Zap,
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import BuyButton from "../components/BuyButton";
+import Footer from "../components/Footer";
+import Header from "../components/Header";
+import ScreenshotPlaceholder from "../components/ScreenshotPlaceholder";
+import SEO from "../components/SEO";
 
 const accentBoxStyle = {
-  background:
-    "linear-gradient(135deg, rgba(74,144,226,0.1) 0%, rgba(74,144,226,0.05) 100%)",
+  background: "rgba(74,144,226,0.10)",
   borderColor: "rgba(74,144,226,0.3)",
 };
 
 const accentBoxHighlightStyle = {
-  background:
-    "linear-gradient(135deg, rgba(174,164,191,0.15) 0%, rgba(174,164,191,0.05) 100%)",
+  background: "rgba(174,164,191,0.12)",
   borderColor: "rgba(174,164,191,0.4)",
-};
-
-const surfaceGradientStyle = {
-  background:
-    "linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-elevated) 100%)",
 };
 
 export default function FeaturesPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
+    <div className="site-shell">
       <SEO
         title="Features"
         description="3D furniture design, cut list optimization, stock management, cost tracking, and more. All the tools woodworkers need, nothing they don't."
@@ -51,7 +44,7 @@ export default function FeaturesPage() {
             <h1 className="mb-6 text-center text-6xl font-bold">
               Every Tool You Need.
               <br />
-              <span className="text-primary-text">Nothing You Don't.</span>
+              <span className="text-highlight">Nothing You Don't.</span>
             </h1>
             <p className="mx-auto mb-16 max-w-2xl text-center text-xl text-text-muted">
               Designed by woodworkers who were tired of complicated software
@@ -63,7 +56,7 @@ export default function FeaturesPage() {
             <div className="mb-16 mt-16 grid gap-16">
               {/* 3D Design */}
               <div
-                className="rounded-lg border p-8 max-sm:p-6"
+                className="site-section p-8 max-sm:p-6"
                 style={accentBoxStyle}
               >
                 <div className="mb-6 flex items-center gap-4">
@@ -123,7 +116,7 @@ export default function FeaturesPage() {
 
               {/* Cut List Optimization */}
               <div
-                className="rounded-lg border p-8 max-sm:p-6"
+                className="site-section p-8 max-sm:p-6"
                 style={accentBoxStyle}
               >
                 <div className="mb-6 flex items-center gap-4">
@@ -185,7 +178,7 @@ export default function FeaturesPage() {
 
               {/* Cost Tracking */}
               <div
-                className="rounded-lg border p-8 max-sm:p-6"
+                className="site-section p-8 max-sm:p-6"
                 style={accentBoxStyle}
               >
                 <div className="mb-6 flex items-center gap-4">
@@ -246,7 +239,7 @@ export default function FeaturesPage() {
 
               {/* Privacy & Offline */}
               <div
-                className="rounded-lg border p-8 max-sm:p-6"
+                className="site-section p-8 max-sm:p-6"
                 style={accentBoxHighlightStyle}
               >
                 <div className="mb-6 flex items-center gap-4">
@@ -305,7 +298,7 @@ export default function FeaturesPage() {
               And There's More
             </h2>
             <div className="mb-16 mt-16 grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-8 max-md:gap-6">
-              <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+              <Card className="feature-card p-8 max-md:p-6">
                 <span className="mb-4 block">
                   <Zap size={28} />
                 </span>
@@ -319,7 +312,7 @@ export default function FeaturesPage() {
                 </p>
               </Card>
 
-              <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+              <Card className="feature-card p-8 max-md:p-6">
                 <span className="mb-4 block">
                   <Wrench size={28} />
                 </span>
@@ -333,7 +326,7 @@ export default function FeaturesPage() {
                 </p>
               </Card>
 
-              <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+              <Card className="feature-card p-8 max-md:p-6">
                 <span className="mb-4 block">
                   <Ruler size={28} />
                 </span>
@@ -347,7 +340,7 @@ export default function FeaturesPage() {
                 </p>
               </Card>
 
-              <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+              <Card className="feature-card p-8 max-md:p-6">
                 <span className="mb-4 block">
                   <Target size={28} />
                 </span>
@@ -361,7 +354,7 @@ export default function FeaturesPage() {
                 </p>
               </Card>
 
-              <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+              <Card className="feature-card p-8 max-md:p-6">
                 <span className="mb-4 block">
                   <Upload size={28} />
                 </span>
@@ -375,7 +368,7 @@ export default function FeaturesPage() {
                 </p>
               </Card>
 
-              <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+              <Card className="feature-card p-8 max-md:p-6">
                 <span className="mb-4 block">
                   <RefreshCw size={28} />
                 </span>
@@ -389,7 +382,7 @@ export default function FeaturesPage() {
                 </p>
               </Card>
 
-              <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+              <Card className="feature-card p-8 max-md:p-6">
                 <span className="mb-4 block">
                   <Shield size={28} />
                 </span>
@@ -406,10 +399,7 @@ export default function FeaturesPage() {
             </div>
 
             {/* CTA Section */}
-            <div
-              className="my-16 rounded-xl border-2 border-accent p-16 text-center max-md:p-12 max-sm:my-8 max-sm:p-8"
-              style={surfaceGradientStyle}
-            >
+            <div className="site-section my-16 p-16 text-center max-md:p-12 max-sm:my-8 max-sm:p-8">
               <h2 className="mb-4 text-4xl font-bold max-md:text-2xl max-sm:text-xl">
                 Ready to Design Smarter?
               </h2>
@@ -419,7 +409,7 @@ export default function FeaturesPage() {
               </p>
               <div className="mb-6 flex justify-center gap-4 max-sm:flex-col max-sm:items-center">
                 <Button size="lg" asChild>
-                  <a href="#download">Download Free Trial</a>
+                  <a href="/download">Download Free Trial</a>
                 </Button>
                 <BuyButton />
               </div>

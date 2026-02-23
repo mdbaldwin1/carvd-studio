@@ -135,10 +135,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       const result = await loadRepairedFile(recoveryState.repairResult.repairedData, recoveryState.filePath);
 
       if (result.success) {
-        showToast('Project recovered successfully');
+        showToast('Project recovered successfully', 'success');
         refreshRecentProjects();
       } else if (result.error) {
-        showToast(`Error loading recovered project: ${result.error}`);
+        showToast(`Error loading recovered project: ${result.error}`, 'error');
       }
     }
 
@@ -194,13 +194,13 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
         }
 
         if (openResult.success) {
-          showToast('Project opened');
+          showToast('Project opened', 'success');
           refreshRecentProjects();
         } else if (openResult.error) {
-          showToast(`Error: ${openResult.error}`);
+          showToast(`Error: ${openResult.error}`, 'error');
         }
       } catch (error) {
-        showToast(`Error relocating file: ${error}`);
+        showToast(`Error relocating file: ${error}`, 'error');
       }
     },
     [showToast, refreshRecentProjects, handleFileOperationResult]
@@ -223,10 +223,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
               return; // Recovery modal will be shown
             }
             if (result.success) {
-              showToast('Project opened');
+              showToast('Project opened', 'success');
               refreshRecentProjects();
             } else if (result.error) {
-              showToast(`Error: ${result.error}`);
+              showToast(`Error: ${result.error}`, 'error');
             }
           }
         });
@@ -236,10 +236,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
           return; // Recovery modal will be shown
         }
         if (result.success) {
-          showToast('Project opened');
+          showToast('Project opened', 'success');
           refreshRecentProjects();
         } else if (result.error) {
-          showToast(`Error: ${result.error}`);
+          showToast(`Error: ${result.error}`, 'error');
         }
       }
     };
@@ -283,10 +283,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
     // Normal project save
     const result = await saveProject();
     if (result.success) {
-      showToast('Project saved');
+      showToast('Project saved', 'success');
       refreshRecentProjects();
     } else if (result.error) {
-      showToast(`Error saving: ${result.error}`);
+      showToast(`Error saving: ${result.error}`, 'error');
     }
     // If canceled, do nothing
   }, [showToast, refreshRecentProjects, isEditingTemplate, onSaveTemplate, isEditingAssembly, onSaveAssembly]);
@@ -294,20 +294,20 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   const handleSaveAs = useCallback(async () => {
     // "Save As" doesn't apply to template or assembly editing
     if (isEditingTemplate) {
-      showToast('Use "Save Template" to save template changes');
+      showToast('Use "Save Template" to save template changes', 'info');
       return;
     }
     if (isEditingAssembly) {
-      showToast('Use "Save Assembly" to save assembly changes');
+      showToast('Use "Save Assembly" to save assembly changes', 'info');
       return;
     }
 
     const result = await saveProjectAs();
     if (result.success) {
-      showToast('Project saved');
+      showToast('Project saved', 'success');
       refreshRecentProjects();
     } else if (result.error) {
-      showToast(`Error saving: ${result.error}`);
+      showToast(`Error saving: ${result.error}`, 'error');
     }
     // If canceled, do nothing
   }, [showToast, refreshRecentProjects, isEditingTemplate, isEditingAssembly]);
@@ -315,11 +315,11 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   const handleNew = useCallback(async () => {
     // Block when editing template or assembly
     if (isEditingTemplate) {
-      showToast('Finish editing template first');
+      showToast('Finish editing template first', 'warning');
       return;
     }
     if (isEditingAssembly) {
-      showToast('Finish editing assembly first');
+      showToast('Finish editing assembly first', 'warning');
       return;
     }
 
@@ -328,23 +328,23 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
         type: 'new',
         execute: async () => {
           await newProject();
-          showToast('New project created');
+          showToast('New project created', 'success');
         }
       });
     } else {
       await newProject();
-      showToast('New project created');
+      showToast('New project created', 'success');
     }
   }, [showToast, isEditingTemplate, isEditingAssembly]);
 
   const handleOpen = useCallback(async () => {
     // Block when editing template or assembly
     if (isEditingTemplate) {
-      showToast('Finish editing template first');
+      showToast('Finish editing template first', 'warning');
       return;
     }
     if (isEditingAssembly) {
-      showToast('Finish editing assembly first');
+      showToast('Finish editing assembly first', 'warning');
       return;
     }
 
@@ -357,10 +357,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
             return; // Recovery modal will be shown
           }
           if (result.success) {
-            showToast('Project opened');
+            showToast('Project opened', 'success');
             refreshRecentProjects();
           } else if (result.error) {
-            showToast(`Error: ${result.error}`);
+            showToast(`Error: ${result.error}`, 'error');
           }
         }
       });
@@ -370,10 +370,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
         return; // Recovery modal will be shown
       }
       if (result.success) {
-        showToast('Project opened');
+        showToast('Project opened', 'success');
         refreshRecentProjects();
       } else if (result.error) {
-        showToast(`Error: ${result.error}`);
+        showToast(`Error: ${result.error}`, 'error');
       }
     }
   }, [showToast, refreshRecentProjects, isEditingTemplate, isEditingAssembly, handleFileOperationResult]);
@@ -382,11 +382,11 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
     async (openFilePath: string) => {
       // Block when editing template or assembly
       if (isEditingTemplate) {
-        showToast('Finish editing template first');
+        showToast('Finish editing template first', 'warning');
         return;
       }
       if (isEditingAssembly) {
-        showToast('Finish editing assembly first');
+        showToast('Finish editing assembly first', 'warning');
         return;
       }
 
@@ -399,10 +399,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
               return; // Recovery modal will be shown
             }
             if (result.success) {
-              showToast('Project opened');
+              showToast('Project opened', 'success');
               refreshRecentProjects();
             } else if (result.error) {
-              showToast(`Error: ${result.error}`);
+              showToast(`Error: ${result.error}`, 'error');
             }
           }
         });
@@ -412,10 +412,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
           return; // Recovery modal will be shown
         }
         if (result.success) {
-          showToast('Project opened');
+          showToast('Project opened', 'success');
           refreshRecentProjects();
         } else if (result.error) {
-          showToast(`Error: ${result.error}`);
+          showToast(`Error: ${result.error}`, 'error');
         }
       }
     },
@@ -425,11 +425,11 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   const handleGoHome = useCallback(async () => {
     // Block when editing template or assembly
     if (isEditingTemplate) {
-      showToast('Finish editing template first');
+      showToast('Finish editing template first', 'warning');
       return;
     }
     if (isEditingAssembly) {
-      showToast('Finish editing assembly first');
+      showToast('Finish editing assembly first', 'warning');
       return;
     }
 
@@ -455,7 +455,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
     if (result.success && pending) {
       await pending.execute();
     } else if (result.error) {
-      showToast(`Error saving: ${result.error}`);
+      showToast(`Error saving: ${result.error}`, 'error');
       // If save failed during close, cancel the close
       if (isCloseAction) {
         await window.electronAPI.cancelClose();

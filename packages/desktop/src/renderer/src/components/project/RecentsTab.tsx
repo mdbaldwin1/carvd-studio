@@ -1,5 +1,6 @@
 import { FileText, Star, Trash2, AlertTriangle } from 'lucide-react';
 import { Card } from '@renderer/components/ui/card';
+import { IconButton } from '../common/IconButton';
 import { RecentProject, formatRelativeDate } from './StartScreen';
 
 interface RecentsTabProps {
@@ -78,25 +79,31 @@ export function RecentsTab({
             className={`flex gap-1 opacity-0 transition-opacity duration-100 group-hover:opacity-100 ${!project.exists ? '!opacity-100' : ''}`}
           >
             {project.exists && (
-              <button
-                className={`project-action favorite w-7 h-7 flex items-center justify-center bg-transparent border-none rounded text-text-muted cursor-pointer transition-all duration-100 hover:bg-bg-tertiary hover:text-text opacity-0 group-hover:opacity-100 ${project.isFavorite ? 'active !opacity-100 text-warning' : ''}`}
+              <IconButton
                 onClick={(e) => onToggleFavorite(project, e)}
-                title={project.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                aria-label={
+                label={
                   project.isFavorite ? `Remove ${project.name} from favorites` : `Add ${project.name} to favorites`
                 }
+                size="xs"
+                variant="ghost"
+                color={project.isFavorite ? 'primary' : 'secondary'}
+                className={`project-action favorite opacity-0 group-hover:opacity-100 ${project.isFavorite ? 'active !opacity-100 !text-warning' : ''}`}
+                title={project.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
               >
                 <Star size={16} fill={project.isFavorite ? 'currentColor' : 'none'} />
-              </button>
+              </IconButton>
             )}
-            <button
-              className="project-action danger w-7 h-7 flex items-center justify-center bg-transparent border-none rounded text-text-muted cursor-pointer transition-all duration-100 hover:bg-bg-tertiary hover:!text-error"
+            <IconButton
+              className="project-action danger hover:!text-error"
               onClick={(e) => onRemoveRecent(project, e)}
+              label={`Remove ${project.name} from recent`}
+              size="xs"
+              variant="ghost"
+              color="secondary"
               title="Remove from recent"
-              aria-label={`Remove ${project.name} from recent`}
             >
               <Trash2 size={16} />
-            </button>
+            </IconButton>
           </div>
         </Card>
       ))}

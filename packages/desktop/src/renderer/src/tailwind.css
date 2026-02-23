@@ -15,7 +15,7 @@
    *   #203864  Twilight Indigo
    *   #077187  Cerulean
    *   #AEA4BF  Lilac Ash
-   *   #FFD21F  Gold
+   *   #FFD21F  Gold -- fbb040
    *   #FFEECF  Papaya Whip
    */
 
@@ -42,15 +42,15 @@
   --color-text-secondary: var(--color-text-muted);
   --color-text-tertiary: #8a7ea3; /* Lilac Ash darkened */
 
-  /* Accent — Cerulean (interactive: focus, highlights, active states) */
-  --color-accent: #077187; /* ← exact Cerulean */
-  --color-accent-hover: #0990a6; /* Cerulean lightened */
-  --color-accent-muted: #055a6c; /* Cerulean darkened */
-  --color-accent-bg: rgba(7, 113, 135, 0.15);
-  --color-accent-foreground: #ffeecf; /* Papaya Whip on Cerulean */
+  /* Accent — Lilac Ash (interactive: focus, highlights, active states) */
+  --color-accent: #aea4bf; /* ← exact Lilac Ash */
+  --color-accent-hover: #c3bbd0; /* Lilac Ash lightened */
+  --color-accent-muted: #8f84a3; /* Lilac Ash darkened */
+  --color-accent-bg: rgba(174, 164, 191, 0.16);
+  --color-accent-foreground: #1a1a1a; /* High-contrast text on Lilac */
 
   /* Primary — Gold (CTAs, emphasis) */
-  --color-primary: #ffd21f; /* ← exact Gold */
+  --color-primary: #fbb040; /* ← exact Gold */
   --color-primary-hover: #ffd94d; /* Gold lightened */
   --color-primary-muted: #d4ae19; /* Gold darkened */
   --color-primary-bg: rgba(255, 210, 31, 0.1);
@@ -135,17 +135,17 @@
   --color-text-secondary: var(--color-text-muted);
   --color-text-tertiary: #aea4bf; /* ← exact Lilac Ash */
 
-  /* Accent — Cerulean (same hue, works well on light bg) */
-  --color-accent: #077187; /* ← exact Cerulean */
-  --color-accent-hover: #055a6c; /* Cerulean darkened */
-  --color-accent-muted: #0990a6; /* Cerulean lightened */
-  --color-accent-bg: rgba(7, 113, 135, 0.1);
-  --color-accent-foreground: #ffffff;
+  /* Accent — Lilac Ash */
+  --color-accent: #aea4bf; /* ← exact Lilac Ash */
+  --color-accent-hover: #8f84a3; /* Lilac Ash darkened */
+  --color-accent-muted: #c3bbd0; /* Lilac Ash lightened */
+  --color-accent-bg: rgba(174, 164, 191, 0.16);
+  --color-accent-foreground: #1a1a1a;
 
   /* Primary — Gold (darkened for contrast against cream bg) */
   --color-primary: #d4ae19; /* Gold darkened for light bg */
   --color-primary-hover: #b8960e; /* Gold further darkened */
-  --color-primary-muted: #ffd21f; /* ← exact Gold */
+  --color-primary-muted: #fbb040; /* ← exact Gold */
   --color-primary-bg: rgba(255, 210, 31, 0.15);
   --color-primary-foreground: #203864; /* Twilight Indigo on Gold */
 
@@ -301,6 +301,58 @@
   --color-chart-4: var(--color-warning);
   --color-chart-5: var(--color-danger);
   --radius: var(--radius-md);
+}
+
+/* Sonner toast theming (kept explicit so dark mode never falls back to white cards) */
+[data-sonner-toaster] {
+  pointer-events: none !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast].carvd-toast {
+  pointer-events: auto !important;
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast].carvd-toast [data-title] {
+  color: var(--color-text) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast].carvd-toast [data-description] {
+  color: var(--color-text-muted) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] .carvd-toast-action {
+  background: color-mix(in srgb, var(--color-primary) 22%, transparent) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--color-primary) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] .carvd-toast-action:hover {
+  background: color-mix(in srgb, var(--color-primary) 32%, transparent) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] .carvd-toast-cancel {
+  background: var(--color-bg-hover) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--color-text) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] .carvd-toast-cancel:hover {
+  background: var(--color-bg-alt) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-close-button] {
+  background: var(--color-bg-hover) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text-muted) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-close-button]:hover {
+  background: var(--color-bg-alt) !important;
+  color: var(--color-text) !important;
 }
 
 /* ===========================================

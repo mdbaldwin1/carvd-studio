@@ -4,6 +4,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import { getBlockedMessage } from '../../utils/featureLimits';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { showSavedFileToast } from '../../utils/fileToast';
 // pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { logger } from '../../utils/logger';
 import { CutList, CutInstruction } from '../../types';
@@ -85,37 +86,46 @@ export function CutListPartsTab({
 
   const handleDownloadPDF = useCallback(async () => {
     if (!canExportPDF) {
-      showToast(getBlockedMessage('exportPDF'));
+      showToast(getBlockedMessage('exportPDF'), 'warning');
       return;
     }
 
     try {
       const { exportCutListToPdf } = await import('../../utils/pdfExport');
       const result = await exportCutListToPdf(cutList, { projectName, units });
-      if (result.success) {
-        showToast('Parts list saved to PDF');
+      if (result.success && result.filePath) {
+        showSavedFileToast('Parts list saved to PDF', result.filePath);
       } else if (result.error) {
-        showToast('Failed to save PDF');
+        showToast('Failed to save PDF', 'error');
         logger.error('Parts list PDF export error:', result.error);
       }
     } catch (error) {
       logger.error('Parts list PDF export error:', error);
-      showToast('Failed to export PDF');
+      showToast('Failed to export PDF', 'error');
     }
   }, [cutList, projectName, units, canExportPDF, showToast]);
 
   const handleDownloadCSV = useCallback(async () => {
-    const { exportCutListToCsv } = await import('../../utils/pdfExport');
-    const csvContent = exportCutListToCsv(cutList, units);
-    const BOM = '\uFEFF';
-    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${projectName || 'cut-list'}-parts.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('Parts list exported to CSV');
+    try {
+      const { exportCutListToCsv } = await import('../../utils/pdfExport');
+      const csvContent = exportCutListToCsv(cutList, units);
+      const defaultFileName = `${projectName || 'cut-list'}-parts.csv`;
+      const result = await window.electronAPI.showSaveDialog({
+        defaultPath: defaultFileName,
+        filters: [{ name: 'CSV Files', extensions: ['csv'] }]
+      });
+
+      if (result.canceled || !result.filePath) {
+        return;
+      }
+
+      const BOM = '\uFEFF';
+      await window.electronAPI.writeFile(result.filePath, BOM + csvContent);
+      showSavedFileToast('Parts list saved to CSV', result.filePath);
+    } catch (error) {
+      logger.error('Parts list CSV export error:', error);
+      showToast('Failed to export CSV', 'error');
+    }
   }, [cutList, units, projectName, showToast]);
 
   const downloadItems: DropdownItem[] = useMemo(

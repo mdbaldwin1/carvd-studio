@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { useProjectStore } from '../../store/projectStore';
 import { useAssemblyEditingStore } from '../../store/assemblyEditingStore';
 import { useSelectionStore } from '../../store/selectionStore';
@@ -321,6 +321,83 @@ describe('HierarchicalPartsList', () => {
       expect(screen.getByText('Outer Group')).toBeInTheDocument();
       expect(screen.getByText('Inner Group')).toBeInTheDocument();
     });
+
+    it('keeps items visible when groupMembers reference missing parent groups', () => {
+      useProjectStore.setState({
+        parts: [{ ...mockParts[0], id: 'part-a', name: 'Orphan Part' }],
+        groups: [{ id: 'group-a', name: 'Orphan Group' }],
+        groupMembers: [
+          { id: 'gm-1', groupId: 'missing-parent', memberId: 'group-a', memberType: 'group' },
+          { id: 'gm-2', groupId: 'missing-parent', memberId: 'part-a', memberType: 'part' }
+        ]
+      });
+
+      render(<HierarchicalPartsList {...defaultProps} />);
+
+      expect(screen.getByText('Orphan Group')).toBeInTheDocument();
+      expect(screen.getByText('Orphan Part')).toBeInTheDocument();
+    });
+
+    it('renders groups and parts when all groups are in a parent cycle (no top-level root)', () => {
+      useProjectStore.setState({
+        parts: [{ ...mockParts[0], id: 'part-cycle', name: 'Cycle Part' }],
+        groups: [
+          { id: 'group-a', name: 'Group A' },
+          { id: 'group-b', name: 'Group B' }
+        ],
+        groupMembers: [
+          { id: 'gm-1', groupId: 'group-a', memberId: 'group-b', memberType: 'group' },
+          { id: 'gm-2', groupId: 'group-b', memberId: 'group-a', memberType: 'group' },
+          { id: 'gm-3', groupId: 'group-a', memberId: 'part-cycle', memberType: 'part' }
+        ]
+      });
+      useSelectionStore.setState({ expandedGroupIds: ['group-a', 'group-b'] });
+
+      render(<HierarchicalPartsList {...defaultProps} />);
+
+      expect(screen.getAllByText('Group A').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Group B').length).toBeGreaterThan(0);
+      expect(screen.getByText('Cycle Part')).toBeInTheDocument();
+    });
+
+    it('auto-expands ancestor groups when a nested part is selected', async () => {
+      useProjectStore.setState({
+        parts: mockParts,
+        groups: [
+          { id: 'group-1', name: 'Outer Group' },
+          { id: 'group-2', name: 'Inner Group' }
+        ],
+        groupMembers: [
+          { id: 'gm-1', groupId: 'group-1', memberId: 'group-2', memberType: 'group' },
+          { id: 'gm-2', groupId: 'group-2', memberId: 'part-1', memberType: 'part' }
+        ]
+      });
+      useSelectionStore.setState({ selectedPartIds: ['part-1'], selectedGroupIds: [], expandedGroupIds: [] });
+
+      render(<HierarchicalPartsList {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(useSelectionStore.getState().expandedGroupIds).toEqual(expect.arrayContaining(['group-1', 'group-2']));
+      });
+    });
+
+    it('auto-expands ancestor groups when a nested group is selected', async () => {
+      useProjectStore.setState({
+        parts: mockParts,
+        groups: [
+          { id: 'group-1', name: 'Outer Group' },
+          { id: 'group-2', name: 'Inner Group' }
+        ],
+        groupMembers: [{ id: 'gm-1', groupId: 'group-1', memberId: 'group-2', memberType: 'group' }]
+      });
+      useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['group-2'], expandedGroupIds: [] });
+
+      render(<HierarchicalPartsList {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(useSelectionStore.getState().expandedGroupIds).toEqual(expect.arrayContaining(['group-1', 'group-2']));
+      });
+    });
   });
 
   describe('search filtering', () => {
@@ -363,6 +440,27 @@ describe('HierarchicalPartsList', () => {
 
       // Group should be included because child matches
       expect(screen.getByText('Cabinet Parts')).toBeInTheDocument();
+      expect(screen.getByText('Side Panel')).toBeInTheDocument();
+    });
+
+    it('auto-expands parent groups during search so nested matches are visible', () => {
+      useProjectStore.setState({
+        parts: mockParts,
+        groups: [
+          { id: 'group-1', name: 'Outer Group' },
+          { id: 'group-2', name: 'Inner Group' }
+        ],
+        groupMembers: [
+          { id: 'gm-1', groupId: 'group-1', memberId: 'group-2', memberType: 'group' },
+          { id: 'gm-2', groupId: 'group-2', memberId: 'part-1', memberType: 'part' }
+        ]
+      });
+      useSelectionStore.setState({ expandedGroupIds: [] }); // both groups collapsed
+
+      render(<HierarchicalPartsList {...defaultProps} searchFilter="Side" />);
+
+      expect(screen.getByText('Outer Group')).toBeInTheDocument();
+      expect(screen.getByText('Inner Group')).toBeInTheDocument();
       expect(screen.getByText('Side Panel')).toBeInTheDocument();
     });
   });

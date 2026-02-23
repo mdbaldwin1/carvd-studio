@@ -121,7 +121,7 @@ export default function TroubleshootingSection() {
                 Make sure you're connected to the internet
               </li>
               <li className="relative mb-2 pl-8 before:absolute before:left-0 before:font-semibold before:text-accent before:content-[counter(step-counter)'.'] [counter-increment:step-counter] last:mb-0 max-sm:pl-6">
-                Check that you haven't exceeded the activation limit (3 devices)
+                Check that you haven't exceeded your activation limit
               </li>
               <li className="relative pl-8 before:absolute before:left-0 before:font-semibold before:text-accent before:content-[counter(step-counter)'.'] [counter-increment:step-counter] max-sm:pl-6">
                 If you've reached the limit, deactivate an old device first in
@@ -137,7 +137,8 @@ export default function TroubleshootingSection() {
           </h4>
           <div className="leading-relaxed text-text-muted max-sm:text-sm">
             <p className="mb-2">
-              You can activate your license on up to 3 computers. To move it:
+              You can activate your license on multiple computers up to your
+              activation limit. To move it:
             </p>
             <ol className="my-4 list-none p-0 [counter-reset:step-counter]">
               <li className="relative mb-2 pl-8 before:absolute before:left-0 before:font-semibold before:text-accent before:content-[counter(step-counter)'.'] [counter-increment:step-counter] last:mb-0 max-sm:pl-6">

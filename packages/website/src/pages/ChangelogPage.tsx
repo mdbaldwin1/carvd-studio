@@ -38,7 +38,7 @@ function getCategoryBadgeClasses(name: string): string {
 
 export default function ChangelogPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
+    <div className="site-shell">
       <SEO
         title="Changelog"
         description="Latest updates and release notes for Carvd Studio. See what's new in each version."

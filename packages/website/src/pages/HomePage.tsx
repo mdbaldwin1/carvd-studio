@@ -26,14 +26,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 const accentBoxHighlightStyle = {
-  background:
-    "linear-gradient(135deg, rgba(174,164,191,0.15) 0%, rgba(174,164,191,0.05) 100%)",
+  background: "rgba(174,164,191,0.12)",
   borderColor: "rgba(174,164,191,0.4)",
 };
 
 const surfaceGradientStyle = {
-  background:
-    "linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-elevated) 100%)",
+  background: "var(--color-surface)",
 };
 
 export default function HomePage() {
@@ -44,7 +42,7 @@ export default function HomePage() {
   } = useDownloadInfo();
 
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
+    <div className="site-shell">
       <SEO
         path="/"
         jsonLd={[createOrganizationSchema(), createSoftwareAppSchema()]}
@@ -55,16 +53,20 @@ export default function HomePage() {
         {/* Hero Section */}
         <section className="container py-16 text-center max-md:py-12 max-sm:py-8">
           <div className="mx-auto max-w-4xl">
-            <Badge
-              variant="outline"
-              className="mx-auto mb-6 gap-1 border-accent bg-[rgba(174,164,191,0.2)] text-accent"
-            >
+            <div className="mb-6 flex justify-center">
+              <img
+                src="/branding/CarvdStudio-Vertical-WHT.svg"
+                alt="Carvd Studio"
+                className="h-56 w-auto max-md:h-48 max-sm:h-40"
+              />
+            </div>
+            <Badge variant="outline" className="hero-kicker mx-auto mb-6 gap-1">
               <Sparkles size={16} /> Now Available for macOS &amp; Windows
             </Badge>
             <h1 className="mb-6 break-words text-6xl font-bold leading-tight max-md:text-4xl max-sm:text-3xl">
               Stop Wasting Wood.
               <br />
-              <span className="text-primary-text">Start Building Smarter.</span>
+              <span className="text-highlight">Start Building Smarter.</span>
             </h1>
             <p className="mx-auto mb-12 max-w-2xl text-xl leading-relaxed text-text-muted max-md:text-lg max-sm:mb-8 max-sm:text-base">
               Professional furniture design software that helps you waste less
@@ -95,8 +97,8 @@ export default function HomePage() {
 
         {/* Stats Section */}
         <section className="container">
-          <div className="my-16 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-8 max-md:my-12 max-md:gap-6">
-            <div className="p-8 text-center max-md:p-6">
+          <div className="site-section my-16 grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 p-4 max-md:my-12 max-md:gap-3">
+            <div className="rounded-lg border border-border/70 bg-surface/65 p-8 text-center max-md:p-6">
               <span className="mb-2 block text-5xl font-bold text-highlight max-md:text-3xl max-sm:text-2xl">
                 Less
               </span>
@@ -104,7 +106,7 @@ export default function HomePage() {
                 Material Waste
               </span>
             </div>
-            <div className="p-8 text-center max-md:p-6">
+            <div className="rounded-lg border border-border/70 bg-surface/65 p-8 text-center max-md:p-6">
               <span className="mb-2 block text-5xl font-bold text-highlight max-md:text-3xl max-sm:text-2xl">
                 Faster
               </span>
@@ -112,7 +114,7 @@ export default function HomePage() {
                 Project Planning
               </span>
             </div>
-            <div className="p-8 text-center max-md:p-6">
+            <div className="rounded-lg border border-border/70 bg-surface/65 p-8 text-center max-md:p-6">
               <span className="mb-2 block text-5xl font-bold text-highlight max-md:text-3xl max-sm:text-2xl">
                 100%
               </span>
@@ -140,7 +142,7 @@ export default function HomePage() {
                 graph paper trying to optimize layouts—only to realize you
                 miscalculated halfway through cutting.
               </p>
-              <p className="text-lg font-semibold text-primary-text">
+              <p className="text-lg font-semibold text-highlight">
                 That stops today.
               </p>
             </div>
@@ -171,7 +173,7 @@ export default function HomePage() {
         {/* Features Grid */}
         <section className="container mt-16">
           <div className="mt-16 grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-8 max-md:mt-12 max-md:gap-6">
-            <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+            <Card className="feature-card p-8 max-md:p-6">
               <span className="mb-4 block">
                 <Palette size={28} />
               </span>
@@ -185,7 +187,7 @@ export default function HomePage() {
                 in your shop.
               </p>
             </Card>
-            <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+            <Card className="feature-card p-8 max-md:p-6">
               <span className="mb-4 block">
                 <Ruler size={28} />
               </span>
@@ -199,7 +201,7 @@ export default function HomePage() {
                 budget further.
               </p>
             </Card>
-            <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+            <Card className="feature-card p-8 max-md:p-6">
               <span className="mb-4 block">
                 <DollarSign size={28} />
               </span>
@@ -213,7 +215,7 @@ export default function HomePage() {
                 foot and every dollar.
               </p>
             </Card>
-            <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+            <Card className="feature-card p-8 max-md:p-6">
               <span className="mb-4 block">
                 <Lock size={28} />
               </span>
@@ -226,7 +228,7 @@ export default function HomePage() {
                 or anywhere—even without internet. Complete privacy guaranteed.
               </p>
             </Card>
-            <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+            <Card className="feature-card p-8 max-md:p-6">
               <span className="mb-4 block">
                 <Zap size={28} />
               </span>
@@ -240,7 +242,7 @@ export default function HomePage() {
                 your way and lets you work.
               </p>
             </Card>
-            <Card className="p-8 transition-all hover:border-accent hover:-translate-y-1 hover:shadow-lg max-md:p-6">
+            <Card className="feature-card p-8 max-md:p-6">
               <span className="mb-4 block">
                 <Wrench size={28} />
               </span>
@@ -263,7 +265,7 @@ export default function HomePage() {
             Built for Every Type of Woodworker
           </h2>
           <div className="grid grid-cols-3 gap-8 max-md:grid-cols-1 max-md:gap-6">
-            <Card className="p-8 transition-all hover:border-accent hover:-translate-y-0.5 hover:shadow-lg max-md:p-6">
+            <Card className="feature-card p-8 max-md:p-6">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-md bg-surface-elevated max-md:h-12 max-md:w-12">
                 <Building2 size={36} />
               </div>
@@ -276,7 +278,7 @@ export default function HomePage() {
                 accurate estimates on the spot.
               </p>
             </Card>
-            <Card className="p-8 transition-all hover:border-accent hover:-translate-y-0.5 hover:shadow-lg max-md:p-6">
+            <Card className="feature-card p-8 max-md:p-6">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-md bg-surface-elevated max-md:h-12 max-md:w-12">
                 <Armchair size={36} />
               </div>
@@ -289,7 +291,7 @@ export default function HomePage() {
                 before you touch the wood.
               </p>
             </Card>
-            <Card className="p-8 transition-all hover:border-accent hover:-translate-y-0.5 hover:shadow-lg max-md:p-6">
+            <Card className="feature-card p-8 max-md:p-6">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-md bg-surface-elevated max-md:h-12 max-md:w-12">
                 <Home size={36} />
               </div>
@@ -417,17 +419,14 @@ export default function HomePage() {
               Free to download. Try everything for 14 days. Then decide.
             </p>
             <p className="mb-8 text-center">
-              <Badge
-                variant="outline"
-                className="border-accent bg-[rgba(174,164,191,0.2)] text-accent"
-              >
+              <Badge variant="outline" className="hero-kicker border-accent">
                 Version {appVersion}
               </Badge>
             </p>
             <div className="flex flex-wrap justify-center gap-8 max-sm:flex-col max-sm:items-center">
               <a
                 href={macDownload.url}
-                className="flex min-w-[200px] flex-col items-center gap-2 rounded-lg border-2 border-border bg-bg px-8 py-8 text-text no-underline transition-all hover:-translate-y-1 hover:border-highlight hover:text-text hover:shadow-lg max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
+                className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
                 <span>
                   <AppleIcon size={32} />
@@ -442,7 +441,7 @@ export default function HomePage() {
               </a>
               <a
                 href={windowsDownload.url}
-                className="flex min-w-[200px] flex-col items-center gap-2 rounded-lg border-2 border-border bg-bg px-8 py-8 text-text no-underline transition-all hover:-translate-y-1 hover:border-highlight hover:text-text hover:shadow-lg max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
+                className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
                 <span>
                   <WindowsIcon size={32} />

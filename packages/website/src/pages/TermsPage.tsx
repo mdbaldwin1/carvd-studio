@@ -4,7 +4,7 @@ import Footer from "../components/Footer";
 
 export default function TermsPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
+    <div className="site-shell">
       <SEO
         title="Terms of Service"
         description="Carvd Studio terms of service. Simple, fair terms for using our woodworking design software."

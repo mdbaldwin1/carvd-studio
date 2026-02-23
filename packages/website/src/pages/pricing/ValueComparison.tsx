@@ -1,8 +1,7 @@
 import { Card } from "@/components/ui/card";
 
 const accentBoxHighlightStyle = {
-  background:
-    "linear-gradient(135deg, rgba(174,164,191,0.15) 0%, rgba(174,164,191,0.05) 100%)",
+  background: "rgba(174,164,191,0.12)",
   borderColor: "rgba(174,164,191,0.4)",
 };
 
@@ -40,16 +39,12 @@ export default function ValueComparison() {
           className="p-6"
           style={{ borderColor: "var(--color-primary)", borderWidth: "2px" }}
         >
-          <h3 className="mb-4 text-center text-xl font-bold text-primary-text">
+          <h3 className="mb-4 text-center text-xl font-bold text-primary">
             Carvd Studio
           </h3>
           <div className="mb-4 text-center">
-            <div className="mb-2 text-4xl font-bold text-primary-text">
-              $59.99
-            </div>
-            <div className="text-sm font-semibold text-primary-text">
-              pay once
-            </div>
+            <div className="mb-2 text-4xl font-bold text-primary">$59.99</div>
+            <div className="text-sm font-semibold text-primary">pay once</div>
           </div>
           <ul className="space-y-2 p-0 text-sm">
             {[

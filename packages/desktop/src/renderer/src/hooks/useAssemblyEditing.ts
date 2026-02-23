@@ -171,7 +171,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
       // Check if current project has unsaved changes
       if (hasUnsavedChanges()) {
         // User needs to save or discard current project first
-        showToast('Save or discard your project first');
+        showToast('Save or discard your project first', 'warning');
         return false;
       }
 
@@ -193,14 +193,14 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
     // Check license limits for assemblies
     const limits = getFeatureLimits(useLicenseStore.getState().licenseMode);
     if (!limits.canUseAssemblies) {
-      showToast(getBlockedMessage('useAssemblies'));
+      showToast(getBlockedMessage('useAssemblies'), 'warning');
       return false;
     }
 
     // Check if current project has unsaved changes
     if (hasUnsavedChanges()) {
       // User needs to save or discard current project first
-      showToast('Save or discard your project first');
+      showToast('Save or discard your project first', 'warning');
       return false;
     }
 
@@ -231,7 +231,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
 
     if (!editingAssemblyId) {
       logger.error('[saveAndExit] No editingAssemblyId');
-      showToast('No assembly to save');
+      showToast('No assembly to save', 'warning');
       return;
     }
 
@@ -240,13 +240,13 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
     logger.debug('[saveAndExit] saveEditingAssembly returned:', updatedAssembly);
 
     if (!updatedAssembly) {
-      showToast('Failed to save assembly');
+      showToast('Failed to save assembly', 'error');
       return;
     }
 
     // Check if we have any parts
     if (updatedAssembly.parts.length === 0) {
-      showToast('Cannot save empty assembly - add at least one part');
+      showToast('Cannot save empty assembly - add at least one part', 'warning');
       return;
     }
 
@@ -304,7 +304,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
         logger.debug('[saveAndExit] Adding new assembly:', assemblyToSave);
         await addAssembly(assemblyToSave);
         logger.debug('[saveAndExit] addAssembly completed');
-        showToast(`Created "${updatedAssembly.name}" in library`);
+        showToast(`Created "${updatedAssembly.name}" in library`, 'success');
       } else {
         // Update existing assembly in library
         const updates = {
@@ -319,7 +319,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
         logger.debug('[saveAndExit] Updating assembly:', editingAssemblyId, updates);
         await updateAssembly(editingAssemblyId, updates);
         logger.debug('[saveAndExit] updateAssembly completed');
-        showToast(`Saved "${updatedAssembly.name}" to library`);
+        showToast(`Saved "${updatedAssembly.name}" to library`, 'success');
       }
 
       // Exit editing mode and restore previous project
@@ -328,7 +328,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
       restorePreviousProject();
     } catch (error) {
       logger.error('Failed to save assembly to library:', error);
-      showToast('Failed to save assembly to library');
+      showToast('Failed to save assembly to library', 'error');
     }
   }, [
     editingAssemblyId,

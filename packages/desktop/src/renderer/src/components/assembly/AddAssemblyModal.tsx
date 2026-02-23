@@ -1,11 +1,11 @@
-import { Plus, Search, X } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useLicenseStore } from '../../store/licenseStore';
 import { Assembly } from '../../types';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { getFeatureLimits } from '../../utils/featureLimits';
 import { Button } from '@renderer/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import {
   Dialog,
   DialogClose,
@@ -14,6 +14,12 @@ import {
   DialogHeader,
   DialogTitle
 } from '@renderer/components/ui/dialog';
+import { AssemblyDetails } from './AssemblyDetails';
+import { AssemblyListItem } from '../stock/AssemblyListItem';
+import { LibraryDetailHeader } from '../common/library/LibraryDetailHeader';
+import { LibraryDetailPane } from '../common/library/LibraryDetailPane';
+import { LibraryEmptyState } from '../common/library/LibraryEmptyState';
+import { LibrarySidebar } from '../common/library/LibrarySidebar';
 
 interface AddAssemblyModalProps {
   isOpen: boolean;
@@ -138,17 +144,24 @@ export function AddAssemblyModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[700px] max-h-[80vh]" onClose={onClose}>
+      <DialogContent className="w-[820px] max-w-[92vw] max-h-[86vh]" onClose={onClose}>
         <DialogHeader>
           <DialogTitle>Add Assembly to Project</DialogTitle>
           <DialogClose onClose={onClose} />
         </DialogHeader>
 
         <div className="flex flex-1 overflow-hidden min-h-[300px]">
-          {/* Library list sidebar */}
-          <div className="w-60 shrink-0 border-r border-border flex flex-col overflow-hidden">
-            <div className="flex justify-between items-center py-3 px-4 border-b border-border text-xs text-text-muted">
-              <span>{availableAssemblies.length} available</span>
+          <LibrarySidebar
+            count={availableAssemblies.length}
+            hasItems={availableAssemblies.length > 0}
+            showNoResults={filteredAssemblies.length === 0}
+            className="shrink-0"
+            search={{
+              value: searchTerm,
+              onChange: setSearchTerm,
+              placeholder: 'Search assemblies...'
+            }}
+            headerActions={
               <div className="flex gap-1 items-center">
                 {availableAssemblies.length > 0 && (
                   <Button variant="ghost" size="xs" onClick={handleSelectAll}>
@@ -172,29 +185,8 @@ export function AddAssemblyModal({
                   </Button>
                 )}
               </div>
-            </div>
-            {availableAssemblies.length > 0 && (
-              <div className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded mb-2">
-                <Search size={14} className="text-text-muted shrink-0" />
-                <input
-                  className="flex-1 border-none bg-transparent text-text text-[13px] outline-none placeholder:text-text-muted"
-                  type="text"
-                  placeholder="Search assemblies..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                {searchTerm && (
-                  <button
-                    className="flex items-center justify-center w-5 h-5 border-none bg-none text-text-muted cursor-pointer p-0 rounded-sm shrink-0 hover:text-text hover:bg-bg-hover"
-                    onClick={() => setSearchTerm('')}
-                    aria-label="Clear search"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-            )}
-            {availableAssemblies.length === 0 ? (
+            }
+            emptyState={
               <div className="text-text-muted text-xs italic p-4 text-center">
                 <p>No assemblies available</p>
                 <p className="text-[11px] text-text-muted mt-1">
@@ -205,108 +197,82 @@ export function AddAssemblyModal({
                     : 'All library assemblies are already in this project'}
                 </p>
               </div>
-            ) : filteredAssemblies.length === 0 ? (
+            }
+            noResultsState={
               <div className="text-text-muted text-xs italic p-4 text-center">
                 <p>No assemblies match "{searchTerm}"</p>
               </div>
-            ) : (
-              <ul className="list-none m-0 p-2 overflow-y-auto flex-1">
-                {filteredAssemblies.map((assembly) => (
-                  <li
-                    key={assembly.id}
-                    className={`flex items-center gap-2 py-2.5 px-3 rounded-md cursor-pointer transition-[background] duration-150 hover:bg-surface-hover ${selectedIds.has(assembly.id) ? 'bg-selected' : ''} ${displayedAssemblyId === assembly.id ? 'outline-2 outline-solid outline-primary -outline-offset-2' : ''}`}
-                    onClick={() => handleItemClick(assembly)}
-                  >
-                    {assembly.thumbnailData ? (
-                      <img
-                        src={`data:image/png;base64,${assembly.thumbnailData.data}`}
-                        alt={assembly.name}
-                        className="w-10 h-[30px] object-cover rounded shrink-0 bg-bg-tertiary"
-                      />
-                    ) : (
-                      <span className="text-base shrink-0">{assembly.thumbnail || '📦'}</span>
-                    )}
-                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                      <span className="text-[13px] text-text whitespace-nowrap overflow-hidden text-ellipsis">
-                        {assembly.name}
-                      </span>
-                      <span className="text-[11px] text-text-muted">
-                        {assembly.parts.length} part{assembly.parts.length !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {selectedIds.size > 0 && (
-              <div className="py-2 px-3 border-t border-border text-xs text-text-muted shrink-0">
-                <span>{selectedIds.size} selected</span>
-              </div>
-            )}
-          </div>
+            }
+            footer={
+              selectedIds.size > 0 ? (
+                <div className="py-2 px-3 border-t border-border text-xs text-text-muted shrink-0">
+                  <span>{selectedIds.size} selected</span>
+                </div>
+              ) : undefined
+            }
+          >
+            <ul className="list-none m-0 p-2 overflow-y-auto flex-1">
+              {filteredAssemblies.map((assembly) => (
+                <AssemblyListItem
+                  key={assembly.id}
+                  assembly={assembly}
+                  selected={selectedIds.has(assembly.id)}
+                  highlighted={displayedAssemblyId === assembly.id}
+                  onClick={() => handleItemClick(assembly)}
+                />
+              ))}
+            </ul>
+          </LibrarySidebar>
 
           {/* Detail/edit panel */}
-          <div className="flex-1 flex flex-col p-5 overflow-y-auto">
+          <LibraryDetailPane className="p-5">
             {!displayedAssembly ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-text-muted gap-2">
-                <p className="mb-2">Select an assembly from the library to view details</p>
-                <p className="text-[11px] text-text-muted mt-1">or click "+" to create one</p>
-                <a
-                  href="#"
-                  className="text-accent no-underline text-xs hover:underline hover:text-accent-hover transition-colors duration-150"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
-                  }}
-                >
-                  Learn more about assemblies
-                </a>
-              </div>
+              <LibraryEmptyState
+                title="Select an assembly from the library to view details"
+                subtitle='or click "+" to create one'
+                linkLabel="Learn more about assemblies"
+                docsSection="assemblies"
+              />
             ) : (
               <>
-                <div className="flex items-center gap-3 mb-4">
-                  {displayedAssembly.thumbnailData ? (
-                    <img
-                      src={`data:image/png;base64,${displayedAssembly.thumbnailData.data}`}
-                      alt={displayedAssembly.name}
-                      className="w-[120px] h-[90px] object-cover rounded-md shrink-0 bg-bg-tertiary"
-                    />
-                  ) : (
-                    <span className="text-2xl">{displayedAssembly.thumbnail || '📦'}</span>
-                  )}
-                  <h3 className="m-0 text-lg text-text">{displayedAssembly.name}</h3>
-                </div>
-
-                {displayedAssembly.description && (
-                  <div className="mb-4 p-3 bg-bg rounded-md">
-                    <p className="m-0 text-[13px] text-text-muted leading-relaxed">{displayedAssembly.description}</p>
-                  </div>
-                )}
-
-                {/* Parts preview */}
-                <div className="mt-5 pt-4 border-t border-border">
-                  <label className="block mb-3 text-xs text-text-muted">Parts ({displayedAssembly.parts.length})</label>
-                  <ul className="list-none m-0 p-0 max-h-[150px] overflow-y-auto">
-                    {displayedAssembly.parts.slice(0, 5).map((part, index) => (
-                      <li key={index} className="flex justify-between items-center py-1.5 px-2.5 bg-bg rounded mb-1">
-                        <span className="text-xs text-text">{part.name}</span>
-                        <span className="text-[11px] text-text-muted">
-                          {formatMeasurementWithUnit(part.length, units)} ×{' '}
-                          {formatMeasurementWithUnit(part.width, units)} ×{' '}
-                          {formatMeasurementWithUnit(part.thickness, units)}
+                <LibraryDetailHeader
+                  title={
+                    <div className="flex items-center gap-3">
+                      {displayedAssembly.thumbnailData ? (
+                        <img
+                          src={`data:image/png;base64,${displayedAssembly.thumbnailData.data}`}
+                          alt=""
+                          aria-hidden="true"
+                          className="w-[120px] h-[90px] object-cover rounded-md shrink-0 bg-bg-tertiary"
+                        />
+                      ) : (
+                        <span aria-hidden="true" className="text-2xl">
+                          {displayedAssembly.thumbnail || '📦'}
                         </span>
-                      </li>
-                    ))}
-                    {displayedAssembly.parts.length > 5 && (
-                      <li className="py-1.5 px-2.5 text-[11px] text-text-muted italic">
-                        +{displayedAssembly.parts.length - 5} more parts
-                      </li>
-                    )}
-                  </ul>
-                </div>
+                      )}
+                      <span className="text-lg text-text">{displayedAssembly.name}</span>
+                    </div>
+                  }
+                  className="mb-4 px-0 pt-0"
+                />
+                <Card className="border-border bg-bg">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Assembly Details</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <AssemblyDetails
+                      assembly={displayedAssembly}
+                      units={units}
+                      showDescriptionCard
+                      maxVisibleParts={5}
+                      partsTitle={`Parts (${displayedAssembly.parts.length})`}
+                      partsMaxHeightClassName="max-h-[150px]"
+                    />
+                  </CardContent>
+                </Card>
               </>
             )}
-          </div>
+          </LibraryDetailPane>
         </div>
 
         <DialogFooter>

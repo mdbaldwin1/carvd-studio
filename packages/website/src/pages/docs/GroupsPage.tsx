@@ -23,7 +23,7 @@ export default function GroupsPage() {
       </p>
 
       <div className="grid gap-xl">
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <FolderOpen size={20} className="inline-block" /> Creating Groups
           </h3>
@@ -53,7 +53,7 @@ export default function GroupsPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <Pencil size={20} className="inline-block" /> Editing Groups
           </h3>
@@ -101,7 +101,38 @@ export default function GroupsPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
+          <h3 className="text-2xl font-bold mb-md">Group Properties Panel</h3>
+          <p className="text-sm text-muted mb-md">
+            When a group is selected, the Properties panel includes the same
+            core actions available from context menus and shortcuts.
+          </p>
+          <div className="grid gap-md text-sm">
+            <div>
+              <p className="font-bold mb-xs">Quick Actions</p>
+              <p className="text-muted">
+                Center view on selection, save group as assembly, and common
+                group management actions are available directly in the panel.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Membership Actions</p>
+              <p className="text-muted">
+                Add selected parts to a group, remove items from groups, and
+                merge/ungroup without leaving the panel.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Advanced Controls</p>
+              <p className="text-muted">
+                Less-common options are grouped under collapsed advanced
+                sections to keep the default editing flow cleaner.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <MousePointer size={20} className="inline-block" /> 3D Selection &
             Groups
@@ -119,10 +150,15 @@ export default function GroupsPage() {
               <strong>Move a group</strong> — Select all group members, then
               drag or use arrow keys. All parts move together.
             </p>
+            <p>
+              <strong>Drill into nested groups</strong> — Double-click to step
+              into child groups for focused editing, then double-click
+              background to step back out one level at a time.
+            </p>
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(174,164,191,0.4)] bg-linear-to-br from-[rgba(174,164,191,0.15)] to-[rgba(174,164,191,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <p className="text-lg font-bold mb-sm">
             Pro Tip: Use Groups for Repeated Components
           </p>

@@ -227,7 +227,7 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
     try {
       const content = await window.electronAPI.readRecoveryFile(recoveryInfo.fileName);
       if (!content) {
-        showToast('Recovery file not found');
+        showToast('Recovery file not found', 'error');
         return false;
       }
 
@@ -246,13 +246,13 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
           projectData = parsed;
         }
       } catch {
-        showToast('Recovery file is corrupted');
+        showToast('Recovery file is corrupted', 'error');
         return false;
       }
 
       const validation = parseCarvdFile(JSON.stringify(projectData));
       if (!validation.valid || !validation.data) {
-        showToast('Recovery file is corrupted');
+        showToast('Recovery file is corrupted', 'error');
         return false;
       }
 
@@ -271,12 +271,12 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
 
       setHasRecovery(false);
       setRecoveryInfo(null);
-      showToast('Project restored from auto-save');
+      showToast('Project restored from auto-save', 'success');
 
       return true;
     } catch (error) {
       logger.error('[AutoRecovery] Failed to restore:', error);
-      showToast('Failed to restore project');
+      showToast('Failed to restore project', 'error');
       return false;
     }
   }, [recoveryInfo, loadProject, showToast]);

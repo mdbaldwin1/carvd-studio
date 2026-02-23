@@ -1,6 +1,7 @@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { Button } from '@renderer/components/ui/button';
 import { Progress } from '@renderer/components/ui/progress';
+import { getDocsUrl } from '@renderer/utils/docsLinks';
 
 interface TutorialTooltipProps {
   title: string;
@@ -73,7 +74,7 @@ export function TutorialTooltip({
               className="h-auto p-0 text-text-muted hover:text-accent"
               onClick={(e) => {
                 e.preventDefault();
-                window.electronAPI?.openExternal?.('https://carvd-studio.com/docs#quick-start');
+                window.electronAPI?.openExternal?.(getDocsUrl('quick-start'));
               }}
             >
               View full documentation

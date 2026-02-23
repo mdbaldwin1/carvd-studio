@@ -15,10 +15,12 @@ vi.mock('../../utils/cutListOptimizer', () => ({
 
 // Mock the pdfExport
 const mockExportProjectReportToPdf = vi.fn().mockResolvedValue({ success: true });
+const mockExportCutListToCsv = vi.fn().mockReturnValue('mock,csv,content');
+const mockExportShoppingListToCsv = vi.fn().mockReturnValue('mock,shopping,csv');
 vi.mock('../../utils/pdfExport', () => ({
   exportDiagramsToPdf: vi.fn().mockResolvedValue({ success: true }),
-  exportCutListToCsv: vi.fn().mockReturnValue('mock,csv,content'),
-  exportShoppingListToCsv: vi.fn().mockReturnValue('mock,shopping,csv'),
+  exportCutListToCsv: (...args: unknown[]) => mockExportCutListToCsv(...args),
+  exportShoppingListToCsv: (...args: unknown[]) => mockExportShoppingListToCsv(...args),
   exportCutListToPdf: vi.fn().mockResolvedValue({ success: true }),
   exportShoppingListToPdf: vi.fn().mockResolvedValue({ success: true }),
   exportProjectReportToPdf: (...args: unknown[]) => mockExportProjectReportToPdf(...args)
@@ -143,6 +145,13 @@ describe('CutListModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    window.electronAPI = {
+      ...(window.electronAPI ?? {}),
+      showSaveDialog: vi.fn(),
+      writeFile: vi.fn(),
+      openPath: vi.fn().mockResolvedValue(undefined),
+      openExternal: vi.fn()
+    } as unknown as typeof window.electronAPI;
     vi.mocked(generateOptimizedCutList).mockReturnValue(mockCutList);
     useProjectStore.setState({
       parts: [mockPart],
@@ -163,6 +172,11 @@ describe('CutListModal', () => {
     useUIStore.setState({
       showToast: vi.fn()
     });
+    (window.electronAPI.showSaveDialog as ReturnType<typeof vi.fn>).mockResolvedValue({
+      canceled: false,
+      filePath: '/tmp/export.csv'
+    });
+    (window.electronAPI.writeFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
     useLicenseStore.setState({ licenseMode: 'trial' });
   });
 
@@ -582,9 +596,9 @@ describe('CutListModal', () => {
 
     it('calls onClose when backdrop is clicked', () => {
       const onClose = vi.fn();
-      const { container } = render(<CutListModal {...defaultProps} onClose={onClose} />);
+      render(<CutListModal {...defaultProps} onClose={onClose} />);
 
-      const backdrop = container.firstChild as HTMLElement;
+      const backdrop = document.querySelector('[data-state="open"][class*="bg-overlay"]') as HTMLElement;
       fireEvent.mouseDown(backdrop);
       fireEvent.click(backdrop);
 
@@ -780,8 +794,8 @@ describe('CutListModal', () => {
       });
 
       // Submit the form (click on submit button triggers form submit)
-      const form = document.querySelector('.custom-item-form');
-      fireEvent.submit(form!);
+      const form = screen.getByRole('form', { name: 'Custom shopping item form' });
+      fireEvent.submit(form);
 
       await waitFor(() => {
         expect(updateCustomShoppingItem).toHaveBeenCalledWith(
@@ -805,9 +819,8 @@ describe('CutListModal', () => {
 
       fireEvent.mouseDown(screen.getByRole('tab', { name: /Shopping List/i }));
 
-      // 50 screws at $0.10 = $5.00 - use class selector as prices appear in multiple places
-      const lineTotal = document.querySelector('.custom-items .line-total');
-      expect(lineTotal?.textContent).toBe('$5.00');
+      // 50 screws at $0.10 = $5.00
+      expect(screen.getByTestId('custom-item-total-item-1')).toHaveTextContent('$5.00');
     });
   });
 
@@ -927,18 +940,13 @@ describe('CutListModal', () => {
   });
 
   describe('export functionality', () => {
-    let createObjectURLSpy: ReturnType<typeof vi.spyOn>;
-    let revokeObjectURLSpy: ReturnType<typeof vi.spyOn>;
-
     beforeEach(() => {
       useProjectStore.setState({ cutList: mockCutList });
-      createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
-      revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
-    });
-
-    afterEach(() => {
-      createObjectURLSpy.mockRestore();
-      revokeObjectURLSpy.mockRestore();
+      (window.electronAPI.showSaveDialog as ReturnType<typeof vi.fn>).mockResolvedValue({
+        canceled: false,
+        filePath: '/tmp/export.csv'
+      });
+      (window.electronAPI.writeFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
     });
 
     it('creates CSV when Download CSV clicked', async () => {
@@ -950,9 +958,8 @@ describe('CutListModal', () => {
       await user.click(screen.getByRole('menuitem', { name: /download csv/i }));
 
       await waitFor(() => {
-        expect(createObjectURLSpy).toHaveBeenCalled();
+        expect(mockExportCutListToCsv).toHaveBeenCalled();
       });
-      expect(revokeObjectURLSpy).toHaveBeenCalled();
     });
 
     it('creates shopping list CSV when Download CSV clicked in shopping tab', async () => {
@@ -965,7 +972,7 @@ describe('CutListModal', () => {
       await user.click(screen.getByRole('menuitem', { name: /download csv/i }));
 
       await waitFor(() => {
-        expect(createObjectURLSpy).toHaveBeenCalled();
+        expect(mockExportShoppingListToCsv).toHaveBeenCalled();
       });
     });
   });
@@ -1050,7 +1057,7 @@ describe('CutListModal', () => {
     });
 
     it('shows success toast on successful export', async () => {
-      mockExportProjectReportToPdf.mockResolvedValueOnce({ success: true });
+      mockExportProjectReportToPdf.mockResolvedValueOnce({ success: true, filePath: '/tmp/project-report.pdf' });
 
       render(<CutListModal {...defaultProps} />);
 
@@ -1058,7 +1065,16 @@ describe('CutListModal', () => {
 
       await waitFor(() => {
         const showToast = useUIStore.getState().showToast;
-        expect(showToast).toHaveBeenCalledWith('Project report saved to PDF');
+        expect(showToast).toHaveBeenCalledWith(
+          'Project report saved to PDF',
+          'success',
+          expect.objectContaining({
+            action: expect.objectContaining({
+              label: expect.stringMatching(/Show in (Finder|File Explorer)/),
+              onClick: expect.any(Function)
+            })
+          })
+        );
       });
     });
 
@@ -1071,7 +1087,7 @@ describe('CutListModal', () => {
 
       await waitFor(() => {
         const showToast = useUIStore.getState().showToast;
-        expect(showToast).toHaveBeenCalledWith('Failed to save PDF');
+        expect(showToast).toHaveBeenCalledWith('Failed to save PDF', 'error');
       });
     });
 
@@ -1101,7 +1117,7 @@ describe('CutListModal', () => {
 
       await waitFor(() => {
         const showToast = useUIStore.getState().showToast;
-        expect(showToast).toHaveBeenCalledWith('Failed to export project report');
+        expect(showToast).toHaveBeenCalledWith('Failed to export project report', 'error');
       });
     });
 
@@ -1182,7 +1198,7 @@ describe('CutListModal', () => {
 
       fireEvent.click(screen.getByText('Generate Cut List'));
 
-      expect(showToast).toHaveBeenCalledWith('Cut list optimizer requires a license.');
+      expect(showToast).toHaveBeenCalledWith('Cut list optimizer requires a license.', 'warning');
       expect(generateOptimizedCutList).not.toHaveBeenCalled();
     });
 
@@ -1228,7 +1244,7 @@ describe('CutListModal', () => {
       const learnMore = screen.getByText('Learn more');
       fireEvent.click(learnMore);
 
-      expect(openExternal).toHaveBeenCalledWith('https://carvd-studio.com/docs#cut-lists');
+      expect(openExternal).toHaveBeenCalledWith('https://carvd-studio.com/docs/cut-lists');
     });
   });
 });

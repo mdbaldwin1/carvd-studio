@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ErrorBoundary } from './ErrorBoundary';
 
 // Component that throws an error
@@ -100,6 +100,37 @@ describe('ErrorBoundary', () => {
   });
 
   describe('recovery actions', () => {
+    it('renders copy error icon button', () => {
+      render(
+        <ErrorBoundary>
+          <ThrowingComponent shouldThrow={true} />
+        </ErrorBoundary>
+      );
+
+      expect(screen.getByRole('button', { name: 'Copy error details' })).toBeInTheDocument();
+    });
+
+    it('copies error details to clipboard when copy button is clicked', async () => {
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(window.navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText }
+      });
+
+      render(
+        <ErrorBoundary>
+          <ThrowingComponent shouldThrow={true} />
+        </ErrorBoundary>
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Copy error details' }));
+
+      await waitFor(() => {
+        expect(writeText).toHaveBeenCalledTimes(1);
+        expect(writeText.mock.calls[0][0]).toContain('Test error message');
+      });
+    });
+
     it('renders "Try Again" button', () => {
       render(
         <ErrorBoundary>

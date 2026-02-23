@@ -316,32 +316,16 @@ describe('ProjectSettingsModal', () => {
 
   describe('favorites (no filePath)', () => {
     // These tests run with filePath: null to avoid async issues
-    it('shows Add to favorites button', () => {
+    it('shows header favorite star button', () => {
       render(<ProjectSettingsModal {...defaultProps} />);
 
-      expect(screen.getByText('Add to favorites')).toBeInTheDocument();
-    });
-
-    it('shows help tooltip when project not saved', () => {
-      render(<ProjectSettingsModal {...defaultProps} />);
-
-      // Help icon should be visible in the Favorite row when project is not saved
-      // The HelpTooltip renders a button with aria-label="Show help"
-      const helpButtons = screen.getAllByRole('button', { name: 'Show help' });
-      // The first "Show help" button in the Favorite section
-      const helpButton = helpButtons[0];
-      expect(helpButton).toBeInTheDocument();
-
-      // Click the help button to show the tooltip
-      fireEvent.click(helpButton);
-      expect(screen.getByText('Save this project to add it to favorites.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Save project first' })).toBeInTheDocument();
     });
 
     it('disables favorite button when project not saved', () => {
       render(<ProjectSettingsModal {...defaultProps} />);
 
-      const favoriteBtn = screen.getByText('Add to favorites').closest('button');
-      expect(favoriteBtn).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Save project first' })).toBeDisabled();
     });
   });
 
@@ -375,11 +359,11 @@ describe('ProjectSettingsModal', () => {
 
     it('calls onClose when backdrop is clicked', () => {
       const onClose = vi.fn();
-      const { container } = render(<ProjectSettingsModal {...defaultProps} onClose={onClose} />);
+      render(<ProjectSettingsModal {...defaultProps} onClose={onClose} />);
 
-      const backdrop = container.firstChild as HTMLElement;
-      fireEvent.mouseDown(backdrop!);
-      fireEvent.click(backdrop!);
+      const backdrop = document.querySelector('[data-state="open"][class*="bg-overlay"]') as HTMLElement;
+      fireEvent.mouseDown(backdrop);
+      fireEvent.click(backdrop);
 
       expect(onClose).toHaveBeenCalled();
     });

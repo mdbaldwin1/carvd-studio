@@ -119,6 +119,11 @@ export const useSelectionStore = create<SelectionStoreState>((set, get) => ({
     let newEditingGroupId: string | null = null;
 
     if (editingGroupId !== null) {
+      // Selecting the currently edited group should not exit edit context.
+      if (groupId === editingGroupId) {
+        newEditingGroupId = editingGroupId;
+      }
+
       // Check if groupId is inside editingGroupId (descendant)
       if (isDescendantOf(groupId, editingGroupId, groupMembers) && groupId !== editingGroupId) {
         newEditingGroupId = editingGroupId; // Stay in the parent group
@@ -137,10 +142,14 @@ export const useSelectionStore = create<SelectionStoreState>((set, get) => ({
       if (state.selectedGroupIds.includes(groupId)) {
         return { selectedGroupIds: state.selectedGroupIds.filter((id) => id !== groupId) };
       } else {
+        const { groupMembers } = useProjectStore.getState();
+        const shouldPreserveEditingContext =
+          state.editingGroupId !== null &&
+          (groupId === state.editingGroupId || isDescendantOf(groupId, state.editingGroupId, groupMembers));
         // Preserve existing part selection when shift+clicking to add a group
         return {
           selectedGroupIds: [...state.selectedGroupIds, groupId],
-          editingGroupId: null
+          editingGroupId: shouldPreserveEditingContext ? state.editingGroupId : null
         };
       }
     });

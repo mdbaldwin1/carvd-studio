@@ -34,7 +34,7 @@ export default function TroubleshootingPage() {
             </li>
             <li>• Verify the key in your purchase confirmation email</li>
             <li>
-              • If you've used all 3 device activations, deactivate one first
+              • If you've used all available activations, deactivate one first
               (Settings &rarr; License)
             </li>
             <li>

@@ -28,7 +28,8 @@ export const supportFAQs = [
   },
   {
     question: "How many computers can I use my license on?",
-    answer: "Your license can be activated on up to 3 computers at once.",
+    answer:
+      "Your license can be activated on multiple computers up to your activation limit.",
   },
 ];
 
@@ -108,9 +109,9 @@ export default function FAQSection() {
               How many computers can I use my license on?
             </AccordionTrigger>
             <AccordionContent className="leading-relaxed text-text-muted max-sm:text-sm">
-              Your license can be activated on up to 3 computers at once. This
-              is per license, not per household, so a single license works great
-              for your workshop computer, laptop, and home office.
+              Your license can be activated on multiple computers up to your
+              activation limit. You can manage activations from the app's
+              license settings.
             </AccordionContent>
           </AccordionItem>
 
@@ -162,8 +163,9 @@ export default function FAQSection() {
               Does it support metric and imperial units?
             </AccordionTrigger>
             <AccordionContent className="leading-relaxed text-text-muted max-sm:text-sm">
-              Yes! You can work in inches, feet, millimeters, or centimeters.
-              Switch between unit systems at any time in your project settings.
+              Yes. Carvd Studio supports imperial and metric workflows with
+              fractional input support. You can switch unit systems anytime in
+              project settings.
             </AccordionContent>
           </AccordionItem>
 

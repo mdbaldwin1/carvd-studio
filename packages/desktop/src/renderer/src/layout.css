@@ -33,7 +33,7 @@
 
   /* macOS: Add padding for traffic lights on the left */
   .app-header.platform-darwin {
-    padding-left: 80px;
+    padding-left: 96px;
   }
 
   /* Windows/Linux: Add padding for window controls overlay on the right */
@@ -44,12 +44,17 @@
 
   .header-left {
     @apply flex items-center gap-5;
-    margin-left: 5px;
     -webkit-app-region: no-drag;
   }
 
   .header-title {
-    @apply flex items-center gap-3;
+    @apply flex items-center gap-2;
+  }
+
+  .header-mode-chip {
+    @apply tracking-[0.02em];
+    font-size: 10px;
+    line-height: 1;
   }
 
   .header-title .app-name {
@@ -58,9 +63,7 @@
   }
 
   .header-title .app-name-btn {
-    @apply text-accent font-semibold bg-transparent border-none p-0 m-0 cursor-pointer;
-    font-size: 18px;
-    font-family: inherit;
+    @apply text-accent bg-transparent border-none p-0 m-0 cursor-pointer inline-flex items-center gap-1.5;
     -webkit-app-region: no-drag;
     transition: opacity 0.15s ease;
   }
@@ -79,6 +82,14 @@
     @apply text-text font-medium overflow-hidden text-ellipsis whitespace-nowrap;
     font-size: 15px;
     max-width: 350px;
+  }
+
+  .header-name-editor {
+    @apply flex items-center gap-1.5;
+  }
+
+  .header-name-confirm {
+    @apply text-text-muted hover:text-text;
   }
 
   .header-title .dirty-indicator {
@@ -140,8 +151,8 @@
 @layer components {
   .properties-panel {
     @apply flex-shrink-0 bg-surface border-l border-border p-4 overflow-y-auto;
-    width: var(--sidebar-width);
-    min-width: var(--sidebar-width);
+    width: 296px;
+    min-width: 296px;
   }
 
   .properties-panel h2 {
@@ -152,6 +163,14 @@
 
   .property-group {
     @apply mb-5;
+  }
+
+  .properties-card {
+    @apply rounded-lg border border-border bg-bg p-3 mb-4;
+  }
+
+  .properties-card .property-group:last-child {
+    @apply mb-0;
   }
 
   .property-group > label {
