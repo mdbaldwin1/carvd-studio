@@ -136,7 +136,10 @@ describe('uiStore', () => {
       it('calls sonner toast for default type', () => {
         useUIStore.getState().showToast('Default message');
 
-        expect(mockSonnerToast).toHaveBeenCalledWith('Default message', undefined);
+        expect(mockSonnerToast).toHaveBeenCalledWith(
+          'Default message',
+          expect.objectContaining({ id: expect.any(String) })
+        );
         expect(mockSonnerToast.success).not.toHaveBeenCalled();
         expect(mockSonnerToast.error).not.toHaveBeenCalled();
         expect(mockSonnerToast.warning).not.toHaveBeenCalled();
@@ -146,27 +149,36 @@ describe('uiStore', () => {
       it('calls sonner toast.success for success type', () => {
         useUIStore.getState().showToast('Saved!', 'success');
 
-        expect(mockSonnerToast.success).toHaveBeenCalledWith('Saved!', undefined);
-        expect(mockSonnerToast).not.toHaveBeenCalledWith('Saved!', undefined);
+        expect(mockSonnerToast.success).toHaveBeenCalledWith(
+          'Saved!',
+          expect.objectContaining({ id: expect.any(String) })
+        );
+        expect(mockSonnerToast).not.toHaveBeenCalledWith('Saved!', expect.anything());
       });
 
       it('calls sonner toast.error for error type', () => {
         useUIStore.getState().showToast('Failed!', 'error');
 
-        expect(mockSonnerToast.error).toHaveBeenCalledWith('Failed!', undefined);
-        expect(mockSonnerToast).not.toHaveBeenCalledWith('Failed!', undefined);
+        expect(mockSonnerToast.error).toHaveBeenCalledWith(
+          'Failed!',
+          expect.objectContaining({ id: expect.any(String) })
+        );
+        expect(mockSonnerToast).not.toHaveBeenCalledWith('Failed!', expect.anything());
       });
 
       it('calls sonner toast.warning for warning type', () => {
         useUIStore.getState().showToast('Blocked', 'warning');
 
-        expect(mockSonnerToast.warning).toHaveBeenCalledWith('Blocked', undefined);
+        expect(mockSonnerToast.warning).toHaveBeenCalledWith(
+          'Blocked',
+          expect.objectContaining({ id: expect.any(String) })
+        );
       });
 
       it('calls sonner toast.info for info type', () => {
         useUIStore.getState().showToast('FYI', 'info');
 
-        expect(mockSonnerToast.info).toHaveBeenCalledWith('FYI', undefined);
+        expect(mockSonnerToast.info).toHaveBeenCalledWith('FYI', expect.objectContaining({ id: expect.any(String) }));
       });
     });
 
