@@ -1,5 +1,5 @@
 import { Plus, ChevronRight, BookOpen } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
@@ -10,6 +10,7 @@ const MAX_PREVIEW_TEMPLATES = 4;
 
 const templateCardBase =
   'flex flex-col items-center gap-2 py-4 px-3 bg-bg-secondary border border-border rounded-lg cursor-pointer transition-all duration-150 text-center relative hover:bg-bg-tertiary hover:border-accent hover:-translate-y-0.5';
+const SINGLE_ROW_HEIGHT_BREAKPOINT = 1024;
 
 interface TemplatesSectionProps {
   userTemplates: UserTemplate[];
@@ -26,6 +27,18 @@ export function TemplatesSection({
   onSelectTemplate,
   onStartTutorial
 }: TemplatesSectionProps) {
+  const [useSingleRowLayout, setUseSingleRowLayout] = useState(false);
+
+  useEffect(() => {
+    const updateLayout = () => {
+      setUseSingleRowLayout(window.innerHeight < SINGLE_ROW_HEIGHT_BREAKPOINT);
+    };
+
+    updateLayout();
+    window.addEventListener('resize', updateLayout);
+    return () => window.removeEventListener('resize', updateLayout);
+  }, []);
+
   const handleSelectTemplate = async (template: ProjectTemplate) => {
     // Track usage for user templates
     if (template.type === 'user') {
@@ -83,7 +96,7 @@ export function TemplatesSection({
   }, [userTemplates]);
 
   return (
-    <div className="flex flex-col gap-3 min-h-0 max-h-[50vh] mt-2">
+    <div className="mt-2 flex flex-col gap-3">
       <div className="flex items-center justify-between pb-3 border-b border-border mb-3">
         <h2 className="text-sm font-semibold text-text-secondary m-0 p-0">Templates</h2>
         <Button variant="ghost" size="xs" onClick={onViewAllTemplates}>
@@ -91,7 +104,13 @@ export function TemplatesSection({
           <ChevronRight size={14} />
         </Button>
       </div>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
+      <div
+        className={
+          useSingleRowLayout
+            ? 'grid grid-flow-col auto-cols-[180px] gap-3 overflow-x-auto overflow-y-hidden pb-1'
+            : 'grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3'
+        }
+      >
         {/* Blank Project - always first */}
         <Card
           className={`blank-template ${templateCardBase} border-dashed`}
@@ -169,7 +188,7 @@ export function TemplatesSection({
               </span>
             </div>
             {template.type === 'user' && (
-              <span className="absolute top-2 right-2 text-[10px] py-0.5 px-1.5 bg-accent text-white rounded font-medium">
+              <span className="absolute top-2 right-2 rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
                 Custom
               </span>
             )}

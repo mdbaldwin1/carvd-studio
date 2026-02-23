@@ -20,7 +20,7 @@ export function RecentsTab({
 }: RecentsTabProps) {
   if (projects.length === 0) {
     return (
-      <div className="flex flex-col gap-1 flex-auto min-h-0 max-h-full overflow-y-auto">
+      <div className="flex flex-col gap-1">
         <div className="text-center py-6 text-text-muted text-sm">
           <p className="m-0">No recent projects yet.</p>
         </div>
@@ -29,7 +29,7 @@ export function RecentsTab({
   }
 
   return (
-    <div className="flex flex-col gap-1 flex-auto min-h-0 max-h-full overflow-y-auto">
+    <div className="flex flex-col gap-1">
       {projects.map((project) => (
         <Card
           key={project.path}

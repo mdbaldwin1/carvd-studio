@@ -49,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Start screen overlap in short windows** — Prevented the `Recents`/`Favorites` section from overlapping template tiles by allowing the start screen content column to scroll when vertical space is constrained.
+- **Packaged app header logo loading** — Fixed editor/header branding images not rendering in packaged desktop builds by switching renderer logo paths from absolute (`/branding/...`) to relative (`./branding/...`) URLs.
 - **Website link target fixes** — Corrected broken website navigation links by replacing invalid in-page `#download` anchors on Features/Pricing flows with `/download`, and added a missing `id="requirements"` anchor on the Download page for Support deep links.
 - **3D part visibility during orbit** — Disabled frustum culling for instanced part meshes to prevent parts disappearing at certain camera angles.
 - **Stock highlight dismissal** — Clicking empty workspace space now clears sidebar stock highlighting along with part selection.
