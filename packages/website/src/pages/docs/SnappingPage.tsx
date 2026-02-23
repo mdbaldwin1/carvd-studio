@@ -23,6 +23,15 @@ export default function SnappingPage() {
         parts.
       </p>
 
+      <div className="site-section p-[var(--space-md)] mb-xl">
+        <img
+          src="/screenshots/docs-snap-lines.png"
+          alt="Snapping alignment lines in the 3D editor"
+          className="w-full rounded-xl border border-border shadow-lg"
+          loading="lazy"
+        />
+      </div>
+
       <div className="grid gap-xl">
         <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">

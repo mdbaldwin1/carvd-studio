@@ -100,10 +100,10 @@ describe('StockLibraryModal', () => {
       expect(screen.getByText('Assemblies')).toBeInTheDocument();
     });
 
-    it('shows Done button', () => {
+    it('shows Close button', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      expect(screen.getByText('Done')).toBeInTheDocument();
+      expect(screen.getByText('Close')).toBeInTheDocument();
     });
   });
 
@@ -372,7 +372,7 @@ describe('StockLibraryModal', () => {
       fireEvent.click(screen.getByText('Drawer Assembly'));
       fireEvent.click(screen.getByText('Edit'));
 
-      expect(screen.getByText('Edit Assembly')).toBeInTheDocument();
+      expect(screen.getAllByText('Edit Assembly').length).toBeGreaterThan(0);
     });
 
     it('calls onUpdateAssembly when saved', () => {
@@ -733,11 +733,11 @@ describe('StockLibraryModal', () => {
   });
 
   describe('close interactions', () => {
-    it('calls onClose when Done is clicked', () => {
+    it('calls onClose when Close is clicked', () => {
       const onClose = vi.fn();
       render(<StockLibraryModal {...defaultProps} onClose={onClose} />);
 
-      fireEvent.click(screen.getByText('Done'));
+      fireEvent.click(screen.getByText('Close'));
 
       expect(onClose).toHaveBeenCalled();
     });

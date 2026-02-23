@@ -24,6 +24,25 @@ export default function CutListsPage() {
       />
       <h2 className="text-4xl font-bold mb-xl">Cut List Generation</h2>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-lg mb-xl">
+        <div className="site-section p-[var(--space-md)]">
+          <img
+            src="/screenshots/docs-parts-tab.png"
+            alt="Cut list parts tab"
+            className="w-full rounded-xl border border-border shadow-lg"
+            loading="lazy"
+          />
+        </div>
+        <div className="site-section p-[var(--space-md)]">
+          <img
+            src="/screenshots/cut-list-diagrams.png"
+            alt="Cut list diagrams tab"
+            className="w-full rounded-xl border border-border shadow-lg"
+            loading="lazy"
+          />
+        </div>
+      </div>
+
       <div className="grid gap-2xl">
         <div className="site-section p-[var(--space-xl)]">
           <p className="text-lg font-semibold mb-sm">

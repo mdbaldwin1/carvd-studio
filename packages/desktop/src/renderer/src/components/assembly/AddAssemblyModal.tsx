@@ -150,12 +150,11 @@ export function AddAssemblyModal({
           <DialogClose onClose={onClose} />
         </DialogHeader>
 
-        <div className="flex flex-1 overflow-hidden min-h-[300px]">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           <LibrarySidebar
             count={availableAssemblies.length}
             hasItems={availableAssemblies.length > 0}
             showNoResults={filteredAssemblies.length === 0}
-            className="shrink-0"
             search={{
               value: searchTerm,
               onChange: setSearchTerm,
@@ -205,13 +204,13 @@ export function AddAssemblyModal({
             }
             footer={
               selectedIds.size > 0 ? (
-                <div className="py-2 px-3 border-t border-border text-xs text-text-muted shrink-0">
-                  <span>{selectedIds.size} selected</span>
+                <div className="flex items-center justify-between gap-3 pt-3 mt-auto border-t border-border shrink-0">
+                  <span className="text-xs text-text-muted">{selectedIds.size} selected</span>
                 </div>
               ) : undefined
             }
           >
-            <ul className="list-none m-0 p-2 overflow-y-auto flex-1">
+            <ul className="list-none m-0 p-2 flex-1 min-h-0 overflow-y-auto">
               {filteredAssemblies.map((assembly) => (
                 <AssemblyListItem
                   key={assembly.id}

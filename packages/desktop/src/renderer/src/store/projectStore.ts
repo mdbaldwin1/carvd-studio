@@ -1067,9 +1067,29 @@ export const useProjectStore = create<ProjectState>()(
           // 2. Try to find in library stocks
           const libraryStock = libraryStocks.find((s) => s.id === cp.stockId);
           if (libraryStock) {
-            // Add library stock to project
-            stocksToAdd.push(libraryStock);
-            stockIdResolutionMap.set(cp.stockId, libraryStock.id);
+            // Reuse an equivalent stock already in project (or already queued),
+            // otherwise add the library stock once.
+            const allStocks = [...projectStocks, ...stocksToAdd];
+            const existingMatch = findMatchingStock(
+              {
+                name: libraryStock.name,
+                length: libraryStock.length,
+                width: libraryStock.width,
+                thickness: libraryStock.thickness,
+                grainDirection: libraryStock.grainDirection,
+                pricingUnit: libraryStock.pricingUnit,
+                pricePerUnit: libraryStock.pricePerUnit,
+                color: libraryStock.color
+              },
+              allStocks
+            );
+
+            if (existingMatch) {
+              stockIdResolutionMap.set(cp.stockId, existingMatch.id);
+            } else {
+              stocksToAdd.push(libraryStock);
+              stockIdResolutionMap.set(cp.stockId, libraryStock.id);
+            }
             continue;
           }
 

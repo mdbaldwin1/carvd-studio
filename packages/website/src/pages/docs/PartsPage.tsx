@@ -22,6 +22,15 @@ export default function PartsPage() {
         represents a piece of wood with specific dimensions and properties.
       </p>
 
+      <div className="site-section p-[var(--space-md)] mb-xl">
+        <img
+          src="/screenshots/docs-properties-panel.png"
+          alt="Part properties panel in Carvd Studio"
+          className="w-full rounded-xl border border-border shadow-lg"
+          loading="lazy"
+        />
+      </div>
+
       <div className="grid gap-xl">
         <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">

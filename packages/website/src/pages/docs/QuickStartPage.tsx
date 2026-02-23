@@ -17,6 +17,15 @@ export default function QuickStartPage() {
       />
       <h2 className="mb-8 text-4xl font-bold">Quick Start Guide</h2>
 
+      <div className="site-section mb-8 p-[var(--space-md)]">
+        <img
+          src="/screenshots/docs-new-project.png"
+          alt="New project dialog in Carvd Studio"
+          className="w-full rounded-xl border border-border shadow-lg"
+          loading="lazy"
+        />
+      </div>
+
       <div className="site-section mb-8 p-[var(--space-xl)]">
         <p className="mb-2 font-bold">Get building in 5 minutes:</p>
         <ol className="grid gap-4 text-sm">
@@ -59,11 +68,7 @@ export default function QuickStartPage() {
           and custom templates. No credit card required.
         </p>
         <div className="flex gap-4">
-          <Button
-            asChild
-            size="sm"
-            className="bg-primary text-primary-foreground hover:bg-primary-hover"
-          >
+          <Button asChild size="sm">
             <a href="/download">Download Free Trial</a>
           </Button>
           <Button asChild size="sm" variant="outline">

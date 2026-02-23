@@ -62,6 +62,11 @@ export function StockBoardDiagram({
   const svgWidth = board.stockLength * xScale;
   const svgHeight = board.stockWidth * yScale;
   const selectedPlacement = selectedPartId ? (board.placements.find((p) => p.partId === selectedPartId) ?? null) : null;
+  const MIN_PART_LABEL_FONT = 6;
+  const MAX_PART_LABEL_FONT = 14;
+  const PART_LABEL_HORIZONTAL_PADDING = 4;
+  const PART_LABEL_VERTICAL_PADDING = 2;
+  const APPROX_CHAR_WIDTH_FACTOR = 0.56;
 
   return (
     <div
@@ -93,6 +98,28 @@ export function StockBoardDiagram({
           const py = placement.y * yScale;
           const pw = placement.width * xScale;
           const ph = placement.height * yScale;
+          const availableLabelWidth = Math.max(0, pw - PART_LABEL_HORIZONTAL_PADDING);
+          const availableLabelHeight = Math.max(0, ph - PART_LABEL_VERTICAL_PADDING);
+          const rawName = placement.partName;
+          const fontByHeight = availableLabelHeight * 0.55;
+          const fontByWidth = availableLabelWidth / Math.max(1, rawName.length * APPROX_CHAR_WIDTH_FACTOR);
+          const partLabelFontSize = Math.min(MAX_PART_LABEL_FONT, fontByHeight, fontByWidth);
+          const canRenderPartLabel = partLabelFontSize >= MIN_PART_LABEL_FONT;
+          const maxCharsByWidth = Math.max(
+            1,
+            Math.floor(availableLabelWidth / Math.max(1, partLabelFontSize * APPROX_CHAR_WIDTH_FACTOR))
+          );
+          const shouldTruncate = rawName.length > maxCharsByWidth;
+          const displayedPartName =
+            shouldTruncate && maxCharsByWidth > 3
+              ? `${rawName.slice(0, Math.max(1, maxCharsByWidth - 3))}...`
+              : shouldTruncate
+                ? rawName.slice(0, maxCharsByWidth)
+                : rawName;
+          const rotatedLabelFontSize = Math.max(5, Math.min(8, partLabelFontSize * 0.75));
+          const rotatedOffset = Math.max(7, partLabelFontSize * 0.85);
+          const canRenderRotatedLabel =
+            placement.rotated && ph >= partLabelFontSize + rotatedLabelFontSize + PART_LABEL_VERTICAL_PADDING;
 
           return (
             <g key={placement.partId}>
@@ -114,26 +141,26 @@ export function StockBoardDiagram({
                     : undefined
                 }
               />
-              {placement.width * xScale > 30 && placement.height * yScale > 15 && (
+              {canRenderPartLabel && (
                 <text
                   x={(placement.x + placement.width / 2) * xScale}
                   y={(placement.y + placement.height / 2) * yScale}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fontSize={Math.min(14, Math.max(11, placement.height * yScale * 0.45))}
+                  fontSize={partLabelFontSize}
                   fill={labelColor}
                   style={{ pointerEvents: 'none' }}
                 >
-                  {placement.partName.length > 15 ? placement.partName.substring(0, 12) + '...' : placement.partName}
+                  {displayedPartName}
                 </text>
               )}
-              {placement.rotated && placement.width * xScale > 20 && (
+              {canRenderRotatedLabel && (
                 <text
                   x={(placement.x + placement.width / 2) * xScale}
-                  y={(placement.y + placement.height / 2) * yScale + 10}
+                  y={(placement.y + placement.height / 2) * yScale + rotatedOffset}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fontSize={8}
+                  fontSize={rotatedLabelFontSize}
                   fill={labelColor}
                   style={{ pointerEvents: 'none' }}
                 >

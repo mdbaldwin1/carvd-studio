@@ -1,4 +1,5 @@
 import { Button } from '@renderer/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { Download, Plus, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -377,7 +378,14 @@ export function StocksTab({
 
             {isFormMode ? (
               <div className="flex-1 p-5 overflow-y-auto">
-                <StockFormFields formData={formData} onChange={setFormData} />
+                <Card className="border-border bg-bg">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">{isCreating ? 'Create Stock' : 'Edit Stock'}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <StockFormFields formData={formData} onChange={setFormData} />
+                  </CardContent>
+                </Card>
 
                 {!hideInlineFormActions && (
                   <div className="flex justify-end gap-3 mt-6 pt-5 border-t border-border">
@@ -392,39 +400,46 @@ export function StocksTab({
               </div>
             ) : (
               <div className="flex-1 p-5 overflow-y-auto">
-                <LibraryDetailRow
-                  label="Dimensions"
-                  value={
-                    <>
-                      {formatMeasurementWithUnit(formData.length, units)} ×{' '}
-                      {formatMeasurementWithUnit(formData.width, units)} ×{' '}
-                      {formatMeasurementWithUnit(formData.thickness, units)}
-                    </>
-                  }
-                />
-                <LibraryDetailRow
-                  label="Grain"
-                  value={formData.grainDirection === 'none' ? 'None' : `Along ${formData.grainDirection}`}
-                />
-                <LibraryDetailRow
-                  label="Pricing"
-                  value={
-                    <>
-                      ${formData.pricePerUnit.toFixed(2)}{' '}
-                      {formData.pricingUnit === 'board_foot' ? '/ bd ft' : '/ sheet'}
-                    </>
-                  }
-                />
-                <LibraryDetailRow
-                  label="Color"
-                  bordered={false}
-                  value={
-                    <span
-                      className="w-6 h-6 rounded border border-border"
-                      style={{ backgroundColor: formData.color }}
+                <Card className="border-border bg-bg">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Stock Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <LibraryDetailRow
+                      label="Dimensions"
+                      value={
+                        <>
+                          {formatMeasurementWithUnit(formData.length, units)} ×{' '}
+                          {formatMeasurementWithUnit(formData.width, units)} ×{' '}
+                          {formatMeasurementWithUnit(formData.thickness, units)}
+                        </>
+                      }
                     />
-                  }
-                />
+                    <LibraryDetailRow
+                      label="Grain"
+                      value={formData.grainDirection === 'none' ? 'None' : `Along ${formData.grainDirection}`}
+                    />
+                    <LibraryDetailRow
+                      label="Pricing"
+                      value={
+                        <>
+                          ${formData.pricePerUnit.toFixed(2)}{' '}
+                          {formData.pricingUnit === 'board_foot' ? '/ bd ft' : '/ sheet'}
+                        </>
+                      }
+                    />
+                    <LibraryDetailRow
+                      label="Color"
+                      bordered={false}
+                      value={
+                        <span
+                          className="inline-block h-6 w-6 shrink-0 rounded border border-border align-middle"
+                          style={{ backgroundColor: formData.color }}
+                        />
+                      }
+                    />
+                  </CardContent>
+                </Card>
               </div>
             )}
           </>

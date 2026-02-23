@@ -182,7 +182,7 @@ describe('AssembliesTab', () => {
       render(<AssembliesTab {...defaultProps} />);
       fireEvent.click(screen.getByText('Test Assembly'));
       fireEvent.click(screen.getByText('Edit'));
-      expect(screen.getByText('Edit Assembly')).toBeInTheDocument();
+      expect(screen.getAllByText('Edit Assembly').length).toBeGreaterThan(0);
     });
 
     it('shows name and description fields in edit mode', () => {

@@ -125,18 +125,29 @@ prepare_size() {
 }
 
 capture_shot() {
-  local size="$1"
+  local capture_size="$1"
   local file="$2"
   local target_w="$3"
   local target_h="$4"
   local prompt="$5"
+  local delay_seconds="${6:-0}"
 
-  prepare_size "$size"
+  prepare_size "$capture_size"
   echo ""
   echo "------------------------------------------------------------"
-  echo "Target: $file (${target_w}x${target_h})"
+  echo "Target: $file (${target_w}x${target_h}) [capture preset: ${capture_size}]"
   echo "$prompt"
   read -r -p "Set up the app exactly as desired, then press Enter to capture... " _
+
+  if [ "$delay_seconds" -gt 0 ]; then
+    echo "[capture] Starting ${delay_seconds}s countdown..."
+    while [ "$delay_seconds" -gt 0 ]; do
+      echo "  ${delay_seconds}..."
+      sleep 1
+      delay_seconds=$((delay_seconds - 1))
+    done
+    echo "  Capturing now."
+  fi
 
   capture_window "$OUT_DIR/$file"
   /usr/bin/sips -z "$target_h" "$target_w" "$OUT_DIR/$file" >/dev/null
@@ -161,39 +172,40 @@ main() {
   require_carvd_window
   log "Starting assisted screenshot capture."
   log "Output dir: $OUT_DIR"
+  log "Using HQ capture presets (larger window) before resize for readability."
 
   # Home/Features required shots
-  capture_shot "large" "hero-workspace.png" 1400 788 \
+  capture_shot "large-hq" "hero-workspace.png" 1400 788 \
     "Hero: main 3D workspace with realistic project, sidebar, viewport, and properties panel."
-  capture_shot "small" "cut-list-diagrams.png" 800 600 \
+  capture_shot "small-hq" "cut-list-diagrams.png" 800 600 \
     "Cut List modal open on Diagrams tab, optimized board layouts visible."
-  capture_shot "small" "shopping-list.png" 800 600 \
+  capture_shot "small-hq" "shopping-list.png" 800 600 \
     "Cut List modal open on Shopping tab with quantities/costs/utilization."
-  capture_shot "large" "features-3d-workspace.png" 1400 788 \
+  capture_shot "large-hq" "features-3d-workspace.png" 1400 788 \
     "3D workspace with dimensions visible and a part selected."
-  capture_shot "large" "features-cut-list.png" 1400 788 \
+  capture_shot "large-hq" "features-cut-list.png" 1400 788 \
     "Cut List Diagrams view showing multiple boards."
-  capture_shot "large" "features-cost-tracking.png" 1400 788 \
+  capture_shot "large-hq" "features-cost-tracking.png" 1400 788 \
     "Stock/cost tracking view (library modal or properties with costs)."
 
   # Optional docs shots
-  capture_shot "large" "docs-interface-overview.png" 1400 788 \
+  capture_shot "large-hq" "docs-interface-overview.png" 1400 788 \
     "Main interface overview with sidebar, viewport, properties, and header."
-  capture_shot "small" "docs-properties-panel.png" 800 600 \
+  capture_shot "small-hq" "docs-properties-panel.png" 800 600 \
     "Close-up of properties panel with fields clearly readable."
-  capture_shot "small" "docs-parts-tab.png" 800 600 \
+  capture_shot "small-hq" "docs-parts-tab.png" 800 600 \
     "Cut List modal on Parts tab with grouped dimensions/quantities."
-  capture_shot "small" "docs-stock-library.png" 800 600 \
+  capture_shot "small-hq" "docs-stock-library.png" 800 600 \
     "App Library modal, Stocks tab, stock list and right editor/details visible."
-  capture_shot "small" "docs-groups-sidebar.png" 800 600 \
+  capture_shot "small-hq" "docs-groups-sidebar.png" 800 600 \
     "Sidebar showing nested groups/subgroups expanded."
-  capture_shot "small" "docs-assembly-library.png" 800 600 \
+  capture_shot "small-hq" "docs-assembly-library.png" 800 600 \
     "App Library modal, Assemblies tab with list/details."
-  capture_shot "small" "docs-snap-lines.png" 800 600 \
-    "Mid-drag interaction showing snapping/alignment guides."
-  capture_shot "small" "docs-settings.png" 800 600 \
+  capture_shot "small-hq" "docs-snap-lines.png" 800 600 \
+    "Mid-drag interaction showing snapping/alignment guides." 3
+  capture_shot "small-hq" "docs-settings.png" 800 600 \
     "App Settings modal open with settings sections visible."
-  capture_shot "small" "docs-new-project.png" 800 600 \
+  capture_shot "small-hq" "docs-new-project.png" 800 600 \
     "New Project dialog with name/material selection visible."
 
   echo ""

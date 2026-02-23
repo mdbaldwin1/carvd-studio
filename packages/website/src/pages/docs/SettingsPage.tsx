@@ -16,6 +16,15 @@ export default function SettingsPage() {
       />
       <h2 className="text-4xl font-bold mb-xl">Settings & Preferences</h2>
 
+      <div className="site-section p-[var(--space-md)] mb-xl">
+        <img
+          src="/screenshots/docs-settings.png"
+          alt="App settings modal in Carvd Studio"
+          className="w-full rounded-xl border border-border shadow-lg"
+          loading="lazy"
+        />
+      </div>
+
       <div className="grid gap-xl">
         <div id="app-settings" className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">App Settings</h3>

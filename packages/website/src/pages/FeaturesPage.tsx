@@ -15,7 +15,6 @@ import {
 import BuyButton from "../components/BuyButton";
 import Footer from "../components/Footer";
 import Header from "../components/Header";
-import ScreenshotPlaceholder from "../components/ScreenshotPlaceholder";
 import SEO from "../components/SEO";
 
 const accentBoxStyle = {
@@ -107,9 +106,11 @@ export default function FeaturesPage() {
                   </div>
                 </div>
                 <div className="mt-6">
-                  <ScreenshotPlaceholder
-                    tooltip="Screenshot needed: 3D workspace showing furniture design with parts selected, dimension labels visible"
-                    aspectRatio="16:9"
+                  <img
+                    src="/screenshots/features-3d-workspace.png"
+                    alt="3D workspace with selected parts and dimensions"
+                    className="w-full rounded-xl border border-border shadow-lg"
+                    loading="lazy"
                   />
                 </div>
               </div>
@@ -169,9 +170,11 @@ export default function FeaturesPage() {
                   </div>
                 </div>
                 <div className="mt-6">
-                  <ScreenshotPlaceholder
-                    tooltip="Screenshot needed: Cut list modal showing optimized board layouts with color-coded parts"
-                    aspectRatio="16:9"
+                  <img
+                    src="/screenshots/features-cut-list.png"
+                    alt="Cut list modal with optimized board layouts"
+                    className="w-full rounded-xl border border-border shadow-lg"
+                    loading="lazy"
                   />
                 </div>
               </div>
@@ -230,9 +233,11 @@ export default function FeaturesPage() {
                   </div>
                 </div>
                 <div className="mt-6">
-                  <ScreenshotPlaceholder
-                    tooltip="Screenshot needed: Stock library modal showing materials with prices, or the properties panel with cost display"
-                    aspectRatio="16:9"
+                  <img
+                    src="/screenshots/features-cost-tracking.png"
+                    alt="Stock library and cost tracking interface"
+                    className="w-full rounded-xl border border-border shadow-lg"
+                    loading="lazy"
                   />
                 </div>
               </div>
