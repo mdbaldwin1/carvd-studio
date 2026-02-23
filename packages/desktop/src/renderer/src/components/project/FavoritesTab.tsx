@@ -64,7 +64,7 @@ export function FavoritesTab({
 
   if (projects.length === 0) {
     return (
-      <div className="flex flex-col gap-1 flex-auto min-h-0 max-h-full overflow-y-auto">
+      <div className="flex flex-col gap-1">
         <div className="text-center py-6 text-text-muted text-sm">
           <p className="m-0">No favorites yet. Star a project to add it here.</p>
         </div>
@@ -73,7 +73,7 @@ export function FavoritesTab({
   }
 
   return (
-    <div className="flex flex-col gap-1 flex-auto min-h-0 max-h-full overflow-y-auto">
+    <div className="flex flex-col gap-1">
       {projects.map((project, index) => (
         <Card
           key={project.path}

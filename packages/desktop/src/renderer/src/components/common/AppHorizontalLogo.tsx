@@ -27,7 +27,7 @@ export function AppHorizontalLogo({ className, alt = 'Carvd Studio' }: AppHorizo
     return () => observer.disconnect();
   }, []);
 
-  const src = theme === 'light' ? '/branding/CarvdStudio-Horizontal.svg' : '/branding/CarvdStudio-Horizontal-WHT.svg';
+  const src = theme === 'light' ? './branding/CarvdStudio-Horizontal.svg' : './branding/CarvdStudio-Horizontal-WHT.svg';
 
   return (
     <img src={src} alt={alt} className={cn('select-none object-contain object-left', className)} draggable={false} />

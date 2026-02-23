@@ -27,7 +27,7 @@ export function AppLogo({ className, alt = 'Carvd Studio logo' }: AppLogoProps) 
     return () => observer.disconnect();
   }, []);
 
-  const src = theme === 'light' ? '/branding/Carvd-Icon.svg' : '/branding/Carvd-Icon-WHT.svg';
+  const src = theme === 'light' ? './branding/Carvd-Icon.svg' : './branding/Carvd-Icon-WHT.svg';
 
   return <img src={src} alt={alt} className={cn('select-none object-contain', className)} draggable={false} />;
 }

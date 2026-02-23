@@ -175,12 +175,12 @@ export function StartScreen({
   };
 
   return (
-    <div className="start-screen fixed inset-0 flex flex-col items-center bg-bg z-1000">
+    <div className="start-screen fixed inset-0 z-1000 flex flex-col overflow-hidden bg-bg">
       {/* Draggable title bar area for window movement */}
       <div className="w-full h-[38px] shrink-0" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <div className="max-w-[700px] w-full px-12 pb-12 flex-1 min-h-0 flex flex-col gap-8 overflow-hidden [&>:first-child]:mt-auto [&>:last-child]:mb-auto">
+      <div className="mx-auto flex h-[calc(100vh-38px)] w-full max-w-[700px] flex-col gap-6 overflow-hidden px-12 pb-8 pt-2">
         {/* Header */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="mb-2 flex shrink-0 items-center justify-between">
           <div className="flex items-center">
             <AppHorizontalLogo className="h-28 w-auto max-w-[78vw]" />
           </div>
@@ -206,7 +206,7 @@ export function StartScreen({
         />
 
         {/* Projects Section with Tabs */}
-        <Tabs defaultValue="recents" className="flex flex-col gap-3 min-h-0 max-h-[50vh]">
+        <Tabs defaultValue="recents" className="flex min-h-0 flex-1 flex-col gap-3">
           <div className="flex items-stretch justify-between">
             <TabsList className="px-0 bg-transparent">
               <TabsTrigger value="recents" className="flex items-center gap-1.5">
@@ -224,7 +224,7 @@ export function StartScreen({
             </Button>
           </div>
 
-          <TabsContent value="recents">
+          <TabsContent value="recents" className="min-h-0 flex-1 overflow-y-auto">
             <RecentsTab
               projects={recentProjects}
               onOpenProject={onOpenProject}
@@ -234,7 +234,7 @@ export function StartScreen({
             />
           </TabsContent>
 
-          <TabsContent value="favorites">
+          <TabsContent value="favorites" className="min-h-0 flex-1 overflow-y-auto">
             <FavoritesTab
               projects={favoriteProjects}
               onOpenProject={onOpenProject}
