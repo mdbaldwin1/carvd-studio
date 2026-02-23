@@ -9,6 +9,7 @@ import { useProjectStore, generateThumbnail } from '../store/projectStore';
 import { useLicenseStore } from '../store/licenseStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
+import { UNTITLED_TEMPLATE_NAME } from '../constants/appDefaults';
 import { UserTemplate } from '../templates';
 import { Project } from '../types';
 import { getFeatureLimits, getBlockedMessage } from '../utils/featureLimits';
@@ -82,7 +83,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
     async (template: UserTemplate): Promise<boolean> => {
       // Check if current project has unsaved changes
       if (hasUnsavedChanges()) {
-        showToast('Save or discard your project first');
+        showToast('Save or discard your project first', 'warning');
         return false;
       }
 
@@ -134,7 +135,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
         return true;
       } catch (error) {
         logger.error('Failed to start template editing:', error);
-        showToast('Failed to load template');
+        showToast('Failed to load template', 'error');
         return false;
       }
     },
@@ -146,13 +147,13 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
     // Check license limits for custom templates
     const limits = getFeatureLimits(useLicenseStore.getState().licenseMode);
     if (!limits.canUseCustomTemplates) {
-      showToast(getBlockedMessage('useTemplates'));
+      showToast(getBlockedMessage('useTemplates'), 'warning');
       return;
     }
 
     // Check if current project has unsaved changes
     if (hasUnsavedChanges()) {
-      showToast('Save or discard your project first');
+      showToast('Save or discard your project first', 'warning');
       return;
     }
 
@@ -338,7 +339,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
           };
 
           await window.electronAPI.addUserTemplate(newTemplate);
-          showToast(`Created template "${name}"`);
+          showToast(`Created template "${name}"`, 'success');
         } else {
           // Update existing template
           await window.electronAPI.updateUserTemplate(state.templateId, {
@@ -349,7 +350,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
             thumbnailData, // Update thumbnail
             project: JSON.stringify(templateProject)
           });
-          showToast(`Saved template "${name}"`);
+          showToast(`Saved template "${name}"`, 'success');
         }
 
         // Restore original project
@@ -375,7 +376,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
         onSaveComplete?.();
       } catch (error) {
         logger.error('Failed to save template:', error);
-        showToast('Failed to save template');
+        showToast('Failed to save template', 'error');
       }
     },
     [state, loadProject, showToast, markClean, onSaveComplete]
@@ -392,7 +393,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
     const projectStore = useProjectStore.getState();
     // Always use current store values - they're set when template loads and updated by Template Settings modal
     // Use nullish coalescing (??) to allow empty strings, only fall back if undefined/null
-    const name = projectStore.projectName || state.templateName || 'Untitled Template';
+    const name = projectStore.projectName || state.templateName || UNTITLED_TEMPLATE_NAME;
     // For description, use store value directly (can be empty string - that's valid)
     const description = projectStore.projectNotes ?? '';
     await saveAndExit(name, description);

@@ -2,7 +2,9 @@ import { useState, useCallback, useEffect } from 'react';
 import { Upload, CheckCircle, AlertTriangle, Package, Palette, FileBox, LayoutTemplate } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { Button } from '@renderer/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { Checkbox } from '@renderer/components/ui/checkbox';
+import { Select } from '@renderer/components/ui/select';
 import {
   Dialog,
   DialogClose,
@@ -159,7 +161,7 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[480px]" onClose={onClose}>
+      <DialogContent className="w-[620px] max-w-[92vw] max-h-[86vh]" onClose={onClose}>
         <DialogHeader>
           <DialogTitle>Import App State</DialogTitle>
           <DialogClose onClose={onClose} />
@@ -187,36 +189,42 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
           )}
 
           {step === 'options' && preview && (
-            <div>
-              <div className="mb-6">
-                <h3 className="text-[13px] font-semibold text-text m-0 mb-3">Backup Contents</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-3 p-3 bg-bg border border-border rounded-lg">
-                    <LayoutTemplate size={20} className="text-text-muted shrink-0" />
-                    <span className="text-lg font-semibold text-text">{preview.counts.templates}</span>
-                    <span className="text-xs text-text-secondary">Templates</span>
+            <div className="space-y-4">
+              <Card className="border-border bg-bg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Backup Contents</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-3 p-3 bg-bg-alt border border-border rounded-lg">
+                      <LayoutTemplate size={20} className="text-text-muted shrink-0" />
+                      <span className="text-lg font-semibold text-text">{preview.counts.templates}</span>
+                      <span className="text-xs text-text-secondary">Templates</span>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-bg-alt border border-border rounded-lg">
+                      <Package size={20} className="text-text-muted shrink-0" />
+                      <span className="text-lg font-semibold text-text">{preview.counts.assemblies}</span>
+                      <span className="text-xs text-text-secondary">Assemblies</span>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-bg-alt border border-border rounded-lg">
+                      <FileBox size={20} className="text-text-muted shrink-0" />
+                      <span className="text-lg font-semibold text-text">{preview.counts.stocks}</span>
+                      <span className="text-xs text-text-secondary">Stock Materials</span>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-bg-alt border border-border rounded-lg">
+                      <Palette size={20} className="text-text-muted shrink-0" />
+                      <span className="text-lg font-semibold text-text">{preview.counts.colors}</span>
+                      <span className="text-xs text-text-secondary">Custom Colors</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 p-3 bg-bg border border-border rounded-lg">
-                    <Package size={20} className="text-text-muted shrink-0" />
-                    <span className="text-lg font-semibold text-text">{preview.counts.assemblies}</span>
-                    <span className="text-xs text-text-secondary">Assemblies</span>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-bg border border-border rounded-lg">
-                    <FileBox size={20} className="text-text-muted shrink-0" />
-                    <span className="text-lg font-semibold text-text">{preview.counts.stocks}</span>
-                    <span className="text-xs text-text-secondary">Stock Materials</span>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-bg border border-border rounded-lg">
-                    <Palette size={20} className="text-text-muted shrink-0" />
-                    <span className="text-lg font-semibold text-text">{preview.counts.colors}</span>
-                    <span className="text-xs text-text-secondary">Custom Colors</span>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              <div className="mb-6">
-                <h3 className="text-[13px] font-semibold text-text m-0 mb-3">What to Import</h3>
-                <div className="flex flex-col gap-2">
+              <Card className="border-border bg-bg">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">What to Import</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2">
                   <label className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded-md cursor-pointer text-[13px] text-text hover:border-border-hover">
                     <Checkbox
                       checked={includeTemplates}
@@ -268,48 +276,36 @@ export function ImportAppStateModal({ isOpen, onClose }: ImportAppStateModalProp
                     />
                     <span>Custom Colors ({preview.counts.colors})</span>
                   </label>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
               {totalDuplicates > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-[13px] font-semibold text-text m-0 mb-3">Duplicate Handling</h3>
-                  <p className="text-xs text-text-muted m-0 mb-3">
-                    {totalDuplicates} item{totalDuplicates !== 1 ? 's' : ''} already exist in your library.
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    <label className="flex items-start gap-3 p-3 bg-bg border border-border rounded-md cursor-pointer hover:border-border-hover">
-                      <input
-                        type="radio"
-                        name="mergeStrategy"
-                        value="merge"
-                        checked={mergeStrategy === 'merge'}
-                        onChange={() => setMergeStrategy('merge')}
-                        className="w-4 h-4 mt-0.5 accent-accent"
-                      />
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[13px] font-medium text-text">Keep existing (recommended)</span>
-                        <span className="text-xs text-text-muted">Skip items that already exist in your library</span>
-                      </div>
-                    </label>
-                    <label className="flex items-start gap-3 p-3 bg-bg border border-border rounded-md cursor-pointer hover:border-border-hover">
-                      <input
-                        type="radio"
-                        name="mergeStrategy"
-                        value="replace"
-                        checked={mergeStrategy === 'replace'}
-                        onChange={() => setMergeStrategy('replace')}
-                        className="w-4 h-4 mt-0.5 accent-accent"
-                      />
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[13px] font-medium text-text">Replace all</span>
-                        <span className="text-xs text-text-muted">
-                          Remove your existing items and import all from backup
-                        </span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
+                <Card className="border-border bg-bg">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Duplicate Handling</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-text-muted m-0 mb-3">
+                      {totalDuplicates} item{totalDuplicates !== 1 ? 's' : ''} already exist in your library.
+                    </p>
+                    <div className="flex flex-col gap-3">
+                      <Select
+                        id="merge-strategy"
+                        value={mergeStrategy}
+                        onChange={(e) => setMergeStrategy(e.target.value as 'merge' | 'replace')}
+                        className="bg-bg"
+                      >
+                        <option value="merge">Keep existing (recommended)</option>
+                        <option value="replace">Replace all</option>
+                      </Select>
+                      <p className="text-xs text-text-muted m-0">
+                        {mergeStrategy === 'merge'
+                          ? 'Skip items that already exist in your library.'
+                          : 'Remove your existing items and import all from backup.'}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {error && (

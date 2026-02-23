@@ -10,31 +10,39 @@ import { Button } from "@/components/ui/button";
 
 export default function Header() {
   return (
-    <header className="sticky top-0 z-[100] border-b border-border bg-bg/95 backdrop-blur-[10px]">
+    <header className="sticky top-0 z-[100] border-b border-border/70 bg-bg/80 backdrop-blur-xl">
       <a
         href="#main-content"
-        className="absolute left-[-9999px] top-2 z-[999] rounded-sm bg-primary px-4 py-2 font-semibold text-text no-underline focus:left-2"
+        className="absolute left-[-9999px] top-2 z-[999] rounded-sm bg-primary px-4 py-2 font-semibold text-primary-foreground no-underline focus:left-2"
       >
         Skip to content
       </a>
       <div
-        className="container flex items-center justify-between px-4 py-2 sm:py-4 md:px-6 md:py-6"
+        className="container flex items-center justify-between gap-3 py-2 sm:py-3"
         aria-label="Main navigation"
       >
         <a
           href="/"
-          className="text-base font-bold text-text no-underline transition-colors hover:text-accent sm:text-xl md:text-2xl"
+          aria-label="Carvd Studio"
+          className="inline-flex items-center rounded-md p-1 no-underline transition-opacity hover:opacity-90"
         >
-          Carvd Studio
+          <img
+            src="/branding/CarvdStudio-Horizontal-WHT.svg"
+            alt=""
+            aria-hidden="true"
+            className="h-7 w-auto sm:h-8 md:h-9"
+          />
+          <span className="sr-only">Carvd Studio</span>
         </a>
+
         <NavigationMenu>
-          <NavigationMenuList className="gap-4 sm:gap-6 md:gap-12">
+          <NavigationMenuList className="gap-1 rounded-lg border border-border/80 bg-surface/80 p-1 shadow-sm">
             <NavigationMenuItem>
               <NavigationMenuLink
                 href="/features"
                 className={cn(
                   navigationMenuTriggerStyle(),
-                  "bg-transparent text-text hover:bg-transparent hover:text-highlight text-xs sm:text-sm",
+                  "h-9 bg-transparent px-3 text-sm text-text hover:bg-surface-elevated hover:text-highlight",
                 )}
               >
                 Features
@@ -45,7 +53,7 @@ export default function Header() {
                 href="/pricing"
                 className={cn(
                   navigationMenuTriggerStyle(),
-                  "bg-transparent text-text hover:bg-transparent hover:text-highlight text-xs sm:text-sm",
+                  "h-9 bg-transparent px-3 text-sm text-text hover:bg-surface-elevated hover:text-highlight",
                 )}
               >
                 Pricing
@@ -56,14 +64,14 @@ export default function Header() {
                 href="/docs"
                 className={cn(
                   navigationMenuTriggerStyle(),
-                  "bg-transparent text-text hover:bg-transparent hover:text-highlight text-xs sm:text-sm",
+                  "h-9 bg-transparent px-3 text-sm text-text hover:bg-surface-elevated hover:text-highlight",
                 )}
               >
                 Docs
               </NavigationMenuLink>
             </NavigationMenuItem>
             <NavigationMenuItem className="hidden md:block">
-              <Button asChild size="sm">
+              <Button asChild size="sm" className="h-9 px-4">
                 <a href="/download">Download</a>
               </Button>
             </NavigationMenuItem>

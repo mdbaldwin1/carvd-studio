@@ -10,14 +10,9 @@ import ContactSection from "./support/ContactSection";
 
 const supportEmail = "support@carvd-studio.com";
 
-const surfaceGradientStyle = {
-  background:
-    "linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-elevated) 100%)",
-};
-
 export default function SupportPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
+    <div className="site-shell">
       <SEO
         title="Support"
         description="Get help with Carvd Studio. Troubleshooting guides, frequently asked questions, and contact information for our support team."
@@ -42,7 +37,7 @@ export default function SupportPage() {
             <div className="mb-16 grid grid-cols-3 gap-6 max-md:grid-cols-1">
               <a
                 href="#troubleshooting"
-                className="flex flex-col items-center rounded-lg border border-border bg-card p-8 text-center text-text no-underline transition-all hover:-translate-y-1 hover:border-accent hover:text-text hover:shadow-lg max-md:p-6 max-sm:p-4"
+                className="flex flex-col items-center feature-card p-8 text-center text-text no-underline max-md:p-6 max-sm:p-4"
               >
                 <span className="mb-4 max-md:mb-3 max-sm:mb-2">
                   <Wrench size={24} />
@@ -56,7 +51,7 @@ export default function SupportPage() {
               </a>
               <a
                 href="#faq"
-                className="flex flex-col items-center rounded-lg border border-border bg-card p-8 text-center text-text no-underline transition-all hover:-translate-y-1 hover:border-accent hover:text-text hover:shadow-lg max-md:p-6 max-sm:p-4"
+                className="flex flex-col items-center feature-card p-8 text-center text-text no-underline max-md:p-6 max-sm:p-4"
               >
                 <span className="mb-4 max-md:mb-3 max-sm:mb-2">
                   <HelpCircle size={24} />
@@ -68,7 +63,7 @@ export default function SupportPage() {
               </a>
               <a
                 href="#contact"
-                className="flex flex-col items-center rounded-lg border border-border bg-card p-8 text-center text-text no-underline transition-all hover:-translate-y-1 hover:border-accent hover:text-text hover:shadow-lg max-md:p-6 max-sm:p-4"
+                className="flex flex-col items-center feature-card p-8 text-center text-text no-underline max-md:p-6 max-sm:p-4"
               >
                 <span className="mb-4 max-md:mb-3 max-sm:mb-2">
                   <Mail size={24} />
@@ -87,10 +82,7 @@ export default function SupportPage() {
             <ContactSection />
 
             {/* CTA */}
-            <div
-              className="my-16 rounded-xl border-2 border-accent p-16 text-center max-md:p-12 max-sm:my-8 max-sm:p-8"
-              style={surfaceGradientStyle}
-            >
+            <div className="site-section my-16 p-16 text-center max-md:p-12 max-sm:my-8 max-sm:p-8">
               <h2 className="mb-4 text-4xl font-bold max-md:text-2xl max-sm:text-xl">
                 Didn't find what you need?
               </h2>

@@ -61,7 +61,10 @@ export function buildMenuTemplate(): MenuItemConstructorOptions[] {
     template.push({
       label: app.name,
       submenu: [
-        { role: 'about' },
+        {
+          label: 'About Carvd Studio',
+          click: () => sendMenuCommand('show-about')
+        },
         { type: 'separator' },
         {
           label: 'Settings...',

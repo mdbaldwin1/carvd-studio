@@ -13,14 +13,8 @@ import {
   AccordionContent,
 } from "@/components/ui/accordion";
 
-const surfaceGradientStyle = {
-  background:
-    "linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-elevated) 100%)",
-};
-
 const warningBoxStyle = {
-  background:
-    "linear-gradient(135deg, rgba(255,210,31,0.15) 0%, rgba(255,210,31,0.05) 100%)",
+  background: "rgba(255,210,31,0.12)",
   borderColor: "rgba(255,210,31,0.4)",
 };
 
@@ -32,7 +26,7 @@ export default function DownloadPage() {
   } = useDownloadInfo();
 
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
+    <div className="site-shell">
       <SEO
         title="Download"
         description="Download Carvd Studio for macOS and Windows. Free 14-day trial with all features. No credit card required."
@@ -45,6 +39,13 @@ export default function DownloadPage() {
         {/* Hero Download Section */}
         <section className="container py-16 text-center max-md:py-12 max-sm:py-8">
           <div className="mx-auto max-w-4xl">
+            <div className="mb-6 flex justify-center">
+              <img
+                src="/branding/CarvdStudio-Horizontal-WHT.svg"
+                alt="Carvd Studio"
+                className="h-20 w-auto max-md:h-16 max-sm:h-12"
+              />
+            </div>
             <h1 className="mb-6 text-5xl font-bold max-md:text-4xl max-sm:text-3xl">
               Download Carvd Studio
             </h1>
@@ -53,17 +54,14 @@ export default function DownloadPage() {
               required.
             </p>
             <p className="mb-12 text-center">
-              <Badge
-                variant="outline"
-                className="border-accent bg-[rgba(174,164,191,0.2)] text-accent"
-              >
+              <Badge variant="outline" className="hero-kicker">
                 Version {appVersion}
               </Badge>
             </p>
             <div className="flex flex-wrap justify-center gap-8 max-sm:flex-col max-sm:items-center">
               <a
                 href={macDownload.url}
-                className="flex min-w-[200px] flex-col items-center gap-2 rounded-lg border-2 border-border bg-bg px-8 py-8 text-text no-underline transition-all hover:-translate-y-1 hover:border-highlight hover:text-text hover:shadow-lg max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
+                className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
                 <span>
                   <AppleIcon size={32} />
@@ -78,7 +76,7 @@ export default function DownloadPage() {
               </a>
               <a
                 href={windowsDownload.url}
-                className="flex min-w-[200px] flex-col items-center gap-2 rounded-lg border-2 border-border bg-bg px-8 py-8 text-text no-underline transition-all hover:-translate-y-1 hover:border-highlight hover:text-text hover:shadow-lg max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
+                className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
                 <span>
                   <WindowsIcon size={32} />
@@ -96,7 +94,7 @@ export default function DownloadPage() {
         </section>
 
         {/* Installation Instructions */}
-        <section className="container mt-16">
+        <section id="requirements" className="container mt-16">
           <h2 className="mb-12 text-center text-3xl font-bold">
             Installation Instructions
           </h2>
@@ -254,10 +252,7 @@ export default function DownloadPage() {
                   v{appVersion}
                 </span>
                 <span className="text-sm text-text-muted">Current Release</span>
-                <Badge
-                  variant="outline"
-                  className="border-accent bg-[rgba(174,164,191,0.2)] text-accent"
-                >
+                <Badge variant="outline" className="hero-kicker">
                   Latest
                 </Badge>
               </div>
@@ -418,10 +413,10 @@ export default function DownloadPage() {
                   Can I transfer my license to a new computer?
                 </AccordionTrigger>
                 <AccordionContent className="leading-relaxed text-text-muted">
-                  Yes! Your license can be activated on up to 3 computers at
-                  once. If you need to move to a new machine, you can deactivate
-                  your license in the app settings before activating on the new
-                  computer.
+                  Yes. You can activate on multiple computers up to your
+                  activation limit. If you need to move to a new machine, you
+                  can deactivate your license in app settings before activating
+                  on the new computer.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -430,10 +425,7 @@ export default function DownloadPage() {
 
         {/* CTA */}
         <section className="container mb-16">
-          <div
-            className="my-16 rounded-xl border-2 border-accent p-16 text-center max-md:p-12 max-sm:my-8 max-sm:p-8"
-            style={surfaceGradientStyle}
-          >
+          <div className="site-section my-16 p-16 text-center max-md:p-12 max-sm:my-8 max-sm:p-8">
             <h2 className="mb-4 text-4xl font-bold max-md:text-2xl max-sm:text-xl">
               Ready to start designing?
             </h2>

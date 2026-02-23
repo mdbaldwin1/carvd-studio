@@ -5,7 +5,7 @@
 
 import { Check, Pencil, Save, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, AlertDescription, AlertTitle } from '@renderer/components/ui/alert';
+import { Alert, AlertTitle } from '@renderer/components/ui/alert';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 
@@ -64,8 +64,6 @@ export function AssemblyEditingBanner({
           <AlertTitle className="flex items-center gap-2 text-accent-foreground">
             <span className="text-base">📦</span>
             <span>{isCreatingNew ? 'Creating new assembly:' : 'Editing assembly:'}</span>
-          </AlertTitle>
-          <AlertDescription className="mt-1 text-accent-foreground">
             {isEditing ? (
               <span className="flex items-center gap-1">
                 <Input
@@ -88,16 +86,19 @@ export function AssemblyEditingBanner({
                 </Button>
               </span>
             ) : (
-              <button
-                className="flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0 text-sm font-semibold text-accent-foreground hover:opacity-80"
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                className="h-auto gap-1.5 rounded px-2 py-1 text-sm font-semibold text-accent-foreground hover:bg-black/10 hover:opacity-100"
                 onClick={handleStartEditing}
                 title="Click to rename"
               >
                 <strong>{assemblyName}</strong>
                 <Pencil size={12} className="opacity-60" />
-              </button>
+              </Button>
             )}
-          </AlertDescription>
+          </AlertTitle>
         </div>
         <div className="flex items-center gap-2">
           <Button

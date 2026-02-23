@@ -1,6 +1,8 @@
 import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
-import { join, normalize, isAbsolute } from 'path';
+import { join, normalize, isAbsolute, dirname } from 'path';
+import { existsSync } from 'fs';
 import { readFile, writeFile, unlink, access, readdir, mkdir, stat } from 'fs/promises';
+import { pathToFileURL } from 'url';
 import log from 'electron-log';
 import {
   store,
@@ -207,6 +209,41 @@ let splashWindow: BrowserWindow | null = null;
 let splashStartTime: number = 0;
 const MINIMUM_SPLASH_DURATION = 1500; // 1.5 seconds minimum
 
+function resolveSplashLogoPath(filename: string): string {
+  const candidates = [
+    join(__dirname, 'branding', filename),
+    join(app.getAppPath(), 'src/main/branding', filename),
+    join(app.getAppPath(), 'assets', filename),
+    join(app.getAppPath(), '../assets', filename),
+    join(app.getAppPath(), '../../assets', filename)
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return pathToFileURL(candidate).toString();
+    }
+  }
+
+  return `./branding/${filename}`;
+}
+
+function resolveAppIconPath(): string | null {
+  const candidates = [
+    join(app.getAppPath(), 'packages/desktop/build/icon.png'),
+    join(app.getAppPath(), 'build/icon.png'),
+    join(app.getAppPath(), '../build/icon.png'),
+    join(app.getAppPath(), '../../build/icon.png')
+  ];
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 function createSplashWindow(): BrowserWindow {
   splashStartTime = Date.now();
   const splash = new BrowserWindow({
@@ -224,7 +261,13 @@ function createSplashWindow(): BrowserWindow {
     }
   });
 
-  splash.loadFile(join(__dirname, 'splash.html'), { query: { theme: getTheme() } });
+  splash.loadFile(join(__dirname, 'splash.html'), {
+    query: {
+      theme: getTheme(),
+      splashDark: resolveSplashLogoPath('CarvdStudio-Vertical-WHT.svg'),
+      splashLight: resolveSplashLogoPath('CarvdStudio-Vertical.svg')
+    }
+  });
   splash.show();
 
   return splash;
@@ -237,6 +280,7 @@ function createWindow(fileToOpen?: string): BrowserWindow {
   const bounds = getWindowBounds();
   const isMac = process.platform === 'darwin';
   const isTest = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
+  const appIconPath = resolveAppIconPath();
 
   // Offset new windows slightly from existing ones
   const offset = windows.size * 30;
@@ -265,6 +309,7 @@ function createWindow(fileToOpen?: string): BrowserWindow {
           }
         : undefined,
     trafficLightPosition: isMac ? { x: 16, y: 14 } : undefined,
+    icon: appIconPath ?? undefined,
     webPreferences: {
       preload: join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
@@ -422,6 +467,32 @@ ipcMain.handle('write-binary-file', async (_event, filePath: string, data: numbe
   }
   const buffer = Buffer.from(data);
   await writeFile(filePath, buffer);
+});
+
+ipcMain.handle('show-item-in-folder', async (_event, filePath: string) => {
+  if (!isPathSafe(filePath)) {
+    throw new Error('Invalid file path');
+  }
+
+  try {
+    // Prefer revealing the exact file when available.
+    if (existsSync(filePath)) {
+      shell.showItemInFolder(filePath);
+      return { success: true };
+    }
+
+    // Fallback: open the containing directory if the file path is stale.
+    const containingDir = dirname(filePath);
+    if (existsSync(containingDir)) {
+      const openError = await shell.openPath(containingDir);
+      return { success: openError === '' };
+    }
+
+    return { success: false };
+  } catch (error) {
+    log.error('Failed to show item in folder:', error);
+    return { success: false };
+  }
 });
 
 ipcMain.handle('get-app-version', () => {
@@ -1160,6 +1231,18 @@ app.whenReady().then(() => {
   // Show splash screen (skip in test mode for faster startup)
   if (!isTest) {
     splashWindow = createSplashWindow();
+  }
+
+  // Ensure dev builds show branded dock icon on macOS.
+  if (process.platform === 'darwin') {
+    const appIconPath = resolveAppIconPath();
+    if (appIconPath) {
+      try {
+        app.dock.setIcon(appIconPath);
+      } catch (error) {
+        log.warn('[Main] Failed to set dock icon:', error);
+      }
+    }
   }
 
   // Reset trial acknowledgement so expired modal shows each launch

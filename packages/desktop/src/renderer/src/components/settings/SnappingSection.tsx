@@ -1,8 +1,8 @@
-import { HelpTooltip } from '../common/HelpTooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { Checkbox } from '@renderer/components/ui/checkbox';
 import { Select } from '@renderer/components/ui/select';
 import { AppSettings, SnapSensitivity } from '../../types';
+import { HelpTooltip } from '../common/HelpTooltip';
 
 interface SnappingSectionProps {
   formData: AppSettings;
@@ -32,7 +32,7 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
             />
           </div>
           <Select
-            variant="sm"
+            className="w-auto"
             value={formData.snapSensitivity ?? 'normal'}
             onChange={(e) => onSettingChange('snapSensitivity', e.target.value as SnapSensitivity)}
           >

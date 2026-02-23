@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath),
   writeFile: (filePath: string, data: string) => ipcRenderer.invoke('write-file', filePath, data),
   writeBinaryFile: (filePath: string, data: number[]) => ipcRenderer.invoke('write-binary-file', filePath, data),
+  showItemInFolder: (filePath: string) => ipcRenderer.invoke('show-item-in-folder', filePath),
 
   // Recent projects
   getRecentProjects: () => ipcRenderer.invoke('get-recent-projects'),
@@ -232,6 +233,7 @@ export interface ElectronAPI {
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, data: string) => Promise<void>;
   writeBinaryFile: (filePath: string, data: number[]) => Promise<void>;
+  showItemInFolder: (filePath: string) => Promise<{ success: boolean }>;
   getRecentProjects: () => Promise<string[]>;
   addRecentProject: (filePath: string) => Promise<void>;
   clearRecentProjects: () => Promise<void>;

@@ -50,7 +50,7 @@ describe('StartScreen', () => {
       render(<StartScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(screen.getByText('Carvd Studio')).toBeInTheDocument();
+        expect(screen.getByAltText('Carvd Studio')).toBeInTheDocument();
       });
     });
 

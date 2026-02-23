@@ -76,13 +76,13 @@ export function UnsavedChangesDialog({
         </div>
 
         <AlertDialogFooter>
-          <Button size="sm" variant="secondary" className="min-w-22.5" onClick={onCancel}>
+          <Button size="sm" variant="secondary" className="min-w-[90px]" onClick={onCancel}>
             Cancel
           </Button>
-          <Button size="sm" variant="destructiveOutline" className="min-w-22.5" onClick={onDiscard}>
+          <Button size="sm" variant="destructiveOutline" className="min-w-[90px]" onClick={onDiscard}>
             {getDiscardLabel()}
           </Button>
-          <Button size="sm" className="min-w-22.5" onClick={onSave} autoFocus>
+          <Button size="sm" className="min-w-[90px]" onClick={onSave} autoFocus>
             Save
           </Button>
         </AlertDialogFooter>

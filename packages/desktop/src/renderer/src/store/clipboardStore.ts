@@ -69,10 +69,11 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
       useUIStore
         .getState()
         .showToast(
-          `Copied ${partCount} part${partCount === 1 ? '' : 's'} in ${groupCount} group${groupCount === 1 ? '' : 's'}`
+          `Copied ${partCount} part${partCount === 1 ? '' : 's'} in ${groupCount} group${groupCount === 1 ? '' : 's'}`,
+          'success'
         );
     } else {
-      useUIStore.getState().showToast(`Copied ${partCount} part${partCount === 1 ? '' : 's'}`);
+      useUIStore.getState().showToast(`Copied ${partCount} part${partCount === 1 ? '' : 's'}`, 'success');
     }
   },
 
@@ -84,7 +85,7 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
 
     // Check license limits before pasting
     if (!canAddPart(licenseMode, parts.length + clipboard.parts.length - 1)) {
-      useUIStore.getState().showToast(getBlockedMessage('addPart'));
+      useUIStore.getState().showToast(getBlockedMessage('addPart'), 'warning');
       return [];
     }
 
@@ -188,7 +189,7 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
 
     // Check license limits before pasting
     if (!canAddPart(licenseMode, parts.length + clipboard.parts.length - 1)) {
-      useUIStore.getState().showToast(getBlockedMessage('addPart'));
+      useUIStore.getState().showToast(getBlockedMessage('addPart'), 'warning');
       return [];
     }
 

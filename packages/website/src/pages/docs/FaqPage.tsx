@@ -26,7 +26,7 @@ const faqItems = [
   {
     question: "Can I use it on multiple computers?",
     answer:
-      "Yes! Your license works on up to 3 devices — any combination of Mac and Windows. Use it in your shop, office, and laptop simultaneously. Manage activations in Settings > License.",
+      "Yes. You can activate on multiple computers up to your license activation limit. Manage activations in Settings > License.",
   },
   {
     question: "What file format does Carvd Studio use?",
@@ -124,9 +124,8 @@ export default function FaqPage() {
             Can I use it on multiple computers?
           </h3>
           <p className="text-text-muted leading-[var(--line-height-relaxed)]">
-            Yes! Your license works on up to 3 devices&mdash;any combination of
-            Mac and Windows. Use it in your shop, office, and laptop
-            simultaneously. Manage activations in Settings &rarr; License.
+            Yes. You can activate on multiple computers up to your license
+            activation limit. Manage activations in Settings &rarr; License.
           </p>
         </div>
 

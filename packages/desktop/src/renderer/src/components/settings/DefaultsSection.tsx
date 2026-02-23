@@ -1,7 +1,7 @@
-import { HelpTooltip } from '../common/HelpTooltip';
 import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { Select } from '@renderer/components/ui/select';
 import { AppSettings } from '../../types';
+import { HelpTooltip } from '../common/HelpTooltip';
 
 interface DefaultsSectionProps {
   formData: AppSettings;
@@ -34,7 +34,7 @@ export function DefaultsSection({
         <div className="settings-row flex items-center justify-between gap-4 mb-3">
           <label className="text-[13px] text-text">Units</label>
           <Select
-            variant="sm"
+            className="w-auto"
             value={formData.defaultUnits}
             onChange={(e) => onUnitsChange(e.target.value as 'imperial' | 'metric')}
           >
@@ -45,7 +45,7 @@ export function DefaultsSection({
         <div className="settings-row flex items-center justify-between gap-4 mb-3">
           <label className="text-[13px] text-text">Grid Snap Size</label>
           <Select
-            variant="sm"
+            className="w-auto"
             value={displayGridValue}
             onChange={(e) => onSettingChange('defaultGridSize', parseFloat(e.target.value))}
           >

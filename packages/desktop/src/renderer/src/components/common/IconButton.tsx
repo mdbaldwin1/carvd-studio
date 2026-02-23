@@ -45,7 +45,18 @@ function resolveSize(size: IconButtonSize): ButtonProps['size'] {
  * Always requires a `label` prop for accessibility (sets both `aria-label` and `title`).
  */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
-  { label, size = 'sm', variant = 'ghost', color = 'secondary', active, className, title, children, ...props },
+  {
+    label,
+    size = 'sm',
+    variant = 'ghost',
+    color = 'secondary',
+    active,
+    className,
+    title,
+    children,
+    type = 'button',
+    ...props
+  },
   ref
 ) {
   return (
@@ -57,6 +68,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       className={cn(color === 'primary' && variant === 'ghost' && 'text-accent hover:enabled:bg-accent-bg', className)}
       aria-label={label}
       title={title ?? label}
+      type={type}
       {...props}
     >
       {children}

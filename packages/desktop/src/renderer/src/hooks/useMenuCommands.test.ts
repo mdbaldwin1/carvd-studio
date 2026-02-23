@@ -167,7 +167,7 @@ describe('useMenuCommands', () => {
       await menuCommandHandler('save-project');
 
       expect(saveProject).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Project saved');
+      expect(showToast).toHaveBeenCalledWith('Project saved', 'success');
     });
 
     it('handles save-project error', async () => {
@@ -181,7 +181,7 @@ describe('useMenuCommands', () => {
       renderHook(() => useMenuCommands());
       await menuCommandHandler('save-project');
 
-      expect(showToast).toHaveBeenCalledWith('Save failed');
+      expect(showToast).toHaveBeenCalledWith('Save failed', 'error');
     });
 
     it('handles save-project-as command', async () => {
@@ -192,7 +192,7 @@ describe('useMenuCommands', () => {
       await menuCommandHandler('save-project-as');
 
       expect(saveProjectAs).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Project saved');
+      expect(showToast).toHaveBeenCalledWith('Project saved', 'success');
     });
 
     it('handles open-project with provided handler', async () => {
@@ -226,7 +226,7 @@ describe('useMenuCommands', () => {
       await menuCommandHandler('clear-recent');
 
       expect(clearRecentProjects).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Recent projects cleared');
+      expect(showToast).toHaveBeenCalledWith('Recent projects cleared', 'success');
     });
 
     it('handles new-from-template command', async () => {
@@ -280,7 +280,7 @@ describe('useMenuCommands', () => {
       await menuCommandHandler('add-to-favorites');
 
       expect(window.electronAPI.addFavoriteProject).toHaveBeenCalledWith('/path/to/project.carvd');
-      expect(showToast).toHaveBeenCalledWith('Added to favorites');
+      expect(showToast).toHaveBeenCalledWith('Added to favorites', 'success');
     });
 
     it('blocks add-to-favorites without saved file', async () => {
@@ -292,7 +292,7 @@ describe('useMenuCommands', () => {
       await menuCommandHandler('add-to-favorites');
 
       expect(window.electronAPI.addFavoriteProject).not.toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Save project first to add to favorites');
+      expect(showToast).toHaveBeenCalledWith('Save project first to add to favorites', 'warning');
     });
   });
 
@@ -305,7 +305,7 @@ describe('useMenuCommands', () => {
       renderHook(() => useMenuCommands());
       await menuCommandHandler('new-project');
 
-      expect(showToast).toHaveBeenCalledWith('Finish editing assembly first');
+      expect(showToast).toHaveBeenCalledWith('Finish editing assembly first', 'warning');
     });
 
     it('blocks file commands when editing template', async () => {
@@ -315,7 +315,7 @@ describe('useMenuCommands', () => {
       renderHook(() => useMenuCommands({ isEditingTemplate: true }));
       await menuCommandHandler('open-project');
 
-      expect(showToast).toHaveBeenCalledWith('Finish editing template first');
+      expect(showToast).toHaveBeenCalledWith('Finish editing template first', 'warning');
     });
 
     it('routes save to template save when editing template', async () => {
@@ -344,7 +344,7 @@ describe('useMenuCommands', () => {
       renderHook(() => useMenuCommands({ isEditingTemplate: true }));
       await menuCommandHandler('save-project-as');
 
-      expect(showToast).toHaveBeenCalledWith('Use "Save Template" to save template changes');
+      expect(showToast).toHaveBeenCalledWith('Use "Save Template" to save template changes', 'info');
       expect(saveProjectAs).not.toHaveBeenCalled();
     });
 
@@ -356,7 +356,7 @@ describe('useMenuCommands', () => {
       renderHook(() => useMenuCommands());
       await menuCommandHandler('save-project-as');
 
-      expect(showToast).toHaveBeenCalledWith('Use "Save Assembly" to save assembly changes');
+      expect(showToast).toHaveBeenCalledWith('Use "Save Assembly" to save assembly changes', 'info');
       expect(saveProjectAs).not.toHaveBeenCalled();
     });
   });

@@ -24,21 +24,27 @@ export default function TemplatesPage() {
       </p>
 
       <div className="grid gap-xl">
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <ClipboardList size={20} /> Using Templates
           </h3>
           <div className="grid gap-md text-sm">
-            <p>1. From the start screen, click "New from Template"</p>
-            <p>2. Browse categories or search for specific designs</p>
-            <p>3. Preview the template with part count and description</p>
             <p>
-              4. Click "Create Project" to start a new project from the template
+              1. Open templates from the start screen, or use{" "}
+              <strong>File → New from Template...</strong>
+            </p>
+            <p>
+              2. Browse built-in and custom templates in the templates screen
+            </p>
+            <p>3. Select a template card to create a new project from it</p>
+            <p>
+              4. A new unsaved project opens with the template's parts and
+              settings
             </p>
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <Save size={20} /> Creating Custom Templates
           </h3>

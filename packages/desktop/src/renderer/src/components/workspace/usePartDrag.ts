@@ -6,6 +6,7 @@ import { useProjectStore, getAllDescendantPartIds } from '../../store/projectSto
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
+import { useUIStore } from '../../store/uiStore';
 import {
   detectSnaps,
   calculateSnapThreshold,
@@ -38,15 +39,16 @@ export function usePartDrag(
   // Group context (computed in Part.tsx)
   groupToSelectOnClick: string | null,
   isOutsideEditingContext: boolean,
+  ancestorGroupIds: string[],
   isSelected: boolean,
   // Store actions
   selectPart: (id: string) => void,
   togglePartSelection: (id: string) => void,
-  clearSelection: () => void,
   selectGroup: (id: string) => void,
   toggleGroupSelection: (id: string) => void,
   updatePart: (id: string, updates: Partial<PartType>) => void,
-  moveSelectedParts: (delta: { x: number; y: number; z: number }) => void
+  moveSelectedParts: (delta: { x: number; y: number; z: number }) => void,
+  startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number) => void
 ) {
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef<{ point: THREE.Vector3; partPos: THREE.Vector3; partOriginalPos: THREE.Vector3 } | null>(
@@ -754,7 +756,16 @@ export function usePartDrag(
     e.stopPropagation();
 
     if (isOutsideEditingContext) {
-      clearSelection();
+      // Recover from stale/narrow edit context by exiting to top-level context
+      // and selecting what was clicked.
+      useSelectionStore.setState({ editingGroupId: null });
+      const topLevelGroupId = ancestorGroupIds[ancestorGroupIds.length - 1] ?? null;
+      if (topLevelGroupId) {
+        selectGroup(topLevelGroupId);
+      } else {
+        selectPart(part.id);
+      }
+      useUIStore.getState().setSelectedSidebarStockId(null);
       return;
     }
 
@@ -766,13 +777,18 @@ export function usePartDrag(
         } else {
           selectPart(part.id);
         }
+        useUIStore.getState().setSelectedSidebarStockId(null);
       }
       setRightClickTarget({ type: 'part' });
       return;
     }
 
-    // Handle shift+click for multi-select
-    if (e.nativeEvent.shiftKey) {
+    const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+    const isModKey = isMac ? e.nativeEvent.metaKey : e.nativeEvent.ctrlKey;
+    const isAdditiveSelection = e.nativeEvent.shiftKey || isModKey;
+
+    // Additive click for multi-select
+    if (isAdditiveSelection) {
       if (groupToSelectOnClick) {
         toggleGroupSelection(groupToSelectOnClick);
       } else {
@@ -785,9 +801,11 @@ export function usePartDrag(
     if (groupToSelectOnClick) {
       if (!isSelected) {
         selectGroup(groupToSelectOnClick);
+        useUIStore.getState().setSelectedSidebarStockId(null);
       }
     } else if (!isSelected) {
       selectPart(part.id);
+      useUIStore.getState().setSelectedSidebarStockId(null);
     }
 
     // Get current state after potential selection change
@@ -800,7 +818,16 @@ export function usePartDrag(
     let anchorPos: THREE.Vector3;
 
     const hasGroupSelected = currentSelectedGroupIds.length > 0;
+    const isInSelectedGroup = groupToSelectOnClick && currentSelectedGroupIds.includes(groupToSelectOnClick);
     const hasMultipleParts = currentSelectedPartIds.length > 1;
+
+    // Group-selected part drag should use the thresholded group-drag path (same as InstancedParts).
+    if (isInSelectedGroup) {
+      if (e.point) {
+        startGroupDrag(e.point, e.nativeEvent.clientX, e.nativeEvent.clientY);
+      }
+      return;
+    }
 
     if (hasGroupSelected || hasMultipleParts) {
       const partIdsToInclude = new Set(currentSelectedPartIds);
@@ -809,9 +836,9 @@ export function usePartDrag(
         const collectGroupParts = (gId: string) => {
           for (const member of currentGroupMembers) {
             if (member.groupId === gId) {
-              if (member.type === 'part') {
+              if (member.memberType === 'part') {
                 partIdsToInclude.add(member.memberId);
-              } else if (member.type === 'group') {
+              } else if (member.memberType === 'group') {
                 collectGroupParts(member.memberId);
               }
             }

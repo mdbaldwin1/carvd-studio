@@ -8,6 +8,16 @@ import { getFeatureLimits, getBlockedMessage } from '../utils/featureLimits';
 // Track toast timeout for cleanup (module-level, not in store state since it's not serializable)
 let toastTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
+interface ToastOptions {
+  action?: ToastAction;
+  duration?: number;
+}
+
 interface UIState {
   // Context menu
   contextMenu: {
@@ -27,6 +37,7 @@ interface UIState {
   // Modal visibility
   cutListModalOpen: boolean;
   saveAssemblyModalOpen: boolean;
+  selectedSidebarStockId: string | null;
 
   // Manual thumbnail capture
   manualThumbnail: {
@@ -48,7 +59,7 @@ interface UIState {
   closeContextMenu: () => void;
 
   // Actions - Toast
-  showToast: (message: string, type?: 'success' | 'error') => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'warning' | 'info', options?: ToastOptions) => void;
   clearToast: () => void;
 
   // Actions - Delete confirmation
@@ -60,6 +71,8 @@ interface UIState {
   closeCutListModal: () => void;
   openSaveAssemblyModal: () => void;
   closeSaveAssemblyModal: () => void;
+  setSelectedSidebarStockId: (stockId: string | null) => void;
+  toggleSelectedSidebarStockId: (stockId: string) => void;
 
   // Actions - Thumbnail
   captureManualThumbnail: () => Promise<boolean>;
@@ -72,12 +85,13 @@ export const useUIStore = create<UIState>((set, get) => ({
   pendingDeletePartIds: null,
   cutListModalOpen: false,
   saveAssemblyModalOpen: false,
+  selectedSidebarStockId: null,
   manualThumbnail: null,
 
   openContextMenu: (menu) => set({ contextMenu: menu }),
   closeContextMenu: () => set({ contextMenu: null }),
 
-  showToast: (message, type?) => {
+  showToast: (message, type, options) => {
     // Clear any existing toast timer to prevent timer accumulation
     if (toastTimeoutId !== null) {
       clearTimeout(toastTimeoutId);
@@ -86,25 +100,62 @@ export const useUIStore = create<UIState>((set, get) => ({
     const id = uuidv4();
     set({ toast: { message, id } });
 
+    const resolvedOptions: ToastOptions | undefined = options?.action
+      ? {
+          ...options,
+          action: {
+            ...options.action,
+            onClick: (event?: unknown) => {
+              if (event && typeof event === 'object') {
+                const maybeEvent = event as { preventDefault?: () => void; stopPropagation?: () => void };
+                maybeEvent.preventDefault?.();
+                maybeEvent.stopPropagation?.();
+              }
+              options.action?.onClick();
+            }
+          }
+        }
+      : options;
+
+    const toastDuration = resolvedOptions?.duration;
+    const sonnerOptions = { ...resolvedOptions, id };
+
     // Render via Sonner
     if (type === 'error') {
-      sonnerToast.error(message);
+      sonnerToast.error(message, sonnerOptions);
     } else if (type === 'success') {
-      sonnerToast.success(message);
+      sonnerToast.success(message, sonnerOptions);
+    } else if (type === 'warning') {
+      sonnerToast.warning(message, sonnerOptions);
+    } else if (type === 'info') {
+      sonnerToast.info(message, sonnerOptions);
     } else {
-      sonnerToast(message);
+      sonnerToast(message, sonnerOptions);
     }
 
-    // Auto-clear store state after 2 seconds
-    toastTimeoutId = setTimeout(() => {
-      const current = get().toast;
-      if (current?.id === id) {
-        set({ toast: null });
-      }
-      toastTimeoutId = null;
-    }, 2000);
+    // Auto-clear store state for non-persistent toasts.
+    // Persistent toasts (duration: Infinity) stay until manually dismissed.
+    const isPersistent = typeof toastDuration === 'number' && !Number.isFinite(toastDuration);
+    if (!isPersistent) {
+      const clearAfterMs = typeof toastDuration === 'number' && toastDuration > 0 ? toastDuration : 2000;
+      toastTimeoutId = setTimeout(() => {
+        const current = get().toast;
+        if (current?.id === id) {
+          set({ toast: null });
+        }
+        toastTimeoutId = null;
+      }, clearAfterMs);
+    }
   },
-  clearToast: () => set({ toast: null }),
+  clearToast: () => {
+    const currentToastId = get().toast?.id;
+    if (currentToastId) {
+      sonnerToast.dismiss(currentToastId);
+    } else {
+      sonnerToast.dismiss();
+    }
+    set({ toast: null });
+  },
 
   requestDeleteParts: (ids) => {
     if (ids.length === 0) return;
@@ -119,12 +170,17 @@ export const useUIStore = create<UIState>((set, get) => ({
     const { licenseMode } = useLicenseStore.getState();
     const limits = getFeatureLimits(licenseMode);
     if (!limits.canUseAssemblies) {
-      get().showToast(getBlockedMessage('useAssemblies'));
+      get().showToast(getBlockedMessage('useAssemblies'), 'warning');
       return;
     }
     set({ saveAssemblyModalOpen: true });
   },
   closeSaveAssemblyModal: () => set({ saveAssemblyModalOpen: false }),
+  setSelectedSidebarStockId: (stockId) => set({ selectedSidebarStockId: stockId }),
+  toggleSelectedSidebarStockId: (stockId) =>
+    set((state) => ({
+      selectedSidebarStockId: state.selectedSidebarStockId === stockId ? null : stockId
+    })),
 
   captureManualThumbnail: async () => {
     const thumbnailData = await generateThumbnail();
@@ -138,10 +194,10 @@ export const useUIStore = create<UIState>((set, get) => ({
           manuallySet: true
         }
       });
-      get().showToast('Thumbnail captured');
+      get().showToast('Thumbnail captured', 'success');
       return true;
     }
-    get().showToast('Failed to capture thumbnail');
+    get().showToast('Failed to capture thumbnail', 'error');
     return false;
   },
   clearManualThumbnail: () => set({ manualThumbnail: null })

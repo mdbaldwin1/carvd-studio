@@ -157,6 +157,40 @@ describe('selectionStore', () => {
 
         expect(useSelectionStore.getState().selectedGroupIds).toHaveLength(0);
       });
+
+      it('keeps editing context when selecting the currently edited group', () => {
+        const store = useProjectStore.getState();
+        const partId = store.addPart({ name: 'Test Part' });
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+
+        useSelectionStore.getState().enterGroup(groupId);
+        useSelectionStore.getState().selectGroup(groupId);
+
+        expect(useSelectionStore.getState().editingGroupId).toBe(groupId);
+      });
+
+      it('keeps parent editing context when shift-selecting nested groups', () => {
+        const store = useProjectStore.getState();
+        const partA = store.addPart({ name: 'Part A' });
+        const partB = store.addPart({ name: 'Part B' });
+        const partC = store.addPart({ name: 'Part C' });
+        const childA = store.createGroup('Child A', [{ id: partA, type: 'part' }]);
+        const childB = store.createGroup('Child B', [{ id: partB, type: 'part' }]);
+        const parent = store.createGroup('Parent', [
+          { id: childA, type: 'group' },
+          { id: childB, type: 'group' },
+          { id: partC, type: 'part' }
+        ]);
+
+        useSelectionStore.getState().enterGroup(parent);
+        useSelectionStore.getState().toggleGroupSelection(childA);
+        useSelectionStore.getState().toggleGroupSelection(childB);
+
+        const state = useSelectionStore.getState();
+        expect(state.editingGroupId).toBe(parent);
+        expect(state.selectedGroupIds).toContain(childA);
+        expect(state.selectedGroupIds).toContain(childB);
+      });
     });
 
     describe('group editing mode', () => {

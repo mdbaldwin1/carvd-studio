@@ -20,30 +20,39 @@ else
     exit 1
 fi
 
-# Find Carvd Studio window by title (works for both dev and production)
-# This avoids confusion with VSCode which is also Electron-based
+# Find Carvd Studio window.
+# 1) Prefer packaged app process name: "Carvd Studio"
+# 2) Fallback to Electron windows whose title ends with " - Carvd Studio"
+#    (excludes VS Code windows like "carvd-studio").
 osascript <<EOF
 tell application "System Events"
     set foundWindow to false
 
-    -- First try production app name
+    -- Packaged app process name
     if exists process "Carvd Studio" then
         tell process "Carvd Studio"
-            set frontmost to true
-            delay 0.2
-            set size of window 1 to {${WIDTH}, ${HEIGHT}}
-            set position of window 1 to {100, 100}
+            if (count of windows) > 0 then
+                set frontmost to true
+                delay 0.2
+                set size of window 1 to {${WIDTH}, ${HEIGHT}}
+                set position of window 1 to {100, 100}
+                set foundWindow to true
+            end if
         end tell
-        set foundWindow to true
     end if
 
-    -- If not found, look for Electron window with "Carvd" in title
+    -- Dev fallback: Electron window title must look like "<project> - Carvd Studio"
     if not foundWindow then
         repeat with proc in (every process whose background only is false)
             if name of proc is "Electron" then
                 tell proc
                     repeat with win in windows
-                        if name of win contains "Carvd" then
+                        try
+                            set winName to name of win
+                        on error
+                            set winName to ""
+                        end try
+                        if winName ends with " - Carvd Studio" then
                             set frontmost to true
                             delay 0.2
                             set size of win to {${WIDTH}, ${HEIGHT}}
@@ -59,7 +68,7 @@ tell application "System Events"
     end if
 
     if not foundWindow then
-        error "Could not find Carvd Studio window. Make sure the app is running."
+        error "Could not find Carvd Studio window (packaged or '* - Carvd Studio' dev window)."
     end if
 end tell
 EOF
@@ -71,7 +80,7 @@ if [ $? -eq 0 ]; then
     echo "  Cmd+Shift+4, then Space, then click the window"
 else
     echo ""
-    echo "Error: Carvd Studio is not running."
-    echo "Start it with: npm run dev:desktop"
+    echo "Error: Could not locate a Carvd Studio window."
+    echo "Run packaged app or run dev app and open a project so title ends with ' - Carvd Studio'."
     exit 1
 fi

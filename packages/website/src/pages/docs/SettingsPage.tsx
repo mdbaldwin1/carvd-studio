@@ -7,7 +7,7 @@ export default function SettingsPage() {
     <section>
       <SEO
         title="Settings & Preferences - Docs"
-        description="Configure app settings, project settings, backup and sync, units, grid size, auto-save, and license management."
+        description="Configure app settings, project settings, backup and sync, units, cut list preferences, and license management."
         path="/docs/settings"
         jsonLd={createBreadcrumbSchema([
           { name: "Docs", path: "/docs" },
@@ -17,55 +17,59 @@ export default function SettingsPage() {
       <h2 className="text-4xl font-bold mb-xl">Settings & Preferences</h2>
 
       <div className="grid gap-xl">
-        <div
-          id="app-settings"
-          className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]"
-        >
+        <div id="app-settings" className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">App Settings</h3>
           <p className="text-muted mb-md text-sm">
             Access via the gear icon or <code>Cmd/Ctrl + ,</code>
           </p>
+          <p className="text-muted mb-md text-sm">
+            Organized into three tabs: <strong>General</strong>,{" "}
+            <strong>New Project Defaults</strong>, and{" "}
+            <strong>Data &amp; License</strong>.
+          </p>
           <div className="grid gap-md text-sm">
             <div>
-              <p className="font-bold mb-xs">Default Units</p>
-              <p className="text-muted">Imperial or Metric for new projects</p>
-            </div>
-            <div>
-              <p className="font-bold mb-xs">Default Grid Size</p>
+              <p className="font-bold mb-xs">Appearance</p>
               <p className="text-muted">
-                Snap grid for new projects (1/4", 1/2", 1", etc.)
+                Theme, hotkey hints, and 3D lighting mode
               </p>
             </div>
             <div>
-              <p className="font-bold mb-xs">Auto-Save Interval</p>
+              <p className="font-bold mb-xs">Behavior</p>
               <p className="text-muted">
-                How often to auto-save (1, 2, 5, or 10 minutes)
+                Auto-save toggle and confirm-before-delete preference
               </p>
             </div>
             <div>
-              <p className="font-bold mb-xs">Show Grid</p>
-              <p className="text-muted">Toggle the 3D grid on/off by default</p>
-            </div>
-            <div>
-              <p className="font-bold mb-xs">License Management</p>
+              <p className="font-bold mb-xs">Snapping</p>
               <p className="text-muted">
-                Activate, deactivate, or view your license status
+                Snap sensitivity and snap-to-grid defaults
               </p>
             </div>
             <div>
-              <p className="font-bold mb-xs">Check for Updates</p>
+              <p className="font-bold mb-xs">New Project Defaults</p>
               <p className="text-muted">
-                Manually check for new versions or enable automatic update
-                checking
+                Default units, grid size, and stock constraints for newly
+                created projects
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Data Management</p>
+              <p className="text-muted">
+                Export and import your app-level backup (templates, assemblies,
+                stocks, and colors)
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">License</p>
+              <p className="text-muted">
+                View status and activate/deactivate your license
               </p>
             </div>
           </div>
         </div>
 
-        <div
-          id="backup-sync"
-          className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]"
-        >
+        <div id="backup-sync" className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">Backup & Sync</h3>
           <p className="text-muted mb-md text-sm">
             Access via Settings → Backup & Sync
@@ -100,13 +104,18 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div
-          id="project-settings"
-          className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]"
-        >
+        <div id="project-settings" className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">Project Settings</h3>
           <p className="text-muted mb-md text-sm">
             Access via File &rarr; Project Settings
+          </p>
+          <p className="text-muted mb-md text-sm">
+            Organized into <strong>Details</strong> (name, notes, favorite) and{" "}
+            <strong>Preferences</strong> (units, cut list, constraints).
+          </p>
+          <p className="text-muted mb-md text-sm">
+            Use the star icon in the Project Settings header to add/remove the
+            current project from favorites.
           </p>
           <div className="grid gap-md text-sm">
             <div>
@@ -120,7 +129,7 @@ export default function SettingsPage() {
               <p className="text-muted">Imperial or Metric for this project</p>
             </div>
             <div>
-              <p className="font-bold mb-xs">Grid Size</p>
+              <p className="font-bold mb-xs">Grid Snap Size</p>
               <p className="text-muted">Snap grid increment for this project</p>
             </div>
             <div>
@@ -144,7 +153,7 @@ export default function SettingsPage() {
             <div>
               <p className="font-bold mb-xs">Stock Constraints</p>
               <p className="text-muted">
-                Enable/disable dimension, grain, color, and overlap constraints
+                Toggle dimension, grain, color sync, and overlap constraints
               </p>
             </div>
           </div>

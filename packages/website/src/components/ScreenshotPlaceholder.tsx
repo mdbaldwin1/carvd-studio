@@ -21,12 +21,12 @@ export default function ScreenshotPlaceholder({
 
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-lg border-2 border-dashed border-border bg-surface ${className}`}
+      className={`relative w-full overflow-hidden rounded-xl border border-border/80 bg-surface/85 shadow-sm ${className}`}
       title={tooltip}
       style={{ paddingTop: aspectRatioStyles[aspectRatio] }}
     >
-      <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-        <div className="mb-4 opacity-50">
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface/70 p-6 text-center">
+        <div className="mb-4 text-text-muted/70">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="48"
@@ -43,7 +43,7 @@ export default function ScreenshotPlaceholder({
             <circle cx="12" cy="13" r="3" />
           </svg>
         </div>
-        <p className="max-w-[300px] text-sm text-text-muted">{tooltip}</p>
+        <p className="max-w-[320px] text-sm text-text-muted">{tooltip}</p>
       </div>
     </div>
   );

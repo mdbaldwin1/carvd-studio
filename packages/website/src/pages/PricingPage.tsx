@@ -12,14 +12,9 @@ import PricingFAQ, { pricingFAQs } from "./pricing/PricingFAQ";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-const surfaceGradientStyle = {
-  background:
-    "linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-elevated) 100%)",
-};
-
 export default function PricingPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
+    <div className="site-shell">
       <SEO
         title="Pricing"
         description="One-time purchase, no subscription. Carvd Studio woodworking design software for $59.99. Own it forever with free updates."
@@ -31,16 +26,13 @@ export default function PricingPage() {
       <main id="main-content" className="container flex-1">
         <div className="py-16">
           <div className="mx-auto max-w-4xl text-center">
-            <Badge
-              variant="outline"
-              className="mx-auto mb-6 gap-1 border-accent bg-[rgba(174,164,191,0.2)] text-accent"
-            >
+            <Badge variant="outline" className="hero-kicker mx-auto mb-6 gap-1">
               <Coins size={16} /> Less Than 6 Months of Subscription Software
             </Badge>
             <h1 className="mb-6 text-6xl font-bold">
               Pay Once.
               <br />
-              <span className="text-primary-text">Own It Forever.</span>
+              <span className="text-highlight">Own It Forever.</span>
             </h1>
             <p className="mx-auto mb-16 max-w-2xl text-center text-xl text-text-muted">
               Even the cheapest furniture design subscriptions start at
@@ -55,10 +47,7 @@ export default function PricingPage() {
             <PricingFAQ />
 
             {/* Final CTA */}
-            <div
-              className="my-16 rounded-xl border-2 border-accent p-16 text-center max-md:p-12 max-sm:my-8 max-sm:p-8"
-              style={surfaceGradientStyle}
-            >
+            <div className="site-section my-16 p-16 text-center max-md:p-12 max-sm:my-8 max-sm:p-8">
               <h2 className="mb-4 text-4xl font-bold max-md:text-2xl max-sm:text-xl">
                 Stop Wasting Money on Subscriptions
               </h2>
@@ -67,7 +56,7 @@ export default function PricingPage() {
               </p>
               <div className="mb-6 flex justify-center gap-4 max-sm:flex-col max-sm:items-center">
                 <Button size="lg" asChild>
-                  <a href="#download">Download Free Trial</a>
+                  <a href="/download">Download Free Trial</a>
                 </Button>
                 <BuyButton />
               </div>

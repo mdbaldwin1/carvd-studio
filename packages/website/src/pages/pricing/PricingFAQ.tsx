@@ -24,7 +24,7 @@ export const pricingFAQs = [
   {
     question: "Can I use it on multiple computers?",
     answer:
-      "Your license works on up to 3 devices — any combination of Mac and Windows.",
+      "Your license can be activated on multiple devices up to your activation limit.",
   },
   {
     question: "Will it work offline?",
@@ -89,9 +89,9 @@ export default function PricingFAQ() {
             Can I use it on multiple computers?
           </AccordionTrigger>
           <AccordionContent className="text-text-muted">
-            Your license works on up to 3 devices—any combination of Mac and
-            Windows. Use it in your shop, office, and on your laptop. All three
-            at the same time if you want.
+            Your license can be activated on multiple devices up to your
+            activation limit. Use it across your shop, office, and laptop as
+            needed.
           </AccordionContent>
         </AccordionItem>
 

@@ -23,7 +23,7 @@ export default function PartsPage() {
       </p>
 
       <div className="grid gap-xl">
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <Package size={20} className="inline-block" /> Part Properties
           </h3>
@@ -72,10 +72,25 @@ export default function PartsPage() {
                 Affects cut list optimization and visual appearance.
               </p>
             </div>
+            <div>
+              <p className="font-bold mb-xs">Allow Overlap</p>
+              <p className="text-muted">
+                Mark intentional overlaps so they don&apos;t trigger overlap
+                warnings in validation and cut list workflows.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Joinery Adjustments</p>
+              <p className="text-muted">
+                Add extra length/width for tenons, dados, and similar joinery.
+                These values affect cut list dimensions, not the 3D preview
+                size.
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <RefreshCw size={20} className="inline-block" /> Part Operations
           </h3>
@@ -111,7 +126,7 @@ export default function PartsPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <Layers size={20} className="inline-block" /> Glue-Up Panels
           </h3>

@@ -9,11 +9,15 @@
 import { ArrowLeft, Copy, Plus, Pencil, Trash2, Download, Upload } from 'lucide-react';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
+import { IconButton } from '../common/IconButton';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 import { v4 as uuidv4 } from 'uuid';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
 import { useLicenseStore } from '../../store/licenseStore';
 import { useUIStore } from '../../store/uiStore';
+import { showSavedFileToast } from '../../utils/fileToast';
+import { getDocsUrl } from '../../utils/docsLinks';
 import { getFeatureLimits } from '../../utils/featureLimits';
 import { Project } from '../../types';
 
@@ -109,7 +113,7 @@ export function TemplatesScreen({
     try {
       const result = await window.electronAPI.exportTemplate(templateId);
       if (result.success && result.filePath) {
-        useUIStore.getState().showToast(`Template exported to ${result.filePath.split('/').pop()}`, 'success');
+        showSavedFileToast(`Template exported to ${result.filePath.split('/').pop()}`, result.filePath);
       } else if (!result.canceled && result.error) {
         useUIStore.getState().showToast(result.error, 'error');
       }
@@ -253,14 +257,10 @@ export function TemplatesScreen({
       <div className="flex-1 max-w-[1200px] w-full mx-auto px-12 pb-12 flex flex-col gap-8 overflow-y-auto">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <button
-            className="flex items-center gap-1.5 py-2 px-3 bg-transparent border border-border rounded-md text-sm font-medium text-text cursor-pointer transition-all duration-150 hover:bg-bg-secondary hover:border-accent"
-            onClick={onBack}
-            title="Back to Start"
-          >
+          <Button variant="outline" size="sm" onClick={onBack} title="Back to Start">
             <ArrowLeft size={20} />
             <span>Back</span>
-          </button>
+          </Button>
           <h1 className="text-[28px] font-bold text-text m-0">Templates</h1>
         </div>
 
@@ -302,7 +302,11 @@ export function TemplatesScreen({
                 </Badge>
                 {canUseCustomTemplates && (
                   <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                    <button
+                    <IconButton
+                      label="Duplicate to My Templates"
+                      size="xs"
+                      variant="outlined"
+                      color="secondary"
                       className={tileActionClass}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -311,7 +315,7 @@ export function TemplatesScreen({
                       title="Duplicate to My Templates"
                     >
                       <Copy size={14} />
-                    </button>
+                    </IconButton>
                   </div>
                 )}
               </div>
@@ -329,13 +333,10 @@ export function TemplatesScreen({
                   <Upload size={14} />
                   Import
                 </Button>
-                <button
-                  className="flex items-center gap-1.5 py-2 px-3.5 bg-primary border-none rounded-md text-[13px] font-medium text-primary-foreground cursor-pointer transition-all duration-150 hover:bg-primary-hover"
-                  onClick={onNewTemplate}
-                >
+                <Button size="sm" onClick={onNewTemplate}>
                   <Plus size={16} />
                   New Template
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -350,7 +351,7 @@ export function TemplatesScreen({
                 className="text-accent text-[13px] hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
-                  window.electronAPI?.openExternal?.('https://carvd-studio.com/docs#templates');
+                  window.electronAPI?.openExternal?.(getDocsUrl('templates'));
                 }}
               >
                 Learn more about templates
@@ -385,52 +386,64 @@ export function TemplatesScreen({
                   <div className="absolute top-2.5 right-2.5 flex gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                     {canUseCustomTemplates && (
                       <>
-                        <button
+                        <IconButton
+                          label={`Edit ${template.name}`}
+                          size="xs"
+                          variant="outlined"
+                          color="secondary"
                           className={tileActionClass}
                           onClick={(e) => {
                             e.stopPropagation();
                             onEditTemplate(template);
                           }}
                           title="Edit template"
-                          aria-label={`Edit ${template.name}`}
                         >
                           <Pencil size={14} />
-                        </button>
-                        <button
+                        </IconButton>
+                        <IconButton
+                          label={`Duplicate ${template.name}`}
+                          size="xs"
+                          variant="outlined"
+                          color="secondary"
                           className={tileActionClass}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDuplicateTemplate(template);
                           }}
                           title="Duplicate template"
-                          aria-label={`Duplicate ${template.name}`}
                         >
                           <Copy size={14} />
-                        </button>
-                        <button
+                        </IconButton>
+                        <IconButton
+                          label={`Export ${template.name}`}
+                          size="xs"
+                          variant="outlined"
+                          color="secondary"
                           className={tileActionClass}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleExportTemplate(template.id);
                           }}
                           title="Export template"
-                          aria-label={`Export ${template.name}`}
                         >
                           <Download size={14} />
-                        </button>
+                        </IconButton>
                       </>
                     )}
-                    <button
+                    <IconButton
+                      label={`Delete ${template.name}`}
+                      size="xs"
+                      variant="outlined"
+                      color="danger"
                       className={`${tileActionClass} hover:!text-error hover:!border-error`}
                       onClick={(e) => {
                         e.stopPropagation();
                         setDeleteConfirmId(template.id);
                       }}
                       title="Delete template"
-                      aria-label={`Delete ${template.name}`}
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </IconButton>
                   </div>
                 </div>
               ))}
@@ -439,23 +452,20 @@ export function TemplatesScreen({
         </section>
       </div>
 
-      {/* Delete confirmation overlay */}
-      {deleteConfirmId && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-1010">
-          <div className="bg-bg-secondary border border-border rounded-lg p-6 text-center max-w-80">
-            <p className="m-0 mb-2 text-text font-medium">Delete this template?</p>
-            <p className="text-text-muted text-[13px] mb-5">This action cannot be undone.</p>
-            <div className="flex gap-3 justify-center">
-              <Button variant="outline" size="sm" onClick={() => setDeleteConfirmId(null)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" size="sm" onClick={() => handleDeleteTemplate(deleteConfirmId)}>
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        isOpen={Boolean(deleteConfirmId)}
+        title="Delete this template?"
+        message="This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onCancel={() => setDeleteConfirmId(null)}
+        onConfirm={() => {
+          if (deleteConfirmId) {
+            void handleDeleteTemplate(deleteConfirmId);
+          }
+        }}
+      />
     </div>
   );
 }

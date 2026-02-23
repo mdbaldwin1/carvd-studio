@@ -1,6 +1,8 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Copy, RefreshCw } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
+import { IconButton } from '@renderer/components/common/IconButton';
+import { useUIStore } from '@renderer/store/uiStore';
 
 interface Props {
   children: ReactNode;
@@ -51,6 +53,49 @@ export class ErrorBoundary extends Component<Props, State> {
     });
   };
 
+  getErrorDetailsText = (): string => {
+    const errorText = this.state.error ? this.state.error.toString() : 'Unknown error';
+    const stackText = this.state.error?.stack ?? '';
+    const componentStackText = this.state.errorInfo?.componentStack ?? '';
+    return [
+      'Carvd Studio Error',
+      `Time: ${new Date().toISOString()}`,
+      '',
+      `Error: ${errorText}`,
+      stackText ? `Stack:\n${stackText}` : '',
+      componentStackText ? `Component Stack:${componentStackText}` : ''
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+  };
+
+  copyTextToClipboard = async (text: string): Promise<void> => {
+    if (window.navigator.clipboard?.writeText) {
+      await window.navigator.clipboard.writeText(text);
+      return;
+    }
+
+    // Fallback for environments without navigator.clipboard
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'absolute';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  };
+
+  handleCopyError = async (): Promise<void> => {
+    try {
+      await this.copyTextToClipboard(this.getErrorDetailsText());
+      useUIStore.getState().showToast('Error copied to clipboard', 'success');
+    } catch {
+      useUIStore.getState().showToast('Failed to copy error details', 'error');
+    }
+  };
+
   render(): ReactNode {
     if (this.state.hasError) {
       // Custom fallback provided
@@ -70,17 +115,24 @@ export class ErrorBoundary extends Component<Props, State> {
               An unexpected error occurred. Your work may have been auto-saved.
             </p>
             {this.state.error && (
-              <details className="text-left mb-6 p-3 bg-surface border border-border rounded-md max-h-[200px] overflow-auto">
-                <summary className="cursor-pointer text-[13px] text-text-muted mb-2">Error details</summary>
-                <pre className="font-mono text-[11px] text-text-secondary whitespace-pre-wrap break-words mt-2">
-                  {this.state.error.toString()}
-                </pre>
-                {this.state.errorInfo && (
+              <div className="mb-6">
+                <div className="mb-2 flex items-center justify-end">
+                  <IconButton label="Copy error details" size="sm" variant="ghost" onClick={this.handleCopyError}>
+                    <Copy size={14} />
+                  </IconButton>
+                </div>
+                <details className="text-left p-3 bg-surface border border-border rounded-md max-h-[200px] overflow-auto">
+                  <summary className="cursor-pointer text-[13px] text-text-muted mb-2">Error details</summary>
                   <pre className="font-mono text-[11px] text-text-secondary whitespace-pre-wrap break-words mt-2">
-                    {this.state.errorInfo.componentStack}
+                    {this.state.error.toString()}
                   </pre>
-                )}
-              </details>
+                  {this.state.errorInfo && (
+                    <pre className="font-mono text-[11px] text-text-secondary whitespace-pre-wrap break-words mt-2">
+                      {this.state.errorInfo.componentStack}
+                    </pre>
+                  )}
+                </details>
+              </div>
             )}
             <div className="flex gap-3 justify-center">
               <Button size="default" variant="outline" onClick={this.handleRecover}>

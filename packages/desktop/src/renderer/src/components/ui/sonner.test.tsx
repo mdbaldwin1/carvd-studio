@@ -53,13 +53,16 @@ describe('Toaster', () => {
     );
   });
 
-  it('enables rich colors and sets 2s duration', () => {
+  it('sets default duration and toast class configuration', () => {
     render(<Toaster />);
 
     expect(MockSonnerToaster).toHaveBeenCalledWith(
       expect.objectContaining({
-        richColors: true,
-        duration: 2000
+        duration: 2000,
+        closeButton: true,
+        toastOptions: expect.objectContaining({
+          className: expect.stringContaining('carvd-toast')
+        })
       })
     );
   });

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, ChangeEvent, KeyboardEvent } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { formatMeasurement, parseInput } from '../../utils/fractions';
+import { Input } from '@renderer/components/ui/input';
 
 interface FractionInputProps {
   value: number;
@@ -97,7 +98,7 @@ export function FractionInput({ value, onChange, min = 0, className }: FractionI
   };
 
   return (
-    <input
+    <Input
       type="text"
       value={displayValue}
       onChange={handleChange}

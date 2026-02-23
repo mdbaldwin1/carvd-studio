@@ -8,9 +8,12 @@ import {
   DialogHeader,
   DialogTitle
 } from '@renderer/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs';
 import { AppSettings } from '../../types';
 import { mmToInches } from '../../utils/fractions';
+import { getDocsUrl } from '../../utils/docsLinks';
 import { useUIStore } from '../../store/uiStore';
+import { showSavedFileToast } from '../../utils/fileToast';
 import { AppearanceSection } from './AppearanceSection';
 import { LicenseSection } from './LicenseSection';
 import { DefaultsSection } from './DefaultsSection';
@@ -89,7 +92,7 @@ export function AppSettingsModal({
     try {
       const result = await window.electronAPI.exportAppState();
       if (result.success && result.filePath) {
-        showToast(`Backup saved to ${result.filePath.split('/').pop()}`, 'success');
+        showSavedFileToast(`Backup saved to ${result.filePath.split('/').pop()}`, result.filePath);
       } else if (!result.canceled) {
         showToast(result.error || 'Failed to export backup', 'error');
       }
@@ -132,7 +135,7 @@ export function AppSettingsModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[480px]" onClose={onClose}>
+      <DialogContent className="w-[640px] max-w-[92vw]" onClose={onClose}>
         <DialogHeader>
           <DialogTitle>App Settings</DialogTitle>
           <div className="flex items-center gap-4">
@@ -141,7 +144,7 @@ export function AppSettingsModal({
               className="text-xs text-text-muted no-underline transition-colors duration-150 hover:text-accent hover:underline"
               onClick={(e) => {
                 e.preventDefault();
-                window.electronAPI.openExternal('https://carvd-studio.com/docs#settings');
+                window.electronAPI.openExternal(getDocsUrl('app-settings'));
               }}
             >
               View documentation
@@ -150,42 +153,55 @@ export function AppSettingsModal({
           </div>
         </DialogHeader>
 
-        <div className="p-5 overflow-y-auto max-h-[60vh]">
-          <AppearanceSection formData={formData} onSettingChange={handleChange} />
+        <Tabs defaultValue="general" className="flex min-h-0 flex-1 flex-col">
+          <TabsList className="mx-5 my-2 border-b border-border">
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="defaults">New Project Defaults</TabsTrigger>
+            <TabsTrigger value="data">Data & License</TabsTrigger>
+          </TabsList>
 
-          {licenseData && (
-            <LicenseSection
-              licenseMode={licenseMode}
-              licenseData={licenseData}
-              onDeactivateLicense={onDeactivateLicense}
-              onShowLicenseModal={onShowLicenseModal}
-              onClose={onClose}
+          <TabsContent value="general" forceMount className="max-h-[60vh] overflow-y-auto px-5 pt-4 pb-5">
+            <p className="mb-4 text-xs text-text-muted">App-wide display and editing behavior preferences.</p>
+            <AppearanceSection formData={formData} onSettingChange={handleChange} />
+            <BehaviorSection formData={formData} onSettingChange={handleChange} />
+            <SnappingSection formData={formData} onSettingChange={handleChange} />
+          </TabsContent>
+
+          <TabsContent value="defaults" forceMount className="max-h-[60vh] overflow-y-auto px-5 pt-4 pb-5">
+            <p className="mb-4 text-xs text-text-muted">
+              Defaults applied when you create a new project. Existing projects keep their own settings.
+            </p>
+            <DefaultsSection
+              formData={formData}
+              onSettingChange={handleChange}
+              gridOptions={gridOptions}
+              displayGridValue={displayGridValue}
+              onUnitsChange={handleUnitsChange}
             />
-          )}
+            <StockConstraintsSection formData={formData} onSettingChange={handleChange} />
+          </TabsContent>
 
-          <DefaultsSection
-            formData={formData}
-            onSettingChange={handleChange}
-            gridOptions={gridOptions}
-            displayGridValue={displayGridValue}
-            onUnitsChange={handleUnitsChange}
-          />
-
-          <BehaviorSection formData={formData} onSettingChange={handleChange} />
-
-          <SnappingSection formData={formData} onSettingChange={handleChange} />
-
-          <StockConstraintsSection formData={formData} onSettingChange={handleChange} />
-
-          <DataManagementSection
-            isExporting={isExporting}
-            onExport={handleExportAppState}
-            onImport={() => {
-              onClose();
-              onShowImportModal?.();
-            }}
-          />
-        </div>
+          <TabsContent value="data" forceMount className="max-h-[60vh] overflow-y-auto px-5 pt-4 pb-5">
+            <p className="mb-4 text-xs text-text-muted">Manage backups and license details for this installation.</p>
+            {licenseData && (
+              <LicenseSection
+                licenseMode={licenseMode}
+                licenseData={licenseData}
+                onDeactivateLicense={onDeactivateLicense}
+                onShowLicenseModal={onShowLicenseModal}
+                onClose={onClose}
+              />
+            )}
+            <DataManagementSection
+              isExporting={isExporting}
+              onExport={handleExportAppState}
+              onImport={() => {
+                onClose();
+                onShowImportModal?.();
+              }}
+            />
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
           <Button variant="secondary" size="sm" onClick={onClose}>

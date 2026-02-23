@@ -1,8 +1,8 @@
-import { HelpTooltip } from '../common/HelpTooltip';
-import { Checkbox } from '@renderer/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 import { Select } from '@renderer/components/ui/select';
 import { AppSettings, LightingMode } from '../../types';
+import { HelpTooltip } from '../common/HelpTooltip';
 
 interface AppearanceSectionProps {
   formData: AppSettings;
@@ -19,7 +19,7 @@ export function AppearanceSection({ formData, onSettingChange }: AppearanceSecti
         <div className="settings-row flex items-center justify-between gap-4 mb-3">
           <label className="text-[13px] text-text">Theme</label>
           <Select
-            variant="sm"
+            className="w-auto"
             value={formData.theme}
             onChange={(e) => onSettingChange('theme', e.target.value as AppSettings['theme'])}
           >
@@ -44,7 +44,7 @@ export function AppearanceSection({ formData, onSettingChange }: AppearanceSecti
             />
           </div>
           <Select
-            variant="sm"
+            className="w-auto"
             value={formData.lightingMode ?? 'default'}
             onChange={(e) => onSettingChange('lightingMode', e.target.value as LightingMode)}
           >
