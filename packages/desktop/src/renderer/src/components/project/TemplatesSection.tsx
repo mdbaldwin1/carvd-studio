@@ -1,8 +1,8 @@
-import { Plus, ChevronRight, BookOpen } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
-import { builtInTemplates, formatDimensions, BuiltInTemplate, UserTemplate, ProjectTemplate } from '../../templates';
+import { BookOpen, ChevronRight, Plus } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { BuiltInTemplate, builtInTemplates, formatDimensions, ProjectTemplate, UserTemplate } from '../../templates';
 import { Project } from '../../types';
 
 // Maximum number of templates to show in the preview (excluding Blank and Tutorial)
@@ -10,7 +10,7 @@ const MAX_PREVIEW_TEMPLATES = 4;
 
 const templateCardBase =
   'flex flex-col items-center gap-2 py-4 px-3 bg-bg-secondary border border-border rounded-lg cursor-pointer transition-all duration-150 text-center relative hover:bg-bg-tertiary hover:border-accent hover:-translate-y-0.5';
-const SINGLE_ROW_HEIGHT_BREAKPOINT = 1024;
+const SINGLE_ROW_HEIGHT_BREAKPOINT = 800;
 
 interface TemplatesSectionProps {
   userTemplates: UserTemplate[];

@@ -49,26 +49,10 @@ export function HotkeyHints({ show }: { show: boolean }) {
     ];
   }
 
-  const cameraHints: { key: string; action: string }[] = [
-    { key: 'Drag', action: 'Orbit' },
-    { key: 'Scroll', action: 'Zoom' },
-    { key: 'Home', action: 'Reset' },
-    { key: `${modKey}+Z`, action: 'Undo' },
-    { key: `${modKey}+Shift+Z`, action: 'Redo' }
-  ];
-
   return (
     <div className="hotkey-hints-container">
       <div className="hotkey-hints">
         {hints.map((hint, index) => (
-          <span key={index} className="hotkey-hint">
-            <kbd>{hint.key}</kbd>
-            <span>{hint.action}</span>
-          </span>
-        ))}
-      </div>
-      <div className="hotkey-hints hotkey-hints-camera">
-        {cameraHints.map((hint, index) => (
           <span key={index} className="hotkey-hint">
             <kbd>{hint.key}</kbd>
             <span>{hint.action}</span>

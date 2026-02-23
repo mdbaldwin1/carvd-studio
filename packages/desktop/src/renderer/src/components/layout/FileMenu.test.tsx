@@ -190,18 +190,19 @@ describe('FileMenu', () => {
       expect(openProjectFromPath).toHaveBeenCalledWith('/path/to/project1.carvd');
     });
 
-    it('shows toast on successful open', async () => {
+    it('refreshes recents on successful open', async () => {
       const user = userEvent.setup();
+      const onRefreshRecent = vi.fn();
       vi.mocked(openProjectFromPath).mockResolvedValue({ success: true });
 
-      render(<FileMenu {...defaultProps} />);
+      render(<FileMenu {...defaultProps} onRefreshRecent={onRefreshRecent} />);
 
       await openRecentSubmenu(user);
       const proj1 = screen.getAllByRole('menuitem').find((el) => el.textContent?.includes('project1'));
       clickSubMenuItem(proj1!);
 
       await vi.waitFor(() => {
-        expect(useUIStore.getState().showToast).toHaveBeenCalledWith('Project opened', 'success');
+        expect(onRefreshRecent).toHaveBeenCalled();
       });
     });
 

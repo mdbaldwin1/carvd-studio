@@ -1,8 +1,6 @@
 import { ComponentProps, ReactNode } from 'react';
 import { cn } from '@renderer/lib/utils';
-import { getDocsUrl } from '../../../utils/docsLinks';
-
-type DocsSection = 'stock' | 'assemblies';
+import { DocsSection, getDocsUrl } from '../../../utils/docsLinks';
 
 interface DocsLinkProps extends Omit<ComponentProps<'a'>, 'href'> {
   section: DocsSection;

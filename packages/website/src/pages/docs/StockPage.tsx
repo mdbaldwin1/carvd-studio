@@ -56,6 +56,14 @@ export default function StockPage() {
               </p>
             </div>
             <div>
+              <p className="font-bold mb-xs">Selection Highlighting</p>
+              <p className="text-muted">
+                Selecting a stock in the sidebar highlights all parts currently
+                assigned to that stock in the 3D editor. Click empty space or a
+                different item to clear the highlight.
+              </p>
+            </div>
+            <div>
               <p className="font-bold mb-xs">Stock Types</p>
               <p className="text-muted">
                 <strong>Sheet goods</strong> (plywood, MDF) — defined by width ×

@@ -87,8 +87,10 @@ export function StockLibraryModal({
               <Button
                 variant="ghost"
                 size="xs"
-                onClick={() => window.electronAPI.openExternal(getDocsUrl('stock'))}
-                title="View library docs"
+                onClick={() =>
+                  window.electronAPI.openExternal(getDocsUrl(activeSection === 'stocks' ? 'stock' : 'assemblies'))
+                }
+                title={activeSection === 'stocks' ? 'View stock docs' : 'View assembly docs'}
               >
                 <BookOpen size={12} />
                 Docs
