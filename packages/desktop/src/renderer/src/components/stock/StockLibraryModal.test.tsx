@@ -79,25 +79,25 @@ describe('StockLibraryModal', () => {
     it('renders when isOpen is true', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      expect(screen.getByText('Library')).toBeInTheDocument();
+      expect(screen.getByText('App Library')).toBeInTheDocument();
     });
 
     it('does not render when isOpen is false', () => {
       render(<StockLibraryModal {...defaultProps} isOpen={false} />);
 
-      expect(screen.queryByText('Library')).not.toBeInTheDocument();
+      expect(screen.queryByText('App Library')).not.toBeInTheDocument();
     });
 
     it('shows Stocks tab', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      expect(screen.getByText('Stocks (2)')).toBeInTheDocument();
+      expect(screen.getByText('Stocks')).toBeInTheDocument();
     });
 
     it('shows Assemblies tab', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
-      expect(screen.getByText('Assemblies (1)')).toBeInTheDocument();
+      expect(screen.getByText('Assemblies')).toBeInTheDocument();
     });
 
     it('shows Done button', () => {
@@ -773,7 +773,7 @@ describe('StockLibraryModal', () => {
       fireEvent.keyDown(window, { key: 'Escape' });
 
       // Should still be in modal (not closed), but out of edit mode
-      expect(screen.getByText('Library')).toBeInTheDocument();
+      expect(screen.getByText('App Library')).toBeInTheDocument();
       expect(screen.queryByText('Save')).not.toBeInTheDocument();
     });
 
