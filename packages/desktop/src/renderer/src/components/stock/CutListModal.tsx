@@ -128,7 +128,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
         {/* No cut list - show generate UI */}
         {!cutList && (
-          <div className="cut-list-generate flex flex-col items-center justify-center gap-4 p-10 text-center">
+          <div className="cut-list-generate flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-y-auto p-10 text-center">
             <p className="text-[13px] text-text-secondary leading-relaxed max-w-[500px] mx-auto m-0">
               Generate an optimized cut list from your design. All parts must be assigned to a stock material before
               generating.{' '}
@@ -244,7 +244,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
           </>
         )}
 
-        <DialogFooter className="cut-list-footer px-6 py-4">
+        <DialogFooter className="cut-list-footer shrink-0 px-6 py-4">
           {cutList && (
             <>
               <Button
