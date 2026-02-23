@@ -1,6 +1,11 @@
 import { useEffect } from 'react';
 import * as THREE from 'three';
 import { useProjectStore, getContainingGroupId, getAllDescendantPartIds } from '../store/projectStore';
+import { useClipboardStore } from '../store/clipboardStore';
+import { useSelectionStore } from '../store/selectionStore';
+import { useSnapStore } from '../store/snapStore';
+import { useUIStore } from '../store/uiStore';
+import { useCameraStore } from '../store/cameraStore';
 import { RotationAngle } from '../types';
 
 // Helper to normalize angle to 0, 90, 180, or 270
@@ -14,30 +19,30 @@ function normalizeToRotationAngle(degrees: number): RotationAngle {
 }
 
 export function useKeyboardShortcuts() {
-  const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const parts = useProjectStore((s) => s.parts);
   const gridSize = useProjectStore((s) => s.gridSize);
-  const requestDeleteParts = useProjectStore((s) => s.requestDeleteParts);
+  const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
   const duplicateSelectedParts = useProjectStore((s) => s.duplicateSelectedParts);
   const updatePart = useProjectStore((s) => s.updatePart);
   const batchUpdateParts = useProjectStore((s) => s.batchUpdateParts);
-  const clearSelection = useProjectStore((s) => s.clearSelection);
-  const copySelectedParts = useProjectStore((s) => s.copySelectedParts);
-  const pasteClipboard = useProjectStore((s) => s.pasteClipboard);
+  const clearSelection = useSelectionStore((s) => s.clearSelection);
+  const copySelectedParts = useClipboardStore((s) => s.copySelectedParts);
+  const pasteClipboard = useClipboardStore((s) => s.pasteClipboard);
   const moveSelectedParts = useProjectStore((s) => s.moveSelectedParts);
-  const requestCenterCamera = useProjectStore((s) => s.requestCenterCamera);
-  const requestCenterCameraAtOrigin = useProjectStore((s) => s.requestCenterCameraAtOrigin);
-  const cameraViewVectors = useProjectStore((s) => s.cameraViewVectors);
-  const toggleReference = useProjectStore((s) => s.toggleReference);
-  const clearReferences = useProjectStore((s) => s.clearReferences);
-  const referencePartIds = useProjectStore((s) => s.referencePartIds);
+  const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
+  const requestCenterCameraAtOrigin = useCameraStore((s) => s.requestCenterCameraAtOrigin);
+  const cameraViewVectors = useCameraStore((s) => s.cameraViewVectors);
+  const toggleReference = useSnapStore((s) => s.toggleReference);
+  const clearReferences = useSnapStore((s) => s.clearReferences);
+  const referencePartIds = useSnapStore((s) => s.referencePartIds);
   const groupMembers = useProjectStore((s) => s.groupMembers);
   const groups = useProjectStore((s) => s.groups);
-  const selectedGroupIds = useProjectStore((s) => s.selectedGroupIds);
-  const editingGroupId = useProjectStore((s) => s.editingGroupId);
+  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
+  const editingGroupId = useSelectionStore((s) => s.editingGroupId);
   const createGroup = useProjectStore((s) => s.createGroup);
   const deleteGroup = useProjectStore((s) => s.deleteGroup);
-  const exitGroup = useProjectStore((s) => s.exitGroup);
+  const exitGroup = useSelectionStore((s) => s.exitGroup);
   const addPart = useProjectStore((s) => s.addPart);
 
   useEffect(() => {
@@ -250,7 +255,7 @@ export function useKeyboardShortcuts() {
           case 'a':
             // Select all parts
             e.preventDefault();
-            useProjectStore.getState().selectParts(parts.map((p) => p.id));
+            useSelectionStore.getState().selectParts(parts.map((p) => p.id));
             return;
 
           case 'g':
@@ -259,12 +264,12 @@ export function useKeyboardShortcuts() {
               e.preventDefault();
               // Find the containing group of selected parts
               const selectedPartsGroupIds = selectedPartIds.map((id) => getContainingGroupId(id, groupMembers));
-              const uniqueGroupIds = [...new Set(selectedPartsGroupIds.filter((id) => id !== null))];
+              const uniqueGroupIds = [
+                ...new Set([...selectedPartsGroupIds.filter((id): id is string => id !== null), ...selectedGroupIds])
+              ];
               // Ungroup each containing group
               for (const groupId of uniqueGroupIds) {
-                if (groupId) {
-                  deleteGroup(groupId, 'ungroup');
-                }
+                deleteGroup(groupId, 'ungroup');
               }
             }
             return;

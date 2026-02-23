@@ -181,9 +181,9 @@ Feature branches → develop → main
 - [x] `LICENSE_PRIVATE_KEY` ✅ - RSA private key for test license generation
 - [x] `CSC_LINK` ✅ - Base64-encoded .p12 certificate (macOS code signing)
 - [x] `CSC_KEY_PASSWORD` ✅ - Password for the .p12 file
-- [x] `APPLE_ID` ✅ - Apple Developer email (for notarization, currently disabled)
-- [x] `APPLE_ID_PASSWORD` ✅ - App-specific password (for notarization, currently disabled)
-- [x] `APPLE_TEAM_ID` ✅ - 10-character team ID (for notarization, currently disabled)
+- [x] `APPLE_ID` ✅ - Apple Developer email (for notarization)
+- [x] `APPLE_ID_PASSWORD` ✅ - App-specific password (for notarization)
+- [x] `APPLE_TEAM_ID` ✅ - 10-character team ID (for notarization)
 - [x] `VERCEL_TOKEN` ✅ - Vercel API token
 - [x] `VERCEL_PROJECT_ID` ✅ - Vercel website project ID
 
@@ -434,8 +434,9 @@ git push origin develop
 # 2. Skips if that version is already released
 # 3. Builds macOS (x64 + arm64) and Windows
 # 4. Creates GitHub Release with DMG, ZIP, EXE artifacts
-# 5. Updates VITE_APP_VERSION in Vercel
-# 6. Creates a version bump PR targeting develop
+# 5. Creates a version bump PR targeting develop
+# sync-develop.yml also merges main back into develop
+# website-version-bump.yml handles Vercel deploy + website versioning separately
 ```
 
 ### Hotfix Process:
@@ -457,11 +458,11 @@ git push -u origin hotfix/critical-bug
 # After merge to main, the release workflow triggers automatically:
 # 1. Builds macOS + Windows
 # 2. Creates GitHub Release
-# 3. Updates Vercel version + triggers redeploy
-# 4. Creates a version bump PR targeting develop (keeps develop in sync)
+# 3. Creates a version bump PR targeting develop
+# sync-develop.yml merges main back into develop automatically
 ```
 
 ---
 
-**Last Updated:** 2026-02-14
+**Last Updated:** 2026-02-18
 **Status:** Core configuration complete, release pipeline operational

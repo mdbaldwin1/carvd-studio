@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Store original import.meta.env.DEV
-const originalDev = import.meta.env.DEV;
-
 describe('logger', () => {
   beforeEach(() => {
     // Clear module cache to allow re-import with different env

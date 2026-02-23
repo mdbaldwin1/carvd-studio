@@ -7,10 +7,7 @@ import {
   Group,
   GroupMember,
   Project,
-  DisplayMode,
-  SnapLine,
   SnapGuide,
-  Clipboard,
   Assembly,
   AssemblyPart,
   AssemblyGroup,
@@ -19,13 +16,17 @@ import {
   CutList,
   PartValidationIssue,
   EmbeddedStock,
-  CustomShoppingItem,
-  CameraState,
-  ReferenceDistanceIndicator
+  CustomShoppingItem
 } from '../types';
 import { STOCK_COLORS } from '../constants';
-import { LicenseMode, canAddPart, canAddStock, getBlockedMessage, getFeatureLimits } from '../utils/featureLimits';
-import { getCombinedBounds, calculateDistancesFromBounds } from '../utils/snapToPartsUtil';
+import { UNTITLED_PROJECT_NAME } from '../constants/appDefaults';
+import { canAddPart, canAddStock, getBlockedMessage, getFeatureLimits } from '../utils/featureLimits';
+import { useUIStore } from './uiStore';
+import { useCameraStore } from './cameraStore';
+import { useSelectionStore } from './selectionStore';
+import { useSnapStore } from './snapStore';
+import { useClipboardStore } from './clipboardStore';
+import { useLicenseStore } from './licenseStore';
 
 interface ProjectState {
   // Project data
@@ -51,99 +52,12 @@ interface ProjectState {
   createdAt: string; // ISO timestamp when project was created
   modifiedAt: string; // ISO timestamp when project was last modified
 
-  // UI state
-  selectedPartIds: string[];
-  hoveredPartId: string | null;
-  transformMode: 'translate' | 'scale';
-  clipboard: Clipboard;
-  activeDragDelta: { x: number; y: number; z: number } | null; // Live drag offset for multi-select
-  contextMenu: {
-    x: number;
-    y: number;
-    type: 'part' | 'background' | 'guide';
-    worldPosition?: { x: number; y: number; z: number }; // For paste-at-location
-    guideId?: string; // For guide-specific context menu
-  } | null;
-  centerCameraRequested: boolean; // Flag to trigger camera centering
-  centerCameraAtOriginRequested: boolean; // Flag to trigger camera centering at origin
-  centerCameraAtPosition: { x: number; y: number; z: number } | null; // Target position for camera centering
-  selectionBox: {
-    start: { x: number; y: number };
-    end: { x: number; y: number };
-  } | null;
-  toast: { message: string; id: string } | null;
-  // Manual thumbnail capture (for templates, assemblies, and projects)
-  manualThumbnail: {
-    data: string;
-    width: number;
-    height: number;
-    generatedAt: string;
-    manuallySet: boolean;
-  } | null;
-  // Camera view vectors for view-relative movement (screen-aligned, normalized)
-  cameraViewVectors: {
-    up: { x: number; y: number; z: number }; // Direction pointing "up" on screen
-    right: { x: number; y: number; z: number }; // Direction pointing "right" on screen
-  };
-  showGrainDirection: boolean; // Toggle for grain direction arrows on parts
-  pendingDeletePartIds: string[] | null; // Parts pending deletion confirmation
-  saveAssemblyModalOpen: boolean; // Flag to open the save assembly modal
-  // Transient view state (not saved with project)
-  displayMode: DisplayMode;
-  showGrid: boolean;
-  // Snap-to-parts feature
-  snapToPartsEnabled: boolean;
-  activeSnapLines: SnapLine[]; // Current alignment lines to display during drag
-  // Reference parts for precision snapping
-  referencePartIds: string[]; // Parts marked as snap reference targets
-  activeReferenceDistances: ReferenceDistanceIndicator[]; // Distance indicators to reference parts during drag
   // Persistent snap guides
   snapGuides: SnapGuide[]; // User-created guide planes for snapping
-  // Camera state (position and target) for restoring view on project load
-  cameraState: CameraState | null;
-  // Flag to trigger camera restoration (set when loading a project or restoring from edit mode)
-  pendingCameraRestore: boolean;
   // Custom shopping list items (hardware, fasteners, etc.)
   customShoppingItems: CustomShoppingItem[]; // User-added items that persist through cut list regeneration
-  // Group UI state (transient)
-  selectedGroupIds: string[]; // Groups currently selected
-  expandedGroupIds: string[]; // Groups expanded in sidebar
-  editingGroupId: string | null; // Currently "entered" group for individual part editing (Figma-style)
-
   // Cut list state
   cutList: CutList | null; // Generated cut list (persisted with project)
-  cutListModalOpen: boolean; // UI state for modal visibility
-
-  // Assembly editing mode state
-  isEditingAssembly: boolean; // Whether we're in assembly editing mode
-  editingAssemblyId: string | null; // ID of the assembly being edited (in library)
-  editingAssemblyName: string; // Name of the assembly being edited
-  previousProjectSnapshot: {
-    projectName: string;
-    parts: Part[];
-    stocks: Stock[];
-    groups: Group[];
-    groupMembers: GroupMember[];
-    assemblies: Assembly[];
-    filePath: string | null;
-    isDirty: boolean;
-    units: 'imperial' | 'metric';
-    gridSize: number;
-    kerfWidth: number;
-    overageFactor: number;
-    projectNotes: string;
-    stockConstraints: StockConstraintSettings;
-    createdAt: string;
-    modifiedAt: string;
-    snapGuides: SnapGuide[];
-    cutList: CutList | null;
-    // UI state to restore
-    expandedGroupIds: string[];
-    referencePartIds: string[];
-  } | null; // Snapshot of project state before entering assembly edit mode
-
-  // License mode (for feature limits)
-  licenseMode: LicenseMode;
 
   // Actions - Parts
   addPart: (part?: Partial<Part>) => string | null;
@@ -153,48 +67,10 @@ interface ProjectState {
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
   deletePart: (id: string) => void;
   deleteSelectedParts: () => void;
-  requestDeleteParts: (ids: string[]) => void;
   confirmDeleteParts: () => void;
-  cancelDeleteParts: () => void;
   duplicatePart: (id: string) => string | null;
   duplicateSelectedParts: () => string[];
   resetSelectedPartsToStock: () => void;
-
-  // Actions - Selection
-  selectPart: (id: string | null) => void;
-  togglePartSelection: (id: string) => void;
-  selectParts: (ids: string[]) => void;
-  clearSelection: () => void;
-  setHoveredPart: (id: string | null) => void;
-  setTransformMode: (mode: 'translate' | 'scale') => void;
-  setActiveDragDelta: (delta: { x: number; y: number; z: number } | null) => void;
-  openContextMenu: (menu: {
-    x: number;
-    y: number;
-    type: 'part' | 'background' | 'guide';
-    worldPosition?: { x: number; y: number; z: number };
-    guideId?: string;
-  }) => void;
-  closeContextMenu: () => void;
-  requestCenterCamera: () => void;
-  requestCenterCameraAtOrigin: () => void;
-  requestCenterCameraAtPosition: (position: { x: number; y: number; z: number }) => void;
-  clearCenterCameraRequest: () => void;
-  setSelectionBox: (box: { start: { x: number; y: number }; end: { x: number; y: number } } | null) => void;
-  showToast: (message: string) => void;
-  clearToast: () => void;
-  captureManualThumbnail: () => Promise<boolean>; // Returns true if capture was successful
-  clearManualThumbnail: () => void;
-  setCameraViewVectors: (vectors: {
-    up: { x: number; y: number; z: number };
-    right: { x: number; y: number; z: number };
-  }) => void;
-  toggleGrainDirection: () => void;
-
-  // Actions - Clipboard
-  copySelectedParts: () => void;
-  pasteClipboard: () => string[];
-  pasteAtPosition: (position: { x: number; y: number; z: number }) => string[];
 
   // Actions - Stocks
   addStock: (stock?: Partial<Stock>) => string | null;
@@ -212,9 +88,6 @@ interface ProjectState {
     position: { x: number; y: number; z: number },
     libraryStocks?: Stock[]
   ) => string[];
-  openSaveAssemblyModal: () => void;
-  closeSaveAssemblyModal: () => void;
-
   // Actions - Project
   newProject: (defaults?: {
     units?: 'imperial' | 'metric';
@@ -223,8 +96,6 @@ interface ProjectState {
   }) => void;
   loadProject: (project: Project, filePath?: string) => void;
   setFilePath: (path: string | null) => void;
-  setCameraState: (state: CameraState | null) => void;
-  clearPendingCameraRestore: () => void;
   markDirty: () => void;
   markClean: () => void;
 
@@ -237,20 +108,6 @@ interface ProjectState {
   setProjectNotes: (notes: string) => void;
   setStockConstraints: (constraints: StockConstraintSettings) => void;
 
-  // Actions - View State (transient, not saved)
-  setDisplayMode: (mode: DisplayMode) => void;
-  setShowGrid: (show: boolean) => void;
-  // Snap-to-parts actions
-  setSnapToPartsEnabled: (enabled: boolean) => void;
-  setActiveSnapLines: (lines: SnapLine[]) => void;
-  // Reference parts actions
-  setReferencePartIds: (ids: string[]) => void;
-  addToReferences: (ids: string[]) => void;
-  removeFromReferences: (ids: string[]) => void;
-  toggleReference: (ids: string[]) => void;
-  clearReferences: () => void;
-  setActiveReferenceDistances: (distances: ReferenceDistanceIndicator[]) => void;
-  updateReferenceDistances: () => void; // Recalculate distances based on current selection and references
   // Snap guide actions
   addSnapGuide: (axis: 'x' | 'y' | 'z', position: number, label?: string) => string;
   removeSnapGuide: (id: string) => void;
@@ -263,23 +120,7 @@ interface ProjectState {
   addToGroup: (groupId: string, memberIds: string[], memberType: 'part' | 'group') => void;
   removeFromGroup: (memberIds: string[], memberType: 'part' | 'group') => void;
   mergeGroups: (groupIds: string[], mode: 'top-level' | 'deep') => string | null;
-  // Group selection actions
-  selectGroup: (groupId: string) => void;
-  toggleGroupSelection: (groupId: string) => void;
-  clearGroupSelection: () => void;
-  // Group editing mode (Figma-style double-click to enter)
-  enterGroup: (groupId: string) => void;
-  exitGroup: () => void;
-  // Group expand/collapse actions
-  toggleGroupExpanded: (groupId: string) => void;
-  expandGroup: (groupId: string) => void;
-  collapseGroup: (groupId: string) => void;
-  expandAllGroups: () => void;
-  collapseAllGroups: () => void;
-
   // Cut list actions
-  openCutListModal: () => void;
-  closeCutListModal: () => void;
   setCutList: (cutList: CutList | null) => void;
   markCutListStale: () => void;
   clearCutList: () => void;
@@ -288,27 +129,10 @@ interface ProjectState {
   addCustomShoppingItem: (item: Omit<CustomShoppingItem, 'id'>) => string;
   updateCustomShoppingItem: (id: string, updates: Partial<CustomShoppingItem>) => void;
   deleteCustomShoppingItem: (id: string) => void;
-
-  // Assembly editing actions
-  startEditingAssembly: (
-    assemblyId: string,
-    assemblyName: string,
-    parts: Part[],
-    groups?: Group[],
-    groupMembers?: GroupMember[],
-    embeddedStocks?: Stock[]
-  ) => void;
-  saveEditingAssembly: () => Assembly | null;
-  cancelEditingAssembly: () => void;
-  restorePreviousProject: () => void;
-  startFreshAfterAssemblyEdit: () => void;
-
-  // License mode action
-  setLicenseMode: (mode: LicenseMode) => void;
 }
 
-// Generate a smart copy name that avoids "Part 1 (copy) (copy) (copy)"
-const generateCopyName = (originalName: string): string => {
+/** Generate a smart copy name that avoids "Part 1 (copy) (copy) (copy)" chains. */
+export const generateCopyName = (originalName: string): string => {
   // Check if name ends with "(copy N)" pattern
   const copyWithNumberMatch = originalName.match(/^(.+) \(copy (\d+)\)$/);
   if (copyWithNumberMatch) {
@@ -356,9 +180,6 @@ const createDefaultStock = (overrides?: Partial<Stock>): Stock => ({
   ...overrides
 });
 
-// Track toast timeout for cleanup (module-level, not in store state since it's not serializable)
-let toastTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
 // Canvas capture callback (registered by Workspace, called by ContextMenu)
 let canvasCaptureHandler: (() => Promise<void>) | null = null;
 
@@ -395,14 +216,16 @@ export async function generateThumbnail(): Promise<string | null> {
   return null;
 }
 
-// Helper function: Find which group a part belongs to (if any)
+/** Find which group a part belongs to, or null if ungrouped. */
 export const getContainingGroupId = (partId: string, groupMembers: GroupMember[]): string | null => {
   const member = groupMembers.find((gm) => gm.memberType === 'part' && gm.memberId === partId);
   return member ? member.groupId : null;
 };
 
-// Helper function: Get all descendant part IDs from a group (recursively includes nested groups)
-// Memoized: caches results per groupMembers array reference to avoid repeated recursive traversals
+/**
+ * Get all descendant part IDs from a group, recursively including nested groups.
+ * Memoized: caches results per groupMembers array reference to avoid repeated traversals.
+ */
 let _descendantCache: WeakRef<GroupMember[]> | null = null;
 let _descendantResults: Map<string, string[]> = new Map();
 
@@ -416,23 +239,45 @@ export const getAllDescendantPartIds = (groupId: string, groupMembers: GroupMemb
   const cached = _descendantResults.get(groupId);
   if (cached) return cached;
 
-  const partIds: string[] = [];
-  const members = groupMembers.filter((gm) => gm.groupId === groupId);
+  const collect = (currentGroupId: string, visited: Set<string>): string[] => {
+    if (visited.has(currentGroupId)) return [];
+    const nextVisited = new Set(visited);
+    nextVisited.add(currentGroupId);
 
-  for (const member of members) {
-    if (member.memberType === 'part') {
-      partIds.push(member.memberId);
-    } else {
-      // Nested group - recurse
-      partIds.push(...getAllDescendantPartIds(member.memberId, groupMembers));
+    const partIds: string[] = [];
+    const members = groupMembers.filter((gm) => gm.groupId === currentGroupId);
+
+    for (const member of members) {
+      if (member.memberType === 'part') {
+        partIds.push(member.memberId);
+      } else {
+        // Nested group - recurse (cycle-safe)
+        partIds.push(...collect(member.memberId, nextVisited));
+      }
     }
-  }
+
+    return partIds;
+  };
+
+  const partIds = collect(groupId, new Set());
 
   _descendantResults.set(groupId, partIds);
   return partIds;
 };
 
-// Helper function: Get all ancestor group IDs for a part (for auto-expand functionality)
+/** Get all descendant group IDs recursively, including the given group itself. */
+export const getAllDescendantGroupIds = (groupId: string, groupMembers: GroupMember[]): string[] => {
+  const groupIds: string[] = [groupId];
+  const members = groupMembers.filter((gm) => gm.groupId === groupId);
+  for (const member of members) {
+    if (member.memberType === 'group') {
+      groupIds.push(...getAllDescendantGroupIds(member.memberId, groupMembers));
+    }
+  }
+  return groupIds;
+};
+
+/** Get all ancestor group IDs for a part, walking up the group hierarchy (for auto-expand). */
 export const getAncestorGroupIds = (partId: string, groupMembers: GroupMember[]): string[] => {
   const ancestors: string[] = [];
   let currentId: string | null = partId;
@@ -452,7 +297,7 @@ export const getAncestorGroupIds = (partId: string, groupMembers: GroupMember[])
   return ancestors;
 };
 
-// Helper function: Check if a group contains another group (to prevent circular references)
+/** Check if a group is a descendant of another group (to prevent circular references). */
 export const isDescendantOf = (
   potentialDescendantId: string,
   potentialAncestorId: string,
@@ -477,7 +322,7 @@ export const isDescendantOf = (
   return descendantGroupIds.includes(potentialDescendantId);
 };
 
-// Helper function: Validate parts for cut list generation
+/** Validate parts for cut list generation, returning any issues found. */
 export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartValidationIssue[] => {
   const issues: PartValidationIssue[] = [];
 
@@ -561,7 +406,7 @@ export const useProjectStore = create<ProjectState>()(
   temporal(
     (set, get) => ({
       // Initial state
-      projectName: 'Untitled Project',
+      projectName: UNTITLED_PROJECT_NAME,
       parts: [],
       stocks: [],
       groups: [],
@@ -579,69 +424,29 @@ export const useProjectStore = create<ProjectState>()(
       createdAt: new Date().toISOString(),
       modifiedAt: new Date().toISOString(),
 
-      selectedPartIds: [],
-      hoveredPartId: null,
-      transformMode: 'translate',
-      clipboard: { parts: [], groups: [], groupMembers: [] },
-      activeDragDelta: null,
-      contextMenu: null,
-      centerCameraRequested: false,
-      centerCameraAtOriginRequested: false,
-      centerCameraAtPosition: null,
-      selectionBox: null,
-      toast: null,
-      manualThumbnail: null,
-      // Default camera view vectors (screen-aligned for default isometric view)
-      cameraViewVectors: {
-        up: { x: 0, y: 1, z: 0 }, // Screen up direction
-        right: { x: 0.707, y: 0, z: -0.707 } // Screen right direction
-      },
-      showGrainDirection: false,
-      pendingDeletePartIds: null,
-      saveAssemblyModalOpen: false,
-      displayMode: 'solid',
-      showGrid: true,
-      snapToPartsEnabled: true, // Enabled by default
-      activeSnapLines: [],
-      referencePartIds: [], // No reference parts by default
-      activeReferenceDistances: [], // Distance indicators to references during drag
       snapGuides: [], // No guides by default
-      cameraState: null, // Will be set from loaded project or captured during use
-      pendingCameraRestore: false, // Set to true when camera should be restored
       customShoppingItems: [], // No custom shopping items by default
-      selectedGroupIds: [], // No groups selected by default
-      expandedGroupIds: [], // All groups collapsed by default
-      editingGroupId: null, // Not inside any group by default
 
       // Cut list state
       cutList: null, // No cut list generated by default
-      cutListModalOpen: false, // Modal closed by default
-
-      // Assembly editing mode state
-      isEditingAssembly: false,
-      editingAssemblyId: null,
-      editingAssemblyName: '',
-      previousProjectSnapshot: null,
-
-      // License mode (default to trial, App.tsx updates this based on actual status)
-      licenseMode: 'trial' as LicenseMode,
 
       // Part actions
       addPart: (partOverrides) => {
-        const { licenseMode, parts } = get();
+        const { parts } = get();
+        const { licenseMode } = useLicenseStore.getState();
 
         // Check license limits
         if (!canAddPart(licenseMode, parts.length)) {
-          get().showToast(getBlockedMessage('addPart'));
+          useUIStore.getState().showToast(getBlockedMessage('addPart'), 'warning');
           return null;
         }
 
         const newPart = createDefaultPart(partOverrides);
         set((state) => ({
           parts: [...state.parts, newPart],
-          selectedPartIds: [newPart.id],
           isDirty: true
         }));
+        useSelectionStore.setState({ selectedPartIds: [newPart.id] });
         get().markCutListStale();
         return newPart.id;
       },
@@ -654,7 +459,7 @@ export const useProjectStore = create<ProjectState>()(
         get().markCutListStale();
         // Update reference distances if position changed
         if (updates.position) {
-          get().updateReferenceDistances();
+          useSnapStore.getState().updateReferenceDistances();
         }
       },
 
@@ -679,7 +484,8 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       moveSelectedParts: (delta) => {
-        const { selectedPartIds, selectedGroupIds, editingGroupId, groupMembers } = get();
+        const { groupMembers } = get();
+        const { selectedPartIds, selectedGroupIds, editingGroupId } = useSelectionStore.getState();
 
         // Determine which parts to move
         let partIdsToMove: Set<string>;
@@ -730,69 +536,71 @@ export const useProjectStore = create<ProjectState>()(
           }),
           isDirty: true
         }));
-        get().updateReferenceDistances();
+        useSnapStore.getState().updateReferenceDistances();
       },
 
       deletePart: (id) => {
         set((state) => ({
           parts: state.parts.filter((p) => p.id !== id),
-          selectedPartIds: state.selectedPartIds.filter((pid) => pid !== id),
-          referencePartIds: state.referencePartIds.filter((pid) => pid !== id),
           // Remove from any groups
           groupMembers: state.groupMembers.filter((gm) => !(gm.memberType === 'part' && gm.memberId === id)),
           isDirty: true
+        }));
+        useSelectionStore.setState((state) => ({
+          selectedPartIds: state.selectedPartIds.filter((pid) => pid !== id)
+        }));
+        useSnapStore.setState((state) => ({
+          referencePartIds: state.referencePartIds.filter((pid) => pid !== id)
         }));
         get().markCutListStale();
       },
 
       deleteSelectedParts: () => {
-        const { selectedPartIds } = get();
+        const { selectedPartIds } = useSelectionStore.getState();
         if (selectedPartIds.length === 0) return;
         set((state) => ({
           parts: state.parts.filter((p) => !selectedPartIds.includes(p.id)),
-          selectedPartIds: [],
-          referencePartIds: state.referencePartIds.filter((id) => !selectedPartIds.includes(id)),
           // Remove from any groups
           groupMembers: state.groupMembers.filter(
             (gm) => !(gm.memberType === 'part' && selectedPartIds.includes(gm.memberId))
           ),
           isDirty: true
         }));
-        get().markCutListStale();
-      },
-
-      requestDeleteParts: (ids) => {
-        if (ids.length === 0) return;
-        set({ pendingDeletePartIds: ids });
-      },
-
-      confirmDeleteParts: () => {
-        const { pendingDeletePartIds } = get();
-        if (!pendingDeletePartIds || pendingDeletePartIds.length === 0) return;
-        set((state) => ({
-          parts: state.parts.filter((p) => !pendingDeletePartIds.includes(p.id)),
-          selectedPartIds: state.selectedPartIds.filter((id) => !pendingDeletePartIds.includes(id)),
-          referencePartIds: state.referencePartIds.filter((id) => !pendingDeletePartIds.includes(id)),
-          // Remove from any groups
-          groupMembers: state.groupMembers.filter(
-            (gm) => !(gm.memberType === 'part' && pendingDeletePartIds.includes(gm.memberId))
-          ),
-          pendingDeletePartIds: null,
-          isDirty: true
+        useSelectionStore.setState({ selectedPartIds: [] });
+        useSnapStore.setState((state) => ({
+          referencePartIds: state.referencePartIds.filter((id) => !selectedPartIds.includes(id))
         }));
         get().markCutListStale();
       },
 
-      cancelDeleteParts: () => {
-        set({ pendingDeletePartIds: null });
+      confirmDeleteParts: () => {
+        const { pendingDeletePartIds } = useUIStore.getState();
+        if (!pendingDeletePartIds || pendingDeletePartIds.length === 0) return;
+        set((state) => ({
+          parts: state.parts.filter((p) => !pendingDeletePartIds.includes(p.id)),
+          // Remove from any groups
+          groupMembers: state.groupMembers.filter(
+            (gm) => !(gm.memberType === 'part' && pendingDeletePartIds.includes(gm.memberId))
+          ),
+          isDirty: true
+        }));
+        useSelectionStore.setState((state) => ({
+          selectedPartIds: state.selectedPartIds.filter((id) => !pendingDeletePartIds.includes(id))
+        }));
+        useSnapStore.setState((state) => ({
+          referencePartIds: state.referencePartIds.filter((id) => !pendingDeletePartIds.includes(id))
+        }));
+        useUIStore.getState().cancelDeleteParts();
+        get().markCutListStale();
       },
 
       duplicatePart: (id) => {
-        const { licenseMode, parts } = get();
+        const { parts } = get();
+        const { licenseMode } = useLicenseStore.getState();
 
         // Check license limits
         if (!canAddPart(licenseMode, parts.length)) {
-          get().showToast(getBlockedMessage('addPart'));
+          useUIStore.getState().showToast(getBlockedMessage('addPart'), 'warning');
           return null;
         }
 
@@ -814,16 +622,18 @@ export const useProjectStore = create<ProjectState>()(
 
         set((state) => ({
           parts: [...state.parts, newPart],
-          selectedPartIds: [newPart.id],
           isDirty: true
         }));
+        useSelectionStore.setState({ selectedPartIds: [newPart.id] });
 
         get().markCutListStale();
         return newPart.id;
       },
 
       duplicateSelectedParts: () => {
-        const { licenseMode, parts, groups, groupMembers, selectedPartIds, selectedGroupIds } = get();
+        const { parts, groups, groupMembers } = get();
+        const { licenseMode } = useLicenseStore.getState();
+        const { selectedPartIds, selectedGroupIds } = useSelectionStore.getState();
         if (selectedPartIds.length === 0 && selectedGroupIds.length === 0) return [];
 
         // Collect all parts to duplicate (directly selected + parts from selected groups)
@@ -853,7 +663,7 @@ export const useProjectStore = create<ProjectState>()(
         // Check license limits before duplicating
         const partsToAdd = partIdsToDupe.size;
         if (!canAddPart(licenseMode, parts.length + partsToAdd - 1)) {
-          get().showToast(getBlockedMessage('addPart'));
+          useUIStore.getState().showToast(getBlockedMessage('addPart'), 'warning');
           return [];
         }
 
@@ -929,11 +739,12 @@ export const useProjectStore = create<ProjectState>()(
           parts: [...state.parts, ...newParts],
           groups: [...state.groups, ...newGroups],
           groupMembers: [...state.groupMembers, ...newGroupMembers],
-          // Select top-level groups if any, otherwise select parts
+          isDirty: true
+        }));
+        useSelectionStore.setState((state) => ({
           selectedPartIds: topLevelGroupIds.length > 0 ? [] : newPartIds,
           selectedGroupIds: topLevelGroupIds,
-          expandedGroupIds: [...state.expandedGroupIds, ...newGroupIds],
-          isDirty: true
+          expandedGroupIds: [...state.expandedGroupIds, ...newGroupIds]
         }));
 
         get().markCutListStale();
@@ -941,7 +752,8 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       resetSelectedPartsToStock: () => {
-        const { stocks, selectedPartIds } = get();
+        const { stocks } = get();
+        const { selectedPartIds } = useSelectionStore.getState();
         if (selectedPartIds.length === 0) return;
 
         set((state) => ({
@@ -962,344 +774,14 @@ export const useProjectStore = create<ProjectState>()(
         }));
       },
 
-      // Selection actions
-      selectPart: (id) => {
-        set({ selectedPartIds: id ? [id] : [], selectedGroupIds: [] });
-        get().updateReferenceDistances();
-      },
-
-      togglePartSelection: (id) => {
-        set((state) => {
-          if (state.selectedPartIds.includes(id)) {
-            return { selectedPartIds: state.selectedPartIds.filter((pid) => pid !== id) };
-          } else {
-            return { selectedPartIds: [...state.selectedPartIds, id] };
-          }
-        });
-        get().updateReferenceDistances();
-      },
-
-      selectParts: (ids) => {
-        set({ selectedPartIds: ids, selectedGroupIds: [] });
-        get().updateReferenceDistances();
-      },
-
-      clearSelection: () => {
-        // Clear selection only - preserve group editing context
-        // Use exitGroup() or Escape key to exit group editing mode
-        set({ selectedPartIds: [], selectedGroupIds: [] });
-        get().updateReferenceDistances();
-      },
-
-      setHoveredPart: (id) => set({ hoveredPartId: id }),
-      setTransformMode: (mode) => set({ transformMode: mode }),
-      setActiveDragDelta: (delta) => set({ activeDragDelta: delta }),
-      openContextMenu: (menu) => set({ contextMenu: menu }),
-      closeContextMenu: () => set({ contextMenu: null }),
-      requestCenterCamera: () => set({ centerCameraRequested: true }),
-      requestCenterCameraAtOrigin: () => set({ centerCameraAtOriginRequested: true }),
-      requestCenterCameraAtPosition: (position) => set({ centerCameraAtPosition: position }),
-      clearCenterCameraRequest: () =>
-        set({ centerCameraRequested: false, centerCameraAtOriginRequested: false, centerCameraAtPosition: null }),
-      setSelectionBox: (box) => set({ selectionBox: box }),
-      showToast: (message) => {
-        // Clear any existing toast timer to prevent timer accumulation
-        if (toastTimeoutId !== null) {
-          clearTimeout(toastTimeoutId);
-          toastTimeoutId = null;
-        }
-        const id = uuidv4();
-        set({ toast: { message, id } });
-        // Auto-clear after 2 seconds
-        toastTimeoutId = setTimeout(() => {
-          const current = get().toast;
-          if (current?.id === id) {
-            set({ toast: null });
-          }
-          toastTimeoutId = null;
-        }, 2000);
-      },
-      clearToast: () => set({ toast: null }),
-      captureManualThumbnail: async () => {
-        const thumbnailData = await generateThumbnail();
-        if (thumbnailData) {
-          set({
-            manualThumbnail: {
-              data: thumbnailData,
-              width: 400,
-              height: 300,
-              generatedAt: new Date().toISOString(),
-              manuallySet: true
-            }
-          });
-          get().showToast('Thumbnail captured');
-          return true;
-        }
-        get().showToast('Failed to capture thumbnail');
-        return false;
-      },
-      clearManualThumbnail: () => set({ manualThumbnail: null }),
-      setCameraViewVectors: (vectors) => set({ cameraViewVectors: vectors }),
-      toggleGrainDirection: () => set((state) => ({ showGrainDirection: !state.showGrainDirection })),
-
-      // Clipboard actions
-      copySelectedParts: () => {
-        const { parts, groups, groupMembers, selectedPartIds, selectedGroupIds } = get();
-
-        // Collect all parts to copy (directly selected + parts from selected groups)
-        const partIdsToCopy = new Set(selectedPartIds);
-
-        // Helper to collect all descendant groups recursively
-        const collectDescendantGroupIds = (groupId: string, collected: Set<string>) => {
-          collected.add(groupId);
-          const childGroups = groupMembers.filter((gm) => gm.groupId === groupId && gm.memberType === 'group');
-          for (const child of childGroups) {
-            collectDescendantGroupIds(child.memberId, collected);
-          }
-        };
-
-        // Collect all groups to copy (selected groups + their descendants)
-        const groupIdsToCopy = new Set<string>();
-        for (const groupId of selectedGroupIds) {
-          collectDescendantGroupIds(groupId, groupIdsToCopy);
-        }
-
-        // Add all parts from copied groups
-        for (const groupId of groupIdsToCopy) {
-          const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
-          groupPartIds.forEach((id) => partIdsToCopy.add(id));
-        }
-
-        // Filter data to copy
-        const copiedParts = parts.filter((p) => partIdsToCopy.has(p.id));
-        const copiedGroups = groups.filter((g) => groupIdsToCopy.has(g.id));
-        const copiedGroupMembers = groupMembers.filter((gm) => groupIdsToCopy.has(gm.groupId));
-
-        // Deep clone to prevent mutation of original objects
-        set({
-          clipboard: {
-            parts: copiedParts.map((p) => ({ ...p })),
-            groups: copiedGroups.map((g) => ({ ...g })),
-            groupMembers: copiedGroupMembers.map((gm) => ({ ...gm }))
-          }
-        });
-
-        // Show toast notification
-        const partCount = copiedParts.length;
-        const groupCount = copiedGroups.length;
-        if (groupCount > 0) {
-          get().showToast(
-            `Copied ${partCount} part${partCount === 1 ? '' : 's'} in ${groupCount} group${groupCount === 1 ? '' : 's'}`
-          );
-        } else {
-          get().showToast(`Copied ${partCount} part${partCount === 1 ? '' : 's'}`);
-        }
-      },
-
-      pasteClipboard: () => {
-        const { licenseMode, parts, clipboard } = get();
-        if (clipboard.parts.length === 0) return [];
-
-        // Check license limits before pasting
-        if (!canAddPart(licenseMode, parts.length + clipboard.parts.length - 1)) {
-          get().showToast(getBlockedMessage('addPart'));
-          return [];
-        }
-
-        // Identify child items (parts/groups that are members of any group)
-        // Only top-level items get "(copy)" appended to their names
-        const childPartIds = new Set(
-          clipboard.groupMembers.filter((gm) => gm.memberType === 'part').map((gm) => gm.memberId)
-        );
-        const childGroupIds = new Set(
-          clipboard.groupMembers.filter((gm) => gm.memberType === 'group').map((gm) => gm.memberId)
-        );
-
-        // Create ID mapping for parts and groups
-        const partIdMap = new Map<string, string>(); // oldId -> newId
-        const groupIdMap = new Map<string, string>(); // oldId -> newId
-
-        // Create new parts with new IDs and offset positions
-        // Only top-level parts (not in any group) get "(copy)" appended
-        const newParts = clipboard.parts.map((part) => {
-          const newId = uuidv4();
-          partIdMap.set(part.id, newId);
-          const isChild = childPartIds.has(part.id);
-          return {
-            ...part,
-            id: newId,
-            name: isChild ? part.name : generateCopyName(part.name),
-            position: {
-              x: part.position.x + 2,
-              y: part.position.y,
-              z: part.position.z + 2
-            }
-          };
-        });
-
-        // Create new groups with new IDs
-        // Only top-level groups (not nested in other groups) get "(copy)" appended
-        const newGroups = clipboard.groups.map((group) => {
-          const newId = uuidv4();
-          groupIdMap.set(group.id, newId);
-          const isChild = childGroupIds.has(group.id);
-          return {
-            ...group,
-            id: newId,
-            name: isChild ? group.name : generateCopyName(group.name)
-          };
-        });
-
-        // Create new group members with mapped IDs
-        const newGroupMembers = clipboard.groupMembers.map((gm) => ({
-          id: uuidv4(),
-          groupId: groupIdMap.get(gm.groupId) || gm.groupId,
-          memberType: gm.memberType,
-          memberId:
-            gm.memberType === 'part'
-              ? partIdMap.get(gm.memberId) || gm.memberId
-              : groupIdMap.get(gm.memberId) || gm.memberId
-        }));
-
-        const newPartIds = newParts.map((p) => p.id);
-        const newGroupIds = newGroups.map((g) => g.id);
-
-        // Find top-level groups (groups that aren't members of other copied groups)
-        const topLevelGroupIds = newGroups
-          .filter((g) => !childGroupIds.has(clipboard.groups.find((og) => groupIdMap.get(og.id) === g.id)?.id || ''))
-          .map((g) => g.id);
-
-        // Update clipboard for subsequent pastes (with updated positions)
-        const updatedClipboard: Clipboard = {
-          parts: newParts,
-          groups: newGroups,
-          groupMembers: newGroupMembers
-        };
-
-        set((state) => ({
-          parts: [...state.parts, ...newParts],
-          groups: [...state.groups, ...newGroups],
-          groupMembers: [...state.groupMembers, ...newGroupMembers],
-          // Select top-level groups if any, otherwise select parts
-          selectedPartIds: topLevelGroupIds.length > 0 ? [] : newPartIds,
-          selectedGroupIds: topLevelGroupIds,
-          expandedGroupIds: [...state.expandedGroupIds, ...newGroupIds],
-          clipboard: updatedClipboard,
-          isDirty: true
-        }));
-
-        get().markCutListStale();
-        return newPartIds;
-      },
-
-      pasteAtPosition: (position) => {
-        const { licenseMode, parts, clipboard } = get();
-        if (clipboard.parts.length === 0) return [];
-
-        // Check license limits before pasting
-        if (!canAddPart(licenseMode, parts.length + clipboard.parts.length - 1)) {
-          get().showToast(getBlockedMessage('addPart'));
-          return [];
-        }
-
-        // Identify child items (parts/groups that are members of any group)
-        // Only top-level items get "(copy)" appended to their names
-        const childPartIds = new Set(
-          clipboard.groupMembers.filter((gm) => gm.memberType === 'part').map((gm) => gm.memberId)
-        );
-        const childGroupIds = new Set(
-          clipboard.groupMembers.filter((gm) => gm.memberType === 'group').map((gm) => gm.memberId)
-        );
-
-        // Calculate the center of the clipboard parts
-        let minX = Infinity,
-          maxX = -Infinity;
-        let minZ = Infinity,
-          maxZ = -Infinity;
-        for (const part of clipboard.parts) {
-          minX = Math.min(minX, part.position.x);
-          maxX = Math.max(maxX, part.position.x);
-          minZ = Math.min(minZ, part.position.z);
-          maxZ = Math.max(maxZ, part.position.z);
-        }
-        const centerX = (minX + maxX) / 2;
-        const centerZ = (minZ + maxZ) / 2;
-
-        // Create ID mapping for parts and groups
-        const partIdMap = new Map<string, string>();
-        const groupIdMap = new Map<string, string>();
-
-        // Create new parts centered at the clicked position
-        // Only top-level parts (not in any group) get "(copy)" appended
-        const newParts = clipboard.parts.map((part) => {
-          const newId = uuidv4();
-          partIdMap.set(part.id, newId);
-          const isChild = childPartIds.has(part.id);
-          return {
-            ...part,
-            id: newId,
-            name: isChild ? part.name : generateCopyName(part.name),
-            position: {
-              x: position.x + (part.position.x - centerX),
-              y: part.position.y,
-              z: position.z + (part.position.z - centerZ)
-            }
-          };
-        });
-
-        // Create new groups with new IDs
-        // Only top-level groups (not nested in other groups) get "(copy)" appended
-        const newGroups = clipboard.groups.map((group) => {
-          const newId = uuidv4();
-          groupIdMap.set(group.id, newId);
-          const isChild = childGroupIds.has(group.id);
-          return {
-            ...group,
-            id: newId,
-            name: isChild ? group.name : generateCopyName(group.name)
-          };
-        });
-
-        // Create new group members with mapped IDs
-        const newGroupMembers = clipboard.groupMembers.map((gm) => ({
-          id: uuidv4(),
-          groupId: groupIdMap.get(gm.groupId) || gm.groupId,
-          memberType: gm.memberType,
-          memberId:
-            gm.memberType === 'part'
-              ? partIdMap.get(gm.memberId) || gm.memberId
-              : groupIdMap.get(gm.memberId) || gm.memberId
-        }));
-
-        const newPartIds = newParts.map((p) => p.id);
-        const newGroupIds = newGroups.map((g) => g.id);
-
-        // Find top-level groups
-        const topLevelGroupIds = newGroups
-          .filter((g) => !childGroupIds.has(clipboard.groups.find((og) => groupIdMap.get(og.id) === g.id)?.id || ''))
-          .map((g) => g.id);
-
-        set((state) => ({
-          parts: [...state.parts, ...newParts],
-          groups: [...state.groups, ...newGroups],
-          groupMembers: [...state.groupMembers, ...newGroupMembers],
-          selectedPartIds: topLevelGroupIds.length > 0 ? [] : newPartIds,
-          selectedGroupIds: topLevelGroupIds,
-          expandedGroupIds: [...state.expandedGroupIds, ...newGroupIds],
-          isDirty: true
-        }));
-
-        get().markCutListStale();
-        return newPartIds;
-      },
-
       // Stock actions
       addStock: (stockOverrides) => {
-        const { licenseMode, stocks } = get();
+        const { stocks } = get();
+        const { licenseMode } = useLicenseStore.getState();
 
         // Check license limits
         if (!canAddStock(licenseMode, stocks.length)) {
-          get().showToast(getBlockedMessage('addStock'));
+          useUIStore.getState().showToast(getBlockedMessage('addStock'), 'warning');
           return null;
         }
 
@@ -1341,7 +823,8 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       assignStockToSelectedParts: (stockId) => {
-        const { stocks, selectedPartIds } = get();
+        const { stocks } = get();
+        const { selectedPartIds } = useSelectionStore.getState();
         if (selectedPartIds.length === 0) return;
 
         if (stockId === null) {
@@ -1395,12 +878,14 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       createAssemblyFromSelection: (name, description) => {
-        const { licenseMode, parts, stocks, groups, groupMembers, selectedPartIds, selectedGroupIds } = get();
+        const { parts, stocks, groups, groupMembers } = get();
+        const { licenseMode } = useLicenseStore.getState();
+        const { selectedPartIds, selectedGroupIds } = useSelectionStore.getState();
 
         // Check license limits for assemblies
         const limits = getFeatureLimits(licenseMode);
         if (!limits.canUseAssemblies) {
-          get().showToast(getBlockedMessage('useAssemblies'));
+          useUIStore.getState().showToast(getBlockedMessage('useAssemblies'), 'warning');
           return null;
         }
 
@@ -1582,9 +1067,29 @@ export const useProjectStore = create<ProjectState>()(
           // 2. Try to find in library stocks
           const libraryStock = libraryStocks.find((s) => s.id === cp.stockId);
           if (libraryStock) {
-            // Add library stock to project
-            stocksToAdd.push(libraryStock);
-            stockIdResolutionMap.set(cp.stockId, libraryStock.id);
+            // Reuse an equivalent stock already in project (or already queued),
+            // otherwise add the library stock once.
+            const allStocks = [...projectStocks, ...stocksToAdd];
+            const existingMatch = findMatchingStock(
+              {
+                name: libraryStock.name,
+                length: libraryStock.length,
+                width: libraryStock.width,
+                thickness: libraryStock.thickness,
+                grainDirection: libraryStock.grainDirection,
+                pricingUnit: libraryStock.pricingUnit,
+                pricePerUnit: libraryStock.pricePerUnit,
+                color: libraryStock.color
+              },
+              allStocks
+            );
+
+            if (existingMatch) {
+              stockIdResolutionMap.set(cp.stockId, existingMatch.id);
+            } else {
+              stocksToAdd.push(libraryStock);
+              stockIdResolutionMap.set(cp.stockId, libraryStock.id);
+            }
             continue;
           }
 
@@ -1689,36 +1194,23 @@ export const useProjectStore = create<ProjectState>()(
           parts: [...state.parts, ...newParts],
           groups: [...state.groups, ...newGroups],
           groupMembers: [...state.groupMembers, ...newGroupMembers],
-          // Select the new items
+          isDirty: true
+        }));
+        useSelectionStore.setState((state) => ({
           selectedPartIds: topLevelGroupIds.length > 0 ? [] : newPartIds,
           selectedGroupIds: topLevelGroupIds,
-          expandedGroupIds: [...state.expandedGroupIds, ...newGroupIds],
-          isDirty: true
+          expandedGroupIds: [...state.expandedGroupIds, ...newGroupIds]
         }));
 
         get().markCutListStale();
         return newPartIds;
       },
 
-      openSaveAssemblyModal: () => {
-        const { licenseMode } = get();
-        const limits = getFeatureLimits(licenseMode);
-        if (!limits.canUseAssemblies) {
-          get().showToast(getBlockedMessage('useAssemblies'));
-          return;
-        }
-        set({ saveAssemblyModalOpen: true });
-      },
-
-      closeSaveAssemblyModal: () => {
-        set({ saveAssemblyModalOpen: false });
-      },
-
       // Project actions
       newProject: (defaults) => {
         const now = new Date().toISOString();
         set({
-          projectName: 'Untitled Project',
+          projectName: UNTITLED_PROJECT_NAME,
           parts: [],
           stocks: [],
           groups: [],
@@ -1740,18 +1232,21 @@ export const useProjectStore = create<ProjectState>()(
           version: '1.0',
           createdAt: now,
           modifiedAt: now,
-          selectedPartIds: [],
-          clipboard: { parts: [], groups: [], groupMembers: [] },
-          referencePartIds: [],
           snapGuides: [],
-          cameraState: null,
-          pendingCameraRestore: false, // No camera to restore for new project
           customShoppingItems: [],
-          cutList: null,
+          cutList: null
+        });
+        useClipboardStore.getState().clearClipboard();
+        useSelectionStore.setState({
+          selectedPartIds: [],
           selectedGroupIds: [],
           expandedGroupIds: [],
           editingGroupId: null
         });
+        useSnapStore.setState({ referencePartIds: [], activeSnapLines: [], activeReferenceDistances: [] });
+        // Reset camera state for new project
+        useCameraStore.getState().setCameraState(null);
+        useCameraStore.getState().clearPendingCameraRestore();
         // Clear undo history after setting new project state
         setTimeout(() => useProjectStore.temporal.getState().clear(), 0);
       },
@@ -1784,25 +1279,30 @@ export const useProjectStore = create<ProjectState>()(
           version: project.version || '1.0',
           createdAt: project.createdAt || new Date().toISOString(),
           modifiedAt: project.modifiedAt || new Date().toISOString(),
-          selectedPartIds: [],
-          clipboard: { parts: [], groups: [], groupMembers: [] },
-          referencePartIds: [],
           snapGuides: project.snapGuides || [],
-          cameraState: project.cameraState || null,
-          pendingCameraRestore: !!project.cameraState, // Trigger camera restoration if project has saved camera state
           customShoppingItems: project.customShoppingItems || [],
-          cutList: project.cutList || null,
+          cutList: project.cutList || null
+        });
+        useClipboardStore.getState().clearClipboard();
+        useSelectionStore.setState({
+          selectedPartIds: [],
           selectedGroupIds: [],
           expandedGroupIds: [],
           editingGroupId: null
         });
+        useSnapStore.setState({ referencePartIds: [], activeSnapLines: [], activeReferenceDistances: [] });
+        // Set camera state in cameraStore (cross-store)
+        const cameraState = project.cameraState || null;
+        useCameraStore.getState().setCameraState(cameraState);
+        if (cameraState) {
+          // pendingCameraRestore is set directly since there's no setter that sets it to true
+          useCameraStore.setState({ pendingCameraRestore: true });
+        }
         // Clear undo history after loading project state
         setTimeout(() => useProjectStore.temporal.getState().clear(), 0);
       },
 
       setFilePath: (path) => set({ filePath: path }),
-      setCameraState: (state) => set({ cameraState: state }),
-      clearPendingCameraRestore: () => set({ pendingCameraRestore: false }),
       markDirty: () => set({ isDirty: true, modifiedAt: new Date().toISOString() }),
       markClean: () => set({ isDirty: false }),
 
@@ -1821,90 +1321,6 @@ export const useProjectStore = create<ProjectState>()(
       setProjectNotes: (projectNotes) => set({ projectNotes, isDirty: true }),
       setStockConstraints: (stockConstraints) => set({ stockConstraints, isDirty: true }),
 
-      // View state actions (transient)
-      setDisplayMode: (displayMode) => set({ displayMode }),
-      setShowGrid: (showGrid) => set({ showGrid }),
-      // Snap-to-parts actions
-      setSnapToPartsEnabled: (snapToPartsEnabled) => set({ snapToPartsEnabled }),
-      setActiveSnapLines: (activeSnapLines) => set({ activeSnapLines }),
-      // Reference parts actions
-      setReferencePartIds: (referencePartIds) => {
-        set({ referencePartIds });
-        get().updateReferenceDistances();
-      },
-      addToReferences: (ids) => {
-        set((state) => ({
-          referencePartIds: [...new Set([...state.referencePartIds, ...ids])]
-        }));
-        get().updateReferenceDistances();
-      },
-      removeFromReferences: (ids) => {
-        set((state) => ({
-          referencePartIds: state.referencePartIds.filter((id) => !ids.includes(id))
-        }));
-        get().updateReferenceDistances();
-      },
-      toggleReference: (ids) => {
-        set((state) => {
-          // Check if all ids are already references
-          const allAreReferences = ids.every((id) => state.referencePartIds.includes(id));
-          if (allAreReferences) {
-            // Remove all from references
-            return { referencePartIds: state.referencePartIds.filter((id) => !ids.includes(id)) };
-          } else {
-            // Add all to references
-            return { referencePartIds: [...new Set([...state.referencePartIds, ...ids])] };
-          }
-        });
-        get().updateReferenceDistances();
-      },
-      clearReferences: () => set({ referencePartIds: [], activeReferenceDistances: [] }),
-      setActiveReferenceDistances: (activeReferenceDistances) => set({ activeReferenceDistances }),
-      updateReferenceDistances: () => {
-        const { referencePartIds, selectedPartIds, selectedGroupIds, parts, groupMembers } = get();
-
-        // No references set or nothing selected - clear indicators
-        if (referencePartIds.length === 0 || (selectedPartIds.length === 0 && selectedGroupIds.length === 0)) {
-          set({ activeReferenceDistances: [] });
-          return;
-        }
-
-        // Get reference parts
-        const referenceParts = parts.filter((p) => referencePartIds.includes(p.id));
-        if (referenceParts.length === 0) {
-          set({ activeReferenceDistances: [] });
-          return;
-        }
-
-        // Get all selected parts (including parts from selected groups)
-        const selectedPartsFromGroups: string[] = [];
-        for (const groupId of selectedGroupIds) {
-          const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
-          selectedPartsFromGroups.push(...groupPartIds);
-        }
-        const allSelectedPartIds = [...new Set([...selectedPartIds, ...selectedPartsFromGroups])];
-
-        // Remove reference parts from selection (can't measure to self)
-        const selectedPartsToMeasure = allSelectedPartIds.filter((id) => !referencePartIds.includes(id));
-        if (selectedPartsToMeasure.length === 0) {
-          set({ activeReferenceDistances: [] });
-          return;
-        }
-
-        // Get selected parts
-        const selectedParts = parts.filter((p) => selectedPartsToMeasure.includes(p.id));
-        if (selectedParts.length === 0) {
-          set({ activeReferenceDistances: [] });
-          return;
-        }
-
-        // Calculate combined bounds of selected parts and generate indicators
-        const selectedBounds = getCombinedBounds(selectedParts);
-        const fromPartId = selectedParts.length === 1 ? selectedParts[0].id : 'selected-group';
-        const indicators = calculateDistancesFromBounds(selectedBounds, fromPartId, referenceParts);
-
-        set({ activeReferenceDistances: indicators });
-      },
       // Snap guide actions
       addSnapGuide: (axis, position, label) => {
         const id = uuidv4();
@@ -1921,12 +1337,13 @@ export const useProjectStore = create<ProjectState>()(
 
       // Group actions
       createGroup: (name, members) => {
-        const { licenseMode, groupMembers } = get();
+        const { groupMembers } = get();
+        const { licenseMode } = useLicenseStore.getState();
 
         // Check license limits for groups
         const limits = getFeatureLimits(licenseMode);
         if (!limits.canUseGroups) {
-          get().showToast(getBlockedMessage('useGroups'));
+          useUIStore.getState().showToast(getBlockedMessage('useGroups'), 'warning');
           return null;
         }
 
@@ -1951,13 +1368,15 @@ export const useProjectStore = create<ProjectState>()(
           memberId: member.id
         }));
 
-        set((state) => ({
-          groups: [...state.groups, { id: groupId, name }],
+        set({
+          groups: [...get().groups, { id: groupId, name }],
           groupMembers: [...filteredGroupMembers, ...newGroupMembers],
-          selectedPartIds: [], // Clear part selection
-          selectedGroupIds: [groupId], // Select the new group
-          expandedGroupIds: [...state.expandedGroupIds, groupId], // Expand the new group
           isDirty: true
+        });
+        useSelectionStore.setState((state) => ({
+          selectedPartIds: [],
+          selectedGroupIds: [groupId],
+          expandedGroupIds: [...state.expandedGroupIds, groupId]
         }));
 
         return groupId;
@@ -1973,37 +1392,8 @@ export const useProjectStore = create<ProjectState>()(
       deleteGroup: (groupId, mode, targetParentGroupId) => {
         const { groupMembers } = get();
 
-        // Helper to get all descendant part IDs recursively
-        const getAllDescendantPartIds = (gId: string): string[] => {
-          const partIds: string[] = [];
-          const members = groupMembers.filter((gm) => gm.groupId === gId);
-
-          for (const member of members) {
-            if (member.memberType === 'part') {
-              partIds.push(member.memberId);
-            } else {
-              // Nested group - recurse
-              partIds.push(...getAllDescendantPartIds(member.memberId));
-            }
-          }
-          return partIds;
-        };
-
-        // Helper to get all descendant group IDs recursively
-        const getAllDescendantGroupIds = (gId: string): string[] => {
-          const groupIds: string[] = [gId];
-          const members = groupMembers.filter((gm) => gm.groupId === gId);
-
-          for (const member of members) {
-            if (member.memberType === 'group') {
-              groupIds.push(...getAllDescendantGroupIds(member.memberId));
-            }
-          }
-          return groupIds;
-        };
-
-        const descendantGroupIds = getAllDescendantGroupIds(groupId);
-        const descendantPartIds = getAllDescendantPartIds(groupId);
+        const descendantGroupIds = getAllDescendantGroupIds(groupId, groupMembers);
+        const descendantPartIds = getAllDescendantPartIds(groupId, groupMembers);
 
         if (mode === 'ungroup') {
           // Remove the group, but keep its immediate children
@@ -2038,12 +1428,14 @@ export const useProjectStore = create<ProjectState>()(
             return {
               groups: state.groups.filter((g) => !descendantGroupIds.includes(g.id)),
               groupMembers: newGroupMembers,
-              selectedGroupIds: state.selectedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
-              expandedGroupIds: state.expandedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
-              editingGroupId: descendantGroupIds.includes(state.editingGroupId || '') ? null : state.editingGroupId,
               isDirty: true
             };
           });
+          useSelectionStore.setState((state) => ({
+            selectedGroupIds: state.selectedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
+            expandedGroupIds: state.expandedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
+            editingGroupId: descendantGroupIds.includes(state.editingGroupId || '') ? null : state.editingGroupId
+          }));
         } else {
           // 'recursive' - delete group AND all member parts
           set((state) => ({
@@ -2055,12 +1447,16 @@ export const useProjectStore = create<ProjectState>()(
               return true;
             }),
             parts: state.parts.filter((p) => !descendantPartIds.includes(p.id)),
+            isDirty: true
+          }));
+          useSelectionStore.setState((state) => ({
             selectedPartIds: state.selectedPartIds.filter((id) => !descendantPartIds.includes(id)),
             selectedGroupIds: state.selectedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
             expandedGroupIds: state.expandedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
-            referencePartIds: state.referencePartIds.filter((id) => !descendantPartIds.includes(id)),
-            editingGroupId: descendantGroupIds.includes(state.editingGroupId || '') ? null : state.editingGroupId,
-            isDirty: true
+            editingGroupId: descendantGroupIds.includes(state.editingGroupId || '') ? null : state.editingGroupId
+          }));
+          useSnapStore.setState((state) => ({
+            referencePartIds: state.referencePartIds.filter((id) => !descendantPartIds.includes(id))
           }));
         }
       },
@@ -2089,7 +1485,8 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       removeFromGroup: (memberIds, memberType) => {
-        const { groupMembers, groups, selectedGroupIds, editingGroupId, expandedGroupIds } = get();
+        const { groupMembers, groups } = get();
+        const { selectedGroupIds, editingGroupId, expandedGroupIds } = useSelectionStore.getState();
 
         // Find which groups will be affected (groups containing the members being removed)
         const affectedGroupIds = new Set<string>();
@@ -2118,10 +1515,12 @@ export const useProjectStore = create<ProjectState>()(
           set({
             groupMembers: newGroupMembers.filter((gm) => !emptyGroupIds.includes(gm.groupId)),
             groups: groups.filter((g) => !emptyGroupIds.includes(g.id)),
+            isDirty: true
+          });
+          useSelectionStore.setState({
             selectedGroupIds: selectedGroupIds.filter((id) => !emptyGroupIds.includes(id)),
             editingGroupId: editingGroupId && emptyGroupIds.includes(editingGroupId) ? null : editingGroupId,
-            expandedGroupIds: expandedGroupIds.filter((id) => !emptyGroupIds.includes(id)),
-            isDirty: true
+            expandedGroupIds: expandedGroupIds.filter((id) => !emptyGroupIds.includes(id))
           });
         } else {
           set({
@@ -2132,13 +1531,14 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       mergeGroups: (groupIds, mode) => {
-        const { licenseMode, groups, groupMembers } = get();
+        const { groups, groupMembers } = get();
+        const { licenseMode } = useLicenseStore.getState();
         if (groupIds.length < 2) return null;
 
         // Check license limits for groups
         const limits = getFeatureLimits(licenseMode);
         if (!limits.canUseGroups) {
-          get().showToast(getBlockedMessage('useGroups'));
+          useUIStore.getState().showToast(getBlockedMessage('useGroups'), 'warning');
           return null;
         }
 
@@ -2227,123 +1627,18 @@ export const useProjectStore = create<ProjectState>()(
         set((state) => ({
           groups: [...state.groups, { id: newGroupId, name: mergedName }],
           groupMembers: [...state.groupMembers, ...newGroupMembers],
+          isDirty: true
+        }));
+        useSelectionStore.setState((state) => ({
           selectedPartIds: [],
           selectedGroupIds: [newGroupId],
-          expandedGroupIds: [...state.expandedGroupIds, newGroupId],
-          isDirty: true
+          expandedGroupIds: [...state.expandedGroupIds, newGroupId]
         }));
 
         return newGroupId;
       },
 
-      // Group selection actions
-      selectGroup: (groupId) => {
-        const { editingGroupId, groupMembers } = get();
-
-        // Check if the group being selected is a descendant of the current editing group
-        // If so, keep editingGroupId unchanged so user can drill into nested groups
-        let newEditingGroupId: string | null = null;
-
-        if (editingGroupId !== null) {
-          // Check if groupId is inside editingGroupId (descendant)
-          if (isDescendantOf(groupId, editingGroupId, groupMembers) && groupId !== editingGroupId) {
-            newEditingGroupId = editingGroupId; // Stay in the parent group
-          }
-        }
-
-        set({
-          selectedGroupIds: [groupId],
-          selectedPartIds: [], // Clear part selection when selecting a group
-          editingGroupId: newEditingGroupId
-        });
-        get().updateReferenceDistances();
-      },
-
-      toggleGroupSelection: (groupId) => {
-        set((state) => {
-          if (state.selectedGroupIds.includes(groupId)) {
-            return { selectedGroupIds: state.selectedGroupIds.filter((id) => id !== groupId) };
-          } else {
-            // Preserve existing part selection when shift+clicking to add a group
-            return {
-              selectedGroupIds: [...state.selectedGroupIds, groupId],
-              editingGroupId: null
-            };
-          }
-        });
-        get().updateReferenceDistances();
-      },
-
-      clearGroupSelection: () => {
-        set({ selectedGroupIds: [] });
-        get().updateReferenceDistances();
-      },
-
-      // Group editing mode (Figma-style)
-      enterGroup: (groupId) => {
-        set({
-          editingGroupId: groupId,
-          selectedGroupIds: [], // Clear group selection
-          selectedPartIds: [] // Clear part selection - user can now select individual parts
-        });
-      },
-
-      exitGroup: () => {
-        const { editingGroupId, groupMembers } = get();
-        if (!editingGroupId) return;
-
-        // Find the parent group of the current editing group
-        const parentMembership = groupMembers.find((gm) => gm.memberType === 'group' && gm.memberId === editingGroupId);
-        const parentGroupId = parentMembership ? parentMembership.groupId : null;
-
-        set({
-          editingGroupId: parentGroupId, // Step back one level (null if at top level)
-          selectedPartIds: [] // Clear part selection when exiting
-        });
-      },
-
-      // Group expand/collapse actions
-      toggleGroupExpanded: (groupId) => {
-        set((state) => {
-          if (state.expandedGroupIds.includes(groupId)) {
-            return { expandedGroupIds: state.expandedGroupIds.filter((id) => id !== groupId) };
-          } else {
-            return { expandedGroupIds: [...state.expandedGroupIds, groupId] };
-          }
-        });
-      },
-
-      expandGroup: (groupId) => {
-        set((state) => {
-          if (state.expandedGroupIds.includes(groupId)) return {};
-          return { expandedGroupIds: [...state.expandedGroupIds, groupId] };
-        });
-      },
-
-      collapseGroup: (groupId) => {
-        set((state) => ({
-          expandedGroupIds: state.expandedGroupIds.filter((id) => id !== groupId)
-        }));
-      },
-
-      expandAllGroups: () => {
-        const { groups } = get();
-        set({ expandedGroupIds: groups.map((g) => g.id) });
-      },
-
-      collapseAllGroups: () => {
-        set({ expandedGroupIds: [] });
-      },
-
       // Cut list actions
-      openCutListModal: () => {
-        set({ cutListModalOpen: true });
-      },
-
-      closeCutListModal: () => {
-        set({ cutListModalOpen: false });
-      },
-
       setCutList: (cutList) => {
         set({ cutList, isDirty: true });
       },
@@ -2390,249 +1685,6 @@ export const useProjectStore = create<ProjectState>()(
           customShoppingItems: state.customShoppingItems.filter((item) => item.id !== id),
           isDirty: true
         }));
-      },
-
-      // Assembly editing actions
-      startEditingAssembly: (assemblyId, assemblyName, parts, groups = [], groupMembers = [], embeddedStocks = []) => {
-        const state = get();
-
-        // Save current project state as snapshot (including UI state)
-        const snapshot = {
-          projectName: state.projectName,
-          parts: state.parts,
-          stocks: state.stocks,
-          groups: state.groups,
-          groupMembers: state.groupMembers,
-          assemblies: state.assemblies,
-          filePath: state.filePath,
-          isDirty: state.isDirty,
-          units: state.units,
-          gridSize: state.gridSize,
-          kerfWidth: state.kerfWidth,
-          overageFactor: state.overageFactor,
-          projectNotes: state.projectNotes,
-          stockConstraints: state.stockConstraints,
-          createdAt: state.createdAt,
-          modifiedAt: state.modifiedAt,
-          snapGuides: state.snapGuides,
-          cutList: state.cutList,
-          // UI state to restore
-          expandedGroupIds: state.expandedGroupIds,
-          referencePartIds: state.referencePartIds,
-          cameraState: state.cameraState
-        };
-
-        // Merge previous project stocks with embedded stocks from the assembly
-        // Embedded stocks are added for parts that reference stocks not in the library
-        const existingStockIds = new Set(state.stocks.map((s) => s.id));
-        const mergedStocks = [...state.stocks, ...embeddedStocks.filter((s) => !existingStockIds.has(s.id))];
-
-        // Load assembly parts into workspace
-        set({
-          previousProjectSnapshot: snapshot,
-          isEditingAssembly: true,
-          editingAssemblyId: assemblyId,
-          editingAssemblyName: assemblyName,
-          // Clear workspace and load assembly parts
-          projectName: `Editing: ${assemblyName}`,
-          parts,
-          groups,
-          groupMembers,
-          stocks: mergedStocks, // Keep stocks from current project + embedded stocks from assembly
-          assemblies: [],
-          filePath: null,
-          isDirty: false,
-          // Clear selection and UI state
-          selectedPartIds: [],
-          selectedGroupIds: [],
-          expandedGroupIds: groups.map((g) => g.id),
-          editingGroupId: null,
-          cutList: null,
-          referencePartIds: [],
-          snapGuides: [],
-          // Reset camera to default so it orbits correctly around the assembly
-          cameraState: null,
-          pendingCameraRestore: false // No camera to restore when entering edit mode
-        });
-
-        // Clear undo history
-        setTimeout(() => useProjectStore.temporal.getState().clear(), 0);
-      },
-
-      saveEditingAssembly: () => {
-        const state = get();
-        if (!state.isEditingAssembly || !state.editingAssemblyId) return null;
-
-        // Guard against empty parts array (division by zero)
-        if (state.parts.length === 0) return null;
-
-        // Find the center of all parts to normalize positions
-        const allPositions = state.parts.map((p) => p.position);
-        const centerX = allPositions.reduce((sum, pos) => sum + pos.x, 0) / allPositions.length;
-        const centerZ = allPositions.reduce((sum, pos) => sum + pos.z, 0) / allPositions.length;
-
-        // Helper to create embedded stock snapshot from a stock
-        const createEmbeddedStock = (stock: Stock): EmbeddedStock => ({
-          name: stock.name,
-          length: stock.length,
-          width: stock.width,
-          thickness: stock.thickness,
-          grainDirection: stock.grainDirection,
-          pricingUnit: stock.pricingUnit,
-          pricePerUnit: stock.pricePerUnit,
-          color: stock.color
-        });
-
-        // Create assembly from current parts (normalized to center)
-        const assemblyParts: AssemblyPart[] = state.parts.map((part) => {
-          // Look up and embed stock data if part has a stock assigned
-          let embeddedStock: EmbeddedStock | undefined;
-          if (part.stockId) {
-            const stock = state.stocks.find((s) => s.id === part.stockId);
-            if (stock) {
-              embeddedStock = createEmbeddedStock(stock);
-            }
-          }
-
-          return {
-            name: part.name,
-            length: part.length,
-            width: part.width,
-            thickness: part.thickness,
-            relativePosition: {
-              x: part.position.x - centerX,
-              y: part.position.y,
-              z: part.position.z - centerZ
-            },
-            rotation: part.rotation,
-            stockId: part.stockId,
-            grainSensitive: part.grainSensitive,
-            grainDirection: part.grainDirection,
-            color: part.color,
-            notes: part.notes,
-            extraLength: part.extraLength,
-            extraWidth: part.extraWidth,
-            embeddedStock
-          };
-        });
-
-        // Map part IDs to indices for group members
-        const partIdToIndex = new Map(state.parts.map((p, i) => [p.id, i]));
-        const groupIdToIndex = new Map(state.groups.map((g, i) => [g.id, i]));
-
-        const assemblyGroups: AssemblyGroup[] = state.groups.map((group) => ({
-          originalId: group.id,
-          name: group.name
-        }));
-
-        const assemblyGroupMembers: AssemblyGroupMember[] = state.groupMembers.map((gm) => ({
-          groupIndex: groupIdToIndex.get(gm.groupId) ?? 0,
-          memberType: gm.memberType,
-          memberIndex:
-            gm.memberType === 'part' ? (partIdToIndex.get(gm.memberId) ?? 0) : (groupIdToIndex.get(gm.memberId) ?? 0)
-        }));
-
-        const now = new Date().toISOString();
-        const assembly: Assembly = {
-          id: state.editingAssemblyId,
-          name: state.editingAssemblyName,
-          description: '',
-          parts: assemblyParts,
-          groups: assemblyGroups,
-          groupMembers: assemblyGroupMembers,
-          createdAt: now, // Will be overwritten by library update
-          modifiedAt: now
-        };
-
-        // Note: The actual library update is handled by the caller (hook/component)
-        // because the store doesn't have direct access to the library API
-
-        return assembly;
-      },
-
-      cancelEditingAssembly: () => {
-        const state = get();
-        if (!state.isEditingAssembly) return;
-
-        // Reset assembly editing state (but keep previousProjectSnapshot for restore)
-        set({
-          isEditingAssembly: false,
-          editingAssemblyId: null,
-          editingAssemblyName: ''
-        });
-      },
-
-      restorePreviousProject: () => {
-        const state = get();
-        if (!state.previousProjectSnapshot) return;
-
-        const snapshot = state.previousProjectSnapshot;
-
-        set({
-          projectName: snapshot.projectName,
-          parts: snapshot.parts,
-          stocks: snapshot.stocks,
-          groups: snapshot.groups,
-          groupMembers: snapshot.groupMembers,
-          assemblies: snapshot.assemblies,
-          filePath: snapshot.filePath,
-          isDirty: snapshot.isDirty,
-          units: snapshot.units,
-          gridSize: snapshot.gridSize,
-          kerfWidth: snapshot.kerfWidth,
-          overageFactor: snapshot.overageFactor,
-          projectNotes: snapshot.projectNotes,
-          stockConstraints: snapshot.stockConstraints,
-          createdAt: snapshot.createdAt,
-          modifiedAt: snapshot.modifiedAt,
-          snapGuides: snapshot.snapGuides,
-          cutList: snapshot.cutList,
-          // Clear assembly editing state
-          isEditingAssembly: false,
-          editingAssemblyId: null,
-          editingAssemblyName: '',
-          previousProjectSnapshot: null,
-          // Restore UI state (but clear selection as it may be stale)
-          selectedPartIds: [],
-          selectedGroupIds: [],
-          expandedGroupIds: snapshot.expandedGroupIds,
-          referencePartIds: snapshot.referencePartIds,
-          editingGroupId: null,
-          // Restore camera position
-          cameraState: snapshot.cameraState || null,
-          pendingCameraRestore: !!snapshot.cameraState // Trigger camera restoration if snapshot has camera state
-        });
-
-        // Clear undo history
-        setTimeout(() => useProjectStore.temporal.getState().clear(), 0);
-      },
-
-      startFreshAfterAssemblyEdit: () => {
-        const state = get();
-
-        // Get defaults from previous snapshot if available
-        const defaults = state.previousProjectSnapshot
-          ? {
-              units: state.previousProjectSnapshot.units,
-              gridSize: state.previousProjectSnapshot.gridSize,
-              stockConstraints: state.previousProjectSnapshot.stockConstraints
-            }
-          : undefined;
-
-        // Clear assembly editing state
-        set({
-          isEditingAssembly: false,
-          editingAssemblyId: null,
-          editingAssemblyName: '',
-          previousProjectSnapshot: null
-        });
-
-        // Start a new project
-        get().newProject(defaults);
-      },
-
-      setLicenseMode: (mode) => {
-        set({ licenseMode: mode });
       }
     }),
     {
@@ -2661,3 +1713,5 @@ export const useProjectStore = create<ProjectState>()(
     }
   )
 );
+
+// Selection change subscription bridge is in selectionStore.ts to avoid circular init issues

@@ -1620,7 +1620,6 @@ export function importStocks(
   }
 
   const stockLibrary = store.get('stockLibrary', []);
-  const existingIds = new Set(stockLibrary.map((s) => s.id));
   let imported = 0;
   let skipped = 0;
 

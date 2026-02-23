@@ -13,6 +13,7 @@ const FALLBACK_VERSION = "0.1.0";
 
 export interface DownloadInfo {
   url: string;
+  trackedUrl: string;
   platform: "macos" | "windows";
   fileName: string;
   fileExtension: string;
@@ -56,12 +57,37 @@ export function getWindowsDownloadUrl(version: string): string {
   return `https://github.com/${GITHUB_REPO}/releases/download/v${version}/Carvd.Studio.Setup.${version}.exe`;
 }
 
+export function getTrackedDownloadUrl(
+  platform: "macos" | "windows",
+  source: string = "website",
+): string {
+  const encodedSource = encodeURIComponent(source);
+  return `/api/download?platform=${platform}&source=${encodedSource}`;
+}
+
+export function getDownloadHref(
+  download: DownloadInfo,
+  source: string = "website",
+  hostnameOverride?: string,
+): string {
+  const hostname = hostnameOverride ?? window.location.hostname;
+  const isLocalDev =
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+
+  if (isLocalDev) {
+    return download.url;
+  }
+
+  return getTrackedDownloadUrl(download.platform, source);
+}
+
 /**
  * Get full download info for macOS
  */
 export function getMacDownloadInfo(version: string): DownloadInfo {
   return {
     url: getMacDownloadUrl(version),
+    trackedUrl: getTrackedDownloadUrl("macos"),
     platform: "macos",
     fileName: `Carvd.Studio-${version}-arm64.dmg`,
     fileExtension: ".dmg",
@@ -75,6 +101,7 @@ export function getMacDownloadInfo(version: string): DownloadInfo {
 export function getWindowsDownloadInfo(version: string): DownloadInfo {
   return {
     url: getWindowsDownloadUrl(version),
+    trackedUrl: getTrackedDownloadUrl("windows"),
     platform: "windows",
     fileName: `Carvd.Studio.Setup.${version}.exe`,
     fileExtension: ".exe",

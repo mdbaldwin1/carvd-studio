@@ -1,85 +1,9 @@
 # Carvd Studio — Development Guidelines
 
-## Monorepo Structure
+## Source Of Truth
 
-- `packages/desktop` — Electron desktop app (React + TypeScript + Three.js)
-- `packages/website` — Marketing website (React + TypeScript + Vite)
-
-## Git Workflow
-
-### Branches
-
-- **develop** — Integration branch. All feature work targets here via PRs.
-- **main** — Production branch. Protected. Only receives PRs from develop. Merge commit (not squash).
-- **Feature branches** — Created from develop. Named with prefixes: `feat/`, `fix/`, `chore/`, `docs/`, `test/`, `refactor/`.
-- **Hotfix branches** — Created from **main** (not develop). Named `hotfix/description`. Used for urgent production fixes.
-
-### Branch Protection
-
-Both `develop` and `main` are protected:
-
-- No direct pushes (even for admins)
-- All changes must go through pull requests
-- All CI checks must pass before merging
-
-### Commit Messages
-
-Use conventional commit prefixes:
-
-- `feat:` — New feature or functionality
-- `fix:` — Bug fix
-- `chore:` — Maintenance, dependencies, CI/CD changes
-- `docs:` — Documentation only
-- `test:` — Test additions or modifications
-- `refactor:` — Code restructuring without behavior change
-
-### Merge Strategies
-
-- **Feature branches → develop**: Squash merge (clean history, one commit per feature)
-- **develop → main**: Merge commit (preserves shared ancestry so syncing main back to develop is conflict-free)
-- **Hotfix branches → main**: Squash merge
-
-### Pull Request Workflow
-
-1. Create a feature branch from `develop`
-2. Make changes and commit with conventional prefixes
-3. **Update CHANGELOG.md** under `[Unreleased]` — this is required for PRs to main
-4. Run tests: `npm test` in the relevant package
-5. Run lint: `npm run lint` and typecheck: `npm run typecheck`
-6. Push the branch and create a PR targeting `develop`
-7. Ensure all CI checks pass before requesting merge
-
-### Hotfix Workflow
-
-Hotfixes bypass `develop` to get urgent fixes into production quickly:
-
-1. Create a `hotfix/` branch from **main**
-2. Make the fix and commit
-3. Update CHANGELOG.md
-4. PR into **main** (squash merge) — deploys the fix to production
-5. The `sync-develop` workflow automatically merges main back into develop
-
-### Changelog Format
-
-```markdown
-## [Unreleased]
-
-### Added
-
-- New features go here
-
-### Changed
-
-- Modifications to existing features
-
-### Fixed
-
-- Bug fixes
-
-### Removed
-
-- Removed features or deprecated items
-```
+- `AGENTS.md` is the primary source of truth for agent behavior, branch/PR workflow, commit conventions, changelog expectations, and validation gates.
+- This file is supplemental reference material only (architecture, testing details, performance, and implementation notes).
 
 ## Versioning
 
@@ -112,6 +36,54 @@ This project follows [Semantic Versioning](https://semver.org/). Desktop and web
 - Test framework: Vitest with v8 coverage
 - Tests are colocated with source files (`*.test.ts`, `*.test.tsx`)
 
+### Test Configurations
+
+- **Renderer tests**: `vitest.config.ts` — uses `happy-dom` environment, covers `src/renderer/`
+- **Main process tests**: `vitest.main.config.ts` — uses `node` environment, covers `src/main/`
+- **E2E tests**: Playwright, run separately via `npm run test:e2e`
+
+### Coverage Thresholds
+
+Coverage thresholds are enforced via `coverage.thresholds` in vitest configs. CI will fail if coverage drops below these minimums.
+
+**Renderer** (`vitest.config.ts`): statements 91%, branches 82%, functions 90%, lines 91%
+**Main process** (`vitest.main.config.ts`): statements 73%, branches 70%, functions 66%, lines 74%
+
+### Test Patterns
+
+**Zustand store tests**: Reset store state in `beforeEach` using `useStore.setState()`. For stores that call Electron APIs, mock `window.electronAPI` in `beforeAll`.
+
+**Component tests**: Use `@testing-library/react` with `render`, `screen`, `fireEvent`. Reset relevant store state in `beforeEach`.
+
+**Hook tests**: Use `renderHook` and `act` from `@testing-library/react`. Wrap state mutations in `act()`.
+
+**Electron API mocks**: Define mocks in `beforeAll`:
+
+```typescript
+beforeAll(() => {
+  window.electronAPI = { getPreference: vi.fn(), setPreference: vi.fn() };
+});
+```
+
+**Factory functions**: Use helpers from `tests/helpers/factories.ts` — e.g., `createTestPart()`, `createTestStock()`, `createTestProject()`.
+
+**shadcn/Radix component tests**:
+
+- Prefer semantic queries (`getByRole`, `findByRole`, `getByLabelText`) over class selectors.
+- Radix overlays (Dialog, AlertDialog, DropdownMenu, ContextMenu, Popover, Select content) render via portals; query from `screen`, not a local container.
+- Use `data-state` / `data-disabled` attributes for Radix state assertions where needed.
+- Do not assert legacy `.btn*` classes; assert behavior/roles and shadcn props (`variant`, `size`) indirectly via rendered semantics.
+
+### Common Gotchas
+
+- Use `toBeCloseTo()` for floating-point position assertions
+- Groups auto-expand on creation — collapse first before testing toggle
+- `pendingDeletePartIds` is `null` (not empty array) when no pending deletes
+- Use `fireEvent.submit(form)` over `fireEvent.click(submitButton)` for form tests
+- Use `td.col-qty` (not `.col-qty`) to target table data cells over headers
+- Mock `window.confirm`/`window.alert` in `beforeAll` before calling `mockReturnValue`
+- For undo/redo tests with `newProject()`, enable `vi.useFakeTimers()` before the call so the `setTimeout` clear is captured
+
 ## Key Commands
 
 ```bash
@@ -121,6 +93,7 @@ npm run dev          # Start dev server
 npm test             # Run tests
 npm run lint         # Lint check
 npm run typecheck    # Type check
+npm run analyze      # Bundle size analysis (opens treemap)
 
 # Website
 cd packages/website
@@ -128,3 +101,70 @@ npm run dev          # Start dev server
 npm test             # Run tests
 npm run build        # Build for production
 ```
+
+## Styling
+
+The app uses **Tailwind CSS 4** with CSS custom properties + shadcn/ui primitives.
+
+Desktop styles are split across:
+
+- `tailwind.css` — Tailwind import, theme tokens, global base styles, and token mappings
+- `layout.css` — Electron shell/layout-specific rules
+- `domain.css` — Domain-specific rendering/print rules
+
+Website styles are in:
+
+- `packages/website/src/tailwind.css` — theme tokens, base rules, and compatibility utilities
+
+Use shadcn components from `src/renderer/src/components/ui/` and pass `variant` / `size` props rather than legacy utility-class systems (for example, old `.btn*` patterns). Use `cn()` from `src/renderer/src/lib/utils.ts` for conditional class merging.
+
+## Components
+
+Primary shadcn component sets currently in use:
+
+- **Desktop UI** (`packages/desktop/src/renderer/src/components/ui/`): `button`, `input`, `textarea`, `label`, `select`, `checkbox`, `dialog`, `alert-dialog`, `tabs`, `table`, `card`, `accordion`, `collapsible`, `dropdown-menu`, `context-menu`, `popover`, `tooltip`, `sidebar`, `scroll-area`, `separator`, `badge`, `progress`, `skeleton`, `sonner`.
+- **Website UI** (`packages/website/src/components/ui/`): `button`, `card`, `badge`, `accordion`, `navigation-menu`, `separator`.
+
+## Store Architecture
+
+Zustand stores are split by concern:
+
+- `projectStore` — Domain data (parts, stocks, groups, assemblies), undo/redo via zundo
+- `uiStore` — Transient UI state (toast, modals, thumbnails, tutorial)
+- `selectionStore` — Selection state (selectedPartIds, hoveredPartId)
+- `cameraStore` — Camera state (position, target, zoom)
+- `clipboardStore` — Copy/paste buffer
+- `snapStore` — Snap detection state
+- `licenseStore` — License mode, trial status
+- `appSettingsStore` — User preferences (theme, units, grid)
+- `assemblyEditingStore` — Assembly edit mode state
+
+## Performance Guidelines
+
+### React & Rendering
+
+- Use `React.memo` for components rendered inside `.map()` loops or passed as children to Three.js groups
+- Use `useCallback` for event handlers passed as props to memoized children
+- Use `useMemo` for expensive computations derived from props or state
+- Use fine-grained Zustand selectors with `useShallow` — select only the fields your component needs
+
+### Three.js / React Three Fiber
+
+- Never allocate objects (`new Vector3()`, `new Color()`, `new Float32Array()`) inside `useFrame` or render — pre-allocate at module scope and reuse with `.set()` / `.copy()`
+- Pool geometries and materials at module level in shared files (e.g., `partGeometry.ts`) — all instances should share via import
+- Prefer conditional mounting (`{condition && <Component />}`) over `visible={false}` for complex Three.js objects — unmounted components don't consume draw calls
+- Use distance-based LOD for decorative elements (grain arrows, labels) in large scenes
+
+### Code Splitting & Bundle Size
+
+- Lazy-load components not visible on initial render (modals, dialogs, secondary screens) with `React.lazy` + `<Suspense>`
+- Use dynamic `await import()` for heavy optional features triggered by user action (PDF export, CSV download)
+- Audit `optionalDependencies` when adding large libraries — stub unused optional deps via `resolve.alias` in `electron.vite.config.ts`
+- Run `npm run analyze` before and after changes that add dependencies to verify bundle impact
+- Radix/shadcn primitives can add JS/runtime cost; offset by reducing custom CSS and monitor deltas with bundle audits (`packages/desktop/BUNDLE-SIZE-AUDIT.md`, `packages/website/BUNDLE-SIZE-AUDIT.md`)
+
+### State Management
+
+- Keep undo-tracked stores (zundo) focused on domain data only — exclude transient UI state (hover, selection, camera, drag)
+- Batch related store updates into single actions to minimize re-render cascades
+- Use separate stores for independent concerns (UI, camera, selection, etc.) to avoid unnecessary subscriber notifications

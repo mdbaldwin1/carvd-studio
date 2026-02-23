@@ -6,6 +6,8 @@ import {
   parseCarvdFile,
   stringifyCarvdFile,
   getProjectNameFromPath,
+  repairCarvdFile,
+  getFileSummary,
   CARVD_FILE_EXTENSION,
   CARVD_FILE_FILTER
 } from './fileFormat';
@@ -15,7 +17,6 @@ import {
   createTestStock,
   createTestGroup,
   createTestGroupMember,
-  createTestProject,
   createTestAssembly,
   createDefaultStockConstraints,
   createTestCustomShoppingItem
@@ -313,7 +314,7 @@ describe('fileFormat', () => {
     });
 
     it('rejects missing version', () => {
-      const file = { ...createValidCarvdFile() } as any;
+      const file: Record<string, unknown> = { ...createValidCarvdFile() };
       delete file.version;
 
       const result = validateCarvdFile(file);
@@ -324,7 +325,7 @@ describe('fileFormat', () => {
 
     it('rejects future version numbers', () => {
       const file = createValidCarvdFile();
-      (file as any).version = CARVD_FILE_VERSION + 1;
+      (file as Record<string, unknown>).version = CARVD_FILE_VERSION + 1;
 
       const result = validateCarvdFile(file);
 
@@ -333,7 +334,7 @@ describe('fileFormat', () => {
     });
 
     it('rejects missing project metadata', () => {
-      const file = { ...createValidCarvdFile() } as any;
+      const file: Record<string, unknown> = { ...createValidCarvdFile() };
       delete file.project;
 
       const result = validateCarvdFile(file);
@@ -344,7 +345,7 @@ describe('fileFormat', () => {
 
     it('rejects missing project name', () => {
       const file = createValidCarvdFile();
-      (file.project as any).name = undefined;
+      (file.project as Record<string, unknown>).name = undefined;
 
       const result = validateCarvdFile(file);
 
@@ -354,7 +355,7 @@ describe('fileFormat', () => {
 
     it('warns about invalid units', () => {
       const file = createValidCarvdFile();
-      (file.project as any).units = 'invalid';
+      (file.project as Record<string, unknown>).units = 'invalid';
 
       const result = validateCarvdFile(file);
 
@@ -372,7 +373,7 @@ describe('fileFormat', () => {
       ];
 
       for (const { field, error } of testCases) {
-        const testFile = { ...file } as any;
+        const testFile: Record<string, unknown> = { ...file };
         delete testFile[field];
 
         const result = validateCarvdFile(testFile);
@@ -475,7 +476,7 @@ describe('fileFormat', () => {
     it('warns about assembly parts referencing non-existent stocks', () => {
       const file = createValidCarvdFile();
       // Add an assembly with a part that references a non-existent stock
-      (file as any).assemblies = [
+      (file as Record<string, unknown>).assemblies = [
         {
           id: 'assembly-1',
           name: 'Test Assembly',
@@ -549,7 +550,7 @@ describe('fileFormat', () => {
   describe('migration', () => {
     it('adds default kerfWidth if missing', () => {
       const file = createValidCarvdFile();
-      delete (file.project as any).kerfWidth;
+      delete (file.project as Record<string, unknown>).kerfWidth;
 
       const result = validateCarvdFile(file);
 
@@ -559,7 +560,7 @@ describe('fileFormat', () => {
 
     it('adds default overageFactor if missing', () => {
       const file = createValidCarvdFile();
-      delete (file.project as any).overageFactor;
+      delete (file.project as Record<string, unknown>).overageFactor;
 
       const result = validateCarvdFile(file);
 
@@ -569,7 +570,7 @@ describe('fileFormat', () => {
 
     it('adds default stockConstraints if missing', () => {
       const file = createValidCarvdFile();
-      delete (file.project as any).stockConstraints;
+      delete (file.project as Record<string, unknown>).stockConstraints;
 
       const result = validateCarvdFile(file);
 
@@ -580,7 +581,7 @@ describe('fileFormat', () => {
 
     it('adds default grainSensitive to parts if missing', () => {
       const part = createTestPart();
-      delete (part as any).grainSensitive;
+      delete (part as Record<string, unknown>).grainSensitive;
 
       const file = createValidCarvdFile({ parts: [part] });
 
@@ -592,7 +593,7 @@ describe('fileFormat', () => {
 
     it('adds default grainDirection to parts if missing', () => {
       const part = createTestPart();
-      delete (part as any).grainDirection;
+      delete (part as Record<string, unknown>).grainDirection;
 
       const file = createValidCarvdFile({ parts: [part] });
 
@@ -604,7 +605,7 @@ describe('fileFormat', () => {
 
     it('adds default rotation to parts if missing', () => {
       const part = createTestPart();
-      delete (part as any).rotation;
+      delete (part as Record<string, unknown>).rotation;
 
       const file = createValidCarvdFile({ parts: [part] });
 
@@ -616,7 +617,7 @@ describe('fileFormat', () => {
 
     it('adds default pricingUnit to stocks if missing', () => {
       const stock = createTestStock();
-      delete (stock as any).pricingUnit;
+      delete (stock as Record<string, unknown>).pricingUnit;
 
       const file = createValidCarvdFile({ stocks: [stock] });
 
@@ -683,6 +684,339 @@ describe('fileFormat', () => {
     it('exports correct file filter', () => {
       expect(CARVD_FILE_FILTER.name).toBe('Carvd Studio Project');
       expect(CARVD_FILE_FILTER.extensions).toContain('carvd');
+    });
+  });
+
+  // ============================================================
+  // repairCarvdFile
+  // ============================================================
+
+  describe('repairCarvdFile', () => {
+    it('fails on invalid JSON', () => {
+      const result = repairCarvdFile('not valid json');
+
+      expect(result.success).toBe(false);
+      expect(result.remainingErrors[0]).toContain('Invalid JSON');
+      expect(result.repairActions).toHaveLength(0);
+    });
+
+    it('fails on non-object JSON', () => {
+      const result = repairCarvdFile('"just a string"');
+
+      expect(result.success).toBe(false);
+      expect(result.remainingErrors).toContain('Invalid file: not a JSON object');
+    });
+
+    it('fails on null JSON', () => {
+      const result = repairCarvdFile('null');
+
+      expect(result.success).toBe(false);
+      expect(result.remainingErrors).toContain('Invalid file: not a JSON object');
+    });
+
+    it('fails when project metadata is missing', () => {
+      const result = repairCarvdFile(JSON.stringify({ version: 1 }));
+
+      expect(result.success).toBe(false);
+      expect(result.remainingErrors).toContain('Missing project metadata - cannot repair');
+    });
+
+    it('fails when project is not an object', () => {
+      const result = repairCarvdFile(JSON.stringify({ version: 1, project: 'not an object' }));
+
+      expect(result.success).toBe(false);
+      expect(result.remainingErrors).toContain('Missing project metadata - cannot repair');
+    });
+
+    it('repairs a valid file with no issues', () => {
+      const file = createValidCarvdFile();
+      const json = stringifyCarvdFile(file);
+
+      const result = repairCarvdFile(json);
+
+      expect(result.success).toBe(true);
+      expect(result.repairedData).toBeDefined();
+      expect(result.repairActions).toHaveLength(0);
+      expect(result.remainingErrors).toHaveLength(0);
+    });
+
+    it('adds missing arrays (parts, stocks, groups, groupMembers)', () => {
+      const data = {
+        version: 1,
+        project: {
+          name: 'Test',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          modifiedAt: '2024-01-01T00:00:00.000Z',
+          units: 'imperial',
+          gridSize: 0.0625,
+          kerfWidth: 0.125,
+          overageFactor: 0.1,
+          projectNotes: '',
+          stockConstraints: createDefaultStockConstraints()
+        }
+        // Missing parts, stocks, groups, groupMembers
+      };
+      const json = JSON.stringify(data);
+
+      const result = repairCarvdFile(json);
+
+      expect(result.success).toBe(true);
+      expect(result.repairedData?.parts).toEqual([]);
+      expect(result.repairedData?.stocks).toEqual([]);
+      expect(result.repairedData?.groups).toEqual([]);
+      expect(result.repairedData?.groupMembers).toEqual([]);
+    });
+
+    it('removes orphaned group members referencing non-existent groups', () => {
+      const part = createTestPart();
+      const orphanedMember = createTestGroupMember('non-existent-group', part.id, 'part');
+
+      const file = createValidCarvdFile({
+        parts: [part],
+        groupMembers: [orphanedMember]
+      });
+      const json = stringifyCarvdFile(file);
+
+      const result = repairCarvdFile(json);
+
+      expect(result.success).toBe(true);
+      expect(result.repairedData?.groupMembers).toHaveLength(0);
+      expect(result.repairActions.some((a) => a.includes('non-existent group'))).toBe(true);
+      expect(result.repairActions.some((a) => a.includes('Removed 1 orphaned group membership'))).toBe(true);
+    });
+
+    it('removes group members referencing non-existent parts', () => {
+      const group = createTestGroup();
+      const orphanedMember = createTestGroupMember(group.id, 'non-existent-part', 'part');
+
+      const file = createValidCarvdFile({
+        groups: [group],
+        groupMembers: [orphanedMember]
+      });
+      const json = stringifyCarvdFile(file);
+
+      const result = repairCarvdFile(json);
+
+      expect(result.success).toBe(true);
+      expect(result.repairedData?.groupMembers).toHaveLength(0);
+      expect(result.repairActions.some((a) => a.includes('non-existent part'))).toBe(true);
+    });
+
+    it('removes group members referencing non-existent nested groups', () => {
+      const group = createTestGroup();
+      const orphanedMember: GroupMember = {
+        id: 'member-1',
+        groupId: group.id,
+        memberType: 'group',
+        memberId: 'non-existent-nested-group'
+      };
+
+      const file = createValidCarvdFile({
+        groups: [group],
+        groupMembers: [orphanedMember]
+      });
+      const json = stringifyCarvdFile(file);
+
+      const result = repairCarvdFile(json);
+
+      expect(result.success).toBe(true);
+      expect(result.repairedData?.groupMembers).toHaveLength(0);
+      expect(result.repairActions.some((a) => a.includes('non-existent group'))).toBe(true);
+    });
+
+    it('clears invalid stock references on parts', () => {
+      const part = createTestPart({
+        name: 'Orphan Part',
+        stockId: 'non-existent-stock'
+      });
+
+      const file = createValidCarvdFile({
+        parts: [part]
+      });
+      const json = stringifyCarvdFile(file);
+
+      const result = repairCarvdFile(json);
+
+      expect(result.success).toBe(true);
+      expect(result.repairedData?.parts[0].stockId).toBeNull();
+      expect(result.warnings.some((w) => w.includes('invalid stock reference'))).toBe(true);
+    });
+
+    it('keeps valid stock references intact', () => {
+      const stock = createTestStock();
+      const part = createTestPart({ stockId: stock.id });
+
+      const file = createValidCarvdFile({
+        stocks: [stock],
+        parts: [part]
+      });
+      const json = stringifyCarvdFile(file);
+
+      const result = repairCarvdFile(json);
+
+      expect(result.success).toBe(true);
+      expect(result.repairedData?.parts[0].stockId).toBe(stock.id);
+    });
+
+    it('handles multiple repair actions at once', () => {
+      const group = createTestGroup();
+      const validPart = createTestPart({ name: 'Valid Part' });
+      const orphanedPartMember = createTestGroupMember(group.id, 'non-existent-part', 'part');
+      const orphanedGroupMember: GroupMember = {
+        id: 'orphan-gm-2',
+        groupId: group.id,
+        memberType: 'group',
+        memberId: 'non-existent-nested'
+      };
+      const invalidStockPart = createTestPart({
+        name: 'Bad Stock Part',
+        stockId: 'non-existent-stock'
+      });
+      const validMember = createTestGroupMember(group.id, validPart.id, 'part');
+
+      const file = createValidCarvdFile({
+        parts: [validPart, invalidStockPart],
+        groups: [group],
+        groupMembers: [orphanedPartMember, orphanedGroupMember, validMember]
+      });
+      const json = stringifyCarvdFile(file);
+
+      const result = repairCarvdFile(json);
+
+      expect(result.success).toBe(true);
+      // The 2 orphaned members should be removed, the valid one kept
+      expect(result.repairedData?.groupMembers).toHaveLength(1);
+      // Stock reference should be cleared
+      const badStockPart = result.repairedData?.parts.find((p) => p.name === 'Bad Stock Part');
+      expect(badStockPart?.stockId).toBeNull();
+      // Should have repair actions for both group member types
+      expect(result.repairActions.length).toBeGreaterThan(0);
+    });
+
+    it('reports count of removed orphaned memberships', () => {
+      const group = createTestGroup();
+      const member1 = createTestGroupMember(group.id, 'gone-part-1', 'part');
+      const member2 = createTestGroupMember(group.id, 'gone-part-2', 'part');
+
+      const file = createValidCarvdFile({
+        groups: [group],
+        groupMembers: [member1, member2]
+      });
+      const json = stringifyCarvdFile(file);
+
+      const result = repairCarvdFile(json);
+
+      expect(result.success).toBe(true);
+      expect(result.repairActions.some((a) => a.includes('Removed 2 orphaned group membership'))).toBe(true);
+    });
+
+    it('does not add removal count action when no memberships removed', () => {
+      const stock = createTestStock();
+      const part = createTestPart({ stockId: stock.id });
+      const group = createTestGroup();
+      const member = createTestGroupMember(group.id, part.id, 'part');
+
+      const file = createValidCarvdFile({
+        stocks: [stock],
+        parts: [part],
+        groups: [group],
+        groupMembers: [member]
+      });
+      const json = stringifyCarvdFile(file);
+
+      const result = repairCarvdFile(json);
+
+      expect(result.success).toBe(true);
+      expect(result.repairActions.some((a) => a.includes('orphaned group membership'))).toBe(false);
+    });
+
+    it('preserves parts with null stockId (no invalid reference)', () => {
+      const part = createTestPart({ stockId: null });
+
+      const file = createValidCarvdFile({
+        parts: [part]
+      });
+      const json = stringifyCarvdFile(file);
+
+      const result = repairCarvdFile(json);
+
+      expect(result.success).toBe(true);
+      expect(result.warnings).toHaveLength(0);
+    });
+
+    it('applies migration during repair', () => {
+      const part = createTestPart();
+      delete (part as Record<string, unknown>).grainSensitive;
+      delete (part as Record<string, unknown>).rotation;
+
+      const stock = createTestStock();
+      delete (stock as Record<string, unknown>).pricingUnit;
+
+      const file = createValidCarvdFile({
+        parts: [part],
+        stocks: [stock]
+      });
+      delete (file.project as Record<string, unknown>).kerfWidth;
+      const json = stringifyCarvdFile(file);
+
+      const result = repairCarvdFile(json);
+
+      expect(result.success).toBe(true);
+      expect(result.repairedData?.project.kerfWidth).toBe(0.125);
+      expect(result.repairedData?.parts[0].grainSensitive).toBe(true);
+      expect(result.repairedData?.parts[0].rotation).toEqual({ x: 0, y: 0, z: 0 });
+      expect(result.repairedData?.stocks[0].pricingUnit).toBe('per_item');
+    });
+  });
+
+  // ============================================================
+  // getFileSummary
+  // ============================================================
+
+  describe('getFileSummary', () => {
+    it('returns correct counts for empty file', () => {
+      const file = createValidCarvdFile();
+      const summary = getFileSummary(file);
+
+      expect(summary.parts).toBe(0);
+      expect(summary.stocks).toBe(0);
+      expect(summary.groups).toBe(0);
+    });
+
+    it('returns correct counts for populated file', () => {
+      const stock = createTestStock();
+      const part1 = createTestPart({ stockId: stock.id });
+      const part2 = createTestPart({ stockId: stock.id });
+      const group = createTestGroup();
+
+      const file = createValidCarvdFile({
+        parts: [part1, part2],
+        stocks: [stock],
+        groups: [group]
+      });
+      const summary = getFileSummary(file);
+
+      expect(summary.parts).toBe(2);
+      expect(summary.stocks).toBe(1);
+      expect(summary.groups).toBe(1);
+    });
+
+    it('returns correct counts for complex file', () => {
+      const stock1 = createTestStock();
+      const stock2 = createTestStock();
+      const parts = Array.from({ length: 5 }, () => createTestPart());
+      const groups = Array.from({ length: 3 }, () => createTestGroup());
+
+      const file = createValidCarvdFile({
+        parts,
+        stocks: [stock1, stock2],
+        groups
+      });
+      const summary = getFileSummary(file);
+
+      expect(summary.parts).toBe(5);
+      expect(summary.stocks).toBe(2);
+      expect(summary.groups).toBe(3);
     });
   });
 });

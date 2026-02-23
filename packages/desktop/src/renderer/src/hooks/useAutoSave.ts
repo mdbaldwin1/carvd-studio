@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useProjectStore } from '../store/projectStore';
+import { useUIStore } from '../store/uiStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { saveProject } from '../utils/fileOperations';
 import { logger } from '../utils/logger';
@@ -31,7 +32,7 @@ export function useAutoSave(options: UseAutoSaveOptions = {}): UseAutoSaveResult
 
   const isDirty = useProjectStore((s) => s.isDirty);
   const filePath = useProjectStore((s) => s.filePath);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
   const autoSaveEnabled = useAppSettingsStore((s) => s.settings.autoSave);
 
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);

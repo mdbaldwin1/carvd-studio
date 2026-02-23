@@ -1,0 +1,112 @@
+import { FileText, Star, Trash2, AlertTriangle } from 'lucide-react';
+import { Card } from '@renderer/components/ui/card';
+import { IconButton } from '../common/IconButton';
+import { RecentProject, formatRelativeDate } from './StartScreen';
+
+interface RecentsTabProps {
+  projects: RecentProject[];
+  onOpenProject: (filePath: string) => void;
+  onRelocateFile: (originalPath: string, fileName: string) => void;
+  onToggleFavorite: (project: RecentProject, e: React.MouseEvent) => void;
+  onRemoveRecent: (project: RecentProject, e: React.MouseEvent) => void;
+}
+
+export function RecentsTab({
+  projects,
+  onOpenProject,
+  onRelocateFile,
+  onToggleFavorite,
+  onRemoveRecent
+}: RecentsTabProps) {
+  if (projects.length === 0) {
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="text-center py-6 text-text-muted text-sm">
+          <p className="m-0">No recent projects yet.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {projects.map((project) => (
+        <Card
+          key={project.path}
+          className={`project-item group relative flex items-center gap-3 py-3 px-4 bg-transparent border border-transparent rounded-lg cursor-pointer transition-all duration-100 text-left w-full hover:bg-bg-secondary hover:border-border ${!project.exists ? 'missing opacity-60 !cursor-default hover:!bg-transparent hover:!border-transparent' : ''}`}
+          onClick={() => {
+            if (project.exists) {
+              onOpenProject(project.path);
+            } else {
+              onRelocateFile(project.path, project.name);
+            }
+          }}
+          title={project.exists ? project.path : `File not found: ${project.path}. Click to locate.`}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              if (project.exists) {
+                onOpenProject(project.path);
+              } else {
+                onRelocateFile(project.path, project.name);
+              }
+            }
+          }}
+        >
+          {!project.exists ? (
+            <AlertTriangle size={20} className="text-warning shrink-0" />
+          ) : project.thumbnail ? (
+            <img
+              src={`data:image/png;base64,${project.thumbnail.data}`}
+              alt=""
+              className="project-thumbnail w-12 h-9 object-cover rounded bg-bg-tertiary shrink-0"
+            />
+          ) : (
+            <FileText size={20} className="text-text-muted shrink-0" />
+          )}
+          <span className="flex-1 text-sm text-text whitespace-nowrap overflow-hidden text-ellipsis">
+            {project.name}
+          </span>
+          {!project.exists ? (
+            <span className="text-xs text-warning italic whitespace-nowrap shrink-0">Click to locate</span>
+          ) : project.modifiedAt ? (
+            <span className="text-xs text-text-muted whitespace-nowrap shrink-0">
+              {formatRelativeDate(project.modifiedAt)}
+            </span>
+          ) : null}
+          <div
+            className={`flex gap-1 opacity-0 transition-opacity duration-100 group-hover:opacity-100 ${!project.exists ? '!opacity-100' : ''}`}
+          >
+            {project.exists && (
+              <IconButton
+                onClick={(e) => onToggleFavorite(project, e)}
+                label={
+                  project.isFavorite ? `Remove ${project.name} from favorites` : `Add ${project.name} to favorites`
+                }
+                size="xs"
+                variant="ghost"
+                color={project.isFavorite ? 'primary' : 'secondary'}
+                className={`project-action favorite opacity-0 group-hover:opacity-100 ${project.isFavorite ? 'active !opacity-100 !text-warning' : ''}`}
+                title={project.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                <Star size={16} fill={project.isFavorite ? 'currentColor' : 'none'} />
+              </IconButton>
+            )}
+            <IconButton
+              className="project-action danger hover:!text-error"
+              onClick={(e) => onRemoveRecent(project, e)}
+              label={`Remove ${project.name} from recent`}
+              size="xs"
+              variant="ghost"
+              color="secondary"
+              title="Remove from recent"
+            >
+              <Trash2 size={16} />
+            </IconButton>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}

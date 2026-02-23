@@ -1,17 +1,21 @@
 /**
- * Hook to handle native menu commands from the main process
+ * Hook to handle native menu commands from the main process.
+ * Uses a ref for the options object and imperative store reads
+ * to avoid re-registering the listener on every render.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useProjectStore } from '../store/projectStore';
+import { useAssemblyEditingStore } from '../store/assemblyEditingStore';
+import { useSelectionStore } from '../store/selectionStore';
+import { useUIStore } from '../store/uiStore';
 import {
   newProject,
   saveProject,
   saveProjectAs,
   openProject,
   openProjectFromPath,
-  clearRecentProjects,
-  hasUnsavedChanges
+  clearRecentProjects
 } from '../utils/fileOperations';
 import { logger } from '../utils/logger';
 
@@ -32,22 +36,24 @@ interface UseMenuCommandsOptions {
 }
 
 export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
-  const undo = useProjectStore((s) => s.undo);
-  const redo = useProjectStore((s) => s.redo);
-  const requestDeleteParts = useProjectStore((s) => s.requestDeleteParts);
-  const selectAllParts = useProjectStore((s) => s.selectAllParts);
-  const selectedPartIds = useProjectStore((s) => s.selectedPartIds);
-  const resetCamera = useProjectStore((s) => s.resetCamera);
-  const showToast = useProjectStore((s) => s.showToast);
-  const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
-  const filePath = useProjectStore((s) => s.filePath);
+  // Store options in a ref so the effect doesn't re-run when they change.
+  // The handler always reads the latest options via the ref.
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   useEffect(() => {
     const handleMenuCommand = async (command: string, ...args: unknown[]) => {
+      const opts = optionsRef.current;
+
+      // Read store state imperatively
+      const isEditingAssembly = useAssemblyEditingStore.getState().isEditingAssembly;
+      const showToast = useUIStore.getState().showToast;
+      const filePath = useProjectStore.getState().filePath;
+
       // Block certain file operations when editing a template or assembly
       const blockableFileCommands = ['new-project', 'new-from-template', 'open-project', 'open-recent'];
-      if ((isEditingAssembly || options.isEditingTemplate) && blockableFileCommands.includes(command)) {
-        showToast(isEditingAssembly ? 'Finish editing assembly first' : 'Finish editing template first');
+      if ((isEditingAssembly || opts.isEditingTemplate) && blockableFileCommands.includes(command)) {
+        showToast(isEditingAssembly ? 'Finish editing assembly first' : 'Finish editing template first', 'warning');
         return;
       }
 
@@ -55,8 +61,8 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         // File commands
         case 'new-project': {
           // Use handler with unsaved changes dialog if provided
-          if (options.onNewProject) {
-            await options.onNewProject();
+          if (opts.onNewProject) {
+            await opts.onNewProject();
           } else {
             await newProject();
           }
@@ -64,33 +70,33 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         }
 
         case 'new-from-template': {
-          options.onOpenTemplateBrowser?.();
+          opts.onOpenTemplateBrowser?.();
           break;
         }
 
         case 'open-project': {
           // Use handler with unsaved changes dialog if provided
-          if (options.onOpenProject) {
-            await options.onOpenProject();
+          if (opts.onOpenProject) {
+            await opts.onOpenProject();
           } else {
             const result = await openProject();
             if (!result.success && result.error) {
-              showToast(result.error);
+              showToast(result.error, 'error');
             }
           }
           break;
         }
 
         case 'open-recent': {
-          const filePath = args[0] as string;
-          if (filePath) {
+          const recentFilePath = args[0] as string;
+          if (recentFilePath) {
             // Use handler with unsaved changes dialog if provided
-            if (options.onOpenRecentProject) {
-              await options.onOpenRecentProject(filePath);
+            if (opts.onOpenRecentProject) {
+              await opts.onOpenRecentProject(recentFilePath);
             } else {
-              const result = await openProjectFromPath(filePath);
+              const result = await openProjectFromPath(recentFilePath);
               if (!result.success && result.error) {
-                showToast(result.error);
+                showToast(result.error, 'error');
               }
             }
           }
@@ -99,88 +105,90 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
 
         case 'clear-recent': {
           await clearRecentProjects();
-          showToast('Recent projects cleared');
+          showToast('Recent projects cleared', 'success');
           break;
         }
 
         case 'save-project': {
           // Route to template or assembly save when in those modes
-          if (options.isEditingTemplate && options.onSaveTemplate) {
-            await options.onSaveTemplate();
+          if (opts.isEditingTemplate && opts.onSaveTemplate) {
+            await opts.onSaveTemplate();
             break;
           }
-          if (isEditingAssembly && options.onSaveAssembly) {
-            await options.onSaveAssembly();
+          if (isEditingAssembly && opts.onSaveAssembly) {
+            await opts.onSaveAssembly();
             break;
           }
           // Normal project save
           const result = await saveProject();
           if (result.success) {
-            showToast('Project saved');
+            showToast('Project saved', 'success');
           } else if (result.error) {
-            showToast(result.error);
+            showToast(result.error, 'error');
           }
           break;
         }
 
         case 'save-project-as': {
           // "Save As" doesn't apply to template or assembly editing
-          if (options.isEditingTemplate) {
-            showToast('Use "Save Template" to save template changes');
+          if (opts.isEditingTemplate) {
+            showToast('Use "Save Template" to save template changes', 'info');
             break;
           }
           if (isEditingAssembly) {
-            showToast('Use "Save Assembly" to save assembly changes');
+            showToast('Use "Save Assembly" to save assembly changes', 'info');
             break;
           }
           const result = await saveProjectAs();
           if (result.success) {
-            showToast('Project saved');
+            showToast('Project saved', 'success');
           } else if (result.error) {
-            showToast(result.error);
+            showToast(result.error, 'error');
           }
           break;
         }
 
         // Edit commands
         case 'undo':
-          undo();
+          useProjectStore.getState().undo();
           break;
 
         case 'redo':
-          redo();
+          useProjectStore.getState().redo();
           break;
 
-        case 'delete':
+        case 'delete': {
+          const selectedPartIds = useSelectionStore.getState().selectedPartIds;
           if (selectedPartIds.length > 0) {
-            requestDeleteParts(selectedPartIds);
+            useUIStore.getState().requestDeleteParts(selectedPartIds);
           }
           break;
+        }
 
         case 'select-all':
-          selectAllParts();
+          useProjectStore.getState().selectAllParts();
           break;
 
         // View commands
         case 'reset-camera':
-          resetCamera();
+          useProjectStore.getState().resetCamera();
           break;
 
         // App commands
         case 'open-settings':
-          options.onOpenSettings?.();
+          opts.onOpenSettings?.();
           break;
 
         case 'show-shortcuts':
-          options.onShowShortcuts?.();
+          opts.onShowShortcuts?.();
           break;
 
         case 'show-about':
-          options.onShowAbout?.();
+          opts.onShowAbout?.();
           break;
 
         case 'close-project': {
-          options.onCloseProject?.();
+          opts.onCloseProject?.();
           break;
         }
 
@@ -188,13 +196,13 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
           if (filePath) {
             try {
               await window.electronAPI.addFavoriteProject(filePath);
-              showToast('Added to favorites');
+              showToast('Added to favorites', 'success');
             } catch (error) {
               logger.error('Failed to add to favorites:', error);
-              showToast('Failed to add to favorites');
+              showToast('Failed to add to favorites', 'error');
             }
           } else {
-            showToast('Save project first to add to favorites');
+            showToast('Save project first to add to favorites', 'warning');
           }
           break;
         }
@@ -204,21 +212,10 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
       }
     };
 
-    // Listen for menu commands from main process
+    // Listen for menu commands from main process — registered once
     const cleanup = window.electronAPI.onMenuCommand(handleMenuCommand);
 
-    // Clean up the listener when dependencies change or component unmounts
+    // Clean up the listener when component unmounts
     return cleanup;
-  }, [
-    undo,
-    redo,
-    requestDeleteParts,
-    selectAllParts,
-    selectedPartIds,
-    resetCamera,
-    showToast,
-    isEditingAssembly,
-    filePath,
-    options
-  ]);
+  }, []);
 }

@@ -8,7 +8,7 @@ export default defineConfig({
     environment: 'happy-dom',
     globals: true,
     setupFiles: ['./tests/setup.ts'],
-    exclude: ['**/node_modules/**', '**/e2e/**', '**/tests/e2e/**'],
+    exclude: ['**/node_modules/**', '**/e2e/**', '**/tests/e2e/**', 'src/main/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
@@ -20,13 +20,16 @@ export default defineConfig({
         '**/mockData',
         '**/types.ts',
         'src/main/index.ts', // Electron main entry
-        'src/preload/index.ts' // Preload script
+        'src/preload/index.ts', // Preload script
+        '**/templates/data/*.json',
+        '**/templates/thumbnails.json'
       ],
-      // Coverage thresholds
-      lines: 80,
-      functions: 80,
-      branches: 75,
-      statements: 80
+      thresholds: {
+        statements: 91,
+        branches: 82,
+        functions: 90,
+        lines: 91
+      }
     },
     // Mock Electron APIs
     mockReset: true,

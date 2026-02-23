@@ -63,7 +63,7 @@ vi.mock('three', () => ({
     rotation: { set: vi.fn() },
     scale: { set: vi.fn() }
   })),
-  Vector3: vi.fn(function(this: any, x = 0, y = 0, z = 0) {
+  Vector3: vi.fn(function (this: any, x = 0, y = 0, z = 0) {
     this.x = x;
     this.y = y;
     this.z = z;
@@ -85,23 +85,34 @@ vi.mock('three', () => ({
       this.z -= v.z;
       return this;
     });
-    this.applyQuaternion = vi.fn(function(this: any) { return this; });
+    this.applyQuaternion = vi.fn(function (this: any) {
+      return this;
+    });
     this.distanceTo = vi.fn().mockReturnValue(0);
     return this;
   }),
-  Euler: vi.fn(function(this: any, x = 0, y = 0, z = 0, order = 'XYZ') {
+  Euler: vi.fn(function (this: any, x = 0, y = 0, z = 0, order = 'XYZ') {
     this.x = x;
     this.y = y;
     this.z = z;
     this.order = order;
+    this.set = vi.fn((newX: number, newY: number, newZ: number, newOrder = 'XYZ') => {
+      this.x = newX;
+      this.y = newY;
+      this.z = newZ;
+      this.order = newOrder;
+      return this;
+    });
     return this;
   }),
-  Quaternion: vi.fn(function(this: any) {
+  Quaternion: vi.fn(function (this: any) {
     this.x = 0;
     this.y = 0;
     this.z = 0;
     this.w = 1;
-    this.setFromEuler = vi.fn(function(this: any) { return this; });
+    this.setFromEuler = vi.fn(function (this: any) {
+      return this;
+    });
     return this;
   }),
   Raycaster: vi.fn(),

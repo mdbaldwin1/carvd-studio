@@ -6,6 +6,10 @@
 import { useState, useCallback, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useProjectStore, generateThumbnail } from '../store/projectStore';
+import { useLicenseStore } from '../store/licenseStore';
+import { useUIStore } from '../store/uiStore';
+import { useCameraStore } from '../store/cameraStore';
+import { UNTITLED_TEMPLATE_NAME } from '../constants/appDefaults';
 import { UserTemplate } from '../templates';
 import { Project } from '../types';
 import { getFeatureLimits, getBlockedMessage } from '../utils/featureLimits';
@@ -53,7 +57,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
   const { onSaveComplete, onDiscardComplete } = options;
   const loadProject = useProjectStore((s) => s.loadProject);
   const isDirty = useProjectStore((s) => s.isDirty);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
   const markClean = useProjectStore((s) => s.markClean);
 
   // Template editing state
@@ -79,7 +83,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
     async (template: UserTemplate): Promise<boolean> => {
       // Check if current project has unsaved changes
       if (hasUnsavedChanges()) {
-        showToast('Save or discard your project first');
+        showToast('Save or discard your project first', 'warning');
         return false;
       }
 
@@ -100,7 +104,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
           overageFactor: projectStore.overageFactor,
           projectNotes: projectStore.projectNotes,
           stockConstraints: projectStore.stockConstraints,
-          cameraState: projectStore.cameraState || undefined,
+          cameraState: useCameraStore.getState().cameraState || undefined,
           createdAt: projectStore.createdAt,
           modifiedAt: projectStore.modifiedAt
         };
@@ -131,7 +135,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
         return true;
       } catch (error) {
         logger.error('Failed to start template editing:', error);
-        showToast('Failed to load template');
+        showToast('Failed to load template', 'error');
         return false;
       }
     },
@@ -141,16 +145,15 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
   // Start creating a new template - shows setup dialog first
   const startCreatingNew = useCallback(() => {
     // Check license limits for custom templates
-    const projectStore = useProjectStore.getState();
-    const limits = getFeatureLimits(projectStore.licenseMode);
+    const limits = getFeatureLimits(useLicenseStore.getState().licenseMode);
     if (!limits.canUseCustomTemplates) {
-      showToast(getBlockedMessage('useTemplates'));
+      showToast(getBlockedMessage('useTemplates'), 'warning');
       return;
     }
 
     // Check if current project has unsaved changes
     if (hasUnsavedChanges()) {
-      showToast('Save or discard your project first');
+      showToast('Save or discard your project first', 'warning');
       return;
     }
 
@@ -177,7 +180,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
         overageFactor: projectStore.overageFactor,
         projectNotes: projectStore.projectNotes,
         stockConstraints: projectStore.stockConstraints,
-        cameraState: projectStore.cameraState || undefined,
+        cameraState: useCameraStore.getState().cameraState || undefined,
         createdAt: projectStore.createdAt,
         modifiedAt: projectStore.modifiedAt
       };
@@ -278,7 +281,8 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
         let thumbnailData:
           | { data: string; width: number; height: number; generatedAt: string; manuallySet?: boolean }
           | undefined;
-        const manualThumbnail = projectStore.manualThumbnail;
+        const uiState = useUIStore.getState();
+        const manualThumbnail = uiState.manualThumbnail;
 
         if (manualThumbnail) {
           // Use the manually captured thumbnail
@@ -290,7 +294,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
             manuallySet: true
           };
           // Clear the manual thumbnail after using it
-          projectStore.clearManualThumbnail();
+          uiState.clearManualThumbnail();
         } else if (!state.isCreatingNew && state.templateId) {
           // Check if existing template has a manually set thumbnail - preserve it
           try {
@@ -335,7 +339,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
           };
 
           await window.electronAPI.addUserTemplate(newTemplate);
-          showToast(`Created template "${name}"`);
+          showToast(`Created template "${name}"`, 'success');
         } else {
           // Update existing template
           await window.electronAPI.updateUserTemplate(state.templateId, {
@@ -346,7 +350,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
             thumbnailData, // Update thumbnail
             project: JSON.stringify(templateProject)
           });
-          showToast(`Saved template "${name}"`);
+          showToast(`Saved template "${name}"`, 'success');
         }
 
         // Restore original project
@@ -372,7 +376,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
         onSaveComplete?.();
       } catch (error) {
         logger.error('Failed to save template:', error);
-        showToast('Failed to save template');
+        showToast('Failed to save template', 'error');
       }
     },
     [state, loadProject, showToast, markClean, onSaveComplete]
@@ -389,7 +393,7 @@ export function useTemplateEditing(options: UseTemplateEditingOptions = {}): Use
     const projectStore = useProjectStore.getState();
     // Always use current store values - they're set when template loads and updated by Template Settings modal
     // Use nullish coalescing (??) to allow empty strings, only fall back if undefined/null
-    const name = projectStore.projectName || state.templateName || 'Untitled Template';
+    const name = projectStore.projectName || state.templateName || UNTITLED_TEMPLATE_NAME;
     // For description, use store value directly (can be empty string - that's valid)
     const description = projectStore.projectNotes ?? '';
     await saveAndExit(name, description);

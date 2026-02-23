@@ -5,6 +5,8 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useProjectStore } from '../store/projectStore';
+import { useUIStore } from '../store/uiStore';
+import { useCameraStore } from '../store/cameraStore';
 import { serializeProject, parseCarvdFile, deserializeToProject } from '../utils/fileFormat';
 import { logger } from '../utils/logger';
 
@@ -58,11 +60,11 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
   const groupMembers = useProjectStore((s) => s.groupMembers);
   const assemblies = useProjectStore((s) => s.assemblies);
   const snapGuides = useProjectStore((s) => s.snapGuides);
-  const cameraState = useProjectStore((s) => s.cameraState);
+  const cameraState = useCameraStore((s) => s.cameraState);
   const customShoppingItems = useProjectStore((s) => s.customShoppingItems);
   const cutList = useProjectStore((s) => s.cutList);
   const loadProject = useProjectStore((s) => s.loadProject);
-  const showToast = useProjectStore((s) => s.showToast);
+  const showToast = useUIStore((s) => s.showToast);
 
   const [hasRecovery, setHasRecovery] = useState(false);
   const [recoveryInfo, setRecoveryInfo] = useState<RecoveryInfo | null>(null);
@@ -225,7 +227,7 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
     try {
       const content = await window.electronAPI.readRecoveryFile(recoveryInfo.fileName);
       if (!content) {
-        showToast('Recovery file not found');
+        showToast('Recovery file not found', 'error');
         return false;
       }
 
@@ -244,13 +246,13 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
           projectData = parsed;
         }
       } catch {
-        showToast('Recovery file is corrupted');
+        showToast('Recovery file is corrupted', 'error');
         return false;
       }
 
       const validation = parseCarvdFile(JSON.stringify(projectData));
       if (!validation.valid || !validation.data) {
-        showToast('Recovery file is corrupted');
+        showToast('Recovery file is corrupted', 'error');
         return false;
       }
 
@@ -269,12 +271,12 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
 
       setHasRecovery(false);
       setRecoveryInfo(null);
-      showToast('Project restored from auto-save');
+      showToast('Project restored from auto-save', 'success');
 
       return true;
     } catch (error) {
       logger.error('[AutoRecovery] Failed to restore:', error);
-      showToast('Failed to restore project');
+      showToast('Failed to restore project', 'error');
       return false;
     }
   }, [recoveryInfo, loadProject, showToast]);

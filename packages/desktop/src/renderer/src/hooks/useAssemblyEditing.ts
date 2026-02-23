@@ -5,6 +5,9 @@
 
 import { useState, useCallback } from 'react';
 import { useProjectStore, generateThumbnail } from '../store/projectStore';
+import { useAssemblyEditingStore } from '../store/assemblyEditingStore';
+import { useLicenseStore } from '../store/licenseStore';
+import { useUIStore } from '../store/uiStore';
 import { useAssemblyLibrary } from './useAssemblyLibrary';
 import { useStockLibrary } from './useStockLibrary';
 import { Assembly, Part, Group, GroupMember, Stock } from '../types';
@@ -144,23 +147,22 @@ function assemblyToEditableParts(
 }
 
 export function useAssemblyEditing(): UseAssemblyEditingResult {
-  const isEditingAssembly = useProjectStore((s) => s.isEditingAssembly);
-  const editingAssemblyId = useProjectStore((s) => s.editingAssemblyId);
-  const editingAssemblyName = useProjectStore((s) => s.editingAssemblyName);
+  const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
+  const editingAssemblyId = useAssemblyEditingStore((s) => s.editingAssemblyId);
+  const editingAssemblyName = useAssemblyEditingStore((s) => s.editingAssemblyName);
   const isDirty = useProjectStore((s) => s.isDirty);
-  const startEditingAssembly = useProjectStore((s) => s.startEditingAssembly);
-  const saveEditingAssembly = useProjectStore((s) => s.saveEditingAssembly);
-  const cancelEditingAssembly = useProjectStore((s) => s.cancelEditingAssembly);
-  const restorePreviousProject = useProjectStore((s) => s.restorePreviousProject);
-  const startFreshAfterAssemblyEdit = useProjectStore((s) => s.startFreshAfterAssemblyEdit);
-  const showToast = useProjectStore((s) => s.showToast);
+  const startEditingAssembly = useAssemblyEditingStore((s) => s.startEditingAssembly);
+  const saveEditingAssembly = useAssemblyEditingStore((s) => s.saveEditingAssembly);
+  const cancelEditingAssembly = useAssemblyEditingStore((s) => s.cancelEditingAssembly);
+  const restorePreviousProject = useAssemblyEditingStore((s) => s.restorePreviousProject);
+  const showToast = useUIStore((s) => s.showToast);
 
   const { assemblies, addAssembly, updateAssembly } = useAssemblyLibrary();
   const { stocks: libraryStocks } = useStockLibrary();
 
   // Dialog state
   const [showExitDialog, setShowExitDialog] = useState(false);
-  const [pendingSave, setPendingSave] = useState(false);
+  const [, setPendingSave] = useState(false);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   // Start editing an existing assembly
@@ -169,7 +171,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
       // Check if current project has unsaved changes
       if (hasUnsavedChanges()) {
         // User needs to save or discard current project first
-        showToast('Save or discard your project first');
+        showToast('Save or discard your project first', 'warning');
         return false;
       }
 
@@ -189,17 +191,16 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
   // Start creating a new assembly from scratch
   const startCreatingNew = useCallback(async (): Promise<boolean> => {
     // Check license limits for assemblies
-    const projectStore = useProjectStore.getState();
-    const limits = getFeatureLimits(projectStore.licenseMode);
+    const limits = getFeatureLimits(useLicenseStore.getState().licenseMode);
     if (!limits.canUseAssemblies) {
-      showToast(getBlockedMessage('useAssemblies'));
+      showToast(getBlockedMessage('useAssemblies'), 'warning');
       return false;
     }
 
     // Check if current project has unsaved changes
     if (hasUnsavedChanges()) {
       // User needs to save or discard current project first
-      showToast('Save or discard your project first');
+      showToast('Save or discard your project first', 'warning');
       return false;
     }
 
@@ -230,7 +231,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
 
     if (!editingAssemblyId) {
       logger.error('[saveAndExit] No editingAssemblyId');
-      showToast('No assembly to save');
+      showToast('No assembly to save', 'warning');
       return;
     }
 
@@ -239,24 +240,23 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
     logger.debug('[saveAndExit] saveEditingAssembly returned:', updatedAssembly);
 
     if (!updatedAssembly) {
-      showToast('Failed to save assembly');
+      showToast('Failed to save assembly', 'error');
       return;
     }
 
     // Check if we have any parts
     if (updatedAssembly.parts.length === 0) {
-      showToast('Cannot save empty assembly - add at least one part');
+      showToast('Cannot save empty assembly - add at least one part', 'warning');
       return;
     }
 
     try {
-      const projectStore = useProjectStore.getState();
-
       // Check for manually captured thumbnail first
       let thumbnailData:
         | { data: string; width: number; height: number; generatedAt: string; manuallySet?: boolean }
         | undefined;
-      const manualThumbnail = projectStore.manualThumbnail;
+      const uiState = useUIStore.getState();
+      const manualThumbnail = uiState.manualThumbnail;
 
       if (manualThumbnail) {
         // Use the manually captured thumbnail
@@ -268,7 +268,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
           manuallySet: true
         };
         // Clear the manual thumbnail after using it
-        projectStore.clearManualThumbnail();
+        uiState.clearManualThumbnail();
       } else if (!shouldCreateNew) {
         // Check if existing assembly has a manually set thumbnail - preserve it
         const existingAssembly = assemblies.find((c) => c.id === editingAssemblyId);
@@ -304,7 +304,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
         logger.debug('[saveAndExit] Adding new assembly:', assemblyToSave);
         await addAssembly(assemblyToSave);
         logger.debug('[saveAndExit] addAssembly completed');
-        showToast(`Created "${updatedAssembly.name}" in library`);
+        showToast(`Created "${updatedAssembly.name}" in library`, 'success');
       } else {
         // Update existing assembly in library
         const updates = {
@@ -319,7 +319,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
         logger.debug('[saveAndExit] Updating assembly:', editingAssemblyId, updates);
         await updateAssembly(editingAssemblyId, updates);
         logger.debug('[saveAndExit] updateAssembly completed');
-        showToast(`Saved "${updatedAssembly.name}" to library`);
+        showToast(`Saved "${updatedAssembly.name}" to library`, 'success');
       }
 
       // Exit editing mode and restore previous project
@@ -328,7 +328,7 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
       restorePreviousProject();
     } catch (error) {
       logger.error('Failed to save assembly to library:', error);
-      showToast('Failed to save assembly to library');
+      showToast('Failed to save assembly to library', 'error');
     }
   }, [
     editingAssemblyId,
@@ -338,7 +338,8 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
     updateAssembly,
     cancelEditingAssembly,
     restorePreviousProject,
-    showToast
+    showToast,
+    isCreatingNew
   ]);
 
   // Discard changes and exit editing mode

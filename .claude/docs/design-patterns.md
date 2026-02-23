@@ -1,8 +1,15 @@
 # Design Patterns
 
-## CSS Variables
+Workflow and policy source of truth: see `AGENTS.md` for branch strategy, commit conventions, PR/changelog rules, security handling, and validation gates. This file is implementation/reference guidance.
 
-All styles in `packages/desktop/src/renderer/src/index.css`.
+## CSS & Tailwind
+
+Desktop uses **Tailwind CSS 4** with CSS custom properties for theming. Styles are in `packages/desktop/src/renderer/src/`:
+
+- `tailwind.css` — Tailwind import, `:root` / `[data-theme='light']` CSS variables, `@theme inline` mappings
+- `primitives.css` — Base component styles (buttons, inputs, modals, fonts)
+- `layout.css` — Layout styles (sidebar, header, panels)
+- `domain.css` — Domain-specific styles (3D workspace, cut list)
 
 ### Colors
 
@@ -76,24 +83,27 @@ btn-danger    // Red - destructive actions
 
 **Do:**
 
-```css
+```tsx
+// Tailwind utilities with theme tokens
+<div className="flex p-4 bg-surface text-text border border-border rounded-md">
+
+// CSS custom properties in custom CSS
 .my-component {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  color: var(--color-text);
 }
 ```
 
 **Don't:**
 
 ```tsx
-// No Tailwind
-<div className="flex p-4 bg-gray-800">
+// No hardcoded Tailwind colors — use theme tokens
+<div className="bg-gray-800 text-white">
 
 // No inline styles
 <div style={{ padding: '16px' }}>
 
-// No hardcoded colors
+// No hardcoded hex values in CSS
 .my-component { background: #242424; }
 ```
 
@@ -151,10 +161,14 @@ const handleClick = () => {};
 ```
 components/   → One component per file (PascalCase.tsx)
 hooks/        → One hook per file (useCamelCase.ts)
-store/        → Zustand stores
+store/        → Zustand stores (projectStore, uiStore, selectionStore, cameraStore, etc.)
 utils/        → Pure functions (camelCase.ts)
+templates/    → Template definitions, loaders, built-in assemblies
 types.ts      → All interfaces
-index.css     → ALL styles
+tailwind.css  → Theme tokens + Tailwind import
+primitives.css → Base component styles
+layout.css    → Layout styles
+domain.css    → Domain-specific styles
 ```
 
 ## Website Patterns
@@ -165,16 +179,7 @@ The website uses **lucide-react** for UI icons and custom SVG components in `Bra
 
 ### Styling
 
-The website uses **Tailwind CSS** (unlike the desktop app which uses `index.css` only).
-
-## Commit Messages
-
-```
-feat: add dimension matching snap
-fix: kerf not applied correctly
-refactor: extract snap detection
-style: update button classes
-```
+The website uses **Tailwind CSS** independently from the desktop app.
 
 ## Code Quality
 
@@ -194,7 +199,7 @@ Both packages have `format:check` scripts for CI:
 ### Overview
 
 - **Framework:** Vitest + React Testing Library
-- **Coverage:** ~85% statements, ~76% branches (1625 tests)
+- **Coverage:** ~92% statements, ~82% branches (2822 tests: 2675 renderer + 147 main)
 - **Location:** Tests colocated with source files (`*.test.ts`, `*.test.tsx`)
 - **Helpers:** `/packages/desktop/tests/helpers/factories.ts`
 
@@ -212,7 +217,7 @@ npm run test -- --watch   # Watch mode
 ```typescript
 // Part factories
 createTestPart(overrides?)
-createTestPartWithStock(overrides?)
+createTestPartWithStock(stockId, overrides?)
 
 // Stock factories
 createTestStock(overrides?)
@@ -221,7 +226,7 @@ createBoardStock(overrides?)
 
 // Group factories
 createTestGroup(overrides?)
-createTestGroupMember(overrides?)
+createTestGroupMember(groupId, memberId, memberType?)
 
 // Assembly factory
 createTestAssembly(overrides?)

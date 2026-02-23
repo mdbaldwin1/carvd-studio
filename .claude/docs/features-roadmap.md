@@ -1,5 +1,7 @@
 # Features & Roadmap
 
+Workflow/policy source of truth: see `AGENTS.md`. This file tracks product capabilities, status, and roadmap context.
+
 ## Status: Production-Ready
 
 Core features complete. UX polish in progress for 1.0 release.
@@ -60,7 +62,7 @@ Core features complete. UX polish in progress for 1.0 release.
 - License system (Lemon Squeezy API + 7-day offline cache)
 - Auto-updater (electron-updater + GitHub Releases)
 - Post-update notification (shows what's new after an update)
-- CI/CD: `test.yml` (desktop unit + e2e, website unit + e2e, lint/typecheck/format) + `release.yml` (automated builds & GitHub Releases) + `changelog-check.yml` (enforces CHANGELOG.md updates on PRs to main)
+- CI/CD: `test.yml` (desktop unit + e2e, website unit + e2e, lint/typecheck/format) + `release.yml` (automated desktop builds & GitHub Releases) + `changelog-check.yml` (enforces CHANGELOG.md updates on PRs to main) + `sync-develop.yml` (merges main back into develop) + `website-version-bump.yml` (Vercel deploy, tag, version bump)
 - Release pipeline: macOS (code-signed + notarized via Developer ID Application cert) + Windows (unsigned)
 - Branch protection: Both `develop` and `main` protected — no direct pushes (even admins), all CI must pass
 - Pre-commit hooks: husky + lint-staged runs `prettier --check` on staged files
@@ -74,16 +76,18 @@ Core features complete. UX polish in progress for 1.0 release.
 - Dependabot: Weekly dependency updates for desktop and website, targeting develop branch
 - Welcome tutorial (3 steps)
 
-### Recent Upgrades (through v0.1.9)
+### Recent Upgrades (through v0.1.14)
 
 - React 19 (from React 18)
 - @react-three/fiber v9, @react-three/drei v10, three.js v0.182
 - electron-builder v26
-- Electron 35
+- Electron 40
+- Tailwind CSS 4 migration (from plain CSS)
 - macOS notarization (Developer ID Application cert + Apple notarytool)
 - Website emoji replacement with lucide-react icons + custom brand SVGs
 - Pre-commit hooks, issue templates, PR template, changelog CI check
 - Website CI integration (typecheck + format checks)
+- Comprehensive test coverage push (1625 → 2822 tests)
 
 ## Keyboard Shortcuts
 
@@ -105,20 +109,22 @@ Core features complete. UX polish in progress for 1.0 release.
 
 ## Test Coverage
 
-**Status:** ~85% statement coverage, ~76% branch coverage (1625 tests)
+**Status:** ~92% statement coverage, ~82% branch coverage (2822 tests: 2675 renderer + 147 main process)
 
 | Module              | Coverage |
 | ------------------- | -------- |
 | Hooks               | 100%     |
 | fileFormat.ts       | 100%     |
 | logger.ts           | 100%     |
+| featureLimits.ts    | 100%     |
+| seedData.ts         | 100%     |
 | fractions.ts        | 99%      |
 | cutListOptimizer.ts | 98%      |
-| featureLimits.ts    | 100%     |
-| templates/loader.ts | 90%      |
-| Trial components    | 90%+     |
-| Components          | 85-97%   |
-| projectStore.ts     | 76%      |
+| templates/loader.ts | ~90%     |
+| Components          | 88-97%   |
+| Trial components    | ~90%     |
+| projectStore.ts     | ~76%     |
+| appSettingsStore.ts | ~76%     |
 
 ## Known Issues
 

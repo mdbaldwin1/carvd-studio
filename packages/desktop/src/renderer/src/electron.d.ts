@@ -10,6 +10,7 @@ export interface ElectronAPI {
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, data: string) => Promise<void>;
   writeBinaryFile: (filePath: string, data: number[]) => Promise<void>;
+  showItemInFolder: (filePath: string) => Promise<{ success: boolean }>;
   getRecentProjects: () => Promise<string[]>;
   addRecentProject: (filePath: string) => Promise<void>;
   clearRecentProjects: () => Promise<void>;

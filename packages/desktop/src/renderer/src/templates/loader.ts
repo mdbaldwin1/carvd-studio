@@ -16,7 +16,6 @@ import {
   AssemblyPart,
   AssemblyGroup,
   AssemblyGroupMember,
-  EmbeddedStock,
   Rotation3D,
   StockConstraintSettings
 } from '../types';

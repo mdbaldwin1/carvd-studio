@@ -7,11 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Start screen Settings & Library buttons** — Added icon buttons in the start screen header for quick access to App Settings and Stock/Assembly Library without needing to open a project first
+- **Assembly editing from start screen** — Can now enter assembly edit mode directly from the start screen's assembly library
+- **Inline name editing on AssemblyEditingBanner** — Click the assembly name in the editing banner to rename it in-place
+- **Cut diagram detail modal** — Cutting diagrams in the Cut List modal are now clickable to open a larger detail view with zoom controls and per-part inspection.
+- **Error fallback copy action** — Added an icon-only copy button on the crash fallback screen to copy full error details to clipboard for easier bug reporting.
+- **Website download redirect tracking endpoint** — Added a Vercel API redirect (`/api/download`) that resolves latest GitHub release assets by platform and logs structured download-click events for analytics.
+
+### Changed
+
+- **Hotkey hint layout simplification** — Consolidated editor shortcut hints by moving view/undo hints into the bottom-left navigation helper, reducing duplicate hint blocks and improving readability on narrow windows with right-aligned stacked hints.
+- **PDF diagram label routing readability** — Improved small-part callout routing in cut-diagram PDFs with collision-aware lane placement, side-biased part anchors, and label-lane-aligned targets to reduce crossed/ambiguous leader lines.
+- **Website download links now use tracked redirects** — Home and Download page platform buttons now route through `/api/download` before forwarding to GitHub assets, enabling per-source/per-platform click tracking in Vercel logs.
+- **Download toasts now include file-manager actions** — Export/download success toasts now include a contextual `Show in Finder`/`Show in File Explorer` button, and CSV exports in Cut List tabs now use native save dialogs so the saved file can always be revealed.
+- **New Project material seeding now uses App Library** — Removed hardcoded starter stock definitions from the New Project dialog flow; selected materials now clone directly from the persisted app `stockLibrary`, so project defaults always reflect the user’s current library.
+- **Stock-to-part visual highlighting** — Selecting a stock row in the sidebar now highlights all matching parts in the 3D workspace for quick material-based scanning.
+- **Cut diagram detail UX** — Enlarged the diagram detail modal, switched zoom to uniform scaling across both axes, and added selected-part overlays/metadata (dimensions plus group-chain context).
+- **Website visual-system overhaul** — Refined website design tokens (surfaces, borders, contrast, radii, and shadows), updated shared shadcn primitives (`Button`, `Card`, `Badge`, `NavigationMenu`), and applied consistent desktop-aligned styling across header/footer, marketing pages, and docs navigation/content containers for a more cohesive Carvd Studio brand experience.
+- **Modal UX consistency pass (desktop)** — Standardized sizing, spacing, and section surfaces across major dialogs (`Stock Library`, `Add/Edit Stock`, `Add/Save Assembly`, `Import App State`, `Import to Library`, `File Recovery`, and `Template Browser`) to match the App/Project Settings visual system and improve readability on varied screen sizes.
+- **App Settings modal UX refresh** — Reorganized App Settings into focused tabs (`General`, `Snapping & Constraints`, `Data & License`), widened the dialog for better readability, and improved section scannability without changing existing setting behavior.
+- **App Settings tutorial cleanup** — Removed the `Reset Tutorial` action from App Settings now that tutorial access/reset is available from the start screen flow.
+- **Project Settings visual alignment** — Updated Project Settings sections to use the same card-style containers as App Settings for more consistent contrast and grouping.
+- **Properties panel UX refresh** — Increased panel width, added card-style grouping for key editing sections, and added toast feedback when position edits are blocked by overlap prevention.
+- **Properties panel advanced controls** — Consolidated `Allow Overlap`, `Glue-Up Panel`, and `Joinery Adjustments` under a collapsed `Advanced Settings` section to reduce noise in the main editing flow.
+- **Edit-mode header UX** — Replaced template/assembly editing banners with header-integrated mode chips (`Template`/`Assembly`) and inline editable name controls in the existing title area for project/template/assembly workflows.
+- **Library modal edit-flow hardening** — Added unsaved-change confirmation when switching selections during stock/assembly edits, ensured `Esc` cancels in-panel edits before closing the modal, and improved list keyboard accessibility (Enter/Space selection).
+- **Desktop library componentization and reuse pass** — Extracted shared library UI building blocks (`LibrarySidebar`, `LibraryDetailPane`, `LibraryDetailHeader`, `LibraryDetailRow`, `LibraryEmptyState`, `DocsLink`) plus reusable domain components (`StockFormFields`, `StockListItem`, `AssemblyListItem`, `AssemblyDetails`, `AssemblyPartsList`), and refactored stock/assembly tabs and add-modals to consume them for cleaner one-component-per-file structure and reduced duplicate markup.
+- **Desktop dialog + styling alignment pass** — Reworked the shared desktop `Dialog` wrapper to use Radix dialog primitives with preserved legacy close semantics, reduced per-screen tab style overrides on Start Screen/Cut List/Library flows, and migrated high-traffic desktop forms/actions (stock/assembly search bars, project/template dialogs, recents/favorites actions, template manager actions, and shopping-item forms) from custom/raw controls to shared ShadCN primitives (`Button`, `IconButton`, `Input`, `Textarea`, `Tabs`).
+- **Cross-app theme consistency alignment (bead carvd-studio-12.1)** — Aligned website typography and core theme semantics with desktop Twilight Studio conventions: website now uses Nunito Sans, maps `primary` to Gold CTA tokens, maps `accent`/`ring` to Cerulean interaction tokens, and maps `secondary` to Twilight Indigo to match desktop shadcn usage.
+- **Migrated UI component library to shadcn/ui with Radix UI primitives** across both desktop and website surfaces.
+- **Desktop migration completion** — Replaced custom button/form/overlay/layout primitives with shadcn components (`Button`, `Input`, `Select`, `Dialog`, `AlertDialog`, `Tabs`, `Table`, `Card`, `Accordion`, `Sidebar`, `Alert`, etc.), removed obsolete `primitives.css`, and simplified `layout.css`/`domain.css` to keep only Electron/domain-specific rules.
+- **Website migration completion** — Migrated all shared/page/docs/legal views to Tailwind + shadcn, removed legacy `packages/website/src/index.css`, and consolidated styling into `tailwind.css` with Twilight Studio dark/light theme token mapping.
+- **Accessibility and test modernization** — Shifted tests to role-based + Radix-compatible patterns, including portal-aware queries and state assertions (`data-state`/`data-disabled`), with desktop coverage thresholds maintained (`91/82/90/91`).
+- **Performance and bundle validation** — Completed desktop and website bundle audits; desktop net payload improved slightly post-migration, and website CSS dropped substantially (`-25.5%` raw, `-22.6%` gzip) with JS effectively flat.
+- **Migration documentation alignment** — Updated `CLAUDE.md` and migration handoff docs to reflect final shadcn architecture, component inventory, testing guidance, and bundle-impact expectations.
+- **Aesthetic redesign ("Twilight Studio" theme)** — Refreshed dark/light color palette with Twilight Indigo (#203864), Cerulean (#077187), Lilac Ash (#AEA4BF), Gold (#FFD21F), and Papaya Whip (#FFEECF); updated backgrounds, borders, text tones, sidebar, header, and button styles
+- **Font update** — Switched to Nunito Sans for improved readability and warmth
+- **Splash screen theming** — Splash screen now respects light/dark mode with theme-aware colors and font
+- **3D scene theming** — Canvas background and grid colors now follow the active theme
+- **Group actions in Properties panel** — Expanded group-focused controls in the Properties panel to mirror context-menu capabilities (center view, save as assembly, reference toggles, merge/group operations, add/remove group membership, and delete actions for single/multi/mixed selections).
+- **Cut diagram PDF readability overhaul** — Diagram exports now prioritize one board per page with orientation/scale tuned for legibility, plus improved callout labeling and larger text to better match real shop-floor usage.
+- **Website/docs screenshot refresh** — Replaced placeholder and stale captures across Home/Features/docs with current desktop screenshots and updated capture scripts for repeatable, dock-safe framing and timed interactive shots.
+- **Documentation alignment pass** — Updated docs for current template entry points (`File → New from Template...` and templates screen flow), cut-list diagram detail/export behavior, app-library stock save flow, and Project Settings favorites guidance.
+
 ### Fixed
 
+- **Start screen overlap in short windows** — Prevented the `Recents`/`Favorites` section from overlapping template tiles by allowing the start screen content column to scroll when vertical space is constrained.
+- **Packaged app header logo loading** — Fixed editor/header branding images not rendering in packaged desktop builds by switching renderer logo paths from absolute (`/branding/...`) to relative (`./branding/...`) URLs.
+- **Website link target fixes** — Corrected broken website navigation links by replacing invalid in-page `#download` anchors on Features/Pricing flows with `/download`, and added a missing `id="requirements"` anchor on the Download page for Support deep links.
+- **3D part visibility during orbit** — Disabled frustum culling for instanced part meshes to prevent parts disappearing at certain camera angles.
+- **Stock highlight dismissal** — Clicking empty workspace space now clears sidebar stock highlighting along with part selection.
+- **Desktop app icon color update** — Updated the branded app icon artwork to use the Carvd yellow beaver treatment and regenerated desktop icon assets (`icon.png`, `icon.icns`, `icon.ico`).
+- **Assembly thumbnail rendering** — Fixed missing `data:image/png;base64,` prefix in AssembliesTab causing broken thumbnail images
+- **Library icon inconsistency** — Start screen library button now uses the same `Library` icon as the editor header
+- **New Template button text contrast** — Button text on gold background is now dark (Twilight Indigo) instead of invisible white
+- **"Start Editing" from new template modal** — Creating a new template from the templates screen now correctly enters the 3D editor
+- **Recents not opening after templates navigation** — Clicking a recent project after visiting the templates screen now reliably opens the project
 - **Update Notification Visibility** — Update toast now appears above all modals on the start screen (z-index increased from 1100 to 10003)
 - **Automated PRs Now Trigger CI** — Version bump and sync PRs now use `WORKFLOW_PAT` instead of `GITHUB_TOKEN`, enabling CI checks on automated pull requests
 - **Sync-Develop Workflow Detection** — Fixed bug where sync workflow checked file differences instead of commit history, causing it to miss merge commits from main
+- **Keyboard ungroup parity** — `Ctrl/Cmd+Shift+G` now also ungroup selected groups (not only groups inferred from selected parts).
+- **PDF watermark logo distortion** — Watermark logo now preserves intrinsic image aspect ratio when rendered into exported PDFs.
+- **Assembly stock duplication on add** — Adding an assembly to a project now reuses equivalent existing project stock entries instead of creating duplicate stock rows when the same material already exists.
 
 ## [0.1.11] - 2026-02-14
 

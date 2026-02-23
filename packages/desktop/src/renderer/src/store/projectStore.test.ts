@@ -1,21 +1,62 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useProjectStore, validatePartsForCutList } from './projectStore';
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  useProjectStore,
+  validatePartsForCutList,
+  getContainingGroupId,
+  getAllDescendantPartIds,
+  getAllDescendantGroupIds,
+  getAncestorGroupIds,
+  isDescendantOf
+} from './projectStore';
+import { useLicenseStore } from './licenseStore';
+import { useAssemblyEditingStore } from './assemblyEditingStore';
+import { useSelectionStore } from './selectionStore';
+import { useSnapStore } from './snapStore';
+import { useUIStore } from './uiStore';
 import {
   createTestPart,
   createTestStock,
-  createTestGroup,
   createTestGroupMember,
   createTestProject,
-  createTestAssembly,
-  createNestedGroupStructure,
-  createDefaultStockConstraints
+  createTestAssembly
 } from '../../../../tests/helpers/factories';
-import type { Assembly } from '../types';
+import type { CutList, Stock } from '../types';
 
 // Helper to reset store state before each test
 const resetStore = () => {
   const store = useProjectStore.getState();
   store.newProject();
+  useSelectionStore.setState({
+    selectedPartIds: [],
+    selectedGroupIds: [],
+    hoveredPartId: null,
+    transformMode: 'translate',
+    activeDragDelta: null,
+    selectionBox: null,
+    expandedGroupIds: [],
+    editingGroupId: null
+  });
+  useUIStore.setState({
+    contextMenu: null,
+    toast: null,
+    pendingDeletePartIds: null,
+    cutListModalOpen: false,
+    saveAssemblyModalOpen: false,
+    manualThumbnail: null
+  });
+  useSnapStore.setState({
+    snapToPartsEnabled: true,
+    activeSnapLines: [],
+    referencePartIds: [],
+    activeReferenceDistances: []
+  });
+  useAssemblyEditingStore.setState({
+    isEditingAssembly: false,
+    editingAssemblyId: null,
+    editingAssemblyName: '',
+    previousProjectSnapshot: null
+  });
+  useLicenseStore.setState({ licenseMode: 'trial' });
 };
 
 describe('projectStore', () => {
@@ -63,8 +104,7 @@ describe('projectStore', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart();
 
-        const state = useProjectStore.getState();
-        expect(state.selectedPartIds).toContain(partId);
+        expect(useSelectionStore.getState().selectedPartIds).toContain(partId);
       });
 
       it('marks the project as dirty', () => {
@@ -195,29 +235,29 @@ describe('projectStore', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart();
 
-        expect(useProjectStore.getState().selectedPartIds).toContain(partId);
+        expect(useSelectionStore.getState().selectedPartIds).toContain(partId);
 
         store.deletePart(partId);
 
-        expect(useProjectStore.getState().selectedPartIds).not.toContain(partId);
+        expect(useSelectionStore.getState().selectedPartIds).not.toContain(partId);
       });
 
       it('removes the part from reference parts', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart();
-        store.addToReferences([partId]);
+        useSnapStore.getState().addToReferences([partId]);
 
-        expect(useProjectStore.getState().referencePartIds).toContain(partId);
+        expect(useSnapStore.getState().referencePartIds).toContain(partId);
 
         store.deletePart(partId);
 
-        expect(useProjectStore.getState().referencePartIds).not.toContain(partId);
+        expect(useSnapStore.getState().referencePartIds).not.toContain(partId);
       });
 
       it('removes the part from group memberships', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart();
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
 
         expect(useProjectStore.getState().groupMembers).toHaveLength(1);
 
@@ -234,7 +274,7 @@ describe('projectStore', () => {
         const part2Id = store.addPart({ name: 'Part 2' });
         store.addPart({ name: 'Part 3' });
 
-        store.selectParts([part1Id, part2Id]);
+        useSelectionStore.getState().selectParts([part1Id, part2Id]);
         store.deleteSelectedParts();
 
         const state = useProjectStore.getState();
@@ -245,7 +285,7 @@ describe('projectStore', () => {
       it('does nothing when no parts are selected', () => {
         const store = useProjectStore.getState();
         store.addPart();
-        store.clearSelection();
+        useSelectionStore.getState().clearSelection();
 
         store.deleteSelectedParts();
 
@@ -254,34 +294,13 @@ describe('projectStore', () => {
     });
 
     describe('delete confirmation flow', () => {
-      describe('requestDeleteParts', () => {
-        it('sets pending delete parts', () => {
-          const store = useProjectStore.getState();
-          const part1Id = store.addPart({ name: 'Part 1' });
-          const part2Id = store.addPart({ name: 'Part 2' });
-
-          store.requestDeleteParts([part1Id, part2Id]);
-
-          expect(useProjectStore.getState().pendingDeletePartIds).toEqual([part1Id, part2Id]);
-        });
-
-        it('does not delete parts immediately', () => {
-          const store = useProjectStore.getState();
-          const partId = store.addPart();
-
-          store.requestDeleteParts([partId]);
-
-          expect(useProjectStore.getState().parts).toHaveLength(1);
-        });
-      });
-
       describe('confirmDeleteParts', () => {
         it('deletes pending parts', () => {
           const store = useProjectStore.getState();
           const part1Id = store.addPart({ name: 'Part 1' });
           const part2Id = store.addPart({ name: 'Part 2' });
           store.addPart({ name: 'Part 3' });
-          store.requestDeleteParts([part1Id, part2Id]);
+          useUIStore.getState().requestDeleteParts([part1Id, part2Id]);
 
           store.confirmDeleteParts();
 
@@ -293,11 +312,11 @@ describe('projectStore', () => {
         it('clears pending delete list', () => {
           const store = useProjectStore.getState();
           const partId = store.addPart();
-          store.requestDeleteParts([partId]);
+          useUIStore.getState().requestDeleteParts([partId]);
 
           store.confirmDeleteParts();
 
-          expect(useProjectStore.getState().pendingDeletePartIds).toBeNull();
+          expect(useUIStore.getState().pendingDeletePartIds).toBeNull();
         });
 
         it('does nothing when no pending parts', () => {
@@ -307,20 +326,6 @@ describe('projectStore', () => {
           store.confirmDeleteParts();
 
           expect(useProjectStore.getState().parts).toHaveLength(1);
-        });
-      });
-
-      describe('cancelDeleteParts', () => {
-        it('clears pending delete list without deleting', () => {
-          const store = useProjectStore.getState();
-          const partId = store.addPart();
-          store.requestDeleteParts([partId]);
-
-          store.cancelDeleteParts();
-
-          const state = useProjectStore.getState();
-          expect(state.parts).toHaveLength(1);
-          expect(state.pendingDeletePartIds).toBeNull();
         });
       });
     });
@@ -373,7 +378,7 @@ describe('projectStore', () => {
         const part1Id = store.addPart({ name: 'Part 1' });
         const part2Id = store.addPart({ name: 'Part 2' });
 
-        store.selectParts([part1Id, part2Id]);
+        useSelectionStore.getState().selectParts([part1Id, part2Id]);
         const newIds = store.duplicateSelectedParts();
 
         const state = useProjectStore.getState();
@@ -383,98 +388,7 @@ describe('projectStore', () => {
     });
   });
 
-  // ============================================================
-  // Selection
-  // ============================================================
-
-  describe('selection', () => {
-    describe('selectPart', () => {
-      it('selects a single part', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart();
-        store.clearSelection();
-
-        store.selectPart(partId);
-
-        expect(useProjectStore.getState().selectedPartIds).toEqual([partId]);
-      });
-
-      it('replaces previous selection', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-
-        store.selectPart(part1Id);
-        store.selectPart(part2Id);
-
-        expect(useProjectStore.getState().selectedPartIds).toEqual([part2Id]);
-      });
-
-      it('clears selection when called with null', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart();
-        store.selectPart(partId);
-
-        store.selectPart(null);
-
-        expect(useProjectStore.getState().selectedPartIds).toEqual([]);
-      });
-    });
-
-    describe('togglePartSelection', () => {
-      it('adds a part to selection if not selected', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-
-        store.selectPart(part1Id);
-        store.togglePartSelection(part2Id);
-
-        expect(useProjectStore.getState().selectedPartIds).toContain(part1Id);
-        expect(useProjectStore.getState().selectedPartIds).toContain(part2Id);
-      });
-
-      it('removes a part from selection if already selected', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-
-        store.selectParts([part1Id, part2Id]);
-        store.togglePartSelection(part1Id);
-
-        expect(useProjectStore.getState().selectedPartIds).not.toContain(part1Id);
-        expect(useProjectStore.getState().selectedPartIds).toContain(part2Id);
-      });
-    });
-
-    describe('selectParts', () => {
-      it('selects multiple parts', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-        const part3Id = store.addPart();
-
-        store.selectParts([part1Id, part2Id]);
-
-        const selected = useProjectStore.getState().selectedPartIds;
-        expect(selected).toContain(part1Id);
-        expect(selected).toContain(part2Id);
-        expect(selected).not.toContain(part3Id);
-      });
-    });
-
-    describe('clearSelection', () => {
-      it('clears all selected parts', () => {
-        const store = useProjectStore.getState();
-        store.addPart();
-        store.addPart();
-
-        store.clearSelection();
-
-        expect(useProjectStore.getState().selectedPartIds).toEqual([]);
-      });
-    });
-  });
+  // Selection tests moved to selectionStore.test.ts
 
   // ============================================================
   // Stocks
@@ -552,7 +466,7 @@ describe('projectStore', () => {
         const part1Id = store.addPart();
         const part2Id = store.addPart();
 
-        store.selectParts([part1Id, part2Id]);
+        useSelectionStore.getState().selectParts([part1Id, part2Id]);
         store.assignStockToSelectedParts(stockId);
 
         const state = useProjectStore.getState();
@@ -565,7 +479,7 @@ describe('projectStore', () => {
         const stockId = store.addStock({ color: '#ff0000' });
         const partId = store.addPart({ color: '#000000' });
 
-        store.selectPart(partId);
+        useSelectionStore.getState().selectPart(partId);
         store.assignStockToSelectedParts(stockId);
 
         const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -577,7 +491,7 @@ describe('projectStore', () => {
         const stockId = store.addStock();
         const partId = store.addPart({ stockId });
 
-        store.selectPart(partId);
+        useSelectionStore.getState().selectPart(partId);
         store.assignStockToSelectedParts(null);
 
         const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -615,7 +529,7 @@ describe('projectStore', () => {
 
         const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
 
-        expect(useProjectStore.getState().selectedGroupIds).toContain(groupId);
+        expect(useSelectionStore.getState().selectedGroupIds).toContain(groupId);
       });
     });
 
@@ -676,7 +590,7 @@ describe('projectStore', () => {
         const part2Id = store.addPart({ name: 'Part 2' });
 
         const innerGroupId = store.createGroup('Inner Group', [{ id: part1Id, type: 'part' }]);
-        const outerGroupId = store.createGroup('Outer Group', [
+        store.createGroup('Outer Group', [
           { id: innerGroupId, type: 'group' },
           { id: part2Id, type: 'part' }
         ]);
@@ -764,295 +678,10 @@ describe('projectStore', () => {
       });
     });
 
-    describe('group selection', () => {
-      it('toggles group selection', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.clearSelection();
-        store.toggleGroupSelection(groupId);
-
-        expect(useProjectStore.getState().selectedGroupIds).toContain(groupId);
-
-        store.toggleGroupSelection(groupId);
-
-        expect(useProjectStore.getState().selectedGroupIds).not.toContain(groupId);
-      });
-
-      it('clears group selection', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.selectGroup(groupId);
-        expect(useProjectStore.getState().selectedGroupIds).toHaveLength(1);
-
-        store.clearGroupSelection();
-
-        expect(useProjectStore.getState().selectedGroupIds).toHaveLength(0);
-      });
-    });
-
-    describe('group editing mode', () => {
-      it('enters group editing mode', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.enterGroup(groupId);
-
-        const state = useProjectStore.getState();
-        expect(state.editingGroupId).toBe(groupId);
-        expect(state.selectedGroupIds).toHaveLength(0);
-        expect(state.selectedPartIds).toHaveLength(0);
-      });
-
-      it('exits group editing mode', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.enterGroup(groupId);
-        store.exitGroup();
-
-        expect(useProjectStore.getState().editingGroupId).toBeNull();
-      });
-
-      it('clears part selection when exiting group', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.enterGroup(groupId);
-        store.selectPart(partId);
-        store.exitGroup();
-
-        expect(useProjectStore.getState().selectedPartIds).toHaveLength(0);
-      });
-    });
-
-    describe('group expand/collapse', () => {
-      it('toggles group expanded state', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        // First collapse if auto-expanded
-        store.collapseGroup(groupId);
-        expect(useProjectStore.getState().expandedGroupIds).not.toContain(groupId);
-
-        // Toggle to expand
-        store.toggleGroupExpanded(groupId);
-        expect(useProjectStore.getState().expandedGroupIds).toContain(groupId);
-
-        // Toggle to collapse
-        store.toggleGroupExpanded(groupId);
-        expect(useProjectStore.getState().expandedGroupIds).not.toContain(groupId);
-      });
-
-      it('expands a specific group', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.expandGroup(groupId);
-
-        expect(useProjectStore.getState().expandedGroupIds).toContain(groupId);
-      });
-
-      it('does not duplicate when expanding already expanded group', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.expandGroup(groupId);
-        store.expandGroup(groupId);
-
-        const expandedCount = useProjectStore.getState().expandedGroupIds.filter((id) => id === groupId).length;
-        expect(expandedCount).toBe(1);
-      });
-
-      it('collapses a specific group', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
-
-        store.expandGroup(groupId);
-        store.collapseGroup(groupId);
-
-        expect(useProjectStore.getState().expandedGroupIds).not.toContain(groupId);
-      });
-
-      it('expands all groups', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        const group1Id = store.createGroup('Group 1', [{ id: part1Id, type: 'part' }]);
-        const group2Id = store.createGroup('Group 2', [{ id: part2Id, type: 'part' }]);
-
-        store.expandAllGroups();
-
-        const state = useProjectStore.getState();
-        expect(state.expandedGroupIds).toContain(group1Id);
-        expect(state.expandedGroupIds).toContain(group2Id);
-      });
-
-      it('collapses all groups', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        const group1Id = store.createGroup('Group 1', [{ id: part1Id, type: 'part' }]);
-        const group2Id = store.createGroup('Group 2', [{ id: part2Id, type: 'part' }]);
-
-        store.expandAllGroups();
-        store.collapseAllGroups();
-
-        expect(useProjectStore.getState().expandedGroupIds).toHaveLength(0);
-      });
-    });
+    // Group selection, editing, and expand/collapse tests moved to selectionStore.test.ts
   });
 
-  // ============================================================
-  // Clipboard
-  // ============================================================
-
-  describe('clipboard', () => {
-    describe('copySelectedParts', () => {
-      it('copies selected parts to clipboard', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        store.selectPart(partId);
-
-        store.copySelectedParts();
-
-        const state = useProjectStore.getState();
-        expect(state.clipboard.parts).toHaveLength(1);
-        expect(state.clipboard.parts[0].name).toBe('Test Part');
-      });
-
-      it('copies group structure with parts', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        const groupId = store.createGroup('Test Group', [
-          { id: part1Id, type: 'part' },
-          { id: part2Id, type: 'part' }
-        ]);
-
-        // Select the group
-        store.selectGroup(groupId);
-        store.copySelectedParts();
-
-        const state = useProjectStore.getState();
-        expect(state.clipboard.parts).toHaveLength(2);
-        expect(state.clipboard.groups).toHaveLength(1);
-        expect(state.clipboard.groupMembers).toHaveLength(2);
-      });
-    });
-
-    describe('pasteClipboard', () => {
-      it('creates new parts from clipboard', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Original' });
-        store.selectPart(partId);
-        store.copySelectedParts();
-
-        const newIds = store.pasteClipboard();
-
-        const state = useProjectStore.getState();
-        expect(state.parts).toHaveLength(2);
-        expect(newIds).toHaveLength(1);
-        expect(newIds[0]).not.toBe(partId);
-      });
-
-      it('offsets pasted parts from originals', () => {
-        const store = useProjectStore.getState();
-        store.addPart({ position: { x: 0, y: 0, z: 0 } });
-        store.copySelectedParts();
-
-        store.pasteClipboard();
-
-        const state = useProjectStore.getState();
-        const originalPart = state.parts[0];
-        const pastedPart = state.parts[1];
-
-        // Pasted part should be offset
-        expect(pastedPart.position.x).not.toBe(originalPart.position.x);
-      });
-
-      it('selects pasted parts', () => {
-        const store = useProjectStore.getState();
-        const originalId = store.addPart();
-        store.selectPart(originalId);
-        store.copySelectedParts();
-
-        const newIds = store.pasteClipboard();
-
-        const state = useProjectStore.getState();
-        expect(state.selectedPartIds).toEqual(newIds);
-      });
-    });
-
-    describe('pasteAtPosition', () => {
-      it('pastes parts centered at the specified position', () => {
-        const store = useProjectStore.getState();
-        store.addPart({
-          name: 'Test Part',
-          position: { x: 0, y: 0.375, z: 0 }
-        });
-        store.copySelectedParts();
-
-        const newIds = store.pasteAtPosition({ x: 50, y: 0, z: 50 });
-
-        const state = useProjectStore.getState();
-        expect(newIds).toHaveLength(1);
-        const pastedPart = state.parts.find((p) => p.id === newIds[0]);
-        expect(pastedPart?.position.x).toBeCloseTo(50);
-        expect(pastedPart?.position.z).toBeCloseTo(50);
-      });
-
-      it('maintains relative positions when pasting multiple parts', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart({
-          name: 'Part 1',
-          position: { x: 0, y: 0.375, z: 0 }
-        });
-        const part2Id = store.addPart({
-          name: 'Part 2',
-          position: { x: 10, y: 0.375, z: 0 }
-        });
-        store.selectParts([part1Id, part2Id]);
-        store.copySelectedParts();
-
-        store.pasteAtPosition({ x: 100, y: 0, z: 100 });
-
-        const state = useProjectStore.getState();
-        const pastedParts = state.parts.slice(2); // Last two parts
-        const xDiff = pastedParts[1].position.x - pastedParts[0].position.x;
-        expect(xDiff).toBeCloseTo(10); // Same relative distance
-      });
-
-      it('returns empty array when clipboard is empty', () => {
-        const store = useProjectStore.getState();
-
-        const newIds = store.pasteAtPosition({ x: 50, y: 0, z: 50 });
-
-        expect(newIds).toHaveLength(0);
-      });
-
-      it('selects pasted parts', () => {
-        const store = useProjectStore.getState();
-        store.addPart({ name: 'Test Part' });
-        store.copySelectedParts();
-
-        const newIds = store.pasteAtPosition({ x: 50, y: 0, z: 50 });
-
-        const state = useProjectStore.getState();
-        expect(state.selectedPartIds).toEqual(newIds);
-      });
-    });
-  });
+  // Clipboard tests moved to clipboardStore.test.ts
 
   // ============================================================
   // Project Operations
@@ -1199,170 +828,8 @@ describe('projectStore', () => {
   });
 
   // ============================================================
-  // View State
+  // View State (snap state tests moved to snapStore.test.ts)
   // ============================================================
-
-  describe('view state', () => {
-    describe('setDisplayMode', () => {
-      it('changes display mode to exploded', () => {
-        const store = useProjectStore.getState();
-
-        store.setDisplayMode('exploded');
-
-        expect(useProjectStore.getState().displayMode).toBe('exploded');
-      });
-
-      it('changes display mode to assembled', () => {
-        useProjectStore.setState({ displayMode: 'exploded' });
-        const store = useProjectStore.getState();
-
-        store.setDisplayMode('assembled');
-
-        expect(useProjectStore.getState().displayMode).toBe('assembled');
-      });
-    });
-
-    describe('setShowGrid', () => {
-      it('shows the grid', () => {
-        useProjectStore.setState({ showGrid: false });
-        const store = useProjectStore.getState();
-
-        store.setShowGrid(true);
-
-        expect(useProjectStore.getState().showGrid).toBe(true);
-      });
-
-      it('hides the grid', () => {
-        useProjectStore.setState({ showGrid: true });
-        const store = useProjectStore.getState();
-
-        store.setShowGrid(false);
-
-        expect(useProjectStore.getState().showGrid).toBe(false);
-      });
-    });
-
-    describe('setSnapToPartsEnabled', () => {
-      it('enables snap to parts', () => {
-        useProjectStore.setState({ snapToPartsEnabled: false });
-        const store = useProjectStore.getState();
-
-        store.setSnapToPartsEnabled(true);
-
-        expect(useProjectStore.getState().snapToPartsEnabled).toBe(true);
-      });
-
-      it('disables snap to parts', () => {
-        useProjectStore.setState({ snapToPartsEnabled: true });
-        const store = useProjectStore.getState();
-
-        store.setSnapToPartsEnabled(false);
-
-        expect(useProjectStore.getState().snapToPartsEnabled).toBe(false);
-      });
-    });
-
-    describe('setActiveSnapLines', () => {
-      it('sets active snap lines', () => {
-        const store = useProjectStore.getState();
-        const snapLines = [{ start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 0, z: 0 }, color: '#ff0000' }];
-
-        store.setActiveSnapLines(snapLines);
-
-        expect(useProjectStore.getState().activeSnapLines).toEqual(snapLines);
-      });
-
-      it('clears active snap lines', () => {
-        const store = useProjectStore.getState();
-        store.setActiveSnapLines([{ start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 0, z: 0 }, color: '#ff0000' }]);
-
-        store.setActiveSnapLines([]);
-
-        expect(useProjectStore.getState().activeSnapLines).toHaveLength(0);
-      });
-    });
-
-    describe('setReferencePartIds', () => {
-      it('sets reference part IDs directly', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-
-        store.setReferencePartIds([part1Id, part2Id]);
-
-        expect(useProjectStore.getState().referencePartIds).toEqual([part1Id, part2Id]);
-      });
-
-      it('replaces existing reference part IDs', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-        const part3Id = store.addPart();
-        store.setReferencePartIds([part1Id, part2Id]);
-
-        store.setReferencePartIds([part3Id]);
-
-        expect(useProjectStore.getState().referencePartIds).toEqual([part3Id]);
-      });
-    });
-  });
-
-  // ============================================================
-  // Reference Parts
-  // ============================================================
-
-  describe('reference parts', () => {
-    describe('addToReferences', () => {
-      it('adds parts to reference list', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-
-        store.addToReferences([part1Id, part2Id]);
-
-        expect(useProjectStore.getState().referencePartIds).toContain(part1Id);
-        expect(useProjectStore.getState().referencePartIds).toContain(part2Id);
-      });
-    });
-
-    describe('removeFromReferences', () => {
-      it('removes parts from reference list', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart();
-        store.addToReferences([partId]);
-
-        store.removeFromReferences([partId]);
-
-        expect(useProjectStore.getState().referencePartIds).not.toContain(partId);
-      });
-    });
-
-    describe('toggleReference', () => {
-      it('toggles reference status', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart();
-
-        store.toggleReference([partId]);
-        expect(useProjectStore.getState().referencePartIds).toContain(partId);
-
-        store.toggleReference([partId]);
-        expect(useProjectStore.getState().referencePartIds).not.toContain(partId);
-      });
-    });
-
-    describe('clearReferences', () => {
-      it('clears all reference parts', () => {
-        const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
-        store.addToReferences([part1Id, part2Id]);
-
-        store.clearReferences();
-
-        expect(useProjectStore.getState().referencePartIds).toHaveLength(0);
-      });
-    });
-  });
 
   // ============================================================
   // Snap Guides
@@ -1437,7 +904,7 @@ describe('projectStore', () => {
           skippedParts: [],
           kerfWidth: 0.125,
           overageFactor: 0.1
-        } as any;
+        } as unknown as CutList;
 
         store.setCutList(mockCutList);
 
@@ -1451,7 +918,7 @@ describe('projectStore', () => {
         store.setCutList({
           id: 'test',
           isStale: false
-        } as any);
+        } as unknown as CutList);
 
         store.markCutListStale();
 
@@ -1462,32 +929,11 @@ describe('projectStore', () => {
     describe('clearCutList', () => {
       it('removes the cut list', () => {
         const store = useProjectStore.getState();
-        store.setCutList({ id: 'test' } as any);
+        store.setCutList({ id: 'test' } as unknown as CutList);
 
         store.clearCutList();
 
         expect(useProjectStore.getState().cutList).toBeNull();
-      });
-    });
-
-    describe('openCutListModal', () => {
-      it('opens the cut list modal', () => {
-        const store = useProjectStore.getState();
-
-        store.openCutListModal();
-
-        expect(useProjectStore.getState().cutListModalOpen).toBe(true);
-      });
-    });
-
-    describe('closeCutListModal', () => {
-      it('closes the cut list modal', () => {
-        const store = useProjectStore.getState();
-        store.openCutListModal();
-
-        store.closeCutListModal();
-
-        expect(useProjectStore.getState().cutListModalOpen).toBe(false);
       });
     });
   });
@@ -1615,7 +1061,7 @@ describe('projectStore', () => {
         position: { x: 0, y: 0, z: 0 }
       });
 
-      store.selectPart(partId);
+      useSelectionStore.getState().selectPart(partId);
       store.moveSelectedParts({ x: 5, y: 10, z: 15 });
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -1631,8 +1077,8 @@ describe('projectStore', () => {
         { id: part2Id, type: 'part' }
       ]);
 
-      store.clearSelection();
-      store.selectGroup(groupId);
+      useSelectionStore.getState().clearSelection();
+      useSelectionStore.getState().selectGroup(groupId);
       store.moveSelectedParts({ x: 5, y: 5, z: 5 });
 
       const state = useProjectStore.getState();
@@ -1741,7 +1187,7 @@ describe('projectStore', () => {
           position: { x: 30, y: 0, z: 0 }
         });
 
-        store.selectParts([part1Id, part2Id]);
+        useSelectionStore.getState().selectParts([part1Id, part2Id]);
         const assembly = store.createAssemblyFromSelection('My Assembly', 'A test assembly');
 
         expect(assembly).not.toBeNull();
@@ -1759,7 +1205,7 @@ describe('projectStore', () => {
           position: { x: 30, y: 0, z: 0 }
         });
 
-        store.selectParts([part1Id, part2Id]);
+        useSelectionStore.getState().selectParts([part1Id, part2Id]);
         const assembly = store.createAssemblyFromSelection('Test');
 
         // Parts should be centered around origin
@@ -1772,7 +1218,7 @@ describe('projectStore', () => {
 
       it('returns null when nothing is selected', () => {
         const store = useProjectStore.getState();
-        store.clearSelection();
+        useSelectionStore.getState().clearSelection();
 
         const assembly = store.createAssemblyFromSelection('Test');
 
@@ -1788,8 +1234,8 @@ describe('projectStore', () => {
           { id: part2Id, type: 'part' }
         ]);
 
-        store.clearSelection();
-        store.selectGroup(groupId);
+        useSelectionStore.getState().clearSelection();
+        useSelectionStore.getState().selectGroup(groupId);
         const assembly = store.createAssemblyFromSelection('Grouped Assembly');
 
         expect(assembly!.groups.length).toBeGreaterThan(0);
@@ -1799,7 +1245,7 @@ describe('projectStore', () => {
       it('stores stock ID reference in assembly parts', () => {
         const store = useProjectStore.getState();
         const stockId = store.addStock({ name: 'Test Stock' });
-        const partId = store.addPart({ name: 'Part with Stock' });
+        store.addPart({ name: 'Part with Stock' });
         store.assignStockToSelectedParts(stockId); // Part is auto-selected on creation
 
         const assembly = store.createAssemblyFromSelection('Stock Assembly');
@@ -1817,7 +1263,7 @@ describe('projectStore', () => {
           name: 'Shelf',
           position: { x: 0, y: 0, z: 0 }
         });
-        store.selectParts([part1Id]);
+        useSelectionStore.getState().selectParts([part1Id]);
         const assembly = store.createAssemblyFromSelection('Shelf Assembly');
         store.addAssembly(assembly!);
 
@@ -1854,7 +1300,7 @@ describe('projectStore', () => {
           grainSensitive: true,
           grainDirection: 'width'
         });
-        store.selectParts([partId]);
+        useSelectionStore.getState().selectParts([partId]);
         const assembly = store.createAssemblyFromSelection('Custom Assembly');
         store.addAssembly(assembly!);
         store.deletePart(partId);
@@ -1879,8 +1325,8 @@ describe('projectStore', () => {
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
         ]);
-        store.clearSelection();
-        store.selectGroup(groupId);
+        useSelectionStore.getState().clearSelection();
+        useSelectionStore.getState().selectGroup(groupId);
         const assembly = store.createAssemblyFromSelection('Grouped');
         store.addAssembly(assembly!);
 
@@ -1894,349 +1340,6 @@ describe('projectStore', () => {
         expect(state.parts.length).toBeGreaterThan(0);
         expect(state.groups.length).toBeGreaterThan(0);
         expect(state.groupMembers.length).toBeGreaterThan(0);
-      });
-    });
-
-    describe('save assembly modal', () => {
-      it('opens the save assembly modal', () => {
-        const store = useProjectStore.getState();
-        expect(store.saveAssemblyModalOpen).toBe(false);
-
-        store.openSaveAssemblyModal();
-
-        expect(useProjectStore.getState().saveAssemblyModalOpen).toBe(true);
-      });
-
-      it('closes the save assembly modal', () => {
-        const store = useProjectStore.getState();
-        store.openSaveAssemblyModal();
-
-        store.closeSaveAssemblyModal();
-
-        expect(useProjectStore.getState().saveAssemblyModalOpen).toBe(false);
-      });
-    });
-  });
-
-  // ============================================================
-  // Assembly Editing Mode
-  // ============================================================
-
-  describe('assembly editing', () => {
-    describe('startEditingAssembly', () => {
-      it('enters assembly editing mode', () => {
-        const store = useProjectStore.getState();
-
-        store.startEditingAssembly('assembly-123', 'Test Assembly', [createTestPart({ id: 'part-1', name: 'Shelf' })]);
-
-        const state = useProjectStore.getState();
-        expect(state.isEditingAssembly).toBe(true);
-        expect(state.editingAssemblyId).toBe('assembly-123');
-        expect(state.editingAssemblyName).toBe('Test Assembly');
-      });
-
-      it('saves previous project state snapshot', () => {
-        const store = useProjectStore.getState();
-        store.addPart({ name: 'Existing Part' });
-        store.addStock({ name: 'Existing Stock' });
-
-        store.startEditingAssembly('assembly-123', 'Test Assembly', [createTestPart({ id: 'part-1' })]);
-
-        const state = useProjectStore.getState();
-        expect(state.previousProjectSnapshot).not.toBeNull();
-        expect(state.previousProjectSnapshot!.parts.some((p) => p.name === 'Existing Part')).toBe(true);
-      });
-
-      it('loads assembly parts into workspace', () => {
-        const store = useProjectStore.getState();
-        const assemblyParts = [
-          createTestPart({ id: 'part-1', name: 'Assembly Part 1' }),
-          createTestPart({ id: 'part-2', name: 'Assembly Part 2' })
-        ];
-
-        store.startEditingAssembly('assembly-123', 'Test Assembly', assemblyParts);
-
-        const state = useProjectStore.getState();
-        expect(state.parts).toHaveLength(2);
-        expect(state.parts[0].name).toBe('Assembly Part 1');
-        expect(state.parts[1].name).toBe('Assembly Part 2');
-      });
-
-      it('merges embedded stocks with existing stocks', () => {
-        const store = useProjectStore.getState();
-        const existingStockId = store.addStock({ name: 'Existing Stock' });
-        const embeddedStock = createTestStock({ id: 'embedded-1', name: 'Embedded Stock' });
-
-        store.startEditingAssembly('assembly-123', 'Test Assembly', [createTestPart()], [], [], [embeddedStock]);
-
-        const state = useProjectStore.getState();
-        expect(state.stocks.some((s) => s.id === existingStockId)).toBe(true);
-        expect(state.stocks.some((s) => s.name === 'Embedded Stock')).toBe(true);
-      });
-
-      it('updates project name to indicate editing mode', () => {
-        const store = useProjectStore.getState();
-
-        store.startEditingAssembly('assembly-123', 'Drawer Assembly', [createTestPart()]);
-
-        expect(useProjectStore.getState().projectName).toContain('Drawer Assembly');
-      });
-
-      it('expands all groups when loading assembly with groups', () => {
-        const store = useProjectStore.getState();
-        const part1 = createTestPart({ name: 'Part 1' });
-        const part2 = createTestPart({ name: 'Part 2' });
-        const group = createTestGroup({ name: 'Test Group' });
-        const groupMember = createTestGroupMember(group.id, part1.id);
-
-        store.startEditingAssembly('assembly-123', 'Assembly with Groups', [part1, part2], [group], [groupMember]);
-
-        const state = useProjectStore.getState();
-        expect(state.groups).toHaveLength(1);
-        expect(state.expandedGroupIds).toContain(group.id);
-      });
-
-      it('clears selection and UI state when entering edit mode', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Selected Part' });
-        store.selectPart(partId);
-        store.addToReferences([partId]);
-
-        store.startEditingAssembly('assembly-123', 'Test Assembly', [createTestPart()]);
-
-        const state = useProjectStore.getState();
-        expect(state.selectedPartIds).toHaveLength(0);
-        expect(state.referencePartIds).toHaveLength(0);
-        expect(state.editingGroupId).toBeNull();
-      });
-    });
-
-    describe('saveEditingAssembly', () => {
-      it('returns null when not in editing mode', () => {
-        const store = useProjectStore.getState();
-
-        const result = store.saveEditingAssembly();
-
-        expect(result).toBeNull();
-      });
-
-      it('creates assembly from current workspace parts', () => {
-        const store = useProjectStore.getState();
-        store.startEditingAssembly('assembly-123', 'Test Assembly', [createTestPart({ name: 'Original Part' })]);
-
-        // Modify the workspace
-        store.addPart({ name: 'New Part' });
-
-        const assembly = store.saveEditingAssembly();
-
-        expect(assembly).not.toBeNull();
-        expect(assembly!.parts).toHaveLength(2);
-        expect(assembly!.parts.some((p) => p.name === 'New Part')).toBe(true);
-      });
-
-      it('preserves the assembly ID', () => {
-        const store = useProjectStore.getState();
-        store.startEditingAssembly('assembly-123', 'Test Assembly', [createTestPart()]);
-
-        const assembly = store.saveEditingAssembly();
-
-        expect(assembly!.id).toBe('assembly-123');
-      });
-
-      it('normalizes part positions in the saved assembly', () => {
-        const store = useProjectStore.getState();
-        store.startEditingAssembly('assembly-123', 'Test Assembly', [
-          createTestPart({ position: { x: 10, y: 0, z: 0 } }),
-          createTestPart({ position: { x: 30, y: 0, z: 0 } })
-        ]);
-
-        const assembly = store.saveEditingAssembly();
-
-        // Parts should be centered
-        const sumX = assembly!.parts.reduce((sum, p) => sum + p.relativePosition.x, 0);
-        expect(sumX).toBeCloseTo(0, 5);
-      });
-
-      it('returns null when no parts in workspace', () => {
-        const store = useProjectStore.getState();
-        store.startEditingAssembly('assembly-123', 'Test Assembly', [createTestPart()]);
-
-        // Delete all parts
-        const partId = useProjectStore.getState().parts[0].id;
-        store.deletePart(partId);
-
-        const assembly = store.saveEditingAssembly();
-
-        expect(assembly).toBeNull();
-      });
-
-      it('embeds stock data in assembly parts', () => {
-        const store = useProjectStore.getState();
-        const stockId = store.addStock({
-          name: 'Test Plywood',
-          length: 96,
-          width: 48,
-          thickness: 0.75,
-          color: '#c4a574'
-        });
-
-        const partWithStock = createTestPart({ stockId, name: 'Part with Stock' });
-
-        store.startEditingAssembly('assembly-123', 'Test Assembly', [partWithStock]);
-
-        const assembly = store.saveEditingAssembly();
-
-        expect(assembly).not.toBeNull();
-        expect(assembly!.parts[0].embeddedStock).toBeDefined();
-        expect(assembly!.parts[0].embeddedStock!.name).toBe('Test Plywood');
-        expect(assembly!.parts[0].embeddedStock!.thickness).toBe(0.75);
-        expect(assembly!.parts[0].embeddedStock!.color).toBe('#c4a574');
-      });
-
-      it('includes groups and group members in saved assembly', () => {
-        const store = useProjectStore.getState();
-        const part1 = createTestPart({ name: 'Part 1' });
-        const part2 = createTestPart({ name: 'Part 2' });
-        const group = createTestGroup({ name: 'Test Group' });
-        const groupMember1 = createTestGroupMember(group.id, part1.id);
-        const groupMember2 = createTestGroupMember(group.id, part2.id);
-
-        store.startEditingAssembly(
-          'assembly-123',
-          'Grouped Assembly',
-          [part1, part2],
-          [group],
-          [groupMember1, groupMember2]
-        );
-
-        const assembly = store.saveEditingAssembly();
-
-        expect(assembly).not.toBeNull();
-        expect(assembly!.groups).toHaveLength(1);
-        expect(assembly!.groups[0].name).toBe('Test Group');
-        expect(assembly!.groupMembers).toHaveLength(2);
-      });
-    });
-
-    describe('cancelEditingAssembly', () => {
-      it('does nothing when not in editing mode', () => {
-        // Force exit any editing mode first
-        const store = useProjectStore.getState();
-        if (store.isEditingAssembly) {
-          store.cancelEditingAssembly();
-        }
-
-        // Now verify we're not in editing mode
-        expect(useProjectStore.getState().isEditingAssembly).toBe(false);
-
-        // Calling cancelEditingAssembly when not editing should be safe
-        useProjectStore.getState().cancelEditingAssembly();
-
-        // State should remain not in editing mode
-        expect(useProjectStore.getState().isEditingAssembly).toBe(false);
-      });
-
-      it('exits editing mode', () => {
-        const store = useProjectStore.getState();
-        store.startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
-
-        store.cancelEditingAssembly();
-
-        const state = useProjectStore.getState();
-        expect(state.isEditingAssembly).toBe(false);
-        expect(state.editingAssemblyId).toBeNull();
-        expect(state.editingAssemblyName).toBe('');
-      });
-
-      it('keeps snapshot for potential restore', () => {
-        const store = useProjectStore.getState();
-        store.addPart({ name: 'Original Part' });
-        store.startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
-
-        store.cancelEditingAssembly();
-
-        // Snapshot should still be available for restorePreviousProject
-        expect(useProjectStore.getState().previousProjectSnapshot).not.toBeNull();
-      });
-    });
-
-    describe('restorePreviousProject', () => {
-      it('restores project state from snapshot', () => {
-        const store = useProjectStore.getState();
-
-        // Set up initial state
-        store.addPart({ name: 'Part A' });
-        store.addPart({ name: 'Part B' });
-        store.addStock({ name: 'Stock X' });
-
-        // Enter and exit editing mode
-        store.startEditingAssembly('assembly-123', 'Test', [createTestPart({ name: 'Temp' })]);
-        store.cancelEditingAssembly();
-
-        // Workspace now has only 'Temp' part
-        expect(useProjectStore.getState().parts.some((p) => p.name === 'Part A')).toBe(false);
-
-        // Restore
-        store.restorePreviousProject();
-
-        const state = useProjectStore.getState();
-        expect(state.parts.some((p) => p.name === 'Part A')).toBe(true);
-        expect(state.parts.some((p) => p.name === 'Part B')).toBe(true);
-        expect(state.stocks.some((s) => s.name === 'Stock X')).toBe(true);
-      });
-
-      it('clears snapshot after restore', () => {
-        const store = useProjectStore.getState();
-        store.addPart({ name: 'Original' });
-        store.startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
-        store.cancelEditingAssembly();
-
-        store.restorePreviousProject();
-
-        expect(useProjectStore.getState().previousProjectSnapshot).toBeNull();
-      });
-
-      it('clears assembly editing state', () => {
-        const store = useProjectStore.getState();
-        store.addPart({ name: 'Original' });
-        store.startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
-        store.cancelEditingAssembly();
-
-        store.restorePreviousProject();
-
-        const state = useProjectStore.getState();
-        expect(state.isEditingAssembly).toBe(false);
-        expect(state.editingAssemblyId).toBeNull();
-      });
-    });
-
-    describe('startFreshAfterAssemblyEdit', () => {
-      it('creates a new project', () => {
-        const store = useProjectStore.getState();
-        store.addPart({ name: 'Part A' });
-        store.startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
-        store.cancelEditingAssembly();
-
-        store.startFreshAfterAssemblyEdit();
-
-        const state = useProjectStore.getState();
-        expect(state.parts).toHaveLength(0);
-        expect(state.stocks).toHaveLength(0);
-        // Project name could be 'New Project' or 'Untitled Project' depending on defaults
-        expect(state.projectName).toMatch(/^(New|Untitled) Project$/);
-      });
-
-      it('clears assembly editing state', () => {
-        const store = useProjectStore.getState();
-        store.startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
-        store.cancelEditingAssembly();
-
-        store.startFreshAfterAssemblyEdit();
-
-        const state = useProjectStore.getState();
-        expect(state.isEditingAssembly).toBe(false);
-        expect(state.editingAssemblyId).toBeNull();
-        expect(state.previousProjectSnapshot).toBeNull();
       });
     });
   });
@@ -2259,7 +1362,7 @@ describe('projectStore', () => {
         color: '#0000ff' // Different color
       });
 
-      store.selectPart(partId);
+      useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -2279,7 +1382,7 @@ describe('projectStore', () => {
         grainDirection: 'width' // Different grain
       });
 
-      store.selectPart(partId);
+      useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -2299,7 +1402,7 @@ describe('projectStore', () => {
         grainDirection: 'width'
       });
 
-      store.selectPart(partId);
+      useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -2315,7 +1418,7 @@ describe('projectStore', () => {
         color: '#0000ff'
       });
 
-      store.clearSelection();
+      useSelectionStore.getState().clearSelection();
       store.resetSelectedPartsToStock();
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -2330,7 +1433,7 @@ describe('projectStore', () => {
         color: '#0000ff'
       });
 
-      store.selectPart(partId);
+      useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -2345,7 +1448,7 @@ describe('projectStore', () => {
         color: '#0000ff'
       });
 
-      store.selectPart(partId);
+      useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
 
       const part = useProjectStore.getState().parts.find((p) => p.id === partId);
@@ -2362,7 +1465,7 @@ describe('projectStore', () => {
       const partId1 = store.addPart({ name: 'Part 1', stockId, color: '#0000ff' });
       const partId2 = store.addPart({ name: 'Part 2', stockId, color: '#00ff00' });
 
-      store.selectParts([partId1, partId2]);
+      useSelectionStore.getState().selectParts([partId1, partId2]);
       store.resetSelectedPartsToStock();
 
       const state = useProjectStore.getState();
@@ -2373,315 +1476,367 @@ describe('projectStore', () => {
     });
   });
 
-  // ============================================================
-  // UI State Actions
-  // ============================================================
+  // UI state tests (setHoveredPart, setTransformMode, setActiveDragDelta, setSelectionBox) moved to selectionStore.test.ts
 
-  describe('UI state', () => {
-    describe('setHoveredPart', () => {
-      it('sets the hovered part ID', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart();
-
-        store.setHoveredPart(partId);
-
-        expect(useProjectStore.getState().hoveredPartId).toBe(partId);
-      });
-
-      it('clears hovered part when set to null', () => {
-        const store = useProjectStore.getState();
-        const partId = store.addPart();
-        store.setHoveredPart(partId);
-
-        store.setHoveredPart(null);
-
-        expect(useProjectStore.getState().hoveredPartId).toBeNull();
-      });
-    });
-
-    describe('setTransformMode', () => {
-      it('sets transform mode to translate', () => {
-        const store = useProjectStore.getState();
-
-        store.setTransformMode('translate');
-
-        expect(useProjectStore.getState().transformMode).toBe('translate');
-      });
-
-      it('sets transform mode to rotate', () => {
-        const store = useProjectStore.getState();
-
-        store.setTransformMode('rotate');
-
-        expect(useProjectStore.getState().transformMode).toBe('rotate');
-      });
-
-      it('sets transform mode to scale', () => {
-        const store = useProjectStore.getState();
-
-        store.setTransformMode('scale');
-
-        expect(useProjectStore.getState().transformMode).toBe('scale');
-      });
-    });
-
-    describe('setActiveDragDelta', () => {
-      it('sets the active drag delta', () => {
-        const store = useProjectStore.getState();
-        const delta = { x: 10, y: 5, z: 3 };
-
-        store.setActiveDragDelta(delta);
-
-        expect(useProjectStore.getState().activeDragDelta).toEqual(delta);
-      });
-
-      it('clears drag delta when set to null', () => {
-        const store = useProjectStore.getState();
-        store.setActiveDragDelta({ x: 10, y: 5, z: 3 });
-
-        store.setActiveDragDelta(null);
-
-        expect(useProjectStore.getState().activeDragDelta).toBeNull();
-      });
-    });
-
-    describe('setSelectionBox', () => {
-      it('sets selection box coordinates', () => {
-        const store = useProjectStore.getState();
-        const box = { x1: 0, y1: 0, x2: 100, y2: 100 };
-
-        store.setSelectionBox(box);
-
-        expect(useProjectStore.getState().selectionBox).toEqual(box);
-      });
-
-      it('clears selection box when set to null', () => {
-        const store = useProjectStore.getState();
-        store.setSelectionBox({ x1: 0, y1: 0, x2: 100, y2: 100 });
-
-        store.setSelectionBox(null);
-
-        expect(useProjectStore.getState().selectionBox).toBeNull();
-      });
-    });
-
-    describe('toggleGrainDirection', () => {
-      it('toggles showGrainDirection from false to true', () => {
-        useProjectStore.setState({ showGrainDirection: false });
-        const store = useProjectStore.getState();
-
-        store.toggleGrainDirection();
-
-        expect(useProjectStore.getState().showGrainDirection).toBe(true);
-      });
-
-      it('toggles showGrainDirection from true to false', () => {
-        useProjectStore.setState({ showGrainDirection: true });
-        const store = useProjectStore.getState();
-
-        store.toggleGrainDirection();
-
-        expect(useProjectStore.getState().showGrainDirection).toBe(false);
-      });
-    });
-  });
+  // Camera actions moved to cameraStore.test.ts
 
   // ============================================================
-  // Context Menu Actions
+  // mergeGroups
   // ============================================================
 
-  describe('context menu', () => {
-    describe('openContextMenu', () => {
-      it('opens context menu with part data', () => {
+  describe('mergeGroups', () => {
+    describe('top-level mode', () => {
+      it('merges two groups into a new group', () => {
         const store = useProjectStore.getState();
-        const menuData = {
-          type: 'part' as const,
-          x: 100,
-          y: 200,
-          partId: 'part-123'
-        };
+        const p1 = store.addPart({ name: 'Part 1' });
+        const p2 = store.addPart({ name: 'Part 2' });
+        const g1 = store.createGroup('Group A', [{ id: p1, type: 'part' }]);
+        const g2 = store.createGroup('Group B', [{ id: p2, type: 'part' }]);
 
-        store.openContextMenu(menuData);
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
 
-        expect(useProjectStore.getState().contextMenu).toEqual(menuData);
+        expect(mergedId).not.toBeNull();
+        const state = useProjectStore.getState();
+        // Original groups should be removed
+        expect(state.groups.find((g) => g.id === g1)).toBeUndefined();
+        expect(state.groups.find((g) => g.id === g2)).toBeUndefined();
+        // Merged group should exist
+        const merged = state.groups.find((g) => g.id === mergedId);
+        expect(merged).toBeDefined();
+        expect(merged?.name).toContain('Merged');
       });
 
-      it('opens context menu with group data', () => {
+      it('names merged group from 2 groups with both names', () => {
         const store = useProjectStore.getState();
-        const menuData = {
-          type: 'group' as const,
-          x: 150,
-          y: 250,
-          groupId: 'group-456'
-        };
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const g1 = store.createGroup('Alpha', [{ id: p1, type: 'part' }]);
+        const g2 = store.createGroup('Beta', [{ id: p2, type: 'part' }]);
 
-        store.openContextMenu(menuData);
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
 
-        expect(useProjectStore.getState().contextMenu).toEqual(menuData);
+        const merged = useProjectStore.getState().groups.find((g) => g.id === mergedId);
+        expect(merged?.name).toBe('Alpha & Beta Merged');
       });
-    });
 
-    describe('closeContextMenu', () => {
-      it('closes the context menu', () => {
+      it('names merged group from 3+ groups with count', () => {
         const store = useProjectStore.getState();
-        store.openContextMenu({
-          type: 'part',
-          x: 100,
-          y: 200,
-          partId: 'part-123'
-        });
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const p3 = store.addPart({ name: 'P3' });
+        const g1 = store.createGroup('Alpha', [{ id: p1, type: 'part' }]);
+        const g2 = store.createGroup('Beta', [{ id: p2, type: 'part' }]);
+        const g3 = store.createGroup('Gamma', [{ id: p3, type: 'part' }]);
 
-        store.closeContextMenu();
+        const mergedId = store.mergeGroups([g1!, g2!, g3!], 'top-level');
 
-        expect(useProjectStore.getState().contextMenu).toBeNull();
+        const merged = useProjectStore.getState().groups.find((g) => g.id === mergedId);
+        expect(merged?.name).toBe('Alpha & 2 others Merged');
       });
-    });
-  });
 
-  // ============================================================
-  // Camera Actions
-  // ============================================================
-
-  describe('camera actions', () => {
-    describe('requestCenterCamera', () => {
-      it('sets centerCameraRequested to true', () => {
+      it('preserves nested groups in top-level mode', () => {
         const store = useProjectStore.getState();
-        expect(store.centerCameraRequested).toBe(false);
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }]);
+        const g1 = store.createGroup('Outer', [{ id: inner!, type: 'group' }]);
+        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }]);
 
-        store.requestCenterCamera();
-
-        expect(useProjectStore.getState().centerCameraRequested).toBe(true);
-      });
-    });
-
-    describe('requestCenterCameraAtOrigin', () => {
-      it('sets centerCameraAtOriginRequested to true', () => {
-        const store = useProjectStore.getState();
-        expect(store.centerCameraAtOriginRequested).toBe(false);
-
-        store.requestCenterCameraAtOrigin();
-
-        expect(useProjectStore.getState().centerCameraAtOriginRequested).toBe(true);
-      });
-    });
-
-    describe('requestCenterCameraAtPosition', () => {
-      it('sets the position to center camera at', () => {
-        const store = useProjectStore.getState();
-        const position = { x: 10, y: 5, z: 20 };
-
-        store.requestCenterCameraAtPosition(position);
-
-        expect(useProjectStore.getState().centerCameraAtPosition).toEqual(position);
-      });
-    });
-
-    describe('clearCenterCameraRequest', () => {
-      it('clears all camera request flags', () => {
-        const store = useProjectStore.getState();
-        store.requestCenterCamera();
-        store.requestCenterCameraAtOrigin();
-        store.requestCenterCameraAtPosition({ x: 10, y: 5, z: 20 });
-
-        store.clearCenterCameraRequest();
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
 
         const state = useProjectStore.getState();
-        expect(state.centerCameraRequested).toBe(false);
-        expect(state.centerCameraAtOriginRequested).toBe(false);
-        expect(state.centerCameraAtPosition).toBeNull();
+        // Inner group should still exist as a member of the merged group
+        expect(state.groups.find((g) => g.id === inner)).toBeDefined();
+        const mergedMembers = state.groupMembers.filter((gm) => gm.groupId === mergedId);
+        expect(mergedMembers.some((m) => m.memberId === inner && m.memberType === 'group')).toBe(true);
+      });
+
+      it('returns null when fewer than 2 groups provided', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'P1' });
+        const g1 = store.createGroup('Only One', [{ id: p1, type: 'part' }]);
+
+        expect(store.mergeGroups([g1!], 'top-level')).toBeNull();
+        expect(store.mergeGroups([], 'top-level')).toBeNull();
+      });
+
+      it('selects and expands the merged group', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }]);
+        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }]);
+
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
+
+        const { selectedGroupIds, expandedGroupIds } = useSelectionStore.getState();
+        expect(selectedGroupIds).toContain(mergedId);
+        expect(expandedGroupIds).toContain(mergedId);
+      });
+
+      it('marks project as dirty', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }]);
+        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }]);
+        useProjectStore.setState({ isDirty: false });
+
+        store.mergeGroups([g1!, g2!], 'top-level');
+
+        expect(useProjectStore.getState().isDirty).toBe(true);
       });
     });
 
-    describe('setCameraViewVectors', () => {
-      it('sets camera view vectors', () => {
+    describe('deep mode', () => {
+      it('flattens nested groups into parts', () => {
         const store = useProjectStore.getState();
-        const vectors = {
-          position: { x: 10, y: 20, z: 30 },
-          target: { x: 0, y: 0, z: 0 }
-        };
+        const p1 = store.addPart({ name: 'Inner Part' });
+        const p2 = store.addPart({ name: 'Outer Part' });
+        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }]);
+        const g1 = store.createGroup('Outer', [{ id: inner!, type: 'group' }]);
+        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }]);
 
-        store.setCameraViewVectors(vectors);
+        const mergedId = store.mergeGroups([g1!, g2!], 'deep');
 
-        expect(useProjectStore.getState().cameraViewVectors).toEqual(vectors);
+        const state = useProjectStore.getState();
+        // Inner group should be removed in deep mode
+        expect(state.groups.find((g) => g.id === inner)).toBeUndefined();
+        // Merged group should have only parts (no groups)
+        const mergedMembers = state.groupMembers.filter((gm) => gm.groupId === mergedId);
+        expect(mergedMembers.every((m) => m.memberType === 'part')).toBe(true);
+        expect(mergedMembers).toHaveLength(2);
       });
 
-      it('clears camera view vectors when set to null', () => {
+      it('removes original groups and nested groups', () => {
         const store = useProjectStore.getState();
-        store.setCameraViewVectors({
-          position: { x: 10, y: 20, z: 30 },
-          target: { x: 0, y: 0, z: 0 }
-        });
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }]);
+        const g1 = store.createGroup('Wrapper', [{ id: inner!, type: 'group' }]);
+        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }]);
 
-        store.setCameraViewVectors(null);
+        store.mergeGroups([g1!, g2!], 'deep');
 
-        expect(useProjectStore.getState().cameraViewVectors).toBeNull();
+        const state = useProjectStore.getState();
+        expect(state.groups.find((g) => g.id === g1)).toBeUndefined();
+        expect(state.groups.find((g) => g.id === g2)).toBeUndefined();
+        expect(state.groups.find((g) => g.id === inner)).toBeUndefined();
+      });
+    });
+
+    describe('license checks', () => {
+      it('blocks merge in free mode', () => {
+        const store = useProjectStore.getState();
+        const p1 = store.addPart({ name: 'P1' });
+        const p2 = store.addPart({ name: 'P2' });
+        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }]);
+        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }]);
+
+        useLicenseStore.setState({ licenseMode: 'free' });
+
+        const result = store.mergeGroups([g1!, g2!], 'top-level');
+
+        expect(result).toBeNull();
+        // Original groups should still exist
+        const state = useProjectStore.getState();
+        expect(state.groups.find((g) => g.id === g1)).toBeDefined();
+        expect(state.groups.find((g) => g.id === g2)).toBeDefined();
       });
     });
   });
 
   // ============================================================
-  // Toast Actions
+  // removeFromGroup: empty group cleanup
   // ============================================================
 
-  describe('toast notifications', () => {
-    describe('showToast', () => {
-      it('sets toast message', () => {
-        const store = useProjectStore.getState();
+  describe('removeFromGroup - empty group cleanup', () => {
+    it('removes the group when last member is removed', () => {
+      const store = useProjectStore.getState();
+      const partId = store.addPart({ name: 'Solo Part' });
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
 
-        store.showToast('Test notification');
+      store.removeFromGroup([partId], 'part');
 
-        const toast = useProjectStore.getState().toast;
-        expect(toast?.message).toBe('Test notification');
-        expect(toast?.id).toBeDefined();
-      });
-
-      it('replaces existing toast', () => {
-        const store = useProjectStore.getState();
-        store.showToast('First message');
-        const firstToastId = useProjectStore.getState().toast?.id;
-
-        store.showToast('Second message');
-
-        const toast = useProjectStore.getState().toast;
-        expect(toast?.message).toBe('Second message');
-        expect(toast?.id).not.toBe(firstToastId);
-      });
+      const state = useProjectStore.getState();
+      expect(state.groups.find((g) => g.id === groupId)).toBeUndefined();
+      expect(state.groupMembers.filter((gm) => gm.groupId === groupId)).toHaveLength(0);
     });
 
-    describe('clearToast', () => {
-      it('clears the toast', () => {
-        const store = useProjectStore.getState();
-        store.showToast('Test message');
+    it('deselects the removed empty group', () => {
+      const store = useProjectStore.getState();
+      const partId = store.addPart({ name: 'Solo Part' });
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      useSelectionStore.setState({ selectedGroupIds: [groupId!] });
 
-        store.clearToast();
+      store.removeFromGroup([partId], 'part');
 
-        expect(useProjectStore.getState().toast).toBeNull();
-      });
+      expect(useSelectionStore.getState().selectedGroupIds).not.toContain(groupId);
+    });
+
+    it('clears editingGroupId if the empty group was being edited', () => {
+      const store = useProjectStore.getState();
+      const partId = store.addPart({ name: 'Solo Part' });
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      useSelectionStore.setState({ editingGroupId: groupId! });
+
+      store.removeFromGroup([partId], 'part');
+
+      expect(useSelectionStore.getState().editingGroupId).toBeNull();
+    });
+
+    it('removes empty group from expandedGroupIds', () => {
+      const store = useProjectStore.getState();
+      const partId = store.addPart({ name: 'Solo Part' });
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      useSelectionStore.setState({ expandedGroupIds: [groupId!] });
+
+      store.removeFromGroup([partId], 'part');
+
+      expect(useSelectionStore.getState().expandedGroupIds).not.toContain(groupId);
+    });
+
+    it('keeps non-empty groups when one member is removed', () => {
+      const store = useProjectStore.getState();
+      const p1 = store.addPart({ name: 'Part 1' });
+      const p2 = store.addPart({ name: 'Part 2' });
+      const groupId = store.createGroup('Multi', [
+        { id: p1, type: 'part' },
+        { id: p2, type: 'part' }
+      ]);
+
+      store.removeFromGroup([p1], 'part');
+
+      const state = useProjectStore.getState();
+      expect(state.groups.find((g) => g.id === groupId)).toBeDefined();
+      expect(state.groupMembers.filter((gm) => gm.groupId === groupId)).toHaveLength(1);
+    });
+  });
+});
+
+// ============================================================
+// Exported utility functions
+// ============================================================
+
+describe('projectStore utility functions', () => {
+  describe('getContainingGroupId', () => {
+    it('returns groupId for a part that belongs to a group', () => {
+      const groupMembers = [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g1', 'p2', 'part')];
+
+      expect(getContainingGroupId('p1', groupMembers)).toBe('g1');
+    });
+
+    it('returns null for an ungrouped part', () => {
+      const groupMembers = [createTestGroupMember('g1', 'p1', 'part')];
+
+      expect(getContainingGroupId('p999', groupMembers)).toBeNull();
+    });
+
+    it('returns null for empty groupMembers', () => {
+      expect(getContainingGroupId('p1', [])).toBeNull();
     });
   });
 
-  // ============================================================
-  // Thumbnail Actions
-  // ============================================================
+  describe('getAllDescendantPartIds', () => {
+    it('returns direct part members', () => {
+      const groupMembers = [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g1', 'p2', 'part')];
 
-  describe('thumbnail actions', () => {
-    describe('clearManualThumbnail', () => {
-      it('clears the manual thumbnail', () => {
-        useProjectStore.setState({
-          manualThumbnail: {
-            data: 'base64data',
-            width: 400,
-            height: 300,
-            generatedAt: new Date().toISOString(),
-            manuallySet: true
-          }
-        });
-        const store = useProjectStore.getState();
+      const result = getAllDescendantPartIds('g1', groupMembers);
+      expect(result).toEqual(expect.arrayContaining(['p1', 'p2']));
+      expect(result).toHaveLength(2);
+    });
 
-        store.clearManualThumbnail();
+    it('returns nested parts from subgroups', () => {
+      const groupMembers = [
+        createTestGroupMember('outer', 'inner', 'group'),
+        createTestGroupMember('inner', 'p1', 'part'),
+        createTestGroupMember('inner', 'p2', 'part')
+      ];
 
-        expect(useProjectStore.getState().manualThumbnail).toBeNull();
-      });
+      const result = getAllDescendantPartIds('outer', groupMembers);
+      expect(result).toEqual(expect.arrayContaining(['p1', 'p2']));
+      expect(result).toHaveLength(2);
+    });
+
+    it('returns empty array for a group with no members', () => {
+      expect(getAllDescendantPartIds('g1', [])).toHaveLength(0);
+    });
+  });
+
+  describe('getAllDescendantGroupIds', () => {
+    it('returns the group itself plus nested groups', () => {
+      const groupMembers = [
+        createTestGroupMember('outer', 'inner', 'group'),
+        createTestGroupMember('inner', 'deep', 'group'),
+        createTestGroupMember('deep', 'p1', 'part')
+      ];
+
+      const result = getAllDescendantGroupIds('outer', groupMembers);
+      expect(result).toEqual(expect.arrayContaining(['outer', 'inner', 'deep']));
+      expect(result).toHaveLength(3);
+    });
+
+    it('returns just the group itself when no nested groups', () => {
+      const groupMembers = [createTestGroupMember('g1', 'p1', 'part')];
+
+      const result = getAllDescendantGroupIds('g1', groupMembers);
+      expect(result).toEqual(['g1']);
+    });
+  });
+
+  describe('getAncestorGroupIds', () => {
+    it('returns ancestor chain for a deeply nested part', () => {
+      const groupMembers = [
+        createTestGroupMember('outer', 'inner', 'group'),
+        createTestGroupMember('inner', 'p1', 'part')
+      ];
+
+      const result = getAncestorGroupIds('p1', groupMembers);
+      expect(result).toEqual(['inner', 'outer']);
+    });
+
+    it('returns single group for a directly grouped part', () => {
+      const groupMembers = [createTestGroupMember('g1', 'p1', 'part')];
+
+      const result = getAncestorGroupIds('p1', groupMembers);
+      expect(result).toEqual(['g1']);
+    });
+
+    it('returns empty array for ungrouped part', () => {
+      expect(getAncestorGroupIds('p1', [])).toHaveLength(0);
+    });
+  });
+
+  describe('isDescendantOf', () => {
+    it('returns true for same group', () => {
+      expect(isDescendantOf('g1', 'g1', [])).toBe(true);
+    });
+
+    it('returns true for direct child group', () => {
+      const groupMembers = [createTestGroupMember('parent', 'child', 'group')];
+
+      expect(isDescendantOf('child', 'parent', groupMembers)).toBe(true);
+    });
+
+    it('returns true for deeply nested group', () => {
+      const groupMembers = [
+        createTestGroupMember('outer', 'inner', 'group'),
+        createTestGroupMember('inner', 'deep', 'group')
+      ];
+
+      expect(isDescendantOf('deep', 'outer', groupMembers)).toBe(true);
+    });
+
+    it('returns false for unrelated groups', () => {
+      const groupMembers = [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g2', 'p2', 'part')];
+
+      expect(isDescendantOf('g2', 'g1', groupMembers)).toBe(false);
+    });
+
+    it('returns false for parent checking against child (wrong direction)', () => {
+      const groupMembers = [createTestGroupMember('parent', 'child', 'group')];
+
+      expect(isDescendantOf('parent', 'child', groupMembers)).toBe(false);
     });
   });
 });
@@ -2690,7 +1845,7 @@ describe('validatePartsForCutList', () => {
   describe('stock assignment validation', () => {
     it('returns error when part has no stock assigned', () => {
       const parts = [createTestPart({ name: 'Unassigned Part', stockId: null })];
-      const stocks: any[] = [];
+      const stocks: Stock[] = [];
 
       const issues = validatePartsForCutList(parts, stocks);
 
@@ -2702,7 +1857,7 @@ describe('validatePartsForCutList', () => {
 
     it('returns error when assigned stock not found', () => {
       const parts = [createTestPart({ name: 'Orphan Part', stockId: 'non-existent-id' })];
-      const stocks: any[] = [];
+      const stocks: Stock[] = [];
 
       const issues = validatePartsForCutList(parts, stocks);
 

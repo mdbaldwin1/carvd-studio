@@ -1,6 +1,7 @@
 # Carvd Studio Launch Checklist
 
 Last updated: 2026-02-14
+Workflow/policy source of truth: see `AGENTS.md`. This checklist is operational launch guidance.
 
 ## Priority Order
 
@@ -63,19 +64,20 @@ Last updated: 2026-02-14
 4. **Resize window precisely** using the resize script:
 
    ```bash
-   # For 16:9 screenshots (hero, features, interface overview)
-   # Screenshots #1, #4, #5, #6, #7
-   ./packages/desktop/scripts/resize-for-screenshots.sh large
+   # Recommended HQ presets (capture larger, then downscale)
+   # 16:9 screenshots (hero, features, interface overview)
+   ./packages/desktop/scripts/resize-for-screenshots.sh large-hq
 
-   # For 4:3 screenshots (modals, panels, detail shots)
-   # Screenshots #2, #3, #8-15
-   ./packages/desktop/scripts/resize-for-screenshots.sh small
+   # 4:3 screenshots (modals, panels, detail shots)
+   ./packages/desktop/scripts/resize-for-screenshots.sh small-hq
    ```
 
-   | Size    | Dimensions | Use For                                        |
-   | ------- | ---------- | ---------------------------------------------- |
-   | `large` | 1400×900   | Hero shots, full workspace, feature highlights |
-   | `small` | 800×600    | Modals, panels, sidebar details                |
+   | Size       | Dimensions | Use For                                        |
+   | ---------- | ---------- | ---------------------------------------------- |
+   | `large-hq` | 1920×1080  | Hero shots, full workspace, feature highlights |
+   | `small-hq` | 1600×1200  | Modals, panels, sidebar details                |
+   | `large`    | 1400×900   | Legacy preset                                  |
+   | `small`    | 800×600    | Legacy preset                                  |
 
 5. **Capture the screenshot:**
    - macOS: `Cmd+Shift+4` then `Space` then click the window
@@ -242,7 +244,7 @@ node scripts/version-bump.cjs patch  # or minor, major
 # Or merge a PR that bumps the version, then merge develop → main
 ```
 
-**Current state (v0.1.9):**
+**Current state (v0.1.14):**
 
 - macOS: Code-signed (Developer ID Application) + notarized by Apple — Gatekeeper allows the app
 - Windows: Build works, no code signing yet (shows SmartScreen warning)

@@ -1,0 +1,180 @@
+/*
+ * App Layout Shell — Tailwind component classes
+ *
+ * "Twilight Studio" redesign — taller header, wider sidebar/panel,
+ * more generous spacing and typographic weight.
+ */
+
+/* ===========================================
+   APP CONTAINER & MAIN
+   =========================================== */
+
+@layer components {
+  .app {
+    @apply flex flex-col h-full;
+  }
+
+  .app-main {
+    @apply flex-1 flex overflow-hidden;
+  }
+}
+
+/* ===========================================
+   HEADER
+   =========================================== */
+
+@layer components {
+  .app-header {
+    @apply bg-surface border-b border-border flex items-center justify-between gap-6;
+    height: var(--header-height);
+    padding: 0 20px;
+    -webkit-app-region: drag;
+  }
+
+  /* macOS: Add padding for traffic lights on the left */
+  .app-header.platform-darwin {
+    padding-left: 96px;
+  }
+
+  /* Windows/Linux: Add padding for window controls overlay on the right */
+  .app-header.platform-win32,
+  .app-header.platform-linux {
+    padding-right: 140px;
+  }
+
+  .header-left {
+    @apply flex items-center gap-5;
+    -webkit-app-region: no-drag;
+  }
+
+  .header-title {
+    @apply flex items-center gap-2;
+  }
+
+  .header-mode-chip {
+    @apply tracking-[0.02em];
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  .header-title .app-name {
+    @apply text-accent font-semibold;
+    font-size: 18px;
+  }
+
+  .header-title .app-name-btn {
+    @apply text-accent bg-transparent border-none p-0 m-0 cursor-pointer inline-flex items-center gap-1.5;
+    -webkit-app-region: no-drag;
+    transition: opacity 0.15s ease;
+  }
+
+  .header-title .app-name-btn:hover {
+    opacity: 0.7;
+  }
+
+  .header-title .title-separator {
+    @apply text-text-muted font-light;
+    font-size: 18px;
+    opacity: 0.4;
+  }
+
+  .header-title .project-name {
+    @apply text-text font-medium overflow-hidden text-ellipsis whitespace-nowrap;
+    font-size: 15px;
+    max-width: 350px;
+  }
+
+  .header-name-editor {
+    @apply flex items-center gap-1.5;
+  }
+
+  .header-name-confirm {
+    @apply text-text-muted hover:text-text;
+  }
+
+  .header-title .dirty-indicator {
+    @apply text-accent font-bold;
+  }
+
+  .app-header h1 {
+    @apply text-accent font-semibold;
+    font-size: 18px;
+    -webkit-app-region: no-drag;
+  }
+
+  .header-actions {
+    @apply flex items-center gap-4;
+    -webkit-app-region: no-drag;
+  }
+
+  .header-actions-group {
+    @apply flex items-center gap-2.5;
+  }
+
+  .upgrade-btn {
+    @apply font-semibold;
+  }
+
+  .undo-redo-buttons {
+    @apply flex gap-1.5;
+  }
+}
+
+/* ===========================================
+   SIDEBAR
+   =========================================== */
+
+@layer components {
+  .stock-list,
+  .assembly-list,
+  .parts-list {
+    @apply flex-1 overflow-y-auto min-h-0;
+  }
+
+  /* Sidebar list items — full-width hover */
+  .stock-list > li,
+  .assembly-list > li,
+  .parts-list .part-item,
+  .parts-list .group-header {
+    border-radius: 0 !important;
+  }
+
+  .group-header:hover {
+    @apply bg-surface-hover;
+  }
+}
+
+/* ===========================================
+   PROPERTIES PANEL
+   =========================================== */
+
+@layer components {
+  .properties-panel {
+    @apply flex-shrink-0 bg-surface border-l border-border p-4 overflow-y-auto;
+    width: 296px;
+    min-width: 296px;
+  }
+
+  .properties-panel h2 {
+    @apply text-text-muted font-semibold uppercase mb-3;
+    font-size: 12px;
+    letter-spacing: 0.8px;
+  }
+
+  .property-group {
+    @apply mb-5;
+  }
+
+  .properties-card {
+    @apply rounded-lg border border-border bg-bg p-3 mb-4;
+  }
+
+  .properties-card .property-group:last-child {
+    @apply mb-0;
+  }
+
+  .property-group > label {
+    @apply block text-text-muted mb-1.5;
+    font-size: 13px;
+  }
+}
