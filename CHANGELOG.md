@@ -48,7 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Splash screen theming** — Splash screen now respects light/dark mode with theme-aware colors and font
 - **3D scene theming** — Canvas background and grid colors now follow the active theme
 - **Group actions in Properties panel** — Expanded group-focused controls in the Properties panel to mirror context-menu capabilities (center view, save as assembly, reference toggles, merge/group operations, add/remove group membership, and delete actions for single/multi/mixed selections).
-- **Cut diagram PDF density** — Diagram exports now place multiple board diagrams per page to reduce wasted space and page count.
+- **Cut diagram PDF readability overhaul** — Diagram exports now prioritize one board per page with orientation/scale tuned for legibility, plus improved callout labeling and larger text to better match real shop-floor usage.
+- **Website/docs screenshot refresh** — Replaced placeholder and stale captures across Home/Features/docs with current desktop screenshots and updated capture scripts for repeatable, dock-safe framing and timed interactive shots.
 - **Documentation alignment pass** — Updated docs for current template entry points (`File → New from Template...` and templates screen flow), cut-list diagram detail/export behavior, app-library stock save flow, and Project Settings favorites guidance.
 
 ### Fixed
@@ -69,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sync-Develop Workflow Detection** — Fixed bug where sync workflow checked file differences instead of commit history, causing it to miss merge commits from main
 - **Keyboard ungroup parity** — `Ctrl/Cmd+Shift+G` now also ungroup selected groups (not only groups inferred from selected parts).
 - **PDF watermark logo distortion** — Watermark logo now preserves intrinsic image aspect ratio when rendered into exported PDFs.
+- **Assembly stock duplication on add** — Adding an assembly to a project now reuses equivalent existing project stock entries instead of creating duplicate stock rows when the same material already exists.
 
 ## [0.1.11] - 2026-02-14
 
