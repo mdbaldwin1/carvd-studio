@@ -310,6 +310,7 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
   const handleDoubleClick = useCallback(
     (e: ThreeEvent<MouseEvent>) => {
       e.stopPropagation();
+      (e.nativeEvent as MouseEvent & { __carvdPartDblClickHandled?: boolean }).__carvdPartDblClickHandled = true;
       if (e.instanceId === undefined) return;
 
       const partId = partIdByIndex[e.instanceId];

@@ -24,6 +24,15 @@ export default function StockPage() {
         manage stocks and assemblies in one place.
       </p>
 
+      <div className="site-section p-[var(--space-md)] mb-xl">
+        <img
+          src="/screenshots/docs-stock-library.png"
+          alt="Stock library modal showing available materials"
+          className="w-full rounded-xl border border-border shadow-lg"
+          loading="lazy"
+        />
+      </div>
+
       <div className="grid gap-xl">
         <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">

@@ -16,6 +16,15 @@ export default function InterfacePage() {
       />
       <h2 className="text-4xl font-bold mb-xl">Interface Overview</h2>
 
+      <div className="site-section p-[var(--space-md)] mb-xl">
+        <img
+          src="/screenshots/docs-interface-overview.png"
+          alt="Interface overview of Carvd Studio workspace"
+          className="w-full rounded-xl border border-border shadow-lg"
+          loading="lazy"
+        />
+      </div>
+
       <div className="grid gap-xl mb-xl">
         <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">Main Workspace</h3>

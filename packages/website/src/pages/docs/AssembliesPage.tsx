@@ -23,6 +23,15 @@ export default function AssembliesPage() {
         Think of them as "smart groups" with memory.
       </p>
 
+      <div className="site-section p-[var(--space-md)] mb-xl">
+        <img
+          src="/screenshots/docs-assembly-library.png"
+          alt="Assembly library in Carvd Studio"
+          className="w-full rounded-xl border border-border shadow-lg"
+          loading="lazy"
+        />
+      </div>
+
       <div className="grid gap-xl">
         <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">

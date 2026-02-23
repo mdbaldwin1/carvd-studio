@@ -7,6 +7,7 @@ import { Assembly } from '../../types';
 import { showSavedFileToast } from '../../utils/fileToast';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { Textarea } from '@renderer/components/ui/textarea';
@@ -374,47 +375,54 @@ export function AssembliesTab({
 
             {isEditingAssembly ? (
               <div className="flex-1 p-5 overflow-y-auto">
-                <div className="flex flex-col mb-4 gap-2.5">
-                  <Label>Name</Label>
-                  <Input
-                    type="text"
-                    value={assemblyFormData.name}
-                    onChange={(e) => setAssemblyFormData({ ...assemblyFormData, name: e.target.value })}
-                  />
-                </div>
-
-                <div className="flex flex-col mb-4 gap-2.5">
-                  <Label>Description</Label>
-                  <Textarea
-                    value={assemblyFormData.description}
-                    onChange={(e) => setAssemblyFormData({ ...assemblyFormData, description: e.target.value })}
-                    placeholder="Optional description"
-                    rows={3}
-                  />
-                </div>
-
-                {onEditAssemblyIn3D && !isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
-                  <div className="flex flex-col mb-4 gap-2.5">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={async () => {
-                        const success = await onEditAssemblyIn3D(selectedAssembly);
-                        if (success) {
-                          onClose();
-                        }
-                      }}
-                    >
-                      Edit Layout in 3D
-                      <HelpTooltip
-                        text="Opens this assembly in the 3D workspace for editing parts and positions."
-                        docsSection="assemblies"
-                        inline
+                <Card className="border-border bg-bg">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Edit Assembly</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <div className="flex flex-col mb-4 gap-2.5">
+                      <Label>Name</Label>
+                      <Input
+                        type="text"
+                        value={assemblyFormData.name}
+                        onChange={(e) => setAssemblyFormData({ ...assemblyFormData, name: e.target.value })}
                       />
-                    </Button>
-                  </div>
-                )}
+                    </div>
+
+                    <div className="flex flex-col mb-4 gap-2.5">
+                      <Label>Description</Label>
+                      <Textarea
+                        value={assemblyFormData.description}
+                        onChange={(e) => setAssemblyFormData({ ...assemblyFormData, description: e.target.value })}
+                        placeholder="Optional description"
+                        rows={3}
+                      />
+                    </div>
+
+                    {onEditAssemblyIn3D && !isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
+                      <div className="flex flex-col mb-1 gap-2.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={async () => {
+                            const success = await onEditAssemblyIn3D(selectedAssembly);
+                            if (success) {
+                              onClose();
+                            }
+                          }}
+                        >
+                          Edit Layout in 3D
+                          <HelpTooltip
+                            text="Opens this assembly in the 3D workspace for editing parts and positions."
+                            docsSection="assemblies"
+                            inline
+                          />
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
                 {!hideInlineFormActions && (
                   <div className="flex justify-end gap-3 mt-6 pt-5 border-t border-border">
@@ -429,13 +437,20 @@ export function AssembliesTab({
               </div>
             ) : (
               <div className="flex-1 p-5 overflow-y-auto">
-                <AssemblyDetails
-                  assembly={selectedAssembly}
-                  units={units}
-                  showMetadataRows
-                  partsTitle="Parts in this assembly:"
-                  partsMaxHeightClassName="max-h-[200px]"
-                />
+                <Card className="border-border bg-bg">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Assembly Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <AssemblyDetails
+                      assembly={selectedAssembly}
+                      units={units}
+                      showMetadataRows
+                      partsTitle="Parts in this assembly:"
+                      partsMaxHeightClassName="max-h-[200px]"
+                    />
+                  </CardContent>
+                </Card>
               </div>
             )}
           </>

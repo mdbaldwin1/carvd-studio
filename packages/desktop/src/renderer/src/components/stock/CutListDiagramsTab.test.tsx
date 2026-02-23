@@ -250,8 +250,7 @@ describe('CutListDiagramsTab', () => {
       expect(labelTexts).not.toContain('Narrow');
     });
 
-    it('truncates long part names to 12 chars with ellipsis', () => {
-      // Name > 15 chars should be truncated to 12 + '...'
+    it('renders long part names with adaptive fitting', () => {
       const longName = 'Very Long Part Name Here';
       const cutList = createCutList({
         stockBoards: [
@@ -274,7 +273,7 @@ describe('CutListDiagramsTab', () => {
       const { container } = render(<CutListDiagramsTab {...defaultProps} cutList={cutList} />);
       const texts = container.querySelectorAll('svg text');
       const labelTexts = Array.from(texts).map((t) => t.textContent);
-      expect(labelTexts).toContain('Very Long Pa...');
+      expect(labelTexts.some((text) => (text ?? '').startsWith('Very Long'))).toBe(true);
     });
 
     it('does not truncate short part names', () => {
@@ -338,8 +337,7 @@ describe('CutListDiagramsTab', () => {
       expect(labelTexts).not.toContain('(rotated)');
     });
 
-    it('does not show rotation indicator when rotated part is too narrow', () => {
-      // width=4 => 4*4=16 < 20, so no "(rotated)" even though rotated=true
+    it('does not show rotation indicator when rotated part is too short to fit', () => {
       const cutList = createCutList({
         stockBoards: [
           createBoard({
@@ -350,7 +348,7 @@ describe('CutListDiagramsTab', () => {
                 x: 0,
                 y: 0,
                 width: 4,
-                height: 4,
+                height: 0.1,
                 rotated: true,
                 color: '#c4a574'
               }

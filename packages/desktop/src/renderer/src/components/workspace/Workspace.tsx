@@ -489,6 +489,10 @@ export function Workspace() {
 
     const handleDoubleClick = (e: MouseEvent) => {
       if (e.button !== 0) return;
+      if ((e as MouseEvent & { __carvdPartDblClickHandled?: boolean }).__carvdPartDblClickHandled) {
+        debugSelection('native:dblclick:left:skipped-already-handled');
+        return;
+      }
       const hitPartId = getHitPartId(e.clientX, e.clientY);
       debugSelection('native:dblclick:left', { x: e.clientX, y: e.clientY, hitPartId });
       if (hitPartId) {

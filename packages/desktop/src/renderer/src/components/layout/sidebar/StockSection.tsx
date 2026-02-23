@@ -44,7 +44,7 @@ export function StockSection({
 }: StockSectionProps) {
   return (
     <Collapsible asChild open={!isCollapsed} onOpenChange={onOpenChange}>
-      <SidebarGroup>
+      <SidebarGroup className={isCollapsed ? 'flex-none' : 'flex-1'}>
         <CollapsibleTrigger asChild>
           <div
             className="flex cursor-pointer items-center gap-1.5 rounded-none p-4 pr-2.5 transition-[background-color,margin] duration-150 hover:bg-bg-hover"

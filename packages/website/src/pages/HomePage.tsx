@@ -1,4 +1,3 @@
-import ScreenshotPlaceholder from "../components/ScreenshotPlaceholder";
 import BuyButton from "../components/BuyButton";
 import SEO from "../components/SEO";
 import Header from "../components/Header";
@@ -88,9 +87,11 @@ export default function HomePage() {
 
           {/* Hero Screenshot */}
           <div className="mx-auto mt-16 max-w-5xl">
-            <ScreenshotPlaceholder
-              tooltip="Screenshot needed: Main 3D workspace showing a furniture project (e.g., a cabinet or bookshelf with multiple parts visible)"
-              aspectRatio="16:9"
+            <img
+              src="/screenshots/hero-workspace.png"
+              alt="Carvd Studio workspace showing a furniture project in 3D"
+              className="w-full rounded-xl border border-border shadow-lg"
+              loading="eager"
             />
           </div>
         </section>
@@ -158,13 +159,17 @@ export default function HomePage() {
 
             {/* Feature Screenshots */}
             <div className="mt-16 grid grid-cols-2 gap-6">
-              <ScreenshotPlaceholder
-                tooltip="Screenshot needed: Cut list modal showing optimized board layouts with parts labeled"
-                aspectRatio="4:3"
+              <img
+                src="/screenshots/cut-list-diagrams.png"
+                alt="Cut list diagrams showing optimized board layouts"
+                className="w-full rounded-xl border border-border shadow-lg"
+                loading="lazy"
               />
-              <ScreenshotPlaceholder
-                tooltip="Screenshot needed: Shopping list / cost estimate view showing material quantities and prices"
-                aspectRatio="4:3"
+              <img
+                src="/screenshots/shopping-list.png"
+                alt="Shopping list and project cost breakdown"
+                className="w-full rounded-xl border border-border shadow-lg"
+                loading="lazy"
               />
             </div>
           </div>

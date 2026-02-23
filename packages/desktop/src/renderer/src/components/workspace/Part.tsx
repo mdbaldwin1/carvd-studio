@@ -193,6 +193,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
   // Double-click to enter a group (Figma-style)
   const handleDoubleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
+    (e.nativeEvent as MouseEvent & { __carvdPartDblClickHandled?: boolean }).__carvdPartDblClickHandled = true;
 
     if (isOutsideEditingContext) {
       return;

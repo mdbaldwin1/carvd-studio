@@ -22,6 +22,15 @@ export default function GroupsPage() {
         together. Think of them as folders for your furniture components.
       </p>
 
+      <div className="site-section p-[var(--space-md)] mb-xl">
+        <img
+          src="/screenshots/docs-groups-sidebar.png"
+          alt="Sidebar showing nested group hierarchy"
+          className="w-full rounded-xl border border-border shadow-lg"
+          loading="lazy"
+        />
+      </div>
+
       <div className="grid gap-xl">
         <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
