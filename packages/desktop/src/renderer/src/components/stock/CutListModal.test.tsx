@@ -145,6 +145,13 @@ describe('CutListModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    window.electronAPI = {
+      ...(window.electronAPI ?? {}),
+      showSaveDialog: vi.fn(),
+      writeFile: vi.fn(),
+      openPath: vi.fn().mockResolvedValue(undefined),
+      openExternal: vi.fn()
+    } as unknown as typeof window.electronAPI;
     vi.mocked(generateOptimizedCutList).mockReturnValue(mockCutList);
     useProjectStore.setState({
       parts: [mockPart],
