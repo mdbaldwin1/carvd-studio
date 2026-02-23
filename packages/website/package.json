@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
+    "generate:sitemap": "node scripts/generate-sitemap.mjs",
+    "prebuild": "npm run generate:sitemap",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx",

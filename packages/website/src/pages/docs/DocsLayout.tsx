@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { useMemo } from "react";
+import { NavLink, Outlet, useSearchParams } from "react-router-dom";
 import BuyButton from "../../components/BuyButton";
 import Footer from "../../components/Footer";
 import Header from "../../components/Header";
@@ -11,8 +11,22 @@ import { getNavSections, matchesDocSearch } from "./docsNavConfig";
 const navSections = getNavSections();
 
 export default function DocsLayout() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = searchParams.get("search") ?? "";
   const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const setSearchQuery = (nextValue: string) => {
+    const next = new URLSearchParams(searchParams);
+    const trimmed = nextValue.trim();
+
+    if (trimmed.length > 0) {
+      next.set("search", nextValue);
+    } else {
+      next.delete("search");
+    }
+
+    setSearchParams(next, { replace: true });
+  };
 
   const filteredNavSections = useMemo(() => {
     if (!normalizedQuery) return navSections;

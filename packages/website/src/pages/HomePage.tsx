@@ -7,6 +7,7 @@ import { AppleIcon, WindowsIcon } from "../components/BrandIcons";
 import {
   createOrganizationSchema,
   createSoftwareAppSchema,
+  createWebsiteSchema,
 } from "../utils/jsonLd";
 import {
   Sparkles,
@@ -44,7 +45,11 @@ export default function HomePage() {
     <div className="site-shell">
       <SEO
         path="/"
-        jsonLd={[createOrganizationSchema(), createSoftwareAppSchema()]}
+        jsonLd={[
+          createOrganizationSchema(),
+          createSoftwareAppSchema(),
+          createWebsiteSchema(),
+        ]}
       />
       <Header />
 
