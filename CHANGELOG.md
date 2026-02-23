@@ -14,11 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Inline name editing on AssemblyEditingBanner** — Click the assembly name in the editing banner to rename it in-place
 - **Cut diagram detail modal** — Cutting diagrams in the Cut List modal are now clickable to open a larger detail view with zoom controls and per-part inspection.
 - **Error fallback copy action** — Added an icon-only copy button on the crash fallback screen to copy full error details to clipboard for easier bug reporting.
+- **Website download redirect tracking endpoint** — Added a Vercel API redirect (`/api/download`) that resolves latest GitHub release assets by platform and logs structured download-click events for analytics.
 
 ### Changed
 
 - **Hotkey hint layout simplification** — Consolidated editor shortcut hints by moving view/undo hints into the bottom-left navigation helper, reducing duplicate hint blocks and improving readability on narrow windows with right-aligned stacked hints.
 - **PDF diagram label routing readability** — Improved small-part callout routing in cut-diagram PDFs with collision-aware lane placement, side-biased part anchors, and label-lane-aligned targets to reduce crossed/ambiguous leader lines.
+- **Website download links now use tracked redirects** — Home and Download page platform buttons now route through `/api/download` before forwarding to GitHub assets, enabling per-source/per-platform click tracking in Vercel logs.
 - **Download toasts now include file-manager actions** — Export/download success toasts now include a contextual `Show in Finder`/`Show in File Explorer` button, and CSV exports in Cut List tabs now use native save dialogs so the saved file can always be revealed.
 - **New Project material seeding now uses App Library** — Removed hardcoded starter stock definitions from the New Project dialog flow; selected materials now clone directly from the persisted app `stockLibrary`, so project defaults always reflect the user’s current library.
 - **Stock-to-part visual highlighting** — Selecting a stock row in the sidebar now highlights all matching parts in the 3D workspace for quick material-based scanning.

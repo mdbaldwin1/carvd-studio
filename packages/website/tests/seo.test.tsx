@@ -209,6 +209,18 @@ describe("JSON-LD Helpers", () => {
 describe("Page SEO Integration", () => {
   // Mock downloads for pages that need it
   vi.mock("../src/utils/downloads", () => ({
+    getTrackedDownloadUrl: (
+      platform: "macos" | "windows",
+      source = "website",
+    ) =>
+      `/api/download?platform=${platform}&source=${encodeURIComponent(source)}`,
+    getDownloadHref: (
+      download: { platform: "macos" | "windows" },
+      source = "website",
+    ) =>
+      `/api/download?platform=${download.platform}&source=${encodeURIComponent(
+        source,
+      )}`,
     useDownloadInfo: () => ({
       loading: false,
       version: "0.1.0",

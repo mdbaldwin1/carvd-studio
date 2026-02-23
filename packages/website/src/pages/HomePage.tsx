@@ -3,7 +3,7 @@ import BuyButton from "../components/BuyButton";
 import SEO from "../components/SEO";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { useDownloadInfo } from "../utils/downloads";
+import { getDownloadHref, useDownloadInfo } from "../utils/downloads";
 import { AppleIcon, WindowsIcon } from "../components/BrandIcons";
 import {
   createOrganizationSchema,
@@ -425,7 +425,7 @@ export default function HomePage() {
             </p>
             <div className="flex flex-wrap justify-center gap-8 max-sm:flex-col max-sm:items-center">
               <a
-                href={macDownload.url}
+                href={getDownloadHref(macDownload, "home-hero-card")}
                 className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
                 <span>
@@ -440,7 +440,7 @@ export default function HomePage() {
                 </span>
               </a>
               <a
-                href={windowsDownload.url}
+                href={getDownloadHref(windowsDownload, "home-hero-card")}
                 className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
                 <span>
