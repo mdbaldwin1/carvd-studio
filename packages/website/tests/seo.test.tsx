@@ -5,6 +5,7 @@ import SEO from "../src/components/SEO";
 import {
   createOrganizationSchema,
   createSoftwareAppSchema,
+  createWebsiteSchema,
   createFAQSchema,
   createBreadcrumbSchema,
 } from "../src/utils/jsonLd";
@@ -168,6 +169,19 @@ describe("JSON-LD Helpers", () => {
       expect(schema.operatingSystem).toBe("macOS, Windows");
       expect(schema.offers.price).toBe("59.99");
       expect(schema.offers.priceCurrency).toBe("USD");
+    });
+  });
+
+  describe("createWebsiteSchema", () => {
+    it("returns valid WebSite schema with SearchAction", () => {
+      const schema = createWebsiteSchema();
+      expect(schema["@context"]).toBe("https://schema.org");
+      expect(schema["@type"]).toBe("WebSite");
+      expect(schema.url).toBe("https://carvd-studio.com");
+      expect(schema.potentialAction["@type"]).toBe("SearchAction");
+      expect(schema.potentialAction.target).toBe(
+        "https://carvd-studio.com/docs?search={search_term_string}",
+      );
     });
   });
 

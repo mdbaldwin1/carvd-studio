@@ -27,6 +27,20 @@ export function createSoftwareAppSchema() {
   };
 }
 
+export function createWebsiteSchema() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Carvd Studio",
+    url: SITE_URL,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${SITE_URL}/docs?search={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  };
+}
+
 export function createFAQSchema(items: { question: string; answer: string }[]) {
   return {
     "@context": "https://schema.org",

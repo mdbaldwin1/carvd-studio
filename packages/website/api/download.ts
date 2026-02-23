@@ -22,7 +22,12 @@ export default async function handler(request: Request): Promise<Response> {
   if (!platform) {
     return Response.json(
       { error: "Missing or invalid platform. Use ?platform=macos|windows" },
-      { status: 400 },
+      {
+        status: 400,
+        headers: {
+          "X-Robots-Tag": "noindex, nofollow, noarchive",
+        },
+      },
     );
   }
 
@@ -73,7 +78,14 @@ export default async function handler(request: Request): Promise<Response> {
       }),
     );
 
-    return Response.redirect(destination, 302);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: destination,
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex, nofollow, noarchive",
+      },
+    });
   } catch (error) {
     console.error("download_redirect_failed", {
       platform,
@@ -81,9 +93,13 @@ export default async function handler(request: Request): Promise<Response> {
       error: error instanceof Error ? error.message : "unknown_error",
     });
 
-    return Response.redirect(
-      `https://github.com/${GITHUB_REPO}/releases/latest`,
-      302,
-    );
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: `https://github.com/${GITHUB_REPO}/releases/latest`,
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex, nofollow, noarchive",
+      },
+    });
   }
 }

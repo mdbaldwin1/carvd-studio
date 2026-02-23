@@ -1,5 +1,6 @@
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import SEO from "../../components/SEO";
+import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import { getNavSections } from "./docsNavConfig";
 
 const navSections = getNavSections();
@@ -11,6 +12,9 @@ export default function DocsIndexPage() {
         title="Documentation"
         description="Comprehensive documentation for Carvd Studio. Guides, tutorials, and reference for all features."
         path="/docs"
+        jsonLd={createBreadcrumbSchema([
+          { name: "Documentation", path: "/docs" },
+        ])}
       />
       <h2 className="mb-8 text-3xl font-bold max-md:text-xl max-sm:text-lg">
         Welcome to the Docs
