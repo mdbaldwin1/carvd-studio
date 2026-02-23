@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   getMacDownloadUrl,
   getWindowsDownloadUrl,
+  getTrackedDownloadUrl,
+  getDownloadHref,
   getMacDownloadInfo,
   getWindowsDownloadInfo,
   fetchLatestVersion,
@@ -30,11 +32,64 @@ describe("downloads", () => {
     });
   });
 
+  describe("getTrackedDownloadUrl", () => {
+    it("returns tracked macOS endpoint", () => {
+      expect(getTrackedDownloadUrl("macos", "download-page")).toBe(
+        "/api/download?platform=macos&source=download-page",
+      );
+    });
+
+    it("encodes custom source values", () => {
+      expect(getTrackedDownloadUrl("windows", "home hero")).toBe(
+        "/api/download?platform=windows&source=home%20hero",
+      );
+    });
+  });
+
+  describe("getDownloadHref", () => {
+    it("uses direct asset URL on localhost", () => {
+      const href = getDownloadHref(
+        {
+          url: "https://github.com/example/mac.dmg",
+          trackedUrl: "/api/download?platform=macos&source=website",
+          platform: "macos",
+          fileName: "mac.dmg",
+          fileExtension: ".dmg",
+          minOsVersion: "macOS 10.15+",
+        },
+        "download-hero-card",
+        "localhost",
+      );
+
+      expect(href).toBe("https://github.com/example/mac.dmg");
+    });
+
+    it("uses tracked redirect on non-local hosts", () => {
+      const href = getDownloadHref(
+        {
+          url: "https://github.com/example/win.exe",
+          trackedUrl: "/api/download?platform=windows&source=website",
+          platform: "windows",
+          fileName: "win.exe",
+          fileExtension: ".exe",
+          minOsVersion: "Windows 10+",
+        },
+        "download-hero-card",
+        "carvd-studio.com",
+      );
+
+      expect(href).toContain("/api/download");
+      expect(href).toContain("platform=windows");
+      expect(href).toContain("source=download-hero-card");
+    });
+  });
+
   describe("getMacDownloadInfo", () => {
     it("returns complete download info", () => {
       const info = getMacDownloadInfo("0.1.0");
       expect(info).toEqual({
         url: "https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg",
+        trackedUrl: "/api/download?platform=macos&source=website",
         platform: "macos",
         fileName: "Carvd.Studio-0.1.0-arm64.dmg",
         fileExtension: ".dmg",
@@ -48,6 +103,7 @@ describe("downloads", () => {
       const info = getWindowsDownloadInfo("0.1.0");
       expect(info).toEqual({
         url: "https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio.Setup.0.1.0.exe",
+        trackedUrl: "/api/download?platform=windows&source=website",
         platform: "windows",
         fileName: "Carvd.Studio.Setup.0.1.0.exe",
         fileExtension: ".exe",
