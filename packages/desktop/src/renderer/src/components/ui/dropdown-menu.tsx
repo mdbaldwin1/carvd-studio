@@ -21,7 +21,7 @@ const DropdownMenuContent = forwardRef<
         ref={ref}
         sideOffset={sideOffset}
         className={cn(
-          'z-[1000] min-w-[8rem] overflow-hidden rounded-md border border-border bg-surface p-1',
+          'z-[1302] min-w-[8rem] overflow-hidden rounded-md border border-border bg-surface p-1',
           'shadow-[0_4px_16px_rgba(0,0,0,0.2)]',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
           'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
@@ -118,7 +118,7 @@ const DropdownMenuSubContent = forwardRef<
       <DropdownMenuPrimitive.SubContent
         ref={ref}
         className={cn(
-          'z-[1001] min-w-[8rem] overflow-hidden rounded-md border border-border bg-surface p-1',
+          'z-[1303] min-w-[8rem] overflow-hidden rounded-md border border-border bg-surface p-1',
           'shadow-[0_4px_16px_rgba(0,0,0,0.2)]',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
           'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',

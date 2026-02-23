@@ -3,14 +3,13 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 
 const highlightBoxStyle = {
-  background:
-    "linear-gradient(135deg, rgba(174,164,191,0.15) 0%, rgba(174,164,191,0.05) 100%)",
+  background: "rgba(174,164,191,0.12)",
   borderColor: "rgba(174,164,191,0.4)",
 };
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,#2d2d2d_0%,#1a1a1a_50%,#0a0a0a_100%)]">
+    <div className="site-shell">
       <SEO
         title="Privacy Policy"
         description="Carvd Studio privacy policy. Learn how we handle your data — spoiler: your designs stay on your computer."

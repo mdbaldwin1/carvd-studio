@@ -24,7 +24,7 @@ export default function AssembliesPage() {
       </p>
 
       <div className="grid gap-xl">
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <Save size={20} /> Creating Assemblies
           </h3>
@@ -39,14 +39,14 @@ export default function AssembliesPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <Download size={20} /> Using Assemblies
           </h3>
           <div className="grid gap-md text-sm">
-            <p>1. Open the assembly browser from the menu or sidebar</p>
+            <p>1. Open the Library from the header and switch to Assemblies</p>
             <p>2. Browse your saved assemblies and built-in examples</p>
-            <p>3. Click "Insert" to add the assembly to your current project</p>
+            <p>3. Drag an assembly into the canvas to place it</p>
             <p>
               4. All parts are added as a group — move, resize, or modify as
               needed
@@ -54,7 +54,7 @@ export default function AssembliesPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <Pencil size={20} /> Editing Assemblies
           </h3>
@@ -69,8 +69,8 @@ export default function AssembliesPage() {
             <div>
               <p className="font-bold mb-xs">Update Library Version</p>
               <p className="text-muted">
-                Make improvements and save over the original assembly to update
-                it for future use.
+                Use "Edit in 3D" from the library, make improvements, then save
+                to update it for future use.
               </p>
             </div>
             <div>

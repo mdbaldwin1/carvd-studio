@@ -22,7 +22,7 @@ export default function FirstProjectPage() {
       </p>
 
       <div className="grid gap-xl">
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             Step 1: Create a New Project
           </h3>
@@ -39,7 +39,7 @@ export default function FirstProjectPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">Step 2: Add the Shelves</h3>
           <div className="grid gap-md text-sm">
             <p>
@@ -54,7 +54,7 @@ export default function FirstProjectPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">Step 3: Add the Sides</h3>
           <div className="grid gap-md text-sm">
             <p>1. Add a new part: 36" × 3/4" × 10" for the side panels</p>
@@ -64,7 +64,7 @@ export default function FirstProjectPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             Step 4: Generate Your Cut List
           </h3>

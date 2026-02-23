@@ -504,11 +504,11 @@ describe('TemplateBrowserModal', () => {
 
     it('calls onClose when backdrop clicked', async () => {
       const onClose = vi.fn();
-      const { container } = render(<TemplateBrowserModal {...defaultProps} onClose={onClose} />);
+      render(<TemplateBrowserModal {...defaultProps} onClose={onClose} />);
 
-      const backdrop = container.firstChild as HTMLElement;
-      fireEvent.mouseDown(backdrop!);
-      fireEvent.click(backdrop!);
+      const backdrop = document.querySelector('[data-state="open"][class*="bg-overlay"]') as HTMLElement;
+      fireEvent.mouseDown(backdrop);
+      fireEvent.click(backdrop);
 
       expect(onClose).toHaveBeenCalled();
     });

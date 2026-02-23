@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle, Key, X } from 'lucide-react';
 import { HelpTooltip } from '../common/HelpTooltip';
 import { Button } from '@renderer/components/ui/button';
-import { Dialog, DialogContent } from '@renderer/components/ui/dialog';
+import { Card, CardContent } from '@renderer/components/ui/card';
+import { Input } from '@renderer/components/ui/input';
+import { Dialog, DialogContent, DialogTitle } from '@renderer/components/ui/dialog';
+import { getDocsUrl } from '@renderer/utils/docsLinks';
 
 interface LicenseActivationModalProps {
   isOpen: boolean;
@@ -69,130 +72,133 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose?.()}>
-      <DialogContent
-        className="bg-surface rounded-xl p-8 max-w-[500px] w-[90%] shadow-[0_20px_60px_var(--color-overlay)] border border-border"
-        onClose={() => onClose?.()}
-      >
+      <DialogContent className="w-[620px] max-w-[92vw] max-h-[86vh] bg-surface" onClose={() => onClose?.()}>
         {/* Close button */}
         {onClose && (
-          <button
-            className="absolute top-3 right-3 bg-transparent border-none text-text-secondary cursor-pointer p-2 rounded-sm flex items-center justify-center transition-colors duration-150 hover:bg-bg-hover hover:text-text"
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="absolute top-3 right-3 text-text-secondary hover:text-text"
             onClick={onClose}
             aria-label="Close"
           >
             <X size={20} />
-          </button>
+          </Button>
         )}
 
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary mb-4 text-text">
-            <Key size={32} />
-          </div>
-          <h2 id="license-modal-title" className="m-0 text-2xl font-semibold text-text">
-            Activate Carvd Studio
-          </h2>
-          <p className="mt-2 mb-0 text-text-secondary text-sm">Enter your license key to unlock all features</p>
-        </div>
-
-        {/* Success Message */}
-        {success && (
-          <div className="flex items-center gap-3 p-4 bg-success-bg border border-success-border rounded-lg mb-6">
-            <CheckCircle size={20} />
-            <span className="text-success text-sm font-medium">License activated successfully!</span>
-          </div>
-        )}
-
-        {/* Error Message */}
-        {error && !success && (
-          <div className="flex items-start gap-3 p-4 bg-danger-bg border border-danger-border rounded-lg mb-6">
-            <AlertCircle size={20} className="shrink-0 mt-0.5" />
-            <div>
-              <div className="text-danger text-sm font-medium mb-1">Activation Failed</div>
-              <div className="text-text-secondary text-[13px]">{error}</div>
+        <div className="p-5 overflow-y-auto">
+          {/* Header */}
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary mb-4 text-text">
+              <Key size={28} />
             </div>
+            <DialogTitle id="license-modal-title" className="m-0 text-2xl text-text">
+              Activate Carvd Studio
+            </DialogTitle>
+            <p className="mt-2 mb-0 text-text-secondary text-sm">Enter your license key to unlock all features</p>
           </div>
-        )}
 
-        {/* License Key Input */}
-        {!success && (
-          <>
-            <div className="mb-6">
-              <div className="flex items-center gap-1">
-                <label htmlFor="license-key-input" className="block mb-2 text-sm font-medium text-text">
-                  License Key
-                </label>
-                <HelpTooltip
-                  text="You should have received your license key via email after purchase from Lemon Squeezy."
-                  docsSection="faq"
-                />
+          {/* Success Message */}
+          {success && (
+            <div className="flex items-center gap-3 p-4 bg-success-bg border border-success-border rounded-lg mb-6">
+              <CheckCircle size={20} />
+              <span className="text-success text-sm font-medium">License activated successfully!</span>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {error && !success && (
+            <div className="flex items-start gap-3 p-4 bg-danger-bg border border-danger-border rounded-lg mb-6">
+              <AlertCircle size={20} className="shrink-0 mt-0.5" />
+              <div>
+                <div className="text-danger text-sm font-medium mb-1">Activation Failed</div>
+                <div className="text-text-secondary text-[13px]">{error}</div>
               </div>
-              <input
-                id="license-key-input"
-                type="text"
-                value={licenseKey}
-                onChange={(e) => setLicenseKey(e.target.value)}
-                placeholder="Paste your license key here"
-                disabled={isValidating}
-                autoFocus
-                className={`w-full p-3 text-sm font-mono border rounded-md bg-bg text-text outline-none transition-colors duration-200 focus:border-primary ${error ? 'has-error border-danger' : 'border-border'}`}
-              />
             </div>
+          )}
 
-            {/* Activate Button */}
-            <Button
-              size="default"
-              className="w-full"
-              onClick={handleActivate}
-              disabled={isValidating || !licenseKey.trim()}
-            >
-              {isValidating ? 'Validating...' : 'Activate License'}
-            </Button>
-          </>
-        )}
+          {/* License Key Input */}
+          {!success && (
+            <>
+              <Card className="border-border bg-bg mb-6">
+                <CardContent className="pt-5">
+                  <div className="flex items-center gap-1">
+                    <label htmlFor="license-key-input" className="block mb-2 text-sm font-medium text-text">
+                      License Key
+                    </label>
+                    <HelpTooltip
+                      text="You should have received your license key via email after purchase from Lemon Squeezy."
+                      docsSection="faq"
+                    />
+                  </div>
+                  <Input
+                    id="license-key-input"
+                    type="text"
+                    value={licenseKey}
+                    onChange={(e) => setLicenseKey(e.target.value)}
+                    placeholder="Paste your license key here"
+                    disabled={isValidating}
+                    autoFocus
+                    className={`p-3 font-mono ${error ? 'has-error border-danger' : 'border-border'}`}
+                  />
+                </CardContent>
+              </Card>
 
-        {/* Help Text */}
-        <div className="mt-6 pt-6 border-t border-border text-center">
-          <p className="m-0 text-[13px] text-text-secondary">
-            Need help?{' '}
-            <a
-              href="#"
-              className="text-primary no-underline font-medium hover:underline"
-              onClick={(e) => {
-                e.preventDefault();
-                window.electronAPI?.openExternal?.('https://carvd-studio.com/docs#troubleshooting');
-              }}
-            >
-              Troubleshooting guide
-            </a>
-            {' · '}
-            <a
-              href="#"
-              className="text-primary no-underline font-medium hover:underline"
-              onClick={(e) => {
-                e.preventDefault();
-                window.electronAPI?.openExternal?.(
-                  'mailto:support@carvd-studio.com?subject=Carvd%20Studio%20License%20Activation%20Help'
-                );
-              }}
-            >
-              Contact Support
-            </a>
-          </p>
-          {onClose && (
-            <p className="mt-3 mb-0 text-[13px] text-text-secondary">
+              <Button
+                size="default"
+                className="w-full"
+                onClick={handleActivate}
+                disabled={isValidating || !licenseKey.trim()}
+              >
+                {isValidating ? 'Validating...' : 'Activate License'}
+              </Button>
+            </>
+          )}
+
+          {/* Help Text */}
+          <div className="mt-6 pt-6 border-t border-border text-center">
+            <p className="m-0 text-[13px] text-text-secondary">
+              Need help?{' '}
               <a
                 href="#"
-                className="text-text-muted no-underline hover:text-text-secondary hover:underline"
+                className="text-primary no-underline font-medium hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
-                  onClose();
+                  window.electronAPI?.openExternal?.(getDocsUrl('troubleshooting'));
                 }}
               >
-                Continue with limited features
+                Troubleshooting guide
+              </a>
+              {' · '}
+              <a
+                href="#"
+                className="text-primary no-underline font-medium hover:underline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.electronAPI?.openExternal?.(
+                    'mailto:support@carvd-studio.com?subject=Carvd%20Studio%20License%20Activation%20Help'
+                  );
+                }}
+              >
+                Contact Support
               </a>
             </p>
-          )}
+            {onClose && (
+              <p className="mt-3 mb-0 text-[13px] text-text-secondary">
+                <a
+                  href="#"
+                  className="text-text-muted no-underline hover:text-text-secondary hover:underline"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onClose();
+                  }}
+                >
+                  Continue with limited features
+                </a>
+              </p>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

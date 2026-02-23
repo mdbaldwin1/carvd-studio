@@ -18,8 +18,7 @@ export default function DocsPrevNext() {
         <a
           href={`/docs/${prev.slug}`}
           className={cn(
-            "flex max-w-[45%] flex-col gap-1 rounded-md border border-border p-4 text-text no-underline transition-all duration-150",
-            "hover:border-accent hover:bg-surface",
+            "feature-card flex max-w-[45%] flex-col gap-1 p-4 text-text no-underline",
             "max-[600px]:max-w-full",
           )}
         >
@@ -33,8 +32,7 @@ export default function DocsPrevNext() {
         <a
           href={`/docs/${next.slug}`}
           className={cn(
-            "ml-auto flex max-w-[45%] flex-col gap-1 rounded-md border border-border p-4 text-right text-text no-underline transition-all duration-150",
-            "hover:border-accent hover:bg-surface",
+            "feature-card ml-auto flex max-w-[45%] flex-col gap-1 p-4 text-right text-text no-underline",
             "max-[600px]:max-w-full max-[600px]:text-left",
           )}
         >

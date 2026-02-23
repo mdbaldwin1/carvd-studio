@@ -1,4 +1,4 @@
-import { Plus, ChevronRight } from 'lucide-react';
+import { Plus, ChevronRight, BookOpen } from 'lucide-react';
 import { useMemo } from 'react';
 import { Button } from '@renderer/components/ui/button';
 import { Card } from '@renderer/components/ui/card';
@@ -86,7 +86,7 @@ export function TemplatesSection({
     <div className="flex flex-col gap-3 min-h-0 max-h-[50vh] mt-2">
       <div className="flex items-center justify-between pb-3 border-b border-border mb-3">
         <h2 className="text-sm font-semibold text-text-secondary m-0 p-0">Templates</h2>
-        <Button variant="ghost" size="xs" className="text-accent hover:text-primary" onClick={onViewAllTemplates}>
+        <Button variant="ghost" size="xs" onClick={onViewAllTemplates}>
           View All
           <ChevronRight size={14} />
         </Button>
@@ -127,8 +127,8 @@ export function TemplatesSection({
               }
             }}
           >
-            <span className="text-[32px] leading-none w-full max-w-30 h-[90px] flex items-center justify-center bg-bg-tertiary rounded-md text-text-muted">
-              {tutorialTemplate.thumbnail}
+            <span className="w-full max-w-30 h-[90px] flex items-center justify-center bg-bg-tertiary rounded-md text-text-muted">
+              <BookOpen size={34} strokeWidth={1.75} />
             </span>
             <div className="flex flex-col gap-0.5">
               <span className="text-sm font-medium text-text">{tutorialTemplate.name}</span>

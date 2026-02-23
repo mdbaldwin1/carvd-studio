@@ -17,9 +17,9 @@ const AlertDialogOverlay = forwardRef<
     <AlertDialogPrimitive.Overlay
       ref={ref}
       className={cn(
-        'fixed inset-0 z-50 bg-black/80',
+        'fixed inset-0 z-[1200] bg-black/80',
         'data-[state=open]:animate-in data-[state=open]:fade-in-0',
-        'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+        'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:pointer-events-none',
         className
       )}
       {...props}
@@ -37,7 +37,7 @@ const AlertDialogContent = forwardRef<
       <AlertDialogPrimitive.Content
         ref={ref}
         className={cn(
-          'fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%]',
+          'fixed left-[50%] top-[50%] z-[1201] translate-x-[-50%] translate-y-[-50%]',
           'w-full max-w-[420px]',
           'bg-surface border border-border rounded-lg',
           'shadow-[0_8px_32px_var(--color-overlay)]',

@@ -169,7 +169,7 @@ describe('useFileOperations', () => {
       });
 
       expect(saveProject).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Project saved');
+      expect(showToast).toHaveBeenCalledWith('Project saved', 'success');
     });
 
     it('shows error toast on save failure', async () => {
@@ -186,7 +186,7 @@ describe('useFileOperations', () => {
         await result.current.handleSave();
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error saving: Disk full');
+      expect(showToast).toHaveBeenCalledWith('Error saving: Disk full', 'error');
     });
 
     it('does nothing when save is canceled', async () => {
@@ -254,7 +254,7 @@ describe('useFileOperations', () => {
       });
 
       expect(saveProjectAs).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Project saved');
+      expect(showToast).toHaveBeenCalledWith('Project saved', 'success');
     });
 
     it('shows error toast on save-as failure', async () => {
@@ -271,7 +271,7 @@ describe('useFileOperations', () => {
         await result.current.handleSaveAs();
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error saving: Permission denied');
+      expect(showToast).toHaveBeenCalledWith('Error saving: Permission denied', 'error');
     });
 
     it('does nothing when save-as is canceled', async () => {
@@ -302,7 +302,7 @@ describe('useFileOperations', () => {
       });
 
       expect(saveProjectAs).not.toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Use "Save Template" to save template changes');
+      expect(showToast).toHaveBeenCalledWith('Use "Save Template" to save template changes', 'info');
     });
 
     it('blocks save-as when editing assembly', async () => {
@@ -316,7 +316,7 @@ describe('useFileOperations', () => {
       });
 
       expect(saveProjectAs).not.toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Use "Save Assembly" to save assembly changes');
+      expect(showToast).toHaveBeenCalledWith('Use "Save Assembly" to save assembly changes', 'info');
     });
   });
 
@@ -333,7 +333,7 @@ describe('useFileOperations', () => {
       });
 
       expect(newProject).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('New project created');
+      expect(showToast).toHaveBeenCalledWith('New project created', 'success');
     });
 
     it('shows unsaved changes dialog when dirty', async () => {
@@ -360,7 +360,7 @@ describe('useFileOperations', () => {
       });
 
       expect(newProject).not.toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Finish editing template first');
+      expect(showToast).toHaveBeenCalledWith('Finish editing template first', 'warning');
     });
 
     it('blocks when editing assembly', async () => {
@@ -374,7 +374,7 @@ describe('useFileOperations', () => {
       });
 
       expect(newProject).not.toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Finish editing assembly first');
+      expect(showToast).toHaveBeenCalledWith('Finish editing assembly first', 'warning');
     });
   });
 
@@ -391,7 +391,7 @@ describe('useFileOperations', () => {
       });
 
       expect(openProject).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Project opened');
+      expect(showToast).toHaveBeenCalledWith('Project opened', 'success');
     });
 
     it('shows error toast on open failure', async () => {
@@ -408,7 +408,7 @@ describe('useFileOperations', () => {
         await result.current.handleOpen();
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error: Corrupt file');
+      expect(showToast).toHaveBeenCalledWith('Error: Corrupt file', 'error');
     });
 
     it('blocks when editing template', async () => {
@@ -422,7 +422,7 @@ describe('useFileOperations', () => {
       });
 
       expect(openProject).not.toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Finish editing template first');
+      expect(showToast).toHaveBeenCalledWith('Finish editing template first', 'warning');
     });
 
     it('blocks when editing assembly', async () => {
@@ -436,7 +436,7 @@ describe('useFileOperations', () => {
       });
 
       expect(openProject).not.toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Finish editing assembly first');
+      expect(showToast).toHaveBeenCalledWith('Finish editing assembly first', 'warning');
     });
 
     it('shows unsaved changes dialog when dirty', async () => {
@@ -485,7 +485,7 @@ describe('useFileOperations', () => {
       });
 
       expect(openProjectFromPath).toHaveBeenCalledWith('/path/to/recent.carvd');
-      expect(showToast).toHaveBeenCalledWith('Project opened');
+      expect(showToast).toHaveBeenCalledWith('Project opened', 'success');
     });
 
     it('shows error toast on open recent failure', async () => {
@@ -502,7 +502,7 @@ describe('useFileOperations', () => {
         await result.current.handleOpenRecent('/path/to/missing.carvd');
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error: File not found');
+      expect(showToast).toHaveBeenCalledWith('Error: File not found', 'error');
     });
 
     it('blocks when editing template', async () => {
@@ -516,7 +516,7 @@ describe('useFileOperations', () => {
       });
 
       expect(openProjectFromPath).not.toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Finish editing template first');
+      expect(showToast).toHaveBeenCalledWith('Finish editing template first', 'warning');
     });
 
     it('blocks when editing assembly', async () => {
@@ -530,7 +530,7 @@ describe('useFileOperations', () => {
       });
 
       expect(openProjectFromPath).not.toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Finish editing assembly first');
+      expect(showToast).toHaveBeenCalledWith('Finish editing assembly first', 'warning');
     });
 
     it('shows unsaved changes dialog when dirty', async () => {
@@ -590,7 +590,7 @@ describe('useFileOperations', () => {
       });
 
       expect(onGoHome).not.toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Finish editing template first');
+      expect(showToast).toHaveBeenCalledWith('Finish editing template first', 'warning');
     });
 
     it('blocks when editing assembly', async () => {
@@ -605,7 +605,7 @@ describe('useFileOperations', () => {
       });
 
       expect(onGoHome).not.toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Finish editing assembly first');
+      expect(showToast).toHaveBeenCalledWith('Finish editing assembly first', 'warning');
     });
 
     it('shows unsaved changes dialog when dirty', async () => {
@@ -656,7 +656,7 @@ describe('useFileOperations', () => {
         '/new/location/project.carvd'
       );
       expect(openProjectFromPath).toHaveBeenCalledWith('/new/location/project.carvd');
-      expect(showToast).toHaveBeenCalledWith('Project opened');
+      expect(showToast).toHaveBeenCalledWith('Project opened', 'success');
     });
 
     it('does nothing when dialog is canceled', async () => {
@@ -709,7 +709,7 @@ describe('useFileOperations', () => {
         await result.current.handleRelocateFile('/old/path.carvd', 'old.carvd');
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error: Read error');
+      expect(showToast).toHaveBeenCalledWith('Error: Read error', 'error');
     });
 
     it('triggers recovery when relocated file needsRecovery', async () => {
@@ -748,7 +748,7 @@ describe('useFileOperations', () => {
         await result.current.handleRelocateFile('/old/path.carvd', 'old.carvd');
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error relocating file: Error: Dialog error');
+      expect(showToast).toHaveBeenCalledWith('Error relocating file: Error: Dialog error', 'error');
     });
   });
 
@@ -899,7 +899,7 @@ describe('useFileOperations', () => {
       });
 
       expect(loadRepairedFile).toHaveBeenCalledWith(repairedData, '/path/to/file.carvd');
-      expect(showToast).toHaveBeenCalledWith('Project recovered successfully');
+      expect(showToast).toHaveBeenCalledWith('Project recovered successfully', 'success');
 
       // Modal should be closed after accept
       props = getRecoveryProps();
@@ -951,7 +951,7 @@ describe('useFileOperations', () => {
         await props.onAcceptRepair();
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error loading recovered project: Load failed');
+      expect(showToast).toHaveBeenCalledWith('Error loading recovered project: Load failed', 'error');
 
       vi.useRealTimers();
     });
@@ -1033,7 +1033,7 @@ describe('useFileOperations', () => {
 
       expect(saveProject).toHaveBeenCalled();
       expect(newProject).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('New project created');
+      expect(showToast).toHaveBeenCalledWith('New project created', 'success');
 
       // Dialog should be closed
       dialogProps = getDialogProps();
@@ -1066,7 +1066,7 @@ describe('useFileOperations', () => {
         await dialogProps.onSave();
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error saving: Save failed');
+      expect(showToast).toHaveBeenCalledWith('Error saving: Save failed', 'error');
       expect(window.electronAPI.cancelClose).toHaveBeenCalled();
     });
 
@@ -1193,7 +1193,7 @@ describe('useFileOperations', () => {
         await dialogProps.onSave();
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error saving: Disk error');
+      expect(showToast).toHaveBeenCalledWith('Error saving: Disk error', 'error');
       expect(newProject).not.toHaveBeenCalled();
       // cancelClose should NOT be called for non-close actions
       expect(window.electronAPI.cancelClose).not.toHaveBeenCalled();
@@ -1252,7 +1252,7 @@ describe('useFileOperations', () => {
       });
 
       expect(openProjectFromPath).toHaveBeenCalledWith('/path/to/file.carvd');
-      expect(showToast).toHaveBeenCalledWith('Project opened');
+      expect(showToast).toHaveBeenCalledWith('Project opened', 'success');
     });
 
     it('shows error toast when open from event fails', async () => {
@@ -1269,7 +1269,7 @@ describe('useFileOperations', () => {
         await onOpenProjectCallback!('/path/to/file.carvd');
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error: Cannot read');
+      expect(showToast).toHaveBeenCalledWith('Error: Cannot read', 'error');
     });
 
     it('shows unsaved changes dialog when dirty on open event', async () => {
@@ -1307,7 +1307,7 @@ describe('useFileOperations', () => {
       });
 
       expect(openProjectFromPath).toHaveBeenCalledWith('/path/to/file.carvd');
-      expect(showToast).toHaveBeenCalledWith('Project opened');
+      expect(showToast).toHaveBeenCalledWith('Project opened', 'success');
     });
 
     it('triggers recovery from open event when result needsRecovery (no unsaved)', async () => {
@@ -1378,7 +1378,7 @@ describe('useFileOperations', () => {
         await dialogProps.onDiscard();
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error: Broken file');
+      expect(showToast).toHaveBeenCalledWith('Error: Broken file', 'error');
     });
   });
 
@@ -1670,7 +1670,7 @@ describe('useFileOperations', () => {
         await dialogProps.onDiscard();
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error: Failed to open');
+      expect(showToast).toHaveBeenCalledWith('Error: Failed to open', 'error');
     });
 
     it('handles recovery in open pending action after discard', async () => {
@@ -1721,7 +1721,7 @@ describe('useFileOperations', () => {
       });
 
       expect(openProjectFromPath).toHaveBeenCalledWith('/my/project.carvd');
-      expect(showToast).toHaveBeenCalledWith('Project opened');
+      expect(showToast).toHaveBeenCalledWith('Project opened', 'success');
     });
 
     it('handles error in open recent pending action', async () => {
@@ -1745,7 +1745,7 @@ describe('useFileOperations', () => {
         await dialogProps.onDiscard();
       });
 
-      expect(showToast).toHaveBeenCalledWith('Error: Not found');
+      expect(showToast).toHaveBeenCalledWith('Error: Not found', 'error');
     });
 
     it('handles recovery in open recent pending action', async () => {

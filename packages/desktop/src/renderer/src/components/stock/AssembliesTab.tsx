@@ -1,16 +1,23 @@
-import { Copy, Download, Plus, Search, Upload, X } from 'lucide-react';
+import { Copy, Download, Plus, Upload } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import { isBuiltInAssembly } from '../../templates/builtInAssemblies';
 import { Assembly } from '../../types';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { showSavedFileToast } from '../../utils/fileToast';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { Textarea } from '@renderer/components/ui/textarea';
+import { AssemblyDetails } from '../assembly/AssemblyDetails';
 import { HelpTooltip } from '../common/HelpTooltip';
+import { DocsLink } from '../common/library/DocsLink';
+import { LibraryDetailHeader } from '../common/library/LibraryDetailHeader';
+import { LibraryDetailPane } from '../common/library/LibraryDetailPane';
+import { LibraryEmptyState } from '../common/library/LibraryEmptyState';
+import { LibrarySidebar } from '../common/library/LibrarySidebar';
+import { AssemblyListItem } from './AssemblyListItem';
 
 interface AssembliesTabProps {
   assemblies: Assembly[];
@@ -21,6 +28,14 @@ interface AssembliesTabProps {
   onCreateNewAssembly?: () => Promise<boolean>;
   canCreateAssemblies: boolean;
   onClose: () => void;
+  hideInlineFormActions?: boolean;
+  onFormModeChange?: (state: {
+    isFormMode: boolean;
+    confirmLabel?: 'Save';
+    canConfirm?: boolean;
+    onConfirm?: () => void;
+    onCancel?: () => void;
+  }) => void;
 }
 
 export function AssembliesTab({
@@ -31,7 +46,9 @@ export function AssembliesTab({
   onEditAssemblyIn3D,
   onCreateNewAssembly,
   canCreateAssemblies,
-  onClose
+  onClose,
+  hideInlineFormActions = false,
+  onFormModeChange
 }: AssembliesTabProps) {
   const units = useProjectStore((s) => s.units);
   const showToast = useUIStore((s) => s.showToast);
@@ -45,11 +62,27 @@ export function AssembliesTab({
     () => (searchTerm ? assemblies.filter((a) => a.name.toLowerCase().includes(searchTerm.toLowerCase())) : assemblies),
     [assemblies, searchTerm]
   );
+  const selectedAssembly = selectedAssemblyId ? assemblies.find((a) => a.id === selectedAssemblyId) : null;
+  const hasUnsavedFormChanges = useMemo(() => {
+    if (!isEditingAssembly || !selectedAssembly) return false;
+    return (
+      assemblyFormData.name !== selectedAssembly.name ||
+      assemblyFormData.description !== (selectedAssembly.description || '')
+    );
+  }, [assemblyFormData.description, assemblyFormData.name, isEditingAssembly, selectedAssembly]);
 
-  // Handle escape key
+  const confirmDiscardUnsaved = useCallback(() => {
+    if (!hasUnsavedFormChanges) return true;
+    return window.confirm('Discard unsaved assembly changes?');
+  }, [hasUnsavedFormChanges]);
+
+  // Handle escape key; capture phase ensures edit-cancel takes precedence over dialog-close.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         if (isEditingAssembly) {
           handleCancelEditAssembly();
         } else {
@@ -57,16 +90,22 @@ export function AssembliesTab({
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- handleCancelEditAssembly is a useCallback defined below; deps cover the values it reads
   }, [isEditingAssembly, onClose]);
 
-  const handleSelectAssembly = useCallback((assembly: Assembly) => {
-    setSelectedAssemblyId(assembly.id);
-    setIsEditingAssembly(false);
-    setAssemblyFormData({ name: assembly.name, description: assembly.description || '' });
-  }, []);
+  const handleSelectAssembly = useCallback(
+    (assembly: Assembly) => {
+      if (assembly.id !== selectedAssemblyId && isEditingAssembly && !confirmDiscardUnsaved()) {
+        return;
+      }
+      setSelectedAssemblyId(assembly.id);
+      setIsEditingAssembly(false);
+      setAssemblyFormData({ name: assembly.name, description: assembly.description || '' });
+    },
+    [confirmDiscardUnsaved, isEditingAssembly, selectedAssemblyId]
+  );
 
   const handleStartEditAssembly = useCallback(() => {
     setIsEditingAssembly(true);
@@ -93,6 +132,10 @@ export function AssembliesTab({
     }
   }, [selectedAssemblyId, assemblyFormData, onUpdateAssembly]);
 
+  const canSaveAssembly = useMemo(() => {
+    return isEditingAssembly && selectedAssemblyId !== null && assemblyFormData.name.trim().length > 0;
+  }, [isEditingAssembly, selectedAssemblyId, assemblyFormData.name]);
+
   const handleDeleteAssembly = useCallback(() => {
     if (selectedAssemblyId) {
       onDeleteAssembly(selectedAssemblyId);
@@ -108,7 +151,7 @@ export function AssembliesTab({
         const message = result.stocksIncluded
           ? `Assembly exported with ${result.stocksIncluded} stock${result.stocksIncluded === 1 ? '' : 's'}`
           : 'Assembly exported successfully';
-        showToast(message, 'success');
+        showSavedFileToast(message, result.filePath);
       } else if (!result.canceled && result.error) {
         showToast(result.error, 'error');
       }
@@ -135,15 +178,34 @@ export function AssembliesTab({
     }
   }, [showToast]);
 
-  const selectedAssembly = selectedAssemblyId ? assemblies.find((a) => a.id === selectedAssemblyId) : null;
+  useEffect(() => {
+    if (!onFormModeChange) return;
+    if (isEditingAssembly) {
+      onFormModeChange({
+        isFormMode: true,
+        confirmLabel: 'Save',
+        canConfirm: canSaveAssembly,
+        onConfirm: handleSaveAssembly,
+        onCancel: handleCancelEditAssembly
+      });
+      return;
+    }
+    onFormModeChange({ isFormMode: false });
+  }, [onFormModeChange, isEditingAssembly, canSaveAssembly, handleSaveAssembly, handleCancelEditAssembly]);
 
   return (
     <>
-      {/* Assemblies list sidebar */}
-      <div className="w-60 border-r border-border flex flex-col">
-        <div className="flex justify-between items-center py-3 px-4 border-b border-border text-xs text-text-muted">
-          <span>{assemblies.length} available</span>
-          <div className="flex items-center gap-1">
+      <LibrarySidebar
+        count={assemblies.length}
+        hasItems={assemblies.length > 0}
+        showNoResults={filteredAssemblies.length === 0}
+        search={{
+          value: searchTerm,
+          onChange: setSearchTerm,
+          placeholder: 'Search assemblies...'
+        }}
+        headerActions={
+          <>
             {canCreateAssemblies && (
               <Button
                 variant="ghost"
@@ -171,46 +233,18 @@ export function AssembliesTab({
                 <Plus size={14} />
               </Button>
             )}
-          </div>
-        </div>
-        {assemblies.length > 0 && (
-          <div className="flex items-center gap-2 py-2 px-3 bg-bg border border-border rounded mb-2">
-            <Search size={14} className="text-text-muted shrink-0" />
-            <input
-              className="flex-1 border-none bg-transparent text-text text-[13px] outline-none placeholder:text-text-muted"
-              type="text"
-              placeholder="Search assemblies..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <button
-                className="flex items-center justify-center w-5 h-5 border-none bg-none text-text-muted cursor-pointer p-0 rounded-sm shrink-0 hover:text-text hover:bg-bg-hover"
-                onClick={() => setSearchTerm('')}
-                aria-label="Clear search"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        )}
-        {assemblies.length === 0 ? (
+          </>
+        }
+        emptyState={
           <div className="text-text-muted text-xs italic p-4 text-center">
             {!canCreateAssemblies ? (
               <>
                 <p>Assemblies require a license</p>
                 <p className="text-[11px] text-text-muted mt-1">
                   Upgrade to create and use assemblies.{' '}
-                  <a
-                    href="#"
-                    className="text-accent no-underline hover:underline hover:text-accent-hover transition-colors duration-150"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
-                    }}
-                  >
+                  <DocsLink section="assemblies" className="hover:underline">
                     Learn more
-                  </a>
+                  </DocsLink>
                 </p>
               </>
             ) : (
@@ -220,165 +254,123 @@ export function AssembliesTab({
                   {onCreateNewAssembly ? (
                     <>
                       Click "+" above or save a selection as an assembly from the canvas.{' '}
-                      <a
-                        href="#"
-                        className="text-accent no-underline hover:underline hover:text-accent-hover transition-colors duration-150"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
-                        }}
-                      >
+                      <DocsLink section="assemblies" className="hover:underline">
                         Learn more
-                      </a>
+                      </DocsLink>
                     </>
                   ) : (
                     <>
                       Save a selection as an assembly from the canvas.{' '}
-                      <a
-                        href="#"
-                        className="text-accent no-underline hover:underline hover:text-accent-hover transition-colors duration-150"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
-                        }}
-                      >
+                      <DocsLink section="assemblies" className="hover:underline">
                         Learn more
-                      </a>
+                      </DocsLink>
                     </>
                   )}
                 </p>
               </>
             )}
           </div>
-        ) : filteredAssemblies.length === 0 ? (
+        }
+        noResultsState={
           <div className="text-text-muted text-xs italic p-4 text-center">
             <p>No assemblies match "{searchTerm}"</p>
           </div>
-        ) : (
-          <ul className="list-none m-0 p-2 flex-1 min-h-0 overflow-y-auto">
-            {filteredAssemblies.map((assembly) => (
-              <li
-                key={assembly.id}
-                className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-[background] duration-100 hover:bg-surface-hover ${selectedAssemblyId === assembly.id ? 'bg-selected' : ''}`}
-                onClick={() => handleSelectAssembly(assembly)}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('application/carvd-assembly', assembly.id);
-                  e.dataTransfer.setData('application/carvd-assembly-source', 'library');
-                  e.dataTransfer.effectAllowed = 'copy';
-                }}
-              >
-                {assembly.thumbnailData?.data ? (
-                  <img
-                    src={`data:image/png;base64,${assembly.thumbnailData.data}`}
-                    alt={assembly.name}
-                    className="w-10 h-[30px] object-cover rounded shrink-0 bg-bg-tertiary"
-                  />
-                ) : (
-                  <span className="text-base shrink-0">📦</span>
-                )}
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs whitespace-nowrap overflow-hidden text-ellipsis">
-                    {assembly.name}
-                    {isBuiltInAssembly(assembly.id) && (
-                      <Badge
-                        variant="secondary"
-                        className="ml-1.5 rounded py-px px-1 text-[9px] uppercase tracking-wide"
-                      >
-                        Built-in
-                      </Badge>
-                    )}
-                  </span>
-                  <span className="text-[10px] text-text-muted">
-                    {assembly.parts.length} part{assembly.parts.length !== 1 ? 's' : ''}
-                    {assembly.groups.length > 0 &&
-                      `, ${assembly.groups.length} group${assembly.groups.length !== 1 ? 's' : ''}`}
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+        }
+      >
+        <ul className="list-none m-0 p-2 flex-1 min-h-0 overflow-y-auto">
+          {filteredAssemblies.map((assembly) => (
+            <AssemblyListItem
+              key={assembly.id}
+              assembly={assembly}
+              selected={selectedAssemblyId === assembly.id}
+              showBuiltInBadge
+              showGroupsInMeta
+              onClick={() => handleSelectAssembly(assembly)}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/carvd-assembly', assembly.id);
+                e.dataTransfer.setData('application/carvd-assembly-source', 'library');
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
+            />
+          ))}
+        </ul>
+      </LibrarySidebar>
 
       {/* Assembly detail panel */}
-      <div className="flex-1 flex flex-col overflow-y-auto">
+      <LibraryDetailPane>
         {!selectedAssembly ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-text-muted gap-2">
-            <p>Select an assembly to view details</p>
-            <p className="text-[11px] text-text-muted mt-1">or click "+" to create a new assembly</p>
-            <a
-              href="#"
-              className="text-accent no-underline text-xs hover:underline hover:text-accent-hover transition-colors duration-150"
-              onClick={(e) => {
-                e.preventDefault();
-                window.electronAPI.openExternal('https://carvd-studio.com/docs#assemblies');
-              }}
-            >
-              Learn more about assemblies
-            </a>
-          </div>
+          <LibraryEmptyState
+            title="Select an assembly to view details"
+            subtitle='or click "+" to create a new assembly'
+            linkLabel="Learn more about assemblies"
+            docsSection="assemblies"
+          />
         ) : (
           <>
-            <div className="flex justify-between items-center py-4 px-5 border-b border-border">
-              <h3 className="text-base font-semibold m-0 flex items-center gap-2">
-                {isEditingAssembly ? 'Edit Assembly' : selectedAssembly.name}
-                {!isEditingAssembly && isBuiltInAssembly(selectedAssembly.id) && (
-                  <Badge variant="secondary" className="rounded py-0.5 px-1.5 text-[10px] uppercase tracking-wide">
-                    Built-in
-                  </Badge>
-                )}
-              </h3>
-              {!isEditingAssembly && (
-                <div className="flex gap-2">
-                  {!isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
-                    <>
-                      <Button variant="ghost" size="xs" onClick={handleStartEditAssembly}>
-                        Edit
-                      </Button>
-                      {onEditAssemblyIn3D && (
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          onClick={async () => {
-                            const success = await onEditAssemblyIn3D(selectedAssembly);
-                            if (success) {
-                              onClose();
-                            }
-                          }}
-                        >
-                          Edit in 3D
+            <LibraryDetailHeader
+              title={
+                <>
+                  {isEditingAssembly ? 'Edit Assembly' : selectedAssembly.name}
+                  {!isEditingAssembly && isBuiltInAssembly(selectedAssembly.id) && (
+                    <Badge variant="secondary" className="rounded py-0.5 px-1.5 text-[10px] uppercase tracking-wide">
+                      Built-in
+                    </Badge>
+                  )}
+                </>
+              }
+              actions={
+                !isEditingAssembly ? (
+                  <div className="flex gap-2">
+                    {!isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
+                      <>
+                        <Button variant="ghost" size="xs" onClick={handleStartEditAssembly}>
+                          Edit
                         </Button>
-                      )}
-                    </>
-                  )}
-                  {onDuplicateAssembly && canCreateAssemblies && (
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      onClick={async () => {
-                        await onDuplicateAssembly(selectedAssembly);
-                      }}
-                      title="Create a copy of this assembly"
-                    >
-                      <Copy size={12} />
-                      Duplicate
-                    </Button>
-                  )}
-                  {!isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
-                    <Button variant="ghost" size="xs" onClick={handleExportAssembly} title="Export assembly to file">
-                      <Download size={12} />
-                      Export
-                    </Button>
-                  )}
-                  {!isBuiltInAssembly(selectedAssembly.id) && (
-                    <Button variant="destructiveOutline" size="xs" onClick={handleDeleteAssembly}>
-                      Delete
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
+                        {onEditAssemblyIn3D && (
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={async () => {
+                              const success = await onEditAssemblyIn3D(selectedAssembly);
+                              if (success) {
+                                onClose();
+                              }
+                            }}
+                          >
+                            Edit in 3D
+                          </Button>
+                        )}
+                      </>
+                    )}
+                    {onDuplicateAssembly && canCreateAssemblies && (
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        onClick={async () => {
+                          await onDuplicateAssembly(selectedAssembly);
+                        }}
+                        title="Create a copy of this assembly"
+                      >
+                        <Copy size={12} />
+                        Duplicate
+                      </Button>
+                    )}
+                    {!isBuiltInAssembly(selectedAssembly.id) && canCreateAssemblies && (
+                      <Button variant="ghost" size="xs" onClick={handleExportAssembly} title="Export assembly to file">
+                        <Download size={12} />
+                        Export
+                      </Button>
+                    )}
+                    {!isBuiltInAssembly(selectedAssembly.id) && (
+                      <Button variant="destructiveOutline" size="xs" onClick={handleDeleteAssembly}>
+                        Delete
+                      </Button>
+                    )}
+                  </div>
+                ) : undefined
+              }
+            />
 
             {isEditingAssembly ? (
               <div className="flex-1 p-5 overflow-y-auto">
@@ -424,71 +416,31 @@ export function AssembliesTab({
                   </div>
                 )}
 
-                <div className="flex justify-end gap-3 mt-6 pt-5 border-t border-border">
-                  <Button variant="outline" size="sm" onClick={handleCancelEditAssembly}>
-                    Cancel
-                  </Button>
-                  <Button size="sm" onClick={handleSaveAssembly}>
-                    Save
-                  </Button>
-                </div>
+                {!hideInlineFormActions && (
+                  <div className="flex justify-end gap-3 mt-6 pt-5 border-t border-border">
+                    <Button variant="outline" size="sm" onClick={handleCancelEditAssembly}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={handleSaveAssembly} disabled={!canSaveAssembly}>
+                      Save
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex-1 p-5 overflow-y-auto">
-                {selectedAssembly.description && (
-                  <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
-                    <span className="text-xs text-text-muted shrink-0">Description</span>
-                    <span className="text-[13px] text-text text-right break-words">{selectedAssembly.description}</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
-                  <span className="text-xs text-text-muted shrink-0">Parts</span>
-                  <span className="text-[13px] text-text text-right break-words">{selectedAssembly.parts.length}</span>
-                </div>
-                {selectedAssembly.groups.length > 0 && (
-                  <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
-                    <span className="text-xs text-text-muted shrink-0">Groups</span>
-                    <span className="text-[13px] text-text text-right break-words">
-                      {selectedAssembly.groups.length}
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
-                  <span className="text-xs text-text-muted shrink-0">Created</span>
-                  <span className="text-[13px] text-text text-right break-words">
-                    {new Date(selectedAssembly.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="flex justify-between items-start gap-4 py-3 border-b border-border">
-                  <span className="text-xs text-text-muted shrink-0">Modified</span>
-                  <span className="text-[13px] text-text text-right break-words">
-                    {new Date(selectedAssembly.modifiedAt).toLocaleDateString()}
-                  </span>
-                </div>
-
-                <div className="mt-4 pt-4 border-t border-border">
-                  <span className="text-xs text-text-muted shrink-0 block mb-3">Parts in this assembly:</span>
-                  <ul className="list-none m-0 p-0 max-h-[200px] overflow-y-auto">
-                    {selectedAssembly.parts.map((part, index) => (
-                      <li
-                        key={index}
-                        className="flex justify-between items-center py-2 px-3 bg-bg rounded mb-1 last:mb-0"
-                      >
-                        <span className="text-xs text-text">{part.name}</span>
-                        <span className="text-[11px] text-text-muted">
-                          {formatMeasurementWithUnit(part.length, units)} ×{' '}
-                          {formatMeasurementWithUnit(part.width, units)} ×{' '}
-                          {formatMeasurementWithUnit(part.thickness, units)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <AssemblyDetails
+                  assembly={selectedAssembly}
+                  units={units}
+                  showMetadataRows
+                  partsTitle="Parts in this assembly:"
+                  partsMaxHeightClassName="max-h-[200px]"
+                />
               </div>
             )}
           </>
         )}
-      </div>
+      </LibraryDetailPane>
     </>
   );
 }

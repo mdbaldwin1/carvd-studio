@@ -27,7 +27,7 @@ const _axisX = new THREE.Vector3(1, 0, 0);
 const _axisY = new THREE.Vector3(0, 1, 0);
 const _axisZ = new THREE.Vector3(0, 0, 1);
 
-const DRAG_THRESHOLD_SQ = 9; // 3px squared
+const DRAG_THRESHOLD_SQ = 25; // 5px squared
 
 export function useGroupDrag(
   camera: THREE.Camera,

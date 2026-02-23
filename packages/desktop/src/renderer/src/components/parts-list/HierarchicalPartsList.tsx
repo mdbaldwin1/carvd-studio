@@ -1,14 +1,18 @@
-import React, { useMemo, useCallback, useRef, useEffect } from 'react';
-import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
-import { ChevronRight, ChevronDown, Layers, AlertTriangle } from 'lucide-react';
+import { Button } from '@renderer/components/ui/button';
+import { AlertTriangle, ChevronDown, ChevronRight, Layers } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { useStockLibrary } from '../../hooks/useStockLibrary';
 import { useAssemblyEditingStore } from '../../store/assemblyEditingStore';
-import { getAllDescendantPartIds, useProjectStore, validatePartsForCutList } from '../../store/projectStore';
+import {
+  getAllDescendantPartIds,
+  getAncestorGroupIds,
+  useProjectStore,
+  validatePartsForCutList
+} from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { Group, GroupMember, Part, PartValidationIssue } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
-import { Button } from '@renderer/components/ui/button';
 import { IconButton } from '../common/IconButton';
 
 // ── Tree types ──────────────────────────────────────────────────────────
@@ -53,47 +57,90 @@ type FlatItem = FlatPartItem | FlatGroupItem;
 // ── Build tree from flat data ───────────────────────────────────────────
 
 function buildTree(parts: Part[], groups: Group[], groupMembers: GroupMember[]): TreeNode[] {
+  const partById = new Map(parts.map((part) => [part.id, part]));
+  const groupById = new Map(groups.map((group) => [group.id, group]));
   const membersByGroup = new Map<string, GroupMember[]>();
   const partIdToGroupId = new Map<string, string>();
   const groupIdToParentGroupId = new Map<string, string>();
 
   for (const member of groupMembers) {
+    // Ignore stale/corrupt links that reference missing groups/parts.
+    if (!groupById.has(member.groupId)) continue;
+
     if (member.memberType === 'part') {
+      if (!partById.has(member.memberId)) continue;
       partIdToGroupId.set(member.memberId, member.groupId);
     } else {
+      if (!groupById.has(member.memberId)) continue;
       groupIdToParentGroupId.set(member.memberId, member.groupId);
     }
+
     const members = membersByGroup.get(member.groupId) || [];
     members.push(member);
     membersByGroup.set(member.groupId, members);
   }
 
-  const topLevelGroups = groups.filter((g) => !groupIdToParentGroupId.has(g.id));
   const topLevelParts = parts.filter((p) => !partIdToGroupId.has(p.id));
+  const builtGroupIds = new Set<string>();
 
-  function buildNode(item: Part | Group, itemType: 'part' | 'group'): TreeNode {
+  function buildNode(item: Part | Group, itemType: 'part' | 'group', activeGroups: Set<string> = new Set()): TreeNode {
     if (itemType === 'part') {
       return { type: 'part', data: item as Part };
     }
 
     const group = item as Group;
+    // Break cycles gracefully (corrupt nested group links).
+    if (activeGroups.has(group.id)) {
+      return { type: 'group', data: group, children: [] };
+    }
+
+    builtGroupIds.add(group.id);
     const members = membersByGroup.get(group.id) || [];
     const children: TreeNode[] = [];
+    const nextActiveGroups = new Set(activeGroups);
+    nextActiveGroups.add(group.id);
 
     for (const member of members) {
       if (member.memberType === 'part') {
-        const part = parts.find((p) => p.id === member.memberId);
-        if (part) children.push(buildNode(part, 'part'));
+        const part = partById.get(member.memberId);
+        if (part) children.push(buildNode(part, 'part', nextActiveGroups));
       } else {
-        const childGroup = groups.find((g) => g.id === member.memberId);
-        if (childGroup) children.push(buildNode(childGroup, 'group'));
+        const childGroup = groupById.get(member.memberId);
+        if (childGroup) children.push(buildNode(childGroup, 'group', nextActiveGroups));
       }
     }
 
     return { type: 'group', data: group, children };
   }
 
-  return [...topLevelGroups.map((g) => buildNode(g, 'group')), ...topLevelParts.map((p) => buildNode(p, 'part'))];
+  const topLevelGroups = groups.filter((g) => !groupIdToParentGroupId.has(g.id));
+  const tree: TreeNode[] = [];
+
+  // Normal roots.
+  for (const group of topLevelGroups) {
+    tree.push(buildNode(group, 'group'));
+  }
+
+  // Recovery roots for cyclic/disconnected structures with no valid top-level.
+  if (tree.length === 0 && groups.length > 0) {
+    for (const group of groups) {
+      if (!builtGroupIds.has(group.id)) {
+        tree.push(buildNode(group, 'group'));
+      }
+    }
+  } else {
+    // Also include any unbuilt groups to avoid data-loss in list for disconnected graphs.
+    for (const group of groups) {
+      if (!builtGroupIds.has(group.id)) {
+        tree.push(buildNode(group, 'group'));
+      }
+    }
+  }
+
+  // Include ungrouped parts.
+  tree.push(...topLevelParts.map((part) => buildNode(part, 'part')));
+
+  return tree;
 }
 
 // ── Filter tree by search ───────────────────────────────────────────────
@@ -128,6 +175,7 @@ function flattenTree(
   editingGroupId: string | null,
   validationByPart: Map<string, PartValidationIssue[]>,
   groupMembers: GroupMember[],
+  forceExpandGroups: boolean,
   level = 0,
   parentGroupId: string | null = null
 ): FlatItem[] {
@@ -138,7 +186,7 @@ function flattenTree(
       result.push({ type: 'part', data: node.data, level, parentGroupId });
     } else {
       const group = node.data;
-      const isExpanded = expandedGroupIdSet.has(group.id);
+      const isExpanded = forceExpandGroups || expandedGroupIdSet.has(group.id);
       const isSelected = selectedGroupIdSet.has(group.id);
       const isEditing = editingGroupId === group.id;
       const childCount = getAllDescendantPartIds(group.id, groupMembers).length;
@@ -182,6 +230,7 @@ function flattenTree(
             editingGroupId,
             validationByPart,
             groupMembers,
+            forceExpandGroups,
             level + 1,
             group.id
           )
@@ -373,8 +422,6 @@ export function HierarchicalPartsList({
   const { stocks: libraryStocks } = useStockLibrary();
   const stocks = isEditingAssembly ? libraryStocks : projectStocks;
 
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
-
   // Batch validation: run once for all parts, build lookup
   const validationByPart = useMemo(() => {
     const map = new Map<string, PartValidationIssue[]>();
@@ -411,23 +458,68 @@ export function HierarchicalPartsList({
   const selectedPartIdSet = useMemo(() => new Set(selectedPartIds), [selectedPartIds]);
   const selectedGroupIdSet = useMemo(() => new Set(selectedGroupIds), [selectedGroupIds]);
   const expandedGroupIdSet = useMemo(() => new Set(expandedGroupIds), [expandedGroupIds]);
+  const hasActiveSearch = Boolean(searchFilter?.trim());
+
+  // Ensure selected nested items are visible by expanding their parent chain in the list.
+  useEffect(() => {
+    if (groupMembers.length === 0) return;
+
+    const targetExpandedIds = new Set<string>();
+
+    for (const partId of selectedPartIds) {
+      for (const ancestorId of getAncestorGroupIds(partId, groupMembers)) {
+        targetExpandedIds.add(ancestorId);
+      }
+    }
+
+    for (const groupId of selectedGroupIds) {
+      targetExpandedIds.add(groupId);
+
+      const visited = new Set<string>();
+      let currentGroupId: string | null = groupId;
+      while (currentGroupId && !visited.has(currentGroupId)) {
+        visited.add(currentGroupId);
+        const parentMembership = groupMembers.find((gm) => gm.memberType === 'group' && gm.memberId === currentGroupId);
+        if (!parentMembership) break;
+        targetExpandedIds.add(parentMembership.groupId);
+        currentGroupId = parentMembership.groupId;
+      }
+    }
+
+    if (targetExpandedIds.size === 0) return;
+    const missingExpandedIds = Array.from(targetExpandedIds).filter((groupId) => !expandedGroupIdSet.has(groupId));
+    if (missingExpandedIds.length === 0) return;
+
+    useSelectionStore.setState((state) => ({
+      expandedGroupIds: [
+        ...state.expandedGroupIds,
+        ...missingExpandedIds.filter((id) => !state.expandedGroupIds.includes(id))
+      ]
+    }));
+  }, [selectedPartIds, selectedGroupIds, groupMembers, expandedGroupIdSet]);
 
   // Flatten tree into a flat list respecting expansion state
   const flatItems = useMemo(
     () =>
-      flattenTree(filteredTree, expandedGroupIdSet, selectedGroupIdSet, editingGroupId, validationByPart, groupMembers),
-    [filteredTree, expandedGroupIdSet, selectedGroupIdSet, editingGroupId, validationByPart, groupMembers]
+      flattenTree(
+        filteredTree,
+        expandedGroupIdSet,
+        selectedGroupIdSet,
+        editingGroupId,
+        validationByPart,
+        groupMembers,
+        hasActiveSearch
+      ),
+    [
+      filteredTree,
+      expandedGroupIdSet,
+      selectedGroupIdSet,
+      editingGroupId,
+      validationByPart,
+      groupMembers,
+      hasActiveSearch
+    ]
   );
-
-  // Scroll to selected part when selection changes from 3D view
-  useEffect(() => {
-    if (selectedPartIds.length === 1 && virtuosoRef.current) {
-      const idx = flatItems.findIndex((item) => item.type === 'part' && item.data.id === selectedPartIds[0]);
-      if (idx >= 0) {
-        virtuosoRef.current.scrollToIndex({ index: idx, align: 'center', behavior: 'smooth' });
-      }
-    }
-  }, [selectedPartIds, flatItems]);
 
   // Stable group callbacks
   const handleGroupClick = useCallback(
@@ -535,13 +627,15 @@ export function HierarchicalPartsList({
     return <p className="text-text-muted text-xs italic">No parts match &quot;{searchFilter}&quot;</p>;
   }
 
+  if (flatItems.length === 0) {
+    return <p className="text-text-muted text-xs italic px-4">No parts or groups to display.</p>;
+  }
+
   return (
-    <Virtuoso
-      ref={virtuosoRef}
-      className="mx-[-12px] flex-1 min-h-0"
-      data={flatItems}
-      itemContent={itemContent}
-      overscan={200}
-    />
+    <div className="flex-1 min-h-0 overflow-y-auto">
+      {flatItems.map((item, index) => (
+        <React.Fragment key={`${item.type}-${item.data.id}-${index}`}>{itemContent(index, item)}</React.Fragment>
+      ))}
+    </div>
   );
 }

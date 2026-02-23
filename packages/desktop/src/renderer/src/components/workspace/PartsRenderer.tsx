@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import { useProjectStore, getAllDescendantPartIds } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
+import { useUIStore } from '../../store/uiStore';
 import { Part } from './Part';
 import { InstancedParts } from './InstancedParts';
 
@@ -22,6 +23,7 @@ export function PartsRenderer() {
   const dragIntentPartId = useSelectionStore((s) => s.dragIntent?.partId ?? null);
   const draggingPartId = useSelectionStore((s) => s.draggingPartId);
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
+  const selectedSidebarStockId = useUIStore((s) => s.selectedSidebarStockId);
 
   // Build the set of part IDs that need individual rendering.
   // Group-selected parts stay in the InstancedMesh for performance — only directly
@@ -52,6 +54,14 @@ export function PartsRenderer() {
       individualIds.add(draggingPartId);
     }
 
+    if (selectedSidebarStockId) {
+      for (const part of parts) {
+        if (part.stockId === selectedSidebarStockId) {
+          individualIds.add(part.id);
+        }
+      }
+    }
+
     // Group-selected parts: stay instanced (no individual rendering needed)
     const groupSelected = new Set<string>();
     for (const groupId of selectedGroupIds) {
@@ -72,13 +82,15 @@ export function PartsRenderer() {
 
     return { individualPartIdSet: individualIds, dragAffectedPartIds: dragAffected };
   }, [
+    parts,
     selectedPartIds,
     selectedGroupIds,
     hoveredPartId,
     referencePartIds,
     dragIntentPartId,
     draggingPartId,
-    groupMembers
+    groupMembers,
+    selectedSidebarStockId
   ]);
 
   // Split parts into instanced (bulk) vs individual (interactive)
@@ -102,7 +114,11 @@ export function PartsRenderer() {
 
       {/* Individual rendering — full interactivity with handles, edges, labels */}
       {individualParts.map((part) => (
-        <Part key={part.id} part={part} />
+        <Part
+          key={part.id}
+          part={part}
+          isStockHighlighted={!!selectedSidebarStockId && part.stockId === selectedSidebarStockId}
+        />
       ))}
     </>
   );

@@ -53,7 +53,7 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
       // Block certain file operations when editing a template or assembly
       const blockableFileCommands = ['new-project', 'new-from-template', 'open-project', 'open-recent'];
       if ((isEditingAssembly || opts.isEditingTemplate) && blockableFileCommands.includes(command)) {
-        showToast(isEditingAssembly ? 'Finish editing assembly first' : 'Finish editing template first');
+        showToast(isEditingAssembly ? 'Finish editing assembly first' : 'Finish editing template first', 'warning');
         return;
       }
 
@@ -81,7 +81,7 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
           } else {
             const result = await openProject();
             if (!result.success && result.error) {
-              showToast(result.error);
+              showToast(result.error, 'error');
             }
           }
           break;
@@ -96,7 +96,7 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
             } else {
               const result = await openProjectFromPath(recentFilePath);
               if (!result.success && result.error) {
-                showToast(result.error);
+                showToast(result.error, 'error');
               }
             }
           }
@@ -105,7 +105,7 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
 
         case 'clear-recent': {
           await clearRecentProjects();
-          showToast('Recent projects cleared');
+          showToast('Recent projects cleared', 'success');
           break;
         }
 
@@ -122,9 +122,9 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
           // Normal project save
           const result = await saveProject();
           if (result.success) {
-            showToast('Project saved');
+            showToast('Project saved', 'success');
           } else if (result.error) {
-            showToast(result.error);
+            showToast(result.error, 'error');
           }
           break;
         }
@@ -132,18 +132,18 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         case 'save-project-as': {
           // "Save As" doesn't apply to template or assembly editing
           if (opts.isEditingTemplate) {
-            showToast('Use "Save Template" to save template changes');
+            showToast('Use "Save Template" to save template changes', 'info');
             break;
           }
           if (isEditingAssembly) {
-            showToast('Use "Save Assembly" to save assembly changes');
+            showToast('Use "Save Assembly" to save assembly changes', 'info');
             break;
           }
           const result = await saveProjectAs();
           if (result.success) {
-            showToast('Project saved');
+            showToast('Project saved', 'success');
           } else if (result.error) {
-            showToast(result.error);
+            showToast(result.error, 'error');
           }
           break;
         }
@@ -196,13 +196,13 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
           if (filePath) {
             try {
               await window.electronAPI.addFavoriteProject(filePath);
-              showToast('Added to favorites');
+              showToast('Added to favorites', 'success');
             } catch (error) {
               logger.error('Failed to add to favorites:', error);
-              showToast('Failed to add to favorites');
+              showToast('Failed to add to favorites', 'error');
             }
           } else {
-            showToast('Save project first to add to favorites');
+            showToast('Save project first to add to favorites', 'warning');
           }
           break;
         }

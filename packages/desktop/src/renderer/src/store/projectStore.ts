@@ -19,6 +19,7 @@ import {
   CustomShoppingItem
 } from '../types';
 import { STOCK_COLORS } from '../constants';
+import { UNTITLED_PROJECT_NAME } from '../constants/appDefaults';
 import { canAddPart, canAddStock, getBlockedMessage, getFeatureLimits } from '../utils/featureLimits';
 import { useUIStore } from './uiStore';
 import { useCameraStore } from './cameraStore';
@@ -238,17 +239,27 @@ export const getAllDescendantPartIds = (groupId: string, groupMembers: GroupMemb
   const cached = _descendantResults.get(groupId);
   if (cached) return cached;
 
-  const partIds: string[] = [];
-  const members = groupMembers.filter((gm) => gm.groupId === groupId);
+  const collect = (currentGroupId: string, visited: Set<string>): string[] => {
+    if (visited.has(currentGroupId)) return [];
+    const nextVisited = new Set(visited);
+    nextVisited.add(currentGroupId);
 
-  for (const member of members) {
-    if (member.memberType === 'part') {
-      partIds.push(member.memberId);
-    } else {
-      // Nested group - recurse
-      partIds.push(...getAllDescendantPartIds(member.memberId, groupMembers));
+    const partIds: string[] = [];
+    const members = groupMembers.filter((gm) => gm.groupId === currentGroupId);
+
+    for (const member of members) {
+      if (member.memberType === 'part') {
+        partIds.push(member.memberId);
+      } else {
+        // Nested group - recurse (cycle-safe)
+        partIds.push(...collect(member.memberId, nextVisited));
+      }
     }
-  }
+
+    return partIds;
+  };
+
+  const partIds = collect(groupId, new Set());
 
   _descendantResults.set(groupId, partIds);
   return partIds;
@@ -395,7 +406,7 @@ export const useProjectStore = create<ProjectState>()(
   temporal(
     (set, get) => ({
       // Initial state
-      projectName: 'Untitled Project',
+      projectName: UNTITLED_PROJECT_NAME,
       parts: [],
       stocks: [],
       groups: [],
@@ -426,7 +437,7 @@ export const useProjectStore = create<ProjectState>()(
 
         // Check license limits
         if (!canAddPart(licenseMode, parts.length)) {
-          useUIStore.getState().showToast(getBlockedMessage('addPart'));
+          useUIStore.getState().showToast(getBlockedMessage('addPart'), 'warning');
           return null;
         }
 
@@ -589,7 +600,7 @@ export const useProjectStore = create<ProjectState>()(
 
         // Check license limits
         if (!canAddPart(licenseMode, parts.length)) {
-          useUIStore.getState().showToast(getBlockedMessage('addPart'));
+          useUIStore.getState().showToast(getBlockedMessage('addPart'), 'warning');
           return null;
         }
 
@@ -652,7 +663,7 @@ export const useProjectStore = create<ProjectState>()(
         // Check license limits before duplicating
         const partsToAdd = partIdsToDupe.size;
         if (!canAddPart(licenseMode, parts.length + partsToAdd - 1)) {
-          useUIStore.getState().showToast(getBlockedMessage('addPart'));
+          useUIStore.getState().showToast(getBlockedMessage('addPart'), 'warning');
           return [];
         }
 
@@ -770,7 +781,7 @@ export const useProjectStore = create<ProjectState>()(
 
         // Check license limits
         if (!canAddStock(licenseMode, stocks.length)) {
-          useUIStore.getState().showToast(getBlockedMessage('addStock'));
+          useUIStore.getState().showToast(getBlockedMessage('addStock'), 'warning');
           return null;
         }
 
@@ -874,7 +885,7 @@ export const useProjectStore = create<ProjectState>()(
         // Check license limits for assemblies
         const limits = getFeatureLimits(licenseMode);
         if (!limits.canUseAssemblies) {
-          useUIStore.getState().showToast(getBlockedMessage('useAssemblies'));
+          useUIStore.getState().showToast(getBlockedMessage('useAssemblies'), 'warning');
           return null;
         }
 
@@ -1179,7 +1190,7 @@ export const useProjectStore = create<ProjectState>()(
       newProject: (defaults) => {
         const now = new Date().toISOString();
         set({
-          projectName: 'Untitled Project',
+          projectName: UNTITLED_PROJECT_NAME,
           parts: [],
           stocks: [],
           groups: [],
@@ -1312,7 +1323,7 @@ export const useProjectStore = create<ProjectState>()(
         // Check license limits for groups
         const limits = getFeatureLimits(licenseMode);
         if (!limits.canUseGroups) {
-          useUIStore.getState().showToast(getBlockedMessage('useGroups'));
+          useUIStore.getState().showToast(getBlockedMessage('useGroups'), 'warning');
           return null;
         }
 
@@ -1507,7 +1518,7 @@ export const useProjectStore = create<ProjectState>()(
         // Check license limits for groups
         const limits = getFeatureLimits(licenseMode);
         if (!limits.canUseGroups) {
-          useUIStore.getState().showToast(getBlockedMessage('useGroups'));
+          useUIStore.getState().showToast(getBlockedMessage('useGroups'), 'warning');
           return null;
         }
 

@@ -79,18 +79,20 @@ beforeAll(() => {
     writeBinaryFile: vi.fn(),
     readFile: vi.fn(),
     writeFile: vi.fn(),
+    showItemInFolder: vi.fn(),
     addRecentProject: vi.fn(),
     getRecentProjects: vi.fn(),
     clearRecentProjects: vi.fn(),
     setWindowTitle: vi.fn()
   } as unknown as typeof window.electronAPI;
-  // Mock URL methods used by CSV export
-  URL.createObjectURL = vi.fn().mockReturnValue('blob:mock');
-  URL.revokeObjectURL = vi.fn();
 });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  (window.electronAPI.showSaveDialog as ReturnType<typeof vi.fn>).mockResolvedValue({
+    canceled: false,
+    filePath: '/tmp/export.csv'
+  });
   useUIStore.setState({ toast: null });
 });
 
@@ -235,7 +237,7 @@ describe('CutListPartsTab', () => {
 
     it('shows success toast on successful PDF export', async () => {
       const user = userEvent.setup();
-      mockExportCutListToPdf.mockResolvedValueOnce({ success: true });
+      mockExportCutListToPdf.mockResolvedValueOnce({ success: true, filePath: '/tmp/parts.pdf' });
 
       render(<CutListPartsTab {...defaultProps} />);
 
@@ -297,9 +299,8 @@ describe('CutListPartsTab', () => {
   });
 
   describe('handleDownloadCSV', () => {
-    it('creates CSV download and shows toast', async () => {
+    it('saves CSV via save dialog and shows toast', async () => {
       const user = userEvent.setup();
-      const createElementSpy = vi.spyOn(document, 'createElement');
 
       render(<CutListPartsTab {...defaultProps} />);
 
@@ -309,30 +310,19 @@ describe('CutListPartsTab', () => {
       await waitFor(() => {
         expect(mockExportCutListToCsv).toHaveBeenCalled();
       });
-
-      // Verify a link element was created for download
-      expect(URL.createObjectURL).toHaveBeenCalled();
-      expect(URL.revokeObjectURL).toHaveBeenCalled();
+      expect(window.electronAPI.showSaveDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          defaultPath: 'Test Project-parts.csv'
+        })
+      );
+      expect(window.electronAPI.writeFile).toHaveBeenCalled();
 
       const toast = useUIStore.getState().toast;
-      expect(toast?.message).toBe('Parts list exported to CSV');
-
-      createElementSpy.mockRestore();
+      expect(toast?.message).toBe('Parts list saved to CSV');
     });
 
     it('uses project name in CSV filename', async () => {
       const user = userEvent.setup();
-      let capturedDownload = '';
-      const originalCreateElement = document.createElement.bind(document);
-      const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
-        const el = originalCreateElement(tag);
-        if (tag === 'a') {
-          el.click = vi.fn(() => {
-            capturedDownload = (el as unknown as { download: string }).download;
-          });
-        }
-        return el;
-      });
 
       render(<CutListPartsTab {...defaultProps} projectName="My Project" />);
 
@@ -343,23 +333,15 @@ describe('CutListPartsTab', () => {
         expect(mockExportCutListToCsv).toHaveBeenCalled();
       });
 
-      expect(capturedDownload).toBe('My Project-parts.csv');
-      createElementSpy.mockRestore();
+      expect(window.electronAPI.showSaveDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          defaultPath: 'My Project-parts.csv'
+        })
+      );
     });
 
     it('uses fallback filename when project name is empty', async () => {
       const user = userEvent.setup();
-      let capturedDownload = '';
-      const originalCreateElement = document.createElement.bind(document);
-      const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
-        const el = originalCreateElement(tag);
-        if (tag === 'a') {
-          el.click = vi.fn(() => {
-            capturedDownload = (el as unknown as { download: string }).download;
-          });
-        }
-        return el;
-      });
 
       render(<CutListPartsTab {...defaultProps} projectName="" />);
 
@@ -370,8 +352,11 @@ describe('CutListPartsTab', () => {
         expect(mockExportCutListToCsv).toHaveBeenCalled();
       });
 
-      expect(capturedDownload).toBe('cut-list-parts.csv');
-      createElementSpy.mockRestore();
+      expect(window.electronAPI.showSaveDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          defaultPath: 'cut-list-parts.csv'
+        })
+      );
     });
   });
 });

@@ -10,6 +10,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useSnapStore } from '../../store/snapStore';
 import { formatMeasurementWithUnit, parseInput } from '../../utils/fractions';
 import { ReferenceDistanceIndicator } from '../../types';
+import { Input } from '@renderer/components/ui/input';
 
 export function ReferenceDistanceIndicators(): React.ReactElement | null {
   const activeReferenceDistances = useSnapStore((s) => s.activeReferenceDistances);
@@ -85,7 +86,7 @@ export function ReferenceDistanceIndicators(): React.ReactElement | null {
               style={{ pointerEvents: 'auto' }}
             >
               {isEditing ? (
-                <input
+                <Input
                   type="text"
                   className="w-[70px] py-0.5 px-1.5 text-[11px] font-medium rounded-[3px] border-2 border-accent bg-surface text-text text-center outline-none focus:shadow-[0_0_0_2px_rgba(0,127,255,0.3)]"
                   autoFocus

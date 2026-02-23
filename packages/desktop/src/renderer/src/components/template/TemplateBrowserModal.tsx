@@ -18,6 +18,7 @@ import { useLicenseStore } from '../../store/licenseStore';
 import { useUIStore } from '../../store/uiStore';
 import { getFeatureLimits, getBlockedMessage } from '../../utils/featureLimits';
 import { logger } from '../../utils/logger';
+import { IconButton } from '../common/IconButton';
 
 interface TemplateBrowserModalProps {
   isOpen: boolean;
@@ -115,7 +116,7 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
     const projectState = useProjectStore.getState();
     const limits = getFeatureLimits(useLicenseStore.getState().licenseMode);
     if (!limits.canUseCustomTemplates) {
-      useUIStore.getState().showToast(getBlockedMessage('useTemplates'));
+      useUIStore.getState().showToast(getBlockedMessage('useTemplates'), 'warning');
       return;
     }
 
@@ -195,7 +196,7 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[800px] max-h-[80vh] relative rounded-lg" onClose={onClose}>
+      <DialogContent className="w-[900px] max-w-[94vw] max-h-[86vh] relative rounded-lg" onClose={onClose}>
         <DialogHeader>
           <DialogTitle>New from Template</DialogTitle>
           <DialogClose onClose={onClose} />
@@ -257,17 +258,20 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
                         <span className="text-[13px] font-medium text-text truncate">{template.name}</span>
                         <span className="text-[11px] text-text-muted">{formatDimensions(template.dimensions)}</span>
                       </div>
-                      <button
-                        className="absolute top-1.5 right-1.5 w-[22px] h-[22px] p-0 flex items-center justify-center bg-transparent border-none rounded cursor-pointer text-text-muted opacity-0 group-hover:opacity-100 transition-all duration-150 hover:bg-danger-bg hover:text-danger"
+                      <IconButton
+                        label={`Delete template ${template.name}`}
+                        size="xs"
+                        color="danger"
+                        variant="ghost"
+                        className="absolute top-1.5 right-1.5 opacity-0 transition-all duration-150 group-hover:opacity-100"
                         onClick={(e) => {
                           e.stopPropagation();
                           setDeleteConfirmId(template.id);
                         }}
                         title="Delete template"
-                        aria-label={`Delete template ${template.name}`}
                       >
                         <Trash2 size={14} />
-                      </button>
+                      </IconButton>
                     </Card>
                   ))}
                 </div>

@@ -295,7 +295,16 @@ describe('StocksTab', () => {
         expect(window.electronAPI.exportStocks).toHaveBeenCalledWith(['s1']);
       });
       await waitFor(() => {
-        expect(showToastMock).toHaveBeenCalledWith('Stock exported to exported-stocks.json', 'success');
+        expect(showToastMock).toHaveBeenCalledWith(
+          'Stock exported to exported-stocks.json',
+          'success',
+          expect.objectContaining({
+            action: expect.objectContaining({
+              label: expect.stringMatching(/Show in (Finder|File Explorer)/),
+              onClick: expect.any(Function)
+            })
+          })
+        );
       });
     });
 

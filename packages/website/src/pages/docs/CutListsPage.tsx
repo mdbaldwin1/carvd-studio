@@ -25,7 +25,7 @@ export default function CutListsPage() {
       <h2 className="text-4xl font-bold mb-xl">Cut List Generation</h2>
 
       <div className="grid gap-2xl">
-        <div className="rounded-lg border border-[rgba(174,164,191,0.4)] bg-linear-to-br from-[rgba(174,164,191,0.15)] to-[rgba(174,164,191,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <p className="text-lg font-semibold mb-sm">
             The Heart of Carvd Studio
           </p>
@@ -36,7 +36,7 @@ export default function CutListsPage() {
           </p>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <Ruler size={24} /> Generating a Cut List
           </h3>
@@ -76,7 +76,7 @@ export default function CutListsPage() {
           </ol>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <Settings size={24} /> Cut List Settings
           </h3>
@@ -100,7 +100,7 @@ export default function CutListsPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <BarChart3 size={24} /> Understanding the Results
           </h3>
@@ -117,9 +117,20 @@ export default function CutListsPage() {
               <p className="font-bold mb-xs">Diagrams Tab</p>
               <p className="text-muted">
                 Visual layouts showing exactly where to cut each part on each
-                board. Color-coded parts match your 3D view. Print these and
-                take them to the workshop.
+                board. Color-coded parts match your 3D view. Click a diagram to
+                open a larger detailed view, zoom in/out, and inspect selected
+                part dimensions before exporting.
               </p>
+              <ul className="text-muted mt-sm ml-lg">
+                <li>
+                  • Scroll and pinch-to-zoom are supported in expanded view
+                </li>
+                <li>• Selecting a part shows clearer dimension indicators</li>
+                <li>
+                  • Selected-part details include a group path for nested
+                  structures
+                </li>
+              </ul>
             </div>
             <div>
               <p className="font-bold mb-xs">Shopping Tab</p>
@@ -132,7 +143,7 @@ export default function CutListsPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <ShoppingCart size={24} /> Custom Shopping Items
           </h3>
@@ -149,7 +160,7 @@ export default function CutListsPage() {
           </ul>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <AlertTriangle size={24} /> Validation Warnings
           </h3>
@@ -191,7 +202,7 @@ export default function CutListsPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md flex items-center gap-md">
             <Upload size={24} /> Exporting Your Work
           </h3>
@@ -229,6 +240,14 @@ export default function CutListsPage() {
                   and costs
                 </li>
               </ul>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">After Download</p>
+              <p className="text-muted">
+                Successful exports show a toast with a{" "}
+                <strong>Show in Finder / File Explorer</strong> action so you
+                can jump directly to the saved file.
+              </p>
             </div>
             <div>
               <p className="font-bold mb-xs">PDF vs CSV</p>

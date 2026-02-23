@@ -342,7 +342,16 @@ describe('AssembliesTab', () => {
         expect(window.electronAPI.exportAssembly).toHaveBeenCalledWith('a1');
       });
       await waitFor(() => {
-        expect(mockShowToast).toHaveBeenCalledWith('Assembly exported successfully', 'success');
+        expect(mockShowToast).toHaveBeenCalledWith(
+          'Assembly exported successfully',
+          'success',
+          expect.objectContaining({
+            action: expect.objectContaining({
+              label: expect.stringMatching(/Show in (Finder|File Explorer)/),
+              onClick: expect.any(Function)
+            })
+          })
+        );
       });
     });
 
@@ -360,7 +369,16 @@ describe('AssembliesTab', () => {
       fireEvent.click(screen.getByText('Export'));
 
       await waitFor(() => {
-        expect(mockShowToast).toHaveBeenCalledWith('Assembly exported with 3 stocks', 'success');
+        expect(mockShowToast).toHaveBeenCalledWith(
+          'Assembly exported with 3 stocks',
+          'success',
+          expect.objectContaining({
+            action: expect.objectContaining({
+              label: expect.stringMatching(/Show in (Finder|File Explorer)/),
+              onClick: expect.any(Function)
+            })
+          })
+        );
       });
     });
 
@@ -378,7 +396,16 @@ describe('AssembliesTab', () => {
       fireEvent.click(screen.getByText('Export'));
 
       await waitFor(() => {
-        expect(mockShowToast).toHaveBeenCalledWith('Assembly exported with 1 stock', 'success');
+        expect(mockShowToast).toHaveBeenCalledWith(
+          'Assembly exported with 1 stock',
+          'success',
+          expect.objectContaining({
+            action: expect.objectContaining({
+              label: expect.stringMatching(/Show in (Finder|File Explorer)/),
+              onClick: expect.any(Function)
+            })
+          })
+        );
       });
     });
 

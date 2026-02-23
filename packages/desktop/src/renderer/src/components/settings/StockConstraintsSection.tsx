@@ -78,7 +78,7 @@ export function StockConstraintsSection({ formData, onSettingChange }: StockCons
             <label className="text-[13px] text-text">Prevent Overlap</label>
             <HelpTooltip
               text="Prevent parts from occupying the same space. Shows warnings when parts overlap."
-              docsSection="parts"
+              docsSection="stock"
             />
           </div>
           <Checkbox

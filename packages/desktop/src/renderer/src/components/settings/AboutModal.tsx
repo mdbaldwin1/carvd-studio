@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal';
 import { Button } from '@renderer/components/ui/button';
+import { Card, CardContent } from '@renderer/components/ui/card';
+import { AppHorizontalLogo } from '../common/AppHorizontalLogo';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -25,60 +27,74 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
       isOpen={isOpen}
       onClose={onClose}
       title="About Carvd Studio"
-      className="w-[420px]"
+      className="w-[560px] max-w-[92vw] max-h-[86vh]"
       footer={
         <Button variant="secondary" size="sm" onClick={onClose}>
           Close
         </Button>
       }
     >
-      <div className="p-6 text-center">
-        <div className="mb-5">
-          <span className="text-5xl block mb-2">🪑</span>
-          <h3 className="text-xl font-semibold text-text m-0 mb-1">Carvd Studio</h3>
-          <p className="text-[13px] text-text-muted m-0">Version {appVersion || '...'}</p>
-        </div>
+      <div className="p-6 text-center overflow-y-auto space-y-4">
+        <Card className="border-border bg-bg">
+          <CardContent className="pt-5">
+            <AppHorizontalLogo className="h-20 w-auto mx-auto mb-1" />
+            <p className="text-[13px] text-text-muted m-0">Version {appVersion || '...'}</p>
+          </CardContent>
+        </Card>
 
-        <p className="text-[13px] text-text-secondary leading-relaxed m-0 mb-5">
-          Professional woodworking design software for furniture makers, cabinet builders, and craftspeople. Design
-          projects in 3D, generate cut lists, and optimize material usage.
-        </p>
+        <Card className="border-border bg-bg">
+          <CardContent className="pt-5">
+            <p className="text-[13px] text-text-secondary leading-relaxed m-0">
+              Professional woodworking design software for furniture makers, cabinet builders, and craftspeople. Design
+              projects in 3D, generate cut lists, and optimize material usage.
+            </p>
+          </CardContent>
+        </Card>
 
-        <div className="flex flex-wrap gap-2 justify-center mb-5">
-          <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com')}>
-            Website
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com/docs')}>
-            Documentation
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com/privacy')}>
-            Privacy Policy
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com/terms')}>
-            Terms of Service
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => window.electronAPI.openLicensesFile()}>
-            Open Source Licenses
-          </Button>
-        </div>
+        <Card className="border-border bg-bg">
+          <CardContent className="pt-5">
+            <div className="flex flex-wrap gap-2 justify-center">
+              <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com')}>
+                Website
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com/docs')}>
+                Documentation
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com/privacy')}>
+                Privacy Policy
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com/terms')}>
+                Terms of Service
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => window.electronAPI.openLicensesFile()}>
+                Open Source Licenses
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="p-3 bg-bg rounded-md mb-4">
-          <p className="text-[11px] text-text-muted leading-normal m-0">
-            This software is provided "as is" without warranty of any kind, express or implied. Use at your own risk.
-            Always verify measurements before cutting materials.
-          </p>
-        </div>
+        <Card className="border-border bg-bg">
+          <CardContent className="pt-5">
+            <p className="text-[11px] text-text-muted leading-normal m-0">
+              This software is provided "as is" without warranty of any kind, express or implied. Use at your own risk.
+              Always verify measurements before cutting materials.
+            </p>
+          </CardContent>
+        </Card>
 
         <div className="text-[11px] text-text-muted">
           <p className="m-0 mb-1">&copy; {new Date().getFullYear()} Carvd Studio. All rights reserved.</p>
           <p className="m-0 mb-1">
             Contact:{' '}
-            <button
-              className="bg-none border-none text-primary cursor-pointer p-0 text-[inherit] underline hover:text-primary-hover"
+            <Button
+              type="button"
+              variant="link"
+              size="xs"
+              className="h-auto p-0 text-[inherit]"
               onClick={() => handleOpenLink('mailto:support@carvd-studio.com')}
             >
               support@carvd-studio.com
-            </button>
+            </Button>
           </p>
         </div>
       </div>

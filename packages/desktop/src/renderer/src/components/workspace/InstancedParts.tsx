@@ -14,6 +14,7 @@ import { Part } from '../../types';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useCameraStore } from '../../store/cameraStore';
+import { useUIStore } from '../../store/uiStore';
 import { getPartGroupContext } from './partClickHandler';
 import { setRightClickTarget } from './workspaceUtils';
 import { useGroupDrag } from './useGroupDrag';
@@ -62,8 +63,8 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
   const selectGroup = useSelectionStore((s) => s.selectGroup);
   const toggleGroupSelection = useSelectionStore((s) => s.toggleGroupSelection);
   const enterGroup = useSelectionStore((s) => s.enterGroup);
-  const clearSelection = useSelectionStore((s) => s.clearSelection);
   const setDragIntent = useSelectionStore((s) => s.setDragIntent);
+  const setSelectedSidebarStockId = useUIStore((s) => s.setSelectedSidebarStockId);
 
   // Group drag hook — handles drag of already-selected groups at InstancedMesh level
   const { startGroupDrag } = useGroupDrag(camera, gl, controls);
@@ -118,7 +119,11 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
     if (mesh.instanceColor) {
       mesh.instanceColor.needsUpdate = true;
     }
-  }, [parts, activeDragDelta, dragAffectedPartIds, displayMode]);
+
+    // Expose instance->part mapping for native workspace raycast fallbacks.
+    mesh.userData.partIdByInstance = partIdByIndex;
+    mesh.userData.isInstancedParts = true;
+  }, [parts, activeDragDelta, dragAffectedPartIds, displayMode, partIdByIndex]);
 
   // Compute bounding sphere for frustum culling
   useEffect(() => {
@@ -193,7 +198,16 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
       const ctx = getGroupContext(partId);
 
       if (ctx.isOutsideEditingContext) {
-        clearSelection();
+        // Recover from stale/narrow edit context by exiting to top-level context
+        // and selecting what was clicked.
+        useSelectionStore.setState({ editingGroupId: null });
+        const topLevelGroupId = ctx.ancestorGroupIds[ctx.ancestorGroupIds.length - 1] ?? null;
+        if (topLevelGroupId) {
+          selectGroup(topLevelGroupId);
+        } else {
+          selectPart(partId);
+        }
+        setSelectedSidebarStockId(null);
         return;
       }
 
@@ -204,12 +218,17 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
         } else {
           selectPart(partId);
         }
+        setSelectedSidebarStockId(null);
         setRightClickTarget({ type: 'part' });
         return;
       }
 
-      // Shift+click: toggle selection
-      if (e.nativeEvent.shiftKey) {
+      const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+      const isModKey = isMac ? e.nativeEvent.metaKey : e.nativeEvent.ctrlKey;
+      const isAdditiveSelection = e.nativeEvent.shiftKey || isModKey;
+
+      // Additive click: toggle selection
+      if (isAdditiveSelection) {
         if (ctx.groupToSelectOnClick) {
           toggleGroupSelection(ctx.groupToSelectOnClick);
         } else {
@@ -236,6 +255,7 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
       } else {
         selectPart(partId);
       }
+      setSelectedSidebarStockId(null);
 
       // Store drag intent so the individual Part component can pick up the drag
       setDragIntent({
@@ -248,21 +268,44 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
     [
       partIdByIndex,
       getGroupContext,
-      clearSelection,
       selectPart,
       selectGroup,
       togglePartSelection,
       toggleGroupSelection,
       setDragIntent,
-      startGroupDrag
+      startGroupDrag,
+      setSelectedSidebarStockId
     ]
   );
 
-  const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
-    e.stopPropagation();
-    // Selection is handled in pointerDown; click is a no-op for instanced parts
-    // (the Part component handles click logic after transitioning to individual)
-  }, []);
+  const handleClick = useCallback(
+    (e: ThreeEvent<MouseEvent>) => {
+      e.stopPropagation();
+      if (e.instanceId === undefined) return;
+
+      const partId = partIdByIndex[e.instanceId];
+      if (!partId) return;
+
+      const ctx = getGroupContext(partId);
+      if (ctx.isOutsideEditingContext) return;
+
+      // PointerDown remains the primary path (selection + drag intent). This click
+      // handler is a fallback for plain left-click selection when pointerDown is
+      // consumed by drag/orbit timing.
+      const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+      const isModKey = isMac ? e.nativeEvent.metaKey : e.nativeEvent.ctrlKey;
+      const isAdditiveSelection = e.nativeEvent.shiftKey || isModKey;
+      if (isAdditiveSelection) return;
+
+      if (ctx.groupToSelectOnClick) {
+        selectGroup(ctx.groupToSelectOnClick);
+      } else {
+        selectPart(partId);
+      }
+      setSelectedSidebarStockId(null);
+    },
+    [partIdByIndex, getGroupContext, selectGroup, selectPart, setSelectedSidebarStockId]
+  );
 
   const handleDoubleClick = useCallback(
     (e: ThreeEvent<MouseEvent>) => {
@@ -277,12 +320,23 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
 
       if (ctx.groupToSelectOnClick) {
         enterGroup(ctx.groupToSelectOnClick);
-        if (ctx.containingGroupId === ctx.groupToSelectOnClick) {
+        // Top-level -> nested part: select the immediate child group on the path.
+        // Deeper drilling: keep focus on the exact part.
+        const topLevelGroupId = ctx.ancestorGroupIds[ctx.ancestorGroupIds.length - 1] ?? null;
+        const immediateChildGroupId =
+          ctx.ancestorGroupIds.length > 1 ? ctx.ancestorGroupIds[ctx.ancestorGroupIds.length - 2] : null;
+        if (ctx.groupToSelectOnClick === topLevelGroupId && immediateChildGroupId) {
+          selectGroup(immediateChildGroupId);
+        } else {
           selectPart(partId);
         }
+        return;
       }
+
+      // Already in the target edit context: still select the part that was double-clicked.
+      selectPart(partId);
     },
-    [partIdByIndex, getGroupContext, enterGroup, selectPart]
+    [partIdByIndex, getGroupContext, enterGroup, selectPart, selectGroup]
   );
 
   if (parts.length === 0) return null;
@@ -292,6 +346,7 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
       key={meshCapacity}
       ref={meshRef}
       args={[unitBoxGeometry, undefined, meshCapacity]}
+      frustumCulled={false}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onPointerDown={handlePointerDown}

@@ -20,11 +20,12 @@ export default function StockPage() {
       <p className="text-muted mb-xl">
         Stock materials represent the raw lumber, plywood, or other sheet goods
         you'll cut your parts from. Carvd Studio includes common sizes and lets
-        you add your own.
+        you add your own. Open the <strong>Library</strong> from the header to
+        manage stocks and assemblies in one place.
       </p>
 
       <div className="grid gap-xl">
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <Layers size={20} className="inline-block" /> Managing Your Stock
             Library
@@ -40,8 +41,18 @@ export default function StockPage() {
             <div>
               <p className="font-bold mb-xs">Custom Stock</p>
               <p className="text-muted">
-                Add your own stock with exact dimensions, price, and supplier
-                info. Great for specialty lumber or local pricing.
+                Click the <strong>+</strong> button in the Stocks tab to open
+                the stock form on the right side. Add your own stock with exact
+                dimensions, grain, and pricing info, then use the modal footer{" "}
+                <strong>Create/Save</strong> action to commit changes.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Edit, Import, Export</p>
+              <p className="text-muted">
+                Select a stock from the left list to view details and edit.
+                Import and export are available from the stock list and detail
+                actions.
               </p>
             </div>
             <div>
@@ -55,7 +66,7 @@ export default function StockPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-[rgba(74,144,226,0.3)] bg-linear-to-br from-[rgba(74,144,226,0.1)] to-[rgba(74,144,226,0.05)] p-[var(--space-xl)]">
+        <div className="site-section p-[var(--space-xl)]">
           <h3 className="text-2xl font-bold mb-md">
             <Lock size={20} className="inline-block" /> Stock Constraints
           </h3>

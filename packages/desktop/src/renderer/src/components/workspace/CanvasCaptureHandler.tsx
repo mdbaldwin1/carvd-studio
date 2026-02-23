@@ -5,7 +5,7 @@ import {
   registerCanvasCaptureHandler,
   unregisterCanvasCaptureHandler
 } from '../../store/projectStore';
-import { useUIStore } from '../../store/uiStore';
+import { showSavedFileToast } from '../../utils/fileToast';
 
 // Component that handles canvas capture/export
 export function CanvasCaptureHandler() {
@@ -47,7 +47,7 @@ export function CanvasCaptureHandler() {
 
     // Write the image file
     await window.electronAPI.writeBinaryFile(result.filePath, Array.from(uint8Array));
-    useUIStore.getState().showToast(`Exported to ${result.filePath.split('/').pop()}`);
+    showSavedFileToast(`Exported to ${result.filePath.split('/').pop()}`, result.filePath);
   }, [gl, scene, camera, projectName]);
 
   // Register the capture handler on mount

@@ -4,6 +4,7 @@ import { useSelectionStore } from '../../store/selectionStore';
 import { Assembly } from '../../types';
 import { Button } from '@renderer/components/ui/button';
 import { Checkbox } from '@renderer/components/ui/checkbox';
+import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import {
   Dialog,
   DialogClose,
@@ -84,14 +85,14 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[450px]" onClose={onClose}>
+      <DialogContent className="w-[560px] max-w-[92vw] max-h-[86vh]" onClose={onClose}>
         <DialogHeader>
           <DialogTitle>Save as Assembly</DialogTitle>
           <DialogClose onClose={onClose} />
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <div className="p-5 overflow-y-auto">
+          <div className="p-5 overflow-y-auto space-y-4">
             <p className="text-[13px] text-text-muted mb-4 leading-relaxed">
               Save the current selection as a reusable assembly. You can place copies of this assembly on the canvas
               later.
@@ -103,45 +104,52 @@ export function SaveAssemblyModal({ isOpen, onClose, onSave }: SaveAssemblyModal
               </div>
             )}
 
-            <div className="flex flex-col mb-4 gap-2.5">
-              <Label>Name *</Label>
-              <Input
-                type="text"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setError(null);
-                }}
-                placeholder="e.g., Drawer Assembly, Face Frame"
-                autoFocus
-              />
-            </div>
+            <Card className="border-border bg-bg">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Assembly Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-col gap-2.5">
+                  <Label>Name *</Label>
+                  <Input
+                    type="text"
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="e.g., Drawer Assembly, Face Frame"
+                    autoFocus
+                  />
+                </div>
 
-            <div className="flex flex-col mb-4 gap-2.5">
-              <Label>Description (optional)</Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder='e.g., Standard drawer with 1/2" bottom, pocket screw joinery'
-                rows={3}
-              />
-            </div>
+                <div className="flex flex-col gap-2.5">
+                  <Label>Description (optional)</Label>
+                  <Textarea
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder='e.g., Standard drawer with 1/2" bottom, pocket screw joinery'
+                    rows={4}
+                  />
+                </div>
 
-            <div className="flex flex-col mb-4 gap-2.5">
-              <Label className="flex items-center gap-2.5 cursor-pointer text-sm">
-                <Checkbox
-                  className="w-4 h-4"
-                  checked={addToLibrary}
-                  onChange={(e) => setAddToLibrary(e.target.checked)}
-                />
-                Also add to my Assembly Library
-                <HelpTooltip
-                  text="If checked, this assembly will be available in all projects via the Stock/Assembly Library."
-                  docsSection="assemblies"
-                  inline
-                />
-              </Label>
-            </div>
+                <div className="flex flex-col gap-2.5">
+                  <Label className="flex items-center gap-2.5 cursor-pointer text-sm">
+                    <Checkbox
+                      className="w-4 h-4"
+                      checked={addToLibrary}
+                      onChange={(e) => setAddToLibrary(e.target.checked)}
+                    />
+                    Also add to my Assembly Library
+                    <HelpTooltip
+                      text="If checked, this assembly will be available in all projects via the Stock/Assembly Library."
+                      docsSection="assemblies"
+                      inline
+                    />
+                  </Label>
+                </div>
+              </CardContent>
+            </Card>
 
             {error && (
               <div className="bg-[rgba(196,84,84,0.15)] border border-[rgba(196,84,84,0.4)] text-danger py-2.5 px-3 rounded text-[13px] mt-3">

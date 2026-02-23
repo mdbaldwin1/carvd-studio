@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { HelpCircle } from 'lucide-react';
 import { cn } from '@renderer/lib/utils';
 import { Popover, PopoverTrigger, PopoverContent } from '@renderer/components/ui/popover';
+import { getDocsUrl } from '../../utils/docsLinks';
 
 interface HelpTooltipProps {
   /** The helper text to display in the tooltip */
@@ -14,8 +15,6 @@ interface HelpTooltipProps {
   inline?: boolean;
 }
 
-const DOCS_BASE_URL = 'https://carvd-studio.com/docs';
-
 /**
  * A help icon that shows a popover with helper text and an optional link to documentation.
  * Click the icon to toggle the popover.
@@ -27,8 +26,7 @@ export function HelpTooltip({ text, docsSection, linkText = 'Learn more in docs'
 
   const handleDocsClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    const url = docsSection ? `${DOCS_BASE_URL}#${docsSection}` : DOCS_BASE_URL;
-    window.electronAPI?.openExternal?.(url);
+    window.electronAPI?.openExternal?.(getDocsUrl(docsSection));
     setOpen(false);
   };
 
@@ -36,12 +34,13 @@ export function HelpTooltip({ text, docsSection, linkText = 'Learn more in docs'
     <Popover open={open} onOpenChange={setOpen}>
       <span className={cn('relative inline-flex items-center align-middle', inline && 'ml-1')}>
         <PopoverTrigger asChild>
-          <button
-            type="button"
+          <span
+            role="button"
+            tabIndex={0}
             className={cn(
-              'bg-transparent border-none cursor-pointer text-text-muted',
-              'inline-flex items-center justify-center p-0.5',
-              'rounded-[var(--radius-sm)] opacity-50',
+              'text-text-muted',
+              'inline-flex h-6 w-6 items-center justify-center rounded-[var(--radius-sm)] p-0.5',
+              'opacity-50',
               'transition-all duration-150 ease-in-out',
               'hover:text-text hover:bg-surface-hover hover:opacity-100',
               'focus:outline-none focus:shadow-[0_0_0_2px_var(--color-accent-muted)]'
@@ -49,11 +48,11 @@ export function HelpTooltip({ text, docsSection, linkText = 'Learn more in docs'
             aria-label="Show help"
           >
             <HelpCircle size={14} />
-          </button>
+          </span>
         </PopoverTrigger>
       </span>
       <PopoverContent
-        className="min-w-[220px] max-w-[300px] px-3.5 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+        className="z-[1302] min-w-[220px] max-w-[300px] px-3.5 py-3 shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
         role="tooltip"
         sideOffset={6}
       >

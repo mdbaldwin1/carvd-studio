@@ -1,6 +1,7 @@
 import { FileText, Star, AlertTriangle } from 'lucide-react';
 import { Card } from '@renderer/components/ui/card';
 import { useState } from 'react';
+import { IconButton } from '../common/IconButton';
 import { RecentProject, formatRelativeDate } from './StartScreen';
 
 interface FavoritesTabProps {
@@ -130,14 +131,17 @@ export function FavoritesTab({
               {formatRelativeDate(project.modifiedAt)}
             </span>
           ) : null}
-          <button
-            className={`project-action favorite w-7 h-7 flex items-center justify-center bg-transparent border-none rounded text-text-muted cursor-pointer transition-all duration-100 hover:bg-bg-tertiary hover:text-text ${project.exists ? 'active !opacity-100 text-warning' : ''}`}
+          <IconButton
+            className={`project-action favorite ${project.exists ? 'active !opacity-100 !text-warning' : ''}`}
             onClick={(e) => onToggleFavorite(project, e)}
+            label={`Remove ${project.name} from favorites`}
+            size="xs"
+            variant="ghost"
+            color={project.exists ? 'primary' : 'secondary'}
             title="Remove from favorites"
-            aria-label={`Remove ${project.name} from favorites`}
           >
             <Star size={16} fill="currentColor" />
-          </button>
+          </IconButton>
         </Card>
       ))}
     </div>

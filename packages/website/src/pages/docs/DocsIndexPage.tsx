@@ -15,10 +15,12 @@ export default function DocsIndexPage() {
       <h2 className="mb-8 text-3xl font-bold max-md:text-xl max-sm:text-lg">
         Welcome to the Docs
       </h2>
-      <p className="mb-12 text-text-muted">
-        Browse the sections below or use the sidebar to jump to a specific
-        topic.
-      </p>
+      <div className="site-section mb-12 p-5">
+        <p className="text-text-muted">
+          Browse the sections below or use the sidebar to jump to a specific
+          topic.
+        </p>
+      </div>
       <div className="grid gap-8">
         {navSections.map((section) => (
           <div key={section.title}>
@@ -30,7 +32,7 @@ export default function DocsIndexPage() {
                   href={`/docs/${page.slug}`}
                   className="no-underline"
                 >
-                  <Card className="transition-all hover:border-accent hover:shadow-md">
+                  <Card className="feature-card">
                     <CardHeader>
                       <CardTitle className="text-xl">{page.title}</CardTitle>
                     </CardHeader>

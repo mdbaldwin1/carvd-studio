@@ -313,7 +313,7 @@ describe('useAutoRecovery', () => {
       expect(success!).toBe(true);
       expect(loadProject).toHaveBeenCalled();
       expect(markDirty).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Project restored from auto-save');
+      expect(showToast).toHaveBeenCalledWith('Project restored from auto-save', 'success');
       expect(result.current.hasRecovery).toBe(false);
     });
 
@@ -355,7 +355,7 @@ describe('useAutoRecovery', () => {
       });
 
       expect(success!).toBe(false);
-      expect(showToast).toHaveBeenCalledWith('Recovery file not found');
+      expect(showToast).toHaveBeenCalledWith('Recovery file not found', 'error');
     });
 
     it('shows toast when recovery file is corrupted', async () => {
@@ -384,7 +384,7 @@ describe('useAutoRecovery', () => {
       });
 
       expect(success!).toBe(false);
-      expect(showToast).toHaveBeenCalledWith('Recovery file is corrupted');
+      expect(showToast).toHaveBeenCalledWith('Recovery file is corrupted', 'error');
     });
   });
 

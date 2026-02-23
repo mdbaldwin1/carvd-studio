@@ -190,7 +190,7 @@ describe('useTemplateEditing', () => {
       });
 
       expect(success!).toBe(false);
-      expect(showToast).toHaveBeenCalledWith('Save or discard your project first');
+      expect(showToast).toHaveBeenCalledWith('Save or discard your project first', 'warning');
     });
   });
 
@@ -232,7 +232,7 @@ describe('useTemplateEditing', () => {
       });
 
       expect(result.current.showNewTemplateSetupDialog).toBe(false);
-      expect(showToast).toHaveBeenCalledWith('Save or discard your project first');
+      expect(showToast).toHaveBeenCalledWith('Save or discard your project first', 'warning');
     });
   });
 
@@ -395,7 +395,7 @@ describe('useTemplateEditing', () => {
       });
 
       expect(window.electronAPI.addUserTemplate).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Created template "My New Template"');
+      expect(showToast).toHaveBeenCalledWith('Created template "My New Template"', 'success');
       expect(result.current.isEditingTemplate).toBe(false);
     });
 
@@ -481,7 +481,7 @@ describe('useTemplateEditing', () => {
         await result.current.saveAndExit('Fail Template', 'Desc');
       });
 
-      expect(showToast).toHaveBeenCalledWith('Failed to save template');
+      expect(showToast).toHaveBeenCalledWith('Failed to save template', 'error');
     });
 
     it('shows error toast when updateUserTemplate fails', async () => {
@@ -503,7 +503,7 @@ describe('useTemplateEditing', () => {
         await result.current.saveAndExit('Updated', 'Desc');
       });
 
-      expect(showToast).toHaveBeenCalledWith('Failed to save template');
+      expect(showToast).toHaveBeenCalledWith('Failed to save template', 'error');
       // Should still be in editing mode since save failed
       expect(result.current.isEditingTemplate).toBe(true);
     });
@@ -879,7 +879,7 @@ describe('useTemplateEditing', () => {
       });
 
       expect(success!).toBe(false);
-      expect(showToast).toHaveBeenCalledWith('Failed to load template');
+      expect(showToast).toHaveBeenCalledWith('Failed to load template', 'error');
       expect(result.current.isEditingTemplate).toBe(false);
     });
   });

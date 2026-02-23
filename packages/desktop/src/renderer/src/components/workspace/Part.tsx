@@ -3,26 +3,28 @@ import { ThreeEvent, useThree } from '@react-three/fiber';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { useShallow } from 'zustand/shallow';
+import { useCameraStore } from '../../store/cameraStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
-import { useCameraStore } from '../../store/cameraStore';
 import { useSnapStore } from '../../store/snapStore';
 import { Part as PartType, RotationAngle } from '../../types';
-import { LiveDimensions, HANDLE_POSITIONS, GRAIN_ARROW_MAX_DISTANCE_SQ } from './partTypes';
+import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 import { DimensionLabel } from './DimensionLabel';
 import { GrainDirectionArrow } from './GrainDirectionArrow';
+import { getPartGroupContext } from './partClickHandler';
+import { GRAIN_ARROW_MAX_DISTANCE_SQ, HANDLE_POSITIONS, LiveDimensions } from './partTypes';
 import { ResizeHandle } from './ResizeHandle';
 import { RotationHandle } from './RotationHandle';
+import { useGroupDrag } from './useGroupDrag';
 import { usePartDrag } from './usePartDrag';
 import { usePartResize } from './usePartResize';
-import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
-import { getPartGroupContext } from './partClickHandler';
 
 interface PartProps {
   part: PartType;
+  isStockHighlighted?: boolean;
 }
 
-export const Part = memo(function Part({ part }: PartProps) {
+export const Part = memo(function Part({ part, isStockHighlighted = false }: PartProps) {
   const { camera, gl, controls } = useThree();
 
   // Project state selector - only re-renders when these specific values change
@@ -55,13 +57,13 @@ export const Part = memo(function Part({ part }: PartProps) {
   const setHoveredPart = useSelectionStore((s) => s.setHoveredPart);
   const updatePart = useProjectStore((s) => s.updatePart);
   const moveSelectedParts = useProjectStore((s) => s.moveSelectedParts);
-  const clearSelection = useSelectionStore((s) => s.clearSelection);
   const selectGroup = useSelectionStore((s) => s.selectGroup);
   const toggleGroupSelection = useSelectionStore((s) => s.toggleGroupSelection);
   const enterGroup = useSelectionStore((s) => s.enterGroup);
+  const { startGroupDrag } = useGroupDrag(camera, gl, controls);
 
   // Group membership context — uses shared logic with InstancedParts
-  const { groupToSelectOnClick, isOutsideEditingContext, containingGroupId, ancestorGroupIds } = useMemo(
+  const { groupToSelectOnClick, isOutsideEditingContext, ancestorGroupIds } = useMemo(
     () => getPartGroupContext(part.id, groupMembers, editingGroupId),
     [part.id, groupMembers, editingGroupId]
   );
@@ -141,14 +143,15 @@ export const Part = memo(function Part({ part }: PartProps) {
     controls,
     groupToSelectOnClick,
     isOutsideEditingContext,
+    ancestorGroupIds,
     isSelected,
     selectPart,
     togglePartSelection,
-    clearSelection,
     selectGroup,
     toggleGroupSelection,
     updatePart,
-    moveSelectedParts
+    moveSelectedParts,
+    startGroupDrag
   );
 
   // Resize hook
@@ -197,10 +200,20 @@ export const Part = memo(function Part({ part }: PartProps) {
 
     if (groupToSelectOnClick) {
       enterGroup(groupToSelectOnClick);
-      if (containingGroupId === groupToSelectOnClick) {
+      // Top-level -> nested part: select the immediate child group on the path.
+      // Deeper drilling: keep focus on the exact part.
+      const topLevelGroupId = ancestorGroupIds[ancestorGroupIds.length - 1] ?? null;
+      const immediateChildGroupId = ancestorGroupIds.length > 1 ? ancestorGroupIds[ancestorGroupIds.length - 2] : null;
+      if (groupToSelectOnClick === topLevelGroupId && immediateChildGroupId) {
+        selectGroup(immediateChildGroupId);
+      } else {
         selectPart(part.id);
       }
+      return;
     }
+
+    // Already in the target edit context: still select the double-clicked part.
+    selectPart(part.id);
   };
 
   const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
@@ -282,6 +295,7 @@ export const Part = memo(function Part({ part }: PartProps) {
           onPointerDown={handlePointerDown}
           onPointerOver={handlePointerOver}
           onPointerOut={handlePointerOut}
+          userData={{ partId: part.id }}
         >
           <boxGeometry args={dims} />
           {displayMode === 'solid' && <meshStandardMaterial color={part.color} />}
@@ -289,12 +303,20 @@ export const Part = memo(function Part({ part }: PartProps) {
           {displayMode === 'translucent' && (
             <meshStandardMaterial color="#888888" transparent opacity={0.3} depthWrite={false} />
           )}
-          {(isDirectlySelected || isHovered || isReference || displayMode === 'wireframe') && (
+          {(isDirectlySelected || isHovered || isReference || isStockHighlighted || displayMode === 'wireframe') && (
             <Edges
               scale={1.002}
               threshold={15}
               color={
-                isSelected ? '#ffffff' : isReference ? '#00ffff' : displayMode === 'wireframe' ? part.color : '#888888'
+                isSelected
+                  ? '#ffffff'
+                  : isReference
+                    ? '#00ffff'
+                    : isStockHighlighted
+                      ? '#4fd1ff'
+                      : displayMode === 'wireframe'
+                        ? part.color
+                        : '#888888'
               }
             />
           )}

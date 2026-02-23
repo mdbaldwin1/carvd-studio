@@ -1,24 +1,26 @@
-import { forwardRef, useCallback, useEffect, useId, useRef, type HTMLAttributes } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useRef,
+  type ComponentPropsWithoutRef,
+  type ElementRef,
+  type HTMLAttributes,
+  type MouseEvent
+} from 'react';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '@renderer/lib/utils';
 
-/* ---------------------------------- Root ---------------------------------- */
-
-interface DialogProps {
+interface DialogProps extends ComponentPropsWithoutRef<typeof DialogPrimitive.Root> {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
-  children: React.ReactNode;
 }
 
-/**
- * Root Dialog wrapper. Controls visibility and provides close behavior.
- * Does not render anything when closed.
- */
-function Dialog({ open, onOpenChange, children }: DialogProps) {
-  // Close on Escape
+function Dialog({ open, onOpenChange, children, ...props }: DialogProps) {
+  // Compatibility for existing tests/components that dispatch Escape on window.
   useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+    if (!open || !onOpenChange) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
         onOpenChange(false);
       }
     };
@@ -26,49 +28,51 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, onOpenChange]);
 
-  if (!open) return null;
-  return <>{children}</>;
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} {...props}>
+      {children}
+    </DialogPrimitive.Root>
+  );
 }
 
-/* -------------------------------- Overlay --------------------------------- */
+const DialogTrigger = DialogPrimitive.Trigger;
+const DialogPortal = DialogPrimitive.Portal;
 
-const DialogOverlay = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(function DialogOverlay(
-  { className, ...props },
-  ref
-) {
-  return <div ref={ref} className={cn('fixed inset-0 bg-overlay z-[1100]', className)} {...props} />;
+const DialogOverlay = forwardRef<
+  ElementRef<typeof DialogPrimitive.Overlay>,
+  ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
+>(function DialogOverlay({ className, ...props }, ref) {
+  return (
+    <DialogPrimitive.Overlay
+      ref={ref}
+      className={cn(
+        'fixed inset-0 z-[1100] bg-overlay',
+        'data-[state=open]:animate-in data-[state=open]:fade-in-0',
+        'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:pointer-events-none',
+        className
+      )}
+      {...props}
+    />
+  );
 });
 
-/* -------------------------------- Content --------------------------------- */
-
-interface DialogContentProps extends HTMLAttributes<HTMLDivElement> {
-  /** Called when backdrop is clicked or Escape is pressed. Required. */
-  onClose: () => void;
-  /** ARIA role. Defaults to 'dialog'. */
-  role?: 'dialog' | 'alertdialog';
+interface DialogContentProps extends ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  /** Optional compatibility prop used to customize outside-click behavior. */
+  onClose?: () => void;
 }
 
-/**
- * Dialog content panel with overlay backdrop.
- *
- * Handles backdrop click-to-close using the mousedown+mouseup pattern
- * (prevents accidental closes when dragging to select text in inputs).
- */
-const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(function DialogContent(
-  { className, onClose, role = 'dialog', children, ...props },
+const DialogContent = forwardRef<ElementRef<typeof DialogPrimitive.Content>, DialogContentProps>(function DialogContent(
+  { className, children, onClose, onInteractOutside, onEscapeKeyDown, role = 'dialog', ...props },
   ref
 ) {
-  const titleId = useId();
   const mouseDownOnBackdrop = useRef(false);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    mouseDownOnBackdrop.current = e.target === e.currentTarget;
+  const handleBackdropMouseDown = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    mouseDownOnBackdrop.current = event.target === event.currentTarget;
   }, []);
-
-  const handleClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget && mouseDownOnBackdrop.current) {
-        onClose();
+  const handleBackdropClick = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      if (event.target === event.currentTarget && mouseDownOnBackdrop.current) {
+        onClose?.();
       }
       mouseDownOnBackdrop.current = false;
     },
@@ -76,31 +80,48 @@ const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(function Di
   );
 
   return (
-    <div
-      className="fixed inset-0 bg-overlay flex items-center justify-center z-[1100]"
-      onMouseDown={handleMouseDown}
-      onClick={handleClick}
-    >
-      <div
+    <DialogPortal>
+      <DialogOverlay onMouseDown={handleBackdropMouseDown} onClick={handleBackdropClick} />
+      <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          'bg-surface border border-border rounded-lg',
+          'fixed left-1/2 top-1/2 z-[1101] w-full max-w-[90vw] max-h-[85vh] -translate-x-1/2 -translate-y-1/2',
+          'flex flex-col rounded-lg border border-border bg-surface',
           'shadow-[0_8px_32px_var(--color-overlay)]',
-          'max-w-[90vw] max-h-[85vh] flex flex-col',
           className
         )}
         role={role}
         aria-modal="true"
-        aria-labelledby={titleId}
+        aria-describedby={props['aria-describedby'] ?? undefined}
+        onInteractOutside={(event) => {
+          const target = event.target as HTMLElement | null;
+          // Allow interacting with nested Radix floating layers (dropdowns, popovers, tooltips)
+          // that render in portals outside the dialog content.
+          if (target?.closest('[data-radix-popper-content-wrapper]')) {
+            event.preventDefault();
+            return;
+          }
+          if (onClose) {
+            event.preventDefault();
+            onClose();
+            return;
+          }
+          onInteractOutside?.(event);
+        }}
+        onEscapeKeyDown={(event) => {
+          if (onClose) {
+            event.preventDefault();
+            onClose();
+          }
+          onEscapeKeyDown?.(event);
+        }}
         {...props}
       >
         {children}
-      </div>
-    </div>
+      </DialogPrimitive.Content>
+    </DialogPortal>
   );
 });
-
-/* -------------------------------- Header --------------------------------- */
 
 const DialogHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(function DialogHeader(
   { className, ...props },
@@ -109,70 +130,72 @@ const DialogHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   return (
     <div
       ref={ref}
-      className={cn('flex justify-between items-center py-4 px-5 border-b border-border', className)}
+      className={cn('flex items-center justify-between border-b border-border px-5 py-4', className)}
       {...props}
     />
   );
 });
 
-/* --------------------------------- Title --------------------------------- */
-
-const DialogTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(function DialogTitle(
-  { className, ...props },
-  ref
-) {
-  return <h2 ref={ref} className={cn('text-base font-semibold text-text m-0', className)} {...props} />;
+const DialogTitle = forwardRef<
+  ElementRef<typeof DialogPrimitive.Title>,
+  ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
+>(function DialogTitle({ className, ...props }, ref) {
+  return (
+    <DialogPrimitive.Title ref={ref} className={cn('m-0 text-base font-semibold text-text', className)} {...props} />
+  );
 });
 
-/* ------------------------------ Description ------------------------------ */
-
-const DialogDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
-  function DialogDescription({ className, ...props }, ref) {
-    return <p ref={ref} className={cn('text-sm text-text-muted', className)} {...props} />;
-  }
-);
-
-/* -------------------------------- Footer --------------------------------- */
+const DialogDescription = forwardRef<
+  ElementRef<typeof DialogPrimitive.Description>,
+  ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
+>(function DialogDescription({ className, ...props }, ref) {
+  return <DialogPrimitive.Description ref={ref} className={cn('text-sm text-text-muted', className)} {...props} />;
+});
 
 const DialogFooter = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(function DialogFooter(
   { className, ...props },
   ref
 ) {
   return (
-    <div ref={ref} className={cn('flex justify-end gap-2 py-4 px-5 border-t border-border', className)} {...props} />
+    <div ref={ref} className={cn('flex justify-end gap-2 border-t border-border px-5 py-4', className)} {...props} />
   );
 });
 
-/* --------------------------------- Close --------------------------------- */
-
-interface DialogCloseProps extends HTMLAttributes<HTMLButtonElement> {
-  onClose: () => void;
+interface DialogCloseProps extends ComponentPropsWithoutRef<typeof DialogPrimitive.Close> {
+  onClose?: () => void;
 }
 
-/** Default close button (×) for the dialog header. */
-const DialogClose = forwardRef<HTMLButtonElement, DialogCloseProps>(function DialogClose(
-  { className, onClose, ...props },
+const DialogClose = forwardRef<ElementRef<typeof DialogPrimitive.Close>, DialogCloseProps>(function DialogClose(
+  { className, onClose, children, ...props },
   ref
 ) {
   return (
-    <button
+    <DialogPrimitive.Close
       ref={ref}
       className={cn(
-        'bg-transparent border-none text-text-muted text-2xl cursor-pointer p-0 leading-none',
+        'cursor-pointer border-none bg-transparent p-0 text-2xl leading-none text-text-muted',
         'transition-colors duration-150 hover:text-text',
         className
       )}
-      onClick={onClose}
+      onClick={(event) => {
+        if (onClose) {
+          event.preventDefault();
+          onClose();
+        }
+        props.onClick?.(event);
+      }}
       aria-label="Close"
       {...props}
     >
-      &times;
-    </button>
+      {children ?? '\u00d7'}
+    </DialogPrimitive.Close>
   );
 });
 
 export {
   Dialog,
+  DialogTrigger,
+  DialogPortal,
   DialogOverlay,
   DialogContent,
   DialogHeader,

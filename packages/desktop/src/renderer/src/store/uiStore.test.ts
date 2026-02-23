@@ -6,7 +6,10 @@ import { useLicenseStore } from './licenseStore';
 const { mockSonnerToast } = vi.hoisted(() => {
   const fn = Object.assign(vi.fn(), {
     success: vi.fn(),
-    error: vi.fn()
+    error: vi.fn(),
+    warning: vi.fn(),
+    info: vi.fn(),
+    dismiss: vi.fn()
   });
   return { mockSonnerToast: fn };
 });
@@ -45,6 +48,9 @@ describe('uiStore', () => {
     mockSonnerToast.mockClear();
     mockSonnerToast.success.mockClear();
     mockSonnerToast.error.mockClear();
+    mockSonnerToast.warning.mockClear();
+    mockSonnerToast.info.mockClear();
+    mockSonnerToast.dismiss.mockClear();
   });
 
   // ============================================================
@@ -130,23 +136,37 @@ describe('uiStore', () => {
       it('calls sonner toast for default type', () => {
         useUIStore.getState().showToast('Default message');
 
-        expect(mockSonnerToast).toHaveBeenCalledWith('Default message');
+        expect(mockSonnerToast).toHaveBeenCalledWith('Default message', undefined);
         expect(mockSonnerToast.success).not.toHaveBeenCalled();
         expect(mockSonnerToast.error).not.toHaveBeenCalled();
+        expect(mockSonnerToast.warning).not.toHaveBeenCalled();
+        expect(mockSonnerToast.info).not.toHaveBeenCalled();
       });
 
       it('calls sonner toast.success for success type', () => {
         useUIStore.getState().showToast('Saved!', 'success');
 
-        expect(mockSonnerToast.success).toHaveBeenCalledWith('Saved!');
-        expect(mockSonnerToast).not.toHaveBeenCalledWith('Saved!');
+        expect(mockSonnerToast.success).toHaveBeenCalledWith('Saved!', undefined);
+        expect(mockSonnerToast).not.toHaveBeenCalledWith('Saved!', undefined);
       });
 
       it('calls sonner toast.error for error type', () => {
         useUIStore.getState().showToast('Failed!', 'error');
 
-        expect(mockSonnerToast.error).toHaveBeenCalledWith('Failed!');
-        expect(mockSonnerToast).not.toHaveBeenCalledWith('Failed!');
+        expect(mockSonnerToast.error).toHaveBeenCalledWith('Failed!', undefined);
+        expect(mockSonnerToast).not.toHaveBeenCalledWith('Failed!', undefined);
+      });
+
+      it('calls sonner toast.warning for warning type', () => {
+        useUIStore.getState().showToast('Blocked', 'warning');
+
+        expect(mockSonnerToast.warning).toHaveBeenCalledWith('Blocked', undefined);
+      });
+
+      it('calls sonner toast.info for info type', () => {
+        useUIStore.getState().showToast('FYI', 'info');
+
+        expect(mockSonnerToast.info).toHaveBeenCalledWith('FYI', undefined);
       });
     });
 
