@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Website SEO automation + docs-search schema** — Added build-time sitemap generation (`npm run generate:sitemap` via website `prebuild`), introduced `WebSite` JSON-LD `SearchAction` targeting `/docs?search={search_term_string}`, and documented SEO operations/manual search engine submission steps in `packages/website/SEO.md`.
 - **Start screen Settings & Library buttons** — Added icon buttons in the start screen header for quick access to App Settings and Stock/Assembly Library without needing to open a project first
 - **Assembly editing from start screen** — Can now enter assembly edit mode directly from the start screen's assembly library
 - **Inline name editing on AssemblyEditingBanner** — Click the assembly name in the editing banner to rename it in-place
@@ -18,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Website social preview image hardening** — Switched OG/Twitter metadata to a dedicated `1200x630` PNG (`/branding/og-image-1200x630.png`) for better social crawler compatibility and more consistent preview rendering across platforms.
+- **Docs search URL state** — Documentation search now syncs with `?search=` query params so results are shareable, crawlable, and aligned with structured search metadata.
 - **Hotkey hint layout simplification** — Consolidated editor shortcut hints by moving view/undo hints into the bottom-left navigation helper, reducing duplicate hint blocks and improving readability on narrow windows with right-aligned stacked hints.
 - **PDF diagram label routing readability** — Improved small-part callout routing in cut-diagram PDFs with collision-aware lane placement, side-biased part anchors, and label-lane-aligned targets to reduce crossed/ambiguous leader lines.
 - **Website download links now use tracked redirects** — Home and Download page platform buttons now route through `/api/download` before forwarding to GitHub assets, enabling per-source/per-platform click tracking in Vercel logs.
@@ -54,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Crawler handling for website API redirects** — Added `X-Robots-Tag: noindex, nofollow, noarchive` and `Disallow: /api/` policy for website API endpoints to reduce accidental indexing of non-content URLs.
 - **Start screen overlap in short windows** — Prevented the `Recents`/`Favorites` section from overlapping template tiles by allowing the start screen content column to scroll when vertical space is constrained.
 - **Packaged app header logo loading** — Fixed editor/header branding images not rendering in packaged desktop builds by switching renderer logo paths from absolute (`/branding/...`) to relative (`./branding/...`) URLs.
 - **Website link target fixes** — Corrected broken website navigation links by replacing invalid in-page `#download` anchors on Features/Pricing flows with `/download`, and added a missing `id="requirements"` anchor on the Download page for Support deep links.
