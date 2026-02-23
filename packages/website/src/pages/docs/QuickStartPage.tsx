@@ -44,7 +44,8 @@ export default function QuickStartPage() {
           </li>
           <li>
             <strong>6. Generate Cut List</strong> — Press{" "}
-            <code>Cmd/Ctrl + L</code> to see your optimized cut list
+            <strong>Generate Cut List</strong> in the left sidebar to see your
+            optimized cut list
           </li>
         </ol>
       </div>

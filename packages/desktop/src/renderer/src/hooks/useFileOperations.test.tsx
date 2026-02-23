@@ -333,7 +333,6 @@ describe('useFileOperations', () => {
       });
 
       expect(newProject).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('New project created', 'success');
     });
 
     it('shows unsaved changes dialog when dirty', async () => {
@@ -391,7 +390,6 @@ describe('useFileOperations', () => {
       });
 
       expect(openProject).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Project opened', 'success');
     });
 
     it('shows error toast on open failure', async () => {
@@ -485,7 +483,6 @@ describe('useFileOperations', () => {
       });
 
       expect(openProjectFromPath).toHaveBeenCalledWith('/path/to/recent.carvd');
-      expect(showToast).toHaveBeenCalledWith('Project opened', 'success');
     });
 
     it('shows error toast on open recent failure', async () => {
@@ -656,7 +653,6 @@ describe('useFileOperations', () => {
         '/new/location/project.carvd'
       );
       expect(openProjectFromPath).toHaveBeenCalledWith('/new/location/project.carvd');
-      expect(showToast).toHaveBeenCalledWith('Project opened', 'success');
     });
 
     it('does nothing when dialog is canceled', async () => {
@@ -1033,7 +1029,6 @@ describe('useFileOperations', () => {
 
       expect(saveProject).toHaveBeenCalled();
       expect(newProject).toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('New project created', 'success');
 
       // Dialog should be closed
       dialogProps = getDialogProps();
@@ -1252,7 +1247,6 @@ describe('useFileOperations', () => {
       });
 
       expect(openProjectFromPath).toHaveBeenCalledWith('/path/to/file.carvd');
-      expect(showToast).toHaveBeenCalledWith('Project opened', 'success');
     });
 
     it('shows error toast when open from event fails', async () => {
@@ -1307,7 +1301,6 @@ describe('useFileOperations', () => {
       });
 
       expect(openProjectFromPath).toHaveBeenCalledWith('/path/to/file.carvd');
-      expect(showToast).toHaveBeenCalledWith('Project opened', 'success');
     });
 
     it('triggers recovery from open event when result needsRecovery (no unsaved)', async () => {
@@ -1721,7 +1714,6 @@ describe('useFileOperations', () => {
       });
 
       expect(openProjectFromPath).toHaveBeenCalledWith('/my/project.carvd');
-      expect(showToast).toHaveBeenCalledWith('Project opened', 'success');
     });
 
     it('handles error in open recent pending action', async () => {

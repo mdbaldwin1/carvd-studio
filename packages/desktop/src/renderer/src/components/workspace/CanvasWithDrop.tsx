@@ -15,6 +15,8 @@ export function CanvasWithDrop() {
   const { settings: appSettings } = useAppSettings();
   const { assemblies: assemblyLibrary } = useAssemblyLibrary();
   const { stocks: stockLibrary } = useStockLibrary();
+  const isMac = window.navigator.userAgent.toUpperCase().includes('MAC');
+  const modKey = isMac ? '⌘' : 'Ctrl';
 
   const handleDragOver = (e: React.DragEvent) => {
     if (e.dataTransfer.types.includes('application/carvd-stock')) {
@@ -135,7 +137,16 @@ export function CanvasWithDrop() {
             <kbd>Scroll</kbd> Zoom
           </div>
           <div className="flex items-center gap-2 text-[10px] text-text-muted whitespace-nowrap">
+            <kbd>Home</kbd> Reset View
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-text-muted whitespace-nowrap">
             <kbd>F</kbd> Focus
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-text-muted whitespace-nowrap">
+            <kbd>{modKey}+Z</kbd> Undo
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-text-muted whitespace-nowrap">
+            <kbd>{modKey}+Shift+Z</kbd> Redo
           </div>
         </div>
       )}

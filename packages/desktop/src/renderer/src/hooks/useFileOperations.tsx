@@ -194,7 +194,6 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
         }
 
         if (openResult.success) {
-          showToast('Project opened', 'success');
           refreshRecentProjects();
         } else if (openResult.error) {
           showToast(`Error: ${openResult.error}`, 'error');
@@ -223,7 +222,6 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
               return; // Recovery modal will be shown
             }
             if (result.success) {
-              showToast('Project opened', 'success');
               refreshRecentProjects();
             } else if (result.error) {
               showToast(`Error: ${result.error}`, 'error');
@@ -236,7 +234,6 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
           return; // Recovery modal will be shown
         }
         if (result.success) {
-          showToast('Project opened', 'success');
           refreshRecentProjects();
         } else if (result.error) {
           showToast(`Error: ${result.error}`, 'error');
@@ -328,12 +325,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
         type: 'new',
         execute: async () => {
           await newProject();
-          showToast('New project created', 'success');
         }
       });
     } else {
       await newProject();
-      showToast('New project created', 'success');
     }
   }, [showToast, isEditingTemplate, isEditingAssembly]);
 
@@ -357,7 +352,6 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
             return; // Recovery modal will be shown
           }
           if (result.success) {
-            showToast('Project opened', 'success');
             refreshRecentProjects();
           } else if (result.error) {
             showToast(`Error: ${result.error}`, 'error');
@@ -370,7 +364,6 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
         return; // Recovery modal will be shown
       }
       if (result.success) {
-        showToast('Project opened', 'success');
         refreshRecentProjects();
       } else if (result.error) {
         showToast(`Error: ${result.error}`, 'error');
@@ -399,7 +392,6 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
               return; // Recovery modal will be shown
             }
             if (result.success) {
-              showToast('Project opened', 'success');
               refreshRecentProjects();
             } else if (result.error) {
               showToast(`Error: ${result.error}`, 'error');
@@ -412,7 +404,6 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
           return; // Recovery modal will be shown
         }
         if (result.success) {
-          showToast('Project opened', 'success');
           refreshRecentProjects();
         } else if (result.error) {
           showToast(`Error: ${result.error}`, 'error');

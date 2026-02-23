@@ -36,7 +36,6 @@ export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRe
   const handleOpenRecent = async (filePath: string) => {
     const result = await openProjectFromPath(filePath);
     if (result.success) {
-      showToast('Project opened', 'success');
       onRefreshRecent();
     } else if (result.error) {
       showToast(`Error: ${result.error}`, 'error');

@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { HelpCircle } from 'lucide-react';
 import { cn } from '@renderer/lib/utils';
 import { Popover, PopoverTrigger, PopoverContent } from '@renderer/components/ui/popover';
-import { getDocsUrl } from '../../utils/docsLinks';
+import { DocsSection, getDocsUrl } from '../../utils/docsLinks';
 
 interface HelpTooltipProps {
   /** The helper text to display in the tooltip */
   text: string;
   /** The documentation section anchor (e.g., "parts", "joinery", "settings") */
-  docsSection?: string;
+  docsSection?: DocsSection;
   /** Optional custom link text (defaults to "Learn more in docs") */
   linkText?: string;
   /** Optional inline styling - if true, displays inline with surrounding text */

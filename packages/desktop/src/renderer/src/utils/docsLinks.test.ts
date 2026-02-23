@@ -13,9 +13,11 @@ describe('getDocsUrl', () => {
     expect(getDocsUrl('project-settings')).toBe('https://carvd-studio.com/docs/settings#project-settings');
   });
 
-  it('maps unknown sections to route-style docs slugs', () => {
+  it('maps known docs slugs directly', () => {
     expect(getDocsUrl('parts')).toBe('https://carvd-studio.com/docs/parts');
     expect(getDocsUrl('cut-lists')).toBe('https://carvd-studio.com/docs/cut-lists');
     expect(getDocsUrl('templates')).toBe('https://carvd-studio.com/docs/templates');
+    expect(getDocsUrl('faq')).toBe('https://carvd-studio.com/docs/faq');
+    expect(getDocsUrl('troubleshooting')).toBe('https://carvd-studio.com/docs/troubleshooting');
   });
 });
