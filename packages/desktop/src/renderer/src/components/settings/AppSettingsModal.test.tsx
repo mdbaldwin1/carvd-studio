@@ -321,7 +321,8 @@ describe('AppSettingsModal', () => {
       expect(screen.getByText('ORDER-123')).toBeInTheDocument();
     });
 
-    it('shows trial mode message when in trial mode with no email', () => {
+    it('shows trial purchase + activation actions when in trial mode with no email', () => {
+      const mockOnShowLicenseModal = vi.fn();
       render(
         <AppSettingsModal
           {...defaultProps}
@@ -331,11 +332,14 @@ describe('AppSettingsModal', () => {
             licenseOrderId: null,
             licenseActivatedAt: null
           }}
+          onShowLicenseModal={mockOnShowLicenseModal}
         />
       );
       openTab('Data & License');
 
-      expect(screen.getByText('Trial mode active')).toBeInTheDocument();
+      expect(screen.getByText(/free trial/)).toBeInTheDocument();
+      expect(screen.getByText('Purchase License')).toBeInTheDocument();
+      expect(screen.getByText('Enter License Key')).toBeInTheDocument();
     });
 
     it('shows upgrade section when in free mode with no email', () => {

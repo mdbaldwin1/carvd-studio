@@ -138,14 +138,25 @@ describe('LicenseSection', () => {
   describe('trial mode', () => {
     const licenseData = { licenseEmail: null, licenseOrderId: null, licenseActivatedAt: null };
 
-    it('shows trial mode message', () => {
+    it('shows trial purchase messaging', () => {
       render(<LicenseSection licenseMode="trial" licenseData={licenseData} onClose={vi.fn()} />);
-      expect(screen.getByText('Trial mode active')).toBeInTheDocument();
+      expect(screen.getByText(/free trial/)).toBeInTheDocument();
     });
 
-    it('does not show purchase or deactivate buttons', () => {
+    it('shows purchase license link', () => {
       render(<LicenseSection licenseMode="trial" licenseData={licenseData} onClose={vi.fn()} />);
-      expect(screen.queryByText('Purchase License')).not.toBeInTheDocument();
+      expect(screen.getByText('Purchase License')).toBeInTheDocument();
+    });
+
+    it('shows enter license key button when callback provided', () => {
+      render(
+        <LicenseSection licenseMode="trial" licenseData={licenseData} onShowLicenseModal={vi.fn()} onClose={vi.fn()} />
+      );
+      expect(screen.getByText('Enter License Key')).toBeInTheDocument();
+    });
+
+    it('does not show deactivate button', () => {
+      render(<LicenseSection licenseMode="trial" licenseData={licenseData} onClose={vi.fn()} />);
       expect(screen.queryByText('Deactivate License')).not.toBeInTheDocument();
     });
   });
