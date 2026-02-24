@@ -67,11 +67,12 @@ export function LicenseSection({
               </Button>
             )}
           </>
-        ) : licenseMode === 'free' ? (
+        ) : licenseMode === 'free' || licenseMode === 'trial' ? (
           <div className="bg-bg-secondary border border-border rounded-lg p-4">
             <p className="text-[13px] text-text-secondary leading-relaxed m-0 mb-4">
-              You're using the free version of Carvd Studio. Upgrade to unlock all features including assemblies, custom
-              templates, and the cut list optimizer.
+              {licenseMode === 'trial'
+                ? "You're in your free trial. You can purchase and activate a license at any time."
+                : "You're using the free version of Carvd Studio. Upgrade to unlock all features including assemblies, custom templates, and the cut list optimizer."}
             </p>
             <div className="flex gap-2">
               <a
@@ -99,7 +100,7 @@ export function LicenseSection({
         ) : (
           <div className="p-4 rounded-lg flex items-start gap-3 bg-info-bg border border-info-border">
             <Key size={20} className="text-info shrink-0" />
-            <span className="text-[13px] text-text-secondary leading-relaxed">Trial mode active</span>
+            <span className="text-[13px] text-text-secondary leading-relaxed">License status unavailable</span>
           </div>
         )}
       </CardContent>

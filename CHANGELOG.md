@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Trial license activation access in App Settings** — Trial users can now open `Enter License Key` directly from `App Settings -> Data & License` (in addition to purchasing), instead of waiting for late-trial/expired prompts.
 - **Sync workflow sequencing hardening** — `sync-develop` now runs after the `Release` workflow completes (instead of directly on `main` push), uses workflow-level concurrency, reuses an existing open sync PR branch when present, and auto-closes redundant zero-diff sync PRs to reduce release-race churn.
 - **Website social preview image hardening** — Switched OG/Twitter metadata to a dedicated `1200x630` PNG (`/branding/og-image-1200x630.png`) for better social crawler compatibility and more consistent preview rendering across platforms.
 - **Docs search URL state** — Documentation search now syncs with `?search=` query params so results are shareable, crawlable, and aligned with structured search metadata.
