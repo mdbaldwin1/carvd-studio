@@ -118,7 +118,9 @@
       "output": "dist"
     },
     "files": [
-      "out/**/*"
+      "out/**/*",
+      "package.json",
+      "node_modules/**/*"
     ],
     "extraResources": [
       {
