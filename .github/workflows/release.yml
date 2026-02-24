@@ -189,6 +189,10 @@ jobs:
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           "
 
+      - name: Install desktop runtime dependencies locally
+        working-directory: packages/desktop
+        run: npm run prepare:runtime-deps
+
       - name: Package app (macOS)
         if: matrix.platform == 'mac'
         env:
