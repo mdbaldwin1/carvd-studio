@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Sync workflow sequencing hardening** — `sync-develop` now runs after the `Release` workflow completes (instead of directly on `main` push), uses workflow-level concurrency, reuses an existing open sync PR branch when present, and auto-closes redundant zero-diff sync PRs to reduce release-race churn.
 - **Website social preview image hardening** — Switched OG/Twitter metadata to a dedicated `1200x630` PNG (`/branding/og-image-1200x630.png`) for better social crawler compatibility and more consistent preview rendering across platforms.
 - **Docs search URL state** — Documentation search now syncs with `?search=` query params so results are shareable, crawlable, and aligned with structured search metadata.
 - **Hotkey hint layout simplification** — Consolidated editor shortcut hints by moving view/undo hints into the bottom-left navigation helper, reducing duplicate hint blocks and improving readability on narrow windows with right-aligned stacked hints.
@@ -57,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Updater restart crash in packaged app** — Ensured desktop production dependencies are included in packaged artifacts by including `package.json` and `node_modules` in electron-builder `files`, resolving `ERR_MODULE_NOT_FOUND` for `electron-log` after auto-update restart.
 - **Crawler handling for website API redirects** — Added `X-Robots-Tag: noindex, nofollow, noarchive` and `Disallow: /api/` policy for website API endpoints to reduce accidental indexing of non-content URLs.
 - **Start screen overlap in short windows** — Prevented the `Recents`/`Favorites` section from overlapping template tiles by allowing the start screen content column to scroll when vertical space is constrained.
 - **Packaged app header logo loading** — Fixed editor/header branding images not rendering in packaged desktop builds by switching renderer logo paths from absolute (`/branding/...`) to relative (`./branding/...`) URLs.
