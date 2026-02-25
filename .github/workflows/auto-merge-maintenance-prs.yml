@@ -15,6 +15,9 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
       - name: Configure auto-merge strategy
         env:
           GH_TOKEN: ${{ secrets.WORKFLOW_PAT }}

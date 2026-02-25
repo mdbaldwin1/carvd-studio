@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Maintenance auto-merge workflow execution context** — Added an explicit repository checkout before running `gh pr merge` in the maintenance auto-merge workflow to prevent `fatal: not a git repository` failures on `pull_request_target` runs.
 - **Release packaging builder stability in CI** — Pinned release packaging to `electron-builder@26.7.0` in CI (instead of transient `npx` latest), avoiding the `26.8.x` app-entry corruption regression where `out/main/index.js` is missing from `app.asar`.
 - **Ubuntu E2E dependency install CI hang** — Hardened desktop Linux E2E setup by wrapping `playwright install-deps` with timeout/retry guards so `Test` workflows no longer block indefinitely on runner apt lock/deps stalls.
 - **Lemon Squeezy activation `instance_id` error** — Activation now follows Lemon Squeezy’s instance lifecycle (activate with `instance_name`, then persist and reuse the returned `instance.id` for validate/deactivate), including stale-instance recovery when `instance_id` no longer exists.
