@@ -6,6 +6,7 @@ import { Card, CardContent } from '@renderer/components/ui/card';
 import { Input } from '@renderer/components/ui/input';
 import { Dialog, DialogContent, DialogTitle } from '@renderer/components/ui/dialog';
 import { getDocsUrl } from '@renderer/utils/docsLinks';
+import { EXTERNAL_LINKS } from '@renderer/utils/externalLinks';
 
 interface LicenseActivationModalProps {
   isOpen: boolean;
@@ -176,9 +177,7 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
                 className="text-primary no-underline font-medium hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
-                  window.electronAPI?.openExternal?.(
-                    'mailto:support@carvd-studio.com?subject=Carvd%20Studio%20License%20Activation%20Help'
-                  );
+                  window.electronAPI?.openExternal?.(EXTERNAL_LINKS.support);
                 }}
               >
                 Contact Support

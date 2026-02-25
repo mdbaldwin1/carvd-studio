@@ -27,6 +27,7 @@ const store = new Store();
 const LICENSE_KEY_STORE = 'license_key';
 const LICENSE_DATA_STORE = 'license_data';
 const LICENSE_VALIDATED_AT_STORE = 'license_validated_at';
+const LICENSE_INSTANCE_ID_STORE = 'license_instance_id';
 
 export interface LicenseData {
   email: string;
@@ -139,7 +140,15 @@ export async function verifyLicense(licenseKey: string, skipCache = false): Prom
 
     // Online validation with Lemon Squeezy
     log.info('[License] Validating license online...');
-    const response = await validateLicense(licenseKey);
+    const storedInstanceId = store.get(LICENSE_INSTANCE_ID_STORE) as string | undefined;
+    let response = await validateLicense(licenseKey, storedInstanceId);
+
+    // Recover from stale/unknown remote instance IDs by retrying without instance_id.
+    if (!response.valid && response.error === 'instance_id not found' && storedInstanceId) {
+      log.warn('[License] Stored instance_id not found. Clearing local instance and retrying validation.');
+      store.delete(LICENSE_INSTANCE_ID_STORE);
+      response = await validateLicense(licenseKey);
+    }
 
     if (!response.valid) {
       return {
@@ -198,6 +207,9 @@ export async function verifyLicense(licenseKey: string, skipCache = false): Prom
     store.set(LICENSE_KEY_STORE, licenseKey);
     store.set(LICENSE_DATA_STORE, licenseData);
     store.set(LICENSE_VALIDATED_AT_STORE, Date.now());
+    if (response.instance?.id) {
+      store.set(LICENSE_INSTANCE_ID_STORE, response.instance.id);
+    }
 
     log.info('[License] License validated and cached successfully');
 
@@ -254,6 +266,9 @@ export async function activateLicenseKey(licenseKey: string): Promise<LicenseVer
     }
 
     log.info('[License] License activated successfully');
+    if (response.instance?.id) {
+      store.set(LICENSE_INSTANCE_ID_STORE, response.instance.id);
+    }
 
     // Now verify the license to get full data and cache it
     return await verifyLicense(licenseKey, true);
@@ -273,6 +288,7 @@ export async function activateLicenseKey(licenseKey: string): Promise<LicenseVer
 export async function deactivateLicenseKey(): Promise<{ success: boolean; error?: string }> {
   try {
     const licenseKey = store.get(LICENSE_KEY_STORE) as string | undefined;
+    const instanceId = store.get(LICENSE_INSTANCE_ID_STORE) as string | undefined;
 
     if (!licenseKey) {
       return {
@@ -289,10 +305,13 @@ export async function deactivateLicenseKey(): Promise<{ success: boolean; error?
       store.delete(LICENSE_KEY_STORE);
       store.delete(LICENSE_DATA_STORE);
       store.delete(LICENSE_VALIDATED_AT_STORE);
+      store.delete(LICENSE_INSTANCE_ID_STORE);
       return { success: true };
     }
 
-    const result = await deactivateLicense(licenseKey);
+    const result = instanceId
+      ? await deactivateLicense(licenseKey, instanceId)
+      : { success: false, error: 'No stored activation instance found' };
 
     // Always clear local cache when user explicitly deactivates
     // Even if API fails (e.g., already deactivated server-side, network error),
@@ -300,6 +319,7 @@ export async function deactivateLicenseKey(): Promise<{ success: boolean; error?
     store.delete(LICENSE_KEY_STORE);
     store.delete(LICENSE_DATA_STORE);
     store.delete(LICENSE_VALIDATED_AT_STORE);
+    store.delete(LICENSE_INSTANCE_ID_STORE);
     log.info('[License] Local license cache cleared');
 
     if (!result.success) {
@@ -313,6 +333,7 @@ export async function deactivateLicenseKey(): Promise<{ success: boolean; error?
     store.delete(LICENSE_KEY_STORE);
     store.delete(LICENSE_DATA_STORE);
     store.delete(LICENSE_VALIDATED_AT_STORE);
+    store.delete(LICENSE_INSTANCE_ID_STORE);
     log.info('[License] Local license cache cleared despite API error');
     return { success: true };
   }

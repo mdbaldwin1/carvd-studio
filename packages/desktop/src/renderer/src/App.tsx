@@ -53,6 +53,7 @@ import { useLicenseStore } from './store/licenseStore';
 import { useProjectStore } from './store/projectStore';
 import { useUIStore } from './store/uiStore';
 import { Project, Stock } from './types';
+import { EXTERNAL_LINKS } from './utils/externalLinks';
 import { logger } from './utils/logger';
 import { generateSeedProject } from './utils/seedData';
 
@@ -848,7 +849,7 @@ function App() {
                       className="upgrade-btn"
                       onClick={() => {
                         // Open purchase page in browser
-                        window.open('https://carvd-studio.com/pricing', '_blank');
+                        window.open(EXTERNAL_LINKS.pricing, '_blank');
                         // Also open license modal to enter key
                         setShowLicenseModal(true);
                       }}

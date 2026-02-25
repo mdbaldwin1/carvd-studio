@@ -105,7 +105,7 @@ describe('license', () => {
       expect(result.data!.email).toBe('test@example.com');
       expect(result.data!.customerName).toBe('Test User');
       expect(result.data!.status).toBe('active');
-      expect(validateLicense).toHaveBeenCalledWith('REAL-KEY');
+      expect(validateLicense).toHaveBeenCalledWith('REAL-KEY', undefined);
     });
 
     it('uses cached data for recent validation', async () => {
@@ -250,7 +250,7 @@ describe('license', () => {
       const result = await deactivateLicenseKey();
 
       expect(result.success).toBe(true);
-      expect(deactivateLicense).toHaveBeenCalledWith('REAL-KEY');
+      expect(deactivateLicense).toHaveBeenCalledWith('REAL-KEY', 'inst-1');
       expect(getStoredLicenseKey()).toBeNull();
     });
 

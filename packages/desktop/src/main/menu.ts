@@ -3,6 +3,7 @@
  */
 
 import { Menu, MenuItemConstructorOptions, BrowserWindow, app } from 'electron';
+import { EXTERNAL_LINKS } from './external-links';
 import { getRecentProjects } from './store';
 import { checkForUpdatesManual } from './updater';
 
@@ -217,7 +218,14 @@ export function buildMenuTemplate(): MenuItemConstructorOptions[] {
         label: 'Documentation',
         click: async () => {
           const { shell } = require('electron');
-          await shell.openExternal('https://carvd-studio.com/docs');
+          await shell.openExternal(EXTERNAL_LINKS.docs);
+        }
+      },
+      {
+        label: 'Support',
+        click: async () => {
+          const { shell } = require('electron');
+          await shell.openExternal(EXTERNAL_LINKS.support);
         }
       },
       { type: 'separator' },
@@ -225,14 +233,14 @@ export function buildMenuTemplate(): MenuItemConstructorOptions[] {
         label: 'Privacy Policy',
         click: async () => {
           const { shell } = require('electron');
-          await shell.openExternal('https://carvd-studio.com/privacy');
+          await shell.openExternal(EXTERNAL_LINKS.privacy);
         }
       },
       {
         label: 'Terms of Service',
         click: async () => {
           const { shell } = require('electron');
-          await shell.openExternal('https://carvd-studio.com/terms');
+          await shell.openExternal(EXTERNAL_LINKS.terms);
         }
       },
       { type: 'separator' },
