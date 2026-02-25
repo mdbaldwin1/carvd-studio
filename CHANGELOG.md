@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Release packaging builder resolution in CI** — Updated the release workflow to invoke the workspace-installed `electron-builder` binary directly instead of transient `npx` installs, preventing missing app entry artifacts during packaging.
 - **Lemon Squeezy activation `instance_id` error** — Activation now follows Lemon Squeezy’s instance lifecycle (activate with `instance_name`, then persist and reuse the returned `instance.id` for validate/deactivate), including stale-instance recovery when `instance_id` no longer exists.
 - **Updater restart crash in packaged app** — Hardened desktop packaging so runtime deps are always installed in `packages/desktop/node_modules` before `electron-builder` runs (local scripts and release CI), resolving `ERR_MODULE_NOT_FOUND` for `electron-log` after auto-update restart.
 - **Crawler handling for website API redirects** — Added `X-Robots-Tag: noindex, nofollow, noarchive` and `Disallow: /api/` policy for website API endpoints to reduce accidental indexing of non-content URLs.
