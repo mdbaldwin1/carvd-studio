@@ -67,7 +67,18 @@ jobs:
 
       - name: Install Playwright system deps
         if: runner.os == 'Linux'
-        run: npx playwright install-deps
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            echo "Installing Playwright system deps (attempt ${attempt}/3)"
+            if timeout 300 npx playwright install-deps; then
+              echo "Playwright system dependencies installed"
+              exit 0
+            fi
+            echo "::warning::Playwright system dependency install attempt ${attempt} timed out or failed"
+            sleep 15
+          done
+          echo "::warning::Proceeding without explicit install-deps after retries; tests will validate runtime readiness"
         working-directory: packages/desktop
 
       - name: Setup test license key
