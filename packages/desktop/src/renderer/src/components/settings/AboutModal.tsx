@@ -3,6 +3,7 @@ import { Modal } from '../common/Modal';
 import { Button } from '@renderer/components/ui/button';
 import { Card, CardContent } from '@renderer/components/ui/card';
 import { AppHorizontalLogo } from '../common/AppHorizontalLogo';
+import { EXTERNAL_LINKS } from '@renderer/utils/externalLinks';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -54,16 +55,19 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
         <Card className="border-border bg-bg">
           <CardContent className="pt-5">
             <div className="flex flex-wrap gap-2 justify-center">
-              <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com')}>
+              <Button variant="ghost" size="sm" onClick={() => handleOpenLink(EXTERNAL_LINKS.website)}>
                 Website
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com/docs')}>
+              <Button variant="ghost" size="sm" onClick={() => handleOpenLink(EXTERNAL_LINKS.docs)}>
                 Documentation
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com/privacy')}>
+              <Button variant="ghost" size="sm" onClick={() => handleOpenLink(EXTERNAL_LINKS.support)}>
+                Support
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleOpenLink(EXTERNAL_LINKS.privacy)}>
                 Privacy Policy
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => handleOpenLink('https://carvd-studio.com/terms')}>
+              <Button variant="ghost" size="sm" onClick={() => handleOpenLink(EXTERNAL_LINKS.terms)}>
                 Terms of Service
               </Button>
               <Button variant="ghost" size="sm" onClick={() => window.electronAPI.openLicensesFile()}>
@@ -85,15 +89,15 @@ export function AboutModal({ isOpen, onClose }: AboutModalProps) {
         <div className="text-[11px] text-text-muted">
           <p className="m-0 mb-1">&copy; {new Date().getFullYear()} Carvd Studio. All rights reserved.</p>
           <p className="m-0 mb-1">
-            Contact:{' '}
+            Support:{' '}
             <Button
               type="button"
               variant="link"
               size="xs"
               className="h-auto p-0 text-[inherit]"
-              onClick={() => handleOpenLink('mailto:support@carvd-studio.com')}
+              onClick={() => handleOpenLink(EXTERNAL_LINKS.support)}
             >
-              support@carvd-studio.com
+              carvd-studio.com/support
             </Button>
           </p>
         </div>

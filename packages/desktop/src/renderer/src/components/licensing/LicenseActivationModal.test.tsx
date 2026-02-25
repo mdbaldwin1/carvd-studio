@@ -317,15 +317,13 @@ describe('LicenseActivationModal', () => {
   });
 
   describe('contact support', () => {
-    it('opens external email link when Contact Support clicked', () => {
+    it('opens support page when Contact Support clicked', () => {
       render(<LicenseActivationModal {...defaultProps} />);
 
       const link = screen.getByText('Contact Support');
       fireEvent.click(link);
 
-      expect(window.electronAPI.openExternal).toHaveBeenCalledWith(
-        'mailto:support@carvd-studio.com?subject=Carvd%20Studio%20License%20Activation%20Help'
-      );
+      expect(window.electronAPI.openExternal).toHaveBeenCalledWith('https://carvd-studio.com/support');
     });
   });
 

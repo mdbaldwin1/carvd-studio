@@ -24,9 +24,9 @@ describe('lemonsqueezy-api', () => {
       expect(id).toMatch(/^carvd-.+/);
     });
 
-    it('includes version in the ID', () => {
+    it('does not include app version in the ID', () => {
       const id = getInstanceId();
-      expect(id).toContain('1.0.0');
+      expect(id).not.toContain('1.0.0');
     });
 
     it('changes when userData path changes', () => {
@@ -135,6 +135,11 @@ describe('lemonsqueezy-api', () => {
         expect.stringContaining('/licenses/activate'),
         expect.objectContaining({ method: 'POST' })
       );
+
+      const [, options] = vi.mocked(fetch).mock.calls[0];
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.instance_id).toBeUndefined();
+      expect(body.instance_name).toBeDefined();
     });
 
     it('handles activation failure', async () => {
@@ -168,7 +173,7 @@ describe('lemonsqueezy-api', () => {
       };
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
 
-      const result = await deactivateLicense('KEY');
+      const result = await deactivateLicense('KEY', 'inst-1');
 
       expect(result.success).toBe(true);
       expect(fetch).toHaveBeenCalledWith(
@@ -184,7 +189,7 @@ describe('lemonsqueezy-api', () => {
       };
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse as unknown as Response);
 
-      const result = await deactivateLicense('KEY');
+      const result = await deactivateLicense('KEY', 'inst-1');
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Already deactivated');
@@ -195,7 +200,7 @@ describe('lemonsqueezy-api', () => {
       abortError.name = 'AbortError';
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(abortError);
 
-      const result = await deactivateLicense('KEY');
+      const result = await deactivateLicense('KEY', 'inst-1');
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('timed out');

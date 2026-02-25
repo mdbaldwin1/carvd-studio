@@ -1,12 +1,15 @@
 import {
+  Children,
   forwardRef,
+  isValidElement,
   useCallback,
   useEffect,
   useRef,
   type ComponentPropsWithoutRef,
   type ElementRef,
   type HTMLAttributes,
-  type MouseEvent
+  type MouseEvent,
+  type ReactNode
 } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '@renderer/lib/utils';
@@ -61,10 +64,27 @@ interface DialogContentProps extends ComponentPropsWithoutRef<typeof DialogPrimi
   onClose?: () => void;
 }
 
+function hasDialogTitle(children: ReactNode): boolean {
+  for (const child of Children.toArray(children)) {
+    if (!isValidElement(child)) continue;
+
+    if (child.type === DialogTitle || child.type === DialogPrimitive.Title) {
+      return true;
+    }
+
+    if (hasDialogTitle(child.props?.children)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 const DialogContent = forwardRef<ElementRef<typeof DialogPrimitive.Content>, DialogContentProps>(function DialogContent(
   { className, children, onClose, onInteractOutside, onEscapeKeyDown, role = 'dialog', ...props },
   ref
 ) {
+  const shouldRenderFallbackTitle = !hasDialogTitle(children);
   const mouseDownOnBackdrop = useRef(false);
   const handleBackdropMouseDown = useCallback((event: MouseEvent<HTMLDivElement>) => {
     mouseDownOnBackdrop.current = event.target === event.currentTarget;
@@ -117,6 +137,7 @@ const DialogContent = forwardRef<ElementRef<typeof DialogPrimitive.Content>, Dia
         }}
         {...props}
       >
+        {shouldRenderFallbackTitle && <DialogPrimitive.Title className="sr-only">Dialog</DialogPrimitive.Title>}
         {children}
       </DialogPrimitive.Content>
     </DialogPortal>

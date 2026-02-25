@@ -7,6 +7,7 @@
 
 import { Alert, AlertDescription } from '@renderer/components/ui/alert';
 import { Button } from '@renderer/components/ui/button';
+import { EXTERNAL_LINKS } from '@renderer/utils/externalLinks';
 
 interface TrialBannerProps {
   daysRemaining: number;
@@ -19,7 +20,7 @@ export function TrialBanner({ daysRemaining, onActivateLicense, onPurchase }: Tr
 
   const handlePurchase = () => {
     // Open Lemon Squeezy checkout in default browser
-    window.electronAPI.openExternal('https://carvd-studio.lemonsqueezy.com/buy');
+    window.electronAPI.openExternal(EXTERNAL_LINKS.checkout);
     onPurchase();
   };
 

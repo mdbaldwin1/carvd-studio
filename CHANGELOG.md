@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Desktop checkout/support/legal link centralization** — Consolidated upgrade checkout URLs into a single renderer link config (with optional `VITE_LEMON_SQUEEZY_CHECKOUT_URL` override), switched in-app support actions to the website support page, and added a `Help -> Support` menu item so purchase/help/legal flows consistently route through the website.
 - **Trial license activation access in App Settings** — Trial users can now open `Enter License Key` directly from `App Settings -> Data & License` (in addition to purchasing), instead of waiting for late-trial/expired prompts.
 - **Sync workflow sequencing hardening** — `sync-develop` now runs after the `Release` workflow completes (instead of directly on `main` push), uses workflow-level concurrency, reuses an existing open sync PR branch when present, and auto-closes redundant zero-diff sync PRs to reduce release-race churn.
 - **Website social preview image hardening** — Switched OG/Twitter metadata to a dedicated `1200x630` PNG (`/branding/og-image-1200x630.png`) for better social crawler compatibility and more consistent preview rendering across platforms.
@@ -60,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Lemon Squeezy activation `instance_id` error** — Activation now follows Lemon Squeezy’s instance lifecycle (activate with `instance_name`, then persist and reuse the returned `instance.id` for validate/deactivate), including stale-instance recovery when `instance_id` no longer exists.
 - **Updater restart crash in packaged app** — Hardened desktop packaging so runtime deps are always installed in `packages/desktop/node_modules` before `electron-builder` runs (local scripts and release CI), resolving `ERR_MODULE_NOT_FOUND` for `electron-log` after auto-update restart.
 - **Crawler handling for website API redirects** — Added `X-Robots-Tag: noindex, nofollow, noarchive` and `Disallow: /api/` policy for website API endpoints to reduce accidental indexing of non-content URLs.
 - **Start screen overlap in short windows** — Prevented the `Recents`/`Favorites` section from overlapping template tiles by allowing the start screen content column to scroll when vertical space is constrained.
