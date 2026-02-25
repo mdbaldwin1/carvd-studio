@@ -1,0 +1,65 @@
+name: Auto Merge Maintenance PRs
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, edited]
+  workflow_dispatch: {}
+
+jobs:
+  auto-merge:
+    name: Enable Auto-Merge for Maintenance PRs
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.base.ref == 'develop'
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Configure auto-merge strategy
+        env:
+          GH_TOKEN: ${{ secrets.WORKFLOW_PAT }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_IS_DRAFT: ${{ github.event.pull_request.draft }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PR_NUMBER:-}" ]; then
+            echo "No pull request context available."
+            exit 0
+          fi
+
+          if [ "$PR_IS_DRAFT" = "true" ]; then
+            echo "Draft PR detected; skipping auto-merge setup."
+            exit 0
+          fi
+
+          if [ "$HEAD_REPO" != "$BASE_REPO" ]; then
+            echo "PR head repo differs from base repo; skipping for safety."
+            exit 0
+          fi
+
+          MERGE_METHOD=""
+          case "$PR_TITLE" in
+            "chore: sync main back to develop")
+              MERGE_METHOD="--merge"
+              ;;
+            "chore: bump version to "*|"chore: bump website version to "*)
+              MERGE_METHOD="--squash"
+              ;;
+            *)
+              echo "PR title does not match maintenance auto-merge patterns."
+              exit 0
+              ;;
+          esac
+
+          MERGE_STATE=$(gh pr view "$PR_NUMBER" --json mergeStateStatus --jq '.mergeStateStatus')
+          if [ "$MERGE_STATE" = "BEHIND" ]; then
+            echo "PR branch is behind base; requesting branch update."
+            gh pr update-branch "$PR_NUMBER" || true
+          fi
+
+          echo "Enabling auto-merge for PR #$PR_NUMBER with method: $MERGE_METHOD"
+          gh pr merge "$PR_NUMBER" --auto $MERGE_METHOD --delete-branch
