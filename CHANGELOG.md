@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Release packaging builder stability in CI** — Pinned release packaging to `electron-builder@26.7.0` in CI (instead of transient `npx` latest), avoiding the `26.8.x` app-entry corruption regression where `out/main/index.js` is missing from `app.asar`.
+- **Ubuntu E2E dependency install CI hang** — Hardened desktop Linux E2E setup by wrapping `playwright install-deps` with timeout/retry guards so `Test` workflows no longer block indefinitely on runner apt lock/deps stalls.
 - **Lemon Squeezy activation `instance_id` error** — Activation now follows Lemon Squeezy’s instance lifecycle (activate with `instance_name`, then persist and reuse the returned `instance.id` for validate/deactivate), including stale-instance recovery when `instance_id` no longer exists.
 - **Updater restart crash in packaged app** — Hardened desktop packaging so runtime deps are always installed in `packages/desktop/node_modules` before `electron-builder` runs (local scripts and release CI), resolving `ERR_MODULE_NOT_FOUND` for `electron-log` after auto-update restart.
 - **Crawler handling for website API redirects** — Added `X-Robots-Tag: noindex, nofollow, noarchive` and `Disallow: /api/` policy for website API endpoints to reduce accidental indexing of non-content URLs.
