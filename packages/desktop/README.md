@@ -122,6 +122,16 @@ export APPLE_TEAM_ID="TEAM123456"
 npm run package:mac
 ```
 
+### Lemon Squeezy Checkout URL
+
+Set `VITE_LEMON_SQUEEZY_CHECKOUT_URL` to override the default purchase URL used by desktop upgrade prompts.
+
+```bash
+# from packages/desktop
+cp .env.example .env
+# then edit .env if needed
+```
+
 ## Tech Stack
 
 - **Electron** 40 - Desktop framework

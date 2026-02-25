@@ -84,17 +84,14 @@ export interface LemonSqueezyActivationResponse {
 
 /**
  * Generate a unique instance identifier for this installation
- * Uses machine ID + app version for uniqueness
+ * Uses machine-specific app data path for stability across app updates.
  */
 export function getInstanceId(): string {
-  // In production, you might want to use a more persistent ID
-  // For now, we'll use a combination of machine info
-  const machineId = app.getPath('userData'); // Unique per user+app
-  const version = app.getVersion();
+  const machineId = app.getPath('userData'); // Unique per user+app install
 
   // Create a simple hash of the machine ID
   const hash = Buffer.from(machineId).toString('base64').substring(0, 16);
-  return `carvd-${hash}-${version}`;
+  return `carvd-${hash}`;
 }
 
 /**
@@ -113,7 +110,10 @@ export function getInstanceName(): string {
  * @param licenseKey The license key to validate
  * @returns Validation response from Lemon Squeezy
  */
-export async function validateLicense(licenseKey: string): Promise<LemonSqueezyLicenseValidationResponse> {
+export async function validateLicense(
+  licenseKey: string,
+  instanceId?: string
+): Promise<LemonSqueezyLicenseValidationResponse> {
   try {
     log.info('[LemonSqueezy] Validating license key...');
 
@@ -125,7 +125,7 @@ export async function validateLicense(licenseKey: string): Promise<LemonSqueezyL
       },
       body: JSON.stringify({
         license_key: licenseKey,
-        instance_id: getInstanceId()
+        ...(instanceId ? { instance_id: instanceId } : {})
       })
     });
 
@@ -225,7 +225,10 @@ export async function activateLicense(licenseKey: string): Promise<LemonSqueezyA
  * @param licenseKey The license key to deactivate
  * @returns Success or error
  */
-export async function deactivateLicense(licenseKey: string): Promise<{ success: boolean; error?: string }> {
+export async function deactivateLicense(
+  licenseKey: string,
+  instanceId: string
+): Promise<{ success: boolean; error?: string }> {
   try {
     log.info('[LemonSqueezy] Deactivating license key...');
 
@@ -237,7 +240,7 @@ export async function deactivateLicense(licenseKey: string): Promise<{ success: 
       },
       body: JSON.stringify({
         license_key: licenseKey,
-        instance_id: getInstanceId()
+        instance_id: instanceId
       })
     });
 

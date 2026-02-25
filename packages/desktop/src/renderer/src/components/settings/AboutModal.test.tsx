@@ -90,6 +90,12 @@ describe('AboutModal', () => {
       expect(screen.getByText('Privacy Policy')).toBeInTheDocument();
     });
 
+    it('renders Support link button', () => {
+      render(<AboutModal isOpen={true} onClose={mockOnClose} />);
+
+      expect(screen.getByText('Support')).toBeInTheDocument();
+    });
+
     it('renders Terms of Service link button', () => {
       render(<AboutModal isOpen={true} onClose={mockOnClose} />);
 
@@ -113,6 +119,16 @@ describe('AboutModal', () => {
 
       await waitFor(() => {
         expect(window.electronAPI.openExternal).toHaveBeenCalledWith('https://carvd-studio.com/docs');
+      });
+    });
+
+    it('opens support page when Support button is clicked', async () => {
+      render(<AboutModal isOpen={true} onClose={mockOnClose} />);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Support' }));
+
+      await waitFor(() => {
+        expect(window.electronAPI.openExternal).toHaveBeenCalledWith('https://carvd-studio.com/support');
       });
     });
   });
