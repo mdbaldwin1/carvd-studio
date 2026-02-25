@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Maintenance PR auto-merge automation** — Added a dedicated workflow that auto-enables merge for `sync main back to develop` PRs using merge commits and auto-enables merge for version-bump PRs using squash, reducing manual release-ops steps while preserving main/develop ancestry on syncs.
 - **Desktop checkout/support/legal link centralization** — Consolidated upgrade checkout URLs into a single renderer link config (with optional `VITE_LEMON_SQUEEZY_CHECKOUT_URL` override), switched in-app support actions to the website support page, and added a `Help -> Support` menu item so purchase/help/legal flows consistently route through the website.
 - **Trial license activation access in App Settings** — Trial users can now open `Enter License Key` directly from `App Settings -> Data & License` (in addition to purchasing), instead of waiting for late-trial/expired prompts.
 - **Sync workflow sequencing hardening** — `sync-develop` now runs after the `Release` workflow completes (instead of directly on `main` push), uses workflow-level concurrency, reuses an existing open sync PR branch when present, and auto-closes redundant zero-diff sync PRs to reduce release-race churn.
@@ -61,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Maintenance auto-merge workflow execution context** — Added an explicit repository checkout before running `gh pr merge` in the maintenance auto-merge workflow to prevent `fatal: not a git repository` failures on `pull_request_target` runs.
 - **Release packaging builder stability in CI** — Pinned release packaging to `electron-builder@26.7.0` in CI (instead of transient `npx` latest), avoiding the `26.8.x` app-entry corruption regression where `out/main/index.js` is missing from `app.asar`.
 - **Ubuntu E2E dependency install CI hang** — Hardened desktop Linux E2E setup by wrapping `playwright install-deps` with timeout/retry guards so `Test` workflows no longer block indefinitely on runner apt lock/deps stalls.
 - **Lemon Squeezy activation `instance_id` error** — Activation now follows Lemon Squeezy’s instance lifecycle (activate with `instance_name`, then persist and reuse the returned `instance.id` for validate/deactivate), including stale-instance recovery when `instance_id` no longer exists.
