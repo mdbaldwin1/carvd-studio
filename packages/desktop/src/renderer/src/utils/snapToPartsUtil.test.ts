@@ -13,6 +13,9 @@ import {
   detectOriginSnaps,
   createOriginSnapLine,
   detectFaceSnaps,
+  detectFeatureSnaps,
+  getPartOBB,
+  obbsOverlap,
   STANDARD_DIMENSIONS_IMPERIAL,
   STANDARD_DIMENSIONS_METRIC,
   STANDARD_THICKNESSES_IMPERIAL,
@@ -193,7 +196,7 @@ describe('snapToPartsUtil', () => {
       expect(nearest).toHaveLength(5);
     });
 
-    it('calculates 3D distance correctly', () => {
+    it('prioritizes nearest box gap in 3D', () => {
       const draggingPart = createTestPart({
         id: 'dragging',
         position: { x: 0, y: 0, z: 0 }
@@ -211,10 +214,10 @@ describe('snapToPartsUtil', () => {
       const draggingBounds = getPartBounds(draggingPart);
       const nearest = getNearestParts(draggingBounds, allParts, ['dragging'], 10);
 
-      // Should be sorted: diagonal-xyz (1.73), diagonal-xy (5), far-x (10)
+      // Box-gap sort should prioritize touching/overlapping bounds over center distance.
       expect(nearest[0].id).toBe('diagonal-xyz');
-      expect(nearest[1].id).toBe('diagonal-xy');
-      expect(nearest[2].id).toBe('far-x');
+      expect(nearest[1].id).toBe('far-x');
+      expect(nearest[2].id).toBe('diagonal-xy');
     });
 
     it('handles empty part list', () => {
@@ -228,6 +231,26 @@ describe('snapToPartsUtil', () => {
 
       expect(nearest).toHaveLength(0);
     });
+
+    it('prioritizes near faces even when center is farther away', () => {
+      const draggingPart = createTestPart({
+        id: 'dragging',
+        length: 2,
+        position: { x: 0, y: 0, z: 0 }
+      });
+
+      const allParts = [
+        // Very large plate whose near face is close to dragging part (+X face at x=2.6).
+        createTestPart({ id: 'large-near-face', length: 100, position: { x: 52.6, y: 0, z: 0 } }),
+        // Smaller part with a much closer center but farther face gap (+X face at x=4).
+        createTestPart({ id: 'small-near-center', length: 2, position: { x: 5, y: 0, z: 0 } })
+      ];
+
+      const draggingBounds = getPartBounds(draggingPart);
+      const nearest = getNearestParts(draggingBounds, allParts, ['dragging'], 10);
+
+      expect(nearest[0].id).toBe('large-near-face');
+    });
   });
 
   describe('calculateSnapThreshold', () => {
@@ -238,7 +261,8 @@ describe('snapToPartsUtil', () => {
 
     it('returns smaller threshold when zoomed in', () => {
       const threshold = calculateSnapThreshold(25); // Half the base distance
-      expect(threshold).toBeCloseTo(0.25, 2); // Half the base threshold
+      expect(threshold).toBeCloseTo(0.2, 2); // Tighter than linear scaling for precision
+      expect(threshold).toBeLessThan(0.25);
     });
 
     it('returns larger threshold when zoomed out', () => {
@@ -248,7 +272,7 @@ describe('snapToPartsUtil', () => {
 
     it('clamps to minimum threshold', () => {
       const threshold = calculateSnapThreshold(1); // Very close
-      expect(threshold).toBeGreaterThanOrEqual(0.125); // MIN_THRESHOLD
+      expect(threshold).toBeGreaterThanOrEqual(0.0625); // MIN_THRESHOLD
     });
 
     it('clamps to maximum threshold', () => {
@@ -499,7 +523,7 @@ describe('snapToPartsUtil', () => {
 
     it('clamps tight sensitivity to adjusted minimum', () => {
       const threshold = calculateSnapThreshold(1, 'tight');
-      expect(threshold).toBeGreaterThanOrEqual(0.125 * 0.5); // MIN_THRESHOLD * tight multiplier
+      expect(threshold).toBeGreaterThanOrEqual(0.0625 * 0.5); // MIN_THRESHOLD * tight multiplier
     });
 
     it('clamps loose sensitivity to adjusted maximum', () => {
@@ -1439,6 +1463,7 @@ describe('snapToPartsUtil', () => {
       const result = detectFaceSnaps(draggingPart, { x: 0, y: 0, z: 0 }, [draggingPart, targetPart], ['dragging'], 0.5);
 
       expect(result.snappedX).toBe(false);
+      expect(result.closestDistance).toBeUndefined();
     });
 
     it('creates face snap lines for visualization', () => {
@@ -1458,6 +1483,124 @@ describe('snapToPartsUtil', () => {
 
       expect(result.snapLines.length).toBeGreaterThan(0);
       expect(result.snapLines[0].type).toBe('face');
+    });
+  });
+
+  describe('geometry overlap (OBB)', () => {
+    it('detects overlap for rotated boxes using OBB narrow phase', () => {
+      const a = createTestPart({
+        id: 'a',
+        length: 10,
+        width: 4,
+        thickness: 2,
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 30, z: 0 }
+      });
+      const b = createTestPart({
+        id: 'b',
+        length: 10,
+        width: 4,
+        thickness: 2,
+        position: { x: 1.5, y: 0, z: 0 },
+        rotation: { x: 0, y: 30, z: 0 }
+      });
+
+      expect(obbsOverlap(getPartOBB(a), getPartOBB(b))).toBe(true);
+    });
+  });
+
+  describe('detectFeatureSnaps', () => {
+    it('snaps parallel rotated edges (edge-edge) when offset is within threshold', () => {
+      const draggingPart = createTestPart({
+        id: 'dragging',
+        length: 6,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 45, z: 0 }
+      });
+      const draggingObb = getPartOBB(draggingPart);
+      const normal = draggingObb.axes[2]; // local width axis in world space
+      const gap = 0.2;
+      const offset = draggingPart.width + gap;
+      const targetPart = createTestPart({
+        id: 'target',
+        length: 6,
+        width: 2,
+        thickness: 1,
+        // Position at "one width + small gap" along width normal so nearest long edges are 0.2 apart.
+        position: { x: normal.x * offset, y: normal.y * offset, z: normal.z * offset },
+        rotation: { x: 0, y: 45, z: 0 }
+      });
+
+      const result = detectFeatureSnaps(
+        draggingPart,
+        { x: 0, y: 0, z: 0 },
+        [draggingPart, targetPart],
+        ['dragging'],
+        0.5
+      );
+
+      expect(result.snappedX || result.snappedY || result.snappedZ).toBe(true);
+      expect(result.snapLines.length).toBeGreaterThan(0);
+    });
+
+    it('snaps vertex to face when a corner is near a target face', () => {
+      const draggingPart = createTestPart({
+        id: 'dragging',
+        length: 2,
+        width: 2,
+        thickness: 2,
+        position: { x: 0, y: 0, z: 0 }
+      });
+      const targetPart = createTestPart({
+        id: 'target',
+        // Thin plate so a face sits close to dragging cube's +X corner at x=1.
+        length: 0.5,
+        width: 6,
+        thickness: 6,
+        position: { x: 1.55, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 }
+      });
+
+      const result = detectFeatureSnaps(
+        draggingPart,
+        { x: 0, y: 0, z: 0 },
+        [draggingPart, targetPart],
+        ['dragging'],
+        0.5
+      );
+
+      expect(result.snappedX || result.snappedY || result.snappedZ).toBe(true);
+      expect(result.snapLines.length).toBeGreaterThan(0);
+    });
+
+    it('keeps edge contact when near an edge-corner target instead of leaving a face-projection gap', () => {
+      const part1 = createTestPart({
+        id: 'part-1',
+        length: 6,
+        width: 4,
+        thickness: 1,
+        position: { x: -0.25, y: 4.6875, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 }
+      });
+
+      const part2 = createTestPart({
+        id: 'part-2',
+        length: 6,
+        width: 4,
+        thickness: 1,
+        position: { x: -5.875, y: 7.125, z: 0 },
+        rotation: { x: 0, y: 0, z: -30 }
+      });
+
+      const result = detectFeatureSnaps(part2, part2.position, [part1, part2], ['part-2'], 0.5);
+      const topOfPart1 = part1.position.y + part1.thickness / 2;
+
+      expect(result.snapLines.length).toBeLessThanOrEqual(1);
+      if (result.snapLines.length === 1) {
+        expect(result.snapLines[0].end.y).toBeLessThanOrEqual(topOfPart1 + 1e-3);
+      }
     });
   });
 

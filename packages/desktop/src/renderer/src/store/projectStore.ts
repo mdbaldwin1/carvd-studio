@@ -27,6 +27,9 @@ import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useClipboardStore } from './clipboardStore';
 import { useLicenseStore } from './licenseStore';
+import { rotateAroundWorldAxis } from '../utils/rotation';
+import { getPartBounds } from '../utils/snapToPartsUtil';
+import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
 
 interface ProjectState {
   // Project data
@@ -65,6 +68,7 @@ interface ProjectState {
   updateParts: (ids: string[], updates: Partial<Part>) => void;
   batchUpdateParts: (updates: Array<{ id: string; changes: Partial<Part> }>) => void;
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
+  rotateSelectedParts: (axis: 'x' | 'y' | 'z', degrees: number, pivot: { x: number; y: number; z: number }) => void;
   deletePart: (id: string) => void;
   deleteSelectedParts: () => void;
   confirmDeleteParts: () => void;
@@ -277,6 +281,33 @@ export const getAllDescendantGroupIds = (groupId: string, groupMembers: GroupMem
   return groupIds;
 };
 
+const getDuplicateOffset = (partsToDuplicate: Part[]): { x: number; y: number; z: number } => {
+  if (partsToDuplicate.length === 0) return { x: 2, y: 0, z: 2 };
+
+  const bounds = partsToDuplicate.map((p) => getPartBounds(p));
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+
+  for (const b of bounds) {
+    minX = Math.min(minX, b.minX);
+    maxX = Math.max(maxX, b.maxX);
+    minZ = Math.min(minZ, b.minZ);
+    maxZ = Math.max(maxZ, b.maxZ);
+  }
+
+  const spanX = Math.max(0.5, maxX - minX);
+  const spanZ = Math.max(0.5, maxZ - minZ);
+  const clearance = 0.75;
+
+  return {
+    x: spanX + clearance,
+    y: 0,
+    z: spanZ + clearance
+  };
+};
+
 /** Get all ancestor group IDs for a part, walking up the group hierarchy (for auto-expand). */
 export const getAncestorGroupIds = (partId: string, groupMembers: GroupMember[]): string[] => {
   const ancestors: string[] = [];
@@ -452,13 +483,39 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       updatePart: (id, updates) => {
-        set((state) => ({
-          parts: state.parts.map((p) => (p.id === id ? { ...p, ...updates } : p)),
-          isDirty: true
-        }));
+        let didUpdate = false;
+        set((state) => {
+          const existingPart = state.parts.find((p) => p.id === id);
+          if (!existingPart) return state;
+
+          const nextPart = { ...existingPart, ...updates };
+          const affectsOverlap =
+            updates.position !== undefined || updates.rotation !== undefined || updates.ignoreOverlap !== undefined;
+
+          if (state.stockConstraints.preventOverlap && affectsOverlap) {
+            const transformed = new Map<string, Part>([[id, nextPart]]);
+            if (wouldTransformedPartsOverlap(state.parts, transformed)) {
+              return state;
+            }
+          }
+
+          didUpdate = true;
+          return {
+            parts: state.parts.map((p) => (p.id === id ? nextPart : p)),
+            isDirty: true
+          };
+        });
+
+        if (!didUpdate) return;
+
         get().markCutListStale();
-        // Update reference distances if position changed
-        if (updates.position) {
+        if (
+          updates.position !== undefined ||
+          updates.rotation !== undefined ||
+          updates.length !== undefined ||
+          updates.width !== undefined ||
+          updates.thickness !== undefined
+        ) {
           useSnapStore.getState().updateReferenceDistances();
         }
       },
@@ -473,18 +530,47 @@ export const useProjectStore = create<ProjectState>()(
 
       batchUpdateParts: (updates) => {
         const updateMap = new Map(updates.map((u) => [u.id, u.changes]));
-        set((state) => ({
-          parts: state.parts.map((p) => {
-            const changes = updateMap.get(p.id);
-            return changes ? { ...p, ...changes } : p;
-          }),
-          isDirty: true
-        }));
+        let didUpdate = false;
+        set((state) => {
+          if (updateMap.size === 0) return state;
+
+          const transformed = new Map<string, Part>();
+          let affectsOverlap = false;
+
+          for (const part of state.parts) {
+            const changes = updateMap.get(part.id);
+            if (!changes) continue;
+
+            transformed.set(part.id, { ...part, ...changes });
+            if (
+              changes.position !== undefined ||
+              changes.rotation !== undefined ||
+              changes.ignoreOverlap !== undefined
+            ) {
+              affectsOverlap = true;
+            }
+          }
+
+          if (state.stockConstraints.preventOverlap && affectsOverlap) {
+            if (wouldTransformedPartsOverlap(state.parts, transformed)) {
+              return state;
+            }
+          }
+
+          didUpdate = true;
+          return {
+            parts: state.parts.map((p) => transformed.get(p.id) ?? p),
+            isDirty: true
+          };
+        });
+
+        if (!didUpdate) return;
         get().markCutListStale();
+        useSnapStore.getState().updateReferenceDistances();
       },
 
       moveSelectedParts: (delta) => {
-        const { groupMembers } = get();
+        const { groupMembers, parts, stockConstraints } = get();
         const { selectedPartIds, selectedGroupIds, editingGroupId } = useSelectionStore.getState();
 
         // Determine which parts to move
@@ -522,20 +608,106 @@ export const useProjectStore = create<ProjectState>()(
 
         if (partIdsToMove.size === 0) return;
 
+        let effectiveDelta = delta;
+        if (stockConstraints.preventOverlap) {
+          const safeDelta = resolveSafeTranslationDelta(parts, partIdsToMove, delta);
+          if (!safeDelta) return;
+          effectiveDelta = safeDelta;
+        }
+
         set((state) => ({
           parts: state.parts.map((p) => {
             if (!partIdsToMove.has(p.id)) return p;
             return {
               ...p,
               position: {
-                x: p.position.x + delta.x,
-                y: p.position.y + delta.y,
-                z: p.position.z + delta.z
+                x: p.position.x + effectiveDelta.x,
+                y: p.position.y + effectiveDelta.y,
+                z: p.position.z + effectiveDelta.z
               }
             };
           }),
           isDirty: true
         }));
+        useSnapStore.getState().updateReferenceDistances();
+      },
+
+      rotateSelectedParts: (axis, degrees, pivot) => {
+        const { groupMembers, parts, stockConstraints } = get();
+        const { selectedPartIds, selectedGroupIds, editingGroupId } = useSelectionStore.getState();
+
+        let partIdsToRotate: Set<string>;
+        if (editingGroupId !== null) {
+          partIdsToRotate = new Set(selectedPartIds);
+          for (const groupId of selectedGroupIds) {
+            const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
+            groupPartIds.forEach((id) => partIdsToRotate.add(id));
+          }
+        } else {
+          partIdsToRotate = new Set(selectedPartIds);
+          for (const partId of selectedPartIds) {
+            const containingGroupId = getContainingGroupId(partId, groupMembers);
+            if (containingGroupId) {
+              const groupPartIds = getAllDescendantPartIds(containingGroupId, groupMembers);
+              groupPartIds.forEach((id) => partIdsToRotate.add(id));
+            }
+          }
+          for (const groupId of selectedGroupIds) {
+            const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
+            groupPartIds.forEach((id) => partIdsToRotate.add(id));
+          }
+        }
+
+        if (partIdsToRotate.size === 0 || Math.abs(degrees) < 1e-6) return;
+
+        const axisVec = {
+          x: axis === 'x' ? 1 : 0,
+          y: axis === 'y' ? 1 : 0,
+          z: axis === 'z' ? 1 : 0
+        };
+        const radians = (degrees * Math.PI) / 180;
+        const cos = Math.cos(radians);
+        const sin = Math.sin(radians);
+
+        const rotateVecAroundAxis = (v: { x: number; y: number; z: number }) => {
+          const dot = v.x * axisVec.x + v.y * axisVec.y + v.z * axisVec.z;
+          return {
+            x: v.x * cos + (axisVec.y * v.z - axisVec.z * v.y) * sin + axisVec.x * dot * (1 - cos),
+            y: v.y * cos + (axisVec.z * v.x - axisVec.x * v.z) * sin + axisVec.y * dot * (1 - cos),
+            z: v.z * cos + (axisVec.x * v.y - axisVec.y * v.x) * sin + axisVec.z * dot * (1 - cos)
+          };
+        };
+
+        const transformed = new Map<string, Part>();
+        for (const p of parts) {
+          if (!partIdsToRotate.has(p.id)) continue;
+          const rel = {
+            x: p.position.x - pivot.x,
+            y: p.position.y - pivot.y,
+            z: p.position.z - pivot.z
+          };
+          const rotatedRel = rotateVecAroundAxis(rel);
+          transformed.set(p.id, {
+            ...p,
+            position: {
+              x: pivot.x + rotatedRel.x,
+              y: pivot.y + rotatedRel.y,
+              z: pivot.z + rotatedRel.z
+            },
+            rotation: rotateAroundWorldAxis(p.rotation, axis, degrees)
+          });
+        }
+
+        if (stockConstraints.preventOverlap && wouldTransformedPartsOverlap(parts, transformed)) {
+          return;
+        }
+
+        set((state) => ({
+          parts: state.parts.map((p) => transformed.get(p.id) ?? p),
+          isDirty: true
+        }));
+
+        get().markCutListStale();
         useSnapStore.getState().updateReferenceDistances();
       },
 
@@ -606,6 +778,7 @@ export const useProjectStore = create<ProjectState>()(
 
         const part = parts.find((p) => p.id === id);
         if (!part) return null;
+        const duplicateOffset = getDuplicateOffset([part]);
 
         // Destructure to exclude `id` so createDefaultPart generates a new one
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -614,9 +787,9 @@ export const useProjectStore = create<ProjectState>()(
           ...partWithoutId,
           name: generateCopyName(part.name),
           position: {
-            x: part.position.x + 2,
-            y: part.position.y,
-            z: part.position.z + 2
+            x: part.position.x + duplicateOffset.x,
+            y: part.position.y + duplicateOffset.y,
+            z: part.position.z + duplicateOffset.z
           }
         });
 
@@ -686,6 +859,7 @@ export const useProjectStore = create<ProjectState>()(
         // Duplicate parts with offset
         // Only top-level parts (not in any group being duplicated) get "(copy)" appended
         const selectedParts = parts.filter((p) => partIdsToDupe.has(p.id));
+        const duplicateOffset = getDuplicateOffset(selectedParts);
         const newParts = selectedParts.map((part) => {
           const newId = uuidv4();
           partIdMap.set(part.id, newId);
@@ -695,9 +869,9 @@ export const useProjectStore = create<ProjectState>()(
             id: newId,
             name: isChild ? part.name : generateCopyName(part.name),
             position: {
-              x: part.position.x + 2,
-              y: part.position.y,
-              z: part.position.z + 2
+              x: part.position.x + duplicateOffset.x,
+              y: part.position.y + duplicateOffset.y,
+              z: part.position.z + duplicateOffset.z
             }
           };
         });

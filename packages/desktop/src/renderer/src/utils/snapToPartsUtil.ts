@@ -22,6 +22,13 @@ export interface PartBounds {
   centerZ: number;
 }
 
+export interface PartOBB {
+  center: { x: number; y: number; z: number };
+  // Local axes in world space: length(X), thickness(Y), width(Z)
+  axes: [{ x: number; y: number; z: number }, { x: number; y: number; z: number }, { x: number; y: number; z: number }];
+  halfExtents: [number, number, number];
+}
+
 // Snap suggestion for a single axis
 interface AxisSnap {
   snapped: boolean;
@@ -53,6 +60,8 @@ export interface SnapResult {
   snappedZ: boolean;
   // Alignment lines to display
   snapLines: SnapLine[];
+  // Optional: nearest compatible candidate distance (used for snap hysteresis)
+  closestDistance?: number;
 }
 
 // Calculate axis-aligned bounding box for a part in world space
@@ -117,6 +126,116 @@ export function getPartBounds(part: Part): PartBounds {
 export function getPartBoundsAtPosition(part: Part, position: { x: number; y: number; z: number }): PartBounds {
   const tempPart = { ...part, position };
   return getPartBounds(tempPart);
+}
+
+export function getPartOBB(part: Part, position: { x: number; y: number; z: number } = part.position): PartOBB {
+  _boundsEuler.set(
+    (part.rotation.x * Math.PI) / 180,
+    (part.rotation.y * Math.PI) / 180,
+    (part.rotation.z * Math.PI) / 180,
+    'XYZ'
+  );
+  _boundsQuat.setFromEuler(_boundsEuler);
+
+  const qx = _boundsQuat.x;
+  const qy = _boundsQuat.y;
+  const qz = _boundsQuat.z;
+  const qw = _boundsQuat.w;
+  const xx = qx * qx;
+  const yy = qy * qy;
+  const zz = qz * qz;
+  const xy = qx * qy;
+  const xz = qx * qz;
+  const yz = qy * qz;
+  const wx = qw * qx;
+  const wy = qw * qy;
+  const wz = qw * qz;
+
+  return {
+    center: { x: position.x, y: position.y, z: position.z },
+    axes: [
+      { x: 1 - 2 * (yy + zz), y: 2 * (xy + wz), z: 2 * (xz - wy) },
+      { x: 2 * (xy - wz), y: 1 - 2 * (xx + zz), z: 2 * (yz + wx) },
+      { x: 2 * (xz + wy), y: 2 * (yz - wx), z: 1 - 2 * (xx + yy) }
+    ],
+    halfExtents: [part.length / 2, part.thickness / 2, part.width / 2]
+  };
+}
+
+export function obbsOverlap(
+  a: PartOBB,
+  b: PartOBB,
+  epsilon = 1e-6,
+  separationTolerance = 1e-8,
+  touchingCountsAsOverlap = true
+): boolean {
+  const dot = (u: { x: number; y: number; z: number }, v: { x: number; y: number; z: number }) =>
+    u.x * v.x + u.y * v.y + u.z * v.z;
+
+  const R = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0]
+  ];
+  const absR = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0]
+  ];
+
+  for (let i = 0; i < 3; i += 1) {
+    for (let j = 0; j < 3; j += 1) {
+      R[i][j] = dot(a.axes[i], b.axes[j]);
+      absR[i][j] = Math.abs(R[i][j]) + epsilon;
+    }
+  }
+
+  const tWorld = {
+    x: b.center.x - a.center.x,
+    y: b.center.y - a.center.y,
+    z: b.center.z - a.center.z
+  };
+  const t = [dot(tWorld, a.axes[0]), dot(tWorld, a.axes[1]), dot(tWorld, a.axes[2])];
+
+  for (let i = 0; i < 3; i += 1) {
+    const ra = a.halfExtents[i];
+    const rb = b.halfExtents[0] * absR[i][0] + b.halfExtents[1] * absR[i][1] + b.halfExtents[2] * absR[i][2];
+    const proj = Math.abs(t[i]);
+    const limit = ra + rb;
+    if (touchingCountsAsOverlap) {
+      if (proj > limit) return false;
+    } else if (proj >= limit - separationTolerance) {
+      return false;
+    }
+  }
+
+  for (let j = 0; j < 3; j += 1) {
+    const ra = a.halfExtents[0] * absR[0][j] + a.halfExtents[1] * absR[1][j] + a.halfExtents[2] * absR[2][j];
+    const rb = b.halfExtents[j];
+    const proj = Math.abs(t[0] * R[0][j] + t[1] * R[1][j] + t[2] * R[2][j]);
+    const limit = ra + rb;
+    if (touchingCountsAsOverlap) {
+      if (proj > limit) return false;
+    } else if (proj >= limit - separationTolerance) {
+      return false;
+    }
+  }
+
+  for (let i = 0; i < 3; i += 1) {
+    for (let j = 0; j < 3; j += 1) {
+      const ra = a.halfExtents[(i + 1) % 3] * absR[(i + 2) % 3][j] + a.halfExtents[(i + 2) % 3] * absR[(i + 1) % 3][j];
+      const rb = b.halfExtents[(j + 1) % 3] * absR[i][(j + 2) % 3] + b.halfExtents[(j + 2) % 3] * absR[i][(j + 1) % 3];
+      const proj = Math.abs(t[(i + 2) % 3] * R[(i + 1) % 3][j] - t[(i + 1) % 3] * R[(i + 2) % 3][j]);
+      const limit = ra + rb;
+      if (touchingCountsAsOverlap) {
+        if (proj > limit) return false;
+      } else if (proj >= limit - separationTolerance) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 // Calculate combined bounding box for multiple parts
@@ -439,6 +558,46 @@ export function calculateGroupReferenceDistances(
   return calculateDistancesFromBounds(selectedBounds, fromPartId, referenceParts);
 }
 
+// For arbitrarily rotated contexts, show a single direction-aware vector distance between selected/reference centers.
+export function calculateVectorReferenceDistance(
+  selectedParts: Part[],
+  referenceParts: Part[],
+  fromPartId: string,
+  toPartId: string
+): ReferenceDistanceIndicator[] {
+  if (selectedParts.length === 0 || referenceParts.length === 0) return [];
+  const selectedBounds = getCombinedBounds(selectedParts);
+  const referenceBounds = getCombinedBounds(referenceParts);
+  const start = { x: selectedBounds.centerX, y: selectedBounds.centerY, z: selectedBounds.centerZ };
+  const end = { x: referenceBounds.centerX, y: referenceBounds.centerY, z: referenceBounds.centerZ };
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const dz = end.z - start.z;
+  const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (distance < 1e-6) return [];
+  const ax = Math.abs(dx);
+  const ay = Math.abs(dy);
+  const az = Math.abs(dz);
+  const axis: 'x' | 'y' | 'z' = ax >= ay && ax >= az ? 'x' : ay >= az ? 'y' : 'z';
+  return [
+    {
+      id: `vector-${fromPartId}-${toPartId}`,
+      axis,
+      type: 'edge-to-edge',
+      fromPartId,
+      toPartId,
+      start,
+      end,
+      distance,
+      labelPosition: {
+        x: (start.x + end.x) / 2,
+        y: (start.y + end.y) / 2 + 0.5,
+        z: (start.z + end.z) / 2
+      }
+    }
+  ];
+}
+
 // Find the N nearest parts to the dragging part
 export function getNearestParts(
   draggingBounds: PartBounds,
@@ -449,19 +608,39 @@ export function getNearestParts(
   // Filter out the parts being dragged
   const otherParts = allParts.filter((p) => !draggingPartIds.includes(p.id));
 
-  // Calculate distances and sort
+  // Calculate distances and sort.
+  // Prefer true box-to-box gap over center distance so large pieces with nearby faces are not missed.
   const partsWithDistance = otherParts.map((part) => {
     const bounds = getPartBounds(part);
-    // Distance from center to center
-    const dx = bounds.centerX - draggingBounds.centerX;
-    const dy = bounds.centerY - draggingBounds.centerY;
-    const dz = bounds.centerZ - draggingBounds.centerZ;
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    return { part, distance };
+    const gapX =
+      draggingBounds.maxX < bounds.minX
+        ? bounds.minX - draggingBounds.maxX
+        : bounds.maxX < draggingBounds.minX
+          ? draggingBounds.minX - bounds.maxX
+          : 0;
+    const gapY =
+      draggingBounds.maxY < bounds.minY
+        ? bounds.minY - draggingBounds.maxY
+        : bounds.maxY < draggingBounds.minY
+          ? draggingBounds.minY - bounds.maxY
+          : 0;
+    const gapZ =
+      draggingBounds.maxZ < bounds.minZ
+        ? bounds.minZ - draggingBounds.maxZ
+        : bounds.maxZ < draggingBounds.minZ
+          ? draggingBounds.minZ - bounds.maxZ
+          : 0;
+    const distance = Math.sqrt(gapX * gapX + gapY * gapY + gapZ * gapZ);
+
+    const centerDx = bounds.centerX - draggingBounds.centerX;
+    const centerDy = bounds.centerY - draggingBounds.centerY;
+    const centerDz = bounds.centerZ - draggingBounds.centerZ;
+    const centerDistance = Math.sqrt(centerDx * centerDx + centerDy * centerDy + centerDz * centerDz);
+    return { part, distance, centerDistance };
   });
 
-  // Sort by distance and take nearest N
-  partsWithDistance.sort((a, b) => a.distance - b.distance);
+  // Sort by box gap first, then center distance as a deterministic tie-breaker.
+  partsWithDistance.sort((a, b) => a.distance - b.distance || a.centerDistance - b.centerDistance);
   return partsWithDistance.slice(0, maxParts).map((p) => p.part);
 }
 
@@ -1116,17 +1295,19 @@ export function calculateSnapThreshold(
   // Base threshold at a "normal" viewing distance of ~50 units
   const BASE_THRESHOLD = 0.5; // 1/2 inch at normal zoom
   const BASE_DISTANCE = 50;
+  const ZOOM_IN_CURVE_EXPONENT = 1.3; // > 1 tightens threshold when zoomed in
 
-  // Scale threshold proportionally to camera distance
-  // Closer zoom = smaller threshold (more precision)
-  // Further zoom = larger threshold (easier to snap)
-  const scaleFactor = cameraDistance / BASE_DISTANCE;
+  // Scale threshold by camera distance.
+  // Keep zoomed-out behavior linear, but tighten zoomed-in behavior with a curve
+  // so close-up positioning feels more precise.
+  const linearScale = Math.max(0, cameraDistance / BASE_DISTANCE);
+  const scaleFactor = linearScale < 1 ? Math.pow(linearScale, ZOOM_IN_CURVE_EXPONENT) : linearScale;
 
   // Apply sensitivity multiplier
   const sensitivityMultiplier = SENSITIVITY_MULTIPLIERS[sensitivity] ?? 1.0;
 
   // Clamp between min and max thresholds (adjusted for sensitivity)
-  const MIN_THRESHOLD = 0.125 * sensitivityMultiplier; // 1/8 inch minimum (adjusted)
+  const MIN_THRESHOLD = 0.0625 * sensitivityMultiplier; // 1/16 inch minimum (adjusted)
   const MAX_THRESHOLD = 2 * sensitivityMultiplier; // 2 inch maximum (adjusted)
 
   return Math.max(MIN_THRESHOLD, Math.min(MAX_THRESHOLD, BASE_THRESHOLD * scaleFactor * sensitivityMultiplier));
@@ -1752,85 +1933,533 @@ export function detectFaceSnaps(
   draggingPartIds: string[],
   snapThreshold: number
 ): SnapResult {
+  const FACE_SNAP_CLEARANCE = 1e-4;
   const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
   const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
-  const targetBounds = nearestParts.map((p) => getPartBounds(p));
+  const dragFaces = getPartFaces(draggingPart, currentPosition);
 
-  let xDelta = 0,
-    yDelta = 0,
-    zDelta = 0;
-  let snappedX = false,
-    snappedY = false,
-    snappedZ = false;
-  const snapLines: SnapLine[] = [];
+  let best:
+    | {
+        delta: Vec3;
+        targetBounds: PartBounds;
+        targetFace: OrientedFace;
+      }
+    | undefined;
+  let bestDistance = snapThreshold;
 
-  // For each target part, check if we can align faces flush
-  for (const target of targetBounds) {
-    // X-axis face snaps: dragging part's max X face against target's min X face (or vice versa)
-    if (!snappedX) {
-      // Dragging part's right face (maxX) flush with target's left face (minX)
-      const rightToLeftDelta = target.minX - draggingBounds.maxX;
-      if (Math.abs(rightToLeftDelta) < snapThreshold) {
-        xDelta = rightToLeftDelta;
-        snappedX = true;
-        snapLines.push(createFaceSnapLine('x', target.minX, draggingBounds, target));
-      }
-      // Dragging part's left face (minX) flush with target's right face (maxX)
-      const leftToRightDelta = target.maxX - draggingBounds.minX;
-      if (!snappedX && Math.abs(leftToRightDelta) < snapThreshold) {
-        xDelta = leftToRightDelta;
-        snappedX = true;
-        snapLines.push(createFaceSnapLine('x', target.maxX, draggingBounds, target));
-      }
-    }
+  for (const targetPart of nearestParts) {
+    const targetFaces = getPartFaces(targetPart, targetPart.position);
+    for (const dragFace of dragFaces) {
+      for (const targetFace of targetFaces) {
+        if (!areFacesSnapCompatible(dragFace, targetFace, snapThreshold)) continue;
 
-    // Y-axis face snaps: dragging part's top/bottom face against target's bottom/top
-    if (!snappedY) {
-      // Dragging part's top face (maxY) flush with target's bottom face (minY)
-      const topToBottomDelta = target.minY - draggingBounds.maxY;
-      if (Math.abs(topToBottomDelta) < snapThreshold) {
-        yDelta = topToBottomDelta;
-        snappedY = true;
-        snapLines.push(createFaceSnapLine('y', target.minY, draggingBounds, target));
-      }
-      // Dragging part's bottom face (minY) flush with target's top face (maxY)
-      const bottomToTopDelta = target.maxY - draggingBounds.minY;
-      if (!snappedY && Math.abs(bottomToTopDelta) < snapThreshold) {
-        yDelta = bottomToTopDelta;
-        snappedY = true;
-        snapLines.push(createFaceSnapLine('y', target.maxY, draggingBounds, target));
-      }
-    }
+        const centerDelta = {
+          x: targetFace.center.x - dragFace.center.x,
+          y: targetFace.center.y - dragFace.center.y,
+          z: targetFace.center.z - dragFace.center.z
+        };
+        const planeDistance = dotVec(centerDelta, targetFace.normal);
+        const absDistance = Math.abs(planeDistance);
+        if (absDistance >= bestDistance) continue;
 
-    // Z-axis face snaps: dragging part's front/back face against target's back/front
-    if (!snappedZ) {
-      // Dragging part's front face (maxZ) flush with target's back face (minZ)
-      const frontToBackDelta = target.minZ - draggingBounds.maxZ;
-      if (Math.abs(frontToBackDelta) < snapThreshold) {
-        zDelta = frontToBackDelta;
-        snappedZ = true;
-        snapLines.push(createFaceSnapLine('z', target.minZ, draggingBounds, target));
-      }
-      // Dragging part's back face (minZ) flush with target's front face (maxZ)
-      const backToFrontDelta = target.maxZ - draggingBounds.minZ;
-      if (!snappedZ && Math.abs(backToFrontDelta) < snapThreshold) {
-        zDelta = backToFrontDelta;
-        snappedZ = true;
-        snapLines.push(createFaceSnapLine('z', target.maxZ, draggingBounds, target));
+        bestDistance = absDistance;
+        const clearance = Math.min(FACE_SNAP_CLEARANCE, absDistance * 0.5);
+        const correctedPlaneDistance = planeDistance - Math.sign(planeDistance || 1) * clearance;
+        best = {
+          delta: {
+            x: targetFace.normal.x * correctedPlaneDistance,
+            y: targetFace.normal.y * correctedPlaneDistance,
+            z: targetFace.normal.z * correctedPlaneDistance
+          },
+          targetBounds: getPartBounds(targetPart),
+          targetFace
+        };
       }
     }
   }
 
+  if (!best) {
+    return {
+      adjustedPosition: currentPosition,
+      snappedX: false,
+      snappedY: false,
+      snappedZ: false,
+      snapLines: [],
+      closestDistance: undefined
+    };
+  }
+
+  const adjustedPosition = {
+    x: currentPosition.x + best.delta.x,
+    y: currentPosition.y + best.delta.y,
+    z: currentPosition.z + best.delta.z
+  };
+  const adjustedBounds = getPartBoundsAtPosition(draggingPart, adjustedPosition);
+
+  const snappedX = Math.abs(best.delta.x) > 1e-5;
+  const snappedY = Math.abs(best.delta.y) > 1e-5;
+  const snappedZ = Math.abs(best.delta.z) > 1e-5;
+
+  const ax = Math.abs(best.targetFace.normal.x);
+  const ay = Math.abs(best.targetFace.normal.y);
+  const az = Math.abs(best.targetFace.normal.z);
+  const dominantAxis: 'x' | 'y' | 'z' = ax >= ay && ax >= az ? 'x' : ay >= az ? 'y' : 'z';
+  const dominantSign =
+    dominantAxis === 'x'
+      ? best.targetFace.normal.x
+      : dominantAxis === 'y'
+        ? best.targetFace.normal.y
+        : best.targetFace.normal.z;
+  const position =
+    dominantAxis === 'x'
+      ? dominantSign >= 0
+        ? best.targetBounds.maxX
+        : best.targetBounds.minX
+      : dominantAxis === 'y'
+        ? dominantSign >= 0
+          ? best.targetBounds.maxY
+          : best.targetBounds.minY
+        : dominantSign >= 0
+          ? best.targetBounds.maxZ
+          : best.targetBounds.minZ;
+
   return {
-    adjustedPosition: {
-      x: currentPosition.x + xDelta,
-      y: currentPosition.y + yDelta,
-      z: currentPosition.z + zDelta
-    },
+    adjustedPosition,
     snappedX,
     snappedY,
     snappedZ,
-    snapLines
+    snapLines: [createFaceSnapLine(dominantAxis, position, adjustedBounds, best.targetBounds)],
+    closestDistance: bestDistance
+  };
+}
+
+type Vec3 = { x: number; y: number; z: number };
+
+type OrientedFace = {
+  normal: Vec3;
+  center: Vec3;
+  tangent1: Vec3;
+  tangent2: Vec3;
+  half1: number;
+  half2: number;
+};
+
+function dotVec(a: Vec3, b: Vec3): number {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+function addScaledVec(base: Vec3, dir: Vec3, scale: number): Vec3 {
+  return {
+    x: base.x + dir.x * scale,
+    y: base.y + dir.y * scale,
+    z: base.z + dir.z * scale
+  };
+}
+
+function getPartFaces(part: Part, position: { x: number; y: number; z: number }): OrientedFace[] {
+  _boundsEuler.set(
+    (part.rotation.x * Math.PI) / 180,
+    (part.rotation.y * Math.PI) / 180,
+    (part.rotation.z * Math.PI) / 180,
+    'XYZ'
+  );
+  _boundsQuat.setFromEuler(_boundsEuler);
+
+  const qx = _boundsQuat.x;
+  const qy = _boundsQuat.y;
+  const qz = _boundsQuat.z;
+  const qw = _boundsQuat.w;
+  const xx = qx * qx;
+  const yy = qy * qy;
+  const zz = qz * qz;
+  const xy = qx * qy;
+  const xz = qx * qz;
+  const yz = qy * qz;
+  const wx = qw * qx;
+  const wy = qw * qy;
+  const wz = qw * qz;
+
+  const axisX: Vec3 = {
+    x: 1 - 2 * (yy + zz),
+    y: 2 * (xy + wz),
+    z: 2 * (xz - wy)
+  };
+  const axisY: Vec3 = {
+    x: 2 * (xy - wz),
+    y: 1 - 2 * (xx + zz),
+    z: 2 * (yz + wx)
+  };
+  const axisZ: Vec3 = {
+    x: 2 * (xz + wy),
+    y: 2 * (yz - wx),
+    z: 1 - 2 * (xx + yy)
+  };
+
+  const halfLength = part.length / 2;
+  const halfThickness = part.thickness / 2;
+  const halfWidth = part.width / 2;
+  const partCenter: Vec3 = { x: position.x, y: position.y, z: position.z };
+
+  return [
+    {
+      normal: axisX,
+      center: addScaledVec(partCenter, axisX, halfLength),
+      tangent1: axisY,
+      tangent2: axisZ,
+      half1: halfThickness,
+      half2: halfWidth
+    },
+    {
+      normal: { x: -axisX.x, y: -axisX.y, z: -axisX.z },
+      center: addScaledVec(partCenter, axisX, -halfLength),
+      tangent1: axisY,
+      tangent2: axisZ,
+      half1: halfThickness,
+      half2: halfWidth
+    },
+    {
+      normal: axisY,
+      center: addScaledVec(partCenter, axisY, halfThickness),
+      tangent1: axisX,
+      tangent2: axisZ,
+      half1: halfLength,
+      half2: halfWidth
+    },
+    {
+      normal: { x: -axisY.x, y: -axisY.y, z: -axisY.z },
+      center: addScaledVec(partCenter, axisY, -halfThickness),
+      tangent1: axisX,
+      tangent2: axisZ,
+      half1: halfLength,
+      half2: halfWidth
+    },
+    {
+      normal: axisZ,
+      center: addScaledVec(partCenter, axisZ, halfWidth),
+      tangent1: axisX,
+      tangent2: axisY,
+      half1: halfLength,
+      half2: halfThickness
+    },
+    {
+      normal: { x: -axisZ.x, y: -axisZ.y, z: -axisZ.z },
+      center: addScaledVec(partCenter, axisZ, -halfWidth),
+      tangent1: axisX,
+      tangent2: axisY,
+      half1: halfLength,
+      half2: halfThickness
+    }
+  ];
+}
+
+function projectFaceInterval(face: OrientedFace, axis: Vec3): { min: number; max: number } {
+  const centerProjection = dotVec(face.center, axis);
+  const radius =
+    face.half1 * Math.abs(dotVec(face.tangent1, axis)) + face.half2 * Math.abs(dotVec(face.tangent2, axis));
+  return {
+    min: centerProjection - radius,
+    max: centerProjection + radius
+  };
+}
+
+function areFacesSnapCompatible(faceA: OrientedFace, faceB: OrientedFace, snapThreshold: number): boolean {
+  const normalDot = dotVec(faceA.normal, faceB.normal);
+  // Faces should oppose each other (nearly anti-parallel) for flush snap.
+  if (normalDot > -0.98) return false;
+
+  const overlapSlack = Math.max(0.01, snapThreshold * 0.25);
+  const axesToCheck: Vec3[] = [faceB.tangent1, faceB.tangent2];
+  for (const axis of axesToCheck) {
+    const intervalA = projectFaceInterval(faceA, axis);
+    const intervalB = projectFaceInterval(faceB, axis);
+    const overlap = Math.min(intervalA.max, intervalB.max) - Math.max(intervalA.min, intervalB.min);
+    if (overlap < -overlapSlack) return false;
+  }
+
+  return true;
+}
+
+type PartEdge = {
+  a: Vec3;
+  b: Vec3;
+  dir: Vec3;
+  length: number;
+};
+
+function subVec(a: Vec3, b: Vec3): Vec3 {
+  return { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+}
+
+function addVec(a: Vec3, b: Vec3): Vec3 {
+  return { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z };
+}
+
+function mulVec(a: Vec3, scalar: number): Vec3 {
+  return { x: a.x * scalar, y: a.y * scalar, z: a.z * scalar };
+}
+
+function lenVec(a: Vec3): number {
+  return Math.sqrt(dotVec(a, a));
+}
+
+function normalizeVec(a: Vec3): Vec3 {
+  const l = lenVec(a);
+  if (l < 1e-9) return { x: 0, y: 0, z: 0 };
+  return { x: a.x / l, y: a.y / l, z: a.z / l };
+}
+
+function clamp01(value: number): number {
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
+function closestPointsOnSegments(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3): { c1: Vec3; c2: Vec3 } {
+  const EPS = 1e-8;
+  const d1 = subVec(q1, p1);
+  const d2 = subVec(q2, p2);
+  const r = subVec(p1, p2);
+  const a = dotVec(d1, d1);
+  const e = dotVec(d2, d2);
+  const f = dotVec(d2, r);
+  let s = 0;
+  let t = 0;
+
+  if (a <= EPS && e <= EPS) {
+    return { c1: p1, c2: p2 };
+  }
+
+  if (a <= EPS) {
+    s = 0;
+    t = clamp01(f / e);
+  } else {
+    const c = dotVec(d1, r);
+    if (e <= EPS) {
+      t = 0;
+      s = clamp01(-c / a);
+    } else {
+      const b = dotVec(d1, d2);
+      const denom = a * e - b * b;
+
+      if (Math.abs(denom) > EPS) {
+        s = clamp01((b * f - c * e) / denom);
+      } else {
+        s = 0;
+      }
+
+      t = (b * s + f) / e;
+
+      if (t < 0) {
+        t = 0;
+        s = clamp01(-c / a);
+      } else if (t > 1) {
+        t = 1;
+        s = clamp01((b - c) / a);
+      }
+    }
+  }
+
+  const c1 = addVec(p1, mulVec(d1, s));
+  const c2 = addVec(p2, mulVec(d2, t));
+  return { c1, c2 };
+}
+
+function dominantAxisFromDelta(delta: Vec3): 'x' | 'y' | 'z' {
+  const ax = Math.abs(delta.x);
+  const ay = Math.abs(delta.y);
+  const az = Math.abs(delta.z);
+  return ax >= ay && ax >= az ? 'x' : ay >= az ? 'y' : 'z';
+}
+
+function getPartVertices(part: Part, position: { x: number; y: number; z: number }): Vec3[] {
+  const obb = getPartOBB(part, position);
+  const center = obb.center;
+  const [ax, ay, az] = obb.axes;
+  const [hx, hy, hz] = obb.halfExtents;
+  const verts = new Array<Vec3>(8);
+  for (const sx of [-1, 1] as const) {
+    for (const sy of [-1, 1] as const) {
+      for (const sz of [-1, 1] as const) {
+        const idx = (sx > 0 ? 4 : 0) + (sy > 0 ? 2 : 0) + (sz > 0 ? 1 : 0);
+        verts[idx] = {
+          x: center.x + ax.x * hx * sx + ay.x * hy * sy + az.x * hz * sz,
+          y: center.y + ax.y * hx * sx + ay.y * hy * sy + az.y * hz * sz,
+          z: center.z + ax.z * hx * sx + ay.z * hy * sy + az.z * hz * sz
+        };
+      }
+    }
+  }
+  return verts;
+}
+
+function getPartEdges(part: Part, position: { x: number; y: number; z: number }): PartEdge[] {
+  const v = getPartVertices(part, position);
+  const edgeIndices: Array<[number, number]> = [
+    [0, 1],
+    [0, 2],
+    [0, 4],
+    [1, 3],
+    [1, 5],
+    [2, 3],
+    [2, 6],
+    [3, 7],
+    [4, 5],
+    [4, 6],
+    [5, 7],
+    [6, 7]
+  ];
+  return edgeIndices
+    .map(([i, j]) => {
+      const a = v[i];
+      const b = v[j];
+      const ab = subVec(b, a);
+      const length = lenVec(ab);
+      const dir = normalizeVec(ab);
+      return { a, b, dir, length };
+    })
+    .filter((e) => e.length > 1e-6);
+}
+
+function pointInsideFace(point: Vec3, face: OrientedFace, slack: number): boolean {
+  const offset = subVec(point, face.center);
+  const u = dotVec(offset, face.tangent1);
+  const v = dotVec(offset, face.tangent2);
+  return Math.abs(u) <= face.half1 + slack && Math.abs(v) <= face.half2 + slack;
+}
+
+export function detectFeatureSnaps(
+  draggingPart: Part,
+  currentPosition: { x: number; y: number; z: number },
+  allParts: Part[],
+  draggingPartIds: string[],
+  snapThreshold: number
+): SnapResult {
+  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
+  const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
+  const dragEdges = getPartEdges(draggingPart, currentPosition);
+  const dragVertices = getPartVertices(draggingPart, currentPosition);
+
+  let best:
+    | {
+        delta: Vec3;
+        lineStart: Vec3;
+        lineEnd: Vec3;
+        distance: number;
+      }
+    | undefined;
+  let bestDistance = snapThreshold;
+
+  for (const targetPart of nearestParts) {
+    const targetEdges = getPartEdges(targetPart, targetPart.position);
+    const targetFaces = getPartFaces(targetPart, targetPart.position);
+
+    // Edge-edge: align nearly parallel edges by minimizing perpendicular offset.
+    for (const e1 of dragEdges) {
+      for (const e2 of targetEdges) {
+        const parallel = Math.abs(dotVec(e1.dir, e2.dir));
+        if (parallel < 0.985) continue;
+
+        const { c1, c2 } = closestPointsOnSegments(e1.a, e1.b, e2.a, e2.b);
+        const closestDiff = subVec(c2, c1);
+        const along = dotVec(closestDiff, e1.dir);
+        const perpOffset = subVec(closestDiff, mulVec(e1.dir, along));
+        const distance = lenVec(perpOffset);
+        if (distance <= 1e-5) continue;
+        if (distance >= bestDistance) continue;
+
+        const p1a = dotVec(e1.a, e1.dir);
+        const p1b = dotVec(e1.b, e1.dir);
+        const p2a = dotVec(e2.a, e1.dir);
+        const p2b = dotVec(e2.b, e1.dir);
+        const min1 = Math.min(p1a, p1b);
+        const max1 = Math.max(p1a, p1b);
+        const min2 = Math.min(p2a, p2b);
+        const max2 = Math.max(p2a, p2b);
+        const overlap = Math.min(max1, max2) - Math.max(min1, min2);
+        if (overlap < -Math.max(0.01, snapThreshold * 0.5)) continue;
+
+        bestDistance = distance;
+        best = {
+          delta: perpOffset,
+          lineStart: c1,
+          lineEnd: c2,
+          distance
+        };
+      }
+    }
+
+    // Vertex-face: project a dragging vertex to a compatible target face plane.
+    for (const vertex of dragVertices) {
+      for (const face of targetFaces) {
+        const offset = subVec(vertex, face.center);
+        const planeDistance = dotVec(offset, face.normal);
+        const absDistance = Math.abs(planeDistance);
+        if (absDistance >= bestDistance) continue;
+
+        const projected = subVec(vertex, mulVec(face.normal, planeDistance));
+        // Use a tight boundary tolerance so vertex->face projection does not
+        // "magnetize" to nearby face planes when the projected point is just
+        // outside the actual face extents (causes visible edge gaps).
+        if (!pointInsideFace(projected, face, 1e-4)) continue;
+
+        bestDistance = absDistance;
+        best = {
+          delta: mulVec(face.normal, -planeDistance),
+          lineStart: vertex,
+          lineEnd: projected,
+          distance: absDistance
+        };
+      }
+    }
+  }
+
+  if (!best) {
+    return {
+      adjustedPosition: currentPosition,
+      snappedX: false,
+      snappedY: false,
+      snappedZ: false,
+      snapLines: [],
+      closestDistance: Number.isFinite(bestDistance) ? bestDistance : undefined
+    };
+  }
+
+  if (lenVec(best.delta) <= 1e-5) {
+    return {
+      adjustedPosition: currentPosition,
+      snappedX: false,
+      snappedY: false,
+      snappedZ: false,
+      snapLines: [],
+      closestDistance: best.distance
+    };
+  }
+
+  const adjustedPosition = {
+    x: currentPosition.x + best.delta.x,
+    y: currentPosition.y + best.delta.y,
+    z: currentPosition.z + best.delta.z
+  };
+  const snappedX = Math.abs(best.delta.x) > 1e-5;
+  const snappedY = Math.abs(best.delta.y) > 1e-5;
+  const snappedZ = Math.abs(best.delta.z) > 1e-5;
+  const axis = dominantAxisFromDelta(best.delta);
+
+  return {
+    adjustedPosition,
+    snappedX,
+    snappedY,
+    snappedZ,
+    snapLines: [
+      {
+        axis,
+        type: 'edge',
+        start: { x: best.lineStart.x, y: best.lineStart.y, z: best.lineStart.z },
+        end: { x: best.lineEnd.x, y: best.lineEnd.y, z: best.lineEnd.z },
+        snapValue: axis === 'x' ? best.lineEnd.x : axis === 'y' ? best.lineEnd.y : best.lineEnd.z
+      }
+    ],
+    closestDistance: best.distance
   };
 }
 

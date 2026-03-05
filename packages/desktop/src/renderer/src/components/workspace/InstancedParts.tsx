@@ -24,6 +24,7 @@ const _matrix = new THREE.Matrix4();
 const _position = new THREE.Vector3();
 const _quaternion = new THREE.Quaternion();
 const _scale = new THREE.Vector3();
+const _outlineScale = new THREE.Vector3();
 const _euler = new THREE.Euler();
 const _color = new THREE.Color();
 
@@ -41,6 +42,7 @@ interface InstancedPartsProps {
 export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: InstancedPartsProps) {
   const { camera, gl, controls } = useThree();
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const outlineMeshRef = useRef<THREE.InstancedMesh>(null);
 
   // Stable allocation capacity — only grows, never shrinks, to avoid re-mounting the mesh.
   // Re-mount only when parts are added beyond the current capacity.
@@ -75,7 +77,23 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
   // Update instance matrices and colors whenever parts change
   useEffect(() => {
     const mesh = meshRef.current;
-    if (!mesh || parts.length === 0) return;
+    const outlineMesh = outlineMeshRef.current;
+    if (!mesh) return;
+
+    if (parts.length === 0) {
+      mesh.count = 0;
+      if (outlineMesh) {
+        outlineMesh.count = 0;
+        outlineMesh.instanceMatrix.needsUpdate = true;
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) {
+        mesh.instanceColor.needsUpdate = true;
+      }
+      mesh.userData.partIdByInstance = [];
+      mesh.userData.isInstancedParts = true;
+      return;
+    }
 
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
@@ -102,20 +120,27 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
 
       _matrix.compose(_position, _quaternion, _scale);
       mesh.setMatrixAt(i, _matrix);
+      if (outlineMesh) {
+        _outlineScale.copy(_scale).multiplyScalar(1.03);
+        _matrix.compose(_position, _quaternion, _outlineScale);
+        outlineMesh.setMatrixAt(i, _matrix);
+      }
 
       // Per-instance color
-      if (displayMode === 'translucent') {
-        _color.set('#888888');
-      } else {
-        _color.set(part.color);
-      }
+      _color.set(part.color);
       mesh.setColorAt(i, _color);
     }
 
     // Update visible instance count (may differ from allocated count)
     mesh.count = parts.length;
+    if (outlineMesh) {
+      outlineMesh.count = parts.length;
+    }
 
     mesh.instanceMatrix.needsUpdate = true;
+    if (outlineMesh) {
+      outlineMesh.instanceMatrix.needsUpdate = true;
+    }
     if (mesh.instanceColor) {
       mesh.instanceColor.needsUpdate = true;
     }
@@ -213,10 +238,17 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
 
       // Right-click: select and set context menu target
       if (e.nativeEvent.button === 2) {
-        if (ctx.groupToSelectOnClick) {
-          selectGroup(ctx.groupToSelectOnClick);
-        } else {
-          selectPart(partId);
+        const { selectedPartIds, selectedGroupIds } = useSelectionStore.getState();
+        const isAlreadySelected =
+          selectedPartIds.includes(partId) ||
+          ctx.ancestorGroupIds.some((groupId) => selectedGroupIds.includes(groupId));
+
+        if (!isAlreadySelected) {
+          if (ctx.groupToSelectOnClick) {
+            selectGroup(ctx.groupToSelectOnClick);
+          } else {
+            selectPart(partId);
+          }
         }
         setSelectedSidebarStockId(null);
         setRightClickTarget({ type: 'part' });
@@ -239,7 +271,7 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
 
       // Check if this part belongs to an already-selected group
       const { selectedGroupIds } = useSelectionStore.getState();
-      const isInSelectedGroup = ctx.groupToSelectOnClick && selectedGroupIds.includes(ctx.groupToSelectOnClick);
+      const isInSelectedGroup = ctx.ancestorGroupIds.some((groupId) => selectedGroupIds.includes(groupId));
 
       if (isInSelectedGroup) {
         // Group already selected — don't change selection, just prepare for group drag
@@ -340,23 +372,35 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
     [partIdByIndex, getGroupContext, enterGroup, selectPart, selectGroup]
   );
 
-  if (parts.length === 0) return null;
-
   return (
-    <instancedMesh
-      key={meshCapacity}
-      ref={meshRef}
-      args={[unitBoxGeometry, undefined, meshCapacity]}
-      frustumCulled={false}
-      onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerOut={handlePointerOut}
-    >
-      {displayMode === 'solid' && <meshStandardMaterial />}
-      {displayMode === 'wireframe' && <meshBasicMaterial wireframe />}
-      {displayMode === 'translucent' && <meshStandardMaterial transparent opacity={0.3} depthWrite={false} />}
-    </instancedMesh>
+    <>
+      <instancedMesh
+        key={meshCapacity}
+        ref={meshRef}
+        args={[unitBoxGeometry, undefined, meshCapacity]}
+        frustumCulled={false}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerOut={handlePointerOut}
+      >
+        {displayMode === 'solid' && <meshStandardMaterial />}
+        {displayMode === 'wireframe' && <meshBasicMaterial wireframe />}
+        {displayMode === 'translucent' && <meshStandardMaterial transparent opacity={0.55} depthWrite={false} />}
+      </instancedMesh>
+      {displayMode === 'translucent' && (
+        <instancedMesh ref={outlineMeshRef} args={[unitBoxGeometry, undefined, meshCapacity]} frustumCulled={false}>
+          <meshBasicMaterial
+            color="#1f2937"
+            side={THREE.BackSide}
+            transparent
+            opacity={1}
+            depthWrite={false}
+            depthTest={true}
+          />
+        </instancedMesh>
+      )}
+    </>
   );
 }

@@ -11,10 +11,25 @@ import { useProjectStore, getAllDescendantPartIds } from '../../store/projectSto
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
-import { getCombinedBounds, getPartBoundsAtPosition } from '../../utils/snapToPartsUtil';
+import {
+  getCombinedBounds,
+  calculateSnapThreshold,
+  detectGuideSnaps,
+  createGuideSnapLine,
+  detectOriginSnaps,
+  createOriginSnapLine,
+  detectFaceSnaps,
+  detectFeatureSnaps,
+  detectSnaps,
+  type PartBounds
+} from '../../utils/snapToPartsUtil';
+import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
 import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 import { snapToGrid } from './partTypes';
 import { isOrbitControls } from './workspaceUtils';
+import type { Part } from '../../types';
+import { createAxisSnapWinners } from '../../utils/snapPriority';
+import { applyGroupAxisCandidate } from '../../utils/groupDragSnapArbitration';
 
 // Pre-allocated objects — reused every frame, zero GC pressure
 const _plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -28,6 +43,21 @@ const _axisY = new THREE.Vector3(0, 1, 0);
 const _axisZ = new THREE.Vector3(0, 0, 1);
 
 const DRAG_THRESHOLD_SQ = 25; // 5px squared
+
+function offsetBounds(bounds: PartBounds, delta: { x: number; y: number; z: number }): PartBounds {
+  return {
+    ...bounds,
+    minX: bounds.minX + delta.x,
+    maxX: bounds.maxX + delta.x,
+    minY: bounds.minY + delta.y,
+    maxY: bounds.maxY + delta.y,
+    minZ: bounds.minZ + delta.z,
+    maxZ: bounds.maxZ + delta.z,
+    centerX: bounds.centerX + delta.x,
+    centerY: bounds.centerY + delta.y,
+    centerZ: bounds.centerZ + delta.z
+  };
+}
 
 export function useGroupDrag(
   camera: THREE.Camera,
@@ -44,6 +74,9 @@ export function useGroupDrag(
   const dragActiveRef = useRef(false);
   const startPointRef = useRef<THREE.Vector3 | null>(null);
   const anchorPosRef = useRef<THREE.Vector3 | null>(null);
+  const initialBoundsRef = useRef<PartBounds | null>(null);
+  const movingPartIdsRef = useRef<Set<string>>(new Set());
+  const wasSnappedByPartsRef = useRef<{ x: boolean; y: boolean; z: boolean }>({ x: false, y: false, z: false });
   const planeAxesRef = useRef<{ x: boolean; y: boolean; z: boolean }>({ x: true, y: false, z: true });
   const lastDragPosRef = useRef<{ x: number; y: number; z: number } | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -86,6 +119,10 @@ export function useGroupDrag(
 
   const startGroupDrag = useCallback(
     (worldPoint: THREE.Vector3, screenX: number, screenY: number) => {
+      // If a selected group is being dragged, immediately pause orbit controls so
+      // camera orbit doesn't steal the gesture before drag threshold is crossed.
+      if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = false;
+
       // Store start info
       const startPoint = worldPoint.clone();
       let dragStarted = false;
@@ -119,11 +156,12 @@ export function useGroupDrag(
           const bounds = getCombinedBounds(groupParts);
           const anchor = new THREE.Vector3(bounds.centerX, bounds.centerY, bounds.centerZ);
           anchorPosRef.current = anchor;
+          initialBoundsRef.current = bounds;
+          movingPartIdsRef.current = partIdsToInclude;
+          wasSnappedByPartsRef.current = { x: false, y: false, z: false };
           startPointRef.current = startPoint;
 
           setupDragPlane(anchor);
-
-          if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = false;
         }
 
         // Drag active — process move
@@ -147,11 +185,286 @@ export function useGroupDrag(
           let newZ = axes.z ? anchorPosRef.current.z + deltaZ : anchorPosRef.current.z;
 
           // Grid snap
-          const { liveGridSnap } = useAppSettingsStore.getState().settings;
+          const { liveGridSnap, snapSensitivity, snapToOrigin } = useAppSettingsStore.getState().settings;
           if (liveGridSnap) {
             newX = snapToGrid(newX);
             newZ = snapToGrid(newZ);
             newY = snapToGrid(newY);
+          }
+
+          const { parts, snapGuides } = useProjectStore.getState();
+          const movingIds = movingPartIdsRef.current;
+          const snapLines: import('../../types').SnapLine[] = [];
+          const axisSnapWinners = createAxisSnapWinners();
+          const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled && !evt.altKey;
+
+          if (isSnapEnabled && initialBoundsRef.current) {
+            const cameraDistance = camera.position.distanceTo(_intersection.set(newX, newY, newZ));
+            const snapThreshold = calculateSnapThreshold(cameraDistance, snapSensitivity);
+            let workingDelta = {
+              x: newX - anchorPosRef.current.x,
+              y: newY - anchorPosRef.current.y,
+              z: newZ - anchorPosRef.current.z
+            };
+            let movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+
+            if (snapGuides.length > 0) {
+              const guideSnaps = detectGuideSnaps(movingBounds, snapGuides, snapThreshold);
+              if (guideSnaps.x && axes.x) {
+                workingDelta.x += guideSnaps.x.delta;
+                const guide = snapGuides.find((g) => g.id === guideSnaps.x!.guideId);
+                if (guide) {
+                  movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+                  const applied = applyGroupAxisCandidate(
+                    'x',
+                    'guide',
+                    workingDelta,
+                    workingDelta.x,
+                    axisSnapWinners,
+                    snapLines,
+                    [createGuideSnapLine(guide, movingBounds)]
+                  );
+                  if (!applied) {
+                    movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+                  }
+                }
+              }
+              if (guideSnaps.y && axes.y) {
+                workingDelta.y += guideSnaps.y.delta;
+                const guide = snapGuides.find((g) => g.id === guideSnaps.y!.guideId);
+                if (guide) {
+                  movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+                  const applied = applyGroupAxisCandidate(
+                    'y',
+                    'guide',
+                    workingDelta,
+                    workingDelta.y,
+                    axisSnapWinners,
+                    snapLines,
+                    [createGuideSnapLine(guide, movingBounds)]
+                  );
+                  if (!applied) {
+                    movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+                  }
+                }
+              }
+              if (guideSnaps.z && axes.z) {
+                workingDelta.z += guideSnaps.z.delta;
+                const guide = snapGuides.find((g) => g.id === guideSnaps.z!.guideId);
+                if (guide) {
+                  movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+                  const applied = applyGroupAxisCandidate(
+                    'z',
+                    'guide',
+                    workingDelta,
+                    workingDelta.z,
+                    axisSnapWinners,
+                    snapLines,
+                    [createGuideSnapLine(guide, movingBounds)]
+                  );
+                  if (!applied) {
+                    movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+                  }
+                }
+              }
+            }
+
+            if (snapToOrigin) {
+              const originSnaps = detectOriginSnaps(movingBounds, snapThreshold);
+              if (originSnaps.x && axes.x) {
+                workingDelta.x += originSnaps.x.delta;
+                movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+                const applied = applyGroupAxisCandidate(
+                  'x',
+                  'origin',
+                  workingDelta,
+                  workingDelta.x,
+                  axisSnapWinners,
+                  snapLines,
+                  [createOriginSnapLine('x', originSnaps.x.snapType, movingBounds)]
+                );
+                if (!applied) {
+                  movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+                }
+              }
+              if (originSnaps.y && axes.y) {
+                workingDelta.y += originSnaps.y.delta;
+                movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+                const applied = applyGroupAxisCandidate(
+                  'y',
+                  'origin',
+                  workingDelta,
+                  workingDelta.y,
+                  axisSnapWinners,
+                  snapLines,
+                  [createOriginSnapLine('y', originSnaps.y.snapType, movingBounds)]
+                );
+                if (!applied) {
+                  movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+                }
+              }
+              if (originSnaps.z && axes.z) {
+                workingDelta.z += originSnaps.z.delta;
+                movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+                const applied = applyGroupAxisCandidate(
+                  'z',
+                  'origin',
+                  workingDelta,
+                  workingDelta.z,
+                  axisSnapWinners,
+                  snapLines,
+                  [createOriginSnapLine('z', originSnaps.z.snapType, movingBounds)]
+                );
+                if (!applied) {
+                  movingBounds = offsetBounds(initialBoundsRef.current, workingDelta);
+                }
+              }
+            }
+
+            // Axis-aligned AABB group snap against nearby parts (good baseline parity with single-part axis snaps).
+            const proxyPart: Part = {
+              id: 'group-proxy',
+              name: 'Group Proxy',
+              length: initialBoundsRef.current.maxX - initialBoundsRef.current.minX,
+              width: initialBoundsRef.current.maxZ - initialBoundsRef.current.minZ,
+              thickness: initialBoundsRef.current.maxY - initialBoundsRef.current.minY,
+              position: {
+                x: anchorPosRef.current.x + workingDelta.x,
+                y: anchorPosRef.current.y + workingDelta.y,
+                z: anchorPosRef.current.z + workingDelta.z
+              },
+              rotation: { x: 0, y: 0, z: 0 },
+              stockId: null,
+              grainSensitive: false,
+              grainDirection: 'length',
+              color: '#ffffff'
+            };
+            const proxyPosition = proxyPart.position;
+
+            const faceSnapResult = detectFaceSnaps(proxyPart, proxyPosition, parts, [...movingIds], snapThreshold);
+            if (axes.x && faceSnapResult.snappedX) {
+              applyGroupAxisCandidate(
+                'x',
+                'face',
+                workingDelta,
+                faceSnapResult.adjustedPosition.x - anchorPosRef.current.x,
+                axisSnapWinners,
+                snapLines,
+                faceSnapResult.snapLines.filter((line) => line.axis === 'x')
+              );
+            }
+            if (axes.y && faceSnapResult.snappedY) {
+              applyGroupAxisCandidate(
+                'y',
+                'face',
+                workingDelta,
+                faceSnapResult.adjustedPosition.y - anchorPosRef.current.y,
+                axisSnapWinners,
+                snapLines,
+                faceSnapResult.snapLines.filter((line) => line.axis === 'y')
+              );
+            }
+            if (axes.z && faceSnapResult.snappedZ) {
+              applyGroupAxisCandidate(
+                'z',
+                'face',
+                workingDelta,
+                faceSnapResult.adjustedPosition.z - anchorPosRef.current.z,
+                axisSnapWinners,
+                snapLines,
+                faceSnapResult.snapLines.filter((line) => line.axis === 'z')
+              );
+            }
+
+            const featureProxyPosition = {
+              x: anchorPosRef.current.x + workingDelta.x,
+              y: anchorPosRef.current.y + workingDelta.y,
+              z: anchorPosRef.current.z + workingDelta.z
+            };
+            const featureSnapResult = detectFeatureSnaps(
+              proxyPart,
+              featureProxyPosition,
+              parts,
+              [...movingIds],
+              snapThreshold
+            );
+            if (axes.x && featureSnapResult.snappedX) {
+              applyGroupAxisCandidate(
+                'x',
+                'feature',
+                workingDelta,
+                featureSnapResult.adjustedPosition.x - anchorPosRef.current.x,
+                axisSnapWinners,
+                snapLines,
+                featureSnapResult.snapLines.filter((line) => line.axis === 'x')
+              );
+            }
+            if (axes.y && featureSnapResult.snappedY) {
+              applyGroupAxisCandidate(
+                'y',
+                'feature',
+                workingDelta,
+                featureSnapResult.adjustedPosition.y - anchorPosRef.current.y,
+                axisSnapWinners,
+                snapLines,
+                featureSnapResult.snapLines.filter((line) => line.axis === 'y')
+              );
+            }
+            if (axes.z && featureSnapResult.snappedZ) {
+              applyGroupAxisCandidate(
+                'z',
+                'feature',
+                workingDelta,
+                featureSnapResult.adjustedPosition.z - anchorPosRef.current.z,
+                axisSnapWinners,
+                snapLines,
+                featureSnapResult.snapLines.filter((line) => line.axis === 'z')
+              );
+            }
+
+            const axisProxyPosition = {
+              x: anchorPosRef.current.x + workingDelta.x,
+              y: anchorPosRef.current.y + workingDelta.y,
+              z: anchorPosRef.current.z + workingDelta.z
+            };
+            const snapResult = detectSnaps(proxyPart, axisProxyPosition, parts, [...movingIds], snapThreshold);
+            if (axes.x && snapResult.snappedX) {
+              applyGroupAxisCandidate(
+                'x',
+                'axis',
+                workingDelta,
+                snapResult.adjustedPosition.x - anchorPosRef.current.x,
+                axisSnapWinners,
+                snapLines,
+                snapResult.snapLines.filter((line) => line.axis === 'x')
+              );
+            }
+            if (axes.y && snapResult.snappedY) {
+              applyGroupAxisCandidate(
+                'y',
+                'axis',
+                workingDelta,
+                snapResult.adjustedPosition.y - anchorPosRef.current.y,
+                axisSnapWinners,
+                snapLines,
+                snapResult.snapLines.filter((line) => line.axis === 'y')
+              );
+            }
+            if (axes.z && snapResult.snappedZ) {
+              applyGroupAxisCandidate(
+                'z',
+                'axis',
+                workingDelta,
+                snapResult.adjustedPosition.z - anchorPosRef.current.z,
+                axisSnapWinners,
+                snapLines,
+                snapResult.snapLines.filter((line) => line.axis === 'z')
+              );
+            }
+
+            newX = anchorPosRef.current.x + workingDelta.x;
+            newY = anchorPosRef.current.y + workingDelta.y;
+            newZ = anchorPosRef.current.z + workingDelta.z;
           }
 
           const proposedDelta = {
@@ -162,7 +475,7 @@ export function useGroupDrag(
 
           // Ground constraint — ensure no group part goes below ground
           const { selectedGroupIds, selectedPartIds } = useSelectionStore.getState();
-          const { groupMembers, parts } = useProjectStore.getState();
+          const { groupMembers, parts: allParts } = useProjectStore.getState();
           const partIds = new Set(selectedPartIds);
           for (const groupId of selectedGroupIds) {
             getAllDescendantPartIds(groupId, groupMembers).forEach((id) => partIds.add(id));
@@ -170,7 +483,7 @@ export function useGroupDrag(
 
           let maxYAdjustment = 0;
           for (const pid of partIds) {
-            const p = parts.find((pp) => pp.id === pid);
+            const p = allParts.find((pp) => pp.id === pid);
             if (!p) continue;
             const halfH = calculateWorldHalfHeightFromDegrees(p.rotation, p.length, p.thickness, p.width);
             const projectedY = p.position.y + proposedDelta.y;
@@ -179,6 +492,12 @@ export function useGroupDrag(
           }
 
           proposedDelta.y += maxYAdjustment;
+          useSnapStore.getState().setActiveSnapLines(snapLines);
+          wasSnappedByPartsRef.current = {
+            x: snapLines.some((line) => line.axis === 'x'),
+            y: snapLines.some((line) => line.axis === 'y'),
+            z: snapLines.some((line) => line.axis === 'z')
+          };
 
           lastDragPosRef.current = proposedDelta;
           useSelectionStore.getState().setActiveDragDelta(proposedDelta);
@@ -193,12 +512,13 @@ export function useGroupDrag(
         }
 
         const finalDelta = { ...lastDragPosRef.current };
+        const wasSnappedByParts = wasSnappedByPartsRef.current;
 
         // Grid snap the final delta
         const anchor = anchorPosRef.current!;
-        let newX = snapToGrid(anchor.x + finalDelta.x);
+        let newX = wasSnappedByParts.x ? anchor.x + finalDelta.x : snapToGrid(anchor.x + finalDelta.x);
         let newY = anchor.y + finalDelta.y;
-        let newZ = snapToGrid(anchor.z + finalDelta.z);
+        let newZ = wasSnappedByParts.z ? anchor.z + finalDelta.z : snapToGrid(anchor.z + finalDelta.z);
 
         const snappedDelta = {
           x: newX - anchor.x,
@@ -225,42 +545,17 @@ export function useGroupDrag(
         }
         snappedDelta.y += maxYAdjustment;
 
-        // Overlap prevention
+        // Overlap prevention (OBB + swept fallback)
         if (stockConstraints.preventOverlap) {
-          let hasOverlap = false;
-          for (const pid of partIds) {
-            const p = parts.find((pp) => pp.id === pid);
-            if (!p || p.ignoreOverlap) continue;
-            const movedPos = {
-              x: p.position.x + snappedDelta.x,
-              y: p.position.y + snappedDelta.y,
-              z: p.position.z + snappedDelta.z
-            };
-            const movedBounds = getPartBoundsAtPosition(p, movedPos);
-            for (const other of parts) {
-              if (partIds.has(other.id) || other.ignoreOverlap) continue;
-              const otherBounds = getPartBoundsAtPosition(other, other.position);
-              const epsilon = 0.001;
-              if (
-                movedBounds.minX < otherBounds.maxX - epsilon &&
-                movedBounds.maxX > otherBounds.minX + epsilon &&
-                movedBounds.minY < otherBounds.maxY - epsilon &&
-                movedBounds.maxY > otherBounds.minY + epsilon &&
-                movedBounds.minZ < otherBounds.maxZ - epsilon &&
-                movedBounds.maxZ > otherBounds.minZ + epsilon
-              ) {
-                hasOverlap = true;
-                break;
-              }
-            }
-            if (hasOverlap) break;
-          }
-
-          if (hasOverlap) {
+          const safeDelta = resolveSafeTranslationDelta(parts, partIds, snappedDelta);
+          if (!safeDelta) {
             // Revert — don't commit the move
             cleanup();
             return;
           }
+          snappedDelta.x = safeDelta.x;
+          snappedDelta.y = safeDelta.y;
+          snappedDelta.z = safeDelta.z;
         }
 
         // Commit the move
@@ -272,10 +567,15 @@ export function useGroupDrag(
       const cleanup = () => {
         window.removeEventListener('pointermove', handleMove);
         window.removeEventListener('pointerup', handleUp);
+        window.removeEventListener('pointercancel', handleUp);
+        window.removeEventListener('blur', handleUp);
         cleanupRef.current = null;
         dragActiveRef.current = false;
         startPointRef.current = null;
         anchorPosRef.current = null;
+        initialBoundsRef.current = null;
+        movingPartIdsRef.current = new Set();
+        wasSnappedByPartsRef.current = { x: false, y: false, z: false };
         lastDragPosRef.current = null;
         if (rafIdRef.current !== null) {
           window.cancelAnimationFrame(rafIdRef.current);
@@ -294,9 +594,11 @@ export function useGroupDrag(
 
       window.addEventListener('pointermove', handleMove);
       window.addEventListener('pointerup', handleUp);
+      window.addEventListener('pointercancel', handleUp);
+      window.addEventListener('blur', handleUp);
       cleanupRef.current = cleanup;
     },
-    [controls, getWorldPoint, setupDragPlane]
+    [camera.position, controls, getWorldPoint, setupDragPlane]
   );
 
   return { startGroupDrag };

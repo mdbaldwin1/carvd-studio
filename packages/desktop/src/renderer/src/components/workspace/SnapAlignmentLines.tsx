@@ -1,13 +1,18 @@
 import { Html, Line } from '@react-three/drei';
+import { useThree } from '@react-three/fiber';
+import * as THREE from 'three';
 import { useProjectStore } from '../../store/projectStore';
 import { useSnapStore } from '../../store/snapStore';
+import { useCameraStore } from '../../store/cameraStore';
 import { SnapLine } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 
 // Component that renders snap alignment lines during drag operations
 export function SnapAlignmentLines() {
+  const { camera } = useThree();
   const activeSnapLines = useSnapStore((s) => s.activeSnapLines);
   const units = useProjectStore((s) => s.units);
+  const displayMode = useCameraStore((s) => s.displayMode);
 
   if (activeSnapLines.length === 0) return null;
 
@@ -74,6 +79,25 @@ export function SnapAlignmentLines() {
     return value;
   };
 
+  const getCapPoints = (point: { x: number; y: number; z: number }, other: { x: number; y: number; z: number }) => {
+    const p = new THREE.Vector3(point.x, point.y, point.z);
+    const q = new THREE.Vector3(other.x, other.y, other.z);
+    const lineDir = q.sub(p).normalize();
+    const viewDir = new THREE.Vector3().subVectors(camera.position, p).normalize();
+    let capDir = new THREE.Vector3().crossVectors(viewDir, lineDir);
+    if (capDir.lengthSq() < 1e-6) {
+      capDir = new THREE.Vector3().crossVectors(lineDir, new THREE.Vector3(0, 1, 0));
+      if (capDir.lengthSq() < 1e-6) {
+        capDir = new THREE.Vector3().crossVectors(lineDir, new THREE.Vector3(1, 0, 0));
+      }
+    }
+    capDir.normalize().multiplyScalar(0.2);
+    return [
+      [p.x + capDir.x, p.y + capDir.y, p.z + capDir.z] as [number, number, number],
+      [p.x - capDir.x, p.y - capDir.y, p.z - capDir.z] as [number, number, number]
+    ];
+  };
+
   return (
     <group>
       {activeSnapLines.map((line, index) => (
@@ -86,6 +110,7 @@ export function SnapAlignmentLines() {
             ]}
             color={getLineColor(line)}
             lineWidth={2}
+            depthTest={displayMode === 'solid'}
             dashed
             dashSize={0.5}
             gapSize={0.25}
@@ -100,6 +125,7 @@ export function SnapAlignmentLines() {
               ]}
               color={connectorColor}
               lineWidth={1}
+              depthTest={displayMode === 'solid'}
               dashed
               dashSize={0.3}
               gapSize={0.2}
@@ -121,44 +147,26 @@ export function SnapAlignmentLines() {
                   ]}
                   color={isDimensionMatch ? getLineColor(line) : distanceColor}
                   lineWidth={1.5}
+                  depthTest={displayMode === 'solid'}
                 />
                 {/* End caps (short perpendicular lines) */}
                 <Line
-                  points={[
-                    [
-                      indicator.start.x + (indicator.end.x === indicator.start.x ? 0.2 : 0),
-                      indicator.start.y + (indicator.end.y === indicator.start.y ? 0.2 : 0),
-                      indicator.start.z + (indicator.end.z === indicator.start.z ? 0.2 : 0)
-                    ],
-                    [
-                      indicator.start.x - (indicator.end.x === indicator.start.x ? 0.2 : 0),
-                      indicator.start.y - (indicator.end.y === indicator.start.y ? 0.2 : 0),
-                      indicator.start.z - (indicator.end.z === indicator.start.z ? 0.2 : 0)
-                    ]
-                  ]}
+                  points={getCapPoints(indicator.start, indicator.end)}
                   color={isDimensionMatch ? getLineColor(line) : distanceColor}
                   lineWidth={1.5}
+                  depthTest={displayMode === 'solid'}
                 />
                 <Line
-                  points={[
-                    [
-                      indicator.end.x + (indicator.end.x === indicator.start.x ? 0.2 : 0),
-                      indicator.end.y + (indicator.end.y === indicator.start.y ? 0.2 : 0),
-                      indicator.end.z + (indicator.end.z === indicator.start.z ? 0.2 : 0)
-                    ],
-                    [
-                      indicator.end.x - (indicator.end.x === indicator.start.x ? 0.2 : 0),
-                      indicator.end.y - (indicator.end.y === indicator.start.y ? 0.2 : 0),
-                      indicator.end.z - (indicator.end.z === indicator.start.z ? 0.2 : 0)
-                    ]
-                  ]}
+                  points={getCapPoints(indicator.end, indicator.start)}
                   color={isDimensionMatch ? getLineColor(line) : distanceColor}
                   lineWidth={1.5}
+                  depthTest={displayMode === 'solid'}
                 />
                 {/* Distance label (enhanced for dimension matching) */}
                 <Html
                   position={[indicator.labelPosition.x, indicator.labelPosition.y, indicator.labelPosition.z]}
                   center
+                  occlude={displayMode === 'solid' ? 'blending' : false}
                   zIndexRange={[0, 50]}
                   style={{ pointerEvents: 'none' }}
                 >
