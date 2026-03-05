@@ -6,17 +6,9 @@ import { useSelectionStore } from '../store/selectionStore';
 import { useSnapStore } from '../store/snapStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
-import { RotationAngle } from '../types';
-
-// Helper to normalize angle to 0, 90, 180, or 270
-function normalizeToRotationAngle(degrees: number): RotationAngle {
-  // Normalize to 0-360 range
-  let normalized = ((degrees % 360) + 360) % 360;
-  // Round to nearest 90
-  const rounded = Math.round(normalized / 90) * 90;
-  // Handle 360 -> 0
-  return (rounded === 360 ? 0 : rounded) as RotationAngle;
-}
+import { Rotation3D } from '../types';
+import { calculateWorldHalfHeightFromDegrees } from '../utils/mathPool';
+import { rotateAroundWorldAxis } from '../utils/rotation';
 
 export function useKeyboardShortcuts() {
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
@@ -81,28 +73,10 @@ export function useKeyboardShortcuts() {
         // For single part selection, just rotate in place (around its own center)
         if (selectedParts.length === 1) {
           const part = selectedParts[0];
-
-          // Convert current rotation to quaternion
-          const currentEuler = new THREE.Euler(
-            (part.rotation.x * Math.PI) / 180,
-            (part.rotation.y * Math.PI) / 180,
-            (part.rotation.z * Math.PI) / 180,
-            'XYZ'
-          );
-          const currentQuat = new THREE.Quaternion().setFromEuler(currentEuler);
-
-          // Apply world rotation: newQuat = worldRotation * currentQuat
-          const newQuat = worldRotationQuat.clone().multiply(currentQuat);
-
-          // Convert back to Euler
-          const newEuler = new THREE.Euler().setFromQuaternion(newQuat, 'XYZ');
+          const newRotation = rotateAroundWorldAxis(part.rotation, axis, 90);
 
           updatePart(part.id, {
-            rotation: {
-              x: normalizeToRotationAngle((newEuler.x * 180) / Math.PI),
-              y: normalizeToRotationAngle((newEuler.y * 180) / Math.PI),
-              z: normalizeToRotationAngle((newEuler.z * 180) / Math.PI)
-            }
+            rotation: newRotation
           });
           return;
         }
@@ -128,7 +102,7 @@ export function useKeyboardShortcuts() {
           id: string;
           changes: {
             position: { x: number; y: number; z: number };
-            rotation: { x: RotationAngle; y: RotationAngle; z: RotationAngle };
+            rotation: Rotation3D;
           };
         }> = [];
 
@@ -139,20 +113,8 @@ export function useKeyboardShortcuts() {
           offset.applyQuaternion(worldRotationQuat);
           const newPosition = center.clone().add(offset);
 
-          // 2. Rotate the part's own orientation using quaternion multiplication
-          const currentEuler = new THREE.Euler(
-            (part.rotation.x * Math.PI) / 180,
-            (part.rotation.y * Math.PI) / 180,
-            (part.rotation.z * Math.PI) / 180,
-            'XYZ'
-          );
-          const currentQuat = new THREE.Quaternion().setFromEuler(currentEuler);
-
-          // Apply world rotation: newQuat = worldRotation * currentQuat
-          const newQuat = worldRotationQuat.clone().multiply(currentQuat);
-
-          // Convert back to Euler
-          const newEuler = new THREE.Euler().setFromQuaternion(newQuat, 'XYZ');
+          // 2. Rotate the part's own orientation around world axis
+          const newRotation = rotateAroundWorldAxis(part.rotation, axis, 90);
 
           updates.push({
             id: part.id,
@@ -162,11 +124,7 @@ export function useKeyboardShortcuts() {
                 y: newPosition.y,
                 z: newPosition.z
               },
-              rotation: {
-                x: normalizeToRotationAngle((newEuler.x * 180) / Math.PI),
-                y: normalizeToRotationAngle((newEuler.y * 180) / Math.PI),
-                z: normalizeToRotationAngle((newEuler.z * 180) / Math.PI)
-              }
+              rotation: newRotation
             }
           });
         }
@@ -177,28 +135,12 @@ export function useKeyboardShortcuts() {
         for (let i = 0; i < selectedParts.length; i++) {
           const part = selectedParts[i];
           const update = updates[i];
-          const newRotation = update.changes.rotation;
-
-          // Calculate the half-height of the part after rotation
-          // Based on which dimension is now vertical
-          const rotX = newRotation.x;
-          const rotZ = newRotation.z;
-
-          let effectiveHalfHeight: number;
-          if (rotX === 90 || rotX === 270) {
-            // Part is rotated around X, so width or length is now vertical
-            if (rotZ === 90 || rotZ === 270) {
-              effectiveHalfHeight = part.length / 2;
-            } else {
-              effectiveHalfHeight = part.width / 2;
-            }
-          } else if (rotZ === 90 || rotZ === 270) {
-            // Part is rotated around Z only, so length is now vertical
-            effectiveHalfHeight = part.length / 2;
-          } else {
-            // No rotation or 180° rotation, thickness is vertical
-            effectiveHalfHeight = part.thickness / 2;
-          }
+          const effectiveHalfHeight = calculateWorldHalfHeightFromDegrees(
+            update.changes.rotation,
+            part.length,
+            part.thickness,
+            part.width
+          );
 
           const bottomY = update.changes.position.y - effectiveHalfHeight;
           minY = Math.min(minY, bottomY);

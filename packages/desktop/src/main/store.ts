@@ -20,7 +20,7 @@ export interface AssemblyPartItem {
   width: number;
   thickness: number;
   relativePosition: { x: number; y: number; z: number };
-  rotation: { x: 0 | 90 | 180 | 270; y: 0 | 90 | 180 | 270; z: 0 | 90 | 180 | 270 };
+  rotation: { x: number; y: number; z: number };
   stockId: string | null;
   grainSensitive: boolean;
   grainDirection: 'length' | 'width';

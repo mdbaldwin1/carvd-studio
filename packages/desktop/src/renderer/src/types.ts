@@ -85,7 +85,7 @@ export interface Assembly {
   modifiedAt: string;
 }
 
-export type RotationAngle = 0 | 90 | 180 | 270;
+export type RotationAngle = number;
 
 export interface Rotation3D {
   x: RotationAngle;
@@ -100,7 +100,7 @@ export interface Part {
   width: number;
   thickness: number;
   position: { x: number; y: number; z: number };
-  rotation: Rotation3D; // degrees around each axis (90° increments)
+  rotation: Rotation3D; // degrees around each axis
   stockId: string | null; // assigned stock (null = unassigned)
   grainSensitive: boolean;
   grainDirection: 'length' | 'width'; // which way the grain runs on this part

@@ -18,6 +18,7 @@ import { MultiSelectionDimensions } from './MultiSelectionDimensions';
 import { PartsRenderer } from './PartsRenderer';
 import { PerfMonitor } from './PerfMonitor';
 import { ReferenceDistanceIndicators } from './ReferenceDistanceIndicators';
+import { GroupRotationHandles } from './GroupRotationHandles';
 import { SceneBackground } from './SceneBackground';
 import { SnapAlignmentLines } from './SnapAlignmentLines';
 import { SnapGuides } from './SnapGuides';
@@ -408,9 +409,22 @@ export function Workspace() {
           hitPartId
         });
         if (hitPartId) {
-          selectFromPartHit(hitPartId, false);
+          const selectionState = useSelectionStore.getState();
+          const projectState = useProjectStore.getState();
+          const hitContext = getPartGroupContext(hitPartId, projectState.groupMembers, selectionState.editingGroupId);
+          const isAlreadySelected =
+            selectionState.selectedPartIds.includes(hitPartId) ||
+            hitContext.ancestorGroupIds.some((groupId) => selectionState.selectedGroupIds.includes(groupId));
+
+          if (!isAlreadySelected) {
+            selectFromPartHit(hitPartId, false);
+          }
           setRightClickTarget({ type: 'part' });
-          debugSelection('native:mousedown:right:setTarget', { targetType: 'part', hitPartId });
+          debugSelection('native:mousedown:right:setTarget', {
+            targetType: 'part',
+            hitPartId,
+            isAlreadySelected
+          });
         }
       }
     };
@@ -698,15 +712,7 @@ export function Workspace() {
   useEffect(() => {
     if (!isBoxSelecting) return;
 
-    const handlePointerMove = (e: PointerEvent) => {
-      const newEnd = { x: e.clientX, y: e.clientY };
-      boxEndRef.current = newEnd;
-      if (boxStartRef.current) {
-        setSelectionBox({ start: boxStartRef.current, end: newEnd });
-      }
-    };
-
-    const handlePointerUp = () => {
+    const finishBoxSelection = () => {
       if (boxStartRef.current && boxEndRef.current) {
         // Calculate which parts are within the selection box
         const selectedIds = getPartsInSelectionBox(boxStartRef.current, boxEndRef.current);
@@ -730,12 +736,28 @@ export function Workspace() {
       }
     };
 
+    const handlePointerMove = (e: PointerEvent) => {
+      const newEnd = { x: e.clientX, y: e.clientY };
+      boxEndRef.current = newEnd;
+      if (boxStartRef.current) {
+        setSelectionBox({ start: boxStartRef.current, end: newEnd });
+      }
+    };
+
+    const handlePointerUp = () => {
+      finishBoxSelection();
+    };
+
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    window.addEventListener('blur', handlePointerUp);
 
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+      window.removeEventListener('blur', handlePointerUp);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isBoxSelecting, controls, selectParts, clearSelection, setSelectionBox, setSelectedSidebarStockId]);
@@ -910,6 +932,9 @@ export function Workspace() {
 
       {/* All parts — hybrid instanced + individual rendering */}
       <PartsRenderer />
+
+      {/* Group-wide rotation handles */}
+      <GroupRotationHandles />
 
       {/* Multi-selection bounding box dimensions */}
       <MultiSelectionDimensions />

@@ -40,8 +40,8 @@ export default function InterfacePage() {
             </p>
             <p>
               <strong>Properties Panel</strong> — Right panel showing
-              dimensions, position, stock material, and other settings for the
-              selected part.
+              dimensions, position, precise rotation controls, stock material,
+              and other settings for the selected part.
             </p>
             <p>
               <strong>Header</strong> — Top bar with project/template/assembly

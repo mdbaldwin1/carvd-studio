@@ -63,8 +63,9 @@ export default function SnappingPage() {
             <div>
               <p className="font-bold mb-xs">Edge Snapping</p>
               <p className="text-muted">
-                Parts automatically snap to the edges and faces of neighboring
-                parts. Move a shelf near a side panel and it snaps flush.
+                Parts automatically snap to compatible faces and edges of
+                neighboring parts, including rotated parts that are not aligned
+                to world axes.
               </p>
             </div>
             <div>
@@ -75,9 +76,11 @@ export default function SnappingPage() {
               </p>
             </div>
             <div>
-              <p className="font-bold mb-xs">Corner Snapping</p>
+              <p className="font-bold mb-xs">Feature Snapping</p>
               <p className="text-muted">
-                Snap to corners of other parts for precise joint positioning.
+                In addition to face snap, Carvd can snap edge-to-edge and
+                vertex-to-face for precise joinery placement when parts are
+                tilted or rotated.
               </p>
             </div>
           </div>
@@ -100,6 +103,14 @@ export default function SnappingPage() {
               <p className="text-muted">
                 Use arrow keys to nudge selected parts by one grid unit. Hold{" "}
                 <code>Shift</code> to nudge in fixed 1-inch steps.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Camera-Aware Drag Planes</p>
+              <p className="text-muted">
+                For rotated parts, drag movement now follows the most
+                camera-facing local plane, which keeps movement and snapping
+                more predictable from different viewing angles.
               </p>
             </div>
             <div>

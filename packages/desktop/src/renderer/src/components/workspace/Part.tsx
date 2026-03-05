@@ -7,8 +7,9 @@ import { useCameraStore } from '../../store/cameraStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
-import { Part as PartType, RotationAngle } from '../../types';
+import { Part as PartType } from '../../types';
 import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
+import { rotateAroundLocalAxis } from '../../utils/rotation';
 import { DimensionLabel } from './DimensionLabel';
 import { GrainDirectionArrow } from './GrainDirectionArrow';
 import { getPartGroupContext } from './partClickHandler';
@@ -18,6 +19,9 @@ import { RotationHandle } from './RotationHandle';
 import { useGroupDrag } from './useGroupDrag';
 import { usePartDrag } from './usePartDrag';
 import { usePartResize } from './usePartResize';
+
+// Decorative edges should never consume pointer hits.
+const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
 
 interface PartProps {
   part: PartType;
@@ -233,45 +237,34 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
   };
 
   // Handle rotation around an axis (LOCAL rotation)
-  const handleRotate = useCallback(
-    (axis: 'x' | 'y' | 'z') => {
-      const currentEuler = new THREE.Euler(
-        (part.rotation.x * Math.PI) / 180,
-        (part.rotation.y * Math.PI) / 180,
-        (part.rotation.z * Math.PI) / 180,
-        'XYZ'
-      );
-      const currentQuat = new THREE.Quaternion().setFromEuler(currentEuler);
-
-      const localRotationQuat = new THREE.Quaternion();
-      if (axis === 'x') {
-        localRotationQuat.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
-      } else if (axis === 'y') {
-        localRotationQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
-      } else {
-        localRotationQuat.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
-      }
-
-      const newQuat = currentQuat.clone().multiply(localRotationQuat);
-      const newEuler = new THREE.Euler().setFromQuaternion(newQuat, 'XYZ');
-
-      const normalizeAngle = (rad: number): RotationAngle => {
-        let deg = (rad * 180) / Math.PI;
-        deg = ((deg % 360) + 360) % 360;
-        const rounded = Math.round(deg / 90) * 90;
-        return (rounded === 360 ? 0 : rounded) as RotationAngle;
-      };
-
+  const applyLocalRotation = useCallback(
+    (axis: 'x' | 'y' | 'z', degrees: number) => {
+      const latestPart = useProjectStore.getState().parts.find((p) => p.id === part.id);
+      if (!latestPart) return;
+      const newRotation = rotateAroundLocalAxis(latestPart.rotation, axis, degrees);
       updatePart(part.id, {
-        rotation: {
-          x: normalizeAngle(newEuler.x),
-          y: normalizeAngle(newEuler.y),
-          z: normalizeAngle(newEuler.z)
-        }
+        rotation: newRotation
       });
     },
-    [part.rotation.x, part.rotation.y, part.rotation.z, part.id, updatePart]
+    [part.id, updatePart]
   );
+
+  const handleRotate = useCallback((axis: 'x' | 'y' | 'z') => applyLocalRotation(axis, 90), [applyLocalRotation]);
+  const handleRotateDelta = useCallback(
+    (axis: 'x' | 'y' | 'z', degrees: number) => {
+      if (Math.abs(degrees) < 0.01) return;
+      applyLocalRotation(axis, degrees);
+    },
+    [applyLocalRotation]
+  );
+
+  const handleRotateStart = useCallback(() => {
+    if (controls) controls.enabled = false;
+  }, [controls]);
+
+  const handleRotateEnd = useCallback(() => {
+    if (controls) controls.enabled = true;
+  }, [controls]);
 
   // Use live dimensions for rendering
   const dims: [number, number, number] = [liveDims.length, liveDims.thickness, liveDims.width];
@@ -302,12 +295,18 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
           {displayMode === 'solid' && <meshStandardMaterial color={part.color} />}
           {displayMode === 'wireframe' && <meshBasicMaterial color={part.color} wireframe />}
           {displayMode === 'translucent' && (
-            <meshStandardMaterial color="#888888" transparent opacity={0.3} depthWrite={false} />
+            <meshStandardMaterial color={part.color} transparent opacity={0.55} depthWrite={false} />
           )}
-          {(isDirectlySelected || isHovered || isReference || isStockHighlighted || displayMode === 'wireframe') && (
+          {(isDirectlySelected ||
+            isHovered ||
+            isReference ||
+            isStockHighlighted ||
+            displayMode === 'wireframe' ||
+            displayMode === 'translucent') && (
             <Edges
               scale={1.002}
               threshold={15}
+              raycast={NOOP_RAYCAST}
               color={
                 isSelected
                   ? '#ffffff'
@@ -317,7 +316,9 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
                       ? '#4fd1ff'
                       : displayMode === 'wireframe'
                         ? part.color
-                        : '#888888'
+                        : displayMode === 'translucent'
+                          ? '#ffffff'
+                          : '#888888'
               }
             />
           )}
@@ -346,12 +347,60 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
         {/* Rotation handles on all 6 faces - only show when single part selected */}
         {isOnlySelected && (
           <>
-            <RotationHandle liveDims={liveDims} axis="y" side={1} onRotate={handleRotate} />
-            <RotationHandle liveDims={liveDims} axis="y" side={-1} onRotate={handleRotate} />
-            <RotationHandle liveDims={liveDims} axis="x" side={1} onRotate={handleRotate} />
-            <RotationHandle liveDims={liveDims} axis="x" side={-1} onRotate={handleRotate} />
-            <RotationHandle liveDims={liveDims} axis="z" side={1} onRotate={handleRotate} />
-            <RotationHandle liveDims={liveDims} axis="z" side={-1} onRotate={handleRotate} />
+            <RotationHandle
+              liveDims={liveDims}
+              axis="y"
+              side={1}
+              onRotate={handleRotate}
+              onRotateDelta={handleRotateDelta}
+              onRotateStart={handleRotateStart}
+              onRotateEnd={handleRotateEnd}
+            />
+            <RotationHandle
+              liveDims={liveDims}
+              axis="y"
+              side={-1}
+              onRotate={handleRotate}
+              onRotateDelta={handleRotateDelta}
+              onRotateStart={handleRotateStart}
+              onRotateEnd={handleRotateEnd}
+            />
+            <RotationHandle
+              liveDims={liveDims}
+              axis="x"
+              side={1}
+              onRotate={handleRotate}
+              onRotateDelta={handleRotateDelta}
+              onRotateStart={handleRotateStart}
+              onRotateEnd={handleRotateEnd}
+            />
+            <RotationHandle
+              liveDims={liveDims}
+              axis="x"
+              side={-1}
+              onRotate={handleRotate}
+              onRotateDelta={handleRotateDelta}
+              onRotateStart={handleRotateStart}
+              onRotateEnd={handleRotateEnd}
+            />
+            <RotationHandle
+              liveDims={liveDims}
+              axis="z"
+              side={1}
+              onRotate={handleRotate}
+              onRotateDelta={handleRotateDelta}
+              onRotateStart={handleRotateStart}
+              onRotateEnd={handleRotateEnd}
+            />
+            <RotationHandle
+              liveDims={liveDims}
+              axis="z"
+              side={-1}
+              onRotate={handleRotate}
+              onRotateDelta={handleRotateDelta}
+              onRotateStart={handleRotateStart}
+              onRotateEnd={handleRotateEnd}
+            />
           </>
         )}
 

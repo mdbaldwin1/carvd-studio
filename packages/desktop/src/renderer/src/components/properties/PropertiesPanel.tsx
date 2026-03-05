@@ -19,6 +19,7 @@ import { useUIStore } from '@renderer/store/uiStore';
 import { Stock } from '@renderer/types';
 import { getDocsUrl } from '@renderer/utils/docsLinks';
 import { getFeatureLimits } from '@renderer/utils/featureLimits';
+import { normalizeRotation, snapAngle } from '@renderer/utils/rotation';
 import { useMemo, useRef, useState } from 'react';
 import {
   buildStockDataFromUpdates,
@@ -61,6 +62,8 @@ export function PropertiesPanel() {
 
   // State for "Add New Stock..." modal
   const [isCreateStockModalOpen, setIsCreateStockModalOpen] = useState(false);
+  const [rotationSnapEnabled, setRotationSnapEnabled] = useState(true);
+  const [rotationSnapIncrement, setRotationSnapIncrement] = useState(15);
   const lastOverlapToastAtRef = useRef(0);
 
   // Use library stocks when editing assembly (merged with project stocks to resolve references),
@@ -456,6 +459,31 @@ export function PropertiesPanel() {
       lastOverlapToastAtRef.current = now;
     }
   };
+
+  const normalizeInputAngle = (value: number): number | null => {
+    if (!Number.isFinite(value)) return null;
+    const snapped = rotationSnapEnabled ? snapAngle(value, rotationSnapIncrement) : value;
+    return normalizeRotation({ x: snapped, y: 0, z: 0 }).x;
+  };
+
+  const handleRotationXChange = (x: number) => {
+    const next = normalizeInputAngle(x);
+    if (next === null) return;
+    updatePart(selectedPart.id, { rotation: { ...selectedPart.rotation, x: next } });
+  };
+
+  const handleRotationYChange = (y: number) => {
+    const next = normalizeInputAngle(y);
+    if (next === null) return;
+    updatePart(selectedPart.id, { rotation: { ...selectedPart.rotation, y: next } });
+  };
+
+  const handleRotationZChange = (z: number) => {
+    const next = normalizeInputAngle(z);
+    if (next === null) return;
+    updatePart(selectedPart.id, { rotation: { ...selectedPart.rotation, z: next } });
+  };
+
   const selectedPartWarnings = getConstraintWarnings(selectedPart, stocks, units);
   const overlappingParts = getOverlappingParts(selectedPart, parts);
 
@@ -474,6 +502,17 @@ export function PropertiesPanel() {
         onPositionXChange={handlePositionXChange}
         onPositionYChange={handlePositionYChange}
         onPositionZChange={handlePositionZChange}
+        onRotationXChange={handleRotationXChange}
+        onRotationYChange={handleRotationYChange}
+        onRotationZChange={handleRotationZChange}
+        onResetRotation={() => updatePart(selectedPart.id, { rotation: { x: 0, y: 0, z: 0 } })}
+        snapEnabled={rotationSnapEnabled}
+        onSnapEnabledChange={setRotationSnapEnabled}
+        snapIncrement={rotationSnapIncrement}
+        onSnapIncrementChange={(value) => {
+          if (!Number.isFinite(value)) return;
+          setRotationSnapIncrement(Math.max(1, Math.min(90, Math.round(value))));
+        }}
       />
 
       <SinglePartMaterialCard

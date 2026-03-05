@@ -11,6 +11,7 @@ import { useProjectStore, getAllDescendantPartIds } from '../../store/projectSto
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
+import { useCameraStore } from '../../store/cameraStore';
 import { Part } from './Part';
 import { InstancedParts } from './InstancedParts';
 
@@ -22,6 +23,7 @@ export function PartsRenderer() {
   const hoveredPartId = useSelectionStore((s) => s.hoveredPartId);
   const dragIntentPartId = useSelectionStore((s) => s.dragIntent?.partId ?? null);
   const draggingPartId = useSelectionStore((s) => s.draggingPartId);
+  const displayMode = useCameraStore((s) => s.displayMode);
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
   const selectedSidebarStockId = useUIStore((s) => s.selectedSidebarStockId);
 
@@ -68,6 +70,9 @@ export function PartsRenderer() {
       const descendantIds = getAllDescendantPartIds(groupId, groupMembers);
       for (const id of descendantIds) {
         groupSelected.add(id);
+        // Keep selected-group parts as individual meshes so drag hit-testing is
+        // consistent across the full visible surface (no instanced edge cases).
+        individualIds.add(id);
       }
     }
 
@@ -95,6 +100,12 @@ export function PartsRenderer() {
 
   // Split parts into instanced (bulk) vs individual (interactive)
   const { instancedParts, individualParts } = useMemo(() => {
+    // In Ghost mode, render all parts individually so unselected parts get
+    // the same edge-outline treatment as selected parts.
+    if (displayMode === 'translucent') {
+      return { instancedParts: [], individualParts: parts };
+    }
+
     const instanced = [];
     const individual = [];
     for (const part of parts) {
@@ -105,7 +116,7 @@ export function PartsRenderer() {
       }
     }
     return { instancedParts: instanced, individualParts: individual };
-  }, [parts, individualPartIdSet]);
+  }, [parts, individualPartIdSet, displayMode]);
 
   return (
     <>

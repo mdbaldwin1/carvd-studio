@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { SnapLine, ReferenceDistanceIndicator } from '../types';
-import { getCombinedBounds, calculateDistancesFromBounds } from '../utils/snapToPartsUtil';
+import {
+  getCombinedBounds,
+  calculateDistancesFromBounds,
+  calculateVectorReferenceDistance
+} from '../utils/snapToPartsUtil';
+import { isAxisAlignedRotation } from '../utils/rotation';
 import { useProjectStore, getAllDescendantPartIds } from './projectStore';
 import { useSelectionStore } from './selectionStore';
 
@@ -114,9 +119,12 @@ export const useSnapStore = create<SnapStoreState>((set, get) => ({
     }
 
     // Calculate combined bounds of selected parts and generate indicators
-    const selectedBounds = getCombinedBounds(selectedParts);
     const fromPartId = selectedParts.length === 1 ? selectedParts[0].id : 'selected-group';
-    const indicators = calculateDistancesFromBounds(selectedBounds, fromPartId, referenceParts);
+    const toPartId = referenceParts.length === 1 ? referenceParts[0].id : 'reference-group';
+    const axisAlignedContext = [...selectedParts, ...referenceParts].every((p) => isAxisAlignedRotation(p.rotation));
+    const indicators = axisAlignedContext
+      ? calculateDistancesFromBounds(getCombinedBounds(selectedParts), fromPartId, referenceParts)
+      : calculateVectorReferenceDistance(selectedParts, referenceParts, fromPartId, toPartId);
 
     set({ activeReferenceDistances: indicators });
   }

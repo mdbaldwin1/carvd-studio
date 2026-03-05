@@ -26,6 +26,12 @@ vi.mock('three', () => {
     clone() {
       return new MockVector3(this.x, this.y, this.z);
     }
+    set(x: number, y: number, z: number) {
+      this.x = x;
+      this.y = y;
+      this.z = z;
+      return this;
+    }
     sub(v: MockVector3) {
       this.x -= v.x;
       this.y -= v.y;
@@ -40,6 +46,9 @@ vi.mock('three', () => {
     }
     applyQuaternion() {
       return this;
+    }
+    dot(v: MockVector3) {
+      return this.x * v.x + this.y * v.y + this.z * v.z;
     }
   }
   class MockQuaternion {
@@ -64,6 +73,12 @@ vi.mock('three', () => {
       this.x = x;
       this.y = y;
       this.z = z;
+    }
+    set(x: number, y: number, z: number) {
+      this.x = x;
+      this.y = y;
+      this.z = z;
+      return this;
     }
     setFromQuaternion() {
       // Use controllable output for testing different rotation results

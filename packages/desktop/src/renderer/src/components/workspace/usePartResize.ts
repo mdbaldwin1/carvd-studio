@@ -31,6 +31,11 @@ export function usePartResize(
   updatePart: (id: string, updates: Partial<PartType>) => void
 ) {
   const [isResizing, setIsResizing] = useState(false);
+  const snappedDimensionsRef = useRef<{ length: boolean; width: boolean; thickness: boolean }>({
+    length: false,
+    width: false,
+    thickness: false
+  });
   const resizeStart = useRef<{
     handlePos: HandlePosition;
     startPoint: THREE.Vector3;
@@ -84,19 +89,24 @@ export function usePartResize(
     (partPosition: THREE.Vector3) => {
       _tempForward.current.set(0, 0, -1).applyQuaternion(camera.quaternion);
 
-      const dotX = Math.abs(_tempForward.current.dot(_tempAxisX.current.set(1, 0, 0)));
-      const dotY = Math.abs(_tempForward.current.dot(_tempAxisY.current.set(0, 1, 0)));
-      const dotZ = Math.abs(_tempForward.current.dot(_tempAxisZ.current.set(0, 0, 1)));
+      // Camera-aware local-plane selection improves resize behavior for arbitrarily rotated parts.
+      const xAxis = _tempAxisX.current.set(1, 0, 0).applyQuaternion(rotationQuaternion).normalize();
+      const yAxis = _tempAxisY.current.set(0, 1, 0).applyQuaternion(rotationQuaternion).normalize();
+      const zAxis = _tempAxisZ.current.set(0, 0, 1).applyQuaternion(rotationQuaternion).normalize();
+
+      const dotX = Math.abs(_tempForward.current.dot(xAxis));
+      const dotY = Math.abs(_tempForward.current.dot(yAxis));
+      const dotZ = Math.abs(_tempForward.current.dot(zAxis));
 
       if (dotZ >= dotX && dotZ >= dotY) {
-        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.set(0, 0, 1), partPosition);
+        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.copy(zAxis), partPosition);
       } else if (dotX >= dotY) {
-        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.set(1, 0, 0), partPosition);
+        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.copy(xAxis), partPosition);
       } else {
-        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.set(0, 1, 0), partPosition);
+        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.copy(yAxis), partPosition);
       }
     },
-    [camera]
+    [camera, rotationQuaternion]
   );
 
   const handleResizeMove = (currentPoint: THREE.Vector3) => {
@@ -176,14 +186,18 @@ export function usePartResize(
       );
 
       const snapLines: import('../../types').SnapLine[] = [];
+      const snappedDimensions = { length: false, width: false, thickness: false };
 
       for (const snap of dimensionSnaps) {
         if (snap.dimension === 'length') {
           newLength = snap.targetValue;
+          snappedDimensions.length = true;
         } else if (snap.dimension === 'width') {
           newWidth = snap.targetValue;
+          snappedDimensions.width = true;
         } else if (snap.dimension === 'thickness') {
           newThickness = snap.targetValue;
+          snappedDimensions.thickness = true;
         }
 
         const tempPart = {
@@ -216,10 +230,13 @@ export function usePartResize(
         snapLines.push(snapLine);
       }
 
+      snappedDimensionsRef.current = snappedDimensions;
+
       // Batch snap lines + reference distances into single store update
       useSnapStore.getState().setSnapIndicators(snapLines, []);
     } else {
       useSnapStore.getState().setSnapIndicators([], []);
+      snappedDimensionsRef.current = { length: false, width: false, thickness: false };
     }
 
     // Calculate the world-space center offset to keep the fixed corner/edge in place
@@ -263,10 +280,20 @@ export function usePartResize(
     const maxWidth = isDimensionConstrained && assignedStock && !part.glueUpPanel ? assignedStock.width : Infinity;
     const maxThickness = isDimensionConstrained && assignedStock ? assignedStock.thickness : Infinity;
 
-    // Snap the final dimensions to grid
-    let newLength = Math.min(maxLength, Math.max(0.5, snapToGrid(liveDims.length)));
-    let newWidth = Math.min(maxWidth, Math.max(0.5, snapToGrid(liveDims.width)));
-    let newThickness = Math.min(maxThickness, Math.max(0.25, snapToGrid(liveDims.thickness)));
+    // Preserve live snapped dimensions on commit; otherwise fall back to grid snapping.
+    const snappedDimensions = snappedDimensionsRef.current;
+    let newLength = Math.min(
+      maxLength,
+      Math.max(0.5, snappedDimensions.length ? liveDims.length : snapToGrid(liveDims.length))
+    );
+    let newWidth = Math.min(
+      maxWidth,
+      Math.max(0.5, snappedDimensions.width ? liveDims.width : snapToGrid(liveDims.width))
+    );
+    let newThickness = Math.min(
+      maxThickness,
+      Math.max(0.25, snappedDimensions.thickness ? liveDims.thickness : snapToGrid(liveDims.thickness))
+    );
 
     _tempLocalOffset.current.set(
       ((newLength - partLength) / 2) * handlePos.x,
@@ -295,6 +322,7 @@ export function usePartResize(
     });
 
     setIsResizing(false);
+    snappedDimensionsRef.current = { length: false, width: false, thickness: false };
     resizeStart.current = null;
     if (isOrbitControls(controls)) controls.enabled = true;
     document.body.style.cursor = 'auto';
@@ -329,9 +357,13 @@ export function usePartResize(
 
     window.addEventListener('pointermove', handleWindowPointerMove);
     window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', handleWindowPointerUp);
+    window.addEventListener('blur', handleWindowPointerUp);
     return () => {
       window.removeEventListener('pointermove', handleWindowPointerMove);
       window.removeEventListener('pointerup', handleWindowPointerUp);
+      window.removeEventListener('pointercancel', handleWindowPointerUp);
+      window.removeEventListener('blur', handleWindowPointerUp);
       if (rafIdRef.current !== null) {
         window.cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;

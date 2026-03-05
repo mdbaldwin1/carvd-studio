@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Precise part rotation controls (POC)** — Added single-part `Rotation (X, Y, Z)` controls in the Properties panel with direct degree entry, angle snap toggle, adjustable snap step, one-click reset, and drag-to-rotate ring handles with live angle feedback.
+- **Feature-level part snapping for angled assemblies (POC)** — Added true feature snap candidates during drag: edge-to-edge (parallel edge alignment) and vertex-to-face projection, layered on top of oriented face snapping for non-axis-aligned parts.
+- **Group-wide rotation drag handles (POC)** — Added shared rotation handles for multi-part/group selections so selected sets can be rotated together around a common pivot using the same drag interaction as single-part rotation.
 - **Expanded source branding asset pack** — Added new `assets/` source logos in PNG/SVG variants for icon, horizontal, horizontal-words, vertical, and white-header use cases to support consistent marketing and in-app branding exports.
 - **Website SEO automation + docs-search schema** — Added build-time sitemap generation (`npm run generate:sitemap` via website `prebuild`), introduced `WebSite` JSON-LD `SearchAction` targeting `/docs?search={search_term_string}`, and documented SEO operations/manual search engine submission steps in `packages/website/SEO.md`.
 - **Start screen Settings & Library buttons** — Added icon buttons in the start screen header for quick access to App Settings and Stock/Assembly Library without needing to open a project first
@@ -20,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Ghost display mode readability** — Increased Ghost/translucent part opacity and added outline rendering so part silhouettes are easier to read while staying semi-transparent.
+- **Rotation model generalized beyond 90° increments** — Internal rotation typing and transformation utilities now support arbitrary angles while preserving fast `X/Y/Z` keyboard rotations for intuitive quick-turn workflows.
+- **Rotated-part snapping and overlap hardening** — Face-to-face snapping now validates oriented face compatibility (opposing normals plus in-plane overlap) and solves oriented snap deltas, overlap prevention during drag/properties edits now uses OBB-vs-OBB tests instead of broad AABB-only checks, and drag overlap resolution now applies swept/binary-search fallback so parts can approach contact smoothly without hard blocking.
+- **Unified overlap policy enforcement** — Centralized overlap checks now apply symmetric `ignoreOverlap` behavior (if either part opts out, overlap is allowed) and consistent OBB-based prevention across drag, group drag, keyboard/reference moves, store-driven transforms, and properties overlap warnings.
+- **Canvas interaction hardening for angled parts** — Drag/resize interaction planes are now chosen from camera-facing local part planes for more intuitive movement on arbitrarily rotated parts, group drag overlap checks now use OBB tests with swept fallback (matching single-part behavior), and legacy axis-only snap candidates are automatically disabled for non-axis-aligned contexts to avoid conflicting snap pulls.
 - **Maintenance PR auto-merge automation** — Added a dedicated workflow that auto-enables merge for `sync main back to develop` PRs using merge commits and auto-enables merge for version-bump PRs using squash, reducing manual release-ops steps while preserving main/develop ancestry on syncs.
 - **Desktop checkout/support/legal link centralization** — Consolidated upgrade checkout URLs into a single renderer link config (with optional `VITE_LEMON_SQUEEZY_CHECKOUT_URL` override), switched in-app support actions to the website support page, and added a `Help -> Support` menu item so purchase/help/legal flows consistently route through the website.
 - **Trial license activation access in App Settings** — Trial users can now open `Enter License Key` directly from `App Settings -> Data & License` (in addition to purchasing), instead of waiting for late-trial/expired prompts.
