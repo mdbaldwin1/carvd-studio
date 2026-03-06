@@ -354,11 +354,13 @@ export function usePartDrag(
 
         let currentPoint: THREE.Vector3 | null = null;
         const isSnapEnabledForPlane = useSnapStore.getState().snapToPartsEnabled && !evt.altKey;
+        const preventOverlapEnabled = useProjectStore.getState().stockConstraints.preventOverlap;
         const latchedFaceForPlane = latchedFaceSnapRef.current;
         const useFaceLatchPlane = Boolean(
           isSnapEnabledForPlane &&
           latchedFaceForPlane?.faceNormal &&
-          !isAxisAlignedNormal(latchedFaceForPlane.faceNormal)
+          !isAxisAlignedNormal(latchedFaceForPlane.faceNormal) &&
+          !preventOverlapEnabled
         );
         let planeInfo: DragPlaneInfo;
         let newX: number;
@@ -527,7 +529,8 @@ export function usePartDrag(
             latchedFaceSnapRef.current !== null &&
             isSnapEnabled &&
             !!latchedFaceSnapRef.current.faceNormal &&
-            !isAxisAlignedNormal(latchedFaceSnapRef.current.faceNormal);
+            !isAxisAlignedNormal(latchedFaceSnapRef.current.faceNormal) &&
+            !stockConstraints.preventOverlap;
           if (liveGridSnap && !hasActiveFaceLatch) {
             newX = snapToGrid(newX);
             newZ = snapToGrid(newZ);
