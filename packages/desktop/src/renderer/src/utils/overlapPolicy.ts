@@ -7,6 +7,10 @@ const MIN_SAFE_FRACTION = 1e-3;
 const SAFE_SEARCH_STEPS = 14;
 const SWEEP_PATH_STEPS = 24;
 type TranslationDelta = { x: number; y: number; z: number };
+type ResolveSafeTranslationOptions = {
+  // When false, keep motion on the original movement vector (no axis redirection/sliding).
+  allowAxisSliding?: boolean;
+};
 
 function lerpDelta(from: TranslationDelta, to: TranslationDelta, t: number): TranslationDelta {
   return {
@@ -91,12 +95,30 @@ export function wouldTranslationCauseOverlap(parts: Part[], movingIds: Set<strin
 export function resolveSafeTranslationDelta(
   parts: Part[],
   movingIds: Set<string>,
-  proposedDelta: TranslationDelta
+  proposedDelta: TranslationDelta,
+  options: ResolveSafeTranslationOptions = {}
 ): TranslationDelta | null {
+  const { allowAxisSliding = true } = options;
   const origin: TranslationDelta = { x: 0, y: 0, z: 0 };
   const fullPathOverlap = findFirstOverlapInterval(parts, movingIds, origin, proposedDelta, SWEEP_PATH_STEPS);
   if (!fullPathOverlap) {
     return proposedDelta;
+  }
+
+  if (!allowAxisSliding) {
+    let low = fullPathOverlap.safeT;
+    let high = fullPathOverlap.blockedT;
+    for (let i = 0; i < SAFE_SEARCH_STEPS; i += 1) {
+      const mid = (low + high) / 2;
+      const candidate = lerpDelta(origin, proposedDelta, mid);
+      if (wouldTranslationCauseOverlap(parts, movingIds, candidate)) {
+        high = mid;
+      } else {
+        low = mid;
+      }
+    }
+    if (low < MIN_SAFE_FRACTION) return null;
+    return lerpDelta(origin, proposedDelta, low);
   }
 
   // Resolve per-axis so tangential movement survives while penetration components are clamped.

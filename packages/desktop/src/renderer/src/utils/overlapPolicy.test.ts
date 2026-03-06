@@ -110,4 +110,23 @@ describe('overlapPolicy', () => {
     expect(safe!.x).toBeLessThan(20);
     expect(wouldTranslationCauseOverlap(parts, movingIds, safe!)).toBe(false);
   });
+
+  it('can keep blocked movement on-vector without sideways redirection', () => {
+    const moving = createPart({ id: 'moving', length: 4, width: 4, position: { x: 0, y: 0.5, z: 0 } });
+    const blocker = createPart({ id: 'blocker', length: 4, width: 4, position: { x: 6, y: 0.5, z: 0 } });
+    const parts = [moving, blocker];
+    const movingIds = new Set<string>(['moving']);
+    const proposed = { x: 8, y: 0, z: 4 };
+
+    const sliding = resolveSafeTranslationDelta(parts, movingIds, proposed);
+    const onVector = resolveSafeTranslationDelta(parts, movingIds, proposed, { allowAxisSliding: false });
+
+    expect(sliding).not.toBeNull();
+    expect(onVector).not.toBeNull();
+    expect(wouldTranslationCauseOverlap(parts, movingIds, sliding!)).toBe(false);
+    expect(wouldTranslationCauseOverlap(parts, movingIds, onVector!)).toBe(false);
+
+    // Sliding mode may redirect heavily into Z once X blocks; on-vector mode should avoid that.
+    expect(Math.abs(onVector!.z)).toBeLessThan(Math.abs(sliding!.z));
+  });
 });

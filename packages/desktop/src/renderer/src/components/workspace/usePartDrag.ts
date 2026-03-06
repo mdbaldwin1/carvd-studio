@@ -976,7 +976,9 @@ export function usePartDrag(
           }
 
           if (stockConstraints.preventOverlap) {
-            const safeDelta = resolveSafeTranslationDelta(allParts, new Set(effectiveDraggingIds), proposedDelta);
+            const safeDelta = resolveSafeTranslationDelta(allParts, new Set(effectiveDraggingIds), proposedDelta, {
+              allowAxisSliding: latchedFaceSnapRef.current === null
+            });
             if (!safeDelta) {
               return;
             }
@@ -1129,7 +1131,9 @@ export function usePartDrag(
           // Check overlap prevention for multi-part move
           const stockConstraints = useProjectStore.getState().stockConstraints;
           if (stockConstraints.preventOverlap) {
-            const safeDelta = resolveSafeTranslationDelta(allParts, new Set(effectivePartIds), adjustedDelta);
+            const safeDelta = resolveSafeTranslationDelta(allParts, new Set(effectivePartIds), adjustedDelta, {
+              allowAxisSliding: latchedFaceSnapRef.current === null
+            });
             if (!safeDelta) {
               setLiveDims({
                 x: part.position.x,
@@ -1191,7 +1195,8 @@ export function usePartDrag(
             const safeDelta = resolveSafeTranslationDelta(
               allParts,
               new Set(effectivePartIds.length > 0 ? effectivePartIds : [part.id]),
-              { x: baseDelta.x, y: newY - dragStart.current.partPos.y, z: baseDelta.z }
+              { x: baseDelta.x, y: newY - dragStart.current.partPos.y, z: baseDelta.z },
+              { allowAxisSliding: latchedFaceSnapRef.current === null }
             );
             if (!safeDelta) {
               setLiveDims({
