@@ -1,4 +1,4 @@
-import { Line, Text } from '@react-three/drei';
+import { Billboard, Line, Text } from '@react-three/drei';
 import { Suspense, memo, useMemo } from 'react';
 import * as THREE from 'three';
 import { useProjectStore, getAllDescendantPartIds } from '../../store/projectStore';
@@ -67,11 +67,6 @@ const BoundingBoxDimensionLabel = memo(
       labelPos[1] + lineDir[1] * halfGap,
       labelPos[2] + lineDir[2] * halfGap
     ];
-    const textQuaternion = new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0, 0, 1),
-      new THREE.Vector3(offsetVec[0], offsetVec[1], offsetVec[2]).normalize()
-    );
-
     // Calculate tick direction
     const dimDir: [number, number, number] = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
     const tickDir: [number, number, number] = [
@@ -150,20 +145,21 @@ const BoundingBoxDimensionLabel = memo(
 
         {/* Dimension text (3D mesh so depth/occlusion is consistent with scene geometry) */}
         <Suspense fallback={null}>
-          <Text
-            raycast={NOOP_RAYCAST}
-            position={labelPos}
-            quaternion={textQuaternion}
-            font={labelFontUrl}
-            fontSize={0.38}
-            color={color}
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.02}
-            outlineColor="#000000"
-          >
-            {labelText}
-          </Text>
+          <Billboard position={labelPos} follow={true} lockX={true} lockZ={true}>
+            <Text
+              raycast={NOOP_RAYCAST}
+              font={labelFontUrl}
+              fontSize={0.38}
+              color={color}
+              anchorX="center"
+              anchorY="middle"
+              material-side={THREE.DoubleSide}
+              outlineWidth={0.02}
+              outlineColor="#000000"
+            >
+              {labelText}
+            </Text>
+          </Billboard>
         </Suspense>
       </group>
     );

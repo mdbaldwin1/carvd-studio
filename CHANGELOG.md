@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Advanced surface snapping framework (POC)** — Added surface-anchor snaps (center-1D, center-2D, edge-to-midline, edge-to-quarterline), fractional face anchors (0/25/50/75/100), and extended per-axis snap arbitration stages (`surface`, `fraction`) for more predictable placement on face-latched drags.
+- **Snap indicator language + perf telemetry (POC)** — Added semantic snap line metadata (`family`, `subtype`, `state`) with enhanced workspace indicator tokens/colors, plus dev-time snap-loop performance sampling (`avg/max/over-budget`) to catch drag-time regressions early.
 - **Precise part rotation controls (POC)** — Added single-part `Rotation (X, Y, Z)` controls in the Properties panel with direct degree entry, angle snap toggle, adjustable snap step, one-click reset, and drag-to-rotate ring handles with live angle feedback.
 - **Feature-level part snapping for angled assemblies (POC)** — Added true feature snap candidates during drag: edge-to-edge (parallel edge alignment) and vertex-to-face projection, layered on top of oriented face snapping for non-axis-aligned parts.
 - **Group-wide rotation drag handles (POC)** — Added shared rotation handles for multi-part/group selections so selected sets can be rotated together around a common pivot using the same drag interaction as single-part rotation.
@@ -23,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Snapping settings expanded with presets and anchor toggles** — App Settings now expose advanced snap controls (`Simple`/`Precision`/`Layout` preset, surface-anchor toggle, fractional-anchor toggle, candidate-indicator toggle), and drag pipelines respect those preferences in both single-part and group drag flows.
 - **Ghost display mode readability** — Increased Ghost/translucent part opacity and added outline rendering so part silhouettes are easier to read while staying semi-transparent.
 - **Rotation model generalized beyond 90° increments** — Internal rotation typing and transformation utilities now support arbitrary angles while preserving fast `X/Y/Z` keyboard rotations for intuitive quick-turn workflows.
 - **Rotated-part snapping and overlap hardening** — Face-to-face snapping now validates oriented face compatibility (opposing normals plus in-plane overlap) and solves oriented snap deltas, overlap prevention during drag/properties edits now uses OBB-vs-OBB tests instead of broad AABB-only checks, and drag overlap resolution now applies swept/binary-search fallback so parts can approach contact smoothly without hard blocking.

@@ -297,6 +297,9 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
           {displayMode === 'translucent' && (
             <meshStandardMaterial color={part.color} transparent opacity={0.55} depthWrite={false} />
           )}
+          {displayMode !== 'solid' && displayMode !== 'wireframe' && displayMode !== 'translucent' && (
+            <meshStandardMaterial color={part.color} />
+          )}
           {(isDirectlySelected ||
             isHovered ||
             isReference ||

@@ -15,6 +15,7 @@ export function useKeyboardShortcuts() {
   const parts = useProjectStore((s) => s.parts);
   const gridSize = useProjectStore((s) => s.gridSize);
   const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
+  const requestDeleteGroups = useUIStore((s) => s.requestDeleteGroups);
   const duplicateSelectedParts = useProjectStore((s) => s.duplicateSelectedParts);
   const updatePart = useProjectStore((s) => s.updatePart);
   const batchUpdateParts = useProjectStore((s) => s.batchUpdateParts);
@@ -280,11 +281,10 @@ export function useKeyboardShortcuts() {
           // Delete selected parts and groups
           if (hasSelection) {
             e.preventDefault();
-            // Delete selected groups first (recursive mode deletes group and all contents)
-            for (const groupId of selectedGroupIds) {
-              deleteGroup(groupId, 'recursive');
+            if (selectedGroupIds.length > 0) {
+              requestDeleteGroups(selectedGroupIds);
             }
-            // Then delete any directly selected parts (that weren't in deleted groups)
+            // Then request delete any directly selected parts (that weren't in deleted groups)
             if (selectedPartIds.length > 0) {
               requestDeleteParts(selectedPartIds);
             }

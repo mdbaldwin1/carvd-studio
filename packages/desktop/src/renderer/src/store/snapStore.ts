@@ -9,6 +9,16 @@ import { isAxisAlignedRotation } from '../utils/rotation';
 import { useProjectStore, getAllDescendantPartIds } from './projectStore';
 import { useSelectionStore } from './selectionStore';
 
+function snapLineSignature(lines: SnapLine[]): string {
+  return lines
+    .filter((line) => (line.state ?? 'winner') !== 'candidate')
+    .map((line) => {
+      const value = typeof line.snapValue === 'number' && Number.isFinite(line.snapValue) ? line.snapValue : 0;
+      return `${line.family ?? line.type}:${line.subtype ?? ''}:${line.axis}:${value.toFixed(3)}`;
+    })
+    .join('|');
+}
+
 interface SnapStoreState {
   // Snap-to-parts feature
   snapToPartsEnabled: boolean;
@@ -16,13 +26,28 @@ interface SnapStoreState {
   // Reference parts for precision snapping
   referencePartIds: string[]; // Parts marked as snap reference targets
   activeReferenceDistances: ReferenceDistanceIndicator[]; // Distance indicators to reference parts during drag
+  faceLatchActive: boolean;
+  snapPulseAt: number;
+  snapLabelPosition: { x: number; y: number; z: number } | null;
+  snapPerf: {
+    lastMs: number;
+    avgMs: number;
+    maxMs: number;
+    sampleCount: number;
+    overBudgetCount: number;
+    budgetMs: number;
+  };
 
   // Simple setters
   setSnapToPartsEnabled: (enabled: boolean) => void;
   setActiveSnapLines: (lines: SnapLine[]) => void;
   setActiveReferenceDistances: (distances: ReferenceDistanceIndicator[]) => void;
+  setFaceLatchActive: (active: boolean) => void;
+  setSnapLabelPosition: (position: { x: number; y: number; z: number } | null) => void;
   // Batched setter for hot paths (single setState call instead of two)
   setSnapIndicators: (lines: SnapLine[], distances: ReferenceDistanceIndicator[]) => void;
+  recordSnapPerfSample: (ms: number) => void;
+  resetSnapPerf: () => void;
 
   // Reference parts actions
   setReferencePartIds: (ids: string[]) => void;
@@ -40,11 +65,69 @@ export const useSnapStore = create<SnapStoreState>((set, get) => ({
   activeSnapLines: [],
   referencePartIds: [],
   activeReferenceDistances: [],
+  faceLatchActive: false,
+  snapPulseAt: 0,
+  snapLabelPosition: null,
+  snapPerf: {
+    lastMs: 0,
+    avgMs: 0,
+    maxMs: 0,
+    sampleCount: 0,
+    overBudgetCount: 0,
+    budgetMs: 4
+  },
 
   setSnapToPartsEnabled: (snapToPartsEnabled) => set({ snapToPartsEnabled }),
-  setActiveSnapLines: (activeSnapLines) => set({ activeSnapLines }),
+  setActiveSnapLines: (activeSnapLines) =>
+    set((state) => {
+      const prevWinner = snapLineSignature(state.activeSnapLines);
+      const nextWinner = snapLineSignature(activeSnapLines);
+      return {
+        activeSnapLines,
+        snapPulseAt: prevWinner !== nextWinner ? performance.now() : state.snapPulseAt
+      };
+    }),
   setActiveReferenceDistances: (activeReferenceDistances) => set({ activeReferenceDistances }),
-  setSnapIndicators: (activeSnapLines, activeReferenceDistances) => set({ activeSnapLines, activeReferenceDistances }),
+  setFaceLatchActive: (faceLatchActive) => set({ faceLatchActive }),
+  setSnapLabelPosition: (snapLabelPosition) => set({ snapLabelPosition }),
+  setSnapIndicators: (activeSnapLines, activeReferenceDistances) =>
+    set((state) => {
+      const prevWinner = snapLineSignature(state.activeSnapLines);
+      const nextWinner = snapLineSignature(activeSnapLines);
+      return {
+        activeSnapLines,
+        activeReferenceDistances,
+        snapPulseAt: prevWinner !== nextWinner ? performance.now() : state.snapPulseAt
+      };
+    }),
+  recordSnapPerfSample: (ms) =>
+    set((state) => {
+      const sampleCount = state.snapPerf.sampleCount + 1;
+      const avgMs = (state.snapPerf.avgMs * state.snapPerf.sampleCount + ms) / sampleCount;
+      const maxMs = Math.max(state.snapPerf.maxMs, ms);
+      const overBudgetCount = state.snapPerf.overBudgetCount + (ms > state.snapPerf.budgetMs ? 1 : 0);
+      return {
+        snapPerf: {
+          ...state.snapPerf,
+          lastMs: ms,
+          avgMs,
+          maxMs,
+          sampleCount,
+          overBudgetCount
+        }
+      };
+    }),
+  resetSnapPerf: () =>
+    set((state) => ({
+      snapPerf: {
+        ...state.snapPerf,
+        lastMs: 0,
+        avgMs: 0,
+        maxMs: 0,
+        sampleCount: 0,
+        overBudgetCount: 0
+      }
+    })),
 
   setReferencePartIds: (referencePartIds) => {
     set({ referencePartIds });

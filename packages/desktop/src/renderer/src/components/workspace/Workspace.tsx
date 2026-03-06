@@ -25,17 +25,12 @@ import { SnapGuides } from './SnapGuides';
 import { ThumbnailCaptureHandler } from './ThumbnailCaptureHandler';
 import {
   LIGHTING_PRESETS,
+  hadRecentPartPointerInteraction,
   isOrbitControls,
   setRightClickTarget,
   getRightClickTarget,
   clearRightClickTarget
 } from './workspaceUtils';
-
-declare global {
-  interface Window {
-    __selectionDebugLogs?: Array<{ ts: string; args: unknown[] }>;
-  }
-}
 
 // Reads the effective theme from the DOM and returns 'light' or 'dark'
 function useEffectiveTheme(): 'light' | 'dark' {
@@ -57,21 +52,13 @@ function useEffectiveTheme(): 'light' | 'dark' {
 }
 
 export function Workspace() {
-  const debugSelection = (...args: unknown[]) => {
-    if (import.meta.env.DEV) {
-      const entry = { ts: new Date().toISOString(), args };
-      const current = window.__selectionDebugLogs || [];
-      current.push(entry);
-      if (current.length > 400) {
-        current.splice(0, current.length - 400);
-      }
-      window.__selectionDebugLogs = current;
-      console.info('[SelectionDebug]', ...args);
-    }
-  };
+  const debugSelection = (..._args: unknown[]) => {};
 
   const parts = useProjectStore((s) => s.parts);
   const clearSelection = useSelectionStore((s) => s.clearSelection);
+  const clearDragIntent = useSelectionStore((s) => s.clearDragIntent);
+  const setDraggingPartId = useSelectionStore((s) => s.setDraggingPartId);
+  const setActiveDragDelta = useSelectionStore((s) => s.setActiveDragDelta);
   const selectPart = useSelectionStore((s) => s.selectPart);
   const selectGroup = useSelectionStore((s) => s.selectGroup);
   const togglePartSelection = useSelectionStore((s) => s.togglePartSelection);
@@ -205,76 +192,9 @@ export function Workspace() {
         }
       }
 
-      // Fallback: screen-space hit test from project parts.
-      // This path does not depend on mesh/instance raycast internals.
-      const pointerScreenX = clientX;
-      const pointerScreenY = clientY;
-      let bestPartId: string | null = null;
-      let bestDepth = Infinity;
-      const marginPx = 2;
-
-      const corners = Array.from({ length: 8 }, () => new THREE.Vector3());
-      const center = new THREE.Vector3();
-      const euler = new THREE.Euler();
-      const quat = new THREE.Quaternion();
-
-      for (const part of parts) {
-        const halfLength = part.length / 2;
-        const halfThickness = part.thickness / 2;
-        const halfWidth = part.width / 2;
-
-        euler.set(
-          (part.rotation.x * Math.PI) / 180,
-          (part.rotation.y * Math.PI) / 180,
-          (part.rotation.z * Math.PI) / 180,
-          'XYZ'
-        );
-        quat.setFromEuler(euler);
-        center.set(part.position.x, part.position.y, part.position.z);
-
-        corners[0].set(-halfLength, -halfThickness, -halfWidth);
-        corners[1].set(-halfLength, -halfThickness, halfWidth);
-        corners[2].set(-halfLength, halfThickness, -halfWidth);
-        corners[3].set(-halfLength, halfThickness, halfWidth);
-        corners[4].set(halfLength, -halfThickness, -halfWidth);
-        corners[5].set(halfLength, -halfThickness, halfWidth);
-        corners[6].set(halfLength, halfThickness, -halfWidth);
-        corners[7].set(halfLength, halfThickness, halfWidth);
-
-        let minX = Infinity;
-        let maxX = -Infinity;
-        let minY = Infinity;
-        let maxY = -Infinity;
-
-        for (const c of corners) {
-          c.applyQuaternion(quat).add(center).project(camera);
-          const sx = ((c.x + 1) / 2) * rect.width + rect.left;
-          const sy = ((-c.y + 1) / 2) * rect.height + rect.top;
-          minX = Math.min(minX, sx);
-          maxX = Math.max(maxX, sx);
-          minY = Math.min(minY, sy);
-          maxY = Math.max(maxY, sy);
-        }
-
-        const contains =
-          pointerScreenX >= minX - marginPx &&
-          pointerScreenX <= maxX + marginPx &&
-          pointerScreenY >= minY - marginPx &&
-          pointerScreenY <= maxY + marginPx;
-        if (!contains) continue;
-
-        const depth = center.clone().project(camera).z;
-        if (depth < bestDepth) {
-          bestDepth = depth;
-          bestPartId = part.id;
-        }
-      }
-
-      if (bestPartId) return bestPartId;
-
       return null;
     },
-    [camera, gl, scene, parts]
+    [camera, gl, scene]
   );
 
   const selectFromPartHit = useCallback(
@@ -382,15 +302,44 @@ export function Workspace() {
     [enterGroup, selectGroup, selectPart, setSelectedSidebarStockId]
   );
 
-  // Prevent native context menu on canvas - we'll show our own on mouseup
+  // Prevent native context menu on canvas and provide a robust fallback open path.
   useEffect(() => {
     const canvas = gl.domElement;
-    const preventContextMenu = (e: MouseEvent) => {
+    const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
+      const target = getRightClickTarget();
+      if (target) {
+        if (target.type === 'guide' && target.guideId) {
+          openContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            type: 'guide',
+            guideId: target.guideId
+          });
+        } else if (target.type === 'part') {
+          openContextMenu({ x: e.clientX, y: e.clientY, type: 'part' });
+        } else {
+          openContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            type: 'background',
+            worldPosition: target.worldPosition
+          });
+        }
+      } else {
+        const hitPartId = getHitPartId(e.clientX, e.clientY);
+        if (hitPartId) {
+          openContextMenu({ x: e.clientX, y: e.clientY, type: 'part' });
+        } else {
+          openContextMenu({ x: e.clientX, y: e.clientY, type: 'background' });
+        }
+      }
+      rightClickDownPos.current = null;
+      clearRightClickTarget();
     };
-    canvas.addEventListener('contextmenu', preventContextMenu);
-    return () => canvas.removeEventListener('contextmenu', preventContextMenu);
-  }, [gl]);
+    canvas.addEventListener('contextmenu', handleContextMenu);
+    return () => canvas.removeEventListener('contextmenu', handleContextMenu);
+  }, [gl, openContextMenu, getHitPartId]);
 
   // Track right-click for our custom context menu (fires on mouseup, not mousedown)
   useEffect(() => {
@@ -438,6 +387,13 @@ export function Workspace() {
 
         // Native selection fallback for simple clicks.
         if (distance <= 5 && elapsed <= 500) {
+          // Part meshes/instances already process pointer-down selection. Skip
+          // native fallback when that path just ran to avoid double toggles
+          // (notably Shift-additive selection toggling twice).
+          if (hadRecentPartPointerInteraction()) {
+            leftClickDownPos.current = null;
+            return;
+          }
           const hitPartId = getHitPartId(e.clientX, e.clientY);
           debugSelection('native:mouseup:left', {
             x: e.clientX,
@@ -451,7 +407,19 @@ export function Workspace() {
             const isModKey = isMac ? e.metaKey : e.ctrlKey;
             selectFromPartHit(hitPartId, e.shiftKey || isModKey);
           } else {
-            debugSelection('native:mouseup:left:no-part-hit');
+            const sel = useSelectionStore.getState();
+            const project = useProjectStore.getState();
+            const invalidPartCount = project.parts.filter(
+              (p) =>
+                !Number.isFinite(p.position.x) || !Number.isFinite(p.position.y) || !Number.isFinite(p.position.z)
+            ).length;
+            debugSelection('native:mouseup:left:no-part-hit', {
+              selectedPartIds: sel.selectedPartIds,
+              selectedGroupIds: sel.selectedGroupIds,
+              editingGroupId: sel.editingGroupId,
+              partCount: project.parts.length,
+              invalidPartCount
+            });
           }
         }
         leftClickDownPos.current = null;
@@ -545,6 +513,13 @@ export function Workspace() {
     [camera, gl, scene]
   );
 
+  const resetTransientInteractionState = useCallback(() => {
+    clearDragIntent();
+    setDraggingPartId(null);
+    setActiveDragDelta(null);
+    if (isOrbitControls(controls)) controls.enabled = true;
+  }, [clearDragIntent, setDraggingPartId, setActiveDragDelta, controls]);
+
   // Click on empty space to deselect (only if not box selecting and not after drag)
   const handleBackgroundClick = (e: ThreeEvent<MouseEvent>) => {
     if (!e.object.userData.isGround || isBoxSelecting) return;
@@ -585,9 +560,21 @@ export function Workspace() {
     }
 
     pointerDownPos.current = null;
+    resetTransientInteractionState();
     clearSelection();
     setSelectedSidebarStockId(null);
-    debugSelection('background:click:cleared-selection');
+    const sel = useSelectionStore.getState();
+    const project = useProjectStore.getState();
+    const invalidPartCount = project.parts.filter(
+      (p) => !Number.isFinite(p.position.x) || !Number.isFinite(p.position.y) || !Number.isFinite(p.position.z)
+    ).length;
+    debugSelection('background:click:cleared-selection', {
+      selectedPartIds: sel.selectedPartIds,
+      selectedGroupIds: sel.selectedGroupIds,
+      editingGroupId: sel.editingGroupId,
+      partCount: project.parts.length,
+      invalidPartCount
+    });
   };
 
   // Track what was right-clicked on pointer down (for context menu on mouseup)
@@ -639,6 +626,7 @@ export function Workspace() {
     }
 
     pointerDownPos.current = null;
+    resetTransientInteractionState();
     clearSelection();
     setSelectedSidebarStockId(null);
   };
@@ -652,6 +640,8 @@ export function Workspace() {
         return;
       }
       pointerDownPos.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+      // Defensive: always clear stale transient drag intent/state when beginning a background click.
+      resetTransientInteractionState();
     }
   };
 

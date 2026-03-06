@@ -1,6 +1,6 @@
 import type { SnapLine } from '../types';
 
-export type SnapStage = 'guide' | 'origin' | 'face' | 'feature' | 'axis';
+export type SnapStage = 'guide' | 'origin' | 'face' | 'surface' | 'fraction' | 'feature' | 'axis';
 type Axis = 'x' | 'y' | 'z';
 
 export type AxisSnapWinners = Record<Axis, SnapStage | null>;
@@ -10,6 +10,8 @@ export const SNAP_STAGE_PRIORITIES: Record<SnapStage, number> = {
   guide: 500,
   origin: 400,
   face: 300,
+  surface: 250,
+  fraction: 225,
   feature: 200,
   axis: 100
 };
@@ -20,7 +22,7 @@ export function createAxisSnapWinners(): AxisSnapWinners {
 
 export function shouldUseSnapStage(currentStage: SnapStage | null, candidateStage: SnapStage): boolean {
   if (!currentStage) return true;
-  return SNAP_STAGE_PRIORITIES[candidateStage] >= SNAP_STAGE_PRIORITIES[currentStage];
+  return SNAP_STAGE_PRIORITIES[candidateStage] > SNAP_STAGE_PRIORITIES[currentStage];
 }
 
 export function tryApplyAxisSnap(

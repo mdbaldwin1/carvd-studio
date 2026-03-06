@@ -43,6 +43,7 @@ export function PropertiesPanel() {
   const openSaveAssemblyModal = useUIStore((s) => s.openSaveAssemblyModal);
   const showToast = useUIStore((s) => s.showToast);
   const deleteGroup = useProjectStore((s) => s.deleteGroup);
+  const requestDeleteGroups = useUIStore((s) => s.requestDeleteGroups);
   const createGroup = useProjectStore((s) => s.createGroup);
   const addToGroup = useProjectStore((s) => s.addToGroup);
   const removeFromGroup = useProjectStore((s) => s.removeFromGroup);
@@ -152,8 +153,8 @@ export function PropertiesPanel() {
   };
 
   const handleDeleteSelection = () => {
-    for (const groupId of selectedGroupIds) {
-      deleteGroup(groupId, 'recursive');
+    if (selectedGroupIds.length > 0) {
+      requestDeleteGroups(selectedGroupIds);
     }
     if (selectedPartIds.length > 0) {
       requestDeleteParts(selectedPartIds);
@@ -198,7 +199,7 @@ export function PropertiesPanel() {
           }}
           onRemoveFromParent={(groupId) => removeFromGroup([groupId], 'group')}
           onUngroup={(groupId) => deleteGroup(groupId, 'ungroup', editingGroupId ?? null)}
-          onDeleteGroup={(groupId) => deleteGroup(groupId, 'recursive', null)}
+          onDeleteGroup={(groupId) => requestDeleteGroups([groupId])}
         />
       );
     }

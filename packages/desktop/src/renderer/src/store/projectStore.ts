@@ -31,6 +31,9 @@ import { rotateAroundWorldAxis } from '../utils/rotation';
 import { getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
 
+const isFiniteVec3 = (v: { x: number; y: number; z: number }): boolean =>
+  Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
+
 interface ProjectState {
   // Project data
   projectName: string;
@@ -72,6 +75,7 @@ interface ProjectState {
   deletePart: (id: string) => void;
   deleteSelectedParts: () => void;
   confirmDeleteParts: () => void;
+  confirmDeleteGroups: () => void;
   duplicatePart: (id: string) => string | null;
   duplicateSelectedParts: () => string[];
   resetSelectedPartsToStock: () => void;
@@ -483,12 +487,30 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       updatePart: (id, updates) => {
+        if (updates.position && !isFiniteVec3(updates.position)) return;
+        if (
+          (updates.length !== undefined && !Number.isFinite(updates.length)) ||
+          (updates.width !== undefined && !Number.isFinite(updates.width)) ||
+          (updates.thickness !== undefined && !Number.isFinite(updates.thickness))
+        ) {
+          return;
+        }
+        if (
+          updates.rotation &&
+          (!Number.isFinite(updates.rotation.x) ||
+            !Number.isFinite(updates.rotation.y) ||
+            !Number.isFinite(updates.rotation.z))
+        ) {
+          return;
+        }
+
         let didUpdate = false;
         set((state) => {
           const existingPart = state.parts.find((p) => p.id === id);
           if (!existingPart) return state;
 
           const nextPart = { ...existingPart, ...updates };
+          if (!isFiniteVec3(nextPart.position)) return state;
           const affectsOverlap =
             updates.position !== undefined || updates.rotation !== undefined || updates.ignoreOverlap !== undefined;
 
@@ -570,6 +592,8 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       moveSelectedParts: (delta) => {
+        if (!isFiniteVec3(delta)) return;
+
         const { groupMembers, parts, stockConstraints } = get();
         const { selectedPartIds, selectedGroupIds, editingGroupId } = useSelectionStore.getState();
 
@@ -612,6 +636,7 @@ export const useProjectStore = create<ProjectState>()(
         if (stockConstraints.preventOverlap) {
           const safeDelta = resolveSafeTranslationDelta(parts, partIdsToMove, delta);
           if (!safeDelta) return;
+          if (!isFiniteVec3(safeDelta)) return;
           effectiveDelta = safeDelta;
         }
 
@@ -763,6 +788,18 @@ export const useProjectStore = create<ProjectState>()(
           referencePartIds: state.referencePartIds.filter((id) => !pendingDeletePartIds.includes(id))
         }));
         useUIStore.getState().cancelDeleteParts();
+        get().markCutListStale();
+      },
+
+      confirmDeleteGroups: () => {
+        const { pendingDeleteGroupIds } = useUIStore.getState();
+        if (!pendingDeleteGroupIds || pendingDeleteGroupIds.length === 0) return;
+
+        for (const groupId of pendingDeleteGroupIds) {
+          get().deleteGroup(groupId, 'recursive');
+        }
+
+        useUIStore.getState().cancelDeleteGroups();
         get().markCutListStale();
       },
 
@@ -1608,7 +1645,10 @@ export const useProjectStore = create<ProjectState>()(
           useSelectionStore.setState((state) => ({
             selectedGroupIds: state.selectedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
             expandedGroupIds: state.expandedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
-            editingGroupId: descendantGroupIds.includes(state.editingGroupId || '') ? null : state.editingGroupId
+            // Deleting a group should always exit edit scope to avoid stale edit-context
+            // locking interaction on remaining top-level parts.
+            editingGroupId: null,
+            hoveredPartId: null
           }));
         } else {
           // 'recursive' - delete group AND all member parts
@@ -1627,7 +1667,9 @@ export const useProjectStore = create<ProjectState>()(
             selectedPartIds: state.selectedPartIds.filter((id) => !descendantPartIds.includes(id)),
             selectedGroupIds: state.selectedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
             expandedGroupIds: state.expandedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
-            editingGroupId: descendantGroupIds.includes(state.editingGroupId || '') ? null : state.editingGroupId
+            // Deleting groups/parts should always exit edit scope to prevent stale context.
+            editingGroupId: null,
+            hoveredPartId: null
           }));
           useSnapStore.setState((state) => ({
             referencePartIds: state.referencePartIds.filter((id) => !descendantPartIds.includes(id))

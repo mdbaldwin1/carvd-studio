@@ -334,7 +334,17 @@ export function usePartResize(
   useEffect(() => {
     if (!isResizing) return;
 
+    const handleWindowPointerUp = () => {
+      if (isResizing && resizeStart.current) {
+        finishResize();
+      }
+    };
+
     const handleWindowPointerMove = (e: PointerEvent) => {
+      if (e.buttons === 0) {
+        handleWindowPointerUp();
+        return;
+      }
       // Coalesce pointer events to animation frame rate
       latestEventRef.current = e;
       if (rafIdRef.current !== null) return;
@@ -347,12 +357,6 @@ export function usePartResize(
           handleResizeMove(currentPoint);
         }
       });
-    };
-
-    const handleWindowPointerUp = () => {
-      if (isResizing && resizeStart.current) {
-        finishResize();
-      }
     };
 
     window.addEventListener('pointermove', handleWindowPointerMove);
