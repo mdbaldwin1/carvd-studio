@@ -959,8 +959,7 @@ export function usePartDrag(
             return;
           }
 
-          const hasFaceLatchForOverlap = latchedFaceSnapRef.current !== null && isSnapEnabled;
-          if (stockConstraints.preventOverlap && !hasFaceLatchForOverlap) {
+          if (stockConstraints.preventOverlap) {
             const safeDelta = resolveSafeTranslationDelta(allParts, new Set(effectiveDraggingIds), proposedDelta);
             if (!safeDelta) {
               return;

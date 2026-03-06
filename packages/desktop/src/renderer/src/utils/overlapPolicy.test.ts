@@ -93,4 +93,21 @@ describe('overlapPolicy', () => {
     expect(safe!.y).toBeGreaterThan(-0.3);
     expect(wouldTranslationCauseOverlap(parts, movingIds, safe!)).toBe(false);
   });
+
+  it('prevents tunneling through blockers when final position is clear', () => {
+    const moving = createPart({ id: 'moving', length: 4, position: { x: 0, y: 0.5, z: 0 } });
+    const blocker = createPart({ id: 'blocker', length: 2, position: { x: 9, y: 0.5, z: 0 } });
+    const parts = [moving, blocker];
+    const movingIds = new Set<string>(['moving']);
+
+    const proposed = { x: 20, y: 0, z: 0 };
+    // Final pose would be clear, but the movement path crosses the blocker.
+    expect(wouldTranslationCauseOverlap(parts, movingIds, proposed)).toBe(false);
+
+    const safe = resolveSafeTranslationDelta(parts, movingIds, proposed);
+    expect(safe).not.toBeNull();
+    expect(safe!.x).toBeGreaterThan(0);
+    expect(safe!.x).toBeLessThan(20);
+    expect(wouldTranslationCauseOverlap(parts, movingIds, safe!)).toBe(false);
+  });
 });

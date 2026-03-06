@@ -5,7 +5,32 @@ const OBB_EPSILON = 1e-6;
 const OBB_SEPARATION_TOLERANCE = 1e-8;
 const MIN_SAFE_FRACTION = 1e-3;
 const SAFE_SEARCH_STEPS = 14;
+const SWEEP_PATH_STEPS = 24;
 type TranslationDelta = { x: number; y: number; z: number };
+
+function lerpDelta(from: TranslationDelta, to: TranslationDelta, t: number): TranslationDelta {
+  return {
+    x: from.x + (to.x - from.x) * t,
+    y: from.y + (to.y - from.y) * t,
+    z: from.z + (to.z - from.z) * t
+  };
+}
+
+function findFirstOverlapInterval(
+  parts: Part[],
+  movingIds: Set<string>,
+  from: TranslationDelta,
+  to: TranslationDelta,
+  steps: number
+): { safeT: number; blockedT: number } | null {
+  for (let i = 1; i <= steps; i += 1) {
+    const t = i / steps;
+    if (wouldTranslationCauseOverlap(parts, movingIds, lerpDelta(from, to, t))) {
+      return { safeT: (i - 1) / steps, blockedT: t };
+    }
+  }
+  return null;
+}
 
 export function overlapCheckEnabled(a: Part, b: Part): boolean {
   // If either part explicitly allows overlap, the pair is exempt.
@@ -68,7 +93,9 @@ export function resolveSafeTranslationDelta(
   movingIds: Set<string>,
   proposedDelta: TranslationDelta
 ): TranslationDelta | null {
-  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta)) {
+  const origin: TranslationDelta = { x: 0, y: 0, z: 0 };
+  const fullPathOverlap = findFirstOverlapInterval(parts, movingIds, origin, proposedDelta, SWEEP_PATH_STEPS);
+  if (!fullPathOverlap) {
     return proposedDelta;
   }
 
@@ -82,27 +109,24 @@ export function resolveSafeTranslationDelta(
     const axisTarget = proposedDelta[axis];
     if (Math.abs(axisTarget) < 1e-9) continue;
 
+    const axisStart: TranslationDelta = { x: safe.x, y: safe.y, z: safe.z };
     const fullAxisCandidate: TranslationDelta = {
       x: safe.x,
       y: safe.y,
       z: safe.z,
       [axis]: safe[axis] + axisTarget
     };
-    if (!wouldTranslationCauseOverlap(parts, movingIds, fullAxisCandidate)) {
+    const axisInterval = findFirstOverlapInterval(parts, movingIds, axisStart, fullAxisCandidate, SWEEP_PATH_STEPS);
+    if (!axisInterval) {
       safe[axis] += axisTarget;
       continue;
     }
 
-    let low = 0;
-    let high = 1;
+    let low = axisInterval.safeT;
+    let high = axisInterval.blockedT;
     for (let i = 0; i < SAFE_SEARCH_STEPS; i += 1) {
       const mid = (low + high) / 2;
-      const axisCandidate: TranslationDelta = {
-        x: safe.x,
-        y: safe.y,
-        z: safe.z,
-        [axis]: safe[axis] + axisTarget * mid
-      };
+      const axisCandidate = lerpDelta(axisStart, fullAxisCandidate, mid);
 
       if (wouldTranslationCauseOverlap(parts, movingIds, axisCandidate)) {
         high = mid;
