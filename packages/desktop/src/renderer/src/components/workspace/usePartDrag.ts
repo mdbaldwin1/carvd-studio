@@ -59,6 +59,14 @@ export function usePartDrag(
 ) {
   const isFiniteVec3 = (v: { x: number; y: number; z: number }): boolean =>
     Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
+  const isAxisAlignedNormal = (normal: { x: number; y: number; z: number }): boolean => {
+    const ax = Math.abs(normal.x);
+    const ay = Math.abs(normal.y);
+    const az = Math.abs(normal.z);
+    const max = Math.max(ax, ay, az);
+    const sumOthers = ax + ay + az - max;
+    return max >= 0.999 && sumOthers <= 0.0015;
+  };
 
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef<{ point: THREE.Vector3; partPos: THREE.Vector3; partOriginalPos: THREE.Vector3 } | null>(
@@ -347,7 +355,11 @@ export function usePartDrag(
         let currentPoint: THREE.Vector3 | null = null;
         const isSnapEnabledForPlane = useSnapStore.getState().snapToPartsEnabled && !evt.altKey;
         const latchedFaceForPlane = latchedFaceSnapRef.current;
-        const useFaceLatchPlane = Boolean(isSnapEnabledForPlane && latchedFaceForPlane?.faceNormal);
+        const useFaceLatchPlane = Boolean(
+          isSnapEnabledForPlane &&
+          latchedFaceForPlane?.faceNormal &&
+          !isAxisAlignedNormal(latchedFaceForPlane.faceNormal)
+        );
         let planeInfo: DragPlaneInfo;
         let newX: number;
         let newY: number;
@@ -511,7 +523,11 @@ export function usePartDrag(
             showSnapCandidates
           } = appSettings;
 
-          const hasActiveFaceLatch = latchedFaceSnapRef.current !== null && isSnapEnabled;
+          const hasActiveFaceLatch =
+            latchedFaceSnapRef.current !== null &&
+            isSnapEnabled &&
+            !!latchedFaceSnapRef.current.faceNormal &&
+            !isAxisAlignedNormal(latchedFaceSnapRef.current.faceNormal);
           if (liveGridSnap && !hasActiveFaceLatch) {
             newX = snapToGrid(newX);
             newZ = snapToGrid(newZ);
