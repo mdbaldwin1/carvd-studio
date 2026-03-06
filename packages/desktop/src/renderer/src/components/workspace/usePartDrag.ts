@@ -356,12 +356,20 @@ export function usePartDrag(
         if (useFaceLatchPlane && latchedFaceForPlane?.faceNormal) {
           planeInfo = getFaceLatchPlaneInfo(latchedFaceForPlane.faceNormal);
           const anchorPos = lastDragPosition.current
-            ? _tempPlanePoint.current.set(lastDragPosition.current.x, lastDragPosition.current.y, lastDragPosition.current.z)
+            ? _tempPlanePoint.current.set(
+                lastDragPosition.current.x,
+                lastDragPosition.current.y,
+                lastDragPosition.current.z
+              )
             : _tempPlanePoint.current.copy(dragStart.current.partPos);
           currentPoint = getWorldPointOnPlane(evt, planeInfo.normal, anchorPos);
           if (!currentPoint) return;
 
-          if (!faceLatchDragRef.current.active || !faceLatchDragRef.current.pointerStart || !faceLatchDragRef.current.partStart) {
+          if (
+            !faceLatchDragRef.current.active ||
+            !faceLatchDragRef.current.pointerStart ||
+            !faceLatchDragRef.current.partStart
+          ) {
             faceLatchDragRef.current.active = true;
             faceLatchDragRef.current.pointerStart = currentPoint.clone();
             faceLatchDragRef.current.pointerStartScreen = { x: evt.clientX, y: evt.clientY };
@@ -389,10 +397,10 @@ export function usePartDrag(
             const pu = _tempProjectB.current.copy(anchorPos).add(axisU).project(camera);
             const pv = _tempIntersection.current.copy(anchorPos).add(axisV).project(camera);
             faceLatchDragRef.current.screenBasis = {
-              sux: ((pu.x - p0.x) * 0.5) * rect.width,
-              suy: ((p0.y - pu.y) * 0.5) * rect.height,
-              svx: ((pv.x - p0.x) * 0.5) * rect.width,
-              svy: ((p0.y - pv.y) * 0.5) * rect.height
+              sux: (pu.x - p0.x) * 0.5 * rect.width,
+              suy: (p0.y - pu.y) * 0.5 * rect.height,
+              svx: (pv.x - p0.x) * 0.5 * rect.width,
+              svy: (p0.y - pv.y) * 0.5 * rect.height
             };
           }
 
@@ -925,10 +933,11 @@ export function usePartDrag(
             }
 
             // Batch snap lines + reference distances into single store update
-            const winnerLines = snapLines.map((line) => ({ ...line, state: line.state ?? 'winner' as const }));
-            const candidateLines = showSnapCandidates || e.shiftKey
-              ? winnerLines.map((line) => ({ ...line, state: 'candidate' as const }))
-              : [];
+            const winnerLines = snapLines.map((line) => ({ ...line, state: line.state ?? ('winner' as const) }));
+            const candidateLines =
+              showSnapCandidates || evt.shiftKey
+                ? winnerLines.map((line) => ({ ...line, state: 'candidate' as const }))
+                : [];
             useSnapStore.getState().setSnapIndicators([...winnerLines, ...candidateLines], referenceDistances);
             useSnapStore.getState().setSnapLabelPosition({ x: newX, y: newY, z: newZ });
             useSnapStore.getState().recordSnapPerfSample(performance.now() - snapPerfStart);
