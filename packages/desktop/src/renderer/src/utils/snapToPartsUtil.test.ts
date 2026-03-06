@@ -489,6 +489,61 @@ describe('snapToPartsUtil', () => {
       expect(result.snappedZ).toBe(false);
     });
 
+    it('marks snapped axis when distribution layout snap wins', () => {
+      const draggingPart = createTestPart({
+        id: 'dragging',
+        length: 2,
+        position: { x: 29.8, y: 0, z: 0 }
+      });
+      const targetA = createTestPart({ id: 'target-a', length: 2, position: { x: 0, y: 0, z: 0 } });
+      const targetB = createTestPart({ id: 'target-b', length: 2, position: { x: 10, y: 0, z: 0 } });
+      const targetC = createTestPart({ id: 'target-c', length: 2, position: { x: 20, y: 0, z: 0 } });
+
+      const result = detectSnaps(
+        draggingPart,
+        draggingPart.position,
+        [draggingPart, targetA, targetB, targetC],
+        ['dragging'],
+        0.5,
+        {
+          enableLayoutSnaps: true,
+          enableEqualSpacingSnap: false,
+          enableDistributionSnap: true,
+          enablePatternSnap: false
+        }
+      );
+
+      expect(result.snappedX).toBe(true);
+      expect(result.snapLines.some((line) => line.axis === 'x' && line.subtype === 'distribution')).toBe(true);
+    });
+
+    it('marks snapped axis when pattern layout snap wins', () => {
+      const draggingPart = createTestPart({
+        id: 'dragging',
+        length: 2,
+        position: { x: 19.8, y: 0, z: 0 }
+      });
+      const targetA = createTestPart({ id: 'target-a', length: 2, position: { x: 0, y: 0, z: 0 } });
+      const targetB = createTestPart({ id: 'target-b', length: 2, position: { x: 10, y: 0, z: 0 } });
+
+      const result = detectSnaps(
+        draggingPart,
+        draggingPart.position,
+        [draggingPart, targetA, targetB],
+        ['dragging'],
+        0.5,
+        {
+          enableLayoutSnaps: true,
+          enableEqualSpacingSnap: false,
+          enableDistributionSnap: false,
+          enablePatternSnap: true
+        }
+      );
+
+      expect(result.snappedX).toBe(true);
+      expect(result.snapLines.some((line) => line.axis === 'x' && line.subtype === 'pattern')).toBe(true);
+    });
+
     it('uses default threshold when not specified', () => {
       const draggingPart = createTestPart({
         id: 'dragging',

@@ -862,7 +862,8 @@ function checkDistributionSnap(
   for (let i = 1; i < centers.length; i += 1) deltas.push(centers[i] - centers[i - 1]);
   const avgStep = deltas.reduce((sum, v) => sum + v, 0) / deltas.length;
   if (Math.abs(avgStep) < 1e-5) return null;
-  const dragCenter = axis === 'x' ? draggingBounds.centerX : axis === 'y' ? draggingBounds.centerY : draggingBounds.centerZ;
+  const dragCenter =
+    axis === 'x' ? draggingBounds.centerX : axis === 'y' ? draggingBounds.centerY : draggingBounds.centerZ;
   const origin = centers[0];
   const nearestSlot = origin + Math.round((dragCenter - origin) / avgStep) * avgStep;
   const delta = nearestSlot - dragCenter;
@@ -886,7 +887,8 @@ function checkPatternSnap(
   const centers = targetBounds
     .map((b) => (axis === 'x' ? b.centerX : axis === 'y' ? b.centerY : b.centerZ))
     .sort((a, b) => a - b);
-  const dragCenter = axis === 'x' ? draggingBounds.centerX : axis === 'y' ? draggingBounds.centerY : draggingBounds.centerZ;
+  const dragCenter =
+    axis === 'x' ? draggingBounds.centerX : axis === 'y' ? draggingBounds.centerY : draggingBounds.centerZ;
   let best: LayoutSnap | null = null;
   let bestDistance = threshold;
   for (let i = 0; i < centers.length; i += 1) {
@@ -1337,18 +1339,33 @@ export function detectSnaps(
       ? checkDistributionSnap(draggingBounds, targetBounds, 'z', equalSpacingThreshold)
       : null;
   const xPatternSnap =
-    enableLayoutSnaps && enablePatternSnap ? checkPatternSnap(draggingBounds, targetBounds, 'x', equalSpacingThreshold) : null;
+    enableLayoutSnaps && enablePatternSnap
+      ? checkPatternSnap(draggingBounds, targetBounds, 'x', equalSpacingThreshold)
+      : null;
   const yPatternSnap =
-    enableLayoutSnaps && enablePatternSnap ? checkPatternSnap(draggingBounds, targetBounds, 'y', equalSpacingThreshold) : null;
+    enableLayoutSnaps && enablePatternSnap
+      ? checkPatternSnap(draggingBounds, targetBounds, 'y', equalSpacingThreshold)
+      : null;
   const zPatternSnap =
-    enableLayoutSnaps && enablePatternSnap ? checkPatternSnap(draggingBounds, targetBounds, 'z', equalSpacingThreshold) : null;
+    enableLayoutSnaps && enablePatternSnap
+      ? checkPatternSnap(draggingBounds, targetBounds, 'z', equalSpacingThreshold)
+      : null;
 
-  const chooseLayoutSnap = (equalSnap: EqualSpacingSnap | null, distribution: LayoutSnap | null, pattern: LayoutSnap | null) => {
-    const candidates = [equalSnap ? Math.abs(equalSnap.delta) : Infinity, distribution ? Math.abs(distribution.delta) : Infinity, pattern ? Math.abs(pattern.delta) : Infinity];
+  const chooseLayoutSnap = (
+    equalSnap: EqualSpacingSnap | null,
+    distribution: LayoutSnap | null,
+    pattern: LayoutSnap | null
+  ) => {
+    const candidates = [
+      equalSnap ? Math.abs(equalSnap.delta) : Infinity,
+      distribution ? Math.abs(distribution.delta) : Infinity,
+      pattern ? Math.abs(pattern.delta) : Infinity
+    ];
     const min = Math.min(...candidates);
     if (!Number.isFinite(min)) return null;
     if (equalSnap && Math.abs(equalSnap.delta) === min) return { kind: 'equal' as const, delta: equalSnap.delta };
-    if (distribution && Math.abs(distribution.delta) === min) return { kind: 'distribution' as const, delta: distribution.delta };
+    if (distribution && Math.abs(distribution.delta) === min)
+      return { kind: 'distribution' as const, delta: distribution.delta };
     if (pattern) return { kind: 'pattern' as const, delta: pattern.delta };
     return null;
   };
@@ -1377,11 +1394,14 @@ export function detectSnaps(
 
   // Track which type of snap was used
   const useXEqualSnap =
-    xLayoutChoice?.kind === 'equal' && ((!xSnap && xEqualSnap) || (xSnap && Math.abs(xLayoutChoice.delta) < Math.abs(xSnap.delta)));
+    xLayoutChoice?.kind === 'equal' &&
+    ((!xSnap && xEqualSnap) || (xSnap && Math.abs(xLayoutChoice.delta) < Math.abs(xSnap.delta)));
   const useYEqualSnap =
-    yLayoutChoice?.kind === 'equal' && ((!ySnap && yEqualSnap) || (ySnap && Math.abs(yLayoutChoice.delta) < Math.abs(ySnap.delta)));
+    yLayoutChoice?.kind === 'equal' &&
+    ((!ySnap && yEqualSnap) || (ySnap && Math.abs(yLayoutChoice.delta) < Math.abs(ySnap.delta)));
   const useZEqualSnap =
-    zLayoutChoice?.kind === 'equal' && ((!zSnap && zEqualSnap) || (zSnap && Math.abs(zLayoutChoice.delta) < Math.abs(zSnap.delta)));
+    zLayoutChoice?.kind === 'equal' &&
+    ((!zSnap && zEqualSnap) || (zSnap && Math.abs(zLayoutChoice.delta) < Math.abs(zSnap.delta)));
   const useXDistribution = xLayoutChoice?.kind === 'distribution';
   const useYDistribution = yLayoutChoice?.kind === 'distribution';
   const useZDistribution = zLayoutChoice?.kind === 'distribution';
@@ -1524,9 +1544,9 @@ export function detectSnaps(
 
   return {
     adjustedPosition,
-    snappedX: !!xSnap || !!useXEqualSnap,
-    snappedY: !!ySnap || !!useYEqualSnap,
-    snappedZ: !!zSnap || !!useZEqualSnap,
+    snappedX: !!xSnap || !!useXEqualSnap || !!useXDistribution || !!useXPattern,
+    snappedY: !!ySnap || !!useYEqualSnap || !!useYDistribution || !!useYPattern,
+    snappedZ: !!zSnap || !!useZEqualSnap || !!useZDistribution || !!useZPattern,
     snapLines
   };
 }
@@ -2455,7 +2475,11 @@ function areFacesSnapCompatible(faceA: OrientedFace, faceB: OrientedFace, snapTh
   return true;
 }
 
-function projectPartInterval(part: Part, position: { x: number; y: number; z: number }, axis: Vec3): { min: number; max: number } {
+function projectPartInterval(
+  part: Part,
+  position: { x: number; y: number; z: number },
+  axis: Vec3
+): { min: number; max: number } {
   const vertices = getPartVertices(part, position);
   let min = Infinity;
   let max = -Infinity;
@@ -3109,20 +3133,15 @@ export function detectFeatureSnaps(
         lineEnd: Vec3;
         distance: number;
         priority: number;
-        subtype:
-          | 'edge-edge'
-          | 'vertex-face'
-          | 'vertex-vertex'
-          | 'vertex-edge'
-          | 'midpoint-midpoint'
-          | 'edge-extension';
+        subtype: 'edge-edge' | 'vertex-face' | 'vertex-vertex' | 'vertex-edge' | 'midpoint-midpoint' | 'edge-extension';
       }
     | undefined;
   let closestDistance: number | undefined;
 
   const consider = (candidate: Omit<NonNullable<typeof best>, 'priority'>, priority: number) => {
     if (candidate.distance <= 1e-5 || candidate.distance > snapThreshold) return;
-    closestDistance = closestDistance === undefined ? candidate.distance : Math.min(closestDistance, candidate.distance);
+    closestDistance =
+      closestDistance === undefined ? candidate.distance : Math.min(closestDistance, candidate.distance);
     if (!best || priority > best.priority || (priority === best.priority && candidate.distance < best.distance)) {
       best = { ...candidate, priority };
     }
@@ -3159,11 +3178,11 @@ export function detectFeatureSnaps(
 
         consider(
           {
-          delta: perpOffset,
-          lineStart: c1,
-          lineEnd: c2,
-          distance,
-          subtype: 'edge-edge'
+            delta: perpOffset,
+            lineStart: c1,
+            lineEnd: c2,
+            distance,
+            subtype: 'edge-edge'
           },
           600
         );
@@ -3185,11 +3204,11 @@ export function detectFeatureSnaps(
 
         consider(
           {
-          delta: mulVec(face.normal, -planeDistance),
-          lineStart: vertex,
-          lineEnd: projected,
-          distance: absDistance,
-          subtype: 'vertex-face'
+            delta: mulVec(face.normal, -planeDistance),
+            lineStart: vertex,
+            lineEnd: projected,
+            distance: absDistance,
+            subtype: 'vertex-face'
           },
           550
         );
@@ -3204,11 +3223,11 @@ export function detectFeatureSnaps(
         if (distance > snapThreshold * 0.4) continue;
         consider(
           {
-          delta,
-          lineStart: dragVertex,
-          lineEnd: targetVertex,
-          distance,
-          subtype: 'vertex-vertex'
+            delta,
+            lineStart: dragVertex,
+            lineEnd: targetVertex,
+            distance,
+            subtype: 'vertex-vertex'
           },
           300
         );
@@ -3224,11 +3243,11 @@ export function detectFeatureSnaps(
         if (distance > snapThreshold * 0.4) continue;
         consider(
           {
-          delta,
-          lineStart: dragVertex,
-          lineEnd: projected,
-          distance,
-          subtype: 'vertex-edge'
+            delta,
+            lineStart: dragVertex,
+            lineEnd: projected,
+            distance,
+            subtype: 'vertex-edge'
           },
           450
         );
@@ -3246,11 +3265,11 @@ export function detectFeatureSnaps(
         if (distance > snapThreshold * 0.4) continue;
         consider(
           {
-          delta,
-          lineStart: dragMid,
-          lineEnd: targetMid,
-          distance,
-          subtype: 'midpoint-midpoint'
+            delta,
+            lineStart: dragMid,
+            lineEnd: targetMid,
+            distance,
+            subtype: 'midpoint-midpoint'
           },
           500
         );
@@ -3271,11 +3290,11 @@ export function detectFeatureSnaps(
         if (distance > snapThreshold * 0.4) continue;
         consider(
           {
-          delta,
-          lineStart: dragMid,
-          lineEnd: projectedOnLine,
-          distance,
-          subtype: 'edge-extension'
+            delta,
+            lineStart: dragMid,
+            lineEnd: projectedOnLine,
+            distance,
+            subtype: 'edge-extension'
           },
           350
         );
