@@ -83,6 +83,7 @@ export function usePartDrag(
     faceNormal?: { x: number; y: number; z: number };
     snapLines: import('../../types').SnapLine[];
   } | null>(null);
+  const faceUnsnapUntilRef = useRef(0);
   const patternRotationRef = useRef<{ x: number; y: number; z: number } | null>(null);
 
   const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
@@ -575,6 +576,7 @@ export function usePartDrag(
 
           if (isSnapEnabled) {
             const snapPerfStart = performance.now();
+            const now = performance.now();
             const cameraDistance = camera.position.distanceTo(_tempCameraTarget.current.set(newX, newY, newZ));
             const snapThreshold = calculateSnapThreshold(cameraDistance, snapSensitivity);
             const hasLatchedFaceAtStart = latchedFaceSnapRef.current !== null;
@@ -648,13 +650,23 @@ export function usePartDrag(
 
             // Check part snaps
             if (snapTargetParts.length > 0 && allParts.length > 1) {
-              const faceSnapResult = detectFaceSnaps(
-                part,
-                { x: newX, y: newY, z: newZ },
-                snapTargetParts,
-                effectiveDraggingIds,
-                snapThreshold
-              );
+              const shouldSkipFaceSnap = now < faceUnsnapUntilRef.current;
+              const faceSnapResult = shouldSkipFaceSnap
+                ? {
+                    adjustedPosition: { x: newX, y: newY, z: newZ },
+                    snappedX: false,
+                    snappedY: false,
+                    snappedZ: false,
+                    snapLines: [] as import('../../types').SnapLine[]
+                  }
+                : detectFaceSnaps(
+                    part,
+                    { x: newX, y: newY, z: newZ },
+                    snapTargetParts,
+                    effectiveDraggingIds,
+                    snapThreshold
+                  );
+
               const hasFaceSnap = faceSnapResult.snappedX || faceSnapResult.snappedY || faceSnapResult.snappedZ;
               if (hasFaceSnap) {
                 latchedFaceSnapRef.current = {
@@ -667,6 +679,7 @@ export function usePartDrag(
                 };
               } else if (
                 latchedFaceSnapRef.current &&
+                !shouldSkipFaceSnap &&
                 faceSnapResult.closestDistance !== undefined &&
                 faceSnapResult.closestDistance < snapThreshold * 1.1
               ) {
@@ -684,6 +697,17 @@ export function usePartDrag(
                     offsetX * latched.faceNormal.x + offsetY * latched.faceNormal.y + offsetZ * latched.faceNormal.z
                   );
                   shouldBreakLatch = normalDistance > breakoutDistance;
+
+                  if (preventOverlapEnabled) {
+                    // If user is explicitly pulling off the latched face while overlap
+                    // prevention is on, force a short unsnap window so we can detach.
+                    const signedNormalDistance =
+                      offsetX * latched.faceNormal.x + offsetY * latched.faceNormal.y + offsetZ * latched.faceNormal.z;
+                    if (signedNormalDistance > Math.max(0.04, snapThreshold * 0.25)) {
+                      shouldBreakLatch = true;
+                      faceUnsnapUntilRef.current = now + 180;
+                    }
+                  }
                 } else {
                   const breakX = latched.snappedX && Math.abs(newX - latched.adjustedPosition.x) > breakoutDistance;
                   const breakY = latched.snappedY && Math.abs(newY - latched.adjustedPosition.y) > breakoutDistance;
