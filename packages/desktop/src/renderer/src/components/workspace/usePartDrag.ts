@@ -985,9 +985,30 @@ export function usePartDrag(
             if (!isFiniteVec3(safeDelta)) {
               return;
             }
-            newX = dragStart.current.partPos.x + safeDelta.x;
-            newY = dragStart.current.partPos.y + safeDelta.y;
-            newZ = dragStart.current.partPos.z + safeDelta.z;
+            const clippedByOverlap =
+              Math.abs(safeDelta.x - proposedDelta.x) > 1e-6 ||
+              Math.abs(safeDelta.y - proposedDelta.y) > 1e-6 ||
+              Math.abs(safeDelta.z - proposedDelta.z) > 1e-6;
+            const hasFaceLatch = latchedFaceSnapRef.current !== null && isSnapEnabled;
+
+            if (hasFaceLatch && clippedByOverlap) {
+              // When pushing into a blocked face-latch contact, keep the prior accepted
+              // position to avoid secondary-axis drift (camera in/out movement).
+              const fallbackDelta = lastDragPosition.current
+                ? {
+                    x: lastDragPosition.current.x - dragStart.current.partPos.x,
+                    y: lastDragPosition.current.y - dragStart.current.partPos.y,
+                    z: lastDragPosition.current.z - dragStart.current.partPos.z
+                  }
+                : { x: 0, y: 0, z: 0 };
+              newX = dragStart.current.partPos.x + fallbackDelta.x;
+              newY = dragStart.current.partPos.y + fallbackDelta.y;
+              newZ = dragStart.current.partPos.z + fallbackDelta.z;
+            } else {
+              newX = dragStart.current.partPos.x + safeDelta.x;
+              newY = dragStart.current.partPos.y + safeDelta.y;
+              newZ = dragStart.current.partPos.z + safeDelta.z;
+            }
           }
 
           lastDragPosition.current = { x: newX, y: newY, z: newZ };
