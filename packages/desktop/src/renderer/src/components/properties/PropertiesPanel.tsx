@@ -4,7 +4,6 @@ import { NoSelectionProperties } from '@renderer/components/properties/NoSelecti
 import { SinglePartAdvancedCard } from '@renderer/components/properties/SinglePartAdvancedCard';
 import { SinglePartBasicsCard } from '@renderer/components/properties/SinglePartBasicsCard';
 import { SinglePartCutsSummaryCard } from '@renderer/components/properties/SinglePartCutsSummaryCard';
-import { SinglePartFeaturesCard } from '@renderer/components/properties/SinglePartFeaturesCard';
 import { SinglePartMaterialCard } from '@renderer/components/properties/SinglePartMaterialCard';
 import { SinglePartNotesCard } from '@renderer/components/properties/SinglePartNotesCard';
 import { SingleGroupProperties } from '@renderer/components/properties/SingleGroupProperties';
@@ -523,12 +522,6 @@ export function PropertiesPanel() {
         selectedPart={selectedPart}
         units={units}
         onEditCuts={() => startEditingPartCuts(selectedPart.id, selectedPart.name, selectedPart.features)}
-      />
-
-      <SinglePartFeaturesCard
-        selectedPart={selectedPart}
-        units={units}
-        onFeaturesChange={(features) => updatePart(selectedPart.id, { features })}
       />
 
       <SinglePartMaterialCard

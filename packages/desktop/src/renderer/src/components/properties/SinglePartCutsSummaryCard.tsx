@@ -1,6 +1,7 @@
 import { Button } from '@renderer/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { Part } from '@renderer/types';
+import { getPartFeatureConflicts } from '@renderer/utils/partFeatureConflicts';
 import {
   getAuthoredFeatureCount,
   getEnabledFeatureCount,
@@ -19,6 +20,9 @@ export function SinglePartCutsSummaryCard({ selectedPart, units, onEditCuts }: S
   const enabledCount = getEnabledFeatureCount(selectedPart.features);
   const badgeLabel = getFeatureBadgeLabel(selectedPart.features);
   const primaryText = getPrimaryFeatureText(selectedPart.features, units);
+  const conflicts = getPartFeatureConflicts(selectedPart.features ?? [], selectedPart);
+  const hasErrors = conflicts.some((conflict) => conflict.severity === 'error');
+  const conflictSummary = conflicts[0]?.message ?? null;
 
   return (
     <Card>
@@ -43,6 +47,12 @@ export function SinglePartCutsSummaryCard({ selectedPart, units, onEditCuts }: S
                 {enabledCount !== authoredCount ? ` (${enabledCount} enabled)` : ''}
               </div>
               {primaryText && <div className="mt-1 text-xs leading-relaxed">{primaryText}</div>}
+              {conflictSummary && (
+                <div className={`mt-2 text-xs leading-relaxed ${hasErrors ? 'text-danger' : 'text-warning'}`}>
+                  {hasErrors ? 'Conflict: ' : 'Warning: '}
+                  {conflictSummary}
+                </div>
+              )}
             </>
           )}
         </div>
