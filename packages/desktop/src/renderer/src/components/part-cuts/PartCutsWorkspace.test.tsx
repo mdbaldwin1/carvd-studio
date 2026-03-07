@@ -14,8 +14,12 @@ describe('PartCutsWorkspace', () => {
         draftFeatures={[]}
         units="imperial"
         selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
         onSelectFeature={onSelectFeature}
         onDraftFeaturesChange={onDraftFeaturesChange}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
         onExit={vi.fn()}
         onSave={vi.fn()}
         hasUnsavedChanges={false}
@@ -73,8 +77,12 @@ describe('PartCutsWorkspace', () => {
         draftFeatures={part.features ?? []}
         units="imperial"
         selectedFeatureId="feature-1"
+        hoveredTarget={null}
+        pendingTarget={null}
         onSelectFeature={vi.fn()}
         onDraftFeaturesChange={onDraftFeaturesChange}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
         onExit={vi.fn()}
         onSave={vi.fn()}
         hasUnsavedChanges={true}
@@ -124,8 +132,12 @@ describe('PartCutsWorkspace', () => {
         draftFeatures={part.features ?? []}
         units="imperial"
         selectedFeatureId="feature-1"
+        hoveredTarget={null}
+        pendingTarget={null}
         onSelectFeature={vi.fn()}
         onDraftFeaturesChange={vi.fn()}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
         onExit={vi.fn()}
         onSave={vi.fn()}
         hasUnsavedChanges={true}
@@ -133,7 +145,7 @@ describe('PartCutsWorkspace', () => {
     );
 
     expect(screen.getByText('Selected Operation')).toBeInTheDocument();
-    expect(screen.getByText('Target Map')).toBeInTheDocument();
+    expect(screen.getByText('Inspector Target')).toBeInTheDocument();
     expect(screen.getByText('Same-Part Feedback')).toBeInTheDocument();
     expect(screen.getAllByText('Conflict').length).toBeGreaterThan(0);
   });

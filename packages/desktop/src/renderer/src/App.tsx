@@ -181,6 +181,8 @@ function App() {
     sourcePartName,
     draftFeatures,
     selectedFeatureId,
+    hoveredTarget: partCutsHoveredTarget,
+    pendingTarget: partCutsPendingTarget,
     showExitDialog: showPartCutsExitDialog,
     saveAndExit: savePartCutsAndExit,
     discardAndExit: discardPartCutsAndExit,
@@ -188,7 +190,9 @@ function App() {
     cancelExit: cancelPartCutsExit,
     hasUnsavedChanges: partCutsHasUnsavedChanges,
     setDraftFeatures: setPartCutsDraftFeatures,
-    selectFeature: selectPartCutsFeature
+    selectFeature: selectPartCutsFeature,
+    setHoveredTarget: setPartCutsHoveredTarget,
+    setPendingTarget: setPartCutsPendingTarget
   } = usePartCutsEditing();
 
   // File operations - now after editing hooks so we can route save commands appropriately
@@ -959,8 +963,12 @@ function App() {
                   draftFeatures={draftFeatures}
                   units={useProjectStore.getState().units}
                   selectedFeatureId={selectedFeatureId}
+                  hoveredTarget={partCutsHoveredTarget}
+                  pendingTarget={partCutsPendingTarget}
                   onSelectFeature={selectPartCutsFeature}
                   onDraftFeaturesChange={setPartCutsDraftFeatures}
+                  onHoveredTargetChange={setPartCutsHoveredTarget}
+                  onPendingTargetChange={setPartCutsPendingTarget}
                   onExit={requestPartCutsExit}
                   onSave={savePartCutsAndExit}
                   hasUnsavedChanges={partCutsHasUnsavedChanges}
