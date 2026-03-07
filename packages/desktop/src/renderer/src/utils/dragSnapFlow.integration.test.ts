@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Part, SnapLine } from '../types';
-import {
-  detectFeatureSnaps,
-  detectFractionalFaceSnaps,
-  detectSurfaceAnchorSnaps,
-  getPartOBB
-} from './snapToPartsUtil';
+import { detectFeatureSnaps, detectFractionalFaceSnaps, detectSurfaceAnchorSnaps, getPartOBB } from './snapToPartsUtil';
 import { createAxisSnapWinners, tryApplyAxisSnap } from './snapPriority';
 
 function createPart(overrides: Partial<Part> = {}): Part {
@@ -90,16 +85,40 @@ describe('drag snap flow integration', () => {
     const lines: SnapLine[] = [];
 
     if (surface.snappedY) {
-      tryApplyAxisSnap('y', 'surface', winners, lines, surface.snapLines.filter((l) => l.axis === 'y'));
+      tryApplyAxisSnap(
+        'y',
+        'surface',
+        winners,
+        lines,
+        surface.snapLines.filter((l) => l.axis === 'y')
+      );
     }
     if (surface.snappedZ) {
-      tryApplyAxisSnap('z', 'surface', winners, lines, surface.snapLines.filter((l) => l.axis === 'z'));
+      tryApplyAxisSnap(
+        'z',
+        'surface',
+        winners,
+        lines,
+        surface.snapLines.filter((l) => l.axis === 'z')
+      );
     }
     if (fraction.snappedY) {
-      tryApplyAxisSnap('y', 'fraction', winners, lines, fraction.snapLines.filter((l) => l.axis === 'y'));
+      tryApplyAxisSnap(
+        'y',
+        'fraction',
+        winners,
+        lines,
+        fraction.snapLines.filter((l) => l.axis === 'y')
+      );
     }
     if (fraction.snappedZ) {
-      tryApplyAxisSnap('z', 'fraction', winners, lines, fraction.snapLines.filter((l) => l.axis === 'z'));
+      tryApplyAxisSnap(
+        'z',
+        'fraction',
+        winners,
+        lines,
+        fraction.snapLines.filter((l) => l.axis === 'z')
+      );
     }
 
     expect(winners.y === 'surface' || winners.z === 'surface').toBe(true);

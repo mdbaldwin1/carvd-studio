@@ -198,7 +198,7 @@ export function SnapAlignmentLines() {
             color={getLineColor(line)}
             lineWidth={
               (line.family === 'feature' ? 1.1 : line.state === 'winner' || !line.state ? 2 : 1) +
-              ((line.state === 'winner' || !line.state) ? pulseScale : 0)
+              (line.state === 'winner' || !line.state ? pulseScale : 0)
             }
             depthTest={displayMode === 'solid'}
             transparent={line.state === 'candidate'}
@@ -230,11 +230,7 @@ export function SnapAlignmentLines() {
               position={
                 snapLabelPosition
                   ? [snapLabelPosition.x, snapLabelPosition.y + 0.2 + index * 0.12, snapLabelPosition.z]
-                  : [
-                      (line.start.x + line.end.x) / 2,
-                      (line.start.y + line.end.y) / 2,
-                      (line.start.z + line.end.z) / 2
-                    ]
+                  : [(line.start.x + line.end.x) / 2, (line.start.y + line.end.y) / 2, (line.start.z + line.end.z) / 2]
               }
               center
               occlude={displayMode === 'solid' ? 'blending' : false}

@@ -257,7 +257,16 @@ export interface SnapLine {
   axis: 'x' | 'y' | 'z'; // Which axis this line is along
   type: 'edge' | 'center' | 'face' | 'equal-spacing' | 'dimension-match'; // Type of snap
   // Optional semantic family/subtype metadata for rendering and arbitration debug
-  family?: 'guide' | 'origin' | 'face' | 'surface-anchor' | 'surface-fraction' | 'feature' | 'equal-spacing' | 'dimension-match' | 'axis';
+  family?:
+    | 'guide'
+    | 'origin'
+    | 'face'
+    | 'surface-anchor'
+    | 'surface-fraction'
+    | 'feature'
+    | 'equal-spacing'
+    | 'dimension-match'
+    | 'axis';
   subtype?: string;
   state?: 'candidate' | 'winner' | 'latched';
   priority?: number;

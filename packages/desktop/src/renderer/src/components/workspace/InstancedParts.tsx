@@ -394,7 +394,9 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
         {displayMode === 'solid' && <meshStandardMaterial />}
         {displayMode === 'wireframe' && <meshBasicMaterial wireframe />}
         {displayMode === 'translucent' && <meshStandardMaterial transparent opacity={0.55} depthWrite={false} />}
-        {displayMode !== 'solid' && displayMode !== 'wireframe' && displayMode !== 'translucent' && <meshStandardMaterial />}
+        {displayMode !== 'solid' && displayMode !== 'wireframe' && displayMode !== 'translucent' && (
+          <meshStandardMaterial />
+        )}
       </instancedMesh>
       {displayMode === 'translucent' && (
         <instancedMesh ref={outlineMeshRef} args={[undefined, undefined, meshCapacity]} frustumCulled={false}>
