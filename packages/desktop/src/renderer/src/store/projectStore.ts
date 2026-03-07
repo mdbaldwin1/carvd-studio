@@ -31,6 +31,8 @@ import { rotateAroundWorldAxis } from '../utils/rotation';
 import { getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
 import { clonePartFeatures, normalizeAssemblyPart, normalizePart } from '../utils/partFeatures';
+import { validateRectCutFeature } from '../utils/rectCutUtils';
+import { getFeatureTargetLabel } from '../utils/partFeatureSummary';
 
 interface ProjectState {
   // Project data
@@ -429,6 +431,24 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
           severity: 'warning'
         });
       }
+    }
+
+    for (const feature of part.features ?? []) {
+      if (!feature.enabled) continue;
+      if (feature.kind !== 'rect_cut') continue;
+
+      const rectCutIssue = validateRectCutFeature(feature, part);
+      if (!rectCutIssue) continue;
+
+      const featureLabel =
+        feature.label?.trim() || `${feature.cutType.replace(/_/g, ' ')} on ${getFeatureTargetLabel(feature)}`;
+      issues.push({
+        partId: part.id,
+        partName: part.name,
+        type: 'feature_validation',
+        message: `Operation "${featureLabel}" is invalid: ${rectCutIssue}`,
+        severity: 'error'
+      });
     }
   }
 

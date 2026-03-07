@@ -369,7 +369,7 @@ export interface ReferenceDistanceIndicator {
 export interface PartValidationIssue {
   partId: string;
   partName: string;
-  type: 'no_stock' | 'exceeds_dimensions' | 'exceeds_thickness' | 'grain_mismatch';
+  type: 'no_stock' | 'exceeds_dimensions' | 'exceeds_thickness' | 'grain_mismatch' | 'feature_validation';
   message: string;
   severity: 'error' | 'warning';
   canBypass?: boolean; // true for glue-up panels exceeding width
@@ -388,6 +388,7 @@ export interface CutInstruction {
   canRotate: boolean; // true if part can be rotated for optimization
   isGlueUp: boolean; // true if this is a glue-up panel
   boardsNeeded?: number; // number of boards for glue-up panels
+  features?: PartFeature[];
   notes?: string;
 }
 

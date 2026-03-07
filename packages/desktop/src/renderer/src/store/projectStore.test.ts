@@ -2246,6 +2246,49 @@ describe('validatePartsForCutList', () => {
     });
   });
 
+  describe('feature validation', () => {
+    it('returns error for invalid rectangular operations loaded from part data', () => {
+      const stock = createTestStock({
+        id: 'stock-1',
+        length: 96,
+        width: 48,
+        thickness: 0.75
+      });
+      const parts = [
+        createTestPart({
+          name: 'Feature Part',
+          stockId: 'stock-1',
+          length: 24,
+          width: 12,
+          thickness: 0.75,
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'rect_cut',
+              version: 1,
+              enabled: true,
+              label: 'Bad cutout',
+              target: { type: 'face', face: 'top_face' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'cutout',
+              parameters: {
+                size: { length: 30, width: 4 },
+                depthMode: 'through'
+              },
+              placement: { x: 0, z: 0 }
+            }
+          ]
+        })
+      ];
+
+      const issues = validatePartsForCutList(parts, [stock]);
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0].type).toBe('feature_validation');
+      expect(issues[0].message).toContain('Bad cutout');
+    });
+  });
+
   describe('multiple parts validation', () => {
     it('validates all parts and aggregates issues', () => {
       const stock = createTestStock({

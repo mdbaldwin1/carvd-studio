@@ -18,6 +18,7 @@ function createTestInstruction(overrides: Partial<CutInstruction> = {}): CutInst
     grainSensitive: false,
     canRotate: true,
     isGlueUp: false,
+    features: [],
     ...overrides
   };
 }
@@ -102,7 +103,7 @@ describe('exportCutListToCsv', () => {
     expect(csv).toContain('CUT LIST');
     expect(csv).toContain('Units: inches');
     expect(csv).toContain('Qty');
-    expect(csv).toContain('Cut Length');
+    expect(csv).toContain('Blank Length');
     expect(csv).toContain('Test Part');
   });
 
@@ -147,6 +148,34 @@ describe('exportCutListToCsv', () => {
     const cutList = createTestCutList();
     const csv = exportCutListToCsv(cutList, 'metric');
     expect(csv).toContain('Units: mm');
+  });
+
+  it('includes authored operations in CSV output', () => {
+    const cutList = createTestCutList({
+      instructions: [
+        createTestInstruction({
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'mitre',
+              lengthMode: 'long_point',
+              parameters: {
+                horizontalAngle: 45
+              }
+            }
+          ]
+        })
+      ]
+    });
+    const csv = exportCutListToCsv(cutList, 'imperial');
+
+    expect(csv).toContain('Operations / Notes');
+    expect(csv).toContain('Mitre 45° on Left End · Long Point reference');
   });
 
   it('separates different stock dimensions into different rows', () => {

@@ -335,6 +335,7 @@ describe('CutListModal', () => {
       fireEvent.mouseDown(screen.getByRole('tab', { name: /Cutting Diagrams/i }));
 
       expect(screen.getByText('1 board needed')).toBeInTheDocument();
+      expect(screen.getByText(/Diagrams show blank breakdown only/)).toBeInTheDocument();
     });
 
     it('switches to Shopping List tab', () => {
@@ -356,9 +357,10 @@ describe('CutListModal', () => {
 
       expect(screen.getByText('Qty')).toBeInTheDocument();
       expect(screen.getByText('Part Name')).toBeInTheDocument();
-      expect(screen.getByText('Cut Length')).toBeInTheDocument();
-      expect(screen.getByText('Cut Width')).toBeInTheDocument();
+      expect(screen.getByText('Blank Length')).toBeInTheDocument();
+      expect(screen.getByText('Blank Width')).toBeInTheDocument();
       expect(screen.getByText('Stock')).toBeInTheDocument();
+      expect(screen.getByText('Operations / Notes')).toBeInTheDocument();
     });
 
     it('shows stock name in parts list', () => {
