@@ -38,6 +38,37 @@ describe('PartCutsWorkspace', () => {
     expect(onSelectFeature).toHaveBeenCalled();
   });
 
+  it('adds a paired preset operation group from the left rail', () => {
+    const onDraftFeaturesChange = vi.fn();
+    const onSelectFeature = vi.fn();
+
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Rail' })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={onSelectFeature}
+        onDraftFeaturesChange={onDraftFeaturesChange}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={false}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Mitre Both Ends'));
+
+    expect(onDraftFeaturesChange).toHaveBeenCalledWith([
+      expect.objectContaining({ kind: 'end_cut', target: { type: 'face', face: 'left_end' } }),
+      expect.objectContaining({ kind: 'end_cut', target: { type: 'face', face: 'right_end' } })
+    ]);
+    expect(onSelectFeature).toHaveBeenCalled();
+  });
+
   it('reorders operations in the workspace stack', () => {
     const onDraftFeaturesChange = vi.fn();
     const part = createTestPart({
@@ -94,6 +125,54 @@ describe('PartCutsWorkspace', () => {
     expect(onDraftFeaturesChange).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'feature-2' }),
       expect.objectContaining({ id: 'feature-1' })
+    ]);
+  });
+
+  it('mirrors an operation from the workspace stack', () => {
+    const onDraftFeaturesChange = vi.fn();
+    const part = createTestPart({
+      name: 'Rail',
+      features: [
+        {
+          id: 'feature-1',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mitre',
+          lengthMode: 'long_point',
+          parameters: { horizontalAngle: 45 }
+        }
+      ]
+    });
+
+    render(
+      <PartCutsWorkspace
+        part={part}
+        draftFeatures={part.features ?? []}
+        units="imperial"
+        selectedFeatureId="feature-1"
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={onDraftFeaturesChange}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mirror to Opposite End' }));
+
+    expect(onDraftFeaturesChange).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'feature-1' }),
+      expect.objectContaining({
+        kind: 'end_cut',
+        target: { type: 'face', face: 'right_end' }
+      })
     ]);
   });
 

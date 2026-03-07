@@ -11,8 +11,6 @@ import {
   FACE_TARGETS,
   FeatureDraft,
   getFeatureDraftTarget,
-  getPresetHint,
-  getPresetLabel,
   OperationPreset
 } from '@renderer/components/part-features/partFeatureEditorState';
 import { PartCutsPreviewCanvas } from '@renderer/components/part-cuts/PartCutsPreviewCanvas';
@@ -26,6 +24,15 @@ import { ScrollArea } from '@renderer/components/ui/scroll-area';
 import { Select } from '@renderer/components/ui/select';
 import { EndCutFeature, Part, PartFeature, PartFeatureTarget, RectCutFeature } from '@renderer/types';
 import { getDerivedLengthMeasurements, getLengthReferenceValue } from '@renderer/utils/endCutUtils';
+import {
+  buildFeaturesFromPreset,
+  getAvailableMirrorActions,
+  getMirrorActionLabel,
+  getWorkspacePresetHint,
+  getWorkspacePresetLabel,
+  mirrorFeature,
+  WorkspacePreset
+} from '@renderer/utils/partFeatureActions';
 import { getPartFeatureConflicts } from '@renderer/utils/partFeatureConflicts';
 import { getPickableTargetLabel, isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
@@ -82,6 +89,32 @@ function getSelectedTargetLabel(draft: FeatureDraft | null): string | null {
   if (draft.cutType === 'corner_notch') return CORNER_LABELS[draft.cornerTarget];
   if (draft.cutType === 'edge_notch') return EDGE_LABELS[draft.edgeTarget];
   return FACE_LABELS[draft.faceTarget];
+}
+
+function getOperationPresetLabel(preset: OperationPreset): string {
+  switch (preset) {
+    case 'end_cut':
+      return 'End Cut';
+    case 'corner_notch':
+      return 'Corner Notch';
+    case 'edge_notch':
+      return 'Edge Notch';
+    case 'cutout':
+      return 'Cutout';
+  }
+}
+
+function getOperationPresetHint(preset: OperationPreset): string {
+  switch (preset) {
+    case 'end_cut':
+      return 'Mitres, bevels, and compound cuts on either end.';
+    case 'corner_notch':
+      return 'Remove a rectangular chunk from one exact corner.';
+    case 'edge_notch':
+      return 'Notch into a specific edge while keeping the blank rectangular.';
+    case 'cutout':
+      return 'Place a rectangular pocket or opening on one face.';
+  }
 }
 
 export function PartCutsWorkspace({
@@ -184,6 +217,14 @@ export function PartCutsWorkspace({
     onSelectFeature(feature.id);
   };
 
+  const handleAddWorkspacePreset = (preset: WorkspacePreset) => {
+    const nextFeatures = [...draftFeatures, ...buildFeaturesFromPreset(preset)];
+    const firstInserted = nextFeatures[draftFeatures.length] ?? null;
+    onDraftFeaturesChange(nextFeatures);
+    onSelectFeature(firstInserted?.id ?? null);
+    setDraft(firstInserted ? buildDraftFromFeature(firstInserted) : null);
+  };
+
   const handleSaveDraft = () => {
     if (!draft) return;
     if (draft.mode === 'rect_cut' && draftValidationMessage) return;
@@ -213,6 +254,16 @@ export function PartCutsWorkspace({
     onDraftFeaturesChange([...draftFeatures, duplicate]);
     onSelectFeature(duplicate.id);
     setDraft(buildDraftFromFeature(duplicate));
+  };
+
+  const handleMirrorFeature = (feature: PartFeature, action: ReturnType<typeof getAvailableMirrorActions>[number]) => {
+    const mirrored = mirrorFeature(feature, action);
+    const sourceIndex = draftFeatures.findIndex((entry) => entry.id === feature.id);
+    const nextFeatures = [...draftFeatures];
+    nextFeatures.splice(sourceIndex + 1, 0, mirrored);
+    onDraftFeaturesChange(nextFeatures);
+    onSelectFeature(mirrored.id);
+    setDraft(buildDraftFromFeature(mirrored));
   };
 
   const handleMoveFeature = (featureId: string, direction: -1 | 1) => {
@@ -264,22 +315,51 @@ export function PartCutsWorkspace({
               <div>{getBlankSizeLabel(part, units)}</div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {(['end_cut', 'corner_notch', 'edge_notch', 'cutout'] as OperationPreset[]).map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  className={`rounded-md border px-3 py-2 text-left transition-colors ${
-                    activePreset === preset
-                      ? 'border-accent bg-accent/10 text-text'
-                      : 'border-border bg-bg-secondary hover:bg-bg-tertiary'
-                  }`}
-                  onClick={() => handleStartPreset(preset)}
-                >
-                  <div className="text-[12px] font-semibold">{getPresetLabel(preset)}</div>
-                  <div className="mt-1 text-[11px] text-text-muted">{getPresetHint(preset)}</div>
-                </button>
-              ))}
+            <div className="space-y-2">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Add Operation</div>
+              <div className="grid grid-cols-2 gap-2">
+                {(['end_cut', 'corner_notch', 'edge_notch', 'cutout'] as OperationPreset[]).map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={`rounded-md border px-3 py-2 text-left transition-colors ${
+                      activePreset === preset
+                        ? 'border-accent bg-accent/10 text-text'
+                        : 'border-border bg-bg-secondary hover:bg-bg-tertiary'
+                    }`}
+                    onClick={() => handleStartPreset(preset)}
+                  >
+                    <div className="text-[12px] font-semibold">{getOperationPresetLabel(preset)}</div>
+                    <div className="mt-1 text-[11px] text-text-muted">{getOperationPresetHint(preset)}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Quick Presets</div>
+              <div className="grid grid-cols-1 gap-2">
+                {(
+                  [
+                    'mitre_both_ends',
+                    'bevel_both_ends',
+                    'square_both_ends',
+                    'top_cutout',
+                    'top_front_edge_notch',
+                    'top_front_left_corner_notch'
+                  ] as WorkspacePreset[]
+                ).map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-left transition-colors hover:bg-bg-tertiary"
+                    onClick={() => handleAddWorkspacePreset(preset)}
+                  >
+                    <div className="text-[12px] font-semibold">{getWorkspacePresetLabel(preset)}</div>
+                    <div className="mt-1 text-[11px] text-text-muted">{getWorkspacePresetHint(preset)}</div>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <ScrollArea className="min-h-0 flex-1 rounded-md border border-border bg-bg-secondary">
@@ -349,6 +429,17 @@ export function PartCutsWorkspace({
                           >
                             Duplicate
                           </Button>
+                          {getAvailableMirrorActions(feature).map((action) => (
+                            <Button
+                              key={action}
+                              type="button"
+                              size="xs"
+                              variant="ghost"
+                              onClick={() => handleMirrorFeature(feature, action)}
+                            >
+                              {getMirrorActionLabel(action)}
+                            </Button>
+                          ))}
                           <Button
                             type="button"
                             size="xs"
