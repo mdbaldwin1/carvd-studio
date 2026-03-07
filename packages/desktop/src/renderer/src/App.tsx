@@ -180,12 +180,15 @@ function App() {
     sourcePart,
     sourcePartName,
     draftFeatures,
+    selectedFeatureId,
     showExitDialog: showPartCutsExitDialog,
     saveAndExit: savePartCutsAndExit,
     discardAndExit: discardPartCutsAndExit,
     requestExit: requestPartCutsExit,
     cancelExit: cancelPartCutsExit,
-    hasUnsavedChanges: partCutsHasUnsavedChanges
+    hasUnsavedChanges: partCutsHasUnsavedChanges,
+    setDraftFeatures: setPartCutsDraftFeatures,
+    selectFeature: selectPartCutsFeature
   } = usePartCutsEditing();
 
   // File operations - now after editing hooks so we can route save commands appropriately
@@ -955,6 +958,9 @@ function App() {
                   part={sourcePart}
                   draftFeatures={draftFeatures}
                   units={useProjectStore.getState().units}
+                  selectedFeatureId={selectedFeatureId}
+                  onSelectFeature={selectPartCutsFeature}
+                  onDraftFeaturesChange={setPartCutsDraftFeatures}
                   onExit={requestPartCutsExit}
                   onSave={savePartCutsAndExit}
                   hasUnsavedChanges={partCutsHasUnsavedChanges}

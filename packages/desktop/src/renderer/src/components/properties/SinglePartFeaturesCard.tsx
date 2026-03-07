@@ -1,5 +1,19 @@
 import { FractionInput } from '@renderer/components/common/FractionInput';
 import { HelpTooltip } from '@renderer/components/common/HelpTooltip';
+import {
+  buildDraftFromFeature,
+  buildDraftFromPreset,
+  buildFeatureFromDraft,
+  CORNER_TARGETS,
+  duplicateFeature,
+  EDGE_TARGETS,
+  END_TARGETS,
+  FACE_TARGETS,
+  FeatureDraft,
+  getPresetHint,
+  getPresetLabel,
+  OperationPreset
+} from '@renderer/components/part-features/partFeatureEditorState';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@renderer/components/ui/accordion';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
@@ -7,16 +21,7 @@ import { Checkbox } from '@renderer/components/ui/checkbox';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { Select } from '@renderer/components/ui/select';
-import {
-  CornerTarget,
-  EdgeTarget,
-  EndCutFeature,
-  FaceTarget,
-  Part,
-  PartFeature,
-  RectCutFeature
-} from '@renderer/types';
-import { clonePartFeature } from '@renderer/utils/partFeatures';
+import { EndCutFeature, Part, PartFeature, RectCutFeature } from '@renderer/types';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import { getDerivedLengthMeasurements, getLengthReferenceValue } from '@renderer/utils/endCutUtils';
 import {
@@ -34,221 +39,10 @@ import {
 } from '@renderer/utils/partFeatureSummary';
 import { useEffect, useMemo, useState } from 'react';
 
-const END_TARGETS: FaceTarget[] = ['left_end', 'right_end'];
-const FACE_TARGETS: FaceTarget[] = ['left_end', 'right_end', 'top_face', 'bottom_face', 'front_face', 'back_face'];
-const EDGE_TARGETS: EdgeTarget[] = [
-  'top_front_edge',
-  'top_back_edge',
-  'top_left_edge',
-  'top_right_edge',
-  'bottom_front_edge',
-  'bottom_back_edge',
-  'bottom_left_edge',
-  'bottom_right_edge',
-  'front_left_edge',
-  'front_right_edge',
-  'back_left_edge',
-  'back_right_edge'
-];
-const CORNER_TARGETS: CornerTarget[] = [
-  'front_top_left_corner',
-  'front_top_right_corner',
-  'front_bottom_left_corner',
-  'front_bottom_right_corner',
-  'back_top_left_corner',
-  'back_top_right_corner',
-  'back_bottom_left_corner',
-  'back_bottom_right_corner'
-];
-
-type OperationPreset = 'end_cut' | 'corner_notch' | 'edge_notch' | 'cutout';
-
-type FeatureDraft =
-  | {
-      mode: 'end_cut';
-      featureId: string | null;
-      label: string;
-      enabled: boolean;
-      targetFace: 'left_end' | 'right_end';
-      cutType: EndCutFeature['cutType'];
-      lengthMode: EndCutFeature['lengthMode'];
-      horizontalAngle: number;
-      verticalAngle: number;
-    }
-  | {
-      mode: 'rect_cut';
-      featureId: string | null;
-      label: string;
-      enabled: boolean;
-      cutType: RectCutFeature['cutType'];
-      faceTarget: FaceTarget;
-      edgeTarget: EdgeTarget;
-      cornerTarget: CornerTarget;
-      sizeLength: number;
-      sizeWidth: number;
-      depthMode: RectCutFeature['parameters']['depthMode'];
-      depth: number;
-      placementX: number;
-      placementZ: number;
-    };
-
 interface SinglePartFeaturesCardProps {
   selectedPart: Part;
   units: 'imperial' | 'metric';
   onFeaturesChange: (features: PartFeature[]) => void;
-}
-
-function generateFeatureId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `feature_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function buildDraftFromPreset(preset: OperationPreset): FeatureDraft {
-  if (preset === 'end_cut') {
-    return {
-      mode: 'end_cut',
-      featureId: null,
-      label: '',
-      enabled: true,
-      targetFace: 'left_end',
-      cutType: 'mitre',
-      lengthMode: 'long_point',
-      horizontalAngle: 45,
-      verticalAngle: 0
-    };
-  }
-
-  return {
-    mode: 'rect_cut',
-    featureId: null,
-    label: '',
-    enabled: true,
-    cutType: preset,
-    faceTarget: 'top_face',
-    edgeTarget: 'top_front_edge',
-    cornerTarget: 'front_bottom_left_corner',
-    sizeLength: 0.75,
-    sizeWidth: 0.75,
-    depthMode: 'through',
-    depth: 0.25,
-    placementX: 0,
-    placementZ: 0
-  };
-}
-
-function buildDraftFromFeature(feature: PartFeature): FeatureDraft {
-  if (feature.kind === 'end_cut') {
-    return {
-      mode: 'end_cut',
-      featureId: feature.id,
-      label: feature.label ?? '',
-      enabled: feature.enabled,
-      targetFace: feature.target.face,
-      cutType: feature.cutType,
-      lengthMode: feature.lengthMode,
-      horizontalAngle: feature.parameters.horizontalAngle,
-      verticalAngle: feature.parameters.verticalAngle ?? 0
-    };
-  }
-
-  return {
-    mode: 'rect_cut',
-    featureId: feature.id,
-    label: feature.label ?? '',
-    enabled: feature.enabled,
-    cutType: feature.cutType,
-    faceTarget: feature.target.type === 'face' ? feature.target.face : 'top_face',
-    edgeTarget: feature.target.type === 'edge' ? feature.target.edge : 'top_front_edge',
-    cornerTarget: feature.target.type === 'corner' ? feature.target.corner : 'front_bottom_left_corner',
-    sizeLength: feature.parameters.size.length,
-    sizeWidth: feature.parameters.size.width,
-    depthMode: feature.parameters.depthMode,
-    depth: feature.parameters.depth ?? 0.25,
-    placementX: feature.placement.x,
-    placementZ: feature.placement.z
-  };
-}
-
-function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
-  if (draft.mode === 'end_cut') {
-    return {
-      id: draft.featureId ?? generateFeatureId(),
-      kind: 'end_cut',
-      version: 1,
-      enabled: draft.enabled,
-      label: draft.label || undefined,
-      target: { type: 'face', face: draft.targetFace },
-      reference: { primaryFrom: draft.targetFace === 'left_end' ? 'min' : 'max' },
-      cutType: draft.cutType,
-      lengthMode: draft.lengthMode,
-      parameters: {
-        horizontalAngle: draft.cutType === 'bevel' ? 0 : draft.horizontalAngle,
-        verticalAngle:
-          draft.cutType === 'mitre' || draft.cutType === 'square' ? undefined : draft.verticalAngle || undefined
-      }
-    };
-  }
-
-  const target =
-    draft.cutType === 'corner_notch'
-      ? { type: 'corner' as const, corner: draft.cornerTarget }
-      : draft.cutType === 'edge_notch'
-        ? { type: 'edge' as const, edge: draft.edgeTarget }
-        : { type: 'face' as const, face: draft.faceTarget };
-
-  return {
-    id: draft.featureId ?? generateFeatureId(),
-    kind: 'rect_cut',
-    version: 1,
-    enabled: draft.enabled,
-    label: draft.label || undefined,
-    target,
-    reference: {
-      primaryFrom: 'min',
-      secondaryFrom: draft.cutType === 'corner_notch' ? 'min' : undefined
-    },
-    cutType: draft.cutType,
-    parameters: {
-      size: {
-        length: draft.sizeLength,
-        width: draft.sizeWidth
-      },
-      depthMode: draft.depthMode,
-      depth: draft.depthMode === 'blind' ? draft.depth : undefined
-    },
-    placement: {
-      x: draft.cutType === 'corner_notch' ? 0 : draft.placementX,
-      z: draft.cutType === 'corner_notch' ? 0 : draft.placementZ
-    }
-  };
-}
-
-function getPresetLabel(preset: OperationPreset): string {
-  switch (preset) {
-    case 'end_cut':
-      return 'End Cut';
-    case 'corner_notch':
-      return 'Corner Notch';
-    case 'edge_notch':
-      return 'Edge Notch';
-    case 'cutout':
-      return 'Cutout';
-  }
-}
-
-function getPresetHint(preset: OperationPreset): string {
-  switch (preset) {
-    case 'end_cut':
-      return 'Mitres, bevels, and compound cuts on either end.';
-    case 'corner_notch':
-      return 'Remove a rectangular chunk from one exact corner.';
-    case 'edge_notch':
-      return 'Notch into a specific edge while keeping the blank rectangular.';
-    case 'cutout':
-      return 'Place a rectangular pocket or opening on one face.';
-  }
 }
 
 export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }: SinglePartFeaturesCardProps) {
@@ -343,9 +137,7 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
   };
 
   const handleDuplicateFeature = (feature: PartFeature) => {
-    const duplicate = clonePartFeature(feature);
-    duplicate.id = generateFeatureId();
-    onFeaturesChange([...features, duplicate]);
+    onFeaturesChange([...features, duplicateFeature(feature)]);
   };
 
   return (
