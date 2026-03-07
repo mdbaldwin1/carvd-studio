@@ -43,7 +43,15 @@ export const CORNER_TARGETS: CornerTarget[] = [
   'back_bottom_right_corner'
 ];
 
-export type OperationPreset = 'end_cut' | 'corner_notch' | 'edge_notch' | 'cutout' | 'dado' | 'rabbet';
+export type OperationPreset =
+  | 'end_cut'
+  | 'corner_notch'
+  | 'edge_notch'
+  | 'cutout'
+  | 'dado'
+  | 'rabbet'
+  | 'groove'
+  | 'mortise';
 
 export type FeatureDraft =
   | {
@@ -105,9 +113,10 @@ export function buildDraftFromPreset(preset: OperationPreset): FeatureDraft {
     faceTarget: preset === 'dado' ? 'top_face' : 'top_face',
     edgeTarget: preset === 'rabbet' ? 'top_front_edge' : 'top_front_edge',
     cornerTarget: 'front_bottom_left_corner',
-    sizeLength: preset === 'dado' ? 0.75 : preset === 'rabbet' ? 0.5 : 0.75,
-    sizeWidth: preset === 'rabbet' ? 0.5 : 0.75,
-    depthMode: preset === 'dado' || preset === 'rabbet' ? 'blind' : 'through',
+    sizeLength: preset === 'dado' ? 0.75 : preset === 'rabbet' ? 0.5 : preset === 'mortise' ? 2 : 0.75,
+    sizeWidth: preset === 'rabbet' || preset === 'groove' ? 0.5 : 0.75,
+    depthMode:
+      preset === 'dado' || preset === 'rabbet' || preset === 'groove' || preset === 'mortise' ? 'blind' : 'through',
     depth: 0.25,
     placementX: 0,
     placementZ: 0
@@ -257,6 +266,10 @@ export function getPresetLabel(preset: OperationPreset): string {
       return 'Dado';
     case 'rabbet':
       return 'Rabbet';
+    case 'groove':
+      return 'Groove';
+    case 'mortise':
+      return 'Mortise';
   }
 }
 
@@ -274,5 +287,9 @@ export function getPresetHint(preset: OperationPreset): string {
       return 'Cut a full-width channel across the top or bottom face.';
     case 'rabbet':
       return 'Cut a full-run edge recess along one supported edge.';
+    case 'groove':
+      return 'Cut a full-length face groove with blind depth.';
+    case 'mortise':
+      return 'Cut a blind face pocket for loose-tenon or joinery layout.';
   }
 }

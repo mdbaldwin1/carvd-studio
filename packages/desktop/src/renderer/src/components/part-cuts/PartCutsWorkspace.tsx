@@ -105,6 +105,10 @@ function getOperationPresetLabel(preset: OperationPreset): string {
       return 'Dado';
     case 'rabbet':
       return 'Rabbet';
+    case 'groove':
+      return 'Groove';
+    case 'mortise':
+      return 'Mortise';
   }
 }
 
@@ -122,6 +126,10 @@ function getOperationPresetHint(preset: OperationPreset): string {
       return 'Cut a full-width channel across the top or bottom face.';
     case 'rabbet':
       return 'Cut a full-run edge recess along one supported edge.';
+    case 'groove':
+      return 'Cut a full-length face groove with blind depth.';
+    case 'mortise':
+      return 'Cut a blind face pocket for joinery layout.';
   }
 }
 
@@ -173,7 +181,9 @@ export function PartCutsWorkspace({
   }, [draft]);
 
   const availableFaceTargets = useMemo(() => {
-    if (!draft || draft.mode !== 'rect_cut' || !['cutout', 'dado'].includes(draft.cutType)) return FACE_TARGETS;
+    if (!draft || draft.mode !== 'rect_cut' || !['cutout', 'dado', 'groove', 'mortise'].includes(draft.cutType)) {
+      return FACE_TARGETS;
+    }
     return TOP_BOTTOM_FACE_TARGETS;
   }, [draft]);
 
@@ -367,23 +377,32 @@ export function PartCutsWorkspace({
             <div className="space-y-2">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Add Operation</div>
               <div className="grid grid-cols-2 gap-2">
-                {(['end_cut', 'corner_notch', 'edge_notch', 'cutout', 'dado', 'rabbet'] as OperationPreset[]).map(
-                  (preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      className={`rounded-md border px-3 py-2 text-left transition-colors ${
-                        activePreset === preset
-                          ? 'border-accent bg-accent/10 text-text'
-                          : 'border-border bg-bg-secondary hover:bg-bg-tertiary'
-                      }`}
-                      onClick={() => handleStartPreset(preset)}
-                    >
-                      <div className="text-[12px] font-semibold">{getOperationPresetLabel(preset)}</div>
-                      <div className="mt-1 text-[11px] text-text-muted">{getOperationPresetHint(preset)}</div>
-                    </button>
-                  )
-                )}
+                {(
+                  [
+                    'end_cut',
+                    'corner_notch',
+                    'edge_notch',
+                    'cutout',
+                    'dado',
+                    'rabbet',
+                    'groove',
+                    'mortise'
+                  ] as OperationPreset[]
+                ).map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className={`rounded-md border px-3 py-2 text-left transition-colors ${
+                      activePreset === preset
+                        ? 'border-accent bg-accent/10 text-text'
+                        : 'border-border bg-bg-secondary hover:bg-bg-tertiary'
+                    }`}
+                    onClick={() => handleStartPreset(preset)}
+                  >
+                    <div className="text-[12px] font-semibold">{getOperationPresetLabel(preset)}</div>
+                    <div className="mt-1 text-[11px] text-text-muted">{getOperationPresetHint(preset)}</div>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -676,7 +695,7 @@ export function PartCutsWorkspace({
                     )}
 
                   {inspectorDraft.mode === 'rect_cut' &&
-                    (inspectorDraft.cutType === 'cutout' || inspectorDraft.cutType === 'dado') && (
+                    ['cutout', 'dado', 'groove', 'mortise'].includes(inspectorDraft.cutType) && (
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         {availableFaceTargets.map((target) => (
                           <Button
@@ -825,6 +844,8 @@ export function PartCutsWorkspace({
                               <option value="cutout">Cutout</option>
                               <option value="dado">Dado</option>
                               <option value="rabbet">Rabbet</option>
+                              <option value="groove">Groove</option>
+                              <option value="mortise">Mortise</option>
                             </Select>
                           </div>
                           <div>
@@ -832,7 +853,12 @@ export function PartCutsWorkspace({
                             <Select
                               id="depth-mode"
                               value={inspectorDraft.depthMode}
-                              disabled={inspectorDraft.cutType === 'dado' || inspectorDraft.cutType === 'rabbet'}
+                              disabled={
+                                inspectorDraft.cutType === 'dado' ||
+                                inspectorDraft.cutType === 'rabbet' ||
+                                inspectorDraft.cutType === 'groove' ||
+                                inspectorDraft.cutType === 'mortise'
+                              }
                               onChange={(e) =>
                                 setDraft({
                                   ...inspectorDraft,
@@ -862,15 +888,34 @@ export function PartCutsWorkspace({
                             Rabbet runs full edge length in this POC. Set the shoulder width and blind depth.
                           </p>
                         )}
+                        {inspectorDraft.cutType === 'groove' && (
+                          <p className="text-[11px] text-text-muted">
+                            Groove runs full board length in this POC. Set the groove width across the board and the
+                            blind depth.
+                          </p>
+                        )}
+                        {inspectorDraft.cutType === 'mortise' && (
+                          <p className="text-[11px] text-text-muted">
+                            Mortise is a blind face pocket in this POC. Set pocket size, placement, and blind depth.
+                          </p>
+                        )}
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div>
-                            <Label>{inspectorDraft.cutType === 'rabbet' ? 'Shoulder Width' : 'Run Along Blank'}</Label>
+                            <Label>
+                              {inspectorDraft.cutType === 'rabbet'
+                                ? 'Shoulder Width'
+                                : inspectorDraft.cutType === 'groove'
+                                  ? 'Full Board Run'
+                                  : 'Run Along Blank'}
+                            </Label>
                             <FractionInput
                               value={
                                 inspectorDraft.cutType === 'rabbet'
                                   ? (rabbetShoulderValue ?? 0.5)
-                                  : inspectorDraft.sizeLength
+                                  : inspectorDraft.cutType === 'groove'
+                                    ? part.length
+                                    : inspectorDraft.sizeLength
                               }
                               onChange={(value) =>
                                 setDraft(
@@ -880,10 +925,13 @@ export function PartCutsWorkspace({
                                         sizeLength: rabbetRunsAlongLength ? inspectorDraft.sizeLength : value,
                                         sizeWidth: rabbetRunsAlongLength ? value : inspectorDraft.sizeWidth
                                       }
-                                    : { ...inspectorDraft, sizeLength: value }
+                                    : inspectorDraft.cutType === 'groove'
+                                      ? { ...inspectorDraft, sizeLength: part.length }
+                                      : { ...inspectorDraft, sizeLength: value }
                                 )
                               }
                               min={0.125}
+                              disabled={inspectorDraft.cutType === 'groove'}
                             />
                           </div>
                           <div>
@@ -892,7 +940,9 @@ export function PartCutsWorkspace({
                                 ? 'Across Board Width'
                                 : inspectorDraft.cutType === 'rabbet'
                                   ? 'Full Edge Run'
-                                  : 'Cross-Cut Width'}
+                                  : inspectorDraft.cutType === 'groove'
+                                    ? 'Groove Width'
+                                    : 'Cross-Cut Width'}
                             </Label>
                             <FractionInput
                               value={
@@ -902,17 +952,21 @@ export function PartCutsWorkspace({
                                     ? rabbetRunsAlongLength
                                       ? part.length
                                       : part.width
-                                    : inspectorDraft.sizeWidth
+                                    : inspectorDraft.cutType === 'groove'
+                                      ? inspectorDraft.sizeWidth
+                                      : inspectorDraft.sizeWidth
                               }
                               onChange={(value) => setDraft({ ...inspectorDraft, sizeWidth: value })}
                               min={0.125}
                               disabled={inspectorDraft.cutType === 'dado' || inspectorDraft.cutType === 'rabbet'}
                             />
-                            {(inspectorDraft.cutType === 'dado' || inspectorDraft.cutType === 'rabbet') && (
+                            {['dado', 'rabbet', 'groove'].includes(inspectorDraft.cutType) && (
                               <p className="mt-1 text-[11px] text-text-muted">
                                 {inspectorDraft.cutType === 'dado'
                                   ? 'Derived from blank width.'
-                                  : 'Runs full edge length in this POC.'}
+                                  : inspectorDraft.cutType === 'rabbet'
+                                    ? 'Runs full edge length in this POC.'
+                                    : 'Derived from blank length.'}
                               </p>
                             )}
                           </div>
@@ -931,7 +985,8 @@ export function PartCutsWorkspace({
 
                         {inspectorDraft.cutType !== 'corner_notch' &&
                           inspectorDraft.cutType !== 'dado' &&
-                          inspectorDraft.cutType !== 'rabbet' && (
+                          inspectorDraft.cutType !== 'rabbet' &&
+                          inspectorDraft.cutType !== 'groove' && (
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                               <div>
                                 <Label>Offset Along Length</Label>
@@ -955,9 +1010,11 @@ export function PartCutsWorkspace({
                         {inspectorDraft.depthMode === 'blind' &&
                           (inspectorDraft.cutType === 'corner_notch' ||
                             inspectorDraft.cutType === 'edge_notch' ||
-                            inspectorDraft.cutType === 'rabbet') && (
+                            inspectorDraft.cutType === 'rabbet' ||
+                            inspectorDraft.cutType === 'groove' ||
+                            inspectorDraft.cutType === 'mortise') && (
                             <p className="text-[11px] text-text-muted">
-                              Blind notch previews currently support top or bottom targets so the recess direction stays
+                              Blind previews currently support top or bottom targets so the recess direction stays
                               unambiguous.
                             </p>
                           )}

@@ -82,6 +82,14 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
     return `Rabbet on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(shoulderWidth, units)} shoulder × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
   }
 
+  if (feature.cutType === 'groove') {
+    return `Groove on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.width, units)} wide × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+  }
+
+  if (feature.cutType === 'mortise') {
+    return `Mortise on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)} × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+  }
+
   return `${toTitleCase(feature.cutType)} on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)}`;
 }
 

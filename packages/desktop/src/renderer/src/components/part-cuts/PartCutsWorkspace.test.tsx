@@ -349,6 +349,32 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByText(/Rabbet runs full edge length/i)).toBeInTheDocument();
   });
 
+  it('supports groove and mortise operation types in the inspector', () => {
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Panel', width: 8 })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={vi.fn()}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={false}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Groove'));
+    expect(screen.getByText(/Groove runs full board length/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Removal Type'), { target: { value: 'mortise' } });
+    expect(screen.getByText(/Mortise is a blind face pocket/i)).toBeInTheDocument();
+  });
+
   it('uses explicit part-level footer actions', () => {
     render(
       <PartCutsWorkspace

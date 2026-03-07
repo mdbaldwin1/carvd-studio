@@ -406,6 +406,53 @@ describe('partFeatureGeometry', () => {
     expect(geometry.boundingBox?.max.x).toBeCloseTo(12);
   });
 
+  it('renders groove and mortise operations through the constrained face-cut path', () => {
+    const geometry = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 8,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'groove',
+            parameters: {
+              size: { length: 0.25, width: 0.25 },
+              depthMode: 'blind',
+              depth: 0.25
+            },
+            placement: { x: 0, z: 2 }
+          },
+          {
+            id: 'feature-2',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mortise',
+            parameters: {
+              size: { length: 2, width: 0.75 },
+              depthMode: 'blind',
+              depth: 0.25
+            },
+            placement: { x: 4, z: 1 }
+          }
+        ]
+      })
+    );
+
+    expect(geometry.getAttribute('position').count).toBeGreaterThan(24);
+    geometry.computeBoundingBox();
+    expect(geometry.boundingBox?.min.x).toBeCloseTo(-12);
+    expect(geometry.boundingBox?.max.x).toBeCloseTo(12);
+  });
+
   it('uses rendered geometry for ground-contact half-height', () => {
     const halfHeight = getPartWorldHalfHeight(
       createTestPart({
