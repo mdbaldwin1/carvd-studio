@@ -210,6 +210,20 @@ Each part gains:
 
 The blank dimensions are the source of truth for stock fit and optimization.
 
+### Extensibility rule
+
+Downstream beads must implement this as a feature framework with initial feature kinds, not as two isolated special cases.
+
+That means:
+
+- a shared base type
+- a shared target model
+- a shared placement/reference model
+- per-feature parameter payloads
+- room for metadata and future schema evolution
+
+The framework should be future-proof for more woodworking and fabrication features without pretending to be a full CAD kernel.
+
 ### Suggested type shape
 
 This is the canonical conceptual schema for downstream beads.
@@ -218,48 +232,68 @@ This is the canonical conceptual schema for downstream beads.
 type PartFeature = EndCutFeature | RectCutFeature;
 
 type PartFeatureId = string;
+type PartFeatureKind = "end_cut" | "rect_cut";
+type PartFeatureVersion = 1;
 
 interface PartFeatureBase {
   id: PartFeatureId;
-  kind: "end_cut" | "rect_cut";
+  kind: PartFeatureKind;
+  version: PartFeatureVersion;
   enabled: boolean;
   label?: string;
+  metadata?: Record<string, unknown>;
+  target: PartFeatureTarget;
+  reference: PartFeatureReference;
+}
+
+type PartFeatureTarget =
+  | { type: "face"; face: FaceTarget }
+  | { type: "edge"; edge: EdgeTarget }
+  | { type: "corner"; corner: CornerTarget };
+
+interface PartFeatureReference {
+  primaryFrom: "min" | "center" | "max";
+  secondaryFrom?: "min" | "center" | "max";
+  tertiaryFrom?: "min" | "center" | "max";
 }
 
 interface EndCutFeature extends PartFeatureBase {
   kind: "end_cut";
-  targetEnd: "left" | "right";
+  target: { type: "face"; face: "left_end" | "right_end" };
   cutType: "square" | "mitre" | "bevel" | "compound";
   lengthMode: "long_point" | "short_point" | "centerline";
-  angleAcrossFace: number;
-  angleAcrossThickness?: number;
+  parameters: {
+    horizontalAngle: number;
+    verticalAngle?: number;
+  };
 }
 
 interface RectCutFeature extends PartFeatureBase {
   kind: "rect_cut";
   cutType: "corner_notch" | "edge_notch" | "cutout";
-  target: RectCutTarget;
-  size: {
-    length: number;
-    width: number;
+  parameters: {
+    size: {
+      length: number;
+      width: number;
+    };
+    depthMode: "through" | "blind";
+    depth?: number;
   };
-  offset: {
+  placement: {
     x: number;
     z: number;
   };
-  depthMode: "through" | "blind";
-  depth?: number;
 }
 
-type RectCutTarget =
-  | "front_top_left_corner"
-  | "front_top_right_corner"
-  | "front_bottom_left_corner"
-  | "front_bottom_right_corner"
-  | "back_top_left_corner"
-  | "back_top_right_corner"
-  | "back_bottom_left_corner"
-  | "back_bottom_right_corner"
+type FaceTarget =
+  | "left_end"
+  | "right_end"
+  | "top_face"
+  | "bottom_face"
+  | "front_face"
+  | "back_face";
+
+type EdgeTarget =
   | "top_front_edge"
   | "top_back_edge"
   | "top_left_edge"
@@ -271,16 +305,52 @@ type RectCutTarget =
   | "front_left_edge"
   | "front_right_edge"
   | "back_left_edge"
-  | "back_right_edge"
-  | "left_end"
-  | "right_end"
-  | "top_face"
-  | "bottom_face"
-  | "front_face"
-  | "back_face";
+  | "back_right_edge";
+
+type CornerTarget =
+  | "front_top_left_corner"
+  | "front_top_right_corner"
+  | "front_bottom_left_corner"
+  | "front_bottom_right_corner"
+  | "back_top_left_corner"
+  | "back_top_right_corner"
+  | "back_bottom_left_corner"
+  | "back_bottom_right_corner";
 ```
 
 Downstream implementation can refine this, but should preserve the semantics below.
+
+### Why this schema is future-proof enough
+
+This shape intentionally leaves room for future woodworking features such as:
+
+- dados
+- rabbets
+- grooves
+- chamfers
+- drilling
+- mortises
+
+Those features can reuse:
+
+- `kind`
+- `target`
+- `reference`
+- `parameters`
+- `metadata`
+
+without forcing a schema rewrite.
+
+### What is intentionally not future-proofed
+
+This schema is not trying to pre-solve:
+
+- arbitrary freeform modeling
+- sketch constraints
+- feature dependency graphs between arbitrary parameters
+- full parametric CAD behavior
+
+That is intentional. The goal is extensible woodworking operations, not general CAD.
 
 ### Ordering
 
@@ -339,7 +409,7 @@ POC simplification:
 Rectangular removals use:
 
 - target
-- X/Z offsets from the anchor reference
+- placement offsets from the selected target reference
 - length and width of the removal
 - optional depth
 
@@ -492,7 +562,7 @@ Rules:
 
 - `corner_notch` originates at a fully named corner target
 - `edge_notch` originates from a fully named edge target
-- `cutout` originates from a fully named face target with explicit offsets
+- `cutout` originates from a fully named face target with explicit placement offsets
 
 The geometry engine may implement all of these through one rectangular-subtraction primitive so long as the authored semantics remain distinct in the UI and data model.
 
@@ -631,11 +701,21 @@ The POC does not need to solve:
 - joinery modeling beyond current allowances
 - parametric references between parts
 
+## Future Expansion Guardrails
+
+When adding new feature kinds later, follow these rules:
+
+1. Reuse the shared `target` model before inventing a feature-specific target field.
+2. Reuse `parameters` payloads instead of adding top-level one-off fields to every feature.
+3. Prefer additive schema evolution over mutating the meaning of existing fields.
+4. Add new `kind` variants without changing the meaning of `end_cut` or `rect_cut`.
+5. Keep blank dimensions authoritative for stock planning unless the product intentionally changes to a different manufacturing model.
+
 ## Downstream Bead Guidance
 
 ### For `12.2`
 
-Implement the schema as blank-plus-operations. Do not collapse the blank dimensions into finished silhouette dimensions.
+Implement the schema as blank-plus-operations. Do not collapse the blank dimensions into finished silhouette dimensions. Build a reusable feature framework with shared target/reference semantics instead of hard-coding only the two initial feature kinds.
 
 ### For `12.3`
 
