@@ -2,6 +2,23 @@
 
 Workflow and policy source of truth: see `AGENTS.md`. This file is reference guidance for `carvd-studio-15.1` and downstream ordered-feature beads.
 
+## Implemented POC Status
+
+As of beads `15.2` and `15.3`, the current branch now implements:
+
+- list-order-driven preview geometry for supported part-feature stacks
+- ordered end-cut precedence in the preview path instead of `max inset wins`
+- shared same-part conflict analysis for duplicate end cuts and overlapping rectangular removals
+- blocking cuts-mode save behavior for error-level ordered conflicts
+- cut-list validation that surfaces saved ordered conflicts
+- numbered fabrication lines that preserve authored operation order in reporting
+
+Still deferred:
+
+- richer conflict classes beyond the current warning/error split
+- deeper unsupported-intersection analysis for complex overlapping removals
+- more advanced sequential machining features beyond the current POC set
+
 ## Purpose
 
 Define how multiple operations on the same part behave when order matters.
