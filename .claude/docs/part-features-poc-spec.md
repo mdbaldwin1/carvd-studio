@@ -55,14 +55,30 @@ Use woodworking-facing labels in UI:
 - `Operations`
 - `Left End`
 - `Right End`
-- `Front Edge`
-- `Back Edge`
 - `Top Face`
 - `Bottom Face`
-- `Front-Left Corner`
-- `Front-Right Corner`
-- `Back-Left Corner`
-- `Back-Right Corner`
+- `Front Face`
+- `Back Face`
+- `Top-Front Edge`
+- `Top-Back Edge`
+- `Top-Left Edge`
+- `Top-Right Edge`
+- `Bottom-Front Edge`
+- `Bottom-Back Edge`
+- `Bottom-Left Edge`
+- `Bottom-Right Edge`
+- `Front-Left Edge`
+- `Front-Right Edge`
+- `Back-Left Edge`
+- `Back-Right Edge`
+- `Front-Top-Left Corner`
+- `Front-Top-Right Corner`
+- `Front-Bottom-Left Corner`
+- `Front-Bottom-Right Corner`
+- `Back-Top-Left Corner`
+- `Back-Top-Right Corner`
+- `Back-Bottom-Left Corner`
+- `Back-Bottom-Right Corner`
 
 Avoid leading with:
 
@@ -83,10 +99,53 @@ For the POC, part-local axes remain:
 User-facing names map to those axes:
 
 - left/right ends are the two faces normal to the length axis
-- front/back edges and corners are defined on the part's width side
-- top/bottom faces are defined on the thickness axis
+- front/back faces are the two faces normal to the width axis
+- top/bottom faces are the two faces normal to the thickness axis
+- edges are intersections of two named faces
+- corners are intersections of three named faces
 
 `Front` and `Back` are naming aids for operations. They do not imply room-facing semantics in the larger project.
+
+### Canonical target taxonomy
+
+The POC should use a true 3D target taxonomy.
+
+Faces:
+
+- `Top Face`
+- `Bottom Face`
+- `Front Face`
+- `Back Face`
+- `Left End`
+- `Right End`
+
+Edges:
+
+- `Top-Front Edge`
+- `Top-Back Edge`
+- `Top-Left Edge`
+- `Top-Right Edge`
+- `Bottom-Front Edge`
+- `Bottom-Back Edge`
+- `Bottom-Left Edge`
+- `Bottom-Right Edge`
+- `Front-Left Edge`
+- `Front-Right Edge`
+- `Back-Left Edge`
+- `Back-Right Edge`
+
+Corners:
+
+- `Front-Top-Left Corner`
+- `Front-Top-Right Corner`
+- `Front-Bottom-Left Corner`
+- `Front-Bottom-Right Corner`
+- `Back-Top-Left Corner`
+- `Back-Top-Right Corner`
+- `Back-Bottom-Left Corner`
+- `Back-Bottom-Right Corner`
+
+The earlier flatter naming model is too ambiguous for implementation and should not be used downstream.
 
 ## Supported Feature Taxonomy
 
@@ -179,7 +238,7 @@ interface EndCutFeature extends PartFeatureBase {
 interface RectCutFeature extends PartFeatureBase {
   kind: "rect_cut";
   cutType: "corner_notch" | "edge_notch" | "cutout";
-  anchor: RectCutAnchor;
+  target: RectCutTarget;
   size: {
     length: number;
     width: number;
@@ -192,17 +251,33 @@ interface RectCutFeature extends PartFeatureBase {
   depth?: number;
 }
 
-type RectCutAnchor =
-  | "front_left_corner"
-  | "front_right_corner"
-  | "back_left_corner"
-  | "back_right_corner"
-  | "front_edge"
-  | "back_edge"
+type RectCutTarget =
+  | "front_top_left_corner"
+  | "front_top_right_corner"
+  | "front_bottom_left_corner"
+  | "front_bottom_right_corner"
+  | "back_top_left_corner"
+  | "back_top_right_corner"
+  | "back_bottom_left_corner"
+  | "back_bottom_right_corner"
+  | "top_front_edge"
+  | "top_back_edge"
+  | "top_left_edge"
+  | "top_right_edge"
+  | "bottom_front_edge"
+  | "bottom_back_edge"
+  | "bottom_left_edge"
+  | "bottom_right_edge"
+  | "front_left_edge"
+  | "front_right_edge"
+  | "back_left_edge"
+  | "back_right_edge"
   | "left_end"
   | "right_end"
   | "top_face"
-  | "bottom_face";
+  | "bottom_face"
+  | "front_face"
+  | "back_face";
 ```
 
 Downstream implementation can refine this, but should preserve the semantics below.
@@ -263,7 +338,7 @@ POC simplification:
 
 Rectangular removals use:
 
-- anchor
+- target
 - X/Z offsets from the anchor reference
 - length and width of the removal
 - optional depth
@@ -282,10 +357,9 @@ Internal coordinates should be part-local and derived from blank dimensions.
 
 User-facing coordinates should always be described relative to:
 
-- an end
-- an edge
-- a face
-- a corner
+- a named face
+- a named edge
+- a named corner
 
 Never expose raw signed coordinates as the primary authoring method in the POC UI.
 
@@ -324,13 +398,18 @@ Within `Operations`, show:
 
 The diagram should show a simple rectangular board and expose clickable targets for:
 
-- left end
-- right end
-- top face
-- bottom face
-- front edge
-- back edge
-- four corners
+- 6 faces
+- 12 edges
+- 8 corners
+
+The UI should not render all 26 targets with equal visual weight at the same time.
+
+Recommended behavior:
+
+- show the broad structure of the part by default
+- after the user picks an operation kind, highlight only valid targets
+- allow hovering a face to reveal related edges and corners
+- use progressive disclosure to avoid label clutter
 
 The diagram is not decorative. It is the primary way to avoid axis-language confusion.
 
@@ -338,12 +417,18 @@ The diagram is not decorative. It is the primary way to avoid axis-language conf
 
 Recommended interaction:
 
-1. Select target on diagram or viewport affordance.
-2. Show only valid operations for that target.
-3. Choose operation kind.
+1. Choose operation kind first.
+2. Highlight only valid targets for that operation.
+3. Select target on diagram or viewport affordance.
 4. Enter dimensions / angle values.
 5. Preview immediately in 3D.
 6. Save operation into the part's operations list.
+
+Reason:
+
+- woodworkers usually think about the cut they want to make before the exact geometric target name
+- the full face/edge/corner taxonomy is clearer when invalid targets are hidden
+- this avoids forcing users to parse 26 possible targets up front
 
 ### Existing operation cards
 
@@ -360,7 +445,7 @@ Examples:
 
 - `Left End - Mitre 45 deg`
 - `Right End - Compound 45 deg / 10 deg`
-- `Back-Left Corner - Notch 3/4 x 3/4 through`
+- `Back-Bottom-Left Corner - Notch 3/4 x 3/4 through`
 
 ### Viewport affordances
 
@@ -405,9 +490,9 @@ Rectangular removals subtract from the blank.
 
 Rules:
 
-- `corner_notch` originates at a corner anchor
-- `edge_notch` originates from a named edge anchor
-- `cutout` originates from a face anchor with explicit offsets
+- `corner_notch` originates at a fully named corner target
+- `edge_notch` originates from a fully named edge target
+- `cutout` originates from a fully named face target with explicit offsets
 
 The geometry engine may implement all of these through one rectangular-subtraction primitive so long as the authored semantics remain distinct in the UI and data model.
 
@@ -528,9 +613,9 @@ Defaults:
 
 Defaults:
 
-- `corner_notch` if a corner is selected
-- `edge_notch` if an edge is selected
-- `cutout` if a face is selected
+- `corner_notch` if a corner target is selected
+- `edge_notch` if an edge target is selected
+- `cutout` if a face target is selected
 - initial size `0.75 x 0.75`
 - default depth `through`
 
