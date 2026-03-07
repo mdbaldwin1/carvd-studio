@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Expanded cuts preset set (POC)** — Part Cuts now includes richer starter presets, including compound end-cut pairs, centered dado starters, rabbet starters, and paired corner-relief presets for faster stack authoring.
 - **Cuts workspace clarity pass (POC)** — Part Cuts now shows draft status, a short workflow guide, stronger selected-operation emphasis, clearer derived-field messaging for constrained operations, and explicit `Back to Project` / `Save Part` footer actions.
 - **Cuts presets and mirroring in Part Cuts (POC)** — The dedicated cuts workspace now includes quick presets for common end-cut and notch/cutout setups, plus mirror actions that copy supported operations to the opposite end or across the board axes without leaving cuts mode.
 - **Ordered multi-operation validation for part cuts (POC)** — Enabled operations on a board now follow explicit list order in the preview path, duplicate enabled end cuts on the same end are treated as blocking conflicts, cuts-mode save and cut-list validation now use the same ordered conflict rules, and fabrication instructions are numbered so exported/report surfaces preserve authored operation order.

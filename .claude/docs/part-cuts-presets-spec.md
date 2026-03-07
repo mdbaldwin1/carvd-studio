@@ -43,6 +43,7 @@ The POC should support these workspace presets.
 - `Mitre Both Ends (45°)`
 - `Bevel Both Ends (15°)`
 - `Square Both Ends`
+- `Compound Both Ends (45° / 15°)`
 
 Each preset should create two ordered `end_cut` operations:
 
@@ -59,6 +60,11 @@ The generated pair should use the same angle/reference defaults unless the prese
 - `Top Back Edge Notch`
 - `Top Front Left Corner Notch`
 - `Top Front Right Corner Notch`
+- `Centered Dado`
+- `Top Front Rabbet`
+- `Top Back Rabbet`
+- `Top Front Corners`
+- `Bottom Front Corners`
 
 These are convenience starting points only. After creation, the user can edit target, size, placement, and depth normally.
 
