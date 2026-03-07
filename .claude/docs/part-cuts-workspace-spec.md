@@ -2,6 +2,25 @@
 
 Workflow and policy source of truth: see `AGENTS.md`. This file is reference guidance for `carvd-studio-13.1` and downstream dedicated-cuts-workspace beads.
 
+## Implemented POC Status
+
+As of beads `13.2` through `13.5`, the implemented POC behavior is:
+
+- dedicated `Part Cuts` mode exists in the app shell
+- entry points exist from the part Properties panel and part context menu
+- a draft session clones part features and supports save/discard/exit handling
+- operation-stack authoring now lives in the cuts workspace
+- reordering, duplication, removal, and enable/disable all happen there
+- the main Properties panel is reduced to a compact cuts summary plus `Edit Cuts`
+- the preview currently uses a target-map workflow and conflict/status feedback instead of full 3D picking
+
+Still deferred beyond the current implemented POC:
+
+- true 3D target picking in the viewport
+- richer geometry-linked preview interaction
+- broader conflict rules beyond the current same-end / overlapping-rect-cut checks
+- additional woodworking operations beyond the current POC feature set
+
 ## Purpose
 
 Define the dedicated `Part Cuts` workspace as the primary authoring surface for fabrication operations on a single part.

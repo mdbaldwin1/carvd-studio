@@ -105,4 +105,20 @@ describe('usePartCutsEditing', () => {
 
     expect(usePartCutsEditingStore.getState().showExitDialog).toBe(true);
   });
+
+  it('discards draft changes and keeps the part selected', () => {
+    const { result } = renderHook(() => usePartCutsEditing());
+
+    act(() => {
+      result.current.openForPart('part-1');
+    });
+
+    act(() => {
+      result.current.setDraftFeatures([]);
+      result.current.discardAndExit();
+    });
+
+    expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(false);
+    expect(useSelectionStore.getState().selectedPartIds).toEqual(['part-1']);
+  });
 });
