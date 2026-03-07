@@ -25,42 +25,14 @@ import {
   TOP_BOTTOM_FACE_TARGETS,
   validateRectCutFeature
 } from '@renderer/utils/rectCutUtils';
+import {
+  CORNER_LABELS,
+  EDGE_LABELS,
+  FACE_LABELS,
+  getFeatureSummary,
+  getFeatureTargetLabel
+} from '@renderer/utils/partFeatureSummary';
 import { useEffect, useMemo, useState } from 'react';
-
-const FACE_LABELS: Record<FaceTarget, string> = {
-  left_end: 'Left End',
-  right_end: 'Right End',
-  top_face: 'Top Face',
-  bottom_face: 'Bottom Face',
-  front_face: 'Front Face',
-  back_face: 'Back Face'
-};
-
-const EDGE_LABELS: Record<EdgeTarget, string> = {
-  top_front_edge: 'Top-Front Edge',
-  top_back_edge: 'Top-Back Edge',
-  top_left_edge: 'Top-Left Edge',
-  top_right_edge: 'Top-Right Edge',
-  bottom_front_edge: 'Bottom-Front Edge',
-  bottom_back_edge: 'Bottom-Back Edge',
-  bottom_left_edge: 'Bottom-Left Edge',
-  bottom_right_edge: 'Bottom-Right Edge',
-  front_left_edge: 'Front-Left Edge',
-  front_right_edge: 'Front-Right Edge',
-  back_left_edge: 'Back-Left Edge',
-  back_right_edge: 'Back-Right Edge'
-};
-
-const CORNER_LABELS: Record<CornerTarget, string> = {
-  front_top_left_corner: 'Front-Top-Left Corner',
-  front_top_right_corner: 'Front-Top-Right Corner',
-  front_bottom_left_corner: 'Front-Bottom-Left Corner',
-  front_bottom_right_corner: 'Front-Bottom-Right Corner',
-  back_top_left_corner: 'Back-Top-Left Corner',
-  back_top_right_corner: 'Back-Top-Right Corner',
-  back_bottom_left_corner: 'Back-Bottom-Left Corner',
-  back_bottom_right_corner: 'Back-Bottom-Right Corner'
-};
 
 const END_TARGETS: FaceTarget[] = ['left_end', 'right_end'];
 const FACE_TARGETS: FaceTarget[] = ['left_end', 'right_end', 'top_face', 'bottom_face', 'front_face', 'back_face'];
@@ -197,39 +169,6 @@ function buildDraftFromFeature(feature: PartFeature): FeatureDraft {
     placementX: feature.placement.x,
     placementZ: feature.placement.z
   };
-}
-
-function getFeatureTargetLabel(feature: PartFeature): string {
-  if (feature.target.type === 'face') return FACE_LABELS[feature.target.face];
-  if (feature.target.type === 'edge') return EDGE_LABELS[feature.target.edge];
-  return CORNER_LABELS[feature.target.corner];
-}
-
-function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'metric'): string {
-  if (feature.kind === 'end_cut') {
-    const angleBits = [];
-    if (feature.cutType === 'mitre' || feature.cutType === 'compound') {
-      angleBits.push(`${feature.parameters.horizontalAngle}°`);
-    }
-    if ((feature.cutType === 'bevel' || feature.cutType === 'compound') && feature.parameters.verticalAngle) {
-      angleBits.push(`${feature.parameters.verticalAngle}° bevel`);
-    }
-    const angleText = angleBits.length > 0 ? ` ${angleBits.join(' / ')}` : '';
-    const referenceLabel =
-      feature.lengthMode === 'centerline'
-        ? 'Centerline'
-        : feature.lengthMode === 'short_point'
-          ? 'Short Point'
-          : 'Long Point';
-    return `${feature.cutType[0].toUpperCase()}${feature.cutType.slice(1)}${angleText} on ${getFeatureTargetLabel(feature)} · ${referenceLabel} reference`;
-  }
-
-  return `${feature.cutType
-    .split('_')
-    .map((word) => word[0].toUpperCase() + word.slice(1))
-    .join(
-      ' '
-    )} on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)}`;
 }
 
 function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
