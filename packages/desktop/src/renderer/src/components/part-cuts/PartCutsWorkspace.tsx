@@ -394,10 +394,16 @@ export function PartCutsWorkspace({
                   [
                     'mitre_both_ends',
                     'bevel_both_ends',
+                    'compound_both_ends',
                     'square_both_ends',
+                    'centered_dado',
+                    'top_front_rabbet',
+                    'top_back_rabbet',
                     'top_cutout',
                     'top_front_edge_notch',
-                    'top_front_left_corner_notch'
+                    'top_front_left_corner_notch',
+                    'top_front_corners',
+                    'bottom_front_corners'
                   ] as WorkspacePreset[]
                 ).map((preset) => (
                   <button

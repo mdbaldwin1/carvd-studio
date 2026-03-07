@@ -5,12 +5,18 @@ export type WorkspacePreset =
   | 'mitre_both_ends'
   | 'bevel_both_ends'
   | 'square_both_ends'
+  | 'compound_both_ends'
   | 'top_cutout'
   | 'bottom_cutout'
+  | 'centered_dado'
+  | 'top_front_rabbet'
+  | 'top_back_rabbet'
   | 'top_front_edge_notch'
   | 'top_back_edge_notch'
   | 'top_front_left_corner_notch'
-  | 'top_front_right_corner_notch';
+  | 'top_front_right_corner_notch'
+  | 'top_front_corners'
+  | 'bottom_front_corners';
 
 export type MirrorAction = 'opposite_end' | 'across_length' | 'across_width';
 
@@ -85,10 +91,48 @@ export function buildFeaturesFromPreset(preset: WorkspacePreset): PartFeature[] 
         buildEndCut('left_end', 'square', { horizontalAngle: 0 }, 'long_point'),
         buildEndCut('right_end', 'square', { horizontalAngle: 0 }, 'long_point')
       ];
+    case 'compound_both_ends':
+      return [
+        buildEndCut('left_end', 'compound', { horizontalAngle: 45, verticalAngle: 15 }, 'long_point'),
+        buildEndCut('right_end', 'compound', { horizontalAngle: 45, verticalAngle: 15 }, 'long_point')
+      ];
     case 'top_cutout':
       return [buildRectCut('cutout', { type: 'face', face: 'top_face' }, { x: 0, z: 0 }, { length: 3, width: 1.5 })];
     case 'bottom_cutout':
       return [buildRectCut('cutout', { type: 'face', face: 'bottom_face' }, { x: 0, z: 0 }, { length: 3, width: 1.5 })];
+    case 'centered_dado':
+      return [
+        buildRectCut(
+          'dado',
+          { type: 'face', face: 'top_face' },
+          { x: 6, z: 0 },
+          { length: 0.75, width: 0 },
+          'blind',
+          0.375
+        )
+      ];
+    case 'top_front_rabbet':
+      return [
+        buildRectCut(
+          'rabbet',
+          { type: 'edge', edge: 'top_front_edge' },
+          { x: 0, z: 0 },
+          { length: 0.5, width: 0.5 },
+          'blind',
+          0.25
+        )
+      ];
+    case 'top_back_rabbet':
+      return [
+        buildRectCut(
+          'rabbet',
+          { type: 'edge', edge: 'top_back_edge' },
+          { x: 0, z: 0 },
+          { length: 0.5, width: 0.5 },
+          'blind',
+          0.25
+        )
+      ];
     case 'top_front_edge_notch':
       return [
         buildRectCut(
@@ -121,6 +165,36 @@ export function buildFeaturesFromPreset(preset: WorkspacePreset): PartFeature[] 
         buildRectCut(
           'corner_notch',
           { type: 'corner', corner: 'front_top_right_corner' },
+          { x: 0, z: 0 },
+          { length: 0.75, width: 0.75 }
+        )
+      ];
+    case 'top_front_corners':
+      return [
+        buildRectCut(
+          'corner_notch',
+          { type: 'corner', corner: 'front_top_left_corner' },
+          { x: 0, z: 0 },
+          { length: 0.75, width: 0.75 }
+        ),
+        buildRectCut(
+          'corner_notch',
+          { type: 'corner', corner: 'front_top_right_corner' },
+          { x: 0, z: 0 },
+          { length: 0.75, width: 0.75 }
+        )
+      ];
+    case 'bottom_front_corners':
+      return [
+        buildRectCut(
+          'corner_notch',
+          { type: 'corner', corner: 'front_bottom_left_corner' },
+          { x: 0, z: 0 },
+          { length: 0.75, width: 0.75 }
+        ),
+        buildRectCut(
+          'corner_notch',
+          { type: 'corner', corner: 'front_bottom_right_corner' },
           { x: 0, z: 0 },
           { length: 0.75, width: 0.75 }
         )
@@ -275,10 +349,18 @@ export function getWorkspacePresetLabel(preset: WorkspacePreset): string {
       return 'Bevel Both Ends';
     case 'square_both_ends':
       return 'Square Both Ends';
+    case 'compound_both_ends':
+      return 'Compound Both Ends';
     case 'top_cutout':
       return 'Top Cutout';
     case 'bottom_cutout':
       return 'Bottom Cutout';
+    case 'centered_dado':
+      return 'Centered Dado';
+    case 'top_front_rabbet':
+      return 'Top Front Rabbet';
+    case 'top_back_rabbet':
+      return 'Top Back Rabbet';
     case 'top_front_edge_notch':
       return 'Top Front Edge Notch';
     case 'top_back_edge_notch':
@@ -287,6 +369,10 @@ export function getWorkspacePresetLabel(preset: WorkspacePreset): string {
       return 'Top Front Left Corner';
     case 'top_front_right_corner_notch':
       return 'Top Front Right Corner';
+    case 'top_front_corners':
+      return 'Top Front Corners';
+    case 'bottom_front_corners':
+      return 'Bottom Front Corners';
   }
 }
 
@@ -298,10 +384,18 @@ export function getWorkspacePresetHint(preset: WorkspacePreset): string {
       return 'Adds matching 15° bevels to both ends.';
     case 'square_both_ends':
       return 'Restores both ends as explicit square cuts.';
+    case 'compound_both_ends':
+      return 'Adds matching compound cuts to both ends.';
     case 'top_cutout':
       return 'Starts a centered top cutout you can resize and place.';
     case 'bottom_cutout':
       return 'Starts a centered bottom cutout you can resize and place.';
+    case 'centered_dado':
+      return 'Starts a centered top dado with blind depth.';
+    case 'top_front_rabbet':
+      return 'Starts a rabbet on the top front edge.';
+    case 'top_back_rabbet':
+      return 'Starts a rabbet on the top back edge.';
     case 'top_front_edge_notch':
       return 'Starts a notch from the top front edge.';
     case 'top_back_edge_notch':
@@ -310,5 +404,9 @@ export function getWorkspacePresetHint(preset: WorkspacePreset): string {
       return 'Starts a top front left corner relief notch.';
     case 'top_front_right_corner_notch':
       return 'Starts a top front right corner relief notch.';
+    case 'top_front_corners':
+      return 'Adds matching relief notches to both top front corners.';
+    case 'bottom_front_corners':
+      return 'Adds matching relief notches to both bottom front corners.';
   }
 }

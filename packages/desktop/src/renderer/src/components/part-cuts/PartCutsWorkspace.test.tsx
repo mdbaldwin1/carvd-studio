@@ -69,6 +69,42 @@ describe('PartCutsWorkspace', () => {
     expect(onSelectFeature).toHaveBeenCalled();
   });
 
+  it('adds richer preset groups and constrained joinery starters from the left rail', () => {
+    const onDraftFeaturesChange = vi.fn();
+
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Rail' })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={onDraftFeaturesChange}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={false}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Top Front Corners'));
+    expect(onDraftFeaturesChange).toHaveBeenLastCalledWith([
+      expect.objectContaining({
+        kind: 'rect_cut',
+        cutType: 'corner_notch',
+        target: { type: 'corner', corner: 'front_top_left_corner' }
+      }),
+      expect.objectContaining({
+        kind: 'rect_cut',
+        cutType: 'corner_notch',
+        target: { type: 'corner', corner: 'front_top_right_corner' }
+      })
+    ]);
+  });
+
   it('reorders operations in the workspace stack', () => {
     const onDraftFeaturesChange = vi.fn();
     const part = createTestPart({

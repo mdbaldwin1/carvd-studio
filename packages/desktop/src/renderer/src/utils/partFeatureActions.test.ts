@@ -18,6 +18,34 @@ describe('partFeatureActions', () => {
     });
   });
 
+  it('builds paired corner reliefs and constrained joinery presets', () => {
+    const cornerPair = buildFeaturesFromPreset('top_front_corners');
+    const dado = buildFeaturesFromPreset('centered_dado');
+    const rabbet = buildFeaturesFromPreset('top_front_rabbet');
+
+    expect(cornerPair).toHaveLength(2);
+    expect(cornerPair[0]).toMatchObject({
+      kind: 'rect_cut',
+      cutType: 'corner_notch',
+      target: { type: 'corner', corner: 'front_top_left_corner' }
+    });
+    expect(cornerPair[1]).toMatchObject({
+      kind: 'rect_cut',
+      cutType: 'corner_notch',
+      target: { type: 'corner', corner: 'front_top_right_corner' }
+    });
+    expect(dado[0]).toMatchObject({
+      kind: 'rect_cut',
+      cutType: 'dado',
+      target: { type: 'face', face: 'top_face' }
+    });
+    expect(rabbet[0]).toMatchObject({
+      kind: 'rect_cut',
+      cutType: 'rabbet',
+      target: { type: 'edge', edge: 'top_front_edge' }
+    });
+  });
+
   it('mirrors an end cut to the opposite end', () => {
     const mirrored = mirrorFeature(
       {
