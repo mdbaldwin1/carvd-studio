@@ -54,6 +54,16 @@ Reason:
 - the first group has explicit rectangular extents and offset semantics
 - the deferred group either has strong derived dimensions or needs custom affordances that are easy to get wrong in a POC
 
+## Expanded Supported Operations
+
+The next handle pass should add:
+
+- `rabbet`
+- `edge_notch`
+- end-cut reference handles
+
+These remain constrained operations, but they need more operation-specific handle semantics than face pockets and stopped channels.
+
 ## Handle Model
 
 Each supported operation gets a rectangular overlay in preview space plus a small set of drag handles.
@@ -63,6 +73,7 @@ Each supported operation gets a rectangular overlay in preview space plus a smal
 - move handle
 - length handle
 - width handle
+- reference handle
 
 ### Stopped dado
 
@@ -99,6 +110,31 @@ Handles:
 - move within top/bottom face plane
 - length resize
 - width resize
+
+### Rabbet
+
+Handles:
+
+- move along the supported edge run
+- shoulder-width resize into the board
+
+Depth remains inspector-only in this pass.
+
+### Edge notch
+
+Handles:
+
+- move along the selected edge run
+- run-length resize
+- notch-width resize into the board
+
+### End-cut reference
+
+Handles:
+
+- drag the controlling reference distance along the part length
+
+Angles remain inspector-only in this pass. The handle edits the selected reference mode value, not the cut angle itself.
 
 ## Drag Semantics
 
