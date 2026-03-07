@@ -23,6 +23,7 @@ import { ScrollArea } from '@renderer/components/ui/scroll-area';
 import { Select } from '@renderer/components/ui/select';
 import { EndCutFeature, Part, PartFeature, RectCutFeature } from '@renderer/types';
 import { getDerivedLengthMeasurements, getLengthReferenceValue } from '@renderer/utils/endCutUtils';
+import { getPartFeatureConflicts } from '@renderer/utils/partFeatureConflicts';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import {
   CORNER_LABELS,
@@ -65,6 +66,14 @@ function reorderFeatures(features: PartFeature[], fromIndex: number, toIndex: nu
   const [moved] = next.splice(fromIndex, 1);
   next.splice(toIndex, 0, moved);
   return next;
+}
+
+function getSelectedTargetLabel(draft: FeatureDraft | null): string | null {
+  if (!draft) return null;
+  if (draft.mode === 'end_cut') return FACE_LABELS[draft.targetFace];
+  if (draft.cutType === 'corner_notch') return CORNER_LABELS[draft.cornerTarget];
+  if (draft.cutType === 'edge_notch') return EDGE_LABELS[draft.edgeTarget];
+  return FACE_LABELS[draft.faceTarget];
 }
 
 export function PartCutsWorkspace({
@@ -141,6 +150,17 @@ export function PartCutsWorkspace({
     };
   }, [draft, draftFeatures, draftPreviewFeature, part.length, part.thickness, part.width]);
 
+  const featureConflicts = useMemo(() => getPartFeatureConflicts(draftFeatures, part), [draftFeatures, part]);
+  const conflictsByFeatureId = useMemo(() => {
+    const map = new Map<string, typeof featureConflicts>();
+    for (const conflict of featureConflicts) {
+      const existing = map.get(conflict.featureId) ?? [];
+      existing.push(conflict);
+      map.set(conflict.featureId, existing);
+    }
+    return map;
+  }, [featureConflicts]);
+
   const handleStartPreset = (preset: OperationPreset) => {
     setDraft(buildDraftFromPreset(preset));
     onSelectFeature(null);
@@ -197,6 +217,8 @@ export function PartCutsWorkspace({
     }
   }, [draft, selectedFeature]);
 
+  const selectedTargetLabel = getSelectedTargetLabel(inspectorDraft);
+
   return (
     <div className="app-main flex min-h-0 flex-1 bg-bg">
       <div className="flex min-h-0 flex-1 gap-4 p-4">
@@ -240,6 +262,7 @@ export function PartCutsWorkspace({
                 ) : (
                   draftFeatures.map((feature, index) => {
                     const isSelected = selectedFeatureId === feature.id;
+                    const conflicts = conflictsByFeatureId.get(feature.id) ?? [];
                     return (
                       <div
                         key={feature.id}
@@ -257,11 +280,19 @@ export function PartCutsWorkspace({
                                 Disabled
                               </Badge>
                             )}
+                            {conflicts.length > 0 && (
+                              <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning">
+                                {conflicts.some((conflict) => conflict.severity === 'error') ? 'Conflict' : 'Warning'}
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-xs leading-relaxed text-text-secondary">
                             {getFeatureSummary(feature, units)}
                           </div>
                         </button>
+                        {conflicts.length > 0 && (
+                          <div className="mt-2 text-[11px] text-warning">{conflicts[0].message}</div>
+                        )}
                         <div className="mt-3 flex flex-wrap gap-2">
                           <Button
                             type="button"
@@ -311,24 +342,109 @@ export function PartCutsWorkspace({
           <CardHeader className="pb-4">
             <CardTitle>Preview</CardTitle>
             <CardDescription>
-              Dedicated 3D part preview and target selection land in `carvd-studio-13.4`.
+              Dedicated 3D part preview lands later; this workspace now makes target choice and operation conflicts
+              visible in the editing surface.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col">
             <div className="flex min-h-[320px] flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-gradient-to-br from-bg-secondary to-bg px-6 py-8 text-center">
-              <div className="max-w-md space-y-3">
+              <div className="max-w-xl space-y-4">
                 <div className="text-lg font-semibold text-text">{part.name}</div>
                 <div className="text-sm text-text-secondary">
-                  This editor is now the primary surface for authoring and ordering part operations. The next bead adds
-                  target highlighting and in-workspace spatial selection.
+                  This editor is now the primary surface for authoring and ordering part operations. The current preview
+                  highlights the selected target and surfaces same-part conflicts before you commit the stack.
                 </div>
                 <div className="text-xs text-text-muted">Blank size: {getBlankSizeLabel(part, units)}</div>
+                {selectedFeature && (
+                  <div className="rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-left text-sm text-text">
+                    <div className="font-medium">Selected Operation</div>
+                    <div className="mt-1">{getFeatureSummary(selectedFeature, units)}</div>
+                    <div className="mt-1 text-xs text-text-muted">Target: {getFeatureTargetLabel(selectedFeature)}</div>
+                  </div>
+                )}
+                {selectedTargetLabel && (
+                  <div className="rounded-md border border-border bg-bg px-3 py-3 text-left">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Target Map</div>
+                    <div className="mb-2 text-sm text-text">
+                      Selected target: <span className="font-medium">{selectedTargetLabel}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {inspectorDraft?.mode === 'end_cut' &&
+                        END_TARGETS.map((target) => (
+                          <Button
+                            key={target}
+                            type="button"
+                            size="xs"
+                            variant="outline"
+                            active={inspectorDraft.targetFace === target}
+                            onClick={() => setDraft({ ...inspectorDraft, targetFace: target })}
+                          >
+                            {FACE_LABELS[target]}
+                          </Button>
+                        ))}
+                      {inspectorDraft?.mode === 'rect_cut' &&
+                        inspectorDraft.cutType === 'corner_notch' &&
+                        availableCornerTargets.map((target) => (
+                          <Button
+                            key={target}
+                            type="button"
+                            size="xs"
+                            variant="outline"
+                            active={inspectorDraft.cornerTarget === target}
+                            onClick={() => setDraft({ ...inspectorDraft, cornerTarget: target })}
+                          >
+                            {CORNER_LABELS[target]}
+                          </Button>
+                        ))}
+                      {inspectorDraft?.mode === 'rect_cut' &&
+                        inspectorDraft.cutType === 'edge_notch' &&
+                        availableEdgeTargets.map((target) => (
+                          <Button
+                            key={target}
+                            type="button"
+                            size="xs"
+                            variant="outline"
+                            active={inspectorDraft.edgeTarget === target}
+                            onClick={() => setDraft({ ...inspectorDraft, edgeTarget: target })}
+                          >
+                            {EDGE_LABELS[target]}
+                          </Button>
+                        ))}
+                      {inspectorDraft?.mode === 'rect_cut' &&
+                        inspectorDraft.cutType === 'cutout' &&
+                        availableFaceTargets.map((target) => (
+                          <Button
+                            key={target}
+                            type="button"
+                            size="xs"
+                            variant="outline"
+                            active={inspectorDraft.faceTarget === target}
+                            onClick={() => setDraft({ ...inspectorDraft, faceTarget: target })}
+                          >
+                            {FACE_LABELS[target]}
+                          </Button>
+                        ))}
+                    </div>
+                  </div>
+                )}
                 {draftFeatures.length > 0 && (
                   <div className="text-xs text-text-muted">
                     Current stack:{' '}
                     {draftFeatures
                       .map((feature, index) => `${index + 1}. ${getFeatureTargetLabel(feature)}`)
                       .join(' · ')}
+                  </div>
+                )}
+                {featureConflicts.length > 0 && (
+                  <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-left">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-warning">Same-Part Feedback</div>
+                    <ul className="mt-2 space-y-1 text-sm text-warning">
+                      {featureConflicts.slice(0, 3).map((conflict, index) => (
+                        <li key={`${conflict.featureId}-${conflict.relatedFeatureId ?? 'none'}-${index}`}>
+                          {conflict.message}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </div>

@@ -88,4 +88,53 @@ describe('PartCutsWorkspace', () => {
       expect.objectContaining({ id: 'feature-1' })
     ]);
   });
+
+  it('shows selected-operation preview feedback and same-part conflicts', () => {
+    const part = createTestPart({
+      name: 'Leg',
+      features: [
+        {
+          id: 'feature-1',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mitre',
+          lengthMode: 'long_point',
+          parameters: { horizontalAngle: 45 }
+        },
+        {
+          id: 'feature-2',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'bevel',
+          lengthMode: 'centerline',
+          parameters: { horizontalAngle: 0, verticalAngle: 15 }
+        }
+      ]
+    });
+
+    render(
+      <PartCutsWorkspace
+        part={part}
+        draftFeatures={part.features ?? []}
+        units="imperial"
+        selectedFeatureId="feature-1"
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={true}
+      />
+    );
+
+    expect(screen.getByText('Selected Operation')).toBeInTheDocument();
+    expect(screen.getByText('Target Map')).toBeInTheDocument();
+    expect(screen.getByText('Same-Part Feedback')).toBeInTheDocument();
+    expect(screen.getAllByText('Conflict').length).toBeGreaterThan(0);
+  });
 });
