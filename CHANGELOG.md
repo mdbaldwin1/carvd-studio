@@ -26,8 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Direct 3D target picking in Part Cuts (POC)** — The dedicated cuts workspace preview now exposes operation-aware face/edge/corner hit regions, supports direct hover/click retargeting on the part itself, and keeps inspector controls as a fallback when camera angle or runtime limitations make direct picking less convenient.
 - **Part operation authoring moved into cuts mode (POC)** — The dedicated `Part Cuts` workspace now owns add/edit/duplicate/remove/reorder flows for operation stacks on a single board, while the Properties panel can remain focused on summary and entry points.
-- **Cuts-mode target map and conflict feedback (POC)** — The dedicated cuts workspace now highlights the selected operation, exposes filtered target-map controls in the preview, and surfaces same-part cut conflicts directly in the stack and preview before save.
+- **Cuts-mode targeting and conflict feedback (POC)** — The dedicated cuts workspace now highlights the selected operation, keeps filtered target-selection fallback controls available alongside the preview, and surfaces same-part cut conflicts directly in the stack and preview before save.
 - **Properties panel cuts summary (POC)** — The main editor now keeps cuts as a compact summary with conflict/status messaging and a single `Edit Cuts` entry, instead of embedding the full operation editor directly in the Properties panel.
 - **End-cut feature fidelity (POC)** — End cuts now render as true mitre, bevel, and compound geometry in the viewport, and the Operations panel shows derived long-point, short-point, and centerline measurements so sloped ends read like shop-facing fabrication data.
 - **Rectangular removal previews (POC)** — Corner notches, edge notches, and face cutouts now preview as actual through or blind recesses within the POC-supported target set, and the Operations panel blocks unsupported or out-of-bounds removal setups before they are saved.

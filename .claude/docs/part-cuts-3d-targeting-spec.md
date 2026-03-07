@@ -2,6 +2,23 @@
 
 Workflow and policy source of truth: see `AGENTS.md`. This file is reference guidance for `carvd-studio-14.1` and downstream 3D targeting beads.
 
+## Implemented POC Status
+
+As of beads `14.2` and `14.3`, the current branch implements:
+
+- a dedicated cuts preview canvas with canonical face/edge/corner target regions
+- operation-aware filtering of valid targets
+- direct hover and click retargeting in the preview
+- selected-target persistence between the preview and inspector
+- a fallback preview target control path in test and non-WebGL contexts
+
+Still deferred:
+
+- drag handles for cut dimensions
+- exact triangulated picking for every feature surface
+- richer in-canvas labels and dimension editing
+- multi-part or project-level fabrication editing
+
 ## Purpose
 
 Define how direct 3D target picking works inside the dedicated `Part Cuts` workspace.

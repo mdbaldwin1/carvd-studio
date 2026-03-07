@@ -12,11 +12,10 @@ As of beads `13.2` through `13.5`, the implemented POC behavior is:
 - operation-stack authoring now lives in the cuts workspace
 - reordering, duplication, removal, and enable/disable all happen there
 - the main Properties panel is reduced to a compact cuts summary plus `Edit Cuts`
-- the preview currently uses a target-map workflow and conflict/status feedback instead of full 3D picking
+- the preview now supports direct 3D target picking for the current POC operations, with inspector/form fallback for verification and difficult camera angles
 
 Still deferred beyond the current implemented POC:
 
-- true 3D target picking in the viewport
 - richer geometry-linked preview interaction
 - broader conflict rules beyond the current same-end / overlapping-rect-cut checks
 - additional woodworking operations beyond the current POC feature set

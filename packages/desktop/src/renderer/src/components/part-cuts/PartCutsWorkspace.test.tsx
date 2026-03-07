@@ -178,4 +178,31 @@ describe('PartCutsWorkspace', () => {
 
     expect(screen.getByText('Selected target:', { exact: false })).toHaveTextContent('Right End');
   });
+
+  it('filters preview fallback targets to the supported cutout faces', () => {
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Panel' })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={vi.fn()}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={false}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Cutout'));
+
+    const previewTargets = within(screen.getByText('Preview Targets').parentElement as HTMLElement);
+    expect(previewTargets.getByRole('button', { name: 'Top Face' })).toBeInTheDocument();
+    expect(previewTargets.getByRole('button', { name: 'Bottom Face' })).toBeInTheDocument();
+    expect(previewTargets.queryByRole('button', { name: 'Front Face' })).not.toBeInTheDocument();
+  });
 });
