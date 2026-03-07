@@ -14,6 +14,7 @@ As of beads `13.2` through `13.5`, the implemented POC behavior is:
 - quick presets now seed common cut stacks and starter operations
 - mirror actions now let supported operations be copied to the opposite end or across the part axes
 - the workspace now includes a compact draft-status summary, always-visible workflow guidance, and clearer selected-operation emphasis
+- the workspace trim pass also removes duplicate selection wording, clarifies left-rail naming, and makes the main entry label more explicit
 - the main Properties panel is reduced to a compact cuts summary plus `Edit Cuts`
 - the preview now supports direct 3D target picking for the current POC operations, with inspector/form fallback for verification and difficult camera angles
 

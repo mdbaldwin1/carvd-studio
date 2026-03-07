@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Cuts workflow trim pass (POC)** — Cleaned up prototype-like wording in Part Cuts by reducing duplicate selection labels, renaming left-rail sections more intentionally, and clarifying the main entry action as `Open Cuts Workspace`.
 - **Expanded cuts preset set (POC)** — Part Cuts now includes richer starter presets, including compound end-cut pairs, centered dado starters, rabbet starters, and paired corner-relief presets for faster stack authoring.
 - **Cuts workspace clarity pass (POC)** — Part Cuts now shows draft status, a short workflow guide, stronger selected-operation emphasis, clearer derived-field messaging for constrained operations, and explicit `Back to Project` / `Save Part` footer actions.
 - **Cuts presets and mirroring in Part Cuts (POC)** — The dedicated cuts workspace now includes quick presets for common end-cut and notch/cutout setups, plus mirror actions that copy supported operations to the opposite end or across the board axes without leaving cuts mode.
