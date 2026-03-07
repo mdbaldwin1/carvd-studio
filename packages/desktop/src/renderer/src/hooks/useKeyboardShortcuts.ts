@@ -364,6 +364,7 @@ export function useKeyboardShortcuts() {
     parts,
     gridSize,
     requestDeleteParts,
+    requestDeleteGroups,
     duplicateSelectedParts,
     updatePart,
     batchUpdateParts,

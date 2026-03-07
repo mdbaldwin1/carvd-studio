@@ -12,6 +12,7 @@ import {
   ROTATION_RING_ARC_START,
   ROTATION_RING_ARC_LENGTH
 } from './partGeometry';
+import { chooseBestRotationAxisCandidate } from './rotationAxisSelection';
 
 export const RotationHandle = memo(
   function RotationHandle({
@@ -48,6 +49,7 @@ export const RotationHandle = memo(
     const axisLockedRef = useRef(false);
     const axisCandidatesRef = useRef<['x' | 'y' | 'z', 'x' | 'y' | 'z']>(['x', 'y']);
     const dragStartClientRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const dragStartWorldPointRef = useRef<THREE.Vector3 | null>(null);
     const dragStartVectorRef = useRef<THREE.Vector3 | null>(null);
     const rotationCenterWorldRef = useRef(new THREE.Vector3());
     const rotationAxisWorldRef = useRef(new THREE.Vector3(0, 1, 0));
@@ -201,23 +203,31 @@ export const RotationHandle = memo(
         const dragDirY = dy / mag;
 
         const [candidateA, candidateB] = axisCandidatesRef.current;
+        const viewDirToCenter = _tmpVecB.current.copy(rotationCenterWorldRef.current).sub(camera.position).normalize();
         const evaluateCandidate = (candidate: 'x' | 'y' | 'z') => {
           setRotationAxisFromLocalAxis(candidate);
-          const startWorldPoint = getWorldPointOnRotationPlane(
-            dragStartClientRef.current.x,
-            dragStartClientRef.current.y
-          );
-          if (!startWorldPoint) return null;
-
-          const startVector = _tmpVecB.current.copy(startWorldPoint).sub(rotationCenterWorldRef.current);
+          // Prefer the actual pointer-down world point projected onto the candidate rotation plane.
+          const planeNormal = rotationAxisWorldRef.current;
+          let startVector: THREE.Vector3;
+          if (dragStartWorldPointRef.current) {
+            const offset = _tmpVecB.current.copy(dragStartWorldPointRef.current).sub(rotationCenterWorldRef.current);
+            const normalComp = offset.dot(planeNormal);
+            startVector = offset.addScaledVector(planeNormal, -normalComp);
+          } else {
+            const startWorldPoint = getWorldPointOnRotationPlane(
+              dragStartClientRef.current.x,
+              dragStartClientRef.current.y
+            );
+            if (!startWorldPoint) return null;
+            startVector = _tmpVecB.current.copy(startWorldPoint).sub(rotationCenterWorldRef.current);
+          }
           if (startVector.lengthSq() < 1e-8) return null;
           startVector.normalize();
 
           const tangentWorld = _tmpVecC.current.copy(rotationAxisWorldRef.current).cross(startVector).normalize();
-          const p0 = getProjectedScreenPoint(startWorldPoint);
-          const p1 = getProjectedScreenPoint(
-            _tmpVecA.current.copy(startWorldPoint).addScaledVector(tangentWorld, 0.25)
-          );
+          const p0World = _tmpVecA.current.copy(rotationCenterWorldRef.current).add(startVector);
+          const p0 = getProjectedScreenPoint(p0World);
+          const p1 = getProjectedScreenPoint(_tmpVecA.current.copy(p0World).addScaledVector(tangentWorld, 0.25));
           const tx = p1.x - p0.x;
           const ty = p1.y - p0.y;
           const tmag = Math.hypot(tx, ty);
@@ -226,22 +236,21 @@ export const RotationHandle = memo(
           const tangentDirX = tx / tmag;
           const tangentDirY = ty / tmag;
           const dot = tangentDirX * dragDirX + tangentDirY * dragDirY;
+          const tangentStrength = THREE.MathUtils.clamp(tmag / 24, 0, 1);
+          const axisPerpendicularity = 1 - Math.abs(rotationAxisWorldRef.current.dot(viewDirToCenter));
+          const alignment = Math.abs(dot);
           return {
             candidate,
-            alignment: Math.abs(dot),
+            alignment,
+            tangentStrength,
+            axisPerpendicularity,
             startVector: startVector.clone()
           };
         };
 
         const resultA = evaluateCandidate(candidateA);
         const resultB = evaluateCandidate(candidateB);
-        const best = !resultA
-          ? resultB
-          : !resultB
-            ? resultA
-            : resultA.alignment >= resultB.alignment
-              ? resultA
-              : resultB;
+        const best = chooseBestRotationAxisCandidate(resultA, resultB);
         if (!best) return false;
 
         setRotationAxisFromLocalAxis(best.candidate);
@@ -250,7 +259,7 @@ export const RotationHandle = memo(
         axisLockedRef.current = true;
         return true;
       },
-      [getProjectedScreenPoint, getWorldPointOnRotationPlane, setRotationAxisFromLocalAxis]
+      [camera.position, getProjectedScreenPoint, getWorldPointOnRotationPlane, setRotationAxisFromLocalAxis]
     );
 
     const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
@@ -278,6 +287,7 @@ export const RotationHandle = memo(
 
       activePointerIdRef.current = e.pointerId;
       dragStartClientRef.current = { x: e.clientX, y: e.clientY };
+      dragStartWorldPointRef.current = e.point ? e.point.clone() : null;
       const center = getProjectedScreenCenter(e.clientX, e.clientY);
       dragCenterRef.current = center;
       dragStartAngleRef.current = getScreenAngle(e.clientX, e.clientY, center);
@@ -353,6 +363,7 @@ export const RotationHandle = memo(
         axisLockedRef.current = false;
         dragCenterRef.current = null;
         dragStartVectorRef.current = null;
+        dragStartWorldPointRef.current = null;
         activePointerIdRef.current = null;
         setIsDragging(false);
         onRotateEnd();
@@ -389,6 +400,7 @@ export const RotationHandle = memo(
           axisLockedRef.current = false;
           dragCenterRef.current = null;
           dragStartVectorRef.current = null;
+          dragStartWorldPointRef.current = null;
           activePointerIdRef.current = null;
           onRotateEnd();
           document.body.style.cursor = 'auto';

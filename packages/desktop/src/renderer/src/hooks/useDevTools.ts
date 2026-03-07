@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { generateSeedProject, generateStockLibraryItems } from '../utils/seedData';
+import { installDragDebugTools } from '../utils/dragDebug';
 
 // Colors for randomized test parts
 const TEST_PART_COLORS = ['#c4a574', '#f5deb3', '#8B4513', '#DEB887', '#D2691E', '#CD853F'];
@@ -22,6 +23,10 @@ declare global {
       createParts: (count: number) => void;
       measureUndoSnapshot: () => void;
       perfBaseline: () => void;
+      enableDragDebug: () => void;
+      disableDragDebug: () => void;
+      clearDragDebugLogs: () => void;
+      getDragDebugLogs: () => unknown[];
     };
   }
 }
@@ -33,6 +38,7 @@ export function useDevTools() {
   useEffect(() => {
     // Only expose in development
     if (import.meta.env.DEV) {
+      installDragDebugTools();
       window.carvdDev = {
         /**
          * Load the seed project (Simple Writing Desk)
@@ -215,6 +221,38 @@ export function useDevTools() {
           console.log('   (logged every 5s by PerfMonitor)');
 
           console.log('\n=============================');
+        },
+
+        /**
+         * Enable deep drag/snap debug logging
+         * Call from console: carvdDev.enableDragDebug()
+         */
+        enableDragDebug: () => {
+          window.enableDragDebug?.();
+        },
+
+        /**
+         * Disable deep drag/snap debug logging
+         * Call from console: carvdDev.disableDragDebug()
+         */
+        disableDragDebug: () => {
+          window.disableDragDebug?.();
+        },
+
+        /**
+         * Clear drag/snap debug log buffer
+         * Call from console: carvdDev.clearDragDebugLogs()
+         */
+        clearDragDebugLogs: () => {
+          window.clearDragDebugLogs?.();
+        },
+
+        /**
+         * Get drag/snap debug logs as JSON-serializable array
+         * Call from console: carvdDev.getDragDebugLogs()
+         */
+        getDragDebugLogs: () => {
+          return window.dumpDragDebugLogs?.() ?? [];
         }
       };
 
@@ -226,6 +264,10 @@ export function useDevTools() {
       console.log('   carvdDev.createParts(100)        - Create N test parts');
       console.log('   carvdDev.measureUndoSnapshot()   - Measure undo snapshot sizes');
       console.log('   carvdDev.perfBaseline()          - Print performance baseline');
+      console.log('   carvdDev.enableDragDebug()       - Enable drag/snap deep logging');
+      console.log('   carvdDev.disableDragDebug()      - Disable drag/snap deep logging');
+      console.log('   carvdDev.clearDragDebugLogs()    - Clear drag/snap debug logs');
+      console.log('   carvdDev.getDragDebugLogs()      - Get drag/snap debug logs');
     }
 
     return () => {

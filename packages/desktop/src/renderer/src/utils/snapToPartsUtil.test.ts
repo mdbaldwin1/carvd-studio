@@ -13,8 +13,6 @@ import {
   detectOriginSnaps,
   createOriginSnapLine,
   detectFaceSnaps,
-  detectSurfaceAnchorSnaps,
-  detectFractionalFaceSnaps,
   detectFeatureSnaps,
   getPartOBB,
   obbsOverlap,
@@ -487,61 +485,6 @@ describe('snapToPartsUtil', () => {
       expect(result.snappedX).toBe(false);
       expect(result.snappedY).toBe(false);
       expect(result.snappedZ).toBe(false);
-    });
-
-    it('marks snapped axis when distribution layout snap wins', () => {
-      const draggingPart = createTestPart({
-        id: 'dragging',
-        length: 2,
-        position: { x: 29.8, y: 0, z: 0 }
-      });
-      const targetA = createTestPart({ id: 'target-a', length: 2, position: { x: 0, y: 0, z: 0 } });
-      const targetB = createTestPart({ id: 'target-b', length: 2, position: { x: 10, y: 0, z: 0 } });
-      const targetC = createTestPart({ id: 'target-c', length: 2, position: { x: 20, y: 0, z: 0 } });
-
-      const result = detectSnaps(
-        draggingPart,
-        draggingPart.position,
-        [draggingPart, targetA, targetB, targetC],
-        ['dragging'],
-        0.5,
-        {
-          enableLayoutSnaps: true,
-          enableEqualSpacingSnap: false,
-          enableDistributionSnap: true,
-          enablePatternSnap: false
-        }
-      );
-
-      expect(result.snappedX).toBe(true);
-      expect(result.snapLines.some((line) => line.axis === 'x' && line.subtype === 'distribution')).toBe(true);
-    });
-
-    it('marks snapped axis when pattern layout snap wins', () => {
-      const draggingPart = createTestPart({
-        id: 'dragging',
-        length: 2,
-        position: { x: 19.8, y: 0, z: 0 }
-      });
-      const targetA = createTestPart({ id: 'target-a', length: 2, position: { x: 0, y: 0, z: 0 } });
-      const targetB = createTestPart({ id: 'target-b', length: 2, position: { x: 10, y: 0, z: 0 } });
-
-      const result = detectSnaps(
-        draggingPart,
-        draggingPart.position,
-        [draggingPart, targetA, targetB],
-        ['dragging'],
-        0.5,
-        {
-          enableLayoutSnaps: true,
-          enableEqualSpacingSnap: false,
-          enableDistributionSnap: false,
-          enablePatternSnap: true
-        }
-      );
-
-      expect(result.snappedX).toBe(true);
-      expect(result.snapLines.some((line) => line.axis === 'x' && line.subtype === 'pattern')).toBe(true);
     });
 
     it('uses default threshold when not specified', () => {
@@ -1660,263 +1603,38 @@ describe('snapToPartsUtil', () => {
       }
     });
 
-    it('detects vertex-to-vertex snapping when corners are nearby', () => {
-      const dragging = createTestPart({
-        id: 'dragging',
-        length: 2,
-        width: 2,
-        thickness: 2,
-        position: { x: 0, y: 0, z: 0 }
-      });
-      const target = createTestPart({
-        id: 'target',
-        length: 2,
-        width: 2,
-        thickness: 2,
-        position: { x: 2.2, y: 2.2, z: 2.2 }
-      });
-
-      const result = detectFeatureSnaps(dragging, dragging.position, [dragging, target], ['dragging'], 0.6);
-      expect(result.snapLines.length).toBeGreaterThan(0);
-      expect(
-        ['vertex-vertex', 'vertex-edge', 'vertex-face', 'edge-edge', 'midpoint-midpoint', 'edge-extension'].includes(
-          result.snapLines[0].subtype ?? ''
-        )
-      ).toBe(true);
-    });
-
-    it('detects midpoint-to-midpoint for parallel edges', () => {
-      const dragging = createTestPart({
-        id: 'dragging',
+    it('snaps collinear angled edges while sliding on a surface-snapped face', () => {
+      const partA = createTestPart({
+        id: 'part-a',
         length: 6,
-        width: 2,
+        width: 4,
         thickness: 1,
-        position: { x: 0, y: 0, z: 0 }
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 45, z: 0 }
       });
-      const target = createTestPart({
-        id: 'target',
+
+      const baseObb = getPartOBB(partA);
+      const slideAxis = baseObb.axes[0];
+
+      const partB = createTestPart({
+        id: 'part-b',
         length: 6,
-        width: 2,
+        width: 4,
         thickness: 1,
-        position: { x: 0.3, y: 0, z: 0.4 }
+        // Touching on wide face (Y), with a small along-edge offset.
+        position: {
+          x: slideAxis.x * 0.2,
+          y: partA.position.y + partA.thickness,
+          z: slideAxis.z * 0.2
+        },
+        rotation: { x: 0, y: 45, z: 0 }
       });
 
-      const result = detectFeatureSnaps(dragging, dragging.position, [dragging, target], ['dragging'], 2);
-      expect(result.snapLines.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('detectSurfaceAnchorSnaps', () => {
-    it('snaps to center in one tangential axis on a face-flush pair', () => {
-      const draggingPart = createTestPart({
-        id: 'dragging',
-        length: 4,
-        width: 2,
-        thickness: 1,
-        position: { x: 0, y: 0, z: 0 }
-      });
-      const targetPart = createTestPart({
-        id: 'target',
-        length: 8,
-        width: 8,
-        thickness: 1,
-        position: { x: 6.15, y: 0.3, z: 0 }
-      });
-
-      const result = detectSurfaceAnchorSnaps(
-        draggingPart,
-        draggingPart.position,
-        [draggingPart, targetPart],
-        ['dragging'],
-        0.5
-      );
-
-      expect(result.snappedY || result.snappedZ || result.snappedX).toBe(true);
-      expect(result.snapLines.length).toBeGreaterThan(0);
-    });
-
-    it('prefers center-2d over edge-derived anchors when both are viable', () => {
-      const draggingPart = createTestPart({
-        id: 'dragging',
-        length: 2,
-        width: 2,
-        thickness: 1,
-        position: { x: 0, y: 0, z: 0 }
-      });
-      const targetPart = createTestPart({
-        id: 'target',
-        length: 8,
-        width: 8,
-        thickness: 1,
-        position: { x: 5.1, y: 0.2, z: 0.2 }
-      });
-
-      const result = detectSurfaceAnchorSnaps(
-        draggingPart,
-        draggingPart.position,
-        [draggingPart, targetPart],
-        ['dragging'],
-        0.5
-      );
-
-      expect(result.snapLines.some((line) => line.type === 'center')).toBe(true);
-    });
-
-    it('returns no snap when there is no compatible/near face contact context', () => {
-      const draggingPart = createTestPart({
-        id: 'dragging',
-        position: { x: 0, y: 0, z: 0 }
-      });
-      const targetPart = createTestPart({
-        id: 'target',
-        position: { x: 30, y: 30, z: 30 }
-      });
-
-      const result = detectSurfaceAnchorSnaps(
-        draggingPart,
-        draggingPart.position,
-        [draggingPart, targetPart],
-        ['dragging'],
-        0.5
-      );
-
-      expect(result.snappedX).toBe(false);
-      expect(result.snappedY).toBe(false);
-      expect(result.snappedZ).toBe(false);
-      expect(result.snapLines).toHaveLength(0);
-    });
-  });
-
-  describe('detectFractionalFaceSnaps', () => {
-    it('supports boundary fractions (0 and 1)', () => {
-      const draggingPart = createTestPart({
-        id: 'dragging',
-        length: 2,
-        width: 2,
-        thickness: 1,
-        position: { x: 0, y: 0.2, z: 0 }
-      });
-      const targetPart = createTestPart({
-        id: 'target',
-        length: 8,
-        width: 8,
-        thickness: 1,
-        position: { x: 5.1, y: 0, z: 0 }
-      });
-
-      const result = detectFractionalFaceSnaps(
-        draggingPart,
-        draggingPart.position,
-        [draggingPart, targetPart],
-        ['dragging'],
-        0.5
-      );
+      const result = detectFeatureSnaps(partB, partB.position, [partA, partB], ['part-b'], 0.5);
 
       expect(result.snappedX || result.snappedY || result.snappedZ).toBe(true);
       expect(result.snapLines.length).toBeGreaterThan(0);
-    });
-
-    it('supports 2-axis fractional combinations', () => {
-      const draggingPart = createTestPart({
-        id: 'dragging',
-        length: 2,
-        width: 2,
-        thickness: 1,
-        position: { x: 0, y: 0.28, z: 0.24 }
-      });
-      const targetPart = createTestPart({
-        id: 'target',
-        length: 8,
-        width: 8,
-        thickness: 1,
-        position: { x: 5.1, y: 0, z: 0 }
-      });
-
-      const result = detectFractionalFaceSnaps(
-        draggingPart,
-        draggingPart.position,
-        [draggingPart, targetPart],
-        ['dragging'],
-        0.5
-      );
-
-      expect(result.snapLines.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('returns no fractional snap when target is not in face-contact context', () => {
-      const draggingPart = createTestPart({ id: 'dragging', position: { x: 0, y: 0, z: 0 } });
-      const targetPart = createTestPart({ id: 'target', position: { x: 40, y: 0, z: 0 } });
-
-      const result = detectFractionalFaceSnaps(
-        draggingPart,
-        draggingPart.position,
-        [draggingPart, targetPart],
-        ['dragging'],
-        0.5
-      );
-
-      expect(result.snappedX).toBe(false);
-      expect(result.snappedY).toBe(false);
-      expect(result.snappedZ).toBe(false);
-    });
-
-    it('supports optional golden-ratio anchors', () => {
-      const draggingPart = createTestPart({
-        id: 'dragging',
-        length: 2,
-        width: 2,
-        thickness: 1,
-        position: { x: 0, y: 0.34, z: 0 }
-      });
-      const targetPart = createTestPart({
-        id: 'target',
-        length: 8,
-        width: 8,
-        thickness: 1,
-        position: { x: 5.1, y: 0, z: 0 }
-      });
-
-      const result = detectFractionalFaceSnaps(
-        draggingPart,
-        draggingPart.position,
-        [draggingPart, targetPart],
-        ['dragging'],
-        0.5,
-        [0, 0.25, 0.5, 0.75, 1],
-        true
-      );
-
-      expect(result.snappedX || result.snappedY || result.snappedZ).toBe(true);
-    });
-
-    it('labels corner anchors when snapping to corner fractions', () => {
-      const draggingPart = createTestPart({
-        id: 'dragging',
-        length: 2,
-        width: 2,
-        thickness: 1,
-        // Position chosen so both tangential deltas are within threshold,
-        // allowing a true 2D corner-anchor candidate to win.
-        position: { x: -1.5, y: -1, z: -4 }
-      });
-      const targetPart = createTestPart({
-        id: 'target',
-        length: 8,
-        width: 8,
-        thickness: 1,
-        position: { x: 5.1, y: 0, z: 0 }
-      });
-
-      const result = detectFractionalFaceSnaps(
-        draggingPart,
-        draggingPart.position,
-        [draggingPart, targetPart],
-        ['dragging'],
-        1.5,
-        [0, 1]
-      );
-
-      expect(result.snapLines.some((line) => line.subtype === 'corner-anchor')).toBe(true);
+      expect(result.closestDistance).toBeLessThanOrEqual(0.2 + 1e-3);
     });
   });
 

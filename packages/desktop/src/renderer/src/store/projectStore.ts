@@ -30,9 +30,7 @@ import { useLicenseStore } from './licenseStore';
 import { rotateAroundWorldAxis } from '../utils/rotation';
 import { getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
-
-const isFiniteVec3 = (v: { x: number; y: number; z: number }): boolean =>
-  Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
+import { dragDebug } from '../utils/dragDebug';
 
 interface ProjectState {
   // Project data
@@ -75,7 +73,6 @@ interface ProjectState {
   deletePart: (id: string) => void;
   deleteSelectedParts: () => void;
   confirmDeleteParts: () => void;
-  confirmDeleteGroups: () => void;
   duplicatePart: (id: string) => string | null;
   duplicateSelectedParts: () => string[];
   resetSelectedPartsToStock: () => void;
@@ -222,6 +219,15 @@ export async function generateThumbnail(): Promise<string | null> {
     return await thumbnailGeneratorHandler();
   }
   return null;
+}
+
+let _lastOverlapClampToastAt = 0;
+const OVERLAP_CLAMP_TOAST_COOLDOWN_MS = 1500;
+function maybeShowOverlapClampToast() {
+  const now = performance.now();
+  if (now - _lastOverlapClampToastAt < OVERLAP_CLAMP_TOAST_COOLDOWN_MS) return;
+  _lastOverlapClampToastAt = now;
+  useUIStore.getState().showToast('Movement limited to avoid overlap', 'info', { duration: 1200 });
 }
 
 /** Find which group a part belongs to, or null if ungrouped. */
@@ -487,37 +493,58 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       updatePart: (id, updates) => {
-        if (updates.position && !isFiniteVec3(updates.position)) return;
-        if (
-          (updates.length !== undefined && !Number.isFinite(updates.length)) ||
-          (updates.width !== undefined && !Number.isFinite(updates.width)) ||
-          (updates.thickness !== undefined && !Number.isFinite(updates.thickness))
-        ) {
-          return;
-        }
-        if (
-          updates.rotation &&
-          (!Number.isFinite(updates.rotation.x) ||
-            !Number.isFinite(updates.rotation.y) ||
-            !Number.isFinite(updates.rotation.z))
-        ) {
-          return;
-        }
-
         let didUpdate = false;
         set((state) => {
           const existingPart = state.parts.find((p) => p.id === id);
           if (!existingPart) return state;
 
-          const nextPart = { ...existingPart, ...updates };
-          if (!isFiniteVec3(nextPart.position)) return state;
+          let nextPart = { ...existingPart, ...updates };
           const affectsOverlap =
             updates.position !== undefined || updates.rotation !== undefined || updates.ignoreOverlap !== undefined;
 
           if (state.stockConstraints.preventOverlap && affectsOverlap) {
             const transformed = new Map<string, Part>([[id, nextPart]]);
             if (wouldTransformedPartsOverlap(state.parts, transformed)) {
-              return state;
+              const isPositionOnlyMove =
+                updates.position !== undefined && updates.rotation === undefined && updates.ignoreOverlap === undefined;
+              if (!isPositionOnlyMove) {
+                dragDebug('projectStore:updatePart:rejectOverlap', { id, updates });
+                return state;
+              }
+
+              const proposedDelta = {
+                x: updates.position!.x - existingPart.position.x,
+                y: updates.position!.y - existingPart.position.y,
+                z: updates.position!.z - existingPart.position.z
+              };
+              const safeDelta = resolveSafeTranslationDelta(state.parts, new Set([id]), proposedDelta);
+              if (!safeDelta) {
+                dragDebug('projectStore:updatePart:noSafeDelta', { id, proposedDelta });
+                return state;
+              }
+
+              nextPart = {
+                ...nextPart,
+                position: {
+                  x: existingPart.position.x + safeDelta.x,
+                  y: existingPart.position.y + safeDelta.y,
+                  z: existingPart.position.z + safeDelta.z
+                }
+              };
+              if (
+                Math.abs(safeDelta.x - proposedDelta.x) > 1e-6 ||
+                Math.abs(safeDelta.y - proposedDelta.y) > 1e-6 ||
+                Math.abs(safeDelta.z - proposedDelta.z) > 1e-6
+              ) {
+                maybeShowOverlapClampToast();
+              }
+              dragDebug('projectStore:updatePart:clampedToSafeDelta', {
+                id,
+                requestedPosition: updates.position,
+                appliedPosition: nextPart.position,
+                proposedDelta,
+                safeDelta
+              });
             }
           }
 
@@ -592,8 +619,6 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       moveSelectedParts: (delta) => {
-        if (!isFiniteVec3(delta)) return;
-
         const { groupMembers, parts, stockConstraints } = get();
         const { selectedPartIds, selectedGroupIds, editingGroupId } = useSelectionStore.getState();
 
@@ -635,8 +660,25 @@ export const useProjectStore = create<ProjectState>()(
         let effectiveDelta = delta;
         if (stockConstraints.preventOverlap) {
           const safeDelta = resolveSafeTranslationDelta(parts, partIdsToMove, delta);
-          if (!safeDelta) return;
-          if (!isFiniteVec3(safeDelta)) return;
+          if (!safeDelta) {
+            dragDebug('projectStore:moveSelectedParts:noSafeDelta', {
+              requestedDelta: delta,
+              partIds: [...partIdsToMove]
+            });
+            return;
+          }
+          if (
+            Math.abs(safeDelta.x - delta.x) > 1e-6 ||
+            Math.abs(safeDelta.y - delta.y) > 1e-6 ||
+            Math.abs(safeDelta.z - delta.z) > 1e-6
+          ) {
+            maybeShowOverlapClampToast();
+            dragDebug('projectStore:moveSelectedParts:clampedToSafeDelta', {
+              requestedDelta: delta,
+              safeDelta,
+              partIds: [...partIdsToMove]
+            });
+          }
           effectiveDelta = safeDelta;
         }
 
@@ -788,18 +830,6 @@ export const useProjectStore = create<ProjectState>()(
           referencePartIds: state.referencePartIds.filter((id) => !pendingDeletePartIds.includes(id))
         }));
         useUIStore.getState().cancelDeleteParts();
-        get().markCutListStale();
-      },
-
-      confirmDeleteGroups: () => {
-        const { pendingDeleteGroupIds } = useUIStore.getState();
-        if (!pendingDeleteGroupIds || pendingDeleteGroupIds.length === 0) return;
-
-        for (const groupId of pendingDeleteGroupIds) {
-          get().deleteGroup(groupId, 'recursive');
-        }
-
-        useUIStore.getState().cancelDeleteGroups();
         get().markCutListStale();
       },
 
@@ -1645,10 +1675,7 @@ export const useProjectStore = create<ProjectState>()(
           useSelectionStore.setState((state) => ({
             selectedGroupIds: state.selectedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
             expandedGroupIds: state.expandedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
-            // Deleting a group should always exit edit scope to avoid stale edit-context
-            // locking interaction on remaining top-level parts.
-            editingGroupId: null,
-            hoveredPartId: null
+            editingGroupId: descendantGroupIds.includes(state.editingGroupId || '') ? null : state.editingGroupId
           }));
         } else {
           // 'recursive' - delete group AND all member parts
@@ -1667,9 +1694,7 @@ export const useProjectStore = create<ProjectState>()(
             selectedPartIds: state.selectedPartIds.filter((id) => !descendantPartIds.includes(id)),
             selectedGroupIds: state.selectedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
             expandedGroupIds: state.expandedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
-            // Deleting groups/parts should always exit edit scope to prevent stale context.
-            editingGroupId: null,
-            hoveredPartId: null
+            editingGroupId: descendantGroupIds.includes(state.editingGroupId || '') ? null : state.editingGroupId
           }));
           useSnapStore.setState((state) => ({
             referencePartIds: state.referencePartIds.filter((id) => !descendantPartIds.includes(id))

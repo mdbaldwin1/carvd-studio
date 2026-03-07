@@ -1,40 +1,12 @@
 import { Part } from '../types';
 import { getPartOBB, obbsOverlap } from './snapToPartsUtil';
+import { dragDebug } from './dragDebug';
 
 const OBB_EPSILON = 1e-6;
 const OBB_SEPARATION_TOLERANCE = 1e-8;
-const MIN_SAFE_FRACTION = 1e-3;
 const SAFE_SEARCH_STEPS = 14;
-const SWEEP_PATH_STEPS = 24;
+const MIN_DIRECTIONAL_FRACTION = 0.005;
 type TranslationDelta = { x: number; y: number; z: number };
-type ResolveSafeTranslationOptions = {
-  // When false, keep motion on the original movement vector (no axis redirection/sliding).
-  allowAxisSliding?: boolean;
-};
-
-function lerpDelta(from: TranslationDelta, to: TranslationDelta, t: number): TranslationDelta {
-  return {
-    x: from.x + (to.x - from.x) * t,
-    y: from.y + (to.y - from.y) * t,
-    z: from.z + (to.z - from.z) * t
-  };
-}
-
-function findFirstOverlapInterval(
-  parts: Part[],
-  movingIds: Set<string>,
-  from: TranslationDelta,
-  to: TranslationDelta,
-  steps: number
-): { safeT: number; blockedT: number } | null {
-  for (let i = 1; i <= steps; i += 1) {
-    const t = i / steps;
-    if (wouldTranslationCauseOverlap(parts, movingIds, lerpDelta(from, to, t))) {
-      return { safeT: (i - 1) / steps, blockedT: t };
-    }
-  }
-  return null;
-}
 
 export function overlapCheckEnabled(a: Part, b: Part): boolean {
   // If either part explicitly allows overlap, the pair is exempt.
@@ -95,75 +67,48 @@ export function wouldTranslationCauseOverlap(parts: Part[], movingIds: Set<strin
 export function resolveSafeTranslationDelta(
   parts: Part[],
   movingIds: Set<string>,
-  proposedDelta: TranslationDelta,
-  options: ResolveSafeTranslationOptions = {}
+  proposedDelta: TranslationDelta
 ): TranslationDelta | null {
-  const { allowAxisSliding = true } = options;
-  const origin: TranslationDelta = { x: 0, y: 0, z: 0 };
-  const fullPathOverlap = findFirstOverlapInterval(parts, movingIds, origin, proposedDelta, SWEEP_PATH_STEPS);
-  if (!fullPathOverlap) {
+  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta)) {
     return proposedDelta;
   }
 
-  if (!allowAxisSliding) {
-    let low = fullPathOverlap.safeT;
-    let high = fullPathOverlap.blockedT;
-    for (let i = 0; i < SAFE_SEARCH_STEPS; i += 1) {
-      const mid = (low + high) / 2;
-      const candidate = lerpDelta(origin, proposedDelta, mid);
-      if (wouldTranslationCauseOverlap(parts, movingIds, candidate)) {
-        high = mid;
-      } else {
-        low = mid;
-      }
-    }
-    if (low < MIN_SAFE_FRACTION) return null;
-    return lerpDelta(origin, proposedDelta, low);
-  }
-
-  // Resolve per-axis so tangential movement survives while penetration components are clamped.
-  const safe: TranslationDelta = { x: 0, y: 0, z: 0 };
-  const axes: Array<'x' | 'y' | 'z'> = ['x', 'y', 'z'].sort(
-    (a, b) => Math.abs(proposedDelta[b]) - Math.abs(proposedDelta[a])
-  );
-
-  for (const axis of axes) {
-    const axisTarget = proposedDelta[axis];
-    if (Math.abs(axisTarget) < 1e-9) continue;
-
-    const axisStart: TranslationDelta = { x: safe.x, y: safe.y, z: safe.z };
-    const fullAxisCandidate: TranslationDelta = {
-      x: safe.x,
-      y: safe.y,
-      z: safe.z,
-      [axis]: safe[axis] + axisTarget
+  // First preference: preserve drag direction by finding the furthest safe
+  // fraction along the full proposed vector.
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < SAFE_SEARCH_STEPS; i += 1) {
+    const mid = (low + high) / 2;
+    const candidate = {
+      x: proposedDelta.x * mid,
+      y: proposedDelta.y * mid,
+      z: proposedDelta.z * mid
     };
-    const axisInterval = findFirstOverlapInterval(parts, movingIds, axisStart, fullAxisCandidate, SWEEP_PATH_STEPS);
-    if (!axisInterval) {
-      safe[axis] += axisTarget;
-      continue;
-    }
-
-    let low = axisInterval.safeT;
-    let high = axisInterval.blockedT;
-    for (let i = 0; i < SAFE_SEARCH_STEPS; i += 1) {
-      const mid = (low + high) / 2;
-      const axisCandidate = lerpDelta(axisStart, fullAxisCandidate, mid);
-
-      if (wouldTranslationCauseOverlap(parts, movingIds, axisCandidate)) {
-        high = mid;
-      } else {
-        low = mid;
-      }
-    }
-
-    if (low >= MIN_SAFE_FRACTION) {
-      safe[axis] += axisTarget * low;
+    if (wouldTranslationCauseOverlap(parts, movingIds, candidate)) {
+      high = mid;
+    } else {
+      low = mid;
     }
   }
+  if (low >= MIN_DIRECTIONAL_FRACTION) {
+    const directionalSafe = {
+      x: proposedDelta.x * low,
+      y: proposedDelta.y * low,
+      z: proposedDelta.z * low
+    };
+    dragDebug('overlapPolicy:directionalSafe', {
+      movingIds: [...movingIds],
+      proposedDelta,
+      safeDelta: directionalSafe,
+      fraction: low
+    });
+    return directionalSafe;
+  }
 
-  const movedDistance = Math.abs(safe.x) + Math.abs(safe.y) + Math.abs(safe.z);
-  if (movedDistance < 1e-6) return null;
-
-  return safe;
+  // Do not redirect onto other axes when blocked; stop instead.
+  dragDebug('overlapPolicy:noDirectionalSafeDelta', {
+    movingIds: [...movingIds],
+    proposedDelta
+  });
+  return null;
 }

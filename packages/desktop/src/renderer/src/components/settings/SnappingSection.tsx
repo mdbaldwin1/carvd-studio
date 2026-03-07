@@ -58,7 +58,7 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
         <CardTitle className="flex items-center gap-1.5">
           Snapping
           <HelpTooltip
-            text="Configure how parts snap to other parts, guides, and the grid. Hold Alt/Option while dragging to temporarily bypass snapping."
+            text="Configure how parts snap to other parts, guides, and the grid. Angled parts use vector/feature alignment cues. Hold Alt/Option while dragging to temporarily bypass snapping."
             docsSection="snapping"
             inline
           />
@@ -127,7 +127,10 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
         <div className="settings-row flex items-center justify-between gap-4 mb-3">
           <div className="inline-flex items-center gap-1">
             <label className="text-[13px] text-text">Surface Anchors</label>
-            <HelpTooltip text="Enable center, midline, and quarter-line snapping on compatible faces." docsSection="snapping" />
+            <HelpTooltip
+              text="Enable center, midline, and quarter-line snapping on compatible faces."
+              docsSection="snapping"
+            />
           </div>
           <Checkbox
             checked={formData.enableSurfaceAnchors ?? true}
@@ -137,7 +140,10 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
         <div className="settings-row flex items-center justify-between gap-4 mb-3">
           <div className="inline-flex items-center gap-1">
             <label className="text-[13px] text-text">Fractional Face Anchors</label>
-            <HelpTooltip text="Enable 0/25/50/75/100 face anchor snapping for precision alignment." docsSection="snapping" />
+            <HelpTooltip
+              text="Enable 0/25/50/75/100 face anchor snapping for precision alignment."
+              docsSection="snapping"
+            />
           </div>
           <Checkbox
             checked={formData.enableFractionalAnchors ?? true}
@@ -219,7 +225,10 @@ export function SnappingSection({ formData, onSettingChange }: SnappingSectionPr
         <div className="settings-row flex items-center justify-between gap-4 mb-3">
           <div className="inline-flex items-center gap-1">
             <label className="text-[13px] text-text">Pattern Snaps</label>
-            <HelpTooltip text="Snap to repeated spacing patterns inferred from existing parts." docsSection="snapping" />
+            <HelpTooltip
+              text="Snap to repeated spacing patterns inferred from existing parts."
+              docsSection="snapping"
+            />
           </div>
           <Checkbox
             checked={formData.enablePatternSnap ?? true}

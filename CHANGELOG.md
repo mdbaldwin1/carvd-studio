@@ -73,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Angled movement + rotation axis UX hardening** — Non-90° part drag now uses orthonormalized virtual axes, group drag now mirrors angled virtual-axis behavior from the grabbed part context, and rotation-handle axis locking now uses pointer-down world-point projection for more reliable camera-angle axis selection.
 - **Angled group drag snap/movement regressions** — Group dragging now uses the same camera-projected drag plane model as single-part drag (removing camera-axis lock jumps), axis-legacy group snaps are automatically skipped in non-axis-aligned contexts, and final placement now preserves snapped axes instead of always re-quantizing to grid on drop.
 - **Layout snap commit flags for axis snaps** — `detectSnaps` now marks distribution/pattern layout snaps as snapped axes, so those snaps are consistently applied by drag handlers and no longer show visual snap lines without committing the matching axis move.
 - **Overlap-prevention blocking during movement** — Live drag overlap checks are now always enforced (including face-latched drag states), and overlap-safe translation solving now performs swept path checks to prevent high-speed “tunneling” through blockers while still preserving tangential slide where possible.
