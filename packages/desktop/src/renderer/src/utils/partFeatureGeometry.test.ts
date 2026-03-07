@@ -254,6 +254,54 @@ describe('partFeatureGeometry', () => {
     expect(geometry.getAttribute('position').count).toBeGreaterThan(0);
   });
 
+  it('renders stopped dado and stopped groove geometry through the face-cut path', () => {
+    const geometry = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 8,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'stopped_dado',
+            parameters: {
+              size: { length: 3, width: 8 },
+              depthMode: 'blind',
+              depth: 0.25
+            },
+            placement: { x: 4, z: 0 }
+          },
+          {
+            id: 'feature-2',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'bottom_face' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'stopped_groove',
+            parameters: {
+              size: { length: 5, width: 0.5 },
+              depthMode: 'blind',
+              depth: 0.125
+            },
+            placement: { x: 6, z: 2 }
+          }
+        ]
+      })
+    );
+
+    geometry.computeBoundingBox();
+    expect(geometry.boundingBox).not.toBeNull();
+    expect(geometry.boundingBox!.max.x).toBeCloseTo(12);
+    expect(geometry.boundingBox!.min.x).toBeCloseTo(-12);
+    expect(geometry.getAttribute('position').count).toBeGreaterThan(0);
+  });
+
   it('returns feature-aware world bounds for a corner notch', () => {
     const bounds = getPartWorldAABB(
       createTestPart({

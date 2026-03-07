@@ -6,6 +6,7 @@ See also:
 
 - `part-features-poc-spec.md` for the base blank-plus-operations model
 - `part-feature-sequential-spec.md` for ordered operation behavior
+- `part-feature-stopped-operations-spec.md` for the follow-on stopped channel variants
 
 ## Purpose
 
