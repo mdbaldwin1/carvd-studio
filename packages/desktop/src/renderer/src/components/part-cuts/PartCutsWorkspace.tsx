@@ -1,5 +1,6 @@
 import { FractionInput } from '@renderer/components/common/FractionInput';
 import {
+  applyTargetToFeatureDraft,
   buildDraftFromFeature,
   buildDraftFromPreset,
   buildFeatureFromDraft,
@@ -9,6 +10,7 @@ import {
   END_TARGETS,
   FACE_TARGETS,
   FeatureDraft,
+  getFeatureDraftTarget,
   getPresetHint,
   getPresetLabel,
   OperationPreset
@@ -25,7 +27,7 @@ import { Select } from '@renderer/components/ui/select';
 import { EndCutFeature, Part, PartFeature, PartFeatureTarget, RectCutFeature } from '@renderer/types';
 import { getDerivedLengthMeasurements, getLengthReferenceValue } from '@renderer/utils/endCutUtils';
 import { getPartFeatureConflicts } from '@renderer/utils/partFeatureConflicts';
-import { getPickableTargetLabel } from '@renderer/utils/partCutPicking';
+import { getPickableTargetLabel, isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import {
   CORNER_LABELS,
@@ -227,6 +229,19 @@ export function PartCutsWorkspace({
     }
   }, [draft, selectedFeature]);
 
+  useEffect(() => {
+    const nextTarget = inspectorDraft ? getFeatureDraftTarget(inspectorDraft) : null;
+    if (!partFeatureTargetEquals(nextTarget, pendingTarget)) {
+      onPendingTargetChange(nextTarget);
+    }
+  }, [inspectorDraft, onPendingTargetChange, pendingTarget]);
+
+  const handlePreviewTargetActivation = (target: PartFeatureTarget | null) => {
+    onPendingTargetChange(target);
+    if (!target || !inspectorDraft || !isTargetValidForDraft(target, inspectorDraft)) return;
+    setDraft(applyTargetToFeatureDraft(inspectorDraft, target));
+  };
+
   const selectedTargetLabel = getSelectedTargetLabel(inspectorDraft);
   const activeTargetLabel = getPickableTargetLabel(hoveredTarget) ?? getPickableTargetLabel(pendingTarget);
   const selectedFeatureSummary = selectedFeature ? getFeatureSummary(selectedFeature, units) : null;
@@ -370,7 +385,7 @@ export function PartCutsWorkspace({
                 hoveredTarget={hoveredTarget}
                 pendingTarget={pendingTarget}
                 onHoverTarget={onHoveredTargetChange}
-                onActivateTarget={onPendingTargetChange}
+                onActivateTarget={handlePreviewTargetActivation}
               />
 
               <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text-secondary">

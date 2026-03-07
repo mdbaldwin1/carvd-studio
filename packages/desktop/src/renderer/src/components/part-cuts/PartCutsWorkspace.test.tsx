@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
@@ -148,5 +148,34 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByText('Inspector Target')).toBeInTheDocument();
     expect(screen.getByText('Same-Part Feedback')).toBeInTheDocument();
     expect(screen.getAllByText('Conflict').length).toBeGreaterThan(0);
+  });
+
+  it('retargets the active draft through the preview fallback controls', () => {
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Stretcher' })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={{ type: 'face', face: 'left_end' }}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={vi.fn()}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={false}
+      />
+    );
+
+    fireEvent.click(screen.getByText('End Cut'));
+    fireEvent.click(
+      within(screen.getByText('Preview Targets').parentElement as HTMLElement).getByRole('button', {
+        name: 'Right End'
+      })
+    );
+
+    expect(screen.getByText('Selected target:', { exact: false })).toHaveTextContent('Right End');
   });
 });

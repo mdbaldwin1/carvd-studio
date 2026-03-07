@@ -1,6 +1,7 @@
 import { Edges, OrbitControls } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
-import { FeatureDraft } from '@renderer/components/part-features/partFeatureEditorState';
+import { FeatureDraft, getFeatureDraftTarget } from '@renderer/components/part-features/partFeatureEditorState';
+import { Button } from '@renderer/components/ui/button';
 import { CardDescription } from '@renderer/components/ui/card';
 import { Part, PartFeatureTarget } from '@renderer/types';
 import {
@@ -24,7 +25,9 @@ interface PartCutsPreviewCanvasProps {
 }
 
 function shouldUseFallbackPreview(): boolean {
-  return typeof window !== 'undefined' && window.navigator.userAgent.includes('jsdom');
+  return (
+    typeof window !== 'undefined' && (import.meta.env.MODE === 'test' || window.navigator.userAgent.includes('jsdom'))
+  );
 }
 
 function PartCutsPreviewScene({
@@ -117,6 +120,8 @@ export function PartCutsPreviewCanvas({
   const maxDimension = Math.max(part.length, part.width, part.thickness, 1);
   const activeTargetLabel = getPickableTargetLabel(hoveredTarget) ?? getPickableTargetLabel(pendingTarget);
   const fallback = shouldUseFallbackPreview();
+  const validTargets = useMemo(() => getValidPickableTargets(previewPart, draft), [draft, previewPart]);
+  const draftTarget = draft ? getFeatureDraftTarget(draft) : null;
 
   if (fallback) {
     return (
@@ -139,6 +144,25 @@ export function PartCutsPreviewCanvas({
           {activeTargetLabel && (
             <div className="rounded-md border border-border bg-bg px-3 py-2 text-left text-sm text-text">
               Active target: <span className="font-medium">{activeTargetLabel}</span>
+            </div>
+          )}
+          {validTargets.length > 0 && (
+            <div className="rounded-md border border-border bg-bg px-3 py-3 text-left">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Preview Targets</div>
+              <div className="flex flex-wrap gap-2">
+                {validTargets.map((target) => (
+                  <Button
+                    key={target.key}
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    active={partFeatureTargetEquals(draftTarget, target.target)}
+                    onClick={() => onActivateTarget(target.target)}
+                  >
+                    {target.label}
+                  </Button>
+                ))}
+              </div>
             </div>
           )}
         </div>

@@ -1,4 +1,12 @@
-import { CornerTarget, EdgeTarget, EndCutFeature, FaceTarget, PartFeature, RectCutFeature } from '@renderer/types';
+import {
+  CornerTarget,
+  EdgeTarget,
+  EndCutFeature,
+  FaceTarget,
+  PartFeature,
+  PartFeatureTarget,
+  RectCutFeature
+} from '@renderer/types';
 import { clonePartFeature } from '@renderer/utils/partFeatures';
 
 export const END_TARGETS: FaceTarget[] = ['left_end', 'right_end'];
@@ -191,6 +199,42 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
       z: draft.cutType === 'corner_notch' ? 0 : draft.placementZ
     }
   };
+}
+
+export function getFeatureDraftTarget(draft: FeatureDraft): PartFeatureTarget {
+  if (draft.mode === 'end_cut') {
+    return { type: 'face', face: draft.targetFace };
+  }
+
+  if (draft.cutType === 'corner_notch') {
+    return { type: 'corner', corner: draft.cornerTarget };
+  }
+
+  if (draft.cutType === 'edge_notch') {
+    return { type: 'edge', edge: draft.edgeTarget };
+  }
+
+  return { type: 'face', face: draft.faceTarget };
+}
+
+export function applyTargetToFeatureDraft(draft: FeatureDraft, target: PartFeatureTarget): FeatureDraft {
+  if (draft.mode === 'end_cut') {
+    return target.type === 'face' && (target.face === 'left_end' || target.face === 'right_end')
+      ? { ...draft, targetFace: target.face }
+      : draft;
+  }
+
+  if (draft.cutType === 'corner_notch') {
+    return target.type === 'corner' ? { ...draft, cornerTarget: target.corner } : draft;
+  }
+
+  if (draft.cutType === 'edge_notch') {
+    return target.type === 'edge' ? { ...draft, edgeTarget: target.edge } : draft;
+  }
+
+  return target.type === 'face' && (target.face === 'top_face' || target.face === 'bottom_face')
+    ? { ...draft, faceTarget: target.face }
+    : draft;
 }
 
 export function duplicateFeature(feature: PartFeature): PartFeature {
