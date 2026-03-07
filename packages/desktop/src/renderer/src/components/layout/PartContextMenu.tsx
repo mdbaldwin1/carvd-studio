@@ -6,6 +6,7 @@ import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
+import { usePartCutsEditingStore } from '../../store/partCutsEditingStore';
 import { getFeatureLimits } from '../../utils/featureLimits';
 import { MenuPanel, MenuItemButton, MenuSeparator, MenuLabel, MenuSub } from '../ui/context-menu';
 
@@ -36,7 +37,10 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const addToGroup = useProjectStore((s) => s.addToGroup);
   const mergeGroups = useProjectStore((s) => s.mergeGroups);
   const openSaveAssemblyModal = useUIStore((s) => s.openSaveAssemblyModal);
+  const showToast = useUIStore((s) => s.showToast);
   const licenseMode = useLicenseStore((s) => s.licenseMode);
+  const isEditingPartCuts = usePartCutsEditingStore((s) => s.isEditingPartCuts);
+  const startEditingPartCuts = usePartCutsEditingStore((s) => s.startEditingPartCuts);
   const limits = getFeatureLimits(licenseMode);
   const canUseAssemblies = limits.canUseAssemblies;
   const canUseGroups = limits.canUseGroups;
@@ -55,6 +59,10 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   if (selectedPartIds.length === 0 && !hasGroupSelection) return null;
 
   const isMultiSelect = effectiveSelectedPartIds.length > 1;
+  const singleSelectedPart =
+    selectedPartIds.length === 1 && selectedGroupIds.length === 0
+      ? (parts.find((part) => part.id === selectedPartIds[0]) ?? null)
+      : null;
 
   // Check if any selected part has a stock assigned
   const selectedParts = parts.filter((p) => effectiveSelectedPartIds.includes(p.id));
@@ -186,6 +194,21 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
     onClose();
   };
 
+  const handleEditCuts = () => {
+    if (isEditingPartCuts) {
+      showToast('Finish editing part cuts first', 'warning');
+      onClose();
+      return;
+    }
+    if (!singleSelectedPart) {
+      showToast('Select exactly one part to edit cuts', 'warning');
+      onClose();
+      return;
+    }
+    startEditingPartCuts(singleSelectedPart.id, singleSelectedPart.name, singleSelectedPart.features);
+    onClose();
+  };
+
   return (
     <MenuPanel ref={menuRef} x={x} y={y}>
       <MenuLabel>
@@ -199,6 +222,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
       </MenuLabel>
       <MenuItemButton onClick={handleCenter}>Center View</MenuItemButton>
       <MenuItemButton onClick={handleCopy}>Copy</MenuItemButton>
+      {singleSelectedPart && <MenuItemButton onClick={handleEditCuts}>Edit Cuts...</MenuItemButton>}
       <MenuItemButton
         onClick={handleSaveAsAssembly}
         disabled={!canUseAssemblies}

@@ -170,6 +170,16 @@ describe('useMenuCommands', () => {
       expect(showToast).toHaveBeenCalledWith('Project saved', 'success');
     });
 
+    it('routes save-project to part cuts save when active', async () => {
+      const onSavePartCuts = vi.fn();
+
+      renderHook(() => useMenuCommands({ isEditingPartCuts: true, onSavePartCuts }));
+      await menuCommandHandler('save-project');
+
+      expect(onSavePartCuts).toHaveBeenCalled();
+      expect(saveProject).not.toHaveBeenCalled();
+    });
+
     it('handles save-project error', async () => {
       (saveProject as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         success: false,
@@ -195,12 +205,35 @@ describe('useMenuCommands', () => {
       expect(showToast).toHaveBeenCalledWith('Project saved', 'success');
     });
 
+    it('blocks save-project-as while editing part cuts', async () => {
+      const showToast = vi.fn();
+      useUIStore.setState({ showToast });
+
+      renderHook(() => useMenuCommands({ isEditingPartCuts: true }));
+      await menuCommandHandler('save-project-as');
+
+      expect(showToast).toHaveBeenCalledWith('Use "Save" to commit part cuts before saving the project', 'info');
+      expect(saveProjectAs).not.toHaveBeenCalled();
+    });
+
     it('handles open-project with provided handler', async () => {
       const onOpenProject = vi.fn().mockResolvedValue(undefined);
       renderHook(() => useMenuCommands({ onOpenProject }));
       await menuCommandHandler('open-project');
 
       expect(onOpenProject).toHaveBeenCalled();
+    });
+
+    it('blocks open-project while editing part cuts', async () => {
+      const showToast = vi.fn();
+      useUIStore.setState({ showToast });
+      const onOpenProject = vi.fn();
+
+      renderHook(() => useMenuCommands({ isEditingPartCuts: true, onOpenProject }));
+      await menuCommandHandler('open-project');
+
+      expect(onOpenProject).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledWith('Finish editing part cuts first', 'warning');
     });
 
     it('handles open-project without handler', async () => {

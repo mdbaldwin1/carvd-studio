@@ -8,6 +8,7 @@ import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
 import { useLicenseStore } from '../../store/licenseStore';
 import { useCameraStore } from '../../store/cameraStore';
+import { usePartCutsEditingStore } from '../../store/partCutsEditingStore';
 import React from 'react';
 
 const createRef = () => React.createRef<HTMLDivElement>();
@@ -66,7 +67,8 @@ beforeEach(() => {
     clearReferences: vi.fn()
   });
   useUIStore.setState({
-    openSaveAssemblyModal: vi.fn()
+    openSaveAssemblyModal: vi.fn(),
+    showToast: vi.fn()
   });
   useLicenseStore.setState({
     licenseMode: 'licensed'
@@ -74,6 +76,7 @@ beforeEach(() => {
   useCameraStore.setState({
     requestCenterCamera: vi.fn()
   });
+  usePartCutsEditingStore.getState().finishEditing();
 });
 
 describe('PartContextMenu', () => {
@@ -128,6 +131,23 @@ describe('PartContextMenu', () => {
     fireEvent.click(screen.getByText('Copy'));
     expect(useClipboardStore.getState().copySelectedParts).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('shows Edit Cuts for single-part selection and starts cuts editing', () => {
+    const onClose = vi.fn();
+    render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={onClose} />);
+
+    fireEvent.click(screen.getByText('Edit Cuts...'));
+
+    expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
+    expect(usePartCutsEditingStore.getState().sourcePartId).toBe('p1');
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('hides Edit Cuts for multi-select', () => {
+    useSelectionStore.setState({ selectedPartIds: ['p1', 'p2'] });
+    render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={vi.fn()} />);
+    expect(screen.queryByText('Edit Cuts...')).not.toBeInTheDocument();
   });
 
   it('renders Save as Assembly button', () => {

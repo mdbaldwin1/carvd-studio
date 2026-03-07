@@ -3,6 +3,7 @@ import { MultiSelectionProperties } from '@renderer/components/properties/MultiS
 import { NoSelectionProperties } from '@renderer/components/properties/NoSelectionProperties';
 import { SinglePartAdvancedCard } from '@renderer/components/properties/SinglePartAdvancedCard';
 import { SinglePartBasicsCard } from '@renderer/components/properties/SinglePartBasicsCard';
+import { SinglePartCutsSummaryCard } from '@renderer/components/properties/SinglePartCutsSummaryCard';
 import { SinglePartFeaturesCard } from '@renderer/components/properties/SinglePartFeaturesCard';
 import { SinglePartMaterialCard } from '@renderer/components/properties/SinglePartMaterialCard';
 import { SinglePartNotesCard } from '@renderer/components/properties/SinglePartNotesCard';
@@ -13,6 +14,7 @@ import { useStockLibrary } from '@renderer/hooks/useStockLibrary';
 import { useAssemblyEditingStore } from '@renderer/store/assemblyEditingStore';
 import { useCameraStore } from '@renderer/store/cameraStore';
 import { useLicenseStore } from '@renderer/store/licenseStore';
+import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { getAllDescendantPartIds, getContainingGroupId, useProjectStore } from '@renderer/store/projectStore';
 import { useSelectionStore } from '@renderer/store/selectionStore';
 import { useSnapStore } from '@renderer/store/snapStore';
@@ -60,6 +62,7 @@ export function PropertiesPanel() {
   const canUseAssemblies = limits.canUseAssemblies;
   const canUseGroups = limits.canUseGroups;
   const constraints = useEffectiveStockConstraints();
+  const startEditingPartCuts = usePartCutsEditingStore((s) => s.startEditingPartCuts);
 
   // State for "Add New Stock..." modal
   const [isCreateStockModalOpen, setIsCreateStockModalOpen] = useState(false);
@@ -514,6 +517,12 @@ export function PropertiesPanel() {
           if (!Number.isFinite(value)) return;
           setRotationSnapIncrement(Math.max(1, Math.min(90, Math.round(value))));
         }}
+      />
+
+      <SinglePartCutsSummaryCard
+        selectedPart={selectedPart}
+        units={units}
+        onEditCuts={() => startEditingPartCuts(selectedPart.id, selectedPart.name, selectedPart.features)}
       />
 
       <SinglePartFeaturesCard

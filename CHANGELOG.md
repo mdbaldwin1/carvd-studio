@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dedicated part cuts workspace shell (POC)** — Added a focused `Part Cuts` editing mode with header integration, save/discard exit handling, a dedicated three-pane workspace shell, and `Edit Cuts` entry points from both single-part Properties and the part context menu.
 - **Feature-part geometry render path (POC)** — Added a dedicated geometry pipeline for feature-bearing parts so mitred ends and footprint-based removals can render outside the fast instanced-box path, while ordinary rectangular parts stay on the high-performance instanced renderer.
 - **Woodworker-oriented part operations workflow (POC)** — Added an `Operations` card to single-part properties with blank-first guidance, operation-first authoring, filtered end/edge/face/corner target pickers, and plain-language operation summaries for upcoming mitres/notches/cutouts work.
 - **Precise part rotation controls (POC)** — Added single-part `Rotation (X, Y, Z)` controls in the Properties panel with direct degree entry, angle snap toggle, adjustable snap step, one-click reset, and drag-to-rotate ring handles with live angle feedback.
