@@ -485,7 +485,7 @@ export function useGroupDrag(
           for (const pid of partIds) {
             const p = allParts.find((pp) => pp.id === pid);
             if (!p) continue;
-            const halfH = calculateWorldHalfHeightFromDegrees(p.rotation, p.length, p.thickness, p.width);
+            const halfH = calculateWorldHalfHeightFromDegrees(p.rotation, p.length, p.thickness, p.width, p.features);
             const projectedY = p.position.y + proposedDelta.y;
             const adjustment = Math.max(0, halfH - projectedY);
             maxYAdjustment = Math.max(maxYAdjustment, adjustment);
@@ -538,7 +538,7 @@ export function useGroupDrag(
         for (const pid of partIds) {
           const p = parts.find((pp) => pp.id === pid);
           if (!p) continue;
-          const halfH = calculateWorldHalfHeightFromDegrees(p.rotation, p.length, p.thickness, p.width);
+          const halfH = calculateWorldHalfHeightFromDegrees(p.rotation, p.length, p.thickness, p.width, p.features);
           const projectedY = p.position.y + snappedDelta.y;
           const adjustment = Math.max(0, halfH - projectedY);
           maxYAdjustment = Math.max(maxYAdjustment, adjustment);

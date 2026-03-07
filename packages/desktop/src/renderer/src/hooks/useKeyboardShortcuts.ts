@@ -139,7 +139,8 @@ export function useKeyboardShortcuts() {
             update.changes.rotation,
             part.length,
             part.thickness,
-            part.width
+            part.width,
+            part.features
           );
 
           const bottomY = update.changes.position.y - effectiveHalfHeight;

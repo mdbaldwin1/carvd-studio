@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Feature-part interaction bounds (POC)** — Camera centering, screen-space hit testing, selection boxing, workspace AABBs, and ground-contact enforcement now derive from rendered feature geometry bounds instead of always assuming a plain rectangular box.
 - **Ghost display mode readability** — Increased Ghost/translucent part opacity and added outline rendering so part silhouettes are easier to read while staying semi-transparent.
 - **Rotation model generalized beyond 90° increments** — Internal rotation typing and transformation utilities now support arbitrary angles while preserving fast `X/Y/Z` keyboard rotations for intuitive quick-turn workflows.
 - **Rotated-part snapping and overlap hardening** — Face-to-face snapping now validates oriented face compatibility (opposing normals plus in-plane overlap) and solves oriented snap deltas, overlap prevention during drag/properties edits now uses OBB-vs-OBB tests instead of broad AABB-only checks, and drag overlap resolution now applies swept/binary-search fallback so parts can approach contact smoothly without hard blocking.

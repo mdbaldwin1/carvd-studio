@@ -1,12 +1,11 @@
 import * as THREE from 'three';
 import { Part, SnapLine, SnapDistanceIndicator, SnapGuide, ReferenceDistanceIndicator } from '../types';
+import { getPartWorldAABB } from './partFeatureGeometry';
 
 // Module-level reusable objects for getPartBounds calculations.
 // Safe because JS is single-threaded and callers only see the returned plain PartBounds object.
 const _boundsEuler = new THREE.Euler();
 const _boundsQuat = new THREE.Quaternion();
-const _boundsCorners = Array.from({ length: 8 }, () => new THREE.Vector3());
-const _boundsPosition = new THREE.Vector3();
 
 // Part bounding box in world space
 export interface PartBounds {
@@ -66,47 +65,7 @@ export interface SnapResult {
 
 // Calculate axis-aligned bounding box for a part in world space
 export function getPartBounds(part: Part): PartBounds {
-  _boundsEuler.set(
-    (part.rotation.x * Math.PI) / 180,
-    (part.rotation.y * Math.PI) / 180,
-    (part.rotation.z * Math.PI) / 180,
-    'XYZ'
-  );
-  _boundsQuat.setFromEuler(_boundsEuler);
-
-  const halfLength = part.length / 2;
-  const halfThickness = part.thickness / 2;
-  const halfWidth = part.width / 2;
-
-  // Set corner values in-place (no new allocations)
-  _boundsCorners[0].set(-halfLength, -halfThickness, -halfWidth);
-  _boundsCorners[1].set(-halfLength, -halfThickness, halfWidth);
-  _boundsCorners[2].set(-halfLength, halfThickness, -halfWidth);
-  _boundsCorners[3].set(-halfLength, halfThickness, halfWidth);
-  _boundsCorners[4].set(halfLength, -halfThickness, -halfWidth);
-  _boundsCorners[5].set(halfLength, -halfThickness, halfWidth);
-  _boundsCorners[6].set(halfLength, halfThickness, -halfWidth);
-  _boundsCorners[7].set(halfLength, halfThickness, halfWidth);
-
-  _boundsPosition.set(part.position.x, part.position.y, part.position.z);
-
-  let minX = Infinity,
-    maxX = -Infinity;
-  let minY = Infinity,
-    maxY = -Infinity;
-  let minZ = Infinity,
-    maxZ = -Infinity;
-
-  for (const corner of _boundsCorners) {
-    corner.applyQuaternion(_boundsQuat);
-    corner.add(_boundsPosition);
-    minX = Math.min(minX, corner.x);
-    maxX = Math.max(maxX, corner.x);
-    minY = Math.min(minY, corner.y);
-    maxY = Math.max(maxY, corner.y);
-    minZ = Math.min(minZ, corner.z);
-    maxZ = Math.max(maxZ, corner.z);
-  }
+  const { minX, maxX, minY, maxY, minZ, maxZ } = getPartWorldAABB(part);
 
   return {
     id: part.id,

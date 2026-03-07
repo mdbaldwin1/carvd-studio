@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.unmock('three');
-import { clearPartGeometryCache, getPartRenderGeometry, hasRenderablePartFeatures } from './partFeatureGeometry';
+import {
+  clearPartGeometryCache,
+  getPartRenderGeometry,
+  getPartWorldAABB,
+  getPartWorldHalfHeight,
+  hasRenderablePartFeatures
+} from './partFeatureGeometry';
 import { createTestPart } from '../../../../tests/helpers/factories';
 
 describe('partFeatureGeometry', () => {
@@ -111,5 +117,57 @@ describe('partFeatureGeometry', () => {
     expect(geometry.boundingBox!.max.y).toBeCloseTo(0.375);
     expect(geometry.boundingBox!.min.y).toBeCloseTo(-0.375);
     expect(geometry.getAttribute('position').count).toBeGreaterThan(0);
+  });
+
+  it('returns feature-aware world bounds for a corner notch', () => {
+    const bounds = getPartWorldAABB(
+      createTestPart({
+        position: { x: 10, y: 2, z: -3 },
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'corner', corner: 'front_bottom_left_corner' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'corner_notch',
+            parameters: {
+              size: { length: 2, width: 2 },
+              depthMode: 'through'
+            },
+            placement: { x: 0, z: 0 }
+          }
+        ]
+      })
+    );
+
+    expect(bounds.minX).toBeCloseTo(-2);
+    expect(bounds.maxX).toBeCloseTo(22);
+    expect(bounds.minZ).toBeCloseTo(-9);
+    expect(bounds.maxZ).toBeCloseTo(3);
+  });
+
+  it('uses rendered geometry for ground-contact half-height', () => {
+    const halfHeight = getPartWorldHalfHeight(
+      createTestPart({
+        rotation: { x: 35, y: 20, z: 0 },
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 45 }
+          }
+        ]
+      })
+    );
+
+    expect(halfHeight).toBeGreaterThan(0);
   });
 });

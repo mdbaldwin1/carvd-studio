@@ -105,7 +105,13 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
 
   // Enforce ground constraint after rotation or dimension changes
   useEffect(() => {
-    const worldHalfHeight = calculateWorldHalfHeightFromDegrees(part.rotation, part.length, part.thickness, part.width);
+    const worldHalfHeight = calculateWorldHalfHeightFromDegrees(
+      part.rotation,
+      part.length,
+      part.thickness,
+      part.width,
+      part.features
+    );
 
     if (part.position.y < worldHalfHeight) {
       updatePart(part.id, {

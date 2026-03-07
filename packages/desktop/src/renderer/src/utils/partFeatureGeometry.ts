@@ -4,6 +4,10 @@ import { Part, PartFeature, RectCutFeature } from '../types';
 type Point2 = { x: number; z: number };
 
 const geometryCache = new Map<string, THREE.BufferGeometry>();
+const _worldAabbPosition = new THREE.Vector3();
+const _worldAabbQuaternion = new THREE.Quaternion();
+const _worldAabbEuler = new THREE.Euler();
+const _worldAabbCorner = new THREE.Vector3();
 
 function featureKey(part: Part): string {
   return JSON.stringify({
@@ -266,6 +270,22 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
   return geometry;
 }
 
+function getFeatureContour(part: Part): Point2[] {
+  let contour = buildOuterContour(part);
+  const rectCuts = getEnabledFeatures(part).filter((feature): feature is RectCutFeature => feature.kind === 'rect_cut');
+
+  for (const feature of rectCuts) {
+    if (feature.parameters.depthMode !== 'through') continue;
+    if (feature.cutType === 'corner_notch') {
+      contour = applyCornerNotch(contour, feature);
+    } else if (feature.cutType === 'edge_notch') {
+      contour = applyEdgeNotch(contour, feature);
+    }
+  }
+
+  return contour;
+}
+
 export function getPartRenderGeometry(part: Part): THREE.BufferGeometry {
   if (!hasRenderablePartFeatures(part)) {
     return new THREE.BoxGeometry(part.length, part.thickness, part.width);
@@ -278,6 +298,99 @@ export function getPartRenderGeometry(part: Part): THREE.BufferGeometry {
   const geometry = createFeatureGeometry(part);
   geometryCache.set(key, geometry);
   return geometry;
+}
+
+export function getPartLocalBoundingBox(part: Part): { min: THREE.Vector3; max: THREE.Vector3 } {
+  const contour = hasRenderablePartFeatures(part) ? getFeatureContour(part) : buildOuterContour(part);
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+
+  for (const point of contour) {
+    minX = Math.min(minX, point.x);
+    maxX = Math.max(maxX, point.x);
+    minZ = Math.min(minZ, point.z);
+    maxZ = Math.max(maxZ, point.z);
+  }
+
+  return {
+    min: new THREE.Vector3(minX, -part.thickness / 2, minZ),
+    max: new THREE.Vector3(maxX, part.thickness / 2, maxZ)
+  };
+}
+
+export function getPartWorldAABB(
+  part: Part,
+  position: { x: number; y: number; z: number } = part.position
+): {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+  minZ: number;
+  maxZ: number;
+} {
+  const localBox = getPartLocalBoundingBox(part);
+  _worldAabbEuler.set(
+    (part.rotation.x * Math.PI) / 180,
+    (part.rotation.y * Math.PI) / 180,
+    (part.rotation.z * Math.PI) / 180,
+    'XYZ'
+  );
+  _worldAabbQuaternion.setFromEuler(_worldAabbEuler);
+  _worldAabbPosition.set(position.x, position.y, position.z);
+  const { min, max } = localBox;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+
+  for (const x of [min.x, max.x]) {
+    for (const y of [min.y, max.y]) {
+      for (const z of [min.z, max.z]) {
+        _worldAabbCorner.set(x, y, z).applyQuaternion(_worldAabbQuaternion).add(_worldAabbPosition);
+        minX = Math.min(minX, _worldAabbCorner.x);
+        maxX = Math.max(maxX, _worldAabbCorner.x);
+        minY = Math.min(minY, _worldAabbCorner.y);
+        maxY = Math.max(maxY, _worldAabbCorner.y);
+        minZ = Math.min(minZ, _worldAabbCorner.z);
+        maxZ = Math.max(maxZ, _worldAabbCorner.z);
+      }
+    }
+  }
+
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    minZ,
+    maxZ
+  };
+}
+
+export function getPartWorldHalfHeight(
+  part: Pick<Part, 'rotation' | 'position' | 'length' | 'width' | 'thickness' | 'features'>
+): number {
+  const bounds = getPartWorldAABB(part as Part, { x: 0, y: 0, z: 0 });
+  return -bounds.minY;
+}
+
+export function getPartLocalCorners(part: Part): THREE.Vector3[] {
+  const { min, max } = getPartLocalBoundingBox(part);
+  return [
+    new THREE.Vector3(min.x, min.y, min.z),
+    new THREE.Vector3(min.x, min.y, max.z),
+    new THREE.Vector3(min.x, max.y, min.z),
+    new THREE.Vector3(min.x, max.y, max.z),
+    new THREE.Vector3(max.x, min.y, min.z),
+    new THREE.Vector3(max.x, min.y, max.z),
+    new THREE.Vector3(max.x, max.y, min.z),
+    new THREE.Vector3(max.x, max.y, max.z)
+  ];
 }
 
 export function clearPartGeometryCache(): void {

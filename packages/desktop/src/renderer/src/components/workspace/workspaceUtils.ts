@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { LightingMode } from '../../types';
+import { getPartWorldAABB } from '../../utils/partFeatureGeometry';
 
 // Lighting presets for different viewing conditions
 export const LIGHTING_PRESETS: Record<
@@ -63,13 +64,6 @@ export function clearRightClickTarget() {
   globalRightClickTarget = null;
 }
 
-// Module-level reusable objects for getPartAABB calculations.
-// Safe because JS is single-threaded and the return value is a plain object.
-const _aabbEuler = new THREE.Euler();
-const _aabbQuat = new THREE.Quaternion();
-const _aabbCorners = Array.from({ length: 8 }, () => new THREE.Vector3());
-const _aabbPosition = new THREE.Vector3();
-
 // Helper to calculate axis-aligned bounding box for a part
 export function getPartAABB(part: {
   position: { x: number; y: number; z: number };
@@ -77,47 +71,7 @@ export function getPartAABB(part: {
   length: number;
   width: number;
   thickness: number;
+  features?: import('../../types').PartFeature[];
 }) {
-  _aabbEuler.set(
-    (part.rotation.x * Math.PI) / 180,
-    (part.rotation.y * Math.PI) / 180,
-    (part.rotation.z * Math.PI) / 180,
-    'XYZ'
-  );
-  _aabbQuat.setFromEuler(_aabbEuler);
-
-  const halfLength = part.length / 2;
-  const halfThickness = part.thickness / 2;
-  const halfWidth = part.width / 2;
-
-  _aabbCorners[0].set(-halfLength, -halfThickness, -halfWidth);
-  _aabbCorners[1].set(-halfLength, -halfThickness, halfWidth);
-  _aabbCorners[2].set(-halfLength, halfThickness, -halfWidth);
-  _aabbCorners[3].set(-halfLength, halfThickness, halfWidth);
-  _aabbCorners[4].set(halfLength, -halfThickness, -halfWidth);
-  _aabbCorners[5].set(halfLength, -halfThickness, halfWidth);
-  _aabbCorners[6].set(halfLength, halfThickness, -halfWidth);
-  _aabbCorners[7].set(halfLength, halfThickness, halfWidth);
-
-  _aabbPosition.set(part.position.x, part.position.y, part.position.z);
-
-  let minX = Infinity,
-    maxX = -Infinity;
-  let minY = Infinity,
-    maxY = -Infinity;
-  let minZ = Infinity,
-    maxZ = -Infinity;
-
-  for (const corner of _aabbCorners) {
-    corner.applyQuaternion(_aabbQuat);
-    corner.add(_aabbPosition);
-    minX = Math.min(minX, corner.x);
-    maxX = Math.max(maxX, corner.x);
-    minY = Math.min(minY, corner.y);
-    maxY = Math.max(maxY, corner.y);
-    minZ = Math.min(minZ, corner.z);
-    maxZ = Math.max(maxZ, corner.z);
-  }
-
-  return { minX, maxX, minY, maxY, minZ, maxZ };
+  return getPartWorldAABB(part as Parameters<typeof getPartWorldAABB>[0]);
 }

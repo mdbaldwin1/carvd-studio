@@ -711,7 +711,8 @@ export function usePartDrag(
               selectedPart.rotation,
               selectedPart.length,
               selectedPart.thickness,
-              selectedPart.width
+              selectedPart.width,
+              selectedPart.features
             );
 
             const projectedY = selectedPart.position.y + baseDelta.y;

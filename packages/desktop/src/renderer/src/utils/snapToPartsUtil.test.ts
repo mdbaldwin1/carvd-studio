@@ -1,4 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+vi.unmock('three');
 import {
   getPartBounds,
   getPartBoundsAtPosition,
@@ -111,6 +113,37 @@ describe('snapToPartsUtil', () => {
       expect(bounds.centerX).toBe(0);
       expect(bounds.centerY).toBe(0);
       expect(bounds.centerZ).toBe(0);
+    });
+
+    it('uses feature-aware bounds for notched parts', () => {
+      const part = createTestPart({
+        position: { x: 10, y: 2, z: -3 },
+        length: 24,
+        width: 12,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'corner', corner: 'front_bottom_left_corner' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'corner_notch',
+            parameters: {
+              size: { length: 2, width: 2 },
+              depthMode: 'through'
+            },
+            placement: { x: 0, z: 0 }
+          }
+        ]
+      });
+
+      const bounds = getPartBounds(part);
+      expect(bounds.minX).toBeCloseTo(-2);
+      expect(bounds.maxX).toBeCloseTo(22);
+      expect(bounds.minZ).toBeCloseTo(-9);
+      expect(bounds.maxZ).toBeCloseTo(3);
     });
   });
 
