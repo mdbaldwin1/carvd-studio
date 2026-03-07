@@ -2287,6 +2287,53 @@ describe('validatePartsForCutList', () => {
       expect(issues[0].type).toBe('feature_validation');
       expect(issues[0].message).toContain('Bad cutout');
     });
+
+    it('returns feature validation errors for duplicate enabled end cuts on the same end', () => {
+      const stock = createTestStock({
+        id: 'stock-1',
+        length: 96,
+        width: 48,
+        thickness: 0.75
+      });
+      const parts = [
+        createTestPart({
+          name: 'Feature Part',
+          stockId: 'stock-1',
+          length: 24,
+          width: 12,
+          thickness: 0.75,
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'mitre',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 45 }
+            },
+            {
+              id: 'feature-2',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'bevel',
+              lengthMode: 'centerline',
+              parameters: { horizontalAngle: 0, verticalAngle: 15 }
+            }
+          ]
+        })
+      ];
+
+      const issues = validatePartsForCutList(parts, [stock]);
+
+      expect(issues.some((issue) => issue.type === 'feature_validation' && issue.severity === 'error')).toBe(true);
+      expect(issues.some((issue) => issue.message.includes('Only one enabled end cut per end'))).toBe(true);
+    });
   });
 
   describe('multiple parts validation', () => {

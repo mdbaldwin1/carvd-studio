@@ -3,7 +3,10 @@ import { useProjectStore } from '../store/projectStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useUIStore } from '../store/uiStore';
 import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
+import { getPartFeatureConflicts } from '../utils/partFeatureConflicts';
 import { clonePartFeatures } from '../utils/partFeatures';
+import { getFeatureTargetLabel } from '../utils/partFeatureSummary';
+import { validateRectCutFeature } from '../utils/rectCutUtils';
 
 export function usePartCutsEditing() {
   const parts = useProjectStore((s) => s.parts);
@@ -56,6 +59,24 @@ export function usePartCutsEditing() {
     if (!currentPart || !sourcePartId) {
       showToast('Part not found', 'error');
       finishEditing();
+      return false;
+    }
+
+    for (const feature of draftFeatures) {
+      if (!feature.enabled || feature.kind !== 'rect_cut') continue;
+      const rectCutIssue = validateRectCutFeature(feature, currentPart);
+      if (!rectCutIssue) continue;
+      const featureLabel =
+        feature.label?.trim() || `${feature.cutType.replace(/_/g, ' ')} on ${getFeatureTargetLabel(feature)}`;
+      showToast(`Resolve "${featureLabel}" before saving part cuts`, 'error');
+      return false;
+    }
+
+    const blockingConflicts = getPartFeatureConflicts(draftFeatures, currentPart).filter(
+      (conflict) => conflict.severity === 'error'
+    );
+    if (blockingConflicts.length > 0) {
+      showToast(blockingConflicts[0].message, 'error');
       return false;
     }
 

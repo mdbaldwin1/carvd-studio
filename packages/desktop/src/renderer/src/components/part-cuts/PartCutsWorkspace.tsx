@@ -163,6 +163,7 @@ export function PartCutsWorkspace({
   }, [draft, draftFeatures, draftPreviewFeature, part.length, part.thickness, part.width]);
 
   const featureConflicts = useMemo(() => getPartFeatureConflicts(draftFeatures, part), [draftFeatures, part]);
+  const hasBlockingFeatureConflicts = featureConflicts.some((conflict) => conflict.severity === 'error');
   const conflictsByFeatureId = useMemo(() => {
     const map = new Map<string, typeof featureConflicts>();
     for (const conflict of featureConflicts) {
@@ -773,7 +774,7 @@ export function PartCutsWorkspace({
               <Button variant="outline" onClick={onExit} className="ml-auto">
                 {hasUnsavedChanges ? 'Cancel' : 'Exit'}
               </Button>
-              <Button onClick={onSave} disabled={!hasUnsavedChanges}>
+              <Button onClick={onSave} disabled={!hasUnsavedChanges || hasBlockingFeatureConflicts}>
                 Save
               </Button>
             </div>

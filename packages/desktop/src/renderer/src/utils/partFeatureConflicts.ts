@@ -3,7 +3,10 @@ import { getFeatureTargetLabel } from '@renderer/utils/partFeatureSummary';
 
 export interface PartFeatureConflict {
   featureId: string;
+  featureIndex: number;
   relatedFeatureId?: string;
+  relatedFeatureIndex?: number;
+  code: 'duplicate_end_cut' | 'rect_overlap';
   severity: 'warning' | 'error';
   message: string;
 }
@@ -70,44 +73,79 @@ export function getPartFeatureConflicts(
   part: Pick<Part, 'length' | 'width'>
 ): PartFeatureConflict[] {
   const conflicts: PartFeatureConflict[] = [];
-  const enabledFeatures = features.filter((feature) => feature.enabled);
+  const enabledFeatures = features.filter((feature) => feature.enabled).map((feature, index) => ({ feature, index }));
+  const endCutsByFace = new Map<'left_end' | 'right_end', { featureId: string; featureIndex: number; label: string }>();
+  const priorRectCuts: Array<{ feature: RectCutFeature; index: number }> = [];
 
-  const endCuts = enabledFeatures.filter((feature) => feature.kind === 'end_cut');
-  for (const feature of endCuts) {
-    const duplicates = endCuts.filter(
-      (candidate) => candidate.id !== feature.id && candidate.target.face === feature.target.face
-    );
-    for (const duplicate of duplicates) {
-      conflicts.push({
+  for (const { feature, index } of enabledFeatures) {
+    if (feature.kind === 'end_cut') {
+      const face = feature.target.face;
+      const prior = endCutsByFace.get(face);
+      if (prior) {
+        const message = `Operation ${index + 1} and Operation ${prior.featureIndex + 1} both use ${getFeatureTargetLabel(feature)}. Only one enabled end cut per end is supported in this POC.`;
+        conflicts.push({
+          featureId: feature.id,
+          featureIndex: index,
+          relatedFeatureId: prior.featureId,
+          relatedFeatureIndex: prior.featureIndex,
+          code: 'duplicate_end_cut',
+          severity: 'error',
+          message
+        });
+        conflicts.push({
+          featureId: prior.featureId,
+          featureIndex: prior.featureIndex,
+          relatedFeatureId: feature.id,
+          relatedFeatureIndex: index,
+          code: 'duplicate_end_cut',
+          severity: 'error',
+          message
+        });
+        continue;
+      }
+
+      endCutsByFace.set(face, {
         featureId: feature.id,
-        relatedFeatureId: duplicate.id,
-        severity: 'error',
-        message: `Another enabled end cut already uses ${getFeatureTargetLabel(feature)}.`
+        featureIndex: index,
+        label: getFeatureTargetLabel(feature)
       });
+      continue;
     }
-  }
 
-  const rectCuts = enabledFeatures.filter((feature): feature is RectCutFeature => feature.kind === 'rect_cut');
-  for (let i = 0; i < rectCuts.length; i += 1) {
-    for (let j = i + 1; j < rectCuts.length; j += 1) {
-      const a = getRectFeatureBounds(rectCuts[i], part);
-      const b = getRectFeatureBounds(rectCuts[j], part);
+    const currentBounds = getRectFeatureBounds(feature, part);
+    if (!currentBounds) {
+      priorRectCuts.push({ feature, index });
+      continue;
+    }
+
+    for (const prior of priorRectCuts) {
+      const priorBounds = getRectFeatureBounds(prior.feature, part);
+      const a = priorBounds;
+      const b = currentBounds;
       if (!a || !b || !overlaps(a, b)) continue;
 
-      const message = `${getFeatureTargetLabel(rectCuts[i])} overlaps ${getFeatureTargetLabel(rectCuts[j])}.`;
+      const message = `Operation ${index + 1} overlaps Operation ${prior.index + 1}. The resulting removal stack is allowed, but order now matters.`;
       conflicts.push({
-        featureId: rectCuts[i].id,
-        relatedFeatureId: rectCuts[j].id,
+        featureId: prior.feature.id,
+        featureIndex: prior.index,
+        relatedFeatureId: feature.id,
+        relatedFeatureIndex: index,
+        code: 'rect_overlap',
         severity: 'warning',
         message
       });
       conflicts.push({
-        featureId: rectCuts[j].id,
-        relatedFeatureId: rectCuts[i].id,
+        featureId: feature.id,
+        featureIndex: index,
+        relatedFeatureId: prior.feature.id,
+        relatedFeatureIndex: prior.index,
+        code: 'rect_overlap',
         severity: 'warning',
         message
       });
     }
+
+    priorRectCuts.push({ feature, index });
   }
 
   return conflicts;

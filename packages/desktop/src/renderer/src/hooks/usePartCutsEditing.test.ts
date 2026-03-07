@@ -91,6 +91,53 @@ describe('usePartCutsEditing', () => {
     expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(false);
   });
 
+  it('blocks save when the draft contains duplicate enabled end cuts on the same end', () => {
+    const updatePart = vi.fn();
+    const showToast = vi.fn();
+    useProjectStore.setState({ updatePart });
+    useUIStore.setState({ showToast });
+    const { result } = renderHook(() => usePartCutsEditing());
+
+    act(() => {
+      result.current.openForPart('part-1');
+    });
+
+    act(() => {
+      result.current.setDraftFeatures([
+        {
+          id: 'feature-1',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mitre',
+          lengthMode: 'long_point',
+          parameters: { horizontalAngle: 45 }
+        },
+        {
+          id: 'feature-2',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'bevel',
+          lengthMode: 'centerline',
+          parameters: { horizontalAngle: 0, verticalAngle: 15 }
+        }
+      ]);
+    });
+
+    act(() => {
+      result.current.saveAndExit();
+    });
+
+    expect(updatePart).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Only one enabled end cut per end'), 'error');
+    expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
+  });
+
   it('prompts on exit when draft changes exist', () => {
     const { result } = renderHook(() => usePartCutsEditing());
 

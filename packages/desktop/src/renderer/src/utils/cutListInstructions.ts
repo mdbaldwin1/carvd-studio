@@ -45,9 +45,10 @@ export function getInstructionEnabledFeatures(instruction: CutInstruction): Part
 }
 
 export function getInstructionFabricationLines(instruction: CutInstruction, units: 'imperial' | 'metric'): string[] {
-  const lines = getInstructionEnabledFeatures(instruction).map(
-    (feature) => feature.label?.trim() || getFeatureSummary(feature, units)
-  );
+  const lines = getInstructionEnabledFeatures(instruction).map((feature, index) => {
+    const label = feature.label?.trim() || getFeatureSummary(feature, units);
+    return `${index + 1}. ${label}`;
+  });
   const note = instruction.notes?.trim();
   if (note) lines.push(note);
   return lines;
