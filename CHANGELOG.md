@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Woodworker-oriented part operations workflow (POC)** — Added an `Operations` card to single-part properties with blank-first guidance, operation-first authoring, filtered end/edge/face/corner target pickers, and plain-language operation summaries for upcoming mitres/notches/cutouts work.
 - **Precise part rotation controls (POC)** — Added single-part `Rotation (X, Y, Z)` controls in the Properties panel with direct degree entry, angle snap toggle, adjustable snap step, one-click reset, and drag-to-rotate ring handles with live angle feedback.
 - **Feature-level part snapping for angled assemblies (POC)** — Added true feature snap candidates during drag: edge-to-edge (parallel edge alignment) and vertex-to-face projection, layered on top of oriented face snapping for non-axis-aligned parts.
 - **Group-wide rotation drag handles (POC)** — Added shared rotation handles for multi-part/group selections so selected sets can be rotated together around a common pivot using the same drag interaction as single-part rotation.

@@ -3,6 +3,7 @@ import { MultiSelectionProperties } from '@renderer/components/properties/MultiS
 import { NoSelectionProperties } from '@renderer/components/properties/NoSelectionProperties';
 import { SinglePartAdvancedCard } from '@renderer/components/properties/SinglePartAdvancedCard';
 import { SinglePartBasicsCard } from '@renderer/components/properties/SinglePartBasicsCard';
+import { SinglePartFeaturesCard } from '@renderer/components/properties/SinglePartFeaturesCard';
 import { SinglePartMaterialCard } from '@renderer/components/properties/SinglePartMaterialCard';
 import { SinglePartNotesCard } from '@renderer/components/properties/SinglePartNotesCard';
 import { SingleGroupProperties } from '@renderer/components/properties/SingleGroupProperties';
@@ -513,6 +514,12 @@ export function PropertiesPanel() {
           if (!Number.isFinite(value)) return;
           setRotationSnapIncrement(Math.max(1, Math.min(90, Math.round(value))));
         }}
+      />
+
+      <SinglePartFeaturesCard
+        selectedPart={selectedPart}
+        units={units}
+        onFeaturesChange={(features) => updatePart(selectedPart.id, { features })}
       />
 
       <SinglePartMaterialCard
