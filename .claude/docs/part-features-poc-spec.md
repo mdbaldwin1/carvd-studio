@@ -2,6 +2,10 @@
 
 Workflow and policy source of truth: see `AGENTS.md`. This file is reference guidance for `carvd-studio-12.1` and downstream part-feature beads.
 
+See also:
+
+- `part-feature-sequential-spec.md` for the ordered multi-operation contract added after the initial POC implementation
+
 ## Purpose
 
 Define the canonical fabrication model, user vocabulary, feature taxonomy, measurement semantics, and implementation constraints for the POC that adds mitres, cutouts, and angled end cuts to parts.
