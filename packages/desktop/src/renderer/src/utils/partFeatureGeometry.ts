@@ -179,32 +179,6 @@ function applyEdgeNotch(contour: Point2[], feature: RectCutFeature): Point2[] {
   ];
 }
 
-function getRenderableRectCutHoles(features: RectCutFeature[], part: Part): Point2[][] {
-  const holes: Point2[][] = [];
-  const halfLength = part.length / 2;
-  const halfWidth = part.width / 2;
-
-  for (const feature of features) {
-    if (feature.cutType !== 'cutout') continue;
-    if (feature.target.type !== 'face') continue;
-    if (!['top_face', 'bottom_face'].includes(feature.target.face)) continue;
-    if (feature.parameters.depthMode !== 'through') continue;
-
-    const startX = clamp(-halfLength + feature.placement.x, -halfLength + 0.001, halfLength - 0.001);
-    const startZ = clamp(-halfWidth + feature.placement.z, -halfWidth + 0.001, halfWidth - 0.001);
-    const endX = clamp(startX + feature.parameters.size.length, startX + 0.001, halfLength - 0.001);
-    const endZ = clamp(startZ + feature.parameters.size.width, startZ + 0.001, halfWidth - 0.001);
-    holes.push([
-      { x: startX, z: startZ },
-      { x: startX, z: endZ },
-      { x: endX, z: endZ },
-      { x: endX, z: startZ }
-    ]);
-  }
-
-  return holes;
-}
-
 function shapeFromContour(contour: Point2[], holes: Point2[][]): THREE.Shape {
   const shape = new THREE.Shape();
   shape.moveTo(contour[0].x, contour[0].z);
@@ -260,22 +234,13 @@ function getLayerGeometry(contour: Point2[], holes: Point2[][], depth: number, y
 function createFeatureGeometry(part: Part): THREE.BufferGeometry {
   let contour = buildOuterContour(part);
   const rectCuts = getEnabledFeatures(part).filter((feature): feature is RectCutFeature => feature.kind === 'rect_cut');
-  const throughRectCuts = rectCuts.filter((feature) => feature.parameters.depthMode === 'through');
-  const blindRectCuts = rectCuts.filter((feature) => feature.parameters.depthMode === 'blind');
-
-  for (const feature of throughRectCuts) {
-    if (feature.cutType === 'corner_notch') {
-      contour = applyCornerNotch(contour, feature);
-    } else if (feature.cutType === 'edge_notch') {
-      contour = applyEdgeNotch(contour, feature);
-    }
-  }
-
-  const baseHoles = getRenderableRectCutHoles(throughRectCuts, part);
-  const supportedBlindCuts = blindRectCuts.filter((feature) => getRectCutPreviewSupport(feature).supported);
+  const supportedRectCuts = rectCuts.filter(
+    (feature) => feature.parameters.depthMode === 'through' || getRectCutPreviewSupport(feature).supported
+  );
   const sliceY = new Set<number>([-part.thickness / 2, part.thickness / 2]);
 
-  for (const feature of supportedBlindCuts) {
+  for (const feature of supportedRectCuts) {
+    if (feature.parameters.depthMode !== 'blind') continue;
     const depth = getRectCutDepth(feature, part.thickness);
     if (depth <= 0) continue;
     if (isTopTarget(feature)) {
@@ -295,27 +260,31 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     if (layerDepth <= 1e-6) continue;
     const yMid = yMin + layerDepth / 2;
 
-    let layerContour = contour;
-    const layerHoles = [...baseHoles];
+    let layerContour = contour.map(clonePoint);
+    const layerHoles: Point2[][] = [];
 
-    for (const feature of supportedBlindCuts) {
+    for (const feature of supportedRectCuts) {
       const depth = getRectCutDepth(feature, part.thickness);
-      if (depth <= 0) continue;
-
       const active =
-        (isTopTarget(feature) && yMid >= part.thickness / 2 - depth) ||
-        (isBottomTarget(feature) && yMid <= -part.thickness / 2 + depth);
+        feature.parameters.depthMode === 'through' ||
+        (depth > 0 &&
+          ((isTopTarget(feature) && yMid >= part.thickness / 2 - depth) ||
+            (isBottomTarget(feature) && yMid <= -part.thickness / 2 + depth)));
 
       if (!active) continue;
 
       if (feature.cutType === 'corner_notch') {
         layerContour = applyCornerNotch(layerContour, feature);
-      } else if (feature.cutType === 'edge_notch') {
-        layerContour = applyEdgeNotch(layerContour, feature);
-      } else if (feature.cutType === 'cutout') {
-        const hole = getRectCutHole(feature, part);
-        if (hole) layerHoles.push(hole);
+        continue;
       }
+
+      if (feature.cutType === 'edge_notch') {
+        layerContour = applyEdgeNotch(layerContour, feature);
+        continue;
+      }
+
+      const hole = getRectCutHole(feature, part);
+      if (hole) layerHoles.push(hole);
     }
 
     layerGeometries.push(getLayerGeometry(layerContour, layerHoles, layerDepth, yMin));
@@ -324,8 +293,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
   const geometry =
     layerGeometries.length === 1
       ? layerGeometries[0]
-      : (mergeGeometries(layerGeometries, false) ??
-        getLayerGeometry(contour, baseHoles, part.thickness, -part.thickness / 2));
+      : (mergeGeometries(layerGeometries, false) ?? getLayerGeometry(contour, [], part.thickness, -part.thickness / 2));
 
   applyVerticalEndCuts(geometry, part);
   geometry.computeVertexNormals();

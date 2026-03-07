@@ -49,8 +49,8 @@ export function getPartEndCutProfiles(input: {
 
   for (const feature of getEnabledEndCuts(input.features)) {
     const profile = feature.target.face === 'left_end' ? left : right;
-    profile.horizontalInset = Math.max(profile.horizontalInset, getFeatureHorizontalInset(feature, input.width));
-    profile.verticalInset = Math.max(profile.verticalInset, getFeatureVerticalInset(feature, input.thickness));
+    profile.horizontalInset = getFeatureHorizontalInset(feature, input.width);
+    profile.verticalInset = getFeatureVerticalInset(feature, input.thickness);
     profile.maxInset = profile.horizontalInset + profile.verticalInset;
   }
 

@@ -163,6 +163,66 @@ describe('partFeatureGeometry', () => {
     expect(nearestZeroLeftX).toBeCloseTo(-8, 3);
   });
 
+  it('uses list order when multiple end cuts target the same end in preview geometry', () => {
+    const partA = createTestPart({
+      length: 24,
+      width: 4,
+      thickness: 1,
+      features: [
+        {
+          id: 'feature-1',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'bevel',
+          lengthMode: 'long_point',
+          parameters: { horizontalAngle: 0, verticalAngle: 45 }
+        },
+        {
+          id: 'feature-2',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'bevel',
+          lengthMode: 'long_point',
+          parameters: { horizontalAngle: 0, verticalAngle: 10 }
+        }
+      ]
+    });
+
+    const partB = createTestPart({
+      ...partA,
+      features: [...(partA.features ?? [])].reverse()
+    });
+
+    const geometryA = getPartRenderGeometry(partA);
+    const geometryB = getPartRenderGeometry(partB);
+    const positionsA = geometryA.getAttribute('position');
+    const positionsB = geometryB.getAttribute('position');
+    let topLeftMinXA = Infinity;
+    let topLeftMinXB = Infinity;
+
+    for (let i = 0; i < positionsA.count; i += 1) {
+      const x = positionsA.getX(i);
+      const y = positionsA.getY(i);
+      if (x > 0 || y <= 0.49) continue;
+      topLeftMinXA = Math.min(topLeftMinXA, x);
+    }
+
+    for (let i = 0; i < positionsB.count; i += 1) {
+      const x = positionsB.getX(i);
+      const y = positionsB.getY(i);
+      if (x > 0 || y <= 0.49) continue;
+      topLeftMinXB = Math.min(topLeftMinXB, x);
+    }
+
+    expect(topLeftMinXA).toBeLessThan(topLeftMinXB);
+  });
+
   it('creates through-holes for top-face cutouts', () => {
     const geometry = getPartRenderGeometry(
       createTestPart({
