@@ -19,6 +19,12 @@ import {
 import { clonePartFeature } from '@renderer/utils/partFeatures';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import { getDerivedLengthMeasurements, getLengthReferenceValue } from '@renderer/utils/endCutUtils';
+import {
+  TOP_BOTTOM_CORNER_TARGETS,
+  TOP_BOTTOM_EDGE_TARGETS,
+  TOP_BOTTOM_FACE_TARGETS,
+  validateRectCutFeature
+} from '@renderer/utils/rectCutUtils';
 import { useEffect, useMemo, useState } from 'react';
 
 const FACE_LABELS: Record<FaceTarget, string> = {
@@ -336,6 +342,26 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
     return buildFeatureFromDraft(draft);
   }, [draft]);
 
+  const availableCornerTargets = useMemo(() => {
+    if (!draft || draft.mode !== 'rect_cut' || draft.cutType !== 'corner_notch') return CORNER_TARGETS;
+    return draft.depthMode === 'blind' ? TOP_BOTTOM_CORNER_TARGETS : CORNER_TARGETS;
+  }, [draft]);
+
+  const availableEdgeTargets = useMemo(() => {
+    if (!draft || draft.mode !== 'rect_cut' || draft.cutType !== 'edge_notch') return EDGE_TARGETS;
+    return draft.depthMode === 'blind' ? TOP_BOTTOM_EDGE_TARGETS : EDGE_TARGETS;
+  }, [draft]);
+
+  const availableFaceTargets = useMemo(() => {
+    if (!draft || draft.mode !== 'rect_cut' || draft.cutType !== 'cutout') return FACE_TARGETS;
+    return TOP_BOTTOM_FACE_TARGETS;
+  }, [draft]);
+
+  const draftValidationMessage = useMemo(() => {
+    if (!draft || draft.mode !== 'rect_cut') return null;
+    return validateRectCutFeature(buildFeatureFromDraft(draft), selectedPart);
+  }, [draft, selectedPart]);
+
   const endCutPreviewMeasurements = useMemo(() => {
     if (!draftPreviewFeature || draftPreviewFeature.kind !== 'end_cut') return null;
 
@@ -361,6 +387,7 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
 
   const handleSaveDraft = () => {
     if (!draft) return;
+    if (draft.mode === 'rect_cut' && draftValidationMessage) return;
     const nextFeature = buildFeatureFromDraft(draft);
     const nextFeatures = draft.featureId
       ? features.map((feature) => (feature.id === draft.featureId ? nextFeature : feature))
@@ -532,7 +559,7 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
 
               {draft.mode === 'rect_cut' && draft.cutType === 'corner_notch' && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  {CORNER_TARGETS.map((target) => (
+                  {availableCornerTargets.map((target) => (
                     <Button
                       key={target}
                       type="button"
@@ -549,7 +576,7 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
 
               {draft.mode === 'rect_cut' && draft.cutType === 'edge_notch' && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  {EDGE_TARGETS.map((target) => (
+                  {availableEdgeTargets.map((target) => (
                     <Button
                       key={target}
                       type="button"
@@ -566,7 +593,7 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
 
               {draft.mode === 'rect_cut' && draft.cutType === 'cutout' && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  {FACE_TARGETS.map((target) => (
+                  {availableFaceTargets.map((target) => (
                     <Button
                       key={target}
                       type="button"
@@ -730,6 +757,12 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                       </div>
                     </div>
 
+                    {draft.cutType === 'cutout' && (
+                      <p className="text-[11px] text-text-muted">
+                        POC note: face cutout previews currently target top or bottom faces only.
+                      </p>
+                    )}
+
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <Label>Run Along Blank</Label>
@@ -780,12 +813,31 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                         </div>
                       </div>
                     )}
+
+                    {draft.depthMode === 'blind' &&
+                      (draft.cutType === 'corner_notch' || draft.cutType === 'edge_notch') && (
+                        <p className="text-[11px] text-text-muted">
+                          Blind notch previews currently support top or bottom targets so the recess direction stays
+                          unambiguous.
+                        </p>
+                      )}
+
+                    {draftValidationMessage && (
+                      <div className="rounded-[var(--radius-sm)] border border-danger/30 bg-danger/5 p-3 text-[11px] text-danger">
+                        {draftValidationMessage}
+                      </div>
+                    )}
                   </>
                 )}
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button type="button" size="xs" onClick={handleSaveDraft}>
+                <Button
+                  type="button"
+                  size="xs"
+                  onClick={handleSaveDraft}
+                  disabled={draft.mode === 'rect_cut' && !!draftValidationMessage}
+                >
                   {draft.featureId ? 'Save Operation' : 'Add Operation'}
                 </Button>
                 <Button type="button" size="xs" variant="ghost" onClick={() => setDraft(null)}>

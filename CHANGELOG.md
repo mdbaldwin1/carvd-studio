@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **End-cut feature fidelity (POC)** — End cuts now render as true mitre, bevel, and compound geometry in the viewport, and the Operations panel shows derived long-point, short-point, and centerline measurements so sloped ends read like shop-facing fabrication data.
+- **Rectangular removal previews (POC)** — Corner notches, edge notches, and face cutouts now preview as actual through or blind recesses within the POC-supported target set, and the Operations panel blocks unsupported or out-of-bounds removal setups before they are saved.
 - **Feature-part interaction bounds (POC)** — Camera centering, screen-space hit testing, selection boxing, workspace AABBs, and ground-contact enforcement now derive from rendered feature geometry bounds instead of always assuming a plain rectangular box.
 - **Ghost display mode readability** — Increased Ghost/translucent part opacity and added outline rendering so part silhouettes are easier to read while staying semi-transparent.
 - **Rotation model generalized beyond 90° increments** — Internal rotation typing and transformation utilities now support arbitrary angles while preserving fast `X/Y/Z` keyboard rotations for intuitive quick-turn workflows.

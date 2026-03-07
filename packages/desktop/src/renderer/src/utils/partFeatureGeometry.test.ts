@@ -223,6 +223,82 @@ describe('partFeatureGeometry', () => {
     expect(bounds.maxZ).toBeCloseTo(3);
   });
 
+  it('renders blind top-face cutouts as recessed pockets', () => {
+    const geometry = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 12,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'cutout',
+            parameters: {
+              size: { length: 4, width: 3 },
+              depthMode: 'blind',
+              depth: 0.25
+            },
+            placement: { x: 2, z: 2 }
+          }
+        ]
+      })
+    );
+
+    const positions = geometry.getAttribute('position');
+    const positiveYLevels = new Set<number>();
+
+    for (let i = 0; i < positions.count; i += 1) {
+      const y = positions.getY(i);
+      if (y > 0) positiveYLevels.add(Number(y.toFixed(3)));
+    }
+
+    expect([...positiveYLevels]).toContain(0.125);
+    expect([...positiveYLevels]).toContain(0.375);
+  });
+
+  it('renders blind top-edge notches as layered recesses', () => {
+    const geometry = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 12,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'edge', edge: 'top_front_edge' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'edge_notch',
+            parameters: {
+              size: { length: 4, width: 2 },
+              depthMode: 'blind',
+              depth: 0.25
+            },
+            placement: { x: 3, z: 0 }
+          }
+        ]
+      })
+    );
+
+    const positions = geometry.getAttribute('position');
+    const positiveYLevels = new Set<number>();
+
+    for (let i = 0; i < positions.count; i += 1) {
+      const y = positions.getY(i);
+      if (y > 0) positiveYLevels.add(Number(y.toFixed(3)));
+    }
+
+    expect([...positiveYLevels]).toContain(0.125);
+    expect([...positiveYLevels]).toContain(0.375);
+  });
+
   it('uses rendered geometry for ground-contact half-height', () => {
     const halfHeight = getPartWorldHalfHeight(
       createTestPart({

@@ -138,4 +138,31 @@ describe('SinglePartFeaturesCard', () => {
       })
     ]);
   });
+
+  it('limits cutout targets to top and bottom faces in the POC workflow', () => {
+    render(<SinglePartFeaturesCard selectedPart={createTestPart()} units="imperial" onFeaturesChange={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Cutout/ }));
+
+    expect(screen.getByRole('button', { name: 'Top Face' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bottom Face' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Front Face' })).not.toBeInTheDocument();
+  });
+
+  it('restricts blind edge notches to top/bottom targets', () => {
+    render(
+      <SinglePartFeaturesCard
+        selectedPart={createTestPart({ thickness: 0.75 })}
+        units="imperial"
+        onFeaturesChange={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Edge Notch/ }));
+    fireEvent.change(screen.getByLabelText('Depth'), { target: { value: 'blind' } });
+
+    expect(screen.getByRole('button', { name: 'Top-Front Edge' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Front-Left Edge' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Blind notch previews currently support top or bottom targets/i)).toBeInTheDocument();
+  });
 });
