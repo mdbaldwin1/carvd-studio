@@ -200,6 +200,35 @@ describe('loader', () => {
         expect(part.ignoreOverlap).toBe(false);
       });
 
+      it('preserves part features', () => {
+        const templateWithFeaturedParts: TemplateDefinition = {
+          ...templateWithParts,
+          parts: [
+            {
+              ...templateWithParts.parts[0],
+              features: [
+                {
+                  id: 'feature-1',
+                  kind: 'end_cut',
+                  version: 1,
+                  enabled: true,
+                  target: { type: 'face', face: 'left_end' },
+                  reference: { primaryFrom: 'min' },
+                  cutType: 'mitre',
+                  lengthMode: 'long_point',
+                  parameters: { horizontalAngle: 45 }
+                }
+              ]
+            }
+          ]
+        };
+
+        const project = loadTemplateFromJSON(templateWithFeaturedParts);
+        expect(project.parts[0].features).toHaveLength(1);
+        expect(project.parts[0].features?.[0].kind).toBe('end_cut');
+        expect(project.parts[0].features).not.toBe(templateWithFeaturedParts.parts[0].features);
+      });
+
       it('copies position object', () => {
         const project = loadTemplateFromJSON(templateWithParts);
         expect(project.parts[0].position).toEqual({ x: 0, y: 0, z: 0 });
@@ -460,6 +489,38 @@ describe('loader', () => {
         expect(part.notes).toBe('Grain runs front to back');
         expect(part.extraLength).toBe(0.5);
         expect(part.extraWidth).toBe(0.25);
+      });
+
+      it('preserves assembly part features', () => {
+        const assemblyWithFeaturedParts: AssemblyDefinition = {
+          ...assemblyWithParts,
+          parts: [
+            {
+              ...assemblyWithParts.parts[0],
+              features: [
+                {
+                  id: 'feature-1',
+                  kind: 'rect_cut',
+                  version: 1,
+                  enabled: true,
+                  target: { type: 'corner', corner: 'back_bottom_left_corner' },
+                  reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+                  cutType: 'corner_notch',
+                  parameters: {
+                    size: { length: 0.75, width: 0.75 },
+                    depthMode: 'through'
+                  },
+                  placement: { x: 0, z: 0 }
+                }
+              ]
+            }
+          ]
+        };
+
+        const assembly = loadAssemblyFromJSON(assemblyWithFeaturedParts);
+        expect(assembly.parts[0].features).toHaveLength(1);
+        expect(assembly.parts[0].features?.[0].kind).toBe('rect_cut');
+        expect(assembly.parts[0].features).not.toBe(assemblyWithFeaturedParts.parts[0].features);
       });
 
       it('copies relativePosition object', () => {

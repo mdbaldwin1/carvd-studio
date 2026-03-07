@@ -101,6 +101,34 @@ describe('clipboardStore', () => {
       expect(clipboard.groups).toHaveLength(1);
       expect(clipboard.groupMembers).toHaveLength(2);
     });
+
+    it('deep copies part features into the clipboard', () => {
+      const partId = useProjectStore.getState().addPart({
+        name: 'Featured Part',
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 45 }
+          }
+        ]
+      });
+      useSelectionStore.getState().selectPart(partId);
+
+      useClipboardStore.getState().copySelectedParts();
+
+      const original = useProjectStore.getState().parts.find((part) => part.id === partId);
+      const copied = useClipboardStore.getState().clipboard.parts[0];
+
+      expect(copied.features).toEqual(original?.features);
+      expect(copied.features).not.toBe(original?.features);
+    });
   });
 
   // ============================================================
@@ -143,6 +171,37 @@ describe('clipboardStore', () => {
       const newIds = useClipboardStore.getState().pasteClipboard();
 
       expect(useSelectionStore.getState().selectedPartIds).toEqual(newIds);
+    });
+
+    it('preserves part features when pasting', () => {
+      const partId = useProjectStore.getState().addPart({
+        name: 'Original',
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'corner', corner: 'back_bottom_left_corner' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'corner_notch',
+            parameters: {
+              size: { length: 0.75, width: 0.75 },
+              depthMode: 'through'
+            },
+            placement: { x: 0, z: 0 }
+          }
+        ]
+      });
+      useSelectionStore.getState().selectPart(partId);
+      useClipboardStore.getState().copySelectedParts();
+
+      const newIds = useClipboardStore.getState().pasteClipboard();
+      const pasted = useProjectStore.getState().parts.find((part) => part.id === newIds[0]);
+
+      expect(pasted?.features).toHaveLength(1);
+      expect(pasted?.features?.[0].kind).toBe('rect_cut');
+      expect(pasted?.features).not.toBe(useClipboardStore.getState().clipboard.parts[0].features);
     });
   });
 

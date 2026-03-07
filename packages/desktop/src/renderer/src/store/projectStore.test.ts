@@ -351,6 +351,36 @@ describe('projectStore', () => {
         expect(duplicate?.width).toBe(15);
       });
 
+      it('copies part features onto the duplicate', () => {
+        const store = useProjectStore.getState();
+        const originalId = store.addPart({
+          name: 'Featured',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'mitre',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 45 }
+            }
+          ]
+        });
+
+        const duplicateId = store.duplicatePart(originalId);
+        const duplicate = useProjectStore.getState().parts.find((p) => p.id === duplicateId);
+
+        expect(duplicate?.features).toEqual(
+          useProjectStore.getState().parts.find((p) => p.id === originalId)?.features
+        );
+        expect(duplicate?.features).not.toBe(
+          useProjectStore.getState().parts.find((p) => p.id === originalId)?.features
+        );
+      });
+
       it('generates smart copy names', () => {
         const store = useProjectStore.getState();
         const originalId = store.addPart({ name: 'Test Part' });
@@ -1252,6 +1282,35 @@ describe('projectStore', () => {
 
         expect(assembly!.parts[0].stockId).toBe(stockId);
       });
+
+      it('includes part features in assembly parts', () => {
+        const store = useProjectStore.getState();
+        const partId = store.addPart({
+          name: 'Featured Part',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'rect_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'corner', corner: 'back_bottom_left_corner' },
+              reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+              cutType: 'corner_notch',
+              parameters: {
+                size: { length: 0.75, width: 0.75 },
+                depthMode: 'through'
+              },
+              placement: { x: 0, z: 0 }
+            }
+          ]
+        });
+
+        useSelectionStore.getState().selectParts([partId]);
+        const assembly = store.createAssemblyFromSelection('Featured Assembly');
+
+        expect(assembly?.parts[0].features).toHaveLength(1);
+        expect(assembly?.parts[0].features?.[0].kind).toBe('rect_cut');
+      });
     });
 
     describe('placeAssembly', () => {
@@ -1314,6 +1373,37 @@ describe('projectStore', () => {
         expect(placedPart.color).toBe('#ff0000');
         expect(placedPart.grainSensitive).toBe(true);
         expect(placedPart.grainDirection).toBe('width');
+      });
+
+      it('preserves part features when placing', () => {
+        const store = useProjectStore.getState();
+
+        const partId = store.addPart({
+          name: 'Featured Part',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'right_end' },
+              reference: { primaryFrom: 'max' },
+              cutType: 'bevel',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 0, verticalAngle: 10 }
+            }
+          ]
+        });
+        useSelectionStore.getState().selectParts([partId]);
+        const assembly = store.createAssemblyFromSelection('Featured Assembly');
+        store.addAssembly(assembly!);
+        store.deletePart(partId);
+
+        store.placeAssembly(assembly!.id, { x: 0, y: 0, z: 0 });
+
+        const placedPart = useProjectStore.getState().parts[0];
+        expect(placedPart.features).toHaveLength(1);
+        expect(placedPart.features?.[0].kind).toBe('end_cut');
       });
 
       it('creates new groups when placing grouped assembly', () => {

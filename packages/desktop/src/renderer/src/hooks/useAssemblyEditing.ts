@@ -15,6 +15,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { hasUnsavedChanges } from '../utils/fileOperations';
 import { logger } from '../utils/logger';
 import { getFeatureLimits, getBlockedMessage } from '../utils/featureLimits';
+import { clonePartFeatures, normalizePart } from '../utils/partFeatures';
 
 interface UseAssemblyEditingResult {
   // State
@@ -105,7 +106,7 @@ function assemblyToEditableParts(
       resolvedStockId = resolved || null;
     }
 
-    return {
+    return normalizePart({
       id: uuidv4(),
       name: cp.name,
       length: cp.length,
@@ -123,8 +124,9 @@ function assemblyToEditableParts(
       color: cp.color,
       notes: cp.notes,
       extraLength: cp.extraLength,
-      extraWidth: cp.extraWidth
-    };
+      extraWidth: cp.extraWidth,
+      features: clonePartFeatures(cp.features)
+    });
   });
 
   // Create groups with new IDs

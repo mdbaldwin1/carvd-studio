@@ -30,6 +30,7 @@ import { useLicenseStore } from './licenseStore';
 import { rotateAroundWorldAxis } from '../utils/rotation';
 import { getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
+import { clonePartFeatures, normalizeAssemblyPart, normalizePart } from '../utils/partFeatures';
 
 interface ProjectState {
   // Project data
@@ -156,20 +157,21 @@ export const generateCopyName = (originalName: string): string => {
   return `${originalName} (copy)`;
 };
 
-const createDefaultPart = (overrides?: Partial<Part>): Part => ({
-  id: uuidv4(),
-  name: 'New Part',
-  length: 24,
-  width: 12,
-  thickness: 0.75,
-  position: { x: 0, y: 0.375, z: 0 }, // y = thickness/2 to sit on ground
-  rotation: { x: 0, y: 0, z: 0 },
-  stockId: null,
-  grainSensitive: true,
-  grainDirection: 'length',
-  color: STOCK_COLORS[0],
-  ...overrides
-});
+const createDefaultPart = (overrides?: Partial<Part>): Part =>
+  normalizePart({
+    id: uuidv4(),
+    name: 'New Part',
+    length: 24,
+    width: 12,
+    thickness: 0.75,
+    position: { x: 0, y: 0.375, z: 0 }, // y = thickness/2 to sit on ground
+    rotation: { x: 0, y: 0, z: 0 },
+    stockId: null,
+    grainSensitive: true,
+    grainDirection: 'length',
+    color: STOCK_COLORS[0],
+    ...overrides
+  });
 
 const createDefaultStock = (overrides?: Partial<Stock>): Stock => ({
   id: uuidv4(),
@@ -864,7 +866,7 @@ export const useProjectStore = create<ProjectState>()(
           const newId = uuidv4();
           partIdMap.set(part.id, newId);
           const isChild = childPartIds.has(part.id);
-          return {
+          return normalizePart({
             ...part,
             id: newId,
             name: isChild ? part.name : generateCopyName(part.name),
@@ -872,8 +874,9 @@ export const useProjectStore = create<ProjectState>()(
               x: part.position.x + duplicateOffset.x,
               y: part.position.y + duplicateOffset.y,
               z: part.position.z + duplicateOffset.z
-            }
-          };
+            },
+            features: clonePartFeatures(part.features)
+          });
         });
 
         // Duplicate groups
@@ -1157,6 +1160,7 @@ export const useProjectStore = create<ProjectState>()(
             notes: part.notes,
             extraLength: part.extraLength,
             extraWidth: part.extraWidth,
+            features: clonePartFeatures(part.features),
             embeddedStock
           };
         });
@@ -1313,7 +1317,7 @@ export const useProjectStore = create<ProjectState>()(
             resolvedStockId = resolved || null; // Empty string means clear the stock
           }
 
-          return {
+          return normalizePart({
             id: newId,
             name: cp.name,
             length: cp.length,
@@ -1331,8 +1335,9 @@ export const useProjectStore = create<ProjectState>()(
             color: cp.color,
             notes: cp.notes,
             extraLength: cp.extraLength,
-            extraWidth: cp.extraWidth
-          };
+            extraWidth: cp.extraWidth,
+            features: clonePartFeatures(cp.features)
+          });
         });
 
         // Create new groups
@@ -1428,11 +1433,15 @@ export const useProjectStore = create<ProjectState>()(
       loadProject: (project, filePath) => {
         set({
           projectName: project.name,
-          parts: project.parts,
-          stocks: project.stocks,
-          groups: project.groups,
+          parts: (project.parts ?? []).map((part) => normalizePart(part)),
+          stocks: project.stocks ?? [],
+          groups: project.groups ?? [],
           groupMembers: project.groupMembers || [],
-          assemblies: project.assemblies || [],
+          assemblies:
+            project.assemblies?.map((assembly) => ({
+              ...assembly,
+              parts: assembly.parts.map((part) => normalizeAssemblyPart(part))
+            })) || [],
           filePath: filePath || null,
           isDirty: false,
           // Load project settings or use defaults

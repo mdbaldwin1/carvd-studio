@@ -40,6 +40,7 @@ export interface AssemblyPart {
   notes?: string;
   extraLength?: number;
   extraWidth?: number;
+  features?: PartFeature[];
   // Embedded stock snapshot - allows assembly to recreate stock if original is unavailable
   embeddedStock?: EmbeddedStock;
 }
@@ -93,6 +94,88 @@ export interface Rotation3D {
   z: RotationAngle;
 }
 
+export type PartFeatureId = string;
+export type PartFeatureVersion = 1;
+export type PartFeatureKind = 'end_cut' | 'rect_cut';
+
+export type FaceTarget = 'left_end' | 'right_end' | 'top_face' | 'bottom_face' | 'front_face' | 'back_face';
+
+export type EdgeTarget =
+  | 'top_front_edge'
+  | 'top_back_edge'
+  | 'top_left_edge'
+  | 'top_right_edge'
+  | 'bottom_front_edge'
+  | 'bottom_back_edge'
+  | 'bottom_left_edge'
+  | 'bottom_right_edge'
+  | 'front_left_edge'
+  | 'front_right_edge'
+  | 'back_left_edge'
+  | 'back_right_edge';
+
+export type CornerTarget =
+  | 'front_top_left_corner'
+  | 'front_top_right_corner'
+  | 'front_bottom_left_corner'
+  | 'front_bottom_right_corner'
+  | 'back_top_left_corner'
+  | 'back_top_right_corner'
+  | 'back_bottom_left_corner'
+  | 'back_bottom_right_corner';
+
+export type PartFeatureTarget =
+  | { type: 'face'; face: FaceTarget }
+  | { type: 'edge'; edge: EdgeTarget }
+  | { type: 'corner'; corner: CornerTarget };
+
+export interface PartFeatureReference {
+  primaryFrom: 'min' | 'center' | 'max';
+  secondaryFrom?: 'min' | 'center' | 'max';
+  tertiaryFrom?: 'min' | 'center' | 'max';
+}
+
+export interface PartFeatureBase {
+  id: PartFeatureId;
+  kind: PartFeatureKind;
+  version: PartFeatureVersion;
+  enabled: boolean;
+  label?: string;
+  metadata?: Record<string, unknown>;
+  target: PartFeatureTarget;
+  reference: PartFeatureReference;
+}
+
+export interface EndCutFeature extends PartFeatureBase {
+  kind: 'end_cut';
+  target: { type: 'face'; face: 'left_end' | 'right_end' };
+  cutType: 'square' | 'mitre' | 'bevel' | 'compound';
+  lengthMode: 'long_point' | 'short_point' | 'centerline';
+  parameters: {
+    horizontalAngle: number;
+    verticalAngle?: number;
+  };
+}
+
+export interface RectCutFeature extends PartFeatureBase {
+  kind: 'rect_cut';
+  cutType: 'corner_notch' | 'edge_notch' | 'cutout';
+  parameters: {
+    size: {
+      length: number;
+      width: number;
+    };
+    depthMode: 'through' | 'blind';
+    depth?: number;
+  };
+  placement: {
+    x: number;
+    z: number;
+  };
+}
+
+export type PartFeature = EndCutFeature | RectCutFeature;
+
 export interface Part {
   id: string;
   name: string;
@@ -109,6 +192,7 @@ export interface Part {
   // Joinery adjustments - extra material for cut list (not shown in 3D view)
   extraLength?: number; // additional length for cut list (e.g., tenon material)
   extraWidth?: number; // additional width for cut list (e.g., dado insertion depth)
+  features?: PartFeature[];
   // Glue-up panel flag - wide panels made by edge-gluing multiple boards
   glueUpPanel?: boolean;
   // Ignore overlap flag - builder is aware of intentional overlap (e.g., shelf notched for legs)

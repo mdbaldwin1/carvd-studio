@@ -6,6 +6,7 @@ import { useProjectStore, generateCopyName, getAllDescendantPartIds } from './pr
 import { useLicenseStore } from './licenseStore';
 import { useSelectionStore } from './selectionStore';
 import { useUIStore } from './uiStore';
+import { clonePartFeatures, normalizePart } from '../utils/partFeatures';
 
 interface ClipboardStoreState {
   clipboard: Clipboard;
@@ -56,7 +57,7 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
     // Deep clone to prevent mutation of original objects
     set({
       clipboard: {
-        parts: copiedParts.map((p) => ({ ...p })),
+        parts: copiedParts.map((p) => normalizePart(p)),
         groups: copiedGroups.map((g) => ({ ...g })),
         groupMembers: copiedGroupMembers.map((gm) => ({ ...gm }))
       }
@@ -108,7 +109,7 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
       const newId = uuidv4();
       partIdMap.set(part.id, newId);
       const isChild = childPartIds.has(part.id);
-      return {
+      return normalizePart({
         ...part,
         id: newId,
         name: isChild ? part.name : generateCopyName(part.name),
@@ -116,8 +117,9 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
           x: part.position.x + 2,
           y: part.position.y,
           z: part.position.z + 2
-        }
-      };
+        },
+        features: clonePartFeatures(part.features)
+      });
     });
 
     // Create new groups with new IDs
@@ -154,9 +156,9 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
 
     // Update clipboard for subsequent pastes (with updated positions)
     const updatedClipboard: Clipboard = {
-      parts: newParts,
-      groups: newGroups,
-      groupMembers: newGroupMembers
+      parts: newParts.map((part) => normalizePart(part)),
+      groups: newGroups.map((group) => ({ ...group })),
+      groupMembers: newGroupMembers.map((groupMember) => ({ ...groupMember }))
     };
 
     // Update project state with new parts/groups
@@ -226,7 +228,7 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
       const newId = uuidv4();
       partIdMap.set(part.id, newId);
       const isChild = childPartIds.has(part.id);
-      return {
+      return normalizePart({
         ...part,
         id: newId,
         name: isChild ? part.name : generateCopyName(part.name),
@@ -234,8 +236,9 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
           x: position.x + (part.position.x - centerX),
           y: part.position.y,
           z: position.z + (part.position.z - centerZ)
-        }
-      };
+        },
+        features: clonePartFeatures(part.features)
+      });
     });
 
     // Create new groups with new IDs

@@ -20,6 +20,7 @@ import {
   Stock,
   StockConstraintSettings
 } from '../types';
+import { normalizeAssemblyPart, normalizePart } from './partFeatures';
 
 // Default stock constraints for migration
 const DEFAULT_STOCK_CONSTRAINTS: StockConstraintSettings = {
@@ -94,11 +95,14 @@ export function deserializeToProject(file: CarvdFile): Project {
     overageFactor: file.project.overageFactor,
     projectNotes: file.project.projectNotes,
     stockConstraints: file.project.stockConstraints,
-    parts: file.parts,
+    parts: file.parts.map((part) => normalizePart(part)),
     stocks: file.stocks,
     groups: file.groups,
     groupMembers: file.groupMembers,
-    assemblies: file.assemblies,
+    assemblies: file.assemblies?.map((assembly) => ({
+      ...assembly,
+      parts: assembly.parts.map((part) => normalizeAssemblyPart(part))
+    })),
     snapGuides: file.snapGuides,
     customShoppingItems: file.customShoppingItems,
     cutList: file.cutList,
@@ -244,14 +248,24 @@ function migrateFile(file: CarvdFile): CarvdFile {
 
   // Ensure parts have all required fields
   migrated.parts = migrated.parts.map((part) => ({
-    ...part,
-    grainSensitive: part.grainSensitive ?? true,
-    grainDirection: part.grainDirection ?? 'length',
-    rotation: part.rotation ?? { x: 0, y: 0, z: 0 },
+    ...normalizePart(part),
     extraLength: part.extraLength ?? undefined,
     extraWidth: part.extraWidth ?? undefined,
     glueUpPanel: part.glueUpPanel ?? undefined
   }));
+
+  if (migrated.assemblies) {
+    migrated.assemblies = migrated.assemblies.map((assembly) => ({
+      ...assembly,
+      parts: assembly.parts.map((part) =>
+        normalizeAssemblyPart({
+          ...part,
+          extraLength: part.extraLength ?? undefined,
+          extraWidth: part.extraWidth ?? undefined
+        })
+      )
+    }));
+  }
 
   // Ensure stocks have all required fields
   migrated.stocks = migrated.stocks.map((stock) => ({

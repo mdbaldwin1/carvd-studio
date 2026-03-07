@@ -208,6 +208,16 @@ describe('fileFormat', () => {
       expect(project.assemblies).toHaveLength(1);
       expect(project.customShoppingItems).toHaveLength(1);
     });
+
+    it('normalizes missing part features to an empty array', () => {
+      const part = createTestPart();
+      delete (part as Record<string, unknown>).features;
+
+      const file = createValidCarvdFile({ parts: [part] });
+      const project = deserializeToProject(file);
+
+      expect(project.parts[0].features).toEqual([]);
+    });
   });
 
   // ============================================================
@@ -613,6 +623,17 @@ describe('fileFormat', () => {
 
       expect(result.valid).toBe(true);
       expect(result.data?.parts[0].rotation).toEqual({ x: 0, y: 0, z: 0 });
+    });
+
+    it('adds default features to parts if missing', () => {
+      const part = createTestPart();
+      delete (part as Record<string, unknown>).features;
+
+      const file = createValidCarvdFile({ parts: [part] });
+      const result = validateCarvdFile(file);
+
+      expect(result.valid).toBe(true);
+      expect(result.data?.parts[0].features).toEqual([]);
     });
 
     it('adds default pricingUnit to stocks if missing', () => {
