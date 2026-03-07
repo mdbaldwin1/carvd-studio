@@ -20,7 +20,7 @@ As of beads `13.2` through `13.5`, the implemented POC behavior is:
 
 Still deferred beyond the current implemented POC:
 
-- richer geometry-linked preview interaction
+- richer geometry-linked preview interaction, including direct drag handles for supported operations
 - broader conflict rules beyond the current same-end / overlapping-rect-cut checks
 - additional woodworking operations beyond the current POC feature set
 
