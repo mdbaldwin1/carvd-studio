@@ -29,6 +29,24 @@ export const TOP_BOTTOM_CORNER_TARGETS: CornerTarget[] = [
   'back_bottom_right_corner'
 ];
 
+function cloneRectCutFeature(feature: RectCutFeature): RectCutFeature {
+  return {
+    ...feature,
+    target:
+      feature.target.type === 'face'
+        ? { type: 'face', face: feature.target.face }
+        : feature.target.type === 'edge'
+          ? { type: 'edge', edge: feature.target.edge }
+          : { type: 'corner', corner: feature.target.corner },
+    reference: { ...feature.reference },
+    parameters: {
+      ...feature.parameters,
+      size: { ...feature.parameters.size }
+    },
+    placement: { ...feature.placement }
+  };
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -40,6 +58,61 @@ export function getRectCutDepth(feature: RectCutFeature, thickness: number): num
 
 export function isTopOrBottomFace(face: FaceTarget): boolean {
   return face === 'top_face' || face === 'bottom_face';
+}
+
+function getRabbetRunLength(edge: EdgeTarget, part: Pick<Part, 'length' | 'width'>): number {
+  return edge.includes('front') || edge.includes('back') ? part.length : part.width;
+}
+
+export function getResolvedRectCutFeature(
+  feature: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): RectCutFeature {
+  if (feature.cutType === 'dado') {
+    const targetFace = feature.target.type === 'face' ? feature.target.face : 'top_face';
+    return {
+      ...cloneRectCutFeature(feature),
+      target: { type: 'face', face: targetFace },
+      parameters: {
+        ...feature.parameters,
+        size: {
+          length: feature.parameters.size.length,
+          width: part.width
+        },
+        depthMode: 'blind',
+        depth: feature.parameters.depth
+      },
+      placement: {
+        x: feature.placement.x,
+        z: 0
+      }
+    };
+  }
+
+  if (feature.cutType === 'rabbet') {
+    const targetEdge = feature.target.type === 'edge' ? feature.target.edge : 'top_front_edge';
+    const runLength = getRabbetRunLength(targetEdge, part);
+    const alongLength = targetEdge.includes('front') || targetEdge.includes('back');
+    return {
+      ...cloneRectCutFeature(feature),
+      target: { type: 'edge', edge: targetEdge },
+      parameters: {
+        ...feature.parameters,
+        size: {
+          length: alongLength ? runLength : feature.parameters.size.length,
+          width: alongLength ? feature.parameters.size.width : runLength
+        },
+        depthMode: 'blind',
+        depth: feature.parameters.depth
+      },
+      placement: {
+        x: alongLength ? 0 : feature.placement.x,
+        z: alongLength ? feature.placement.z : 0
+      }
+    };
+  }
+
+  return cloneRectCutFeature(feature);
 }
 
 export function isTopTarget(feature: RectCutFeature): boolean {
@@ -55,22 +128,25 @@ export function isBottomTarget(feature: RectCutFeature): boolean {
 }
 
 export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPreviewSupport {
-  if (feature.cutType === 'cutout') {
+  if (feature.cutType === 'cutout' || feature.cutType === 'dado') {
     if (feature.target.type !== 'face' || !isTopOrBottomFace(feature.target.face)) {
       return {
         supported: false,
-        reason: 'POC cutout previews currently support only top and bottom face targets.'
+        reason:
+          feature.cutType === 'dado'
+            ? 'POC dado previews currently support only top and bottom face targets.'
+            : 'POC cutout previews currently support only top and bottom face targets.'
       };
     }
     return { supported: true };
   }
 
-  if (feature.parameters.depthMode === 'through') {
+  if (feature.cutType !== 'rabbet' && feature.parameters.depthMode === 'through') {
     return { supported: true };
   }
 
   if (
-    feature.cutType === 'edge_notch' &&
+    (feature.cutType === 'edge_notch' || feature.cutType === 'rabbet') &&
     feature.target.type === 'edge' &&
     TOP_BOTTOM_EDGE_TARGETS.includes(feature.target.edge)
   ) {
@@ -95,43 +171,60 @@ export function validateRectCutFeature(
   feature: RectCutFeature,
   part: Pick<Part, 'length' | 'width' | 'thickness'>
 ): string | null {
-  const sizeLength = feature.parameters.size.length;
-  const sizeWidth = feature.parameters.size.width;
+  const resolvedFeature = getResolvedRectCutFeature(feature, part);
+  const sizeLength = resolvedFeature.parameters.size.length;
+  const sizeWidth = resolvedFeature.parameters.size.width;
 
   if (!Number.isFinite(sizeLength) || !Number.isFinite(sizeWidth) || sizeLength <= 0 || sizeWidth <= 0) {
     return 'Removal size must be greater than zero.';
   }
 
-  if (feature.parameters.depthMode === 'blind') {
-    const depth = feature.parameters.depth ?? 0;
+  if (resolvedFeature.parameters.depthMode === 'blind') {
+    const depth = resolvedFeature.parameters.depth ?? 0;
     if (!Number.isFinite(depth) || depth <= 0) return 'Blind depth must be greater than zero.';
     if (depth >= part.thickness) return 'Blind depth must stay less than part thickness.';
   }
 
-  if (feature.cutType === 'cutout') {
-    if (feature.placement.x < 0 || feature.placement.z < 0) return 'Cutout offsets cannot be negative.';
-    if (feature.placement.x + sizeLength > part.length) return 'Cutout length runs past the blank.';
-    if (feature.placement.z + sizeWidth > part.width) return 'Cutout width runs past the blank.';
+  if (resolvedFeature.cutType === 'dado') {
+    if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
+      return 'Dado must target the top or bottom face.';
+    }
+    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Dado must use blind depth in this POC.';
+    if (resolvedFeature.placement.x < 0) return 'Dado offset cannot be negative.';
+    if (resolvedFeature.placement.x + sizeLength > part.length) return 'Dado width runs past the blank.';
   }
 
-  if (feature.cutType === 'edge_notch') {
-    if (feature.placement.x < 0 || feature.placement.z < 0) return 'Notch offsets cannot be negative.';
+  if (resolvedFeature.cutType === 'cutout') {
+    if (resolvedFeature.placement.x < 0 || resolvedFeature.placement.z < 0) return 'Cutout offsets cannot be negative.';
+    if (resolvedFeature.placement.x + sizeLength > part.length) return 'Cutout length runs past the blank.';
+    if (resolvedFeature.placement.z + sizeWidth > part.width) return 'Cutout width runs past the blank.';
+  }
 
-    const edge = feature.target.type === 'edge' ? feature.target.edge : 'top_front_edge';
+  if (resolvedFeature.cutType === 'rabbet') {
+    if (resolvedFeature.target.type !== 'edge' || !TOP_BOTTOM_EDGE_TARGETS.includes(resolvedFeature.target.edge)) {
+      return 'Rabbet must target a supported top or bottom edge.';
+    }
+    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Rabbet must use blind depth in this POC.';
+  }
+
+  if (resolvedFeature.cutType === 'edge_notch' || resolvedFeature.cutType === 'rabbet') {
+    if (resolvedFeature.placement.x < 0 || resolvedFeature.placement.z < 0) return 'Notch offsets cannot be negative.';
+
+    const edge = resolvedFeature.target.type === 'edge' ? resolvedFeature.target.edge : 'top_front_edge';
     if (edge.includes('front') || edge.includes('back')) {
-      if (feature.placement.x + sizeLength > part.length) return 'Edge notch length runs past the blank.';
+      if (resolvedFeature.placement.x + sizeLength > part.length) return 'Edge notch length runs past the blank.';
       if (sizeWidth > part.width) return 'Edge notch width runs past the blank.';
     } else {
-      if (feature.placement.z + sizeWidth > part.width) return 'Edge notch width runs past the blank.';
+      if (resolvedFeature.placement.z + sizeWidth > part.width) return 'Edge notch width runs past the blank.';
       if (sizeLength > part.length) return 'Edge notch length runs past the blank.';
     }
   }
 
-  if (feature.cutType === 'corner_notch') {
+  if (resolvedFeature.cutType === 'corner_notch') {
     if (sizeLength > part.length || sizeWidth > part.width) return 'Corner notch size runs past the blank.';
   }
 
-  const support = getRectCutPreviewSupport(feature);
+  const support = getRectCutPreviewSupport(resolvedFeature);
   if (!support.supported) return support.reason;
 
   return null;

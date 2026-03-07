@@ -2,7 +2,13 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Part, PartFeature, RectCutFeature } from '../types';
 import { getEndCutInsetAt, getPartEndCutProfiles } from './endCutUtils';
-import { getRectCutDepth, getRectCutPreviewSupport, isBottomTarget, isTopTarget } from './rectCutUtils';
+import {
+  getRectCutDepth,
+  getRectCutPreviewSupport,
+  getResolvedRectCutFeature,
+  isBottomTarget,
+  isTopTarget
+} from './rectCutUtils';
 
 type Point2 = { x: number; z: number };
 
@@ -233,7 +239,9 @@ function getLayerGeometry(contour: Point2[], holes: Point2[][], depth: number, y
 
 function createFeatureGeometry(part: Part): THREE.BufferGeometry {
   let contour = buildOuterContour(part);
-  const rectCuts = getEnabledFeatures(part).filter((feature): feature is RectCutFeature => feature.kind === 'rect_cut');
+  const rectCuts = getEnabledFeatures(part)
+    .filter((feature): feature is RectCutFeature => feature.kind === 'rect_cut')
+    .map((feature) => getResolvedRectCutFeature(feature, part));
   const supportedRectCuts = rectCuts.filter(
     (feature) => feature.parameters.depthMode === 'through' || getRectCutPreviewSupport(feature).supported
   );
@@ -278,7 +286,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
         continue;
       }
 
-      if (feature.cutType === 'edge_notch') {
+      if (feature.cutType === 'edge_notch' || feature.cutType === 'rabbet') {
         layerContour = applyEdgeNotch(layerContour, feature);
         continue;
       }
@@ -341,12 +349,13 @@ function applyVerticalEndCuts(geometry: THREE.BufferGeometry, part: Part): void 
 function getFeatureContour(part: Part): Point2[] {
   let contour = buildOuterContour(part);
   const rectCuts = getEnabledFeatures(part).filter((feature): feature is RectCutFeature => feature.kind === 'rect_cut');
+  const resolvedRectCuts = rectCuts.map((feature) => getResolvedRectCutFeature(feature, part));
 
-  for (const feature of rectCuts) {
+  for (const feature of resolvedRectCuts) {
     if (feature.parameters.depthMode !== 'through') continue;
     if (feature.cutType === 'corner_notch') {
       contour = applyCornerNotch(contour, feature);
-    } else if (feature.cutType === 'edge_notch') {
+    } else if (feature.cutType === 'edge_notch' || feature.cutType === 'rabbet') {
       contour = applyEdgeNotch(contour, feature);
     }
   }

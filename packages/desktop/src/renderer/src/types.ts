@@ -159,7 +159,7 @@ export interface EndCutFeature extends PartFeatureBase {
 
 export interface RectCutFeature extends PartFeatureBase {
   kind: 'rect_cut';
-  cutType: 'corner_notch' | 'edge_notch' | 'cutout';
+  cutType: 'corner_notch' | 'edge_notch' | 'cutout' | 'dado' | 'rabbet';
   parameters: {
     size: {
       length: number;

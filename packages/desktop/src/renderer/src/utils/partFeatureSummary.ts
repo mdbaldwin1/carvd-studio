@@ -70,6 +70,18 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
     return `${toTitleCase(feature.cutType)}${angleText} on ${getFeatureTargetLabel(feature)} · ${referenceLabel} reference`;
   }
 
+  if (feature.cutType === 'dado') {
+    return `Dado on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} wide × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+  }
+
+  if (feature.cutType === 'rabbet') {
+    const shoulderWidth =
+      feature.target.type === 'edge' && (feature.target.edge.includes('front') || feature.target.edge.includes('back'))
+        ? feature.parameters.size.width
+        : feature.parameters.size.length;
+    return `Rabbet on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(shoulderWidth, units)} shoulder × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+  }
+
   return `${toTitleCase(feature.cutType)} on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)}`;
 }
 

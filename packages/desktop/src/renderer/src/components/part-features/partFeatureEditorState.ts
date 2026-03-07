@@ -43,7 +43,7 @@ export const CORNER_TARGETS: CornerTarget[] = [
   'back_bottom_right_corner'
 ];
 
-export type OperationPreset = 'end_cut' | 'corner_notch' | 'edge_notch' | 'cutout';
+export type OperationPreset = 'end_cut' | 'corner_notch' | 'edge_notch' | 'cutout' | 'dado' | 'rabbet';
 
 export type FeatureDraft =
   | {
@@ -102,12 +102,12 @@ export function buildDraftFromPreset(preset: OperationPreset): FeatureDraft {
     label: '',
     enabled: true,
     cutType: preset,
-    faceTarget: 'top_face',
-    edgeTarget: 'top_front_edge',
+    faceTarget: preset === 'dado' ? 'top_face' : 'top_face',
+    edgeTarget: preset === 'rabbet' ? 'top_front_edge' : 'top_front_edge',
     cornerTarget: 'front_bottom_left_corner',
-    sizeLength: 0.75,
-    sizeWidth: 0.75,
-    depthMode: 'through',
+    sizeLength: preset === 'dado' ? 0.75 : preset === 'rabbet' ? 0.5 : 0.75,
+    sizeWidth: preset === 'rabbet' ? 0.5 : 0.75,
+    depthMode: preset === 'dado' || preset === 'rabbet' ? 'blind' : 'through',
     depth: 0.25,
     placementX: 0,
     placementZ: 0
@@ -170,7 +170,7 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
   const target =
     draft.cutType === 'corner_notch'
       ? { type: 'corner' as const, corner: draft.cornerTarget }
-      : draft.cutType === 'edge_notch'
+      : draft.cutType === 'edge_notch' || draft.cutType === 'rabbet'
         ? { type: 'edge' as const, edge: draft.edgeTarget }
         : { type: 'face' as const, face: draft.faceTarget };
 
@@ -196,7 +196,7 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
     },
     placement: {
       x: draft.cutType === 'corner_notch' ? 0 : draft.placementX,
-      z: draft.cutType === 'corner_notch' ? 0 : draft.placementZ
+      z: draft.cutType === 'corner_notch' || draft.cutType === 'dado' ? 0 : draft.placementZ
     }
   };
 }
@@ -210,7 +210,7 @@ export function getFeatureDraftTarget(draft: FeatureDraft): PartFeatureTarget {
     return { type: 'corner', corner: draft.cornerTarget };
   }
 
-  if (draft.cutType === 'edge_notch') {
+  if (draft.cutType === 'edge_notch' || draft.cutType === 'rabbet') {
     return { type: 'edge', edge: draft.edgeTarget };
   }
 
@@ -228,7 +228,7 @@ export function applyTargetToFeatureDraft(draft: FeatureDraft, target: PartFeatu
     return target.type === 'corner' ? { ...draft, cornerTarget: target.corner } : draft;
   }
 
-  if (draft.cutType === 'edge_notch') {
+  if (draft.cutType === 'edge_notch' || draft.cutType === 'rabbet') {
     return target.type === 'edge' ? { ...draft, edgeTarget: target.edge } : draft;
   }
 
@@ -253,6 +253,10 @@ export function getPresetLabel(preset: OperationPreset): string {
       return 'Edge Notch';
     case 'cutout':
       return 'Cutout';
+    case 'dado':
+      return 'Dado';
+    case 'rabbet':
+      return 'Rabbet';
   }
 }
 
@@ -266,5 +270,9 @@ export function getPresetHint(preset: OperationPreset): string {
       return 'Notch into a specific edge while keeping the blank rectangular.';
     case 'cutout':
       return 'Place a rectangular pocket or opening on one face.';
+    case 'dado':
+      return 'Cut a full-width channel across the top or bottom face.';
+    case 'rabbet':
+      return 'Cut a full-run edge recess along one supported edge.';
   }
 }

@@ -284,4 +284,30 @@ describe('PartCutsWorkspace', () => {
     expect(previewTargets.getByRole('button', { name: 'Bottom Face' })).toBeInTheDocument();
     expect(previewTargets.queryByRole('button', { name: 'Front Face' })).not.toBeInTheDocument();
   });
+
+  it('supports dado and rabbet operation types in the inspector', () => {
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Panel', width: 8 })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={vi.fn()}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={false}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Dado'));
+    expect(screen.getByText(/Dado runs full board width/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Removal Type'), { target: { value: 'rabbet' } });
+    expect(screen.getByText(/Rabbet runs full edge length/i)).toBeInTheDocument();
+  });
 });

@@ -87,7 +87,7 @@ function getSelectedTargetLabel(draft: FeatureDraft | null): string | null {
   if (!draft) return null;
   if (draft.mode === 'end_cut') return FACE_LABELS[draft.targetFace];
   if (draft.cutType === 'corner_notch') return CORNER_LABELS[draft.cornerTarget];
-  if (draft.cutType === 'edge_notch') return EDGE_LABELS[draft.edgeTarget];
+  if (draft.cutType === 'edge_notch' || draft.cutType === 'rabbet') return EDGE_LABELS[draft.edgeTarget];
   return FACE_LABELS[draft.faceTarget];
 }
 
@@ -101,6 +101,10 @@ function getOperationPresetLabel(preset: OperationPreset): string {
       return 'Edge Notch';
     case 'cutout':
       return 'Cutout';
+    case 'dado':
+      return 'Dado';
+    case 'rabbet':
+      return 'Rabbet';
   }
 }
 
@@ -114,6 +118,10 @@ function getOperationPresetHint(preset: OperationPreset): string {
       return 'Notch into a specific edge while keeping the blank rectangular.';
     case 'cutout':
       return 'Place a rectangular pocket or opening on one face.';
+    case 'dado':
+      return 'Cut a full-width channel across the top or bottom face.';
+    case 'rabbet':
+      return 'Cut a full-run edge recess along one supported edge.';
   }
 }
 
@@ -160,12 +168,12 @@ export function PartCutsWorkspace({
   }, [draft]);
 
   const availableEdgeTargets = useMemo(() => {
-    if (!draft || draft.mode !== 'rect_cut' || draft.cutType !== 'edge_notch') return EDGE_TARGETS;
+    if (!draft || draft.mode !== 'rect_cut' || !['edge_notch', 'rabbet'].includes(draft.cutType)) return EDGE_TARGETS;
     return draft.depthMode === 'blind' ? TOP_BOTTOM_EDGE_TARGETS : EDGE_TARGETS;
   }, [draft]);
 
   const availableFaceTargets = useMemo(() => {
-    if (!draft || draft.mode !== 'rect_cut' || draft.cutType !== 'cutout') return FACE_TARGETS;
+    if (!draft || draft.mode !== 'rect_cut' || !['cutout', 'dado'].includes(draft.cutType)) return FACE_TARGETS;
     return TOP_BOTTOM_FACE_TARGETS;
   }, [draft]);
 
@@ -298,6 +306,14 @@ export function PartCutsWorkspace({
   const activeTargetLabel = getPickableTargetLabel(hoveredTarget) ?? getPickableTargetLabel(pendingTarget);
   const selectedFeatureSummary = selectedFeature ? getFeatureSummary(selectedFeature, units) : null;
   const selectedFeatureTargetLabel = selectedFeature ? getFeatureTargetLabel(selectedFeature) : null;
+  const inspectorIsRabbet = inspectorDraft?.mode === 'rect_cut' && inspectorDraft.cutType === 'rabbet';
+  const rabbetRunsAlongLength =
+    inspectorIsRabbet && (inspectorDraft.edgeTarget.includes('front') || inspectorDraft.edgeTarget.includes('back'));
+  const rabbetShoulderValue = inspectorIsRabbet
+    ? rabbetRunsAlongLength
+      ? inspectorDraft.sizeWidth
+      : inspectorDraft.sizeLength
+    : null;
 
   return (
     <div className="app-main flex min-h-0 flex-1 bg-bg">
@@ -318,21 +334,23 @@ export function PartCutsWorkspace({
             <div className="space-y-2">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Add Operation</div>
               <div className="grid grid-cols-2 gap-2">
-                {(['end_cut', 'corner_notch', 'edge_notch', 'cutout'] as OperationPreset[]).map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className={`rounded-md border px-3 py-2 text-left transition-colors ${
-                      activePreset === preset
-                        ? 'border-accent bg-accent/10 text-text'
-                        : 'border-border bg-bg-secondary hover:bg-bg-tertiary'
-                    }`}
-                    onClick={() => handleStartPreset(preset)}
-                  >
-                    <div className="text-[12px] font-semibold">{getOperationPresetLabel(preset)}</div>
-                    <div className="mt-1 text-[11px] text-text-muted">{getOperationPresetHint(preset)}</div>
-                  </button>
-                ))}
+                {(['end_cut', 'corner_notch', 'edge_notch', 'cutout', 'dado', 'rabbet'] as OperationPreset[]).map(
+                  (preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      className={`rounded-md border px-3 py-2 text-left transition-colors ${
+                        activePreset === preset
+                          ? 'border-accent bg-accent/10 text-text'
+                          : 'border-border bg-bg-secondary hover:bg-bg-tertiary'
+                      }`}
+                      onClick={() => handleStartPreset(preset)}
+                    >
+                      <div className="text-[12px] font-semibold">{getOperationPresetLabel(preset)}</div>
+                      <div className="mt-1 text-[11px] text-text-muted">{getOperationPresetHint(preset)}</div>
+                    </button>
+                  )
+                )}
               </div>
             </div>
 
@@ -587,39 +605,41 @@ export function PartCutsWorkspace({
                     </div>
                   )}
 
-                  {inspectorDraft.mode === 'rect_cut' && inspectorDraft.cutType === 'edge_notch' && (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      {availableEdgeTargets.map((target) => (
-                        <Button
-                          key={target}
-                          type="button"
-                          size="xs"
-                          variant="outline"
-                          active={inspectorDraft.edgeTarget === target}
-                          onClick={() => setDraft({ ...inspectorDraft, edgeTarget: target })}
-                        >
-                          {EDGE_LABELS[target]}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
+                  {inspectorDraft.mode === 'rect_cut' &&
+                    (inspectorDraft.cutType === 'edge_notch' || inspectorDraft.cutType === 'rabbet') && (
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {availableEdgeTargets.map((target) => (
+                          <Button
+                            key={target}
+                            type="button"
+                            size="xs"
+                            variant="outline"
+                            active={inspectorDraft.edgeTarget === target}
+                            onClick={() => setDraft({ ...inspectorDraft, edgeTarget: target })}
+                          >
+                            {EDGE_LABELS[target]}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
 
-                  {inspectorDraft.mode === 'rect_cut' && inspectorDraft.cutType === 'cutout' && (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      {availableFaceTargets.map((target) => (
-                        <Button
-                          key={target}
-                          type="button"
-                          size="xs"
-                          variant="outline"
-                          active={inspectorDraft.faceTarget === target}
-                          onClick={() => setDraft({ ...inspectorDraft, faceTarget: target })}
-                        >
-                          {FACE_LABELS[target]}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
+                  {inspectorDraft.mode === 'rect_cut' &&
+                    (inspectorDraft.cutType === 'cutout' || inspectorDraft.cutType === 'dado') && (
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {availableFaceTargets.map((target) => (
+                          <Button
+                            key={target}
+                            type="button"
+                            size="xs"
+                            variant="outline"
+                            active={inspectorDraft.faceTarget === target}
+                            onClick={() => setDraft({ ...inspectorDraft, faceTarget: target })}
+                          >
+                            {FACE_LABELS[target]}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
 
                   <div className="mt-4 space-y-3">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -751,6 +771,8 @@ export function PartCutsWorkspace({
                               <option value="corner_notch">Corner Notch</option>
                               <option value="edge_notch">Edge Notch</option>
                               <option value="cutout">Cutout</option>
+                              <option value="dado">Dado</option>
+                              <option value="rabbet">Rabbet</option>
                             </Select>
                           </div>
                           <div>
@@ -758,6 +780,7 @@ export function PartCutsWorkspace({
                             <Select
                               id="depth-mode"
                               value={inspectorDraft.depthMode}
+                              disabled={inspectorDraft.cutType === 'dado' || inspectorDraft.cutType === 'rabbet'}
                               onChange={(e) =>
                                 setDraft({
                                   ...inspectorDraft,
@@ -776,22 +799,62 @@ export function PartCutsWorkspace({
                             POC note: face cutout previews currently target top or bottom faces only.
                           </p>
                         )}
+                        {inspectorDraft.cutType === 'dado' && (
+                          <p className="text-[11px] text-text-muted">
+                            Dado runs full board width in this POC. Set the channel width along the blank and the blind
+                            depth.
+                          </p>
+                        )}
+                        {inspectorDraft.cutType === 'rabbet' && (
+                          <p className="text-[11px] text-text-muted">
+                            Rabbet runs full edge length in this POC. Set the shoulder width and blind depth.
+                          </p>
+                        )}
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div>
-                            <Label>Run Along Blank</Label>
+                            <Label>{inspectorDraft.cutType === 'rabbet' ? 'Shoulder Width' : 'Run Along Blank'}</Label>
                             <FractionInput
-                              value={inspectorDraft.sizeLength}
-                              onChange={(value) => setDraft({ ...inspectorDraft, sizeLength: value })}
+                              value={
+                                inspectorDraft.cutType === 'rabbet'
+                                  ? (rabbetShoulderValue ?? 0.5)
+                                  : inspectorDraft.sizeLength
+                              }
+                              onChange={(value) =>
+                                setDraft(
+                                  inspectorDraft.cutType === 'rabbet'
+                                    ? {
+                                        ...inspectorDraft,
+                                        sizeLength: rabbetRunsAlongLength ? inspectorDraft.sizeLength : value,
+                                        sizeWidth: rabbetRunsAlongLength ? value : inspectorDraft.sizeWidth
+                                      }
+                                    : { ...inspectorDraft, sizeLength: value }
+                                )
+                              }
                               min={0.125}
                             />
                           </div>
                           <div>
-                            <Label>Cross-Cut Width</Label>
+                            <Label>
+                              {inspectorDraft.cutType === 'dado'
+                                ? 'Across Board Width'
+                                : inspectorDraft.cutType === 'rabbet'
+                                  ? 'Full Edge Run'
+                                  : 'Cross-Cut Width'}
+                            </Label>
                             <FractionInput
-                              value={inspectorDraft.sizeWidth}
+                              value={
+                                inspectorDraft.cutType === 'dado'
+                                  ? part.width
+                                  : inspectorDraft.cutType === 'rabbet'
+                                    ? rabbetRunsAlongLength
+                                      ? part.length
+                                      : part.width
+                                    : inspectorDraft.sizeWidth
+                              }
                               onChange={(value) => setDraft({ ...inspectorDraft, sizeWidth: value })}
                               min={0.125}
+                              disabled={inspectorDraft.cutType === 'dado' || inspectorDraft.cutType === 'rabbet'}
                             />
                           </div>
                         </div>
@@ -807,29 +870,33 @@ export function PartCutsWorkspace({
                           </div>
                         )}
 
-                        {inspectorDraft.cutType !== 'corner_notch' && (
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <div>
-                              <Label>Offset Along Length</Label>
-                              <FractionInput
-                                value={inspectorDraft.placementX}
-                                onChange={(value) => setDraft({ ...inspectorDraft, placementX: value })}
-                                min={0}
-                              />
+                        {inspectorDraft.cutType !== 'corner_notch' &&
+                          inspectorDraft.cutType !== 'dado' &&
+                          inspectorDraft.cutType !== 'rabbet' && (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <div>
+                                <Label>Offset Along Length</Label>
+                                <FractionInput
+                                  value={inspectorDraft.placementX}
+                                  onChange={(value) => setDraft({ ...inspectorDraft, placementX: value })}
+                                  min={0}
+                                />
+                              </div>
+                              <div>
+                                <Label>Offset Across Width</Label>
+                                <FractionInput
+                                  value={inspectorDraft.placementZ}
+                                  onChange={(value) => setDraft({ ...inspectorDraft, placementZ: value })}
+                                  min={0}
+                                />
+                              </div>
                             </div>
-                            <div>
-                              <Label>Offset Across Width</Label>
-                              <FractionInput
-                                value={inspectorDraft.placementZ}
-                                onChange={(value) => setDraft({ ...inspectorDraft, placementZ: value })}
-                                min={0}
-                              />
-                            </div>
-                          </div>
-                        )}
+                          )}
 
                         {inspectorDraft.depthMode === 'blind' &&
-                          (inspectorDraft.cutType === 'corner_notch' || inspectorDraft.cutType === 'edge_notch') && (
+                          (inspectorDraft.cutType === 'corner_notch' ||
+                            inspectorDraft.cutType === 'edge_notch' ||
+                            inspectorDraft.cutType === 'rabbet') && (
                             <p className="text-[11px] text-text-muted">
                               Blind notch previews currently support top or bottom targets so the recess direction stays
                               unambiguous.

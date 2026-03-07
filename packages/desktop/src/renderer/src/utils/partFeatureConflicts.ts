@@ -1,4 +1,5 @@
 import { Part, PartFeature, RectCutFeature } from '@renderer/types';
+import { getResolvedRectCutFeature } from '@renderer/utils/rectCutUtils';
 import { getFeatureTargetLabel } from '@renderer/utils/partFeatureSummary';
 
 export interface PartFeatureConflict {
@@ -23,22 +24,23 @@ function overlaps(a: RectBounds, b: RectBounds): boolean {
 }
 
 function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length' | 'width'>): RectBounds | null {
-  const sizeLength = feature.parameters.size.length;
-  const sizeWidth = feature.parameters.size.width;
+  const resolvedFeature = getResolvedRectCutFeature(feature, { ...part, thickness: 1 });
+  const sizeLength = resolvedFeature.parameters.size.length;
+  const sizeWidth = resolvedFeature.parameters.size.width;
 
-  if (feature.cutType === 'cutout') {
+  if (resolvedFeature.cutType === 'cutout' || resolvedFeature.cutType === 'dado') {
     return {
-      minX: feature.placement.x,
-      maxX: feature.placement.x + sizeLength,
-      minZ: feature.placement.z,
-      maxZ: feature.placement.z + sizeWidth
+      minX: resolvedFeature.placement.x,
+      maxX: resolvedFeature.placement.x + sizeLength,
+      minZ: resolvedFeature.placement.z,
+      maxZ: resolvedFeature.placement.z + sizeWidth
     };
   }
 
-  if (feature.cutType === 'corner_notch') {
-    if (feature.target.type !== 'corner') return null;
-    const right = feature.target.corner.includes('_right_');
-    const back = feature.target.corner.startsWith('back_');
+  if (resolvedFeature.cutType === 'corner_notch') {
+    if (resolvedFeature.target.type !== 'corner') return null;
+    const right = resolvedFeature.target.corner.includes('_right_');
+    const back = resolvedFeature.target.corner.startsWith('back_');
     return {
       minX: right ? part.length - sizeLength : 0,
       maxX: right ? part.length : sizeLength,
@@ -47,24 +49,24 @@ function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length'
     };
   }
 
-  if (feature.target.type !== 'edge') return null;
+  if (resolvedFeature.target.type !== 'edge') return null;
 
-  if (feature.target.edge.includes('front') || feature.target.edge.includes('back')) {
-    const back = feature.target.edge.includes('back');
+  if (resolvedFeature.target.edge.includes('front') || resolvedFeature.target.edge.includes('back')) {
+    const back = resolvedFeature.target.edge.includes('back');
     return {
-      minX: feature.placement.x,
-      maxX: feature.placement.x + sizeLength,
+      minX: resolvedFeature.placement.x,
+      maxX: resolvedFeature.placement.x + sizeLength,
       minZ: back ? part.width - sizeWidth : 0,
       maxZ: back ? part.width : sizeWidth
     };
   }
 
-  const right = feature.target.edge.includes('right');
+  const right = resolvedFeature.target.edge.includes('right');
   return {
     minX: right ? part.length - sizeLength : 0,
     maxX: right ? part.length : sizeLength,
-    minZ: feature.placement.z,
-    maxZ: feature.placement.z + sizeWidth
+    minZ: resolvedFeature.placement.z,
+    maxZ: resolvedFeature.placement.z + sizeWidth
   };
 }
 

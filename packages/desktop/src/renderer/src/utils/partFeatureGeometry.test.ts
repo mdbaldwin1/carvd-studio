@@ -359,6 +359,53 @@ describe('partFeatureGeometry', () => {
     expect([...positiveYLevels]).toContain(0.375);
   });
 
+  it('renders dado and rabbet operations through the constrained rect-cut path', () => {
+    const geometry = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 8,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'dado',
+            parameters: {
+              size: { length: 0.75, width: 1 },
+              depthMode: 'blind',
+              depth: 0.375
+            },
+            placement: { x: 6, z: 0 }
+          },
+          {
+            id: 'feature-2',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'edge', edge: 'top_front_edge' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'rabbet',
+            parameters: {
+              size: { length: 0.5, width: 0.5 },
+              depthMode: 'blind',
+              depth: 0.25
+            },
+            placement: { x: 0, z: 0 }
+          }
+        ]
+      })
+    );
+
+    expect(geometry.getAttribute('position').count).toBeGreaterThan(24);
+    geometry.computeBoundingBox();
+    expect(geometry.boundingBox?.min.x).toBeCloseTo(-12);
+    expect(geometry.boundingBox?.max.x).toBeCloseTo(12);
+  });
+
   it('uses rendered geometry for ground-contact half-height', () => {
     const halfHeight = getPartWorldHalfHeight(
       createTestPart({
