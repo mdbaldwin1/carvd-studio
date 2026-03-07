@@ -2331,8 +2331,10 @@ describe('validatePartsForCutList', () => {
 
       const issues = validatePartsForCutList(parts, [stock]);
 
-      expect(issues.some((issue) => issue.type === 'feature_validation' && issue.severity === 'error')).toBe(true);
-      expect(issues.some((issue) => issue.message.includes('Only one enabled end cut per end'))).toBe(true);
+      const featureIssues = issues.filter((issue) => issue.type === 'feature_validation' && issue.severity === 'error');
+
+      expect(featureIssues).toHaveLength(1);
+      expect(featureIssues[0]?.message).toContain('Only one enabled end cut per end');
     });
   });
 

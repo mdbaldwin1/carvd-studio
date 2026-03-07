@@ -454,7 +454,8 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
 
     const seenConflictMessages = new Set<string>();
     for (const conflict of getPartFeatureConflicts(part.features ?? [], part)) {
-      const key = `${conflict.code}:${conflict.featureId}:${conflict.relatedFeatureId ?? ''}`;
+      const relatedIds = [conflict.featureId, conflict.relatedFeatureId ?? ''].sort().join(':');
+      const key = `${conflict.code}:${relatedIds}`;
       if (seenConflictMessages.has(key)) continue;
       seenConflictMessages.add(key);
       issues.push({
