@@ -11,6 +11,8 @@ As of beads `13.2` through `13.5`, the implemented POC behavior is:
 - a draft session clones part features and supports save/discard/exit handling
 - operation-stack authoring now lives in the cuts workspace
 - reordering, duplication, removal, and enable/disable all happen there
+- quick presets now seed common cut stacks and starter operations
+- mirror actions now let supported operations be copied to the opposite end or across the part axes
 - the main Properties panel is reduced to a compact cuts summary plus `Edit Cuts`
 - the preview now supports direct 3D target picking for the current POC operations, with inspector/form fallback for verification and difficult camera angles
 
@@ -23,6 +25,7 @@ Still deferred beyond the current implemented POC:
 See also:
 
 - `part-cuts-3d-targeting-spec.md` for the direct viewport targeting contract that follows this workspace model
+- `part-cuts-presets-spec.md` for the preset and mirroring contract layered onto this workspace
 
 ## Purpose
 

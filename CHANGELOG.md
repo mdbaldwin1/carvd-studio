@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Cuts presets and mirroring in Part Cuts (POC)** — The dedicated cuts workspace now includes quick presets for common end-cut and notch/cutout setups, plus mirror actions that copy supported operations to the opposite end or across the board axes without leaving cuts mode.
 - **Ordered multi-operation validation for part cuts (POC)** — Enabled operations on a board now follow explicit list order in the preview path, duplicate enabled end cuts on the same end are treated as blocking conflicts, cuts-mode save and cut-list validation now use the same ordered conflict rules, and fabrication instructions are numbered so exported/report surfaces preserve authored operation order.
 - **Direct 3D target picking in Part Cuts (POC)** — The dedicated cuts workspace preview now exposes operation-aware face/edge/corner hit regions, supports direct hover/click retargeting on the part itself, and keeps inspector controls as a fallback when camera angle or runtime limitations make direct picking less convenient.
 - **Part operation authoring moved into cuts mode (POC)** — The dedicated `Part Cuts` workspace now owns add/edit/duplicate/remove/reorder flows for operation stacks on a single board, while the Properties panel can remain focused on summary and entry points.
