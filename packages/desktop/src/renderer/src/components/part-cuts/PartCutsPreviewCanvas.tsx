@@ -134,7 +134,7 @@ export function PartCutsPreviewCanvas({
           </CardDescription>
           {selectedFeatureSummary && (
             <div className="rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-left text-sm text-text">
-              <div className="font-medium">Selected Operation</div>
+              <div className="font-medium">Preview Selection</div>
               <div className="mt-1">{selectedFeatureSummary}</div>
               {selectedFeatureTargetLabel && (
                 <div className="mt-1 text-xs text-text-muted">Target: {selectedFeatureTargetLabel}</div>
@@ -186,7 +186,7 @@ export function PartCutsPreviewCanvas({
       <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-2">
         {selectedFeatureSummary && (
           <div className="rounded-md border border-accent/30 bg-bg/90 px-3 py-2 text-left text-sm text-text shadow-sm backdrop-blur">
-            <div className="font-medium">Selected Operation</div>
+            <div className="font-medium">Preview Selection</div>
             <div className="mt-1">{selectedFeatureSummary}</div>
             {selectedFeatureTargetLabel && (
               <div className="mt-1 text-xs text-text-muted">Target: {selectedFeatureTargetLabel}</div>

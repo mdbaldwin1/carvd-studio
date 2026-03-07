@@ -358,7 +358,7 @@ export function PartCutsWorkspace({
                 </div>
                 <div>
                   <span className={`font-medium ${hasUnsavedChanges ? 'text-accent' : 'text-text'}`}>
-                    {hasUnsavedChanges ? 'Unsaved changes' : 'Saved draft'}
+                    {hasUnsavedChanges ? 'Unsaved changes' : 'No unsaved changes'}
                   </span>
                 </div>
               </div>
@@ -375,7 +375,7 @@ export function PartCutsWorkspace({
             </div>
 
             <div className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Add Operation</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Operation Types</div>
               <div className="grid grid-cols-2 gap-2">
                 {(
                   [
@@ -407,7 +407,7 @@ export function PartCutsWorkspace({
             </div>
 
             <div className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Quick Presets</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Starter Presets</div>
               <div className="grid grid-cols-1 gap-2">
                 {(
                   [
@@ -589,7 +589,7 @@ export function PartCutsWorkspace({
               {selectedFeatureSummary && (
                 <div className="rounded-md border border-border bg-bg px-3 py-3 text-left">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
-                    Selected Operation
+                    Operation Summary
                   </div>
                   <div className="text-sm text-text">{selectedFeatureSummary}</div>
                 </div>

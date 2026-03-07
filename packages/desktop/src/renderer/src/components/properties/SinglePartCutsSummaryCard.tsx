@@ -57,7 +57,7 @@ export function SinglePartCutsSummaryCard({ selectedPart, units, onEditCuts }: S
           )}
         </div>
         <Button size="sm" className="w-full" onClick={onEditCuts}>
-          Edit Cuts
+          Open Cuts Workspace
         </Button>
       </CardContent>
     </Card>

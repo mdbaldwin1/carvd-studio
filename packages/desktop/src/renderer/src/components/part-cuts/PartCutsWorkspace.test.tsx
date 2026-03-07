@@ -259,7 +259,7 @@ describe('PartCutsWorkspace', () => {
       />
     );
 
-    expect(screen.getAllByText('Selected Operation').length).toBeGreaterThan(0);
+    expect(screen.getByText('Operation Summary')).toBeInTheDocument();
     expect(screen.getByText('Inspector Target')).toBeInTheDocument();
     expect(screen.getByText('Same-Part Feedback')).toBeInTheDocument();
     expect(screen.getByText('Draft Status')).toBeInTheDocument();
