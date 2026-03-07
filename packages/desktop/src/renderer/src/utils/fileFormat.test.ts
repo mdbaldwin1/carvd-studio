@@ -116,6 +116,67 @@ describe('fileFormat', () => {
       expect(file.groupMembers).toHaveLength(1);
     });
 
+    it('includes generated cut lists with feature-backed instructions', () => {
+      const stock = createTestStock({ id: 'stock-1', name: 'Plywood' });
+      const part = createTestPart({ id: 'part-1', name: 'Shelf', stockId: stock.id });
+
+      const file = createValidCarvdFile({
+        parts: [part],
+        stocks: [stock],
+        cutList: {
+          id: 'cutlist-1',
+          generatedAt: '2026-03-07T00:00:00.000Z',
+          projectModifiedAt: '2026-03-07T00:00:00.000Z',
+          isStale: false,
+          instructions: [
+            {
+              partId: 'part-1',
+              partName: 'Shelf',
+              cutLength: 24,
+              cutWidth: 12,
+              thickness: 0.75,
+              stockId: 'stock-1',
+              stockName: 'Plywood',
+              grainSensitive: false,
+              canRotate: true,
+              isGlueUp: false,
+              features: [
+                {
+                  id: 'feature-1',
+                  kind: 'end_cut',
+                  version: 1,
+                  enabled: true,
+                  target: { type: 'face', face: 'left_end' },
+                  reference: { primaryFrom: 'min' },
+                  cutType: 'mitre',
+                  lengthMode: 'long_point',
+                  parameters: { horizontalAngle: 45 }
+                }
+              ]
+            }
+          ],
+          stockBoards: [],
+          statistics: {
+            totalParts: 1,
+            totalStockBoards: 1,
+            totalBoardFeet: 2,
+            totalWasteSquareInches: 10,
+            wastePercentage: 5,
+            estimatedCost: 20,
+            totalWasteCost: 1,
+            byStock: []
+          },
+          bypassedIssues: [],
+          skippedParts: [],
+          kerfWidth: 0.125,
+          overageFactor: 0.1
+        }
+      });
+
+      expect(file.cutList?.instructions[0].features).toHaveLength(1);
+      expect(file.cutList?.instructions[0].features?.[0].kind).toBe('end_cut');
+    });
+
     it('omits empty optional arrays', () => {
       const file = createValidCarvdFile({
         assemblies: [],
@@ -265,6 +326,92 @@ describe('fileFormat', () => {
       expect(deserialized.parts[0].length).toBe(part.length);
       expect(deserialized.parts[0].notes).toBe(part.notes);
       expect(deserialized.stocks[0].name).toBe(stock.name);
+    });
+
+    it('serialize then deserialize preserves cut-list instruction features', () => {
+      const stock = createTestStock({ id: 'stock-1', name: 'Oak' });
+      const part = createTestPart({
+        id: 'part-1',
+        name: 'Rail',
+        stockId: stock.id
+      });
+
+      const original = {
+        projectName: 'Feature Roundtrip',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        modifiedAt: '2024-01-01T12:00:00.000Z',
+        units: 'imperial' as const,
+        gridSize: 0.0625,
+        kerfWidth: 0.125,
+        overageFactor: 0.1,
+        projectNotes: '',
+        stockConstraints: createDefaultStockConstraints(),
+        parts: [part],
+        stocks: [stock],
+        groups: [],
+        groupMembers: [],
+        assemblies: [],
+        snapGuides: [],
+        customShoppingItems: [],
+        cutList: {
+          id: 'cutlist-1',
+          generatedAt: '2026-03-07T00:00:00.000Z',
+          projectModifiedAt: '2026-03-07T00:00:00.000Z',
+          isStale: false,
+          instructions: [
+            {
+              partId: 'part-1',
+              partName: 'Rail',
+              cutLength: 24,
+              cutWidth: 2,
+              thickness: 0.75,
+              stockId: 'stock-1',
+              stockName: 'Oak',
+              grainSensitive: false,
+              canRotate: true,
+              isGlueUp: false,
+              features: [
+                {
+                  id: 'feature-1',
+                  kind: 'rect_cut',
+                  version: 1,
+                  enabled: true,
+                  target: { type: 'corner', corner: 'back_bottom_left_corner' },
+                  reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+                  cutType: 'corner_notch',
+                  parameters: {
+                    size: { length: 0.75, width: 0.75 },
+                    depthMode: 'through'
+                  },
+                  placement: { x: 0, z: 0 }
+                }
+              ]
+            }
+          ],
+          stockBoards: [],
+          statistics: {
+            totalParts: 1,
+            totalStockBoards: 1,
+            totalBoardFeet: 2,
+            totalWasteSquareInches: 10,
+            wastePercentage: 5,
+            estimatedCost: 20,
+            totalWasteCost: 1,
+            byStock: []
+          },
+          bypassedIssues: [],
+          skippedParts: [],
+          kerfWidth: 0.125,
+          overageFactor: 0.1
+        },
+        thumbnail: null
+      };
+
+      const serialized = serializeProject(original);
+      const deserialized = deserializeToProject(serialized);
+
+      expect(deserialized.cutList?.instructions[0].features).toHaveLength(1);
+      expect(deserialized.cutList?.instructions[0].features?.[0].kind).toBe('rect_cut');
     });
 
     it('handles special characters in names', () => {

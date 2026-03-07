@@ -125,6 +125,56 @@ describe('exportCutListToCsv', () => {
     expect(dataRows[0]).toContain('Shelf A; Shelf B');
   });
 
+  it('does not group identical blanks with different operations', () => {
+    const cutList = createTestCutList({
+      instructions: [
+        createTestInstruction({
+          partId: 'p1',
+          partName: 'Rail A',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'mitre',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 45 }
+            }
+          ]
+        }),
+        createTestInstruction({
+          partId: 'p2',
+          partName: 'Rail B',
+          features: [
+            {
+              id: 'feature-2',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'right_end' },
+              reference: { primaryFrom: 'max' },
+              cutType: 'mitre',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 45 }
+            }
+          ]
+        })
+      ]
+    });
+    const csv = exportCutListToCsv(cutList, 'imperial');
+    const dataLines = csv
+      .split('\n')
+      .filter((line) => !line.startsWith('#') && !line.startsWith('CUT') && line.includes(','));
+
+    const dataRows = dataLines.filter((line) => !line.startsWith('Qty'));
+    expect(dataRows.length).toBe(2);
+    expect(dataRows.some((line) => line.includes('Rail A'))).toBe(true);
+    expect(dataRows.some((line) => line.includes('Rail B'))).toBe(true);
+  });
+
   it('marks grain sensitive parts', () => {
     const cutList = createTestCutList({
       instructions: [createTestInstruction({ grainSensitive: true })]

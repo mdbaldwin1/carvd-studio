@@ -191,6 +191,53 @@ describe('CutListPartsTab', () => {
       expect(screen.getByText('2')).toBeInTheDocument();
     });
 
+    it('does not group identical blanks when authored operations differ', () => {
+      const cutList = createCutList({
+        instructions: [
+          createInstruction({
+            partId: 'p1',
+            partName: 'Rail A',
+            features: [
+              {
+                id: 'feature-1',
+                kind: 'end_cut',
+                version: 1,
+                enabled: true,
+                target: { type: 'face', face: 'left_end' },
+                reference: { primaryFrom: 'min' },
+                cutType: 'mitre',
+                lengthMode: 'long_point',
+                parameters: { horizontalAngle: 45 }
+              }
+            ]
+          }),
+          createInstruction({
+            partId: 'p2',
+            partName: 'Rail B',
+            features: [
+              {
+                id: 'feature-2',
+                kind: 'end_cut',
+                version: 1,
+                enabled: true,
+                target: { type: 'face', face: 'right_end' },
+                reference: { primaryFrom: 'max' },
+                cutType: 'mitre',
+                lengthMode: 'long_point',
+                parameters: { horizontalAngle: 45 }
+              }
+            ]
+          })
+        ]
+      });
+
+      render(<CutListPartsTab {...defaultProps} cutList={cutList} />);
+
+      expect(screen.getByText(/2 unique blanks/)).toBeInTheDocument();
+      expect(screen.getByText('Rail A')).toBeInTheDocument();
+      expect(screen.getByText('Rail B')).toBeInTheDocument();
+    });
+
     it('shows expand/collapse for multi-part groups', () => {
       const cutList = createCutList({
         instructions: [
