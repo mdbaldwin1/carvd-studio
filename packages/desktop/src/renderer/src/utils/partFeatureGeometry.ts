@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Part, PartFeature, RectCutFeature } from '../types';
+import { getEndCutInsetAt, getPartEndCutProfiles } from './endCutUtils';
 
 type Point2 = { x: number; z: number };
 
@@ -43,35 +44,16 @@ export function hasRenderablePartFeatures(part: Part): boolean {
   return getEnabledFeatures(part).length > 0;
 }
 
-function getEndOffsets(part: Part) {
-  const features = getEnabledFeatures(part).filter((feature) => feature.kind === 'end_cut');
-  let leftOffset = 0;
-  let rightOffset = 0;
-
-  for (const feature of features) {
-    if (feature.cutType === 'square' || feature.cutType === 'bevel') continue;
-    const angle = Math.abs(feature.parameters.horizontalAngle || 0);
-    const offset = clamp(Math.tan((angle * Math.PI) / 180) * part.width, 0, Math.max(0, part.length - 0.01));
-    if (feature.target.face === 'left_end') {
-      leftOffset = Math.max(leftOffset, offset);
-    } else {
-      rightOffset = Math.max(rightOffset, offset);
-    }
-  }
-
-  return { leftOffset, rightOffset };
-}
-
 function buildOuterContour(part: Part): Point2[] {
   const halfLength = part.length / 2;
   const halfWidth = part.width / 2;
-  const { leftOffset, rightOffset } = getEndOffsets(part);
+  const profiles = getPartEndCutProfiles(part);
 
   return [
     { x: -halfLength, z: -halfWidth },
-    { x: halfLength - rightOffset, z: -halfWidth },
+    { x: halfLength - profiles.right.horizontalInset, z: -halfWidth },
     { x: halfLength, z: halfWidth },
-    { x: -halfLength + leftOffset, z: halfWidth }
+    { x: -halfLength + profiles.left.horizontalInset, z: halfWidth }
   ];
 }
 
@@ -264,10 +246,47 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
   });
   geometry.rotateX(-Math.PI / 2);
   geometry.translate(0, -part.thickness / 2, 0);
+  applyVerticalEndCuts(geometry, part);
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
+}
+
+function applyVerticalEndCuts(geometry: THREE.BufferGeometry, part: Part): void {
+  const profiles = getPartEndCutProfiles(part);
+  if (profiles.left.verticalInset <= 0 && profiles.right.verticalInset <= 0) return;
+
+  const positions = geometry.getAttribute('position');
+  const halfLength = part.length / 2;
+  const halfThickness = part.thickness / 2;
+  const epsilon = 1e-4;
+
+  for (let i = 0; i < positions.count; i += 1) {
+    const x = positions.getX(i);
+    const y = positions.getY(i);
+    const z = positions.getZ(i);
+
+    if (profiles.left.maxInset > 0) {
+      const leftBaseInset = getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z });
+      const leftBaseBoundaryX = -halfLength + leftBaseInset;
+      const leftInset = getEndCutInsetAt('left', profiles, part, { y, z });
+      if (Math.abs(x - leftBaseBoundaryX) < epsilon) {
+        positions.setX(i, -halfLength + leftInset);
+      }
+    }
+
+    if (profiles.right.maxInset > 0) {
+      const rightBaseInset = getEndCutInsetAt('right', profiles, part, { y: halfThickness, z });
+      const rightBaseBoundaryX = halfLength - rightBaseInset;
+      const rightInset = getEndCutInsetAt('right', profiles, part, { y, z });
+      if (Math.abs(x - rightBaseBoundaryX) < epsilon) {
+        positions.setX(i, halfLength - rightInset);
+      }
+    }
+  }
+
+  positions.needsUpdate = true;
 }
 
 function getFeatureContour(part: Part): Point2[] {

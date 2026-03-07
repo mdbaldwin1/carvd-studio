@@ -36,7 +36,7 @@ describe('SinglePartFeaturesCard', () => {
     );
 
     expect(screen.getByText('Blank Size')).toBeInTheDocument();
-    expect(screen.getByText(/23 1\/2/)).toBeInTheDocument();
+    expect(screen.getAllByText(/23 1\/2/)).not.toHaveLength(0);
     expect(screen.getByText(/Mitre 45° on Left End/)).toBeInTheDocument();
   });
 
@@ -75,6 +75,30 @@ describe('SinglePartFeaturesCard', () => {
         })
       })
     ]);
+  });
+
+  it('shows derived long-point, short-point, and centerline measurements for end cuts', () => {
+    render(
+      <SinglePartFeaturesCard
+        selectedPart={createTestPart({
+          length: 24,
+          width: 4,
+          thickness: 0.75
+        })}
+        units="imperial"
+        onFeaturesChange={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /End Cut/ }));
+    fireEvent.change(screen.getByLabelText('Cut Style'), { target: { value: 'mitre' } });
+    fireEvent.change(screen.getByLabelText('Mitre Angle'), { target: { value: '45' } });
+
+    expect(screen.getByText(/Derived Lengths \(long point\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Control value: 24"/)).toBeInTheDocument();
+    expect(screen.getByText(/Long Point 24"/)).toBeInTheDocument();
+    expect(screen.getByText(/Short Point 20"/)).toBeInTheDocument();
+    expect(screen.getByText(/Centerline 22"/)).toBeInTheDocument();
   });
 
   it('can disable an existing operation without removing it', () => {

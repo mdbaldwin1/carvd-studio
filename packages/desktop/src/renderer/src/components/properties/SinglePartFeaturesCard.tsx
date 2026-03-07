@@ -18,6 +18,7 @@ import {
 } from '@renderer/types';
 import { clonePartFeature } from '@renderer/utils/partFeatures';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
+import { getDerivedLengthMeasurements, getLengthReferenceValue } from '@renderer/utils/endCutUtils';
 import { useEffect, useMemo, useState } from 'react';
 
 const FACE_LABELS: Record<FaceTarget, string> = {
@@ -208,7 +209,13 @@ function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'metric'): 
       angleBits.push(`${feature.parameters.verticalAngle}° bevel`);
     }
     const angleText = angleBits.length > 0 ? ` ${angleBits.join(' / ')}` : '';
-    return `${feature.cutType[0].toUpperCase()}${feature.cutType.slice(1)}${angleText} on ${getFeatureTargetLabel(feature)}`;
+    const referenceLabel =
+      feature.lengthMode === 'centerline'
+        ? 'Centerline'
+        : feature.lengthMode === 'short_point'
+          ? 'Short Point'
+          : 'Long Point';
+    return `${feature.cutType[0].toUpperCase()}${feature.cutType.slice(1)}${angleText} on ${getFeatureTargetLabel(feature)} · ${referenceLabel} reference`;
   }
 
   return `${feature.cutType
@@ -300,7 +307,7 @@ function getPresetHint(preset: OperationPreset): string {
 }
 
 export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }: SinglePartFeaturesCardProps) {
-  const features = selectedPart.features ?? [];
+  const features = useMemo(() => selectedPart.features ?? [], [selectedPart.features]);
   const [draft, setDraft] = useState<FeatureDraft | null>(null);
 
   useEffect(() => {
@@ -312,6 +319,43 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
     if (draft.mode === 'end_cut') return 'end_cut';
     return draft.cutType;
   }, [draft]);
+
+  const partDerivedLengths = useMemo(
+    () =>
+      getDerivedLengthMeasurements({
+        length: selectedPart.length,
+        width: selectedPart.width,
+        thickness: selectedPart.thickness,
+        features
+      }),
+    [features, selectedPart.length, selectedPart.thickness, selectedPart.width]
+  );
+
+  const draftPreviewFeature = useMemo(() => {
+    if (!draft || draft.mode !== 'end_cut') return null;
+    return buildFeatureFromDraft(draft);
+  }, [draft]);
+
+  const endCutPreviewMeasurements = useMemo(() => {
+    if (!draftPreviewFeature || draftPreviewFeature.kind !== 'end_cut') return null;
+
+    const nextFeatures = draft.featureId
+      ? features.map((feature) => (feature.id === draft.featureId ? draftPreviewFeature : feature))
+      : [...features, draftPreviewFeature];
+
+    const measurements = getDerivedLengthMeasurements({
+      length: selectedPart.length,
+      width: selectedPart.width,
+      thickness: selectedPart.thickness,
+      features: nextFeatures
+    });
+
+    return {
+      ...measurements,
+      controllingValue: getLengthReferenceValue(measurements, draftPreviewFeature.lengthMode),
+      lengthMode: draftPreviewFeature.lengthMode
+    };
+  }, [draft, draftPreviewFeature, features, selectedPart.length, selectedPart.thickness, selectedPart.width]);
 
   const startDraft = (preset: OperationPreset) => setDraft(buildDraftFromPreset(preset));
 
@@ -408,6 +452,13 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                       </div>
                       <p className="mt-1 text-[12px] text-text">{feature.label || getFeatureSummary(feature, units)}</p>
                       <p className="mt-1 text-[11px] text-text-muted">{getFeatureTargetLabel(feature)}</p>
+                      {feature.kind === 'end_cut' && (
+                        <p className="mt-1 text-[11px] text-text-muted">
+                          Long {formatMeasurementWithUnit(partDerivedLengths.longPoint, units)} · Short{' '}
+                          {formatMeasurementWithUnit(partDerivedLengths.shortPoint, units)} · Centerline{' '}
+                          {formatMeasurementWithUnit(partDerivedLengths.centerline, units)}
+                        </p>
+                      )}
                     </div>
                     <label className="flex items-center gap-2 text-[11px] text-text-muted">
                       <Checkbox
@@ -613,6 +664,29 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                           value={draft.verticalAngle}
                           onChange={(e) => setDraft({ ...draft, verticalAngle: Number(e.target.value) })}
                         />
+                      </div>
+                    )}
+
+                    {endCutPreviewMeasurements && (
+                      <div className="rounded-[var(--radius-sm)] border border-border bg-background p-3">
+                        <p className="text-[12px] font-medium text-text">
+                          Derived Lengths ({endCutPreviewMeasurements.lengthMode.replace('_', ' ')})
+                        </p>
+                        <p className="mt-1 text-[11px] text-text-muted">
+                          Control value: {formatMeasurementWithUnit(endCutPreviewMeasurements.controllingValue, units)}{' '}
+                          from the selected reference.
+                        </p>
+                        <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-text-muted sm:grid-cols-3">
+                          <span>
+                            Long Point {formatMeasurementWithUnit(endCutPreviewMeasurements.longPoint, units)}
+                          </span>
+                          <span>
+                            Short Point {formatMeasurementWithUnit(endCutPreviewMeasurements.shortPoint, units)}
+                          </span>
+                          <span>
+                            Centerline {formatMeasurementWithUnit(endCutPreviewMeasurements.centerline, units)}
+                          </span>
+                        </div>
                       </div>
                     )}
                   </>

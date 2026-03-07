@@ -88,6 +88,81 @@ describe('partFeatureGeometry', () => {
     expect(geometry.boundingBox!.min.x).toBeCloseTo(-12);
   });
 
+  it('slopes the end plane across thickness for bevel cuts', () => {
+    const geometry = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 1,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'bevel',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 0, verticalAngle: 45 }
+          }
+        ]
+      })
+    );
+
+    const positions = geometry.getAttribute('position');
+    let topLeftMinX = Infinity;
+    let bottomLeftMinX = Infinity;
+
+    for (let i = 0; i < positions.count; i += 1) {
+      const x = positions.getX(i);
+      const y = positions.getY(i);
+      if (x > 0) continue;
+      if (y > 0.49) topLeftMinX = Math.min(topLeftMinX, x);
+      if (y < -0.49) bottomLeftMinX = Math.min(bottomLeftMinX, x);
+    }
+
+    expect(bottomLeftMinX).toBeCloseTo(-12, 3);
+    expect(topLeftMinX).toBeCloseTo(-11, 3);
+  });
+
+  it('combines mitre and bevel shaping for compound cuts', () => {
+    const geometry = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 1,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'compound',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 45, verticalAngle: 45 }
+          }
+        ]
+      })
+    );
+
+    const positions = geometry.getAttribute('position');
+    let leftmostX = Infinity;
+    let nearestZeroLeftX = -Infinity;
+
+    for (let i = 0; i < positions.count; i += 1) {
+      const x = positions.getX(i);
+      if (x > 0) continue;
+      leftmostX = Math.min(leftmostX, x);
+      nearestZeroLeftX = Math.max(nearestZeroLeftX, x);
+    }
+
+    expect(leftmostX).toBeCloseTo(-12, 3);
+    expect(nearestZeroLeftX).toBeCloseTo(-8, 3);
+  });
+
   it('creates through-holes for top-face cutouts', () => {
     const geometry = getPartRenderGeometry(
       createTestPart({
