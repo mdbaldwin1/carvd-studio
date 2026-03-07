@@ -6,6 +6,10 @@ Workflow and policy source of truth: see `AGENTS.md`. This file is reference gui
 
 Add another small set of constrained woodworking operations that still fit the current blank-plus-operations model and geometry path.
 
+See also:
+
+- `part-feature-stopped-operations-spec.md` for the follow-on stopped channel variants
+
 ## Product Decision
 
 This pass adds:

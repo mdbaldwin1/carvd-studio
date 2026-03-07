@@ -187,6 +187,7 @@ Supported kinds:
 - dado
 - rabbet
 - groove
+- stopped groove
 - mortise
 
 ### Out of scope for the POC
@@ -331,6 +332,7 @@ Downstream implementation can refine this, but should preserve the semantics bel
 This shape intentionally leaves room for future woodworking features such as:
 
 - dados
+- stopped dados
 - rabbets
 - grooves
 - chamfers
