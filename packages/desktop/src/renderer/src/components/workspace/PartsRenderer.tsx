@@ -12,6 +12,7 @@ import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
+import { hasRenderablePartFeatures } from '../../utils/partFeatureGeometry';
 import { Part } from './Part';
 import { InstancedParts } from './InstancedParts';
 
@@ -61,6 +62,13 @@ export function PartsRenderer() {
         if (part.stockId === selectedSidebarStockId) {
           individualIds.add(part.id);
         }
+      }
+    }
+
+    // Feature-bearing parts use the dedicated geometry path instead of instancing.
+    for (const part of parts) {
+      if (hasRenderablePartFeatures(part)) {
+        individualIds.add(part.id);
       }
     }
 
