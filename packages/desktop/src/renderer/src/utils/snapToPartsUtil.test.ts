@@ -1602,6 +1602,40 @@ describe('snapToPartsUtil', () => {
         expect(result.snapLines[0].end.y).toBeLessThanOrEqual(topOfPart1 + 1e-3);
       }
     });
+
+    it('snaps collinear angled edges while sliding on a surface-snapped face', () => {
+      const partA = createTestPart({
+        id: 'part-a',
+        length: 6,
+        width: 4,
+        thickness: 1,
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 45, z: 0 }
+      });
+
+      const baseObb = getPartOBB(partA);
+      const slideAxis = baseObb.axes[0];
+
+      const partB = createTestPart({
+        id: 'part-b',
+        length: 6,
+        width: 4,
+        thickness: 1,
+        // Touching on wide face (Y), with a small along-edge offset.
+        position: {
+          x: slideAxis.x * 0.2,
+          y: partA.position.y + partA.thickness,
+          z: slideAxis.z * 0.2
+        },
+        rotation: { x: 0, y: 45, z: 0 }
+      });
+
+      const result = detectFeatureSnaps(partB, partB.position, [partA, partB], ['part-b'], 0.5);
+
+      expect(result.snappedX || result.snappedY || result.snappedZ).toBe(true);
+      expect(result.snapLines.length).toBeGreaterThan(0);
+      expect(result.closestDistance).toBeLessThanOrEqual(0.2 + 1e-3);
+    });
   });
 
   describe('standard dimension constants', () => {

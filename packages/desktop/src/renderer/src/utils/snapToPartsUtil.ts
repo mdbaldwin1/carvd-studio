@@ -64,6 +64,15 @@ export interface SnapResult {
   closestDistance?: number;
 }
 
+function withSnapFamily(lines: SnapLine[], family: NonNullable<SnapLine['family']>, subtype?: string): SnapLine[] {
+  return lines.map((line) => ({
+    ...line,
+    family,
+    subtype: line.subtype ?? subtype,
+    state: line.state ?? 'winner'
+  }));
+}
+
 // Calculate axis-aligned bounding box for a part in world space
 export function getPartBounds(part: Part): PartBounds {
   _boundsEuler.set(
@@ -958,6 +967,8 @@ function createSnapLine(
       return {
         axis: 'x',
         type,
+        family: 'axis',
+        state: 'winner',
         start: { x: snapValue, y: avgY, z: minZ },
         end: { x: snapValue, y: avgY, z: maxZ },
         snapValue,
@@ -972,6 +983,8 @@ function createSnapLine(
       return {
         axis: 'y',
         type,
+        family: 'axis',
+        state: 'winner',
         start: { x: minX, y: snapValue, z: avgZ },
         end: { x: maxX, y: snapValue, z: avgZ },
         snapValue,
@@ -986,6 +999,8 @@ function createSnapLine(
       return {
         axis: 'z',
         type,
+        family: 'axis',
+        state: 'winner',
         start: { x: minX, y: avgY, z: snapValue },
         end: { x: maxX, y: avgY, z: snapValue },
         snapValue,
@@ -1051,6 +1066,8 @@ function createEqualSpacingSnapLines(
       snapLines.push({
         axis: 'x',
         type: 'equal-spacing',
+        family: 'equal-spacing',
+        state: 'winner',
         start: { x: draggingBounds.centerX, y, z: minZ },
         end: { x: draggingBounds.centerX, y, z: maxZ },
         snapValue: draggingBounds.centerX,
@@ -1084,6 +1101,8 @@ function createEqualSpacingSnapLines(
       snapLines.push({
         axis: 'y',
         type: 'equal-spacing',
+        family: 'equal-spacing',
+        state: 'winner',
         start: { x: minX, y: draggingBounds.centerY, z },
         end: { x: maxX, y: draggingBounds.centerY, z },
         snapValue: draggingBounds.centerY,
@@ -1117,6 +1136,8 @@ function createEqualSpacingSnapLines(
       snapLines.push({
         axis: 'z',
         type: 'equal-spacing',
+        family: 'equal-spacing',
+        state: 'winner',
         start: { x: minX, y, z: draggingBounds.centerZ },
         end: { x: maxX, y, z: draggingBounds.centerZ },
         snapValue: draggingBounds.centerZ,
@@ -1767,6 +1788,8 @@ export function createGuideSnapLine(guide: SnapGuide, draggingBounds: PartBounds
       return {
         axis: 'x',
         type: 'face',
+        family: 'guide',
+        state: 'winner',
         start: { x: position, y: avgY, z: minZ },
         end: { x: position, y: avgY, z: maxZ },
         snapValue: position
@@ -1780,6 +1803,8 @@ export function createGuideSnapLine(guide: SnapGuide, draggingBounds: PartBounds
       return {
         axis: 'y',
         type: 'face',
+        family: 'guide',
+        state: 'winner',
         start: { x: minX, y: position, z: avgZ },
         end: { x: maxX, y: position, z: avgZ },
         snapValue: position
@@ -1794,6 +1819,8 @@ export function createGuideSnapLine(guide: SnapGuide, draggingBounds: PartBounds
       return {
         axis: 'z',
         type: 'face',
+        family: 'guide',
+        state: 'winner',
         start: { x: minX, y: avgY, z: position },
         end: { x: maxX, y: avgY, z: position },
         snapValue: position
@@ -1884,6 +1911,8 @@ export function createOriginSnapLine(
       return {
         axis: 'x',
         type: snapType === 'center' ? 'center' : 'edge',
+        family: 'origin',
+        state: 'winner',
         start: { x: 0, y, z: minZ },
         end: { x: 0, y, z: maxZ },
         snapValue: 0
@@ -1897,6 +1926,8 @@ export function createOriginSnapLine(
       return {
         axis: 'y',
         type: snapType === 'center' ? 'center' : 'edge',
+        family: 'origin',
+        state: 'winner',
         start: { x: minX, y: 0, z },
         end: { x: maxX, y: 0, z },
         snapValue: 0
@@ -1911,6 +1942,8 @@ export function createOriginSnapLine(
       return {
         axis: 'z',
         type: snapType === 'center' ? 'center' : 'edge',
+        family: 'origin',
+        state: 'winner',
         start: { x: minX, y, z: 0 },
         end: { x: maxX, y, z: 0 },
         snapValue: 0
@@ -2028,7 +2061,7 @@ export function detectFaceSnaps(
     snappedX,
     snappedY,
     snappedZ,
-    snapLines: [createFaceSnapLine(dominantAxis, position, adjustedBounds, best.targetBounds)],
+    snapLines: withSnapFamily([createFaceSnapLine(dominantAxis, position, adjustedBounds, best.targetBounds)], 'face'),
     closestDistance: bestDistance
   };
 }
@@ -2334,6 +2367,7 @@ export function detectFeatureSnaps(
   draggingPartIds: string[],
   snapThreshold: number
 ): SnapResult {
+  const MIN_VERTEX_FACE_DISTANCE = Math.max(1e-4, snapThreshold * 0.002);
   const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
   const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
   const dragEdges = getPartEdges(draggingPart, currentPosition);
@@ -2345,6 +2379,7 @@ export function detectFeatureSnaps(
         lineStart: Vec3;
         lineEnd: Vec3;
         distance: number;
+        subtype: string;
       }
     | undefined;
   let bestDistance = snapThreshold;
@@ -2364,8 +2399,6 @@ export function detectFeatureSnaps(
         const along = dotVec(closestDiff, e1.dir);
         const perpOffset = subVec(closestDiff, mulVec(e1.dir, along));
         const distance = lenVec(perpOffset);
-        if (distance <= 1e-5) continue;
-        if (distance >= bestDistance) continue;
 
         const p1a = dotVec(e1.a, e1.dir);
         const p1b = dotVec(e1.b, e1.dir);
@@ -2378,12 +2411,44 @@ export function detectFeatureSnaps(
         const overlap = Math.min(max1, max2) - Math.max(min1, min2);
         if (overlap < -Math.max(0.01, snapThreshold * 0.5)) continue;
 
+        if (distance <= 1e-5) {
+          // Coplanar/collinear edges: snap by endpoint alignment along the edge direction.
+          // This enables edge snapping while sliding on an already surface-snapped face.
+          const edge1MinPoint = p1a <= p1b ? e1.a : e1.b;
+          const edge1MaxPoint = p1a <= p1b ? e1.b : e1.a;
+          const edge2MinPoint = p2a <= p2b ? e2.a : e2.b;
+          const edge2MaxPoint = p2a <= p2b ? e2.b : e2.a;
+          const alongCandidates = [
+            { delta: min2 - min1, lineStart: edge1MinPoint, lineEnd: edge2MinPoint },
+            { delta: max2 - max1, lineStart: edge1MaxPoint, lineEnd: edge2MaxPoint },
+            { delta: min2 - max1, lineStart: edge1MaxPoint, lineEnd: edge2MinPoint },
+            { delta: max2 - min1, lineStart: edge1MinPoint, lineEnd: edge2MaxPoint }
+          ];
+
+          for (const candidate of alongCandidates) {
+            const candidateDistance = Math.abs(candidate.delta);
+            if (candidateDistance <= 1e-5 || candidateDistance >= bestDistance) continue;
+            bestDistance = candidateDistance;
+            best = {
+              delta: mulVec(e1.dir, candidate.delta),
+              lineStart: candidate.lineStart,
+              lineEnd: candidate.lineEnd,
+              distance: candidateDistance,
+              subtype: 'edge-extension'
+            };
+          }
+          continue;
+        }
+
+        if (distance >= bestDistance) continue;
+
         bestDistance = distance;
         best = {
           delta: perpOffset,
           lineStart: c1,
           lineEnd: c2,
-          distance
+          distance,
+          subtype: 'edge-edge'
         };
       }
     }
@@ -2394,6 +2459,9 @@ export function detectFeatureSnaps(
         const offset = subVec(vertex, face.center);
         const planeDistance = dotVec(offset, face.normal);
         const absDistance = Math.abs(planeDistance);
+        // Ignore already-coplanar candidates; they should not suppress
+        // meaningful edge-alignment snaps on the same surface.
+        if (absDistance <= MIN_VERTEX_FACE_DISTANCE) continue;
         if (absDistance >= bestDistance) continue;
 
         const projected = subVec(vertex, mulVec(face.normal, planeDistance));
@@ -2407,7 +2475,8 @@ export function detectFeatureSnaps(
           delta: mulVec(face.normal, -planeDistance),
           lineStart: vertex,
           lineEnd: projected,
-          distance: absDistance
+          distance: absDistance,
+          subtype: 'vertex-face'
         };
       }
     }
@@ -2450,15 +2519,316 @@ export function detectFeatureSnaps(
     snappedX,
     snappedY,
     snappedZ,
-    snapLines: [
-      {
-        axis,
-        type: 'edge',
-        start: { x: best.lineStart.x, y: best.lineStart.y, z: best.lineStart.z },
-        end: { x: best.lineEnd.x, y: best.lineEnd.y, z: best.lineEnd.z },
-        snapValue: axis === 'x' ? best.lineEnd.x : axis === 'y' ? best.lineEnd.y : best.lineEnd.z
+    snapLines: withSnapFamily(
+      [
+        {
+          axis,
+          type: 'edge',
+          start: { x: best.lineStart.x, y: best.lineStart.y, z: best.lineStart.z },
+          end: { x: best.lineEnd.x, y: best.lineEnd.y, z: best.lineEnd.z },
+          snapValue: axis === 'x' ? best.lineEnd.x : axis === 'y' ? best.lineEnd.y : best.lineEnd.z
+        }
+      ],
+      'feature',
+      best.subtype
+    ),
+    closestDistance: best.distance
+  };
+}
+
+export function detectSurfaceAnchorSnaps(
+  draggingPart: Part,
+  currentPosition: { x: number; y: number; z: number },
+  allParts: Part[],
+  draggingPartIds: string[],
+  snapThreshold: number
+): SnapResult {
+  const dragFaces = getPartFaces(draggingPart, currentPosition);
+  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
+  const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
+  const FACE_SNAP_CLEARANCE = 1e-4;
+  let best:
+    | {
+        delta: Vec3;
+        lineStart: Vec3;
+        lineEnd: Vec3;
+        distance: number;
+        subtype: string;
       }
-    ],
+    | undefined;
+  let bestDistance = snapThreshold;
+
+  for (const targetPart of nearestParts) {
+    const targetFaces = getPartFaces(targetPart, targetPart.position);
+    for (const dragFace of dragFaces) {
+      for (const targetFace of targetFaces) {
+        if (!areFacesSnapCompatible(dragFace, targetFace, snapThreshold)) continue;
+
+        const centerDelta = subVec(targetFace.center, dragFace.center);
+        const planeDistance = dotVec(centerDelta, targetFace.normal);
+        const absPlaneDistance = Math.abs(planeDistance);
+        if (absPlaneDistance > snapThreshold) continue;
+
+        const clearance = Math.min(FACE_SNAP_CLEARANCE, absPlaneDistance * 0.5);
+        const correctedPlaneDistance = planeDistance - Math.sign(planeDistance || 1) * clearance;
+
+        const dragOnTargetPlane = addScaledVec(dragFace.center, targetFace.normal, correctedPlaneDistance);
+        const planarOffset = subVec(dragOnTargetPlane, targetFace.center);
+        const u = dotVec(planarOffset, targetFace.tangent1);
+        const v = dotVec(planarOffset, targetFace.tangent2);
+
+        const anchors: Array<{ u: number; v: number; subtype: string }> = [
+          { u: 0, v: 0, subtype: 'center-2d' },
+          { u: 0, v, subtype: 'center-1d' },
+          { u, v: 0, subtype: 'center-1d' },
+          { u: targetFace.half1 * 0.5, v, subtype: 'edge-quarterline' },
+          { u: -targetFace.half1 * 0.5, v, subtype: 'edge-quarterline' },
+          { u, v: targetFace.half2 * 0.5, subtype: 'edge-quarterline' },
+          { u, v: -targetFace.half2 * 0.5, subtype: 'edge-quarterline' },
+          { u: targetFace.half1, v: 0, subtype: 'edge-midline' },
+          { u: -targetFace.half1, v: 0, subtype: 'edge-midline' },
+          { u: 0, v: targetFace.half2, subtype: 'edge-midline' },
+          { u: 0, v: -targetFace.half2, subtype: 'edge-midline' }
+        ];
+
+        for (const anchor of anchors) {
+          if (Math.abs(anchor.u) > targetFace.half1 + 1e-4 || Math.abs(anchor.v) > targetFace.half2 + 1e-4) continue;
+          const du = anchor.u - u;
+          const dv = anchor.v - v;
+          const candidateDistance = Math.hypot(absPlaneDistance, du, dv);
+          if (candidateDistance >= bestDistance) continue;
+
+          const tangentialDelta = addVec(mulVec(targetFace.tangent1, du), mulVec(targetFace.tangent2, dv));
+          const normalDelta = mulVec(targetFace.normal, correctedPlaneDistance);
+          const delta = addVec(normalDelta, tangentialDelta);
+          const lineEnd = addVec(
+            targetFace.center,
+            addVec(mulVec(targetFace.tangent1, anchor.u), mulVec(targetFace.tangent2, anchor.v))
+          );
+          bestDistance = candidateDistance;
+          best = {
+            delta,
+            lineStart: dragFace.center,
+            lineEnd,
+            distance: candidateDistance,
+            subtype: anchor.subtype
+          };
+        }
+      }
+    }
+  }
+
+  if (!best) {
+    return {
+      adjustedPosition: currentPosition,
+      snappedX: false,
+      snappedY: false,
+      snappedZ: false,
+      snapLines: [],
+      closestDistance: undefined
+    };
+  }
+
+  const adjustedPosition = {
+    x: currentPosition.x + best.delta.x,
+    y: currentPosition.y + best.delta.y,
+    z: currentPosition.z + best.delta.z
+  };
+  const snappedX = Math.abs(best.delta.x) > 1e-5;
+  const snappedY = Math.abs(best.delta.y) > 1e-5;
+  const snappedZ = Math.abs(best.delta.z) > 1e-5;
+  const axis = dominantAxisFromDelta(best.delta);
+
+  return {
+    adjustedPosition,
+    snappedX,
+    snappedY,
+    snappedZ,
+    snapLines: withSnapFamily(
+      [
+        {
+          axis,
+          type: 'center',
+          start: best.lineStart,
+          end: best.lineEnd,
+          snapValue: axis === 'x' ? best.lineEnd.x : axis === 'y' ? best.lineEnd.y : best.lineEnd.z
+        }
+      ],
+      'surface-anchor',
+      best.subtype
+    ),
+    closestDistance: best.distance
+  };
+}
+
+export function detectFractionalFaceSnaps(
+  draggingPart: Part,
+  currentPosition: { x: number; y: number; z: number },
+  allParts: Part[],
+  draggingPartIds: string[],
+  snapThreshold: number,
+  includeGoldenRatioAnchors = false
+): SnapResult {
+  const dragFaces = getPartFaces(draggingPart, currentPosition);
+  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
+  const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
+  const FACE_SNAP_CLEARANCE = 1e-4;
+  const fractionAnchors = [
+    { f: 0, subtype: 'fraction-0' },
+    { f: 0.25, subtype: 'fraction-25' },
+    { f: 0.5, subtype: 'fraction-50' },
+    { f: 0.75, subtype: 'fraction-75' },
+    { f: 1, subtype: 'fraction-100' }
+  ];
+  const goldenAnchors = includeGoldenRatioAnchors
+    ? [
+        { f: 0.382, subtype: 'golden-38' },
+        { f: 0.618, subtype: 'golden-62' }
+      ]
+    : [];
+  const anchors = [...fractionAnchors, ...goldenAnchors];
+
+  let best:
+    | {
+        delta: Vec3;
+        lineStart: Vec3;
+        lineEnd: Vec3;
+        distance: number;
+        subtype: string;
+      }
+    | undefined;
+  let bestDistance = snapThreshold;
+
+  for (const targetPart of nearestParts) {
+    const targetFaces = getPartFaces(targetPart, targetPart.position);
+    for (const dragFace of dragFaces) {
+      for (const targetFace of targetFaces) {
+        if (!areFacesSnapCompatible(dragFace, targetFace, snapThreshold)) continue;
+
+        const centerDelta = subVec(targetFace.center, dragFace.center);
+        const planeDistance = dotVec(centerDelta, targetFace.normal);
+        const absPlaneDistance = Math.abs(planeDistance);
+        if (absPlaneDistance > snapThreshold) continue;
+
+        const clearance = Math.min(FACE_SNAP_CLEARANCE, absPlaneDistance * 0.5);
+        const correctedPlaneDistance = planeDistance - Math.sign(planeDistance || 1) * clearance;
+        const dragOnTargetPlane = addScaledVec(dragFace.center, targetFace.normal, correctedPlaneDistance);
+        const planarOffset = subVec(dragOnTargetPlane, targetFace.center);
+        const u = dotVec(planarOffset, targetFace.tangent1);
+        const v = dotVec(planarOffset, targetFace.tangent2);
+
+        for (const anchor of anchors) {
+          const uTarget = (anchor.f - 0.5) * 2 * targetFace.half1;
+          const du = uTarget - u;
+          const candidateDistanceU = Math.hypot(absPlaneDistance, du);
+          if (candidateDistanceU < bestDistance) {
+            const tangentialDelta = mulVec(targetFace.tangent1, du);
+            const normalDelta = mulVec(targetFace.normal, correctedPlaneDistance);
+            const delta = addVec(normalDelta, tangentialDelta);
+            const lineEnd = addVec(
+              targetFace.center,
+              addVec(mulVec(targetFace.tangent1, uTarget), mulVec(targetFace.tangent2, v))
+            );
+            bestDistance = candidateDistanceU;
+            best = {
+              delta,
+              lineStart: dragFace.center,
+              lineEnd,
+              distance: candidateDistanceU,
+              subtype: anchor.subtype
+            };
+          }
+
+          const vTarget = (anchor.f - 0.5) * 2 * targetFace.half2;
+          const dv = vTarget - v;
+          const candidateDistanceV = Math.hypot(absPlaneDistance, dv);
+          if (candidateDistanceV < bestDistance) {
+            const tangentialDelta = mulVec(targetFace.tangent2, dv);
+            const normalDelta = mulVec(targetFace.normal, correctedPlaneDistance);
+            const delta = addVec(normalDelta, tangentialDelta);
+            const lineEnd = addVec(
+              targetFace.center,
+              addVec(mulVec(targetFace.tangent1, u), mulVec(targetFace.tangent2, vTarget))
+            );
+            bestDistance = candidateDistanceV;
+            best = {
+              delta,
+              lineStart: dragFace.center,
+              lineEnd,
+              distance: candidateDistanceV,
+              subtype: anchor.subtype
+            };
+          }
+        }
+
+        for (const cornerU of [0, 1] as const) {
+          for (const cornerV of [0, 1] as const) {
+            const uTarget = (cornerU - 0.5) * 2 * targetFace.half1;
+            const vTarget = (cornerV - 0.5) * 2 * targetFace.half2;
+            const du = uTarget - u;
+            const dv = vTarget - v;
+            const candidateDistance = Math.hypot(absPlaneDistance, du, dv);
+            if (candidateDistance >= bestDistance) continue;
+            const tangentialDelta = addVec(mulVec(targetFace.tangent1, du), mulVec(targetFace.tangent2, dv));
+            const normalDelta = mulVec(targetFace.normal, correctedPlaneDistance);
+            const delta = addVec(normalDelta, tangentialDelta);
+            const lineEnd = addVec(
+              targetFace.center,
+              addVec(mulVec(targetFace.tangent1, uTarget), mulVec(targetFace.tangent2, vTarget))
+            );
+            bestDistance = candidateDistance;
+            best = {
+              delta,
+              lineStart: dragFace.center,
+              lineEnd,
+              distance: candidateDistance,
+              subtype: 'corner-anchor'
+            };
+          }
+        }
+      }
+    }
+  }
+
+  if (!best) {
+    return {
+      adjustedPosition: currentPosition,
+      snappedX: false,
+      snappedY: false,
+      snappedZ: false,
+      snapLines: [],
+      closestDistance: undefined
+    };
+  }
+
+  const adjustedPosition = {
+    x: currentPosition.x + best.delta.x,
+    y: currentPosition.y + best.delta.y,
+    z: currentPosition.z + best.delta.z
+  };
+  const snappedX = Math.abs(best.delta.x) > 1e-5;
+  const snappedY = Math.abs(best.delta.y) > 1e-5;
+  const snappedZ = Math.abs(best.delta.z) > 1e-5;
+  const axis = dominantAxisFromDelta(best.delta);
+
+  return {
+    adjustedPosition,
+    snappedX,
+    snappedY,
+    snappedZ,
+    snapLines: withSnapFamily(
+      [
+        {
+          axis,
+          type: 'center',
+          start: best.lineStart,
+          end: best.lineEnd,
+          snapValue: axis === 'x' ? best.lineEnd.x : axis === 'y' ? best.lineEnd.y : best.lineEnd.z
+        }
+      ],
+      'surface-fraction',
+      best.subtype
+    ),
     closestDistance: best.distance
   };
 }
@@ -2481,6 +2851,8 @@ function createFaceSnapLine(
       return {
         axis: 'x',
         type: 'face',
+        family: 'face',
+        state: 'winner',
         start: { x: position, y: minY, z: avgZ },
         end: { x: position, y: maxY, z: avgZ },
         snapValue: position
@@ -2494,6 +2866,8 @@ function createFaceSnapLine(
       return {
         axis: 'y',
         type: 'face',
+        family: 'face',
+        state: 'winner',
         start: { x: minX, y: position, z: avgZ },
         end: { x: maxX, y: position, z: avgZ },
         snapValue: position
@@ -2508,6 +2882,8 @@ function createFaceSnapLine(
       return {
         axis: 'z',
         type: 'face',
+        family: 'face',
+        state: 'winner',
         start: { x: minX, y: avgY, z: position },
         end: { x: maxX, y: avgY, z: position },
         snapValue: position

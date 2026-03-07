@@ -6,6 +6,9 @@ describe('snapPriority', () => {
   it('uses descending precedence order from guide to axis', () => {
     expect(SNAP_STAGE_PRIORITIES.guide).toBeGreaterThan(SNAP_STAGE_PRIORITIES.origin);
     expect(SNAP_STAGE_PRIORITIES.origin).toBeGreaterThan(SNAP_STAGE_PRIORITIES.face);
+    expect(SNAP_STAGE_PRIORITIES.face).toBeGreaterThan(SNAP_STAGE_PRIORITIES.surface);
+    expect(SNAP_STAGE_PRIORITIES.surface).toBeGreaterThan(SNAP_STAGE_PRIORITIES.fraction);
+    expect(SNAP_STAGE_PRIORITIES.fraction).toBeGreaterThan(SNAP_STAGE_PRIORITIES.feature);
     expect(SNAP_STAGE_PRIORITIES.face).toBeGreaterThan(SNAP_STAGE_PRIORITIES.feature);
     expect(SNAP_STAGE_PRIORITIES.feature).toBeGreaterThan(SNAP_STAGE_PRIORITIES.axis);
   });
@@ -13,6 +16,7 @@ describe('snapPriority', () => {
   it('blocks lower-priority stages once an axis winner exists', () => {
     expect(shouldUseSnapStage('guide', 'axis')).toBe(false);
     expect(shouldUseSnapStage('origin', 'face')).toBe(false);
+    expect(shouldUseSnapStage('surface', 'surface')).toBe(false);
     expect(shouldUseSnapStage('axis', 'guide')).toBe(true);
   });
 

@@ -16,7 +16,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { useUIStore } from '../../store/uiStore';
 import { getPartGroupContext } from './partClickHandler';
-import { setRightClickTarget } from './workspaceUtils';
+import { markPartPointerInteraction, setRightClickTarget } from './workspaceUtils';
 import { useGroupDrag } from './useGroupDrag';
 
 // Pre-allocated objects at module scope — reused every update, zero GC pressure
@@ -27,9 +27,6 @@ const _scale = new THREE.Vector3();
 const _outlineScale = new THREE.Vector3();
 const _euler = new THREE.Euler();
 const _color = new THREE.Color();
-
-// Shared unit cube geometry — all instances share this single geometry
-const unitBoxGeometry = new THREE.BoxGeometry(1, 1, 1);
 
 interface InstancedPartsProps {
   parts: Part[];
@@ -215,7 +212,15 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
   const handlePointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       e.stopPropagation();
+      markPartPointerInteraction();
       if (e.instanceId === undefined) return;
+
+      // Defensive reset: if a stale drag state survived a prior interaction, clear it
+      // before processing a fresh pointer down selection/drag path.
+      const sel = useSelectionStore.getState();
+      sel.clearDragIntent();
+      sel.setDraggingPartId(null);
+      sel.setActiveDragDelta(null);
 
       const partId = partIdByIndex[e.instanceId];
       if (!partId) return;
@@ -377,7 +382,7 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
       <instancedMesh
         key={meshCapacity}
         ref={meshRef}
-        args={[unitBoxGeometry, undefined, meshCapacity]}
+        args={[undefined, undefined, meshCapacity]}
         frustumCulled={false}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
@@ -385,12 +390,17 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
         onPointerMove={handlePointerMove}
         onPointerOut={handlePointerOut}
       >
+        <boxGeometry args={[1, 1, 1]} />
         {displayMode === 'solid' && <meshStandardMaterial />}
         {displayMode === 'wireframe' && <meshBasicMaterial wireframe />}
         {displayMode === 'translucent' && <meshStandardMaterial transparent opacity={0.55} depthWrite={false} />}
+        {displayMode !== 'solid' && displayMode !== 'wireframe' && displayMode !== 'translucent' && (
+          <meshStandardMaterial />
+        )}
       </instancedMesh>
       {displayMode === 'translucent' && (
-        <instancedMesh ref={outlineMeshRef} args={[unitBoxGeometry, undefined, meshCapacity]} frustumCulled={false}>
+        <instancedMesh ref={outlineMeshRef} args={[undefined, undefined, meshCapacity]} frustumCulled={false}>
+          <boxGeometry args={[1, 1, 1]} />
           <meshBasicMaterial
             color="#1f2937"
             side={THREE.BackSide}

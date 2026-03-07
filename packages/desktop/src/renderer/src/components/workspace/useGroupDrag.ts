@@ -19,6 +19,8 @@ import {
   detectOriginSnaps,
   createOriginSnapLine,
   detectFaceSnaps,
+  detectSurfaceAnchorSnaps,
+  detectFractionalFaceSnaps,
   detectFeatureSnaps,
   detectSnaps,
   type PartBounds
@@ -30,6 +32,8 @@ import { isOrbitControls } from './workspaceUtils';
 import type { Part } from '../../types';
 import { createAxisSnapWinners } from '../../utils/snapPriority';
 import { applyGroupAxisCandidate } from '../../utils/groupDragSnapArbitration';
+import { dragDebug } from '../../utils/dragDebug';
+import { isAxisAlignedRotation } from '../../utils/rotation';
 
 // Pre-allocated objects — reused every frame, zero GC pressure
 const _plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -38,9 +42,13 @@ const _vec2 = new THREE.Vector2();
 const _intersection = new THREE.Vector3();
 const _forward = new THREE.Vector3();
 const _normal = new THREE.Vector3();
-const _axisX = new THREE.Vector3(1, 0, 0);
-const _axisY = new THREE.Vector3(0, 1, 0);
-const _axisZ = new THREE.Vector3(0, 0, 1);
+const _groupEuler = new THREE.Euler();
+const _groupQuat = new THREE.Quaternion();
+const _groupLocalX = new THREE.Vector3();
+const _groupLocalY = new THREE.Vector3();
+const _groupLocalZ = new THREE.Vector3();
+const _groupProjected = new THREE.Vector3();
+const _groupProjectedV = new THREE.Vector3();
 
 const DRAG_THRESHOLD_SQ = 25; // 5px squared
 
@@ -78,6 +86,8 @@ export function useGroupDrag(
   const movingPartIdsRef = useRef<Set<string>>(new Set());
   const wasSnappedByPartsRef = useRef<{ x: boolean; y: boolean; z: boolean }>({ x: false, y: false, z: false });
   const planeAxesRef = useRef<{ x: boolean; y: boolean; z: boolean }>({ x: true, y: false, z: true });
+  const planeBasisURef = useRef(new THREE.Vector3(1, 0, 0));
+  const planeBasisVRef = useRef(new THREE.Vector3(0, 0, 1));
   const lastDragPosRef = useRef<{ x: number; y: number; z: number } | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
 
@@ -96,23 +106,55 @@ export function useGroupDrag(
   );
 
   const setupDragPlane = useCallback(
-    (anchorPos: THREE.Vector3) => {
+    (anchorPos: THREE.Vector3, orientationQuat?: THREE.Quaternion) => {
       _forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
+      _normal.copy(_forward).normalize();
+      _plane.setFromNormalAndCoplanarPoint(_normal, anchorPos);
 
-      const dotX = Math.abs(_forward.dot(_axisX));
-      const dotY = Math.abs(_forward.dot(_axisY));
-      const dotZ = Math.abs(_forward.dot(_axisZ));
+      const quat = orientationQuat ?? _groupQuat.identity();
+      const localAxes = [
+        _groupLocalX.set(1, 0, 0).applyQuaternion(quat).normalize(),
+        _groupLocalY.set(0, 1, 0).applyQuaternion(quat).normalize(),
+        _groupLocalZ.set(0, 0, 1).applyQuaternion(quat).normalize()
+      ];
 
-      if (dotZ >= dotX && dotZ >= dotY) {
-        _plane.setFromNormalAndCoplanarPoint(_normal.set(0, 0, 1), anchorPos);
-        planeAxesRef.current = { x: true, y: true, z: false };
-      } else if (dotX >= dotY) {
-        _plane.setFromNormalAndCoplanarPoint(_normal.set(1, 0, 0), anchorPos);
-        planeAxesRef.current = { x: false, y: true, z: true };
+      const projected = localAxes
+        .map((axis) => {
+          _groupProjected.copy(axis).addScaledVector(_normal, -axis.dot(_normal));
+          const len = _groupProjected.length();
+          if (len < 1e-5) return null;
+          _groupProjected.multiplyScalar(1 / len);
+          return { axis: _groupProjected.clone(), score: len };
+        })
+        .filter((entry): entry is { axis: THREE.Vector3; score: number } => entry !== null)
+        .sort((a, b) => b.score - a.score);
+
+      if (projected.length >= 2) {
+        planeBasisURef.current.copy(projected[0].axis);
+        let second = projected[1].axis;
+        for (let i = 1; i < projected.length; i += 1) {
+          if (Math.abs(projected[i].axis.dot(planeBasisURef.current)) < 0.98) {
+            second = projected[i].axis;
+            break;
+          }
+        }
+        _groupProjectedV.copy(second);
+        const uv = _groupProjectedV.dot(planeBasisURef.current);
+        _groupProjectedV.addScaledVector(planeBasisURef.current, -uv);
+        if (_groupProjectedV.lengthSq() < 1e-8) {
+          _groupProjectedV.copy(_normal).cross(planeBasisURef.current);
+        }
+        planeBasisVRef.current.copy(_groupProjectedV).normalize();
       } else {
-        _plane.setFromNormalAndCoplanarPoint(_normal.set(0, 1, 0), anchorPos);
-        planeAxesRef.current = { x: true, y: false, z: true };
+        planeBasisURef.current.set(1, 0, 0);
+        if (Math.abs(planeBasisURef.current.dot(_normal)) > 0.95) {
+          planeBasisURef.current.set(0, 1, 0);
+        }
+        planeBasisURef.current.addScaledVector(_normal, -planeBasisURef.current.dot(_normal)).normalize();
+        planeBasisVRef.current.copy(_normal).cross(planeBasisURef.current).normalize();
       }
+
+      planeAxesRef.current = { x: true, y: true, z: true };
     },
     [camera]
   );
@@ -160,8 +202,34 @@ export function useGroupDrag(
           movingPartIdsRef.current = partIdsToInclude;
           wasSnappedByPartsRef.current = { x: false, y: false, z: false };
           startPointRef.current = startPoint;
-
-          setupDragPlane(anchor);
+          dragDebug('groupDrag:start', {
+            anchorPos: { x: anchor.x, y: anchor.y, z: anchor.z },
+            movingPartIds: [...partIdsToInclude]
+          });
+          let closestPart: Part | null = null;
+          let bestDistSq = Number.POSITIVE_INFINITY;
+          for (const gp of groupParts) {
+            const dxp = gp.position.x - worldPoint.x;
+            const dyp = gp.position.y - worldPoint.y;
+            const dzp = gp.position.z - worldPoint.z;
+            const distSq = dxp * dxp + dyp * dyp + dzp * dzp;
+            if (distSq < bestDistSq) {
+              bestDistSq = distSq;
+              closestPart = gp;
+            }
+          }
+          if (closestPart) {
+            _groupEuler.set(
+              (closestPart.rotation.x * Math.PI) / 180,
+              (closestPart.rotation.y * Math.PI) / 180,
+              (closestPart.rotation.z * Math.PI) / 180,
+              'XYZ'
+            );
+            _groupQuat.setFromEuler(_groupEuler);
+            setupDragPlane(anchor, _groupQuat);
+          } else {
+            setupDragPlane(anchor);
+          }
         }
 
         // Drag active — process move
@@ -176,21 +244,37 @@ export function useGroupDrag(
           if (!currentPoint) return;
 
           const axes = planeAxesRef.current;
-          const deltaX = currentPoint.x - startPointRef.current.x;
-          const deltaY = currentPoint.y - startPointRef.current.y;
-          const deltaZ = currentPoint.z - startPointRef.current.z;
+          const delta = _groupProjected.copy(currentPoint).sub(startPointRef.current);
+          let uAmount = delta.dot(planeBasisURef.current);
+          let vAmount = delta.dot(planeBasisVRef.current);
 
-          let newX = axes.x ? anchorPosRef.current.x + deltaX : anchorPosRef.current.x;
-          let newY = axes.y ? anchorPosRef.current.y + deltaY : anchorPosRef.current.y;
-          let newZ = axes.z ? anchorPosRef.current.z + deltaZ : anchorPosRef.current.z;
+          const settings = useAppSettingsStore.getState().settings;
+          if (settings.liveGridSnap) {
+            // Quantize along virtual group drag basis instead of world axes.
+            uAmount = snapToGrid(uAmount);
+            vAmount = snapToGrid(vAmount);
+          }
+
+          const projectedDelta = _groupProjectedV
+            .copy(planeBasisURef.current)
+            .multiplyScalar(uAmount)
+            .add(_groupProjected.copy(planeBasisVRef.current).multiplyScalar(vAmount));
+
+          let newX = anchorPosRef.current.x + projectedDelta.x;
+          let newY = anchorPosRef.current.y + projectedDelta.y;
+          let newZ = anchorPosRef.current.z + projectedDelta.z;
 
           // Grid snap
-          const { liveGridSnap, snapSensitivity, snapToOrigin } = useAppSettingsStore.getState().settings;
-          if (liveGridSnap) {
-            newX = snapToGrid(newX);
-            newZ = snapToGrid(newZ);
-            newY = snapToGrid(newY);
-          }
+          const {
+            snapSensitivity,
+            snapToOrigin,
+            enableSurfaceAnchors,
+            enableFractionalAnchors,
+            enableGoldenRatioAnchors,
+            enableFeatureAnchors,
+            enableAxisLegacySnaps
+          } = settings;
+          // Grid snap already applied in virtual basis space above.
 
           const { parts, snapGuides } = useProjectStore.getState();
           const movingIds = movingPartIdsRef.current;
@@ -376,90 +460,130 @@ export function useGroupDrag(
               );
             }
 
+            const applyAdvancedResult = (
+              stage: 'surface' | 'fraction' | 'feature',
+              result: ReturnType<typeof detectFeatureSnaps>
+            ) => {
+              if (axes.x && result.snappedX) {
+                applyGroupAxisCandidate(
+                  'x',
+                  stage,
+                  workingDelta,
+                  result.adjustedPosition.x - anchorPosRef.current.x,
+                  axisSnapWinners,
+                  snapLines,
+                  result.snapLines.filter((line) => line.axis === 'x')
+                );
+              }
+              if (axes.y && result.snappedY) {
+                applyGroupAxisCandidate(
+                  'y',
+                  stage,
+                  workingDelta,
+                  result.adjustedPosition.y - anchorPosRef.current.y,
+                  axisSnapWinners,
+                  snapLines,
+                  result.snapLines.filter((line) => line.axis === 'y')
+                );
+              }
+              if (axes.z && result.snappedZ) {
+                applyGroupAxisCandidate(
+                  'z',
+                  stage,
+                  workingDelta,
+                  result.adjustedPosition.z - anchorPosRef.current.z,
+                  axisSnapWinners,
+                  snapLines,
+                  result.snapLines.filter((line) => line.axis === 'z')
+                );
+              }
+            };
+
             const featureProxyPosition = {
               x: anchorPosRef.current.x + workingDelta.x,
               y: anchorPosRef.current.y + workingDelta.y,
               z: anchorPosRef.current.z + workingDelta.z
             };
-            const featureSnapResult = detectFeatureSnaps(
-              proxyPart,
-              featureProxyPosition,
-              parts,
-              [...movingIds],
-              snapThreshold
-            );
-            if (axes.x && featureSnapResult.snappedX) {
-              applyGroupAxisCandidate(
-                'x',
-                'feature',
-                workingDelta,
-                featureSnapResult.adjustedPosition.x - anchorPosRef.current.x,
-                axisSnapWinners,
-                snapLines,
-                featureSnapResult.snapLines.filter((line) => line.axis === 'x')
+            if (enableSurfaceAnchors ?? true) {
+              const surfaceSnapResult = detectSurfaceAnchorSnaps(
+                proxyPart,
+                featureProxyPosition,
+                parts,
+                [...movingIds],
+                snapThreshold
               );
+              applyAdvancedResult('surface', surfaceSnapResult);
             }
-            if (axes.y && featureSnapResult.snappedY) {
-              applyGroupAxisCandidate(
-                'y',
-                'feature',
-                workingDelta,
-                featureSnapResult.adjustedPosition.y - anchorPosRef.current.y,
-                axisSnapWinners,
-                snapLines,
-                featureSnapResult.snapLines.filter((line) => line.axis === 'y')
+            if ((enableFractionalAnchors ?? true) || (enableGoldenRatioAnchors ?? false)) {
+              const fractionSnapResult = detectFractionalFaceSnaps(
+                proxyPart,
+                featureProxyPosition,
+                parts,
+                [...movingIds],
+                snapThreshold,
+                enableGoldenRatioAnchors ?? false
               );
+              applyAdvancedResult('fraction', fractionSnapResult);
             }
-            if (axes.z && featureSnapResult.snappedZ) {
-              applyGroupAxisCandidate(
-                'z',
-                'feature',
-                workingDelta,
-                featureSnapResult.adjustedPosition.z - anchorPosRef.current.z,
-                axisSnapWinners,
-                snapLines,
-                featureSnapResult.snapLines.filter((line) => line.axis === 'z')
+            if (enableFeatureAnchors ?? true) {
+              const featureSnapResult = detectFeatureSnaps(
+                proxyPart,
+                featureProxyPosition,
+                parts,
+                [...movingIds],
+                snapThreshold
               );
+              applyAdvancedResult('feature', featureSnapResult);
             }
 
-            const axisProxyPosition = {
-              x: anchorPosRef.current.x + workingDelta.x,
-              y: anchorPosRef.current.y + workingDelta.y,
-              z: anchorPosRef.current.z + workingDelta.z
-            };
-            const snapResult = detectSnaps(proxyPart, axisProxyPosition, parts, [...movingIds], snapThreshold);
-            if (axes.x && snapResult.snappedX) {
-              applyGroupAxisCandidate(
-                'x',
-                'axis',
-                workingDelta,
-                snapResult.adjustedPosition.x - anchorPosRef.current.x,
-                axisSnapWinners,
-                snapLines,
-                snapResult.snapLines.filter((line) => line.axis === 'x')
+            const axisAlignedContext =
+              [...movingIds].every((id) => {
+                const p = parts.find((part) => part.id === id);
+                return p ? isAxisAlignedRotation(p.rotation) : true;
+              }) &&
+              parts.every((candidate) =>
+                movingIds.has(candidate.id) ? true : isAxisAlignedRotation(candidate.rotation)
               );
-            }
-            if (axes.y && snapResult.snappedY) {
-              applyGroupAxisCandidate(
-                'y',
-                'axis',
-                workingDelta,
-                snapResult.adjustedPosition.y - anchorPosRef.current.y,
-                axisSnapWinners,
-                snapLines,
-                snapResult.snapLines.filter((line) => line.axis === 'y')
-              );
-            }
-            if (axes.z && snapResult.snappedZ) {
-              applyGroupAxisCandidate(
-                'z',
-                'axis',
-                workingDelta,
-                snapResult.adjustedPosition.z - anchorPosRef.current.z,
-                axisSnapWinners,
-                snapLines,
-                snapResult.snapLines.filter((line) => line.axis === 'z')
-              );
+            if ((enableAxisLegacySnaps ?? true) && axisAlignedContext) {
+              const axisProxyPosition = {
+                x: anchorPosRef.current.x + workingDelta.x,
+                y: anchorPosRef.current.y + workingDelta.y,
+                z: anchorPosRef.current.z + workingDelta.z
+              };
+              const snapResult = detectSnaps(proxyPart, axisProxyPosition, parts, [...movingIds], snapThreshold);
+              if (axes.x && snapResult.snappedX) {
+                applyGroupAxisCandidate(
+                  'x',
+                  'axis',
+                  workingDelta,
+                  snapResult.adjustedPosition.x - anchorPosRef.current.x,
+                  axisSnapWinners,
+                  snapLines,
+                  snapResult.snapLines.filter((line) => line.axis === 'x')
+                );
+              }
+              if (axes.y && snapResult.snappedY) {
+                applyGroupAxisCandidate(
+                  'y',
+                  'axis',
+                  workingDelta,
+                  snapResult.adjustedPosition.y - anchorPosRef.current.y,
+                  axisSnapWinners,
+                  snapLines,
+                  snapResult.snapLines.filter((line) => line.axis === 'y')
+                );
+              }
+              if (axes.z && snapResult.snappedZ) {
+                applyGroupAxisCandidate(
+                  'z',
+                  'axis',
+                  workingDelta,
+                  snapResult.adjustedPosition.z - anchorPosRef.current.z,
+                  axisSnapWinners,
+                  snapLines,
+                  snapResult.snapLines.filter((line) => line.axis === 'z')
+                );
+              }
             }
 
             newX = anchorPosRef.current.x + workingDelta.x;
@@ -492,6 +616,17 @@ export function useGroupDrag(
           }
 
           proposedDelta.y += maxYAdjustment;
+          if (snapLines.length > 0) {
+            dragDebug('groupDrag:move:snaps', {
+              delta: proposedDelta,
+              snapLineTypes: snapLines.map((l) => l.type),
+              snappedAxes: {
+                x: snapLines.some((line) => line.axis === 'x'),
+                y: snapLines.some((line) => line.axis === 'y'),
+                z: snapLines.some((line) => line.axis === 'z')
+              }
+            });
+          }
           useSnapStore.getState().setActiveSnapLines(snapLines);
           wasSnappedByPartsRef.current = {
             x: snapLines.some((line) => line.axis === 'x'),
@@ -512,19 +647,20 @@ export function useGroupDrag(
         }
 
         const finalDelta = { ...lastDragPosRef.current };
-        const wasSnappedByParts = wasSnappedByPartsRef.current;
-
-        // Grid snap the final delta
         const anchor = anchorPosRef.current!;
-        let newX = wasSnappedByParts.x ? anchor.x + finalDelta.x : snapToGrid(anchor.x + finalDelta.x);
+        let newX = anchor.x + finalDelta.x;
         let newY = anchor.y + finalDelta.y;
-        let newZ = wasSnappedByParts.z ? anchor.z + finalDelta.z : snapToGrid(anchor.z + finalDelta.z);
+        let newZ = anchor.z + finalDelta.z;
 
         const snappedDelta = {
           x: newX - anchor.x,
           y: newY - anchor.y,
           z: newZ - anchor.z
         };
+        dragDebug('groupDrag:release:start', {
+          finalDelta,
+          snappedDelta
+        });
 
         // Ground constraint on final position
         const { selectedGroupIds, selectedPartIds } = useSelectionStore.getState();
@@ -549,17 +685,28 @@ export function useGroupDrag(
         if (stockConstraints.preventOverlap) {
           const safeDelta = resolveSafeTranslationDelta(parts, partIds, snappedDelta);
           if (!safeDelta) {
-            // Revert — don't commit the move
-            cleanup();
-            return;
+            dragDebug('groupDrag:release:noSafeDelta', {
+              requestedDelta: snappedDelta,
+              fallbackToPreviewDelta: finalDelta
+            });
+            // Keep the last previewed drag delta instead of reverting.
+            snappedDelta.x = finalDelta.x;
+            snappedDelta.y = finalDelta.y;
+            snappedDelta.z = finalDelta.z;
+          } else {
+            dragDebug('groupDrag:release:safeDelta', {
+              requestedDelta: snappedDelta,
+              safeDelta
+            });
+            snappedDelta.x = safeDelta.x;
+            snappedDelta.y = safeDelta.y;
+            snappedDelta.z = safeDelta.z;
           }
-          snappedDelta.x = safeDelta.x;
-          snappedDelta.y = safeDelta.y;
-          snappedDelta.z = safeDelta.z;
         }
 
         // Commit the move
         const moveSelectedParts = useProjectStore.getState().moveSelectedParts;
+        dragDebug('groupDrag:release:commit', { snappedDelta });
         moveSelectedParts(snappedDelta);
         cleanup();
       };

@@ -30,6 +30,7 @@ import { useLicenseStore } from './licenseStore';
 import { rotateAroundWorldAxis } from '../utils/rotation';
 import { getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
+import { dragDebug } from '../utils/dragDebug';
 
 interface ProjectState {
   // Project data
@@ -218,6 +219,15 @@ export async function generateThumbnail(): Promise<string | null> {
     return await thumbnailGeneratorHandler();
   }
   return null;
+}
+
+let _lastOverlapClampToastAt = 0;
+const OVERLAP_CLAMP_TOAST_COOLDOWN_MS = 1500;
+function maybeShowOverlapClampToast() {
+  const now = performance.now();
+  if (now - _lastOverlapClampToastAt < OVERLAP_CLAMP_TOAST_COOLDOWN_MS) return;
+  _lastOverlapClampToastAt = now;
+  useUIStore.getState().showToast('Movement limited to avoid overlap', 'info', { duration: 1200 });
 }
 
 /** Find which group a part belongs to, or null if ungrouped. */
@@ -488,14 +498,53 @@ export const useProjectStore = create<ProjectState>()(
           const existingPart = state.parts.find((p) => p.id === id);
           if (!existingPart) return state;
 
-          const nextPart = { ...existingPart, ...updates };
+          let nextPart = { ...existingPart, ...updates };
           const affectsOverlap =
             updates.position !== undefined || updates.rotation !== undefined || updates.ignoreOverlap !== undefined;
 
           if (state.stockConstraints.preventOverlap && affectsOverlap) {
             const transformed = new Map<string, Part>([[id, nextPart]]);
             if (wouldTransformedPartsOverlap(state.parts, transformed)) {
-              return state;
+              const isPositionOnlyMove =
+                updates.position !== undefined && updates.rotation === undefined && updates.ignoreOverlap === undefined;
+              if (!isPositionOnlyMove) {
+                dragDebug('projectStore:updatePart:rejectOverlap', { id, updates });
+                return state;
+              }
+
+              const proposedDelta = {
+                x: updates.position!.x - existingPart.position.x,
+                y: updates.position!.y - existingPart.position.y,
+                z: updates.position!.z - existingPart.position.z
+              };
+              const safeDelta = resolveSafeTranslationDelta(state.parts, new Set([id]), proposedDelta);
+              if (!safeDelta) {
+                dragDebug('projectStore:updatePart:noSafeDelta', { id, proposedDelta });
+                return state;
+              }
+
+              nextPart = {
+                ...nextPart,
+                position: {
+                  x: existingPart.position.x + safeDelta.x,
+                  y: existingPart.position.y + safeDelta.y,
+                  z: existingPart.position.z + safeDelta.z
+                }
+              };
+              if (
+                Math.abs(safeDelta.x - proposedDelta.x) > 1e-6 ||
+                Math.abs(safeDelta.y - proposedDelta.y) > 1e-6 ||
+                Math.abs(safeDelta.z - proposedDelta.z) > 1e-6
+              ) {
+                maybeShowOverlapClampToast();
+              }
+              dragDebug('projectStore:updatePart:clampedToSafeDelta', {
+                id,
+                requestedPosition: updates.position,
+                appliedPosition: nextPart.position,
+                proposedDelta,
+                safeDelta
+              });
             }
           }
 
@@ -611,7 +660,25 @@ export const useProjectStore = create<ProjectState>()(
         let effectiveDelta = delta;
         if (stockConstraints.preventOverlap) {
           const safeDelta = resolveSafeTranslationDelta(parts, partIdsToMove, delta);
-          if (!safeDelta) return;
+          if (!safeDelta) {
+            dragDebug('projectStore:moveSelectedParts:noSafeDelta', {
+              requestedDelta: delta,
+              partIds: [...partIdsToMove]
+            });
+            return;
+          }
+          if (
+            Math.abs(safeDelta.x - delta.x) > 1e-6 ||
+            Math.abs(safeDelta.y - delta.y) > 1e-6 ||
+            Math.abs(safeDelta.z - delta.z) > 1e-6
+          ) {
+            maybeShowOverlapClampToast();
+            dragDebug('projectStore:moveSelectedParts:clampedToSafeDelta', {
+              requestedDelta: delta,
+              safeDelta,
+              partIds: [...partIdsToMove]
+            });
+          }
           effectiveDelta = safeDelta;
         }
 

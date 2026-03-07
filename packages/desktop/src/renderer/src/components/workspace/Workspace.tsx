@@ -23,6 +23,7 @@ import { SceneBackground } from './SceneBackground';
 import { SnapAlignmentLines } from './SnapAlignmentLines';
 import { SnapGuides } from './SnapGuides';
 import { ThumbnailCaptureHandler } from './ThumbnailCaptureHandler';
+import { installDragDebugTools } from '../../utils/dragDebug';
 import {
   LIGHTING_PRESETS,
   isOrbitControls,
@@ -57,6 +58,10 @@ function useEffectiveTheme(): 'light' | 'dark' {
 }
 
 export function Workspace() {
+  useEffect(() => {
+    installDragDebugTools();
+  }, []);
+
   const debugSelection = (...args: unknown[]) => {
     if (import.meta.env.DEV) {
       const entry = { ts: new Date().toISOString(), args };
@@ -87,6 +92,8 @@ export function Workspace() {
   const pendingCameraRestore = useCameraStore((s) => s.pendingCameraRestore);
   const clearPendingCameraRestore = useCameraStore((s) => s.clearPendingCameraRestore);
   const editingGroupId = useSelectionStore((s) => s.editingGroupId);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
+  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const exitGroup = useSelectionStore((s) => s.exitGroup);
   const lightingMode = useAppSettingsStore((s) => s.settings.lightingMode) || 'default';
   const brightnessMultiplier = useAppSettingsStore((s) => s.settings.brightnessMultiplier) ?? 1.0;
@@ -178,13 +185,34 @@ export function Workspace() {
   const lastBackgroundDoubleClickAt = useRef(0);
   // Track right-click position and time to distinguish right-click vs right-drag (for pan)
   const rightClickDownPos = useRef<{ x: number; y: number; time: number } | null>(null);
-  const leftClickDownPos = useRef<{ x: number; y: number; time: number } | null>(null);
+  const leftClickDownPos = useRef<{
+    x: number;
+    y: number;
+    time: number;
+    selectedPartIds: string[];
+    selectedGroupIds: string[];
+  } | null>(null);
   const lastSelectionApplyAtRef = useRef(0);
+  const previousSelectionKeyRef = useRef<string | null>(null);
   const lastPartDrillAtRef = useRef(0);
 
   const markSelectionApplied = () => {
     lastSelectionApplyAtRef.current = performance.now();
   };
+
+  // Part/instanced handlers can update selection before this workspace-level
+  // native fallback runs; track those updates so fallback does not overwrite them.
+  useEffect(() => {
+    const key = `${[...selectedPartIds].sort().join(',')}|${[...selectedGroupIds].sort().join(',')}`;
+    if (previousSelectionKeyRef.current === null) {
+      previousSelectionKeyRef.current = key;
+      return;
+    }
+    if (previousSelectionKeyRef.current !== key) {
+      previousSelectionKeyRef.current = key;
+      markSelectionApplied();
+    }
+  }, [selectedPartIds, selectedGroupIds]);
 
   const getHitPartId = useCallback(
     (clientX: number, clientY: number): string | null => {
@@ -398,7 +426,34 @@ export function Workspace() {
 
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button === 0) {
-        leftClickDownPos.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+        const selectionState = useSelectionStore.getState();
+        leftClickDownPos.current = {
+          x: e.clientX,
+          y: e.clientY,
+          time: Date.now(),
+          selectedPartIds: [...selectionState.selectedPartIds].sort(),
+          selectedGroupIds: [...selectionState.selectedGroupIds].sort()
+        };
+
+        const hitPartId = getHitPartId(e.clientX, e.clientY);
+        if (hitPartId) {
+          const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+          const isModKey = isMac ? e.metaKey : e.ctrlKey;
+          const isAdditiveSelection = e.shiftKey || isModKey;
+
+          if (!isAdditiveSelection) {
+            const projectState = useProjectStore.getState();
+            const hitContext = getPartGroupContext(hitPartId, projectState.groupMembers, selectionState.editingGroupId);
+            const isAlreadySelected =
+              selectionState.selectedPartIds.includes(hitPartId) ||
+              hitContext.ancestorGroupIds.some((groupId) => selectionState.selectedGroupIds.includes(groupId));
+
+            if (!isAlreadySelected) {
+              debugSelection('native:mousedown:left:apply-selection', { x: e.clientX, y: e.clientY, hitPartId });
+              selectFromPartHit(hitPartId, false);
+            }
+          }
+        }
       }
       if (e.button === 2) {
         rightClickDownPos.current = { x: e.clientX, y: e.clientY, time: Date.now() };
@@ -431,19 +486,30 @@ export function Workspace() {
 
     const handleMouseUp = (e: MouseEvent) => {
       if (e.button === 0 && leftClickDownPos.current) {
+        const currentSelection = useSelectionStore.getState();
+        const startSelection = leftClickDownPos.current;
+        const currentPartIds = [...currentSelection.selectedPartIds].sort();
+        const currentGroupIds = [...currentSelection.selectedGroupIds].sort();
+        const selectionChangedDuringClick =
+          startSelection.selectedPartIds.length !== currentPartIds.length ||
+          startSelection.selectedGroupIds.length !== currentGroupIds.length ||
+          startSelection.selectedPartIds.some((id, idx) => id !== currentPartIds[idx]) ||
+          startSelection.selectedGroupIds.some((id, idx) => id !== currentGroupIds[idx]);
+
         const dx = e.clientX - leftClickDownPos.current.x;
         const dy = e.clientY - leftClickDownPos.current.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         const elapsed = Date.now() - leftClickDownPos.current.time;
 
         // Native selection fallback for simple clicks.
-        if (distance <= 5 && elapsed <= 500) {
+        if (distance <= 5 && elapsed <= 500 && !selectionChangedDuringClick) {
           const hitPartId = getHitPartId(e.clientX, e.clientY);
           debugSelection('native:mouseup:left', {
             x: e.clientX,
             y: e.clientY,
             distance,
             elapsed,
+            selectionChangedDuringClick,
             hitPartId
           });
           if (hitPartId) {
@@ -453,6 +519,13 @@ export function Workspace() {
           } else {
             debugSelection('native:mouseup:left:no-part-hit');
           }
+        } else if (distance <= 5 && elapsed <= 500 && selectionChangedDuringClick) {
+          debugSelection('native:mouseup:left:skipped-selection-already-changed', {
+            x: e.clientX,
+            y: e.clientY,
+            distance,
+            elapsed
+          });
         }
         leftClickDownPos.current = null;
       }

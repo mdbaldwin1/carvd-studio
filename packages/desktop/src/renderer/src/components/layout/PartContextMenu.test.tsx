@@ -66,7 +66,9 @@ beforeEach(() => {
     clearReferences: vi.fn()
   });
   useUIStore.setState({
-    openSaveAssemblyModal: vi.fn()
+    openSaveAssemblyModal: vi.fn(),
+    requestDeleteParts: vi.fn(),
+    requestDeleteGroups: vi.fn()
   });
   useLicenseStore.setState({
     licenseMode: 'licensed'
@@ -262,15 +264,15 @@ describe('PartContextMenu', () => {
     expect(screen.getByText('Delete')).toBeInTheDocument();
   });
 
-  it('calls deleteSelectedParts when Delete clicked', () => {
+  it('calls requestDeleteParts when Delete clicked', () => {
     const onClose = vi.fn();
     render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={onClose} />);
     fireEvent.click(screen.getByText('Delete'));
-    expect(useProjectStore.getState().deleteSelectedParts).toHaveBeenCalled();
+    expect(useUIStore.getState().requestDeleteParts).toHaveBeenCalledWith(['p1']);
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('deletes groups recursively when groups selected', () => {
+  it('calls requestDeleteGroups when groups selected', () => {
     useProjectStore.setState({
       groups: [group1],
       groupMembers: [{ groupId: 'g1', memberId: 'p1', memberType: 'part' }],
@@ -280,7 +282,7 @@ describe('PartContextMenu', () => {
     const onClose = vi.fn();
     render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={onClose} />);
     fireEvent.click(screen.getByText('Delete'));
-    expect(useProjectStore.getState().deleteGroup).toHaveBeenCalledWith('g1', 'recursive');
+    expect(useUIStore.getState().requestDeleteGroups).toHaveBeenCalledWith(['g1']);
     expect(onClose).toHaveBeenCalled();
   });
 

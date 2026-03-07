@@ -66,7 +66,25 @@ describe('overlapPolicy', () => {
     expect(wouldTranslationCauseOverlap(parts, movingIds, safe!)).toBe(false);
   });
 
-  it('preserves tangential slide while clamping penetrating axis', () => {
+  it('preserves movement direction when a substantial safe fraction exists', () => {
+    const moving = createPart({ id: 'moving', length: 4, width: 4, position: { x: 0, y: 0.5, z: 0 } });
+    const target = createPart({ id: 'target', length: 4, width: 4, position: { x: 12, y: 0.5, z: 0 } });
+    const parts = [moving, target];
+    const movingIds = new Set<string>(['moving']);
+
+    const proposed = { x: 12, y: 0, z: 3 };
+    expect(wouldTranslationCauseOverlap(parts, movingIds, proposed)).toBe(true);
+
+    const safe = resolveSafeTranslationDelta(parts, movingIds, proposed);
+    expect(safe).not.toBeNull();
+    expect(safe!.x).toBeGreaterThan(0);
+    expect(safe!.z).toBeGreaterThan(0);
+    // Direction-preserving solve should keep x:z close to the proposed ratio (12:3).
+    expect(safe!.z / safe!.x).toBeCloseTo(3 / 12, 2);
+    expect(wouldTranslationCauseOverlap(parts, movingIds, safe!)).toBe(false);
+  });
+
+  it('returns null instead of redirecting to another axis when blocked', () => {
     const target = createPart({
       id: 'target',
       length: 8,
@@ -88,9 +106,6 @@ describe('overlapPolicy', () => {
     expect(wouldTranslationCauseOverlap(parts, movingIds, proposed)).toBe(true);
 
     const safe = resolveSafeTranslationDelta(parts, movingIds, proposed);
-    expect(safe).not.toBeNull();
-    expect(safe!.x).toBeGreaterThan(2.5);
-    expect(safe!.y).toBeGreaterThan(-0.3);
-    expect(wouldTranslationCauseOverlap(parts, movingIds, safe!)).toBe(false);
+    expect(safe).toBeNull();
   });
 });

@@ -33,6 +33,7 @@ interface UIState {
 
   // Pending delete confirmation
   pendingDeletePartIds: string[] | null;
+  pendingDeleteGroupIds: string[] | null;
 
   // Modal visibility
   cutListModalOpen: boolean;
@@ -64,7 +65,9 @@ interface UIState {
 
   // Actions - Delete confirmation
   requestDeleteParts: (ids: string[]) => void;
+  requestDeleteGroups: (ids: string[]) => void;
   cancelDeleteParts: () => void;
+  cancelDeleteGroups: () => void;
 
   // Actions - Modals
   openCutListModal: () => void;
@@ -83,6 +86,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   contextMenu: null,
   toast: null,
   pendingDeletePartIds: null,
+  pendingDeleteGroupIds: null,
   cutListModalOpen: false,
   saveAssemblyModalOpen: false,
   selectedSidebarStockId: null,
@@ -161,7 +165,12 @@ export const useUIStore = create<UIState>((set, get) => ({
     if (ids.length === 0) return;
     set({ pendingDeletePartIds: ids });
   },
+  requestDeleteGroups: (ids) => {
+    if (ids.length === 0) return;
+    set({ pendingDeleteGroupIds: ids });
+  },
   cancelDeleteParts: () => set({ pendingDeletePartIds: null }),
+  cancelDeleteGroups: () => set({ pendingDeleteGroupIds: null }),
 
   openCutListModal: () => set({ cutListModalOpen: true }),
   closeCutListModal: () => set({ cutListModalOpen: false }),

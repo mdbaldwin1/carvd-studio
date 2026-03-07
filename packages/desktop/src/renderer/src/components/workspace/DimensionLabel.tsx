@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import labelFontUrl from '../../assets/fonts/NotoSans-Variable.ttf?url';
 
+const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
+
 // Blueprint-style dimension label component
 export const DimensionLabel = memo(
   function DimensionLabel({
@@ -93,11 +95,12 @@ export const DimensionLabel = memo(
     return (
       <group>
         {/* Main dimension line with centered gap at the label */}
-        <Line points={[offsetStart, lineLeftEnd]} color={color} lineWidth={1.5} />
-        <Line points={[lineRightStart, offsetEnd]} color={color} lineWidth={1.5} />
+        <Line raycast={NOOP_RAYCAST} points={[offsetStart, lineLeftEnd]} color={color} lineWidth={1.5} />
+        <Line raycast={NOOP_RAYCAST} points={[lineRightStart, offsetEnd]} color={color} lineWidth={1.5} />
 
         {/* Start extension line */}
         <Line
+          raycast={NOOP_RAYCAST}
           points={[
             [start[0] + offsetVec[0] * 0.2, start[1] + offsetVec[1] * 0.2, start[2] + offsetVec[2] * 0.2],
             [
@@ -112,6 +115,7 @@ export const DimensionLabel = memo(
 
         {/* End extension line */}
         <Line
+          raycast={NOOP_RAYCAST}
           points={[
             [end[0] + offsetVec[0] * 0.2, end[1] + offsetVec[1] * 0.2, end[2] + offsetVec[2] * 0.2],
             [offsetEnd[0] + offsetVec[0] * 0.15, offsetEnd[1] + offsetVec[1] * 0.15, offsetEnd[2] + offsetVec[2] * 0.15]
@@ -122,6 +126,7 @@ export const DimensionLabel = memo(
 
         {/* Start tick mark (perpendicular to dimension line) */}
         <Line
+          raycast={NOOP_RAYCAST}
           points={[
             [
               offsetStart[0] - normalizedTick[0],
@@ -136,6 +141,7 @@ export const DimensionLabel = memo(
 
         {/* End tick mark */}
         <Line
+          raycast={NOOP_RAYCAST}
           points={[
             [offsetEnd[0] - normalizedTick[0], offsetEnd[1] - normalizedTick[1], offsetEnd[2] - normalizedTick[2]],
             [offsetEnd[0] + normalizedTick[0], offsetEnd[1] + normalizedTick[1], offsetEnd[2] + normalizedTick[2]]
@@ -147,6 +153,7 @@ export const DimensionLabel = memo(
         {/* Dimension text (3D mesh so depth/occlusion is consistent with scene geometry) */}
         <Suspense fallback={null}>
           <Text
+            raycast={NOOP_RAYCAST}
             position={labelPos}
             quaternion={textQuaternion}
             font={labelFontUrl}
