@@ -74,6 +74,10 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
     return `Dado on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} wide × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
   }
 
+  if (feature.cutType === 'stopped_dado') {
+    return `Stopped Dado on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} run × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+  }
+
   if (feature.cutType === 'rabbet') {
     const shoulderWidth =
       feature.target.type === 'edge' && (feature.target.edge.includes('front') || feature.target.edge.includes('back'))
@@ -84,6 +88,10 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
 
   if (feature.cutType === 'groove') {
     return `Groove on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.width, units)} wide × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+  }
+
+  if (feature.cutType === 'stopped_groove') {
+    return `Stopped Groove on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} run × ${formatMeasurementWithUnit(feature.parameters.size.width, units)} wide × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
   }
 
   if (feature.cutType === 'mortise') {

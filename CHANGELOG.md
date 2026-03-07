@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Stopped dado and stopped groove operations in Part Cuts (POC)** — Added `Stopped Dado` and `Stopped Groove` as constrained face-channel operations with partial-run semantics, blind-depth validation, 3D preview support, and fabrication summaries inside the dedicated cuts workspace.
 - **Groove and mortise operations in Part Cuts (POC)** — Added `Groove` and `Mortise` as constrained woodworking operations in the dedicated cuts workspace, reusing the current blank-plus-operations framework and constrained face-cut preview path.
 - **Dado and rabbet operations in Part Cuts (POC)** — Added `Dado` and `Rabbet` as woodworking-facing operation types in the dedicated cuts workspace, with constrained validation and preview behavior that fits the existing blank-plus-operations model.
 - **Dedicated part cuts workspace shell (POC)** — Added a focused `Part Cuts` editing mode with header integration, save/discard exit handling, a dedicated three-pane workspace shell, and `Edit Cuts` entry points from both single-part Properties and the part context menu.

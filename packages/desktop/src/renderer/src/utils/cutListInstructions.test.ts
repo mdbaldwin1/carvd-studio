@@ -177,4 +177,64 @@ describe('cutListInstructions', () => {
     expect(lines[0]).toContain('Groove on Top Face');
     expect(lines[1]).toContain('Mortise on Top Face');
   });
+
+  it('uses woodworking labels for stopped dado and stopped groove fabrication lines', () => {
+    const part = createTestPart({
+      width: 8,
+      features: [
+        {
+          id: 'feature-1',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'stopped_dado',
+          parameters: {
+            size: { length: 3, width: 8 },
+            depthMode: 'blind',
+            depth: 0.375
+          },
+          placement: { x: 4, z: 0 }
+        },
+        {
+          id: 'feature-2',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'bottom_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'stopped_groove',
+          parameters: {
+            size: { length: 5, width: 0.25 },
+            depthMode: 'blind',
+            depth: 0.25
+          },
+          placement: { x: 3, z: 1 }
+        }
+      ]
+    });
+
+    const lines = getInstructionFabricationLines(
+      {
+        partId: part.id,
+        partName: part.name,
+        cutLength: part.length,
+        cutWidth: part.width,
+        thickness: part.thickness,
+        stockId: 'stock-1',
+        stockName: 'Maple',
+        grainSensitive: false,
+        grainDirection: 'length',
+        isGlueUp: false,
+        quantity: 1,
+        features: part.features,
+        notes: ''
+      },
+      'imperial'
+    );
+
+    expect(lines[0]).toContain('Stopped Dado on Top Face');
+    expect(lines[1]).toContain('Stopped Groove on Bottom Face');
+  });
 });

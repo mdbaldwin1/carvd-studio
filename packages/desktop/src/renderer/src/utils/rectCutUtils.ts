@@ -89,6 +89,27 @@ export function getResolvedRectCutFeature(
     };
   }
 
+  if (feature.cutType === 'stopped_dado') {
+    const targetFace = feature.target.type === 'face' ? feature.target.face : 'top_face';
+    return {
+      ...cloneRectCutFeature(feature),
+      target: { type: 'face', face: targetFace },
+      parameters: {
+        ...feature.parameters,
+        size: {
+          length: feature.parameters.size.length,
+          width: part.width
+        },
+        depthMode: 'blind',
+        depth: feature.parameters.depth
+      },
+      placement: {
+        x: feature.placement.x,
+        z: 0
+      }
+    };
+  }
+
   if (feature.cutType === 'rabbet') {
     const targetEdge = feature.target.type === 'edge' ? feature.target.edge : 'top_front_edge';
     const runLength = getRabbetRunLength(targetEdge, part);
@@ -134,6 +155,20 @@ export function getResolvedRectCutFeature(
     };
   }
 
+  if (feature.cutType === 'stopped_groove') {
+    const target =
+      feature.target.type === 'face' ? { type: 'face' as const, face: feature.target.face } : feature.target;
+    return {
+      ...cloneRectCutFeature(feature),
+      target,
+      parameters: {
+        ...feature.parameters,
+        depthMode: 'blind',
+        depth: feature.parameters.depth
+      }
+    };
+  }
+
   if (feature.cutType === 'mortise') {
     const target =
       feature.target.type === 'face' ? { type: 'face' as const, face: feature.target.face } : feature.target;
@@ -167,7 +202,9 @@ export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPrevie
   if (
     feature.cutType === 'cutout' ||
     feature.cutType === 'dado' ||
+    feature.cutType === 'stopped_dado' ||
     feature.cutType === 'groove' ||
+    feature.cutType === 'stopped_groove' ||
     feature.cutType === 'mortise'
   ) {
     if (feature.target.type !== 'face' || !isTopOrBottomFace(feature.target.face)) {
@@ -176,11 +213,15 @@ export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPrevie
         reason:
           feature.cutType === 'dado'
             ? 'POC dado previews currently support only top and bottom face targets.'
-            : feature.cutType === 'groove'
-              ? 'POC groove previews currently support only top and bottom face targets.'
-              : feature.cutType === 'mortise'
-                ? 'POC mortise previews currently support only top and bottom face targets.'
-                : 'POC cutout previews currently support only top and bottom face targets.'
+            : feature.cutType === 'stopped_dado'
+              ? 'POC stopped dado previews currently support only top and bottom face targets.'
+              : feature.cutType === 'groove'
+                ? 'POC groove previews currently support only top and bottom face targets.'
+                : feature.cutType === 'stopped_groove'
+                  ? 'POC stopped groove previews currently support only top and bottom face targets.'
+                  : feature.cutType === 'mortise'
+                    ? 'POC mortise previews currently support only top and bottom face targets.'
+                    : 'POC cutout previews currently support only top and bottom face targets.'
       };
     }
     return { supported: true };
@@ -239,6 +280,15 @@ export function validateRectCutFeature(
     if (resolvedFeature.placement.x + sizeLength > part.length) return 'Dado width runs past the blank.';
   }
 
+  if (resolvedFeature.cutType === 'stopped_dado') {
+    if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
+      return 'Stopped dado must target the top or bottom face.';
+    }
+    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Stopped dado must use blind depth in this POC.';
+    if (resolvedFeature.placement.x < 0) return 'Stopped dado offset cannot be negative.';
+    if (resolvedFeature.placement.x + sizeLength > part.length) return 'Stopped dado run extends past the blank.';
+  }
+
   if (resolvedFeature.cutType === 'groove') {
     if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
       return 'Groove must target the top or bottom face.';
@@ -248,6 +298,18 @@ export function validateRectCutFeature(
     if (resolvedFeature.placement.z + sizeWidth > part.width) return 'Groove width runs past the blank.';
   }
 
+  if (resolvedFeature.cutType === 'stopped_groove') {
+    if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
+      return 'Stopped groove must target the top or bottom face.';
+    }
+    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Stopped groove must use blind depth in this POC.';
+    if (resolvedFeature.placement.x < 0 || resolvedFeature.placement.z < 0) {
+      return 'Stopped groove offsets cannot be negative.';
+    }
+    if (resolvedFeature.placement.x + sizeLength > part.length) return 'Stopped groove run extends past the blank.';
+    if (resolvedFeature.placement.z + sizeWidth > part.width) return 'Stopped groove width runs past the blank.';
+  }
+
   if (resolvedFeature.cutType === 'mortise') {
     if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
       return 'Mortise must target the top or bottom face.';
@@ -255,7 +317,11 @@ export function validateRectCutFeature(
     if (resolvedFeature.parameters.depthMode !== 'blind') return 'Mortise must use blind depth in this POC.';
   }
 
-  if (resolvedFeature.cutType === 'cutout' || resolvedFeature.cutType === 'mortise') {
+  if (
+    resolvedFeature.cutType === 'cutout' ||
+    resolvedFeature.cutType === 'stopped_groove' ||
+    resolvedFeature.cutType === 'mortise'
+  ) {
     if (resolvedFeature.placement.x < 0 || resolvedFeature.placement.z < 0) return 'Cutout offsets cannot be negative.';
     if (resolvedFeature.placement.x + sizeLength > part.length) return 'Cutout length runs past the blank.';
     if (resolvedFeature.placement.z + sizeWidth > part.width) return 'Cutout width runs past the blank.';

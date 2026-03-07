@@ -103,10 +103,14 @@ function getOperationPresetLabel(preset: OperationPreset): string {
       return 'Cutout';
     case 'dado':
       return 'Dado';
+    case 'stopped_dado':
+      return 'Stopped Dado';
     case 'rabbet':
       return 'Rabbet';
     case 'groove':
       return 'Groove';
+    case 'stopped_groove':
+      return 'Stopped Groove';
     case 'mortise':
       return 'Mortise';
   }
@@ -124,10 +128,14 @@ function getOperationPresetHint(preset: OperationPreset): string {
       return 'Place a rectangular pocket or opening on one face.';
     case 'dado':
       return 'Cut a full-width channel across the top or bottom face.';
+    case 'stopped_dado':
+      return 'Cut a blind channel across the board width with a limited run along the blank.';
     case 'rabbet':
       return 'Cut a full-run edge recess along one supported edge.';
     case 'groove':
       return 'Cut a full-length face groove with blind depth.';
+    case 'stopped_groove':
+      return 'Cut a blind face groove with a limited run and explicit placement.';
     case 'mortise':
       return 'Cut a blind face pocket for joinery layout.';
   }
@@ -181,7 +189,11 @@ export function PartCutsWorkspace({
   }, [draft]);
 
   const availableFaceTargets = useMemo(() => {
-    if (!draft || draft.mode !== 'rect_cut' || !['cutout', 'dado', 'groove', 'mortise'].includes(draft.cutType)) {
+    if (
+      !draft ||
+      draft.mode !== 'rect_cut' ||
+      !['cutout', 'dado', 'stopped_dado', 'groove', 'stopped_groove', 'mortise'].includes(draft.cutType)
+    ) {
       return FACE_TARGETS;
     }
     return TOP_BOTTOM_FACE_TARGETS;
@@ -384,8 +396,10 @@ export function PartCutsWorkspace({
                     'edge_notch',
                     'cutout',
                     'dado',
+                    'stopped_dado',
                     'rabbet',
                     'groove',
+                    'stopped_groove',
                     'mortise'
                   ] as OperationPreset[]
                 ).map((preset) => (
@@ -843,8 +857,10 @@ export function PartCutsWorkspace({
                               <option value="edge_notch">Edge Notch</option>
                               <option value="cutout">Cutout</option>
                               <option value="dado">Dado</option>
+                              <option value="stopped_dado">Stopped Dado</option>
                               <option value="rabbet">Rabbet</option>
                               <option value="groove">Groove</option>
+                              <option value="stopped_groove">Stopped Groove</option>
                               <option value="mortise">Mortise</option>
                             </Select>
                           </div>
@@ -855,8 +871,10 @@ export function PartCutsWorkspace({
                               value={inspectorDraft.depthMode}
                               disabled={
                                 inspectorDraft.cutType === 'dado' ||
+                                inspectorDraft.cutType === 'stopped_dado' ||
                                 inspectorDraft.cutType === 'rabbet' ||
                                 inspectorDraft.cutType === 'groove' ||
+                                inspectorDraft.cutType === 'stopped_groove' ||
                                 inspectorDraft.cutType === 'mortise'
                               }
                               onChange={(e) =>
@@ -883,6 +901,12 @@ export function PartCutsWorkspace({
                             depth.
                           </p>
                         )}
+                        {inspectorDraft.cutType === 'stopped_dado' && (
+                          <p className="text-[11px] text-text-muted">
+                            Stopped dado spans full board width, but the run is limited along the blank. Set run length,
+                            start offset, and blind depth.
+                          </p>
+                        )}
                         {inspectorDraft.cutType === 'rabbet' && (
                           <p className="text-[11px] text-text-muted">
                             Rabbet runs full edge length in this POC. Set the shoulder width and blind depth.
@@ -892,6 +916,12 @@ export function PartCutsWorkspace({
                           <p className="text-[11px] text-text-muted">
                             Groove runs full board length in this POC. Set the groove width across the board and the
                             blind depth.
+                          </p>
+                        )}
+                        {inspectorDraft.cutType === 'stopped_groove' && (
+                          <p className="text-[11px] text-text-muted">
+                            Stopped groove uses a limited run and explicit placement. Set run length, groove width,
+                            offsets, and blind depth.
                           </p>
                         )}
                         {inspectorDraft.cutType === 'mortise' && (
@@ -905,17 +935,21 @@ export function PartCutsWorkspace({
                             <Label>
                               {inspectorDraft.cutType === 'rabbet'
                                 ? 'Shoulder Width'
-                                : inspectorDraft.cutType === 'groove'
-                                  ? 'Full Board Run'
-                                  : 'Run Along Blank'}
+                                : inspectorDraft.cutType === 'stopped_dado'
+                                  ? 'Run Along Blank'
+                                  : inspectorDraft.cutType === 'groove'
+                                    ? 'Full Board Run'
+                                    : 'Run Along Blank'}
                             </Label>
                             <FractionInput
                               value={
                                 inspectorDraft.cutType === 'rabbet'
                                   ? (rabbetShoulderValue ?? 0.5)
-                                  : inspectorDraft.cutType === 'groove'
-                                    ? part.length
-                                    : inspectorDraft.sizeLength
+                                  : inspectorDraft.cutType === 'stopped_dado'
+                                    ? inspectorDraft.sizeLength
+                                    : inspectorDraft.cutType === 'groove'
+                                      ? part.length
+                                      : inspectorDraft.sizeLength
                               }
                               onChange={(value) =>
                                 setDraft(
@@ -925,9 +959,11 @@ export function PartCutsWorkspace({
                                         sizeLength: rabbetRunsAlongLength ? inspectorDraft.sizeLength : value,
                                         sizeWidth: rabbetRunsAlongLength ? value : inspectorDraft.sizeWidth
                                       }
-                                    : inspectorDraft.cutType === 'groove'
-                                      ? { ...inspectorDraft, sizeLength: part.length }
-                                      : { ...inspectorDraft, sizeLength: value }
+                                    : inspectorDraft.cutType === 'stopped_dado'
+                                      ? { ...inspectorDraft, sizeLength: value }
+                                      : inspectorDraft.cutType === 'groove'
+                                        ? { ...inspectorDraft, sizeLength: part.length }
+                                        : { ...inspectorDraft, sizeLength: value }
                                 )
                               }
                               min={0.125}
@@ -938,35 +974,45 @@ export function PartCutsWorkspace({
                             <Label>
                               {inspectorDraft.cutType === 'dado'
                                 ? 'Across Board Width'
-                                : inspectorDraft.cutType === 'rabbet'
-                                  ? 'Full Edge Run'
-                                  : inspectorDraft.cutType === 'groove'
-                                    ? 'Groove Width'
-                                    : 'Cross-Cut Width'}
+                                : inspectorDraft.cutType === 'stopped_dado'
+                                  ? 'Across Board Width'
+                                  : inspectorDraft.cutType === 'rabbet'
+                                    ? 'Full Edge Run'
+                                    : inspectorDraft.cutType === 'groove'
+                                      ? 'Groove Width'
+                                      : 'Cross-Cut Width'}
                             </Label>
                             <FractionInput
                               value={
                                 inspectorDraft.cutType === 'dado'
                                   ? part.width
-                                  : inspectorDraft.cutType === 'rabbet'
-                                    ? rabbetRunsAlongLength
-                                      ? part.length
-                                      : part.width
-                                    : inspectorDraft.cutType === 'groove'
-                                      ? inspectorDraft.sizeWidth
-                                      : inspectorDraft.sizeWidth
+                                  : inspectorDraft.cutType === 'stopped_dado'
+                                    ? part.width
+                                    : inspectorDraft.cutType === 'rabbet'
+                                      ? rabbetRunsAlongLength
+                                        ? part.length
+                                        : part.width
+                                      : inspectorDraft.cutType === 'groove'
+                                        ? inspectorDraft.sizeWidth
+                                        : inspectorDraft.sizeWidth
                               }
                               onChange={(value) => setDraft({ ...inspectorDraft, sizeWidth: value })}
                               min={0.125}
-                              disabled={inspectorDraft.cutType === 'dado' || inspectorDraft.cutType === 'rabbet'}
+                              disabled={
+                                inspectorDraft.cutType === 'dado' ||
+                                inspectorDraft.cutType === 'stopped_dado' ||
+                                inspectorDraft.cutType === 'rabbet'
+                              }
                             />
-                            {['dado', 'rabbet', 'groove'].includes(inspectorDraft.cutType) && (
+                            {['dado', 'stopped_dado', 'rabbet', 'groove'].includes(inspectorDraft.cutType) && (
                               <p className="mt-1 text-[11px] text-text-muted">
                                 {inspectorDraft.cutType === 'dado'
                                   ? 'Derived from blank width.'
-                                  : inspectorDraft.cutType === 'rabbet'
-                                    ? 'Runs full edge length in this POC.'
-                                    : 'Derived from blank length.'}
+                                  : inspectorDraft.cutType === 'stopped_dado'
+                                    ? 'Derived from blank width.'
+                                    : inspectorDraft.cutType === 'rabbet'
+                                      ? 'Runs full edge length in this POC.'
+                                      : 'Derived from blank length.'}
                               </p>
                             )}
                           </div>
@@ -1002,6 +1048,7 @@ export function PartCutsWorkspace({
                                   value={inspectorDraft.placementZ}
                                   onChange={(value) => setDraft({ ...inspectorDraft, placementZ: value })}
                                   min={0}
+                                  disabled={inspectorDraft.cutType === 'stopped_dado'}
                                 />
                               </div>
                             </div>
@@ -1012,6 +1059,8 @@ export function PartCutsWorkspace({
                             inspectorDraft.cutType === 'edge_notch' ||
                             inspectorDraft.cutType === 'rabbet' ||
                             inspectorDraft.cutType === 'groove' ||
+                            inspectorDraft.cutType === 'stopped_dado' ||
+                            inspectorDraft.cutType === 'stopped_groove' ||
                             inspectorDraft.cutType === 'mortise') && (
                             <p className="text-[11px] text-text-muted">
                               Blind previews currently support top or bottom targets so the recess direction stays

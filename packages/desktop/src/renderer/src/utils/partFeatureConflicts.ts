@@ -28,7 +28,12 @@ function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length'
   const sizeLength = resolvedFeature.parameters.size.length;
   const sizeWidth = resolvedFeature.parameters.size.width;
 
-  if (resolvedFeature.cutType === 'cutout' || resolvedFeature.cutType === 'dado') {
+  if (
+    resolvedFeature.cutType === 'cutout' ||
+    resolvedFeature.cutType === 'dado' ||
+    resolvedFeature.cutType === 'stopped_dado' ||
+    resolvedFeature.cutType === 'stopped_groove'
+  ) {
     return {
       minX: resolvedFeature.placement.x,
       maxX: resolvedFeature.placement.x + sizeLength,

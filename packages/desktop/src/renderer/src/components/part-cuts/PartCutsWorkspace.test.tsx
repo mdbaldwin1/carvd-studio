@@ -375,6 +375,32 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByText(/Mortise is a blind face pocket/i)).toBeInTheDocument();
   });
 
+  it('supports stopped dado and stopped groove operation types in the inspector', () => {
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Panel', width: 8 })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={vi.fn()}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={false}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Stopped Dado'));
+    expect(screen.getByText(/Stopped dado spans full board width/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Removal Type'), { target: { value: 'stopped_groove' } });
+    expect(screen.getByText(/Stopped groove uses a limited run/i)).toBeInTheDocument();
+  });
+
   it('uses explicit part-level footer actions', () => {
     render(
       <PartCutsWorkspace

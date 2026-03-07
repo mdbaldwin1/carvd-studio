@@ -49,8 +49,10 @@ export type OperationPreset =
   | 'edge_notch'
   | 'cutout'
   | 'dado'
+  | 'stopped_dado'
   | 'rabbet'
   | 'groove'
+  | 'stopped_groove'
   | 'mortise';
 
 export type FeatureDraft =
@@ -113,10 +115,33 @@ export function buildDraftFromPreset(preset: OperationPreset): FeatureDraft {
     faceTarget: preset === 'dado' ? 'top_face' : 'top_face',
     edgeTarget: preset === 'rabbet' ? 'top_front_edge' : 'top_front_edge',
     cornerTarget: 'front_bottom_left_corner',
-    sizeLength: preset === 'dado' ? 0.75 : preset === 'rabbet' ? 0.5 : preset === 'mortise' ? 2 : 0.75,
-    sizeWidth: preset === 'rabbet' || preset === 'groove' ? 0.5 : 0.75,
+    sizeLength:
+      preset === 'dado'
+        ? 0.75
+        : preset === 'stopped_dado'
+          ? 3
+          : preset === 'rabbet'
+            ? 0.5
+            : preset === 'mortise'
+              ? 2
+              : preset === 'stopped_groove'
+                ? 4
+                : 0.75,
+    sizeWidth:
+      preset === 'rabbet' || preset === 'groove' || preset === 'stopped_groove'
+        ? 0.5
+        : preset === 'stopped_dado'
+          ? 0
+          : 0.75,
     depthMode:
-      preset === 'dado' || preset === 'rabbet' || preset === 'groove' || preset === 'mortise' ? 'blind' : 'through',
+      preset === 'dado' ||
+      preset === 'stopped_dado' ||
+      preset === 'rabbet' ||
+      preset === 'groove' ||
+      preset === 'stopped_groove' ||
+      preset === 'mortise'
+        ? 'blind'
+        : 'through',
     depth: 0.25,
     placementX: 0,
     placementZ: 0
@@ -205,7 +230,10 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
     },
     placement: {
       x: draft.cutType === 'corner_notch' ? 0 : draft.placementX,
-      z: draft.cutType === 'corner_notch' || draft.cutType === 'dado' ? 0 : draft.placementZ
+      z:
+        draft.cutType === 'corner_notch' || draft.cutType === 'dado' || draft.cutType === 'stopped_dado'
+          ? 0
+          : draft.placementZ
     }
   };
 }
@@ -264,10 +292,14 @@ export function getPresetLabel(preset: OperationPreset): string {
       return 'Cutout';
     case 'dado':
       return 'Dado';
+    case 'stopped_dado':
+      return 'Stopped Dado';
     case 'rabbet':
       return 'Rabbet';
     case 'groove':
       return 'Groove';
+    case 'stopped_groove':
+      return 'Stopped Groove';
     case 'mortise':
       return 'Mortise';
   }
@@ -285,10 +317,14 @@ export function getPresetHint(preset: OperationPreset): string {
       return 'Place a rectangular pocket or opening on one face.';
     case 'dado':
       return 'Cut a full-width channel across the top or bottom face.';
+    case 'stopped_dado':
+      return 'Cut a blind channel across the board width with a limited run along the blank.';
     case 'rabbet':
       return 'Cut a full-run edge recess along one supported edge.';
     case 'groove':
       return 'Cut a full-length face groove with blind depth.';
+    case 'stopped_groove':
+      return 'Cut a blind face groove with a limited run and explicit placement.';
     case 'mortise':
       return 'Cut a blind face pocket for loose-tenon or joinery layout.';
   }
