@@ -186,6 +186,8 @@ Supported kinds:
 - rectangular cutout
 - dado
 - rabbet
+- groove
+- mortise
 
 ### Out of scope for the POC
 
