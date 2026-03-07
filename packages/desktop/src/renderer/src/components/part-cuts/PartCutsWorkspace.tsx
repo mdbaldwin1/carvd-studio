@@ -205,6 +205,7 @@ export function PartCutsWorkspace({
 
   const featureConflicts = useMemo(() => getPartFeatureConflicts(draftFeatures, part), [draftFeatures, part]);
   const hasBlockingFeatureConflicts = featureConflicts.some((conflict) => conflict.severity === 'error');
+  const enabledOperationCount = draftFeatures.filter((feature) => feature.enabled).length;
   const conflictsByFeatureId = useMemo(() => {
     const map = new Map<string, typeof featureConflicts>();
     for (const conflict of featureConflicts) {
@@ -331,6 +332,38 @@ export function PartCutsWorkspace({
               <div>{getBlankSizeLabel(part, units)}</div>
             </div>
 
+            <div className="rounded-md border border-border bg-bg px-3 py-3 text-sm">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">Draft Status</div>
+              <div className="grid grid-cols-2 gap-2 text-text-secondary">
+                <div>
+                  <span className="font-medium text-text">{draftFeatures.length}</span> operations
+                </div>
+                <div>
+                  <span className="font-medium text-text">{enabledOperationCount}</span> enabled
+                </div>
+                <div>
+                  <span className={`font-medium ${hasBlockingFeatureConflicts ? 'text-danger' : 'text-text'}`}>
+                    {hasBlockingFeatureConflicts ? 'Blocking conflicts' : 'No blocking conflicts'}
+                  </span>
+                </div>
+                <div>
+                  <span className={`font-medium ${hasUnsavedChanges ? 'text-accent' : 'text-text'}`}>
+                    {hasUnsavedChanges ? 'Unsaved changes' : 'Saved draft'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border border-border bg-bg px-3 py-3 text-sm text-text-secondary">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">Workflow</div>
+              <ol className="space-y-1 text-[12px]">
+                <li>1. Add or pick an operation.</li>
+                <li>2. Pick the target in the preview or inspector.</li>
+                <li>3. Enter the measurements for that operation.</li>
+                <li>4. Save the operation, then save the part.</li>
+              </ol>
+            </div>
+
             <div className="space-y-2">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Add Operation</div>
               <div className="grid grid-cols-2 gap-2">
@@ -402,6 +435,7 @@ export function PartCutsWorkspace({
                             <div className="text-sm font-medium text-text">
                               {index + 1}. {feature.label?.trim() || getFeatureTargetLabel(feature)}
                             </div>
+                            {isSelected && <Badge className="bg-accent text-accent-foreground">Selected</Badge>}
                             {!feature.enabled && (
                               <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
                                 Disabled
@@ -412,6 +446,9 @@ export function PartCutsWorkspace({
                                 {conflicts.some((conflict) => conflict.severity === 'error') ? 'Conflict' : 'Warning'}
                               </Badge>
                             )}
+                          </div>
+                          <div className="mb-1 text-[11px] text-text-muted">
+                            Target: {getFeatureTargetLabel(feature)}
                           </div>
                           <div className="text-xs leading-relaxed text-text-secondary">
                             {getFeatureSummary(feature, units)}
@@ -521,6 +558,15 @@ export function PartCutsWorkspace({
                   <div className="text-sm text-text">
                     Selected target: <span className="font-medium">{selectedTargetLabel}</span>
                   </div>
+                </div>
+              )}
+
+              {selectedFeatureSummary && (
+                <div className="rounded-md border border-border bg-bg px-3 py-3 text-left">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
+                    Selected Operation
+                  </div>
+                  <div className="text-sm text-text">{selectedFeatureSummary}</div>
                 </div>
               )}
 
@@ -856,6 +902,13 @@ export function PartCutsWorkspace({
                               min={0.125}
                               disabled={inspectorDraft.cutType === 'dado' || inspectorDraft.cutType === 'rabbet'}
                             />
+                            {(inspectorDraft.cutType === 'dado' || inspectorDraft.cutType === 'rabbet') && (
+                              <p className="mt-1 text-[11px] text-text-muted">
+                                {inspectorDraft.cutType === 'dado'
+                                  ? 'Derived from blank width.'
+                                  : 'Runs full edge length in this POC.'}
+                              </p>
+                            )}
                           </div>
                         </div>
 
@@ -930,10 +983,10 @@ export function PartCutsWorkspace({
                 Reset
               </Button>
               <Button variant="outline" onClick={onExit} className="ml-auto">
-                {hasUnsavedChanges ? 'Cancel' : 'Exit'}
+                Back to Project
               </Button>
               <Button onClick={onSave} disabled={!hasUnsavedChanges || hasBlockingFeatureConflicts}>
-                Save
+                Save Part
               </Button>
             </div>
           </CardContent>

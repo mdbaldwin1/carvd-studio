@@ -223,9 +223,11 @@ describe('PartCutsWorkspace', () => {
       />
     );
 
-    expect(screen.getByText('Selected Operation')).toBeInTheDocument();
+    expect(screen.getAllByText('Selected Operation').length).toBeGreaterThan(0);
     expect(screen.getByText('Inspector Target')).toBeInTheDocument();
     expect(screen.getByText('Same-Part Feedback')).toBeInTheDocument();
+    expect(screen.getByText('Draft Status')).toBeInTheDocument();
+    expect(screen.getByText('Workflow')).toBeInTheDocument();
     expect(screen.getAllByText('Conflict').length).toBeGreaterThan(0);
   });
 
@@ -309,5 +311,28 @@ describe('PartCutsWorkspace', () => {
 
     fireEvent.change(screen.getByLabelText('Removal Type'), { target: { value: 'rabbet' } });
     expect(screen.getByText(/Rabbet runs full edge length/i)).toBeInTheDocument();
+  });
+
+  it('uses explicit part-level footer actions', () => {
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Side' })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={vi.fn()}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Back to Project' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save Part' })).toBeInTheDocument();
   });
 });
