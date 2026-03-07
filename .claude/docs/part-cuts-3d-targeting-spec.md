@@ -14,7 +14,7 @@ As of beads `14.2` and `14.3`, the current branch implements:
 
 Still deferred:
 
-- drag handles for cut dimensions
+- drag handles for cut dimensions beyond the current supported face-based rectangular operations
 - exact triangulated picking for every feature surface
 - richer in-canvas labels and dimension editing
 - multi-part or project-level fabrication editing

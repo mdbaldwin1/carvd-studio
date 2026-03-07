@@ -17,6 +17,7 @@ As of beads `13.2` through `13.5`, the implemented POC behavior is:
 - the workspace trim pass also removes duplicate selection wording, clarifies left-rail naming, and makes the main entry label more explicit
 - the main Properties panel is reduced to a compact cuts summary plus `Edit Cuts`
 - the preview now supports direct 3D target picking for the current POC operations, with inspector/form fallback for verification and difficult camera angles
+- the preview now also exposes direct handles for supported face-based rectangular operations, with inspector fallback for unsupported operation families
 
 Still deferred beyond the current implemented POC:
 
