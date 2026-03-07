@@ -21,6 +21,10 @@ Still deferred beyond the current implemented POC:
 - broader conflict rules beyond the current same-end / overlapping-rect-cut checks
 - additional woodworking operations beyond the current POC feature set
 
+See also:
+
+- `part-cuts-3d-targeting-spec.md` for the direct viewport targeting contract that follows this workspace model
+
 ## Purpose
 
 Define the dedicated `Part Cuts` workspace as the primary authoring surface for fabrication operations on a single part.
