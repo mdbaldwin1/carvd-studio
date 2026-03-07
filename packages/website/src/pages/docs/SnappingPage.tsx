@@ -79,9 +79,9 @@ export default function SnappingPage() {
             <div>
               <p className="font-bold mb-xs">Surface Anchors</p>
               <p className="text-muted">
-                Surface anchor snaps include centerline, midline, and quarterline
-                alignment on compatible faces. This is ideal for quickly finding
-                centered or 25%/75% placements on larger panels.
+                Surface anchor snaps include centerline, midline, and
+                quarterline alignment on compatible faces. This is ideal for
+                quickly finding centered or 25%/75% placements on larger panels.
               </p>
             </div>
             <div>
