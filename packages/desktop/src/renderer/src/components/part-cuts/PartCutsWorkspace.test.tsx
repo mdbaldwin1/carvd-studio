@@ -453,7 +453,9 @@ describe('PartCutsWorkspace', () => {
     fireEvent.click(screen.getByText('Rabbet'));
 
     expect(
-      screen.getByText(/This operation still uses inspector-only adjustments in the current preview-handles POC/i)
+      screen.getByText(
+        /Adjust this operation in the inspector. Direct preview handles are currently available for face pockets and stopped channels/i
+      )
     ).toBeInTheDocument();
   });
 

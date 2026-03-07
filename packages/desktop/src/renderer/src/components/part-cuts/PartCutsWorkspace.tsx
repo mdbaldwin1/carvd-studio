@@ -636,7 +636,8 @@ export function PartCutsWorkspace({
           <CardHeader className="pb-4">
             <CardTitle>Inspector</CardTitle>
             <CardDescription>
-              Edit the selected operation here. The project editor no longer needs to be the primary authoring surface.
+              Edit the selected operation here, verify exact measurements, and fine-tune anything the preview does not
+              adjust directly.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-3">

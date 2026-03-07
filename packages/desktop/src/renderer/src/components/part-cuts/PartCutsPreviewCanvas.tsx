@@ -415,7 +415,8 @@ export function PartCutsPreviewCanvas({
           )}
           {draft && !supportsHandles && (
             <div className="rounded-md border border-border bg-bg px-3 py-3 text-left text-sm text-text-muted">
-              This operation still uses inspector-only adjustments in the current preview-handles POC.
+              Adjust this operation in the inspector. Direct preview handles are currently available for face pockets
+              and stopped channels.
             </div>
           )}
         </div>
@@ -451,7 +452,7 @@ export function PartCutsPreviewCanvas({
         {draft && (
           <div className="rounded-md border border-border/80 bg-bg/90 px-3 py-2 text-left text-xs text-text-muted shadow-sm backdrop-blur">
             {supportsHandles
-              ? 'Click a highlighted target first, then drag the amber handles to move or resize this operation.'
+              ? 'Click a highlighted target first, then drag the preview handles to move or resize this operation.'
               : 'Hover or click a highlighted target to resolve a canonical face, edge, or corner for this operation.'}
           </div>
         )}
