@@ -1,6 +1,10 @@
 import { Edges, OrbitControls } from '@react-three/drei';
-import { Canvas } from '@react-three/fiber';
-import { FeatureDraft, getFeatureDraftTarget } from '@renderer/components/part-features/partFeatureEditorState';
+import { Canvas, ThreeEvent } from '@react-three/fiber';
+import {
+  buildFeatureFromDraft,
+  FeatureDraft,
+  getFeatureDraftTarget
+} from '@renderer/components/part-features/partFeatureEditorState';
 import { Button } from '@renderer/components/ui/button';
 import { CardDescription } from '@renderer/components/ui/card';
 import { Part, PartFeatureTarget } from '@renderer/types';
@@ -10,7 +14,9 @@ import {
   partFeatureTargetEquals
 } from '@renderer/utils/partCutPicking';
 import { getPartRenderGeometry } from '@renderer/utils/partFeatureGeometry';
-import { useMemo } from 'react';
+import { getResolvedRectCutFeature } from '@renderer/utils/rectCutUtils';
+import { useMemo, useRef } from 'react';
+import * as THREE from 'three';
 
 interface PartCutsPreviewCanvasProps {
   part: Part;
@@ -22,11 +28,126 @@ interface PartCutsPreviewCanvasProps {
   pendingTarget: PartFeatureTarget | null;
   onHoverTarget: (target: PartFeatureTarget | null) => void;
   onActivateTarget: (target: PartFeatureTarget | null) => void;
+  onDraftChange: (draft: FeatureDraft) => void;
 }
+
+type HandleKind = 'move' | 'length' | 'width';
+
+interface EditableHandleOverlay {
+  center: [number, number, number];
+  lengthHandle: [number, number, number];
+  widthHandle: [number, number, number] | null;
+  areaPosition: [number, number, number];
+  areaSize: [number, number, number];
+  operationLabel: string;
+}
+
+interface ActiveDragState {
+  kind: HandleKind;
+  pointerId: number;
+  startPoint: THREE.Vector3;
+  startDraft: FeatureDraft;
+}
+
+const _localPoint = new THREE.Vector3();
+const HANDLE_EPSILON = 0.08;
+const HANDLE_SIZE = 0.24;
+const MIN_DIMENSION = 0.125;
+const HANDLE_COLOR = '#f59e0b';
+const AREA_COLOR = '#2563eb';
+const SUPPORTED_HANDLE_TYPES = new Set(['cutout', 'mortise', 'stopped_dado', 'stopped_groove']);
 
 function shouldUseFallbackPreview(): boolean {
   return (
     typeof window !== 'undefined' && (import.meta.env.MODE === 'test' || window.navigator.userAgent.includes('jsdom'))
+  );
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function supportsPreviewHandles(draft: FeatureDraft | null): draft is Extract<FeatureDraft, { mode: 'rect_cut' }> {
+  return (
+    !!draft &&
+    draft.mode === 'rect_cut' &&
+    SUPPORTED_HANDLE_TYPES.has(draft.cutType) &&
+    (draft.faceTarget === 'top_face' || draft.faceTarget === 'bottom_face')
+  );
+}
+
+function getEditableHandleOverlay(part: Part, draft: FeatureDraft | null): EditableHandleOverlay | null {
+  if (!supportsPreviewHandles(draft)) return null;
+
+  const feature = buildFeatureFromDraft(draft);
+  if (feature.kind !== 'rect_cut') return null;
+  const resolved = getResolvedRectCutFeature(feature, part);
+  if (resolved.target.type !== 'face') return null;
+
+  const x0 = -part.length / 2 + resolved.placement.x;
+  const z0 = -part.width / 2 + resolved.placement.z;
+  const x1 = x0 + resolved.parameters.size.length;
+  const z1 = z0 + resolved.parameters.size.width;
+  const y =
+    resolved.target.face === 'top_face' ? part.thickness / 2 + HANDLE_EPSILON : -part.thickness / 2 - HANDLE_EPSILON;
+
+  return {
+    center: [(x0 + x1) / 2, y, (z0 + z1) / 2],
+    lengthHandle: [x1, y, (z0 + z1) / 2],
+    widthHandle: resolved.cutType === 'stopped_dado' ? null : [(x0 + x1) / 2, y, z1],
+    areaPosition: [(x0 + x1) / 2, y, (z0 + z1) / 2],
+    areaSize: [resolved.parameters.size.length, 0.02, resolved.parameters.size.width],
+    operationLabel:
+      resolved.cutType === 'stopped_dado'
+        ? 'Stopped dado handles'
+        : resolved.cutType === 'stopped_groove'
+          ? 'Stopped groove handles'
+          : resolved.cutType === 'mortise'
+            ? 'Mortise handles'
+            : 'Cutout handles'
+  };
+}
+
+function applyHandleDelta(
+  part: Part,
+  startDraft: FeatureDraft,
+  kind: HandleKind,
+  deltaX: number,
+  deltaZ: number
+): FeatureDraft {
+  if (!supportsPreviewHandles(startDraft)) return startDraft;
+
+  const nextDraft: FeatureDraft = { ...startDraft };
+  const maxLength = Math.max(MIN_DIMENSION, part.length - startDraft.placementX);
+  const maxWidth = Math.max(MIN_DIMENSION, part.width - startDraft.placementZ);
+
+  if (kind === 'move') {
+    nextDraft.placementX = clamp(startDraft.placementX + deltaX, 0, Math.max(0, part.length - startDraft.sizeLength));
+    nextDraft.placementZ =
+      startDraft.cutType === 'stopped_dado'
+        ? 0
+        : clamp(startDraft.placementZ + deltaZ, 0, Math.max(0, part.width - startDraft.sizeWidth));
+    return nextDraft;
+  }
+
+  if (kind === 'length') {
+    nextDraft.sizeLength = clamp(startDraft.sizeLength + deltaX, MIN_DIMENSION, maxLength);
+    return nextDraft;
+  }
+
+  if (startDraft.cutType === 'stopped_dado') return nextDraft;
+  nextDraft.sizeWidth = clamp(startDraft.sizeWidth + deltaZ, MIN_DIMENSION, maxWidth);
+  return nextDraft;
+}
+
+function nudgeDraft(part: Part, draft: FeatureDraft, kind: HandleKind, direction: 1 | -1): FeatureDraft {
+  const step = 0.25 * direction;
+  return applyHandleDelta(
+    part,
+    draft,
+    kind,
+    kind === 'move' || kind === 'length' ? step : 0,
+    kind === 'move' || kind === 'width' ? step : 0
   );
 }
 
@@ -36,7 +157,8 @@ function PartCutsPreviewScene({
   hoveredTarget,
   pendingTarget,
   onHoverTarget,
-  onActivateTarget
+  onActivateTarget,
+  onDraftChange
 }: {
   previewPart: Part;
   draft: FeatureDraft | null;
@@ -44,10 +166,50 @@ function PartCutsPreviewScene({
   pendingTarget: PartFeatureTarget | null;
   onHoverTarget: (target: PartFeatureTarget | null) => void;
   onActivateTarget: (target: PartFeatureTarget | null) => void;
+  onDraftChange: (draft: FeatureDraft) => void;
 }) {
   const geometry = useMemo(() => getPartRenderGeometry(previewPart), [previewPart]);
   const pickTargets = useMemo(() => getValidPickableTargets(previewPart, draft), [draft, previewPart]);
   const maxDimension = Math.max(previewPart.length, previewPart.width, previewPart.thickness, 1);
+  const handleOverlay = useMemo(() => getEditableHandleOverlay(previewPart, draft), [draft, previewPart]);
+  const groupRef = useRef<THREE.Group>(null);
+  const activeDragRef = useRef<ActiveDragState | null>(null);
+
+  const beginDrag = (kind: HandleKind, event: ThreeEvent<PointerEvent>) => {
+    if (!supportsPreviewHandles(draft)) return;
+    event.stopPropagation();
+    const group = groupRef.current;
+    if (!group) return;
+    _localPoint.copy(event.point);
+    group.worldToLocal(_localPoint);
+    activeDragRef.current = {
+      kind,
+      pointerId: event.pointerId,
+      startPoint: _localPoint.clone(),
+      startDraft: { ...draft }
+    };
+    event.target.setPointerCapture?.(event.pointerId);
+  };
+
+  const updateDrag = (event: ThreeEvent<PointerEvent>) => {
+    const activeDrag = activeDragRef.current;
+    const group = groupRef.current;
+    if (!activeDrag || !group || !supportsPreviewHandles(activeDrag.startDraft)) return;
+    event.stopPropagation();
+    _localPoint.copy(event.point);
+    group.worldToLocal(_localPoint);
+    const deltaX = _localPoint.x - activeDrag.startPoint.x;
+    const deltaZ = _localPoint.z - activeDrag.startPoint.z;
+    onDraftChange(applyHandleDelta(previewPart, activeDrag.startDraft, activeDrag.kind, deltaX, deltaZ));
+  };
+
+  const endDrag = (event: ThreeEvent<PointerEvent>) => {
+    const activeDrag = activeDragRef.current;
+    if (!activeDrag || activeDrag.pointerId !== event.pointerId) return;
+    event.stopPropagation();
+    event.target.releasePointerCapture?.(event.pointerId);
+    activeDragRef.current = null;
+  };
 
   return (
     <>
@@ -55,11 +217,52 @@ function PartCutsPreviewScene({
       <directionalLight position={[maxDimension * 1.6, maxDimension * 2.1, maxDimension * 1.4]} intensity={1.1} />
       <directionalLight position={[-maxDimension * 1.2, maxDimension * 0.8, -maxDimension * 1.2]} intensity={0.45} />
 
-      <group rotation={[-0.35, 0.68, 0]}>
+      <group ref={groupRef} rotation={[-0.35, 0.68, 0]}>
         <mesh geometry={geometry}>
           <meshStandardMaterial color="#d6c3a1" metalness={0.05} roughness={0.82} />
           <Edges geometry={geometry} threshold={15} color="#433225" raycast={() => {}} renderOrder={4} scale={1.002} />
         </mesh>
+
+        {handleOverlay && (
+          <>
+            <mesh position={handleOverlay.areaPosition} renderOrder={6}>
+              <boxGeometry args={handleOverlay.areaSize} />
+              <meshBasicMaterial color={AREA_COLOR} transparent opacity={0.18} depthWrite={false} />
+            </mesh>
+            <mesh
+              position={handleOverlay.center}
+              renderOrder={7}
+              onPointerDown={(event) => beginDrag('move', event)}
+              onPointerMove={updateDrag}
+              onPointerUp={endDrag}
+            >
+              <sphereGeometry args={[HANDLE_SIZE * 0.55, 18, 18]} />
+              <meshBasicMaterial color={HANDLE_COLOR} />
+            </mesh>
+            <mesh
+              position={handleOverlay.lengthHandle}
+              renderOrder={7}
+              onPointerDown={(event) => beginDrag('length', event)}
+              onPointerMove={updateDrag}
+              onPointerUp={endDrag}
+            >
+              <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
+              <meshBasicMaterial color={HANDLE_COLOR} />
+            </mesh>
+            {handleOverlay.widthHandle && (
+              <mesh
+                position={handleOverlay.widthHandle}
+                renderOrder={7}
+                onPointerDown={(event) => beginDrag('width', event)}
+                onPointerMove={updateDrag}
+                onPointerUp={endDrag}
+              >
+                <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
+                <meshBasicMaterial color={HANDLE_COLOR} />
+              </mesh>
+            )}
+          </>
+        )}
 
         {pickTargets.map((pickTarget) => {
           const isHovered = partFeatureTargetEquals(hoveredTarget, pickTarget.target);
@@ -108,7 +311,8 @@ export function PartCutsPreviewCanvas({
   hoveredTarget,
   pendingTarget,
   onHoverTarget,
-  onActivateTarget
+  onActivateTarget,
+  onDraftChange
 }: PartCutsPreviewCanvasProps) {
   const previewPart = useMemo(
     () => ({
@@ -122,6 +326,8 @@ export function PartCutsPreviewCanvas({
   const fallback = shouldUseFallbackPreview();
   const validTargets = useMemo(() => getValidPickableTargets(previewPart, draft), [draft, previewPart]);
   const draftTarget = draft ? getFeatureDraftTarget(draft) : null;
+  const handleOverlay = useMemo(() => getEditableHandleOverlay(previewPart, draft), [draft, previewPart]);
+  const supportsHandles = supportsPreviewHandles(draft);
 
   if (fallback) {
     return (
@@ -165,6 +371,53 @@ export function PartCutsPreviewCanvas({
               </div>
             </div>
           )}
+          {supportsHandles && draft && handleOverlay && (
+            <div className="rounded-md border border-border bg-bg px-3 py-3 text-left">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Preview Handles</div>
+              <div className="mb-2 text-sm text-text">{handleOverlay.operationLabel}</div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  onClick={() => onDraftChange(nudgeDraft(part, draft, 'move', -1))}
+                >
+                  Move Left
+                </Button>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  onClick={() => onDraftChange(nudgeDraft(part, draft, 'move', 1))}
+                >
+                  Move Right
+                </Button>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  onClick={() => onDraftChange(nudgeDraft(part, draft, 'length', 1))}
+                >
+                  Extend Run
+                </Button>
+                {draft.cutType !== 'stopped_dado' && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={() => onDraftChange(nudgeDraft(part, draft, 'width', 1))}
+                  >
+                    Widen
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+          {draft && !supportsHandles && (
+            <div className="rounded-md border border-border bg-bg px-3 py-3 text-left text-sm text-text-muted">
+              This operation still uses inspector-only adjustments in the current preview-handles POC.
+            </div>
+          )}
         </div>
       </div>
     );
@@ -180,6 +433,7 @@ export function PartCutsPreviewCanvas({
           pendingTarget={pendingTarget}
           onHoverTarget={onHoverTarget}
           onActivateTarget={onActivateTarget}
+          onDraftChange={onDraftChange}
         />
       </Canvas>
 
@@ -196,7 +450,9 @@ export function PartCutsPreviewCanvas({
 
         {draft && (
           <div className="rounded-md border border-border/80 bg-bg/90 px-3 py-2 text-left text-xs text-text-muted shadow-sm backdrop-blur">
-            Hover or click a highlighted target to resolve a canonical face, edge, or corner for this operation.
+            {supportsHandles
+              ? 'Click a highlighted target first, then drag the amber handles to move or resize this operation.'
+              : 'Hover or click a highlighted target to resolve a canonical face, edge, or corner for this operation.'}
           </div>
         )}
       </div>

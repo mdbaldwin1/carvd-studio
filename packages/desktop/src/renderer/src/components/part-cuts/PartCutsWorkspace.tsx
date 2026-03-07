@@ -572,6 +572,7 @@ export function PartCutsWorkspace({
                 pendingTarget={pendingTarget}
                 onHoverTarget={onHoveredTargetChange}
                 onActivateTarget={handlePreviewTargetActivation}
+                onDraftChange={setDraft}
               />
 
               <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text-secondary">
@@ -709,7 +710,9 @@ export function PartCutsWorkspace({
                     )}
 
                   {inspectorDraft.mode === 'rect_cut' &&
-                    ['cutout', 'dado', 'groove', 'mortise'].includes(inspectorDraft.cutType) && (
+                    ['cutout', 'dado', 'stopped_dado', 'groove', 'stopped_groove', 'mortise'].includes(
+                      inspectorDraft.cutType
+                    ) && (
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         {availableFaceTargets.map((target) => (
                           <Button

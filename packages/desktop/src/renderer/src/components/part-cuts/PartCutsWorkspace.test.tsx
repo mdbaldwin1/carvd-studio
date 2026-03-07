@@ -401,6 +401,62 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByText(/Stopped groove uses a limited run/i)).toBeInTheDocument();
   });
 
+  it('shows fallback preview handles for stopped dado and updates the draft dimensions', () => {
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Panel', width: 8 })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={vi.fn()}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={false}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Stopped Dado'));
+    expect(screen.getByText('Preview Handles')).toBeInTheDocument();
+    expect(screen.getByText(/Stopped dado handles/i)).toBeInTheDocument();
+
+    expect(screen.getByDisplayValue('3')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Extend Run' }));
+
+    expect(screen.getByDisplayValue('3 1/4')).toBeInTheDocument();
+  });
+
+  it('shows inspector-only preview copy for unsupported handle operations', () => {
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Panel', width: 8 })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={vi.fn()}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={false}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Rabbet'));
+
+    expect(
+      screen.getByText(/This operation still uses inspector-only adjustments in the current preview-handles POC/i)
+    ).toBeInTheDocument();
+  });
+
   it('uses explicit part-level footer actions', () => {
     render(
       <PartCutsWorkspace
