@@ -184,11 +184,11 @@ Supported kinds:
 - corner notch
 - edge notch
 - rectangular cutout
+- dado
+- rabbet
 
 ### Out of scope for the POC
 
-- dados
-- rabbets
 - grooves
 - sliding dovetails
 - curved cutouts

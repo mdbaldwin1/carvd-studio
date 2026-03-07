@@ -376,14 +376,15 @@ describe('fileFormat', () => {
                   kind: 'rect_cut',
                   version: 1,
                   enabled: true,
-                  target: { type: 'corner', corner: 'back_bottom_left_corner' },
-                  reference: { primaryFrom: 'min', secondaryFrom: 'min' },
-                  cutType: 'corner_notch',
+                  target: { type: 'face', face: 'top_face' },
+                  reference: { primaryFrom: 'min' },
+                  cutType: 'dado',
                   parameters: {
-                    size: { length: 0.75, width: 0.75 },
-                    depthMode: 'through'
+                    size: { length: 0.75, width: 2 },
+                    depthMode: 'blind',
+                    depth: 0.375
                   },
-                  placement: { x: 0, z: 0 }
+                  placement: { x: 4, z: 0 }
                 }
               ]
             }
@@ -412,6 +413,13 @@ describe('fileFormat', () => {
 
       expect(deserialized.cutList?.instructions[0].features).toHaveLength(1);
       expect(deserialized.cutList?.instructions[0].features?.[0].kind).toBe('rect_cut');
+      expect(deserialized.cutList?.instructions[0].features?.[0]).toMatchObject({
+        cutType: 'dado',
+        parameters: {
+          depthMode: 'blind',
+          depth: 0.375
+        }
+      });
     });
 
     it('handles special characters in names', () => {
