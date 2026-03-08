@@ -111,12 +111,22 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
 
     return {
       ...measurements,
-      controllingValue: getLengthReferenceValue(measurements, draftPreviewFeature.lengthMode),
-      lengthMode: draftPreviewFeature.lengthMode
+      controllingValue: getLengthReferenceValue(
+        measurements,
+        draftPreviewFeature.parameters.reference?.mode ?? draftPreviewFeature.lengthMode
+      ),
+      lengthMode: draftPreviewFeature.parameters.reference?.mode ?? draftPreviewFeature.lengthMode
     };
   }, [draft, draftPreviewFeature, features, selectedPart.length, selectedPart.thickness, selectedPart.width]);
 
-  const startDraft = (preset: OperationPreset) => setDraft(buildDraftFromPreset(preset));
+  const startDraft = (preset: OperationPreset) =>
+    setDraft(
+      buildDraftFromPreset(preset, {
+        partLength: selectedPart.length,
+        partWidth: selectedPart.width,
+        partThickness: selectedPart.thickness
+      })
+    );
 
   const handleSaveDraft = () => {
     if (!draft) return;
@@ -238,7 +248,7 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                       type="button"
                       size="xs"
                       variant="outline"
-                      onClick={() => setDraft(buildDraftFromFeature(feature))}
+                      onClick={() => setDraft(buildDraftFromFeature(feature, selectedPart))}
                     >
                       Edit
                     </Button>
@@ -386,11 +396,11 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                         <Label htmlFor="length-mode">Reference</Label>
                         <Select
                           id="length-mode"
-                          value={draft.lengthMode}
+                          value={draft.referenceMode}
                           onChange={(e) =>
                             setDraft({
                               ...draft,
-                              lengthMode: e.target.value as EndCutFeature['lengthMode']
+                              referenceMode: e.target.value as EndCutFeature['lengthMode']
                             })
                           }
                         >
@@ -399,6 +409,15 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                           <option value="centerline">Centerline</option>
                         </Select>
                       </div>
+                    </div>
+
+                    <div>
+                      <Label>Reference Value</Label>
+                      <FractionInput
+                        value={draft.referenceValue}
+                        onChange={(value) => setDraft({ ...draft, referenceValue: value })}
+                        min={0.125}
+                      />
                     </div>
 
                     {(draft.cutType === 'mitre' || draft.cutType === 'compound') && (

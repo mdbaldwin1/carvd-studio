@@ -51,6 +51,7 @@ function toTitleCase(input: string): string {
 
 export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'metric'): string {
   if (feature.kind === 'end_cut') {
+    const referenceMode = feature.parameters.reference?.mode ?? feature.lengthMode;
     const angleBits = [];
     if (feature.cutType === 'mitre' || feature.cutType === 'compound') {
       angleBits.push(`${feature.parameters.horizontalAngle}°`);
@@ -60,11 +61,7 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
     }
 
     const referenceLabel =
-      feature.lengthMode === 'centerline'
-        ? 'Centerline'
-        : feature.lengthMode === 'short_point'
-          ? 'Short Point'
-          : 'Long Point';
+      referenceMode === 'centerline' ? 'Centerline' : referenceMode === 'short_point' ? 'Short Point' : 'Long Point';
 
     const angleText = angleBits.length > 0 ? ` ${angleBits.join(' / ')}` : '';
     return `${toTitleCase(feature.cutType)}${angleText} on ${getFeatureTargetLabel(feature)} · ${referenceLabel} reference`;

@@ -32,7 +32,13 @@ describe('PartCutsWorkspace', () => {
     expect(onDraftFeaturesChange).toHaveBeenCalledWith([
       expect.objectContaining({
         kind: 'end_cut',
-        target: { type: 'face', face: 'left_end' }
+        target: { type: 'face', face: 'left_end' },
+        parameters: expect.objectContaining({
+          reference: {
+            mode: 'long_point',
+            value: 24
+          }
+        })
       })
     ]);
     expect(onSelectFeature).toHaveBeenCalled();
@@ -431,6 +437,35 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByDisplayValue('3 1/4')).toBeInTheDocument();
   });
 
+  it('shows preview handles for end-cut reference values and nudges the reference', () => {
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Panel', length: 24, width: 8 })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={vi.fn()}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={false}
+      />
+    );
+
+    fireEvent.click(screen.getByText('End Cut'));
+
+    expect(screen.getByText('Preview Handles')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('24')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Shorten Ref' }));
+
+    expect(screen.getByDisplayValue('23 3/4')).toBeInTheDocument();
+  });
+
   it('shows inspector-only preview copy for unsupported handle operations', () => {
     render(
       <PartCutsWorkspace
@@ -452,11 +487,7 @@ describe('PartCutsWorkspace', () => {
 
     fireEvent.click(screen.getByText('Rabbet'));
 
-    expect(
-      screen.getByText(
-        /Adjust this operation in the inspector. Direct preview handles are currently available for face pockets and stopped channels/i
-      )
-    ).toBeInTheDocument();
+    expect(screen.getByText(/end-cut reference values/i)).toBeInTheDocument();
   });
 
   it('uses explicit part-level footer actions', () => {

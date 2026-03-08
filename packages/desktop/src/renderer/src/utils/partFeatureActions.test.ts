@@ -3,18 +3,30 @@ import { buildFeaturesFromPreset, mirrorFeature } from './partFeatureActions';
 
 describe('partFeatureActions', () => {
   it('builds paired end cuts from the mitre-both-ends preset', () => {
-    const features = buildFeaturesFromPreset('mitre_both_ends');
+    const features = buildFeaturesFromPreset('mitre_both_ends', { partLength: 24 });
 
     expect(features).toHaveLength(2);
     expect(features[0]).toMatchObject({
       kind: 'end_cut',
       target: { type: 'face', face: 'left_end' },
-      cutType: 'mitre'
+      cutType: 'mitre',
+      parameters: {
+        reference: {
+          mode: 'long_point',
+          value: 24
+        }
+      }
     });
     expect(features[1]).toMatchObject({
       kind: 'end_cut',
       target: { type: 'face', face: 'right_end' },
-      cutType: 'mitre'
+      cutType: 'mitre',
+      parameters: {
+        reference: {
+          mode: 'long_point',
+          value: 24
+        }
+      }
     });
   });
 

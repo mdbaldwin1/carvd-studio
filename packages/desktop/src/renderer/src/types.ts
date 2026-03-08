@@ -154,6 +154,10 @@ export interface EndCutFeature extends PartFeatureBase {
   parameters: {
     horizontalAngle: number;
     verticalAngle?: number;
+    reference?: {
+      mode: 'long_point' | 'short_point' | 'centerline';
+      value: number;
+    };
   };
 }
 

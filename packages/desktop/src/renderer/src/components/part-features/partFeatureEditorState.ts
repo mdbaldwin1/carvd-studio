@@ -7,6 +7,7 @@ import {
   PartFeatureTarget,
   RectCutFeature
 } from '@renderer/types';
+import { getEndCutReferenceValue } from '@renderer/utils/endCutUtils';
 import { clonePartFeature } from '@renderer/utils/partFeatures';
 
 export const END_TARGETS: FaceTarget[] = ['left_end', 'right_end'];
@@ -63,7 +64,8 @@ export type FeatureDraft =
       enabled: boolean;
       targetFace: 'left_end' | 'right_end';
       cutType: EndCutFeature['cutType'];
-      lengthMode: EndCutFeature['lengthMode'];
+      referenceMode: EndCutFeature['lengthMode'];
+      referenceValue: number;
       horizontalAngle: number;
       verticalAngle: number;
     }
@@ -91,7 +93,10 @@ export function generateFeatureId(): string {
   return `feature_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function buildDraftFromPreset(preset: OperationPreset): FeatureDraft {
+export function buildDraftFromPreset(
+  preset: OperationPreset,
+  defaults?: { partLength?: number; partWidth?: number; partThickness?: number }
+): FeatureDraft {
   if (preset === 'end_cut') {
     return {
       mode: 'end_cut',
@@ -100,7 +105,8 @@ export function buildDraftFromPreset(preset: OperationPreset): FeatureDraft {
       enabled: true,
       targetFace: 'left_end',
       cutType: 'mitre',
-      lengthMode: 'long_point',
+      referenceMode: 'long_point',
+      referenceValue: defaults?.partLength ?? 24,
       horizontalAngle: 45,
       verticalAngle: 0
     };
@@ -148,7 +154,10 @@ export function buildDraftFromPreset(preset: OperationPreset): FeatureDraft {
   };
 }
 
-export function buildDraftFromFeature(feature: PartFeature): FeatureDraft {
+export function buildDraftFromFeature(
+  feature: PartFeature,
+  part?: Pick<{ length: number; width: number; thickness: number }, 'length' | 'width' | 'thickness'>
+): FeatureDraft {
   if (feature.kind === 'end_cut') {
     return {
       mode: 'end_cut',
@@ -157,7 +166,11 @@ export function buildDraftFromFeature(feature: PartFeature): FeatureDraft {
       enabled: feature.enabled,
       targetFace: feature.target.face,
       cutType: feature.cutType,
-      lengthMode: feature.lengthMode,
+      referenceMode: feature.parameters.reference?.mode ?? feature.lengthMode,
+      referenceValue:
+        part?.length !== undefined
+          ? getEndCutReferenceValue(feature, part)
+          : (feature.parameters.reference?.value ?? 0),
       horizontalAngle: feature.parameters.horizontalAngle,
       verticalAngle: feature.parameters.verticalAngle ?? 0
     };
@@ -192,9 +205,13 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
       target: { type: 'face', face: draft.targetFace },
       reference: { primaryFrom: draft.targetFace === 'left_end' ? 'min' : 'max' },
       cutType: draft.cutType,
-      lengthMode: draft.lengthMode,
+      lengthMode: draft.referenceMode,
       parameters: {
         horizontalAngle: draft.cutType === 'bevel' ? 0 : draft.horizontalAngle,
+        reference: {
+          mode: draft.referenceMode,
+          value: draft.referenceValue
+        },
         verticalAngle:
           draft.cutType === 'mitre' || draft.cutType === 'square' ? undefined : draft.verticalAngle || undefined
       }

@@ -220,8 +220,11 @@ export function PartCutsWorkspace({
 
     return {
       ...measurements,
-      controllingValue: getLengthReferenceValue(measurements, draftPreviewFeature.lengthMode),
-      lengthMode: draftPreviewFeature.lengthMode
+      controllingValue: getLengthReferenceValue(
+        measurements,
+        draftPreviewFeature.parameters.reference?.mode ?? draftPreviewFeature.lengthMode
+      ),
+      lengthMode: draftPreviewFeature.parameters.reference?.mode ?? draftPreviewFeature.lengthMode
     };
   }, [draft, draftFeatures, draftPreviewFeature, part.length, part.thickness, part.width]);
 
@@ -239,21 +242,23 @@ export function PartCutsWorkspace({
   }, [featureConflicts]);
 
   const handleStartPreset = (preset: OperationPreset) => {
-    setDraft(buildDraftFromPreset(preset));
+    setDraft(
+      buildDraftFromPreset(preset, { partLength: part.length, partWidth: part.width, partThickness: part.thickness })
+    );
     onSelectFeature(null);
   };
 
   const handleEditFeature = (feature: PartFeature) => {
-    setDraft(buildDraftFromFeature(feature));
+    setDraft(buildDraftFromFeature(feature, part));
     onSelectFeature(feature.id);
   };
 
   const handleAddWorkspacePreset = (preset: WorkspacePreset) => {
-    const nextFeatures = [...draftFeatures, ...buildFeaturesFromPreset(preset)];
+    const nextFeatures = [...draftFeatures, ...buildFeaturesFromPreset(preset, { partLength: part.length })];
     const firstInserted = nextFeatures[draftFeatures.length] ?? null;
     onDraftFeaturesChange(nextFeatures);
     onSelectFeature(firstInserted?.id ?? null);
-    setDraft(firstInserted ? buildDraftFromFeature(firstInserted) : null);
+    setDraft(firstInserted ? buildDraftFromFeature(firstInserted, part) : null);
   };
 
   const handleSaveDraft = () => {
@@ -284,7 +289,7 @@ export function PartCutsWorkspace({
     const duplicate = duplicateFeature(feature);
     onDraftFeaturesChange([...draftFeatures, duplicate]);
     onSelectFeature(duplicate.id);
-    setDraft(buildDraftFromFeature(duplicate));
+    setDraft(buildDraftFromFeature(duplicate, part));
   };
 
   const handleMirrorFeature = (feature: PartFeature, action: ReturnType<typeof getAvailableMirrorActions>[number]) => {
@@ -294,7 +299,7 @@ export function PartCutsWorkspace({
     nextFeatures.splice(sourceIndex + 1, 0, mirrored);
     onDraftFeaturesChange(nextFeatures);
     onSelectFeature(mirrored.id);
-    setDraft(buildDraftFromFeature(mirrored));
+    setDraft(buildDraftFromFeature(mirrored, part));
   };
 
   const handleMoveFeature = (featureId: string, direction: -1 | 1) => {
@@ -304,13 +309,13 @@ export function PartCutsWorkspace({
     onDraftFeaturesChange(nextFeatures);
   };
 
-  const inspectorDraft = draft ?? (selectedFeature ? buildDraftFromFeature(selectedFeature) : null);
+  const inspectorDraft = draft ?? (selectedFeature ? buildDraftFromFeature(selectedFeature, part) : null);
 
   useEffect(() => {
     if (!draft && selectedFeature) {
-      setDraft(buildDraftFromFeature(selectedFeature));
+      setDraft(buildDraftFromFeature(selectedFeature, part));
     }
-  }, [draft, selectedFeature]);
+  }, [draft, part, selectedFeature]);
 
   useEffect(() => {
     const nextTarget = inspectorDraft ? getFeatureDraftTarget(inspectorDraft) : null;
@@ -777,11 +782,11 @@ export function PartCutsWorkspace({
                             <Label htmlFor="length-mode">Reference</Label>
                             <Select
                               id="length-mode"
-                              value={inspectorDraft.lengthMode}
+                              value={inspectorDraft.referenceMode}
                               onChange={(e) =>
                                 setDraft({
                                   ...inspectorDraft,
-                                  lengthMode: e.target.value as EndCutFeature['lengthMode']
+                                  referenceMode: e.target.value as EndCutFeature['lengthMode']
                                 })
                               }
                             >
@@ -815,6 +820,15 @@ export function PartCutsWorkspace({
                             />
                           </div>
                         )}
+
+                        <div>
+                          <Label>Reference Value</Label>
+                          <FractionInput
+                            value={inspectorDraft.referenceValue}
+                            onChange={(value) => setDraft({ ...inspectorDraft, referenceValue: value })}
+                            min={0.125}
+                          />
+                        </div>
 
                         {endCutPreviewMeasurements && (
                           <div className="rounded-md border border-border bg-bg p-3">
@@ -1093,7 +1107,7 @@ export function PartCutsWorkspace({
                 size="sm"
                 variant="ghost"
                 onClick={() => {
-                  setDraft(selectedFeature ? buildDraftFromFeature(selectedFeature) : null);
+                  setDraft(selectedFeature ? buildDraftFromFeature(selectedFeature, part) : null);
                 }}
               >
                 Reset

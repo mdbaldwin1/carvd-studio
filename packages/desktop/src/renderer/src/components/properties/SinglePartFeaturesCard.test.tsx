@@ -71,7 +71,11 @@ describe('SinglePartFeaturesCard', () => {
         cutType: 'compound',
         parameters: expect.objectContaining({
           horizontalAngle: 22.5,
-          verticalAngle: 10
+          verticalAngle: 10,
+          reference: {
+            mode: 'long_point',
+            value: 24
+          }
         })
       })
     ]);

@@ -31,7 +31,8 @@ function buildEndCut(
   face: 'left_end' | 'right_end',
   cutType: EndCutFeature['cutType'],
   parameters: EndCutFeature['parameters'],
-  lengthMode: EndCutFeature['lengthMode'] = 'long_point'
+  lengthMode: EndCutFeature['lengthMode'] = 'long_point',
+  referenceValue?: number
 ): EndCutFeature {
   return {
     id: generateFeatureId(),
@@ -42,7 +43,16 @@ function buildEndCut(
     reference: { primaryFrom: face === 'left_end' ? 'min' : 'max' },
     cutType,
     lengthMode,
-    parameters
+    parameters: {
+      ...parameters,
+      reference:
+        referenceValue === undefined
+          ? parameters.reference
+          : {
+              mode: lengthMode,
+              value: referenceValue
+            }
+    }
   };
 }
 
@@ -74,27 +84,28 @@ function buildRectCut(
   };
 }
 
-export function buildFeaturesFromPreset(preset: WorkspacePreset): PartFeature[] {
+export function buildFeaturesFromPreset(preset: WorkspacePreset, defaults?: { partLength?: number }): PartFeature[] {
+  const referenceValue = defaults?.partLength;
   switch (preset) {
     case 'mitre_both_ends':
       return [
-        buildEndCut('left_end', 'mitre', { horizontalAngle: 45 }, 'long_point'),
-        buildEndCut('right_end', 'mitre', { horizontalAngle: 45 }, 'long_point')
+        buildEndCut('left_end', 'mitre', { horizontalAngle: 45 }, 'long_point', referenceValue),
+        buildEndCut('right_end', 'mitre', { horizontalAngle: 45 }, 'long_point', referenceValue)
       ];
     case 'bevel_both_ends':
       return [
-        buildEndCut('left_end', 'bevel', { horizontalAngle: 0, verticalAngle: 15 }, 'centerline'),
-        buildEndCut('right_end', 'bevel', { horizontalAngle: 0, verticalAngle: 15 }, 'centerline')
+        buildEndCut('left_end', 'bevel', { horizontalAngle: 0, verticalAngle: 15 }, 'centerline', referenceValue),
+        buildEndCut('right_end', 'bevel', { horizontalAngle: 0, verticalAngle: 15 }, 'centerline', referenceValue)
       ];
     case 'square_both_ends':
       return [
-        buildEndCut('left_end', 'square', { horizontalAngle: 0 }, 'long_point'),
-        buildEndCut('right_end', 'square', { horizontalAngle: 0 }, 'long_point')
+        buildEndCut('left_end', 'square', { horizontalAngle: 0 }, 'long_point', referenceValue),
+        buildEndCut('right_end', 'square', { horizontalAngle: 0 }, 'long_point', referenceValue)
       ];
     case 'compound_both_ends':
       return [
-        buildEndCut('left_end', 'compound', { horizontalAngle: 45, verticalAngle: 15 }, 'long_point'),
-        buildEndCut('right_end', 'compound', { horizontalAngle: 45, verticalAngle: 15 }, 'long_point')
+        buildEndCut('left_end', 'compound', { horizontalAngle: 45, verticalAngle: 15 }, 'long_point', referenceValue),
+        buildEndCut('right_end', 'compound', { horizontalAngle: 45, verticalAngle: 15 }, 'long_point', referenceValue)
       ];
     case 'top_cutout':
       return [buildRectCut('cutout', { type: 'face', face: 'top_face' }, { x: 0, z: 0 }, { length: 3, width: 1.5 })];

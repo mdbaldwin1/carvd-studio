@@ -31,15 +31,19 @@ interface PartCutsPreviewCanvasProps {
   onDraftChange: (draft: FeatureDraft) => void;
 }
 
-type HandleKind = 'move' | 'length' | 'width';
+type HandleKind = 'move' | 'length' | 'width' | 'reference';
 
 interface EditableHandleOverlay {
-  center: [number, number, number];
-  lengthHandle: [number, number, number];
-  widthHandle: [number, number, number] | null;
-  areaPosition: [number, number, number];
-  areaSize: [number, number, number];
+  mode: 'rect' | 'end';
   operationLabel: string;
+  center?: [number, number, number];
+  lengthHandle?: [number, number, number];
+  widthHandle?: [number, number, number] | null;
+  areaPosition?: [number, number, number];
+  areaSize?: [number, number, number];
+  referenceHandle?: [number, number, number];
+  guidePosition?: [number, number, number];
+  guideSize?: [number, number, number];
 }
 
 interface ActiveDragState {
@@ -67,17 +71,32 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function supportsPreviewHandles(draft: FeatureDraft | null): draft is Extract<FeatureDraft, { mode: 'rect_cut' }> {
+function supportsPreviewHandles(draft: FeatureDraft | null): boolean {
+  if (!draft) return false;
+  if (draft.mode === 'end_cut') return true;
   return (
-    !!draft &&
-    draft.mode === 'rect_cut' &&
-    SUPPORTED_HANDLE_TYPES.has(draft.cutType) &&
-    (draft.faceTarget === 'top_face' || draft.faceTarget === 'bottom_face')
+    SUPPORTED_HANDLE_TYPES.has(draft.cutType) && (draft.faceTarget === 'top_face' || draft.faceTarget === 'bottom_face')
   );
 }
 
 function getEditableHandleOverlay(part: Part, draft: FeatureDraft | null): EditableHandleOverlay | null {
   if (!supportsPreviewHandles(draft)) return null;
+
+  if (draft.mode === 'end_cut') {
+    const x =
+      draft.targetFace === 'left_end'
+        ? part.length / 2 - draft.referenceValue
+        : -part.length / 2 + draft.referenceValue;
+    const guideStartX = draft.targetFace === 'left_end' ? -part.length / 2 : x;
+    const guideEndX = draft.targetFace === 'left_end' ? x : part.length / 2;
+    return {
+      mode: 'end',
+      operationLabel: 'End-cut reference handle',
+      referenceHandle: [x, 0, 0],
+      guidePosition: [(guideStartX + guideEndX) / 2, 0, 0],
+      guideSize: [Math.max(MIN_DIMENSION, Math.abs(guideEndX - guideStartX)), 0.02, 0.02]
+    };
+  }
 
   const feature = buildFeatureFromDraft(draft);
   if (feature.kind !== 'rect_cut') return null;
@@ -92,6 +111,7 @@ function getEditableHandleOverlay(part: Part, draft: FeatureDraft | null): Edita
     resolved.target.face === 'top_face' ? part.thickness / 2 + HANDLE_EPSILON : -part.thickness / 2 - HANDLE_EPSILON;
 
   return {
+    mode: 'rect',
     center: [(x0 + x1) / 2, y, (z0 + z1) / 2],
     lengthHandle: [x1, y, (z0 + z1) / 2],
     widthHandle: resolved.cutType === 'stopped_dado' ? null : [(x0 + x1) / 2, y, z1],
@@ -116,6 +136,18 @@ function applyHandleDelta(
   deltaZ: number
 ): FeatureDraft {
   if (!supportsPreviewHandles(startDraft)) return startDraft;
+
+  if (startDraft.mode === 'end_cut') {
+    if (kind !== 'reference') return startDraft;
+    return {
+      ...startDraft,
+      referenceValue: clamp(
+        startDraft.referenceValue + (startDraft.targetFace === 'left_end' ? -deltaX : deltaX),
+        MIN_DIMENSION,
+        startDraft.cutType === 'square' ? part.length : part.length * 2
+      )
+    };
+  }
 
   const nextDraft: FeatureDraft = { ...startDraft };
   const maxLength = Math.max(MIN_DIMENSION, part.length - startDraft.placementX);
@@ -142,6 +174,16 @@ function applyHandleDelta(
 
 function nudgeDraft(part: Part, draft: FeatureDraft, kind: HandleKind, direction: 1 | -1): FeatureDraft {
   const step = 0.25 * direction;
+  if (draft.mode === 'end_cut') {
+    return {
+      ...draft,
+      referenceValue: clamp(
+        draft.referenceValue + step,
+        MIN_DIMENSION,
+        draft.cutType === 'square' ? part.length : part.length * 2
+      )
+    };
+  }
   return applyHandleDelta(
     part,
     draft,
@@ -225,31 +267,37 @@ function PartCutsPreviewScene({
 
         {handleOverlay && (
           <>
-            <mesh position={handleOverlay.areaPosition} renderOrder={6}>
-              <boxGeometry args={handleOverlay.areaSize} />
-              <meshBasicMaterial color={AREA_COLOR} transparent opacity={0.18} depthWrite={false} />
-            </mesh>
-            <mesh
-              position={handleOverlay.center}
-              renderOrder={7}
-              onPointerDown={(event) => beginDrag('move', event)}
-              onPointerMove={updateDrag}
-              onPointerUp={endDrag}
-            >
-              <sphereGeometry args={[HANDLE_SIZE * 0.55, 18, 18]} />
-              <meshBasicMaterial color={HANDLE_COLOR} />
-            </mesh>
-            <mesh
-              position={handleOverlay.lengthHandle}
-              renderOrder={7}
-              onPointerDown={(event) => beginDrag('length', event)}
-              onPointerMove={updateDrag}
-              onPointerUp={endDrag}
-            >
-              <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
-              <meshBasicMaterial color={HANDLE_COLOR} />
-            </mesh>
-            {handleOverlay.widthHandle && (
+            {handleOverlay.mode === 'rect' && handleOverlay.areaPosition && handleOverlay.areaSize && (
+              <mesh position={handleOverlay.areaPosition} renderOrder={6}>
+                <boxGeometry args={handleOverlay.areaSize} />
+                <meshBasicMaterial color={AREA_COLOR} transparent opacity={0.18} depthWrite={false} />
+              </mesh>
+            )}
+            {handleOverlay.mode === 'rect' && handleOverlay.center && (
+              <mesh
+                position={handleOverlay.center}
+                renderOrder={7}
+                onPointerDown={(event) => beginDrag('move', event)}
+                onPointerMove={updateDrag}
+                onPointerUp={endDrag}
+              >
+                <sphereGeometry args={[HANDLE_SIZE * 0.55, 18, 18]} />
+                <meshBasicMaterial color={HANDLE_COLOR} />
+              </mesh>
+            )}
+            {handleOverlay.mode === 'rect' && handleOverlay.lengthHandle && (
+              <mesh
+                position={handleOverlay.lengthHandle}
+                renderOrder={7}
+                onPointerDown={(event) => beginDrag('length', event)}
+                onPointerMove={updateDrag}
+                onPointerUp={endDrag}
+              >
+                <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
+                <meshBasicMaterial color={HANDLE_COLOR} />
+              </mesh>
+            )}
+            {handleOverlay.mode === 'rect' && handleOverlay.widthHandle && (
               <mesh
                 position={handleOverlay.widthHandle}
                 renderOrder={7}
@@ -258,6 +306,24 @@ function PartCutsPreviewScene({
                 onPointerUp={endDrag}
               >
                 <boxGeometry args={[HANDLE_SIZE, HANDLE_SIZE, HANDLE_SIZE]} />
+                <meshBasicMaterial color={HANDLE_COLOR} />
+              </mesh>
+            )}
+            {handleOverlay.mode === 'end' && handleOverlay.guidePosition && handleOverlay.guideSize && (
+              <mesh position={handleOverlay.guidePosition} renderOrder={6}>
+                <boxGeometry args={handleOverlay.guideSize} />
+                <meshBasicMaterial color={AREA_COLOR} transparent opacity={0.22} depthWrite={false} />
+              </mesh>
+            )}
+            {handleOverlay.mode === 'end' && handleOverlay.referenceHandle && (
+              <mesh
+                position={handleOverlay.referenceHandle}
+                renderOrder={7}
+                onPointerDown={(event) => beginDrag('reference', event)}
+                onPointerMove={updateDrag}
+                onPointerUp={endDrag}
+              >
+                <sphereGeometry args={[HANDLE_SIZE * 0.6, 18, 18]} />
                 <meshBasicMaterial color={HANDLE_COLOR} />
               </mesh>
             )}
@@ -380,27 +446,33 @@ export function PartCutsPreviewCanvas({
                   type="button"
                   size="xs"
                   variant="outline"
-                  onClick={() => onDraftChange(nudgeDraft(part, draft, 'move', -1))}
+                  onClick={() =>
+                    onDraftChange(nudgeDraft(part, draft, draft.mode === 'end_cut' ? 'reference' : 'move', -1))
+                  }
                 >
-                  Move Left
+                  {draft.mode === 'end_cut' ? 'Shorten Ref' : 'Move Left'}
                 </Button>
                 <Button
                   type="button"
                   size="xs"
                   variant="outline"
-                  onClick={() => onDraftChange(nudgeDraft(part, draft, 'move', 1))}
+                  onClick={() =>
+                    onDraftChange(nudgeDraft(part, draft, draft.mode === 'end_cut' ? 'reference' : 'move', 1))
+                  }
                 >
-                  Move Right
+                  {draft.mode === 'end_cut' ? 'Lengthen Ref' : 'Move Right'}
                 </Button>
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="outline"
-                  onClick={() => onDraftChange(nudgeDraft(part, draft, 'length', 1))}
-                >
-                  Extend Run
-                </Button>
-                {draft.cutType !== 'stopped_dado' && (
+                {draft.mode === 'rect_cut' && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={() => onDraftChange(nudgeDraft(part, draft, 'length', 1))}
+                  >
+                    Extend Run
+                  </Button>
+                )}
+                {draft.mode === 'rect_cut' && draft.cutType !== 'stopped_dado' && (
                   <Button
                     type="button"
                     size="xs"
@@ -415,8 +487,8 @@ export function PartCutsPreviewCanvas({
           )}
           {draft && !supportsHandles && (
             <div className="rounded-md border border-border bg-bg px-3 py-3 text-left text-sm text-text-muted">
-              Adjust this operation in the inspector. Direct preview handles are currently available for face pockets
-              and stopped channels.
+              Adjust this operation in the inspector. Direct preview handles are currently available for face pockets ,
+              stopped channels, and end-cut reference values.
             </div>
           )}
         </div>
@@ -452,7 +524,7 @@ export function PartCutsPreviewCanvas({
         {draft && (
           <div className="rounded-md border border-border/80 bg-bg/90 px-3 py-2 text-left text-xs text-text-muted shadow-sm backdrop-blur">
             {supportsHandles
-              ? 'Click a highlighted target first, then drag the preview handles to move or resize this operation.'
+              ? 'Click a highlighted target first, then drag the preview handles to adjust this operation.'
               : 'Hover or click a highlighted target to resolve a canonical face, edge, or corner for this operation.'}
           </div>
         )}
