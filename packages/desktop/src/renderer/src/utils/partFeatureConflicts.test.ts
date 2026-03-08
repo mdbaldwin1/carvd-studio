@@ -76,4 +76,137 @@ describe('getPartFeatureConflicts', () => {
       true
     );
   });
+
+  it('flags later removals that start inside previously removed material', () => {
+    const part = createTestPart({
+      width: 8,
+      features: [
+        {
+          id: 'feature-1',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'cutout',
+          parameters: {
+            size: { length: 6, width: 4 },
+            depthMode: 'through'
+          },
+          placement: { x: 1, z: 2 }
+        },
+        {
+          id: 'feature-2',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mortise',
+          parameters: {
+            size: { length: 2, width: 1 },
+            depthMode: 'blind',
+            depth: 0.25
+          },
+          placement: { x: 2, z: 3 }
+        }
+      ]
+    });
+
+    const conflicts = getPartFeatureConflicts(part.features ?? [], part);
+    expect(
+      conflicts.some(
+        (conflict) =>
+          conflict.featureId === 'feature-2' && conflict.code === 'rect_consumed' && conflict.severity === 'error'
+      )
+    ).toBe(true);
+  });
+
+  it('flags anchor-dependent removals when a prior cut removes their starting material', () => {
+    const part = createTestPart({
+      width: 8,
+      features: [
+        {
+          id: 'feature-1',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'cutout',
+          parameters: {
+            size: { length: 4, width: 1 },
+            depthMode: 'through'
+          },
+          placement: { x: 0, z: 0 }
+        },
+        {
+          id: 'feature-2',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'edge', edge: 'top_front_edge' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'rabbet',
+          parameters: {
+            size: { length: 0.5, width: 0.5 },
+            depthMode: 'blind',
+            depth: 0.25
+          },
+          placement: { x: 0, z: 0 }
+        }
+      ]
+    });
+
+    const conflicts = getPartFeatureConflicts(part.features ?? [], part);
+    expect(
+      conflicts.some(
+        (conflict) =>
+          conflict.featureId === 'feature-2' && conflict.code === 'rect_anchor_removed' && conflict.severity === 'error'
+      )
+    ).toBe(true);
+  });
+
+  it('does not escalate blind top-face overlaps against bottom-face work', () => {
+    const part = createTestPart({
+      width: 8,
+      features: [
+        {
+          id: 'feature-1',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mortise',
+          parameters: {
+            size: { length: 4, width: 2 },
+            depthMode: 'blind',
+            depth: 0.25
+          },
+          placement: { x: 1, z: 2 }
+        },
+        {
+          id: 'feature-2',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'bottom_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mortise',
+          parameters: {
+            size: { length: 4, width: 2 },
+            depthMode: 'blind',
+            depth: 0.25
+          },
+          placement: { x: 1, z: 2 }
+        }
+      ]
+    });
+
+    const conflicts = getPartFeatureConflicts(part.features ?? [], part);
+    expect(
+      conflicts.every((conflict) => conflict.code !== 'rect_consumed' && conflict.code !== 'rect_anchor_removed')
+    ).toBe(true);
+  });
 });

@@ -1,5 +1,5 @@
 import { Part, PartFeature, RectCutFeature } from '@renderer/types';
-import { getResolvedRectCutFeature } from '@renderer/utils/rectCutUtils';
+import { getResolvedRectCutFeature, isBottomTarget, isTopTarget } from '@renderer/utils/rectCutUtils';
 import { getFeatureTargetLabel } from '@renderer/utils/partFeatureSummary';
 
 export interface PartFeatureConflict {
@@ -7,7 +7,7 @@ export interface PartFeatureConflict {
   featureIndex: number;
   relatedFeatureId?: string;
   relatedFeatureIndex?: number;
-  code: 'duplicate_end_cut' | 'rect_overlap';
+  code: 'duplicate_end_cut' | 'rect_overlap' | 'rect_consumed' | 'rect_anchor_removed';
   severity: 'warning' | 'error';
   message: string;
 }
@@ -19,8 +19,19 @@ interface RectBounds {
   maxZ: number;
 }
 
+type ReachableSurface = 'top' | 'bottom';
+
 function overlaps(a: RectBounds, b: RectBounds): boolean {
   return a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
+}
+
+function contains(container: RectBounds, candidate: RectBounds): boolean {
+  return (
+    container.minX <= candidate.minX &&
+    container.maxX >= candidate.maxX &&
+    container.minZ <= candidate.minZ &&
+    container.maxZ >= candidate.maxZ
+  );
 }
 
 function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length' | 'width'>): RectBounds | null {
@@ -32,7 +43,9 @@ function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length'
     resolvedFeature.cutType === 'cutout' ||
     resolvedFeature.cutType === 'dado' ||
     resolvedFeature.cutType === 'stopped_dado' ||
-    resolvedFeature.cutType === 'stopped_groove'
+    resolvedFeature.cutType === 'groove' ||
+    resolvedFeature.cutType === 'stopped_groove' ||
+    resolvedFeature.cutType === 'mortise'
   ) {
     return {
       minX: resolvedFeature.placement.x,
@@ -73,6 +86,42 @@ function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length'
     minZ: resolvedFeature.placement.z,
     maxZ: resolvedFeature.placement.z + sizeWidth
   };
+}
+
+function getReachableSurfaces(feature: RectCutFeature, resolvedFeature: RectCutFeature): Set<ReachableSurface> {
+  if (resolvedFeature.cutType === 'cutout' && resolvedFeature.parameters.depthMode === 'through') {
+    return new Set<ReachableSurface>(['top', 'bottom']);
+  }
+
+  if (isTopTarget(resolvedFeature)) return new Set<ReachableSurface>(['top']);
+  if (isBottomTarget(resolvedFeature)) return new Set<ReachableSurface>(['bottom']);
+
+  if (feature.target.type === 'face') {
+    if (feature.target.face === 'top_face') return new Set<ReachableSurface>(['top']);
+    if (feature.target.face === 'bottom_face') return new Set<ReachableSurface>(['bottom']);
+  }
+
+  return new Set<ReachableSurface>();
+}
+
+function sharesReachableSurface(
+  priorFeature: RectCutFeature,
+  currentFeature: RectCutFeature,
+  part: Pick<Part, 'length' | 'width'>
+): boolean {
+  const priorResolved = getResolvedRectCutFeature(priorFeature, { ...part, thickness: 1 });
+  const currentResolved = getResolvedRectCutFeature(currentFeature, { ...part, thickness: 1 });
+  const priorSurfaces = getReachableSurfaces(priorFeature, priorResolved);
+  const currentSurfaces = getReachableSurfaces(currentFeature, currentResolved);
+
+  for (const surface of currentSurfaces) {
+    if (priorSurfaces.has(surface)) return true;
+  }
+  return false;
+}
+
+function isAnchorDependent(feature: RectCutFeature): boolean {
+  return feature.cutType === 'rabbet' || feature.cutType === 'edge_notch' || feature.cutType === 'corner_notch';
 }
 
 export function getPartFeatureConflicts(
@@ -131,14 +180,29 @@ export function getPartFeatureConflicts(
       const b = currentBounds;
       if (!a || !b || !overlaps(a, b)) continue;
 
-      const message = `Operation ${index + 1} overlaps Operation ${prior.index + 1}. The resulting removal stack is allowed, but order now matters.`;
+      let code: PartFeatureConflict['code'] = 'rect_overlap';
+      let severity: PartFeatureConflict['severity'] = 'warning';
+      let message = `Operation ${index + 1} overlaps Operation ${prior.index + 1}. The resulting removal stack is allowed, but order now matters.`;
+
+      if (sharesReachableSurface(prior.feature, feature, part)) {
+        if (isAnchorDependent(feature)) {
+          code = 'rect_anchor_removed';
+          severity = 'error';
+          message = `Operation ${index + 1} depends on ${getFeatureTargetLabel(feature)}, but Operation ${prior.index + 1} already removes that anchor material.`;
+        } else if (contains(a, b)) {
+          code = 'rect_consumed';
+          severity = 'error';
+          message = `Operation ${index + 1} starts inside material already removed by Operation ${prior.index + 1}.`;
+        }
+      }
+
       conflicts.push({
         featureId: prior.feature.id,
         featureIndex: prior.index,
         relatedFeatureId: feature.id,
         relatedFeatureIndex: index,
-        code: 'rect_overlap',
-        severity: 'warning',
+        code,
+        severity,
         message
       });
       conflicts.push({
@@ -146,8 +210,8 @@ export function getPartFeatureConflicts(
         featureIndex: index,
         relatedFeatureId: prior.feature.id,
         relatedFeatureIndex: prior.index,
-        code: 'rect_overlap',
-        severity: 'warning',
+        code,
+        severity,
         message
       });
     }
