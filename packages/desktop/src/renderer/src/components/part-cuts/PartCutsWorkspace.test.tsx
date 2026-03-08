@@ -349,10 +349,10 @@ describe('PartCutsWorkspace', () => {
     );
 
     fireEvent.click(screen.getByText('Dado'));
-    expect(screen.getByText(/Dado runs full board width/i)).toBeInTheDocument();
+    expect(screen.getByText(/Dado spans the full board width/i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Removal Type'), { target: { value: 'rabbet' } });
-    expect(screen.getByText(/Rabbet runs full edge length/i)).toBeInTheDocument();
+    expect(screen.getByText(/Rabbet runs the full edge length/i)).toBeInTheDocument();
   });
 
   it('supports groove and mortise operation types in the inspector', () => {
@@ -375,7 +375,7 @@ describe('PartCutsWorkspace', () => {
     );
 
     fireEvent.click(screen.getByText('Groove'));
-    expect(screen.getByText(/Groove runs full board length/i)).toBeInTheDocument();
+    expect(screen.getByText(/Groove runs the full board length/i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Removal Type'), { target: { value: 'mortise' } });
     expect(screen.getByText(/Mortise is a blind face pocket/i)).toBeInTheDocument();

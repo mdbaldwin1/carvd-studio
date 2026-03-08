@@ -909,14 +909,11 @@ export function PartCutsWorkspace({
                         </div>
 
                         {inspectorDraft.cutType === 'cutout' && (
-                          <p className="text-[11px] text-text-muted">
-                            POC note: face cutout previews currently target top or bottom faces only.
-                          </p>
+                          <p className="text-[11px] text-text-muted">Face cutouts target the top or bottom face.</p>
                         )}
                         {inspectorDraft.cutType === 'dado' && (
                           <p className="text-[11px] text-text-muted">
-                            Dado runs full board width in this POC. Set the channel width along the blank and the blind
-                            depth.
+                            Dado spans the full board width. Set the channel width along the blank and the blind depth.
                           </p>
                         )}
                         {inspectorDraft.cutType === 'stopped_dado' && (
@@ -927,13 +924,13 @@ export function PartCutsWorkspace({
                         )}
                         {inspectorDraft.cutType === 'rabbet' && (
                           <p className="text-[11px] text-text-muted">
-                            Rabbet runs full edge length in this POC. Set the shoulder width and blind depth.
+                            Rabbet runs the full edge length. Set the shoulder width and blind depth.
                           </p>
                         )}
                         {inspectorDraft.cutType === 'groove' && (
                           <p className="text-[11px] text-text-muted">
-                            Groove runs full board length in this POC. Set the groove width across the board and the
-                            blind depth.
+                            Groove runs the full board length. Set the groove width across the board and the blind
+                            depth.
                           </p>
                         )}
                         {inspectorDraft.cutType === 'stopped_groove' && (
@@ -944,7 +941,7 @@ export function PartCutsWorkspace({
                         )}
                         {inspectorDraft.cutType === 'mortise' && (
                           <p className="text-[11px] text-text-muted">
-                            Mortise is a blind face pocket in this POC. Set pocket size, placement, and blind depth.
+                            Mortise is a blind face pocket. Set pocket size, placement, and blind depth.
                           </p>
                         )}
 
@@ -1029,7 +1026,7 @@ export function PartCutsWorkspace({
                                   : inspectorDraft.cutType === 'stopped_dado'
                                     ? 'Derived from blank width.'
                                     : inspectorDraft.cutType === 'rabbet'
-                                      ? 'Runs full edge length in this POC.'
+                                      ? 'Runs the full edge length.'
                                       : 'Derived from blank length.'}
                               </p>
                             )}
@@ -1081,8 +1078,7 @@ export function PartCutsWorkspace({
                             inspectorDraft.cutType === 'stopped_groove' ||
                             inspectorDraft.cutType === 'mortise') && (
                             <p className="text-[11px] text-text-muted">
-                              Blind previews currently support top or bottom targets so the recess direction stays
-                              unambiguous.
+                              Blind previews use top or bottom targets so the recess direction stays clear.
                             </p>
                           )}
 
