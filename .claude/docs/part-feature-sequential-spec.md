@@ -8,7 +8,7 @@ As of beads `15.2` and `15.3`, the current branch now implements:
 
 - list-order-driven preview geometry for supported part-feature stacks
 - ordered end-cut precedence in the preview path instead of `max inset wins`
-- shared same-part conflict analysis for duplicate end cuts and overlapping rectangular removals
+- shared same-part conflict analysis for duplicate end cuts, overlapping rectangular removals, consumed-material errors, and anchor-removal errors
 - blocking cuts-mode save behavior for error-level ordered conflicts
 - cut-list validation that surfaces saved ordered conflicts
 - numbered fabrication lines that preserve authored operation order in reporting
