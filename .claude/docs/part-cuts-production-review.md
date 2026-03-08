@@ -78,3 +78,11 @@ If this branch ever feeds a real production track, the promotion order should be
 4. selected presets, mirroring, and direct-handle interactions
 
 Everything else should be explicitly staged after that instead of merged as one large feature block.
+
+## Actions Taken In This Review Pass
+
+This review pass already applied the following trims:
+
+- removed prototype-heavy `POC note` phrasing from the cuts inspector copy
+- rewrote constrained-operation descriptions to explain the woodworking task directly
+- kept the hard product constraints while making the wording less implementation-colored
