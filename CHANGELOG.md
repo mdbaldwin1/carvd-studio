@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Expanded preview handles in Part Cuts (POC)** — Direct preview handles now cover stored end-cut reference values in addition to face pockets and stopped channels, and new end-cut operations created from the cuts workspace or inspectors now persist an explicit `{ mode, value }` reference object alongside legacy compatibility fields.
 - **Cuts workflow trim pass (POC)** — Cleaned up prototype-like wording in Part Cuts by reducing duplicate selection labels, renaming left-rail sections more intentionally, and clarifying the main entry action as `Open Cuts Workspace`.
 - **Expanded cuts preset set (POC)** — Part Cuts now includes richer starter presets, including compound end-cut pairs, centered dado starters, rabbet starters, and paired corner-relief presets for faster stack authoring.
 - **Cuts workspace clarity pass (POC)** — Part Cuts now shows draft status, a short workflow guide, stronger selected-operation emphasis, clearer derived-field messaging for constrained operations, and explicit `Back to Project` / `Save Part` footer actions.

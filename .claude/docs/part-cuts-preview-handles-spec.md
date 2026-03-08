@@ -136,6 +136,15 @@ Handles:
 
 Angles remain inspector-only in this pass. The handle edits the selected reference mode value, not the cut angle itself.
 
+Stored model:
+
+- end cuts should persist a `reference` object with:
+  - `mode`
+  - `value`
+- `lengthMode` remains as a compatibility field for legacy features and exports
+- blank sizing stays separate from end-cut reference editing
+- preview handles and inspector fields both edit the stored reference value directly
+
 ## Drag Semantics
 
 ### Pointer mapping
