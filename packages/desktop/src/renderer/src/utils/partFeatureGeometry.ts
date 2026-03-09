@@ -322,20 +322,18 @@ function applyVerticalEndCuts(geometry: THREE.BufferGeometry, part: Part): void 
   const halfLength = part.length / 2;
   const halfThickness = part.thickness / 2;
   const epsilon = 1e-4;
-  const capEpsilon = 1e-3;
 
   for (let i = 0; i < positions.count; i += 1) {
     const x = positions.getX(i);
     const y = positions.getY(i);
     const z = positions.getZ(i);
-    const isTopOrBottomCap = Math.abs(Math.abs(y) - halfThickness) < capEpsilon;
 
     if (profiles.left.maxInset > 0) {
       const leftReferenceY = profiles.left.verticalFlip ? halfThickness : -halfThickness;
       const leftBaseInset = getEndCutInsetAt('left', profiles, part, { y: leftReferenceY, z });
       const leftBaseBoundaryX = -halfLength + leftBaseInset;
       const leftInset = getEndCutInsetAt('left', profiles, part, { y, z });
-      if (Math.abs(x - leftBaseBoundaryX) < epsilon || (isTopOrBottomCap && Math.abs(x + halfLength) < capEpsilon)) {
+      if (Math.abs(x - leftBaseBoundaryX) < epsilon) {
         positions.setX(i, -halfLength + leftInset);
       }
     }
@@ -345,7 +343,7 @@ function applyVerticalEndCuts(geometry: THREE.BufferGeometry, part: Part): void 
       const rightBaseInset = getEndCutInsetAt('right', profiles, part, { y: rightReferenceY, z });
       const rightBaseBoundaryX = halfLength - rightBaseInset;
       const rightInset = getEndCutInsetAt('right', profiles, part, { y, z });
-      if (Math.abs(x - rightBaseBoundaryX) < epsilon || (isTopOrBottomCap && Math.abs(x - halfLength) < capEpsilon)) {
+      if (Math.abs(x - rightBaseBoundaryX) < epsilon) {
         positions.setX(i, halfLength - rightInset);
       }
     }

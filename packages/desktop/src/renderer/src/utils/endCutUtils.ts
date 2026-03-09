@@ -64,10 +64,7 @@ function getFeatureHorizontalInset(feature: EndCutFeature, width: number): numbe
 function getFeatureVerticalInset(feature: EndCutFeature, thickness: number): number {
   if (feature.cutType === 'square' || feature.cutType === 'mitre' || thickness <= 0) return 0;
   const angle = Math.abs(feature.parameters.verticalAngle || 0);
-  const horizontalAngle = feature.cutType === 'compound' ? Math.abs(feature.parameters.horizontalAngle || 0) : 0;
-  const horizontalCos = Math.cos((horizontalAngle * Math.PI) / 180);
-  const projectionScale = horizontalCos <= 1e-6 ? 1 : 1 / horizontalCos;
-  return Math.max(0, Math.tan((angle * Math.PI) / 180) * thickness * projectionScale);
+  return Math.max(0, Math.tan((angle * Math.PI) / 180) * thickness);
 }
 
 export function getPartEndCutProfiles(input: {

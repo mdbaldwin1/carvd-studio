@@ -365,76 +365,8 @@ describe('partFeatureGeometry', () => {
       nearestZeroLeftX = Math.max(nearestZeroLeftX, x);
     }
 
-    expect(leftmostX).toBeCloseTo(-8, 3);
-    expect(nearestZeroLeftX).toBeCloseTo(-6.586, 3);
-  });
-
-  it('projects bevel depth through the mitre angle for compound cuts', () => {
-    const plainBevel = getPartRenderGeometry(
-      createTestPart({
-        length: 24,
-        width: 4,
-        thickness: 1,
-        features: [
-          {
-            id: 'feature-1',
-            kind: 'end_cut',
-            version: 1,
-            enabled: true,
-            target: { type: 'face', face: 'left_end' },
-            reference: { primaryFrom: 'min' },
-            cutType: 'bevel',
-            lengthMode: 'long_point',
-            parameters: { horizontalAngle: 0, verticalAngle: 45 }
-          }
-        ]
-      })
-    );
-
-    const compound = getPartRenderGeometry(
-      createTestPart({
-        length: 24,
-        width: 4,
-        thickness: 1,
-        features: [
-          {
-            id: 'feature-1',
-            kind: 'end_cut',
-            version: 1,
-            enabled: true,
-            target: { type: 'face', face: 'left_end' },
-            reference: { primaryFrom: 'min' },
-            cutType: 'compound',
-            lengthMode: 'long_point',
-            parameters: { horizontalAngle: 45, verticalAngle: 45 }
-          }
-        ]
-      })
-    );
-
-    const plainPositions = plainBevel.getAttribute('position');
-    const compoundPositions = compound.getAttribute('position');
-    let plainTopBackInnerX = -Infinity;
-    let compoundTopBackInnerX = -Infinity;
-
-    for (let i = 0; i < plainPositions.count; i += 1) {
-      const x = plainPositions.getX(i);
-      const y = plainPositions.getY(i);
-      const z = plainPositions.getZ(i);
-      if (x > 0) continue;
-      if (y > 0.49 && z > 1.9) plainTopBackInnerX = Math.max(plainTopBackInnerX, x);
-    }
-
-    for (let i = 0; i < compoundPositions.count; i += 1) {
-      const x = compoundPositions.getX(i);
-      const y = compoundPositions.getY(i);
-      const z = compoundPositions.getZ(i);
-      if (x > 0) continue;
-      if (y > 0.49 && z > 1.9) compoundTopBackInnerX = Math.max(compoundTopBackInnerX, x);
-    }
-
-    expect(plainTopBackInnerX).toBeCloseTo(-11, 3);
-    expect(compoundTopBackInnerX).toBeCloseTo(-6.586, 3);
+    expect(leftmostX).toBeCloseTo(-12, 3);
+    expect(nearestZeroLeftX).toBeCloseTo(-8, 3);
   });
 
   it('uses list order when multiple end cuts target the same end in preview geometry', () => {
