@@ -24,15 +24,7 @@ import { ScrollArea } from '@renderer/components/ui/scroll-area';
 import { Select } from '@renderer/components/ui/select';
 import { EndCutFeature, Part, PartFeature, PartFeatureTarget, RectCutFeature } from '@renderer/types';
 import { getDerivedLengthMeasurements, getLengthReferenceValue } from '@renderer/utils/endCutUtils';
-import {
-  buildFeaturesFromPreset,
-  getAvailableMirrorActions,
-  getMirrorActionLabel,
-  getWorkspacePresetHint,
-  getWorkspacePresetLabel,
-  mirrorFeature,
-  WorkspacePreset
-} from '@renderer/utils/partFeatureActions';
+import { getAvailableMirrorActions, getMirrorActionLabel, mirrorFeature } from '@renderer/utils/partFeatureActions';
 import { getPartFeatureConflicts } from '@renderer/utils/partFeatureConflicts';
 import { getPickableTargetLabel, isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
@@ -66,6 +58,8 @@ interface PartCutsWorkspaceProps {
   onSave: () => void;
   hasUnsavedChanges: boolean;
 }
+
+type CutsPanelMode = 'list' | 'add' | 'edit';
 
 function getBlankSizeLabel(part: Part, units: 'imperial' | 'metric'): string {
   return [
@@ -141,6 +135,56 @@ function getOperationPresetHint(preset: OperationPreset): string {
   }
 }
 
+function getDraftStepTitle(draft: FeatureDraft): string {
+  if (draft.mode === 'end_cut') return 'Step 2: Pick the end and set the angle';
+
+  switch (draft.cutType) {
+    case 'corner_notch':
+      return 'Step 2: Pick the corner and size the notch';
+    case 'edge_notch':
+      return 'Step 2: Pick the edge and size the notch';
+    case 'cutout':
+      return 'Step 2: Pick the face and place the cutout';
+    case 'dado':
+    case 'stopped_dado':
+      return 'Step 2: Pick the face and lay out the dado';
+    case 'rabbet':
+      return 'Step 2: Pick the edge and size the rabbet';
+    case 'groove':
+    case 'stopped_groove':
+      return 'Step 2: Pick the face and lay out the groove';
+    case 'mortise':
+      return 'Step 2: Pick the face and place the mortise';
+  }
+}
+
+function getDraftStepDescription(draft: FeatureDraft): string {
+  if (draft.mode === 'end_cut') {
+    return 'Choose the end first, then set the cut style, angle, and measured length.';
+  }
+
+  switch (draft.cutType) {
+    case 'corner_notch':
+      return 'Choose the exact corner, then set the notch size and depth.';
+    case 'edge_notch':
+      return 'Choose the edge, then set the notch size, depth, and offsets.';
+    case 'cutout':
+      return 'Choose the face, then set the opening size, depth, and placement.';
+    case 'dado':
+      return 'Choose the face, then set the dado width and depth.';
+    case 'stopped_dado':
+      return 'Choose the face, then set the stopped run, width, start offset, and depth.';
+    case 'rabbet':
+      return 'Choose the edge, then set the shoulder width and depth.';
+    case 'groove':
+      return 'Choose the face, then set the groove width and depth.';
+    case 'stopped_groove':
+      return 'Choose the face, then set the groove run, width, offsets, and depth.';
+    case 'mortise':
+      return 'Choose the face, then set the pocket size, placement, and depth.';
+  }
+}
+
 export function PartCutsWorkspace({
   part,
   draftFeatures,
@@ -157,21 +201,12 @@ export function PartCutsWorkspace({
   hasUnsavedChanges
 }: PartCutsWorkspaceProps) {
   const [draft, setDraft] = useState<FeatureDraft | null>(null);
+  const [panelMode, setPanelMode] = useState<CutsPanelMode>('list');
 
   useEffect(() => {
     setDraft(null);
+    setPanelMode('list');
   }, [part.id]);
-
-  const selectedFeature = useMemo(
-    () => draftFeatures.find((feature) => feature.id === selectedFeatureId) ?? null,
-    [draftFeatures, selectedFeatureId]
-  );
-
-  const activePreset = useMemo<OperationPreset | null>(() => {
-    if (!draft) return null;
-    if (draft.mode === 'end_cut') return 'end_cut';
-    return draft.cutType;
-  }, [draft]);
 
   const draftPreviewFeature = useMemo(() => {
     if (!draft || draft.mode !== 'end_cut') return null;
@@ -245,20 +280,21 @@ export function PartCutsWorkspace({
     setDraft(
       buildDraftFromPreset(preset, { partLength: part.length, partWidth: part.width, partThickness: part.thickness })
     );
+    setPanelMode('add');
     onSelectFeature(null);
+  };
+
+  const handleBeginAdd = () => {
+    setDraft(null);
+    setPanelMode('add');
+    onSelectFeature(null);
+    onPendingTargetChange(null);
   };
 
   const handleEditFeature = (feature: PartFeature) => {
     setDraft(buildDraftFromFeature(feature, part));
+    setPanelMode('edit');
     onSelectFeature(feature.id);
-  };
-
-  const handleAddWorkspacePreset = (preset: WorkspacePreset) => {
-    const nextFeatures = [...draftFeatures, ...buildFeaturesFromPreset(preset, { partLength: part.length })];
-    const firstInserted = nextFeatures[draftFeatures.length] ?? null;
-    onDraftFeaturesChange(nextFeatures);
-    onSelectFeature(firstInserted?.id ?? null);
-    setDraft(firstInserted ? buildDraftFromFeature(firstInserted, part) : null);
   };
 
   const handleSaveDraft = () => {
@@ -273,12 +309,14 @@ export function PartCutsWorkspace({
     onDraftFeaturesChange(nextFeatures);
     onSelectFeature(nextFeature.id);
     setDraft(null);
+    setPanelMode('list');
   };
 
   const handleRemoveFeature = (featureId: string) => {
     onDraftFeaturesChange(draftFeatures.filter((feature) => feature.id !== featureId));
     if (draft?.featureId === featureId) {
       setDraft(null);
+      setPanelMode('list');
     }
     if (selectedFeatureId === featureId) {
       onSelectFeature(null);
@@ -290,6 +328,7 @@ export function PartCutsWorkspace({
     onDraftFeaturesChange([...draftFeatures, duplicate]);
     onSelectFeature(duplicate.id);
     setDraft(buildDraftFromFeature(duplicate, part));
+    setPanelMode('edit');
   };
 
   const handleMirrorFeature = (feature: PartFeature, action: ReturnType<typeof getAvailableMirrorActions>[number]) => {
@@ -300,6 +339,7 @@ export function PartCutsWorkspace({
     onDraftFeaturesChange(nextFeatures);
     onSelectFeature(mirrored.id);
     setDraft(buildDraftFromFeature(mirrored, part));
+    setPanelMode('edit');
   };
 
   const handleMoveFeature = (featureId: string, direction: -1 | 1) => {
@@ -309,13 +349,12 @@ export function PartCutsWorkspace({
     onDraftFeaturesChange(nextFeatures);
   };
 
-  const inspectorDraft = draft ?? (selectedFeature ? buildDraftFromFeature(selectedFeature, part) : null);
-
-  useEffect(() => {
-    if (!draft && selectedFeature) {
-      setDraft(buildDraftFromFeature(selectedFeature, part));
-    }
-  }, [draft, part, selectedFeature]);
+  const inspectorDraft = panelMode === 'list' ? null : draft;
+  const isChoosingCutType = panelMode === 'add' && !draft;
+  const isEditingDraft = !!inspectorDraft;
+  const editingFeatureIndex = inspectorDraft?.featureId
+    ? draftFeatures.findIndex((feature) => feature.id === inspectorDraft.featureId)
+    : -1;
 
   useEffect(() => {
     const nextTarget = inspectorDraft ? getFeatureDraftTarget(inspectorDraft) : null;
@@ -330,10 +369,21 @@ export function PartCutsWorkspace({
     setDraft(applyTargetToFeatureDraft(inspectorDraft, target));
   };
 
+  const handleCancelEditor = () => {
+    setDraft(null);
+    setPanelMode('list');
+    onSelectFeature(null);
+    onPendingTargetChange(null);
+  };
+
   const selectedTargetLabel = getSelectedTargetLabel(inspectorDraft);
   const activeTargetLabel = getPickableTargetLabel(hoveredTarget) ?? getPickableTargetLabel(pendingTarget);
-  const selectedFeatureSummary = selectedFeature ? getFeatureSummary(selectedFeature, units) : null;
-  const selectedFeatureTargetLabel = selectedFeature ? getFeatureTargetLabel(selectedFeature) : null;
+  const selectedFeatureSummary = inspectorDraft
+    ? getFeatureSummary(buildFeatureFromDraft(inspectorDraft), units)
+    : null;
+  const selectedFeatureTargetLabel = inspectorDraft
+    ? getFeatureTargetLabel(buildFeatureFromDraft(inspectorDraft))
+    : null;
   const inspectorIsRabbet = inspectorDraft?.mode === 'rect_cut' && inspectorDraft.cutType === 'rabbet';
   const rabbetRunsAlongLength =
     inspectorIsRabbet && (inspectorDraft.edgeTarget.includes('front') || inspectorDraft.edgeTarget.includes('back'));
@@ -346,223 +396,11 @@ export function PartCutsWorkspace({
   return (
     <div className="app-main flex min-h-0 flex-1 bg-bg">
       <div className="flex min-h-0 flex-1 gap-4 p-4">
-        <Card className="flex min-h-0 w-[340px] flex-col">
-          <CardHeader className="pb-4">
-            <CardTitle>Operations</CardTitle>
-            <CardDescription>
-              Build and order the cut stack for <span className="font-medium text-text">{part.name}</span>.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
-            <div className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-secondary">
-              <div className="font-medium text-text">Blank Size</div>
-              <div>{getBlankSizeLabel(part, units)}</div>
-            </div>
-
-            <div className="rounded-md border border-border bg-bg px-3 py-3 text-sm">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">Draft Status</div>
-              <div className="grid grid-cols-2 gap-2 text-text-secondary">
-                <div>
-                  <span className="font-medium text-text">{draftFeatures.length}</span> operations
-                </div>
-                <div>
-                  <span className="font-medium text-text">{enabledOperationCount}</span> enabled
-                </div>
-                <div>
-                  <span className={`font-medium ${hasBlockingFeatureConflicts ? 'text-danger' : 'text-text'}`}>
-                    {hasBlockingFeatureConflicts ? 'Blocking conflicts' : 'No blocking conflicts'}
-                  </span>
-                </div>
-                <div>
-                  <span className={`font-medium ${hasUnsavedChanges ? 'text-accent' : 'text-text'}`}>
-                    {hasUnsavedChanges ? 'Unsaved changes' : 'No unsaved changes'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-md border border-border bg-bg px-3 py-3 text-sm text-text-secondary">
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">Workflow</div>
-              <ol className="space-y-1 text-[12px]">
-                <li>1. Add or pick an operation.</li>
-                <li>2. Pick the target in the preview or inspector.</li>
-                <li>3. Enter the measurements for that operation.</li>
-                <li>4. Save the operation, then save the part.</li>
-              </ol>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Operation Types</div>
-              <div className="grid grid-cols-2 gap-2">
-                {(
-                  [
-                    'end_cut',
-                    'corner_notch',
-                    'edge_notch',
-                    'cutout',
-                    'dado',
-                    'stopped_dado',
-                    'rabbet',
-                    'groove',
-                    'stopped_groove',
-                    'mortise'
-                  ] as OperationPreset[]
-                ).map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className={`rounded-md border px-3 py-2 text-left transition-colors ${
-                      activePreset === preset
-                        ? 'border-accent bg-accent/10 text-text'
-                        : 'border-border bg-bg-secondary hover:bg-bg-tertiary'
-                    }`}
-                    onClick={() => handleStartPreset(preset)}
-                  >
-                    <div className="text-[12px] font-semibold">{getOperationPresetLabel(preset)}</div>
-                    <div className="mt-1 text-[11px] text-text-muted">{getOperationPresetHint(preset)}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">Starter Presets</div>
-              <div className="grid grid-cols-1 gap-2">
-                {(
-                  [
-                    'mitre_both_ends',
-                    'bevel_both_ends',
-                    'compound_both_ends',
-                    'square_both_ends',
-                    'centered_dado',
-                    'top_front_rabbet',
-                    'top_back_rabbet',
-                    'top_cutout',
-                    'top_front_edge_notch',
-                    'top_front_left_corner_notch',
-                    'top_front_corners',
-                    'bottom_front_corners'
-                  ] as WorkspacePreset[]
-                ).map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-left transition-colors hover:bg-bg-tertiary"
-                    onClick={() => handleAddWorkspacePreset(preset)}
-                  >
-                    <div className="text-[12px] font-semibold">{getWorkspacePresetLabel(preset)}</div>
-                    <div className="mt-1 text-[11px] text-text-muted">{getWorkspacePresetHint(preset)}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <ScrollArea className="min-h-0 flex-1 rounded-md border border-border bg-bg-secondary">
-              <div className="space-y-2 p-3">
-                {draftFeatures.length === 0 ? (
-                  <div className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-text-muted">
-                    No cuts authored yet. Add an operation, pick the target, then save the stack back to the part.
-                  </div>
-                ) : (
-                  draftFeatures.map((feature, index) => {
-                    const isSelected = selectedFeatureId === feature.id;
-                    const conflicts = conflictsByFeatureId.get(feature.id) ?? [];
-                    return (
-                      <div
-                        key={feature.id}
-                        className={`rounded-md border px-3 py-3 ${
-                          isSelected ? 'border-accent bg-accent/5' : 'border-border bg-bg'
-                        }`}
-                      >
-                        <button type="button" className="w-full text-left" onClick={() => handleEditFeature(feature)}>
-                          <div className="mb-1 flex items-center justify-between gap-2">
-                            <div className="text-sm font-medium text-text">
-                              {index + 1}. {feature.label?.trim() || getFeatureTargetLabel(feature)}
-                            </div>
-                            {isSelected && <Badge className="bg-accent text-accent-foreground">Selected</Badge>}
-                            {!feature.enabled && (
-                              <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                                Disabled
-                              </Badge>
-                            )}
-                            {conflicts.length > 0 && (
-                              <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning">
-                                {conflicts.some((conflict) => conflict.severity === 'error') ? 'Conflict' : 'Warning'}
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="mb-1 text-[11px] text-text-muted">
-                            Target: {getFeatureTargetLabel(feature)}
-                          </div>
-                          <div className="text-xs leading-relaxed text-text-secondary">
-                            {getFeatureSummary(feature, units)}
-                          </div>
-                        </button>
-                        {conflicts.length > 0 && (
-                          <div className="mt-2 text-[11px] text-warning">{conflicts[0].message}</div>
-                        )}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            size="xs"
-                            variant="outline"
-                            onClick={() => handleMoveFeature(feature.id, -1)}
-                            disabled={index === 0}
-                          >
-                            Move Up
-                          </Button>
-                          <Button
-                            type="button"
-                            size="xs"
-                            variant="outline"
-                            onClick={() => handleMoveFeature(feature.id, 1)}
-                            disabled={index === draftFeatures.length - 1}
-                          >
-                            Move Down
-                          </Button>
-                          <Button
-                            type="button"
-                            size="xs"
-                            variant="ghost"
-                            onClick={() => handleDuplicateFeature(feature)}
-                          >
-                            Duplicate
-                          </Button>
-                          {getAvailableMirrorActions(feature).map((action) => (
-                            <Button
-                              key={action}
-                              type="button"
-                              size="xs"
-                              variant="ghost"
-                              onClick={() => handleMirrorFeature(feature, action)}
-                            >
-                              {getMirrorActionLabel(action)}
-                            </Button>
-                          ))}
-                          <Button
-                            type="button"
-                            size="xs"
-                            variant="destructiveGhost"
-                            onClick={() => handleRemoveFeature(feature.id)}
-                          >
-                            Remove
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
         <Card className="flex min-h-0 flex-1 flex-col">
           <CardHeader className="pb-4">
-            <CardTitle>Preview</CardTitle>
+            <CardTitle>{part.name}</CardTitle>
             <CardDescription>
-              Hover and click valid targets directly on the part preview. The inspector stays available as the fallback
-              and verification surface.
+              Blank size: <span className="font-medium text-text">{getBlankSizeLabel(part, units)}</span>
             </CardDescription>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col">
@@ -580,50 +418,24 @@ export function PartCutsWorkspace({
                 onDraftChange={setDraft}
               />
 
-              <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text-secondary">
-                <span className="font-medium text-text">Blank size:</span>
-                <span>{getBlankSizeLabel(part, units)}</span>
-                {selectedTargetLabel && (
-                  <span>
-                    Draft target: <span className="font-medium text-text">{selectedTargetLabel}</span>
-                  </span>
-                )}
-                {activeTargetLabel && (
-                  <span>
-                    Preview pick: <span className="font-medium text-text">{activeTargetLabel}</span>
-                  </span>
-                )}
-              </div>
-
-              {selectedTargetLabel && (
-                <div className="rounded-md border border-border bg-bg px-3 py-3 text-left">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
-                    Inspector Target
-                  </div>
-                  <div className="text-sm text-text">
-                    Selected target: <span className="font-medium">{selectedTargetLabel}</span>
-                  </div>
-                </div>
-              )}
-
-              {selectedFeatureSummary && (
-                <div className="rounded-md border border-border bg-bg px-3 py-3 text-left">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
-                    Operation Summary
-                  </div>
-                  <div className="text-sm text-text">{selectedFeatureSummary}</div>
-                </div>
-              )}
-
-              {draftFeatures.length > 0 && (
-                <div className="text-xs text-text-muted">
-                  Current stack:{' '}
-                  {draftFeatures.map((feature, index) => `${index + 1}. ${getFeatureTargetLabel(feature)}`).join(' · ')}
+              {(selectedTargetLabel || activeTargetLabel || selectedFeatureSummary) && (
+                <div className="rounded-md border border-border bg-bg px-3 py-3 text-left text-sm text-text-secondary">
+                  {selectedFeatureSummary && <div className="font-medium text-text">{selectedFeatureSummary}</div>}
+                  {selectedTargetLabel && (
+                    <div className="mt-1">
+                      Target: <span className="font-medium text-text">{selectedTargetLabel}</span>
+                    </div>
+                  )}
+                  {activeTargetLabel && (
+                    <div className="mt-1">
+                      Preview pick: <span className="font-medium text-text">{activeTargetLabel}</span>
+                    </div>
+                  )}
                 </div>
               )}
               {featureConflicts.length > 0 && (
                 <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-left">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-warning">Same-Part Feedback</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-warning">Cut Conflicts</div>
                   <ul className="mt-2 space-y-1 text-sm text-warning">
                     {featureConflicts.slice(0, 3).map((conflict, index) => (
                       <li key={`${conflict.featureId}-${conflict.relatedFeatureId ?? 'none'}-${index}`}>
@@ -637,30 +449,160 @@ export function PartCutsWorkspace({
           </CardContent>
         </Card>
 
-        <Card className="flex min-h-0 w-[360px] flex-col">
+        <Card className="flex min-h-0 w-[420px] flex-col">
           <CardHeader className="pb-4">
-            <CardTitle>Inspector</CardTitle>
-            <CardDescription>
-              Edit the selected operation here, verify exact measurements, and fine-tune anything the preview does not
-              adjust directly.
-            </CardDescription>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>{panelMode === 'list' ? 'Cuts' : panelMode === 'add' ? 'Add Cut' : 'Edit Cut'}</CardTitle>
+                <CardDescription>
+                  {panelMode === 'list'
+                    ? `${draftFeatures.length} cut${draftFeatures.length === 1 ? '' : 's'} on this part`
+                    : panelMode === 'add' && !draft
+                      ? 'Step 1: choose the kind of cut you want to add.'
+                      : inspectorDraft
+                        ? getDraftStepDescription(inspectorDraft)
+                        : 'Finish this cut, then save it back to the cut list.'}
+                </CardDescription>
+              </div>
+              {panelMode === 'list' ? (
+                <Button onClick={handleBeginAdd}>+ Add Cut</Button>
+              ) : (
+                <Button variant="ghost" onClick={handleCancelEditor}>
+                  Back to Cuts
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
-            {!inspectorDraft ? (
-              <div className="rounded-md border border-dashed border-border px-3 py-4 text-sm text-text-muted">
-                Select an operation or start a new one from the left rail.
+            {panelMode === 'list' && (
+              <>
+                <div className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-secondary">
+                  <div className="flex items-center justify-between gap-2">
+                    <span>
+                      <span className="font-medium text-text">{enabledOperationCount}</span> enabled
+                    </span>
+                    <span className={`font-medium ${hasUnsavedChanges ? 'text-accent' : 'text-text'}`}>
+                      {hasUnsavedChanges ? 'Unsaved part changes' : 'Saved to part draft'}
+                    </span>
+                  </div>
+                </div>
+
+                <ScrollArea className="min-h-0 flex-1">
+                  <div className="space-y-3 pr-1">
+                    {draftFeatures.length === 0 ? (
+                      <div className="rounded-md border border-dashed border-border px-3 py-5 text-sm text-text-muted">
+                        No cuts yet. Use <span className="font-medium text-text">+ Add Cut</span> to start the first
+                        one.
+                      </div>
+                    ) : (
+                      draftFeatures.map((feature, index) => {
+                        const conflicts = conflictsByFeatureId.get(feature.id) ?? [];
+                        return (
+                          <button
+                            key={feature.id}
+                            type="button"
+                            className="w-full rounded-md border border-border bg-bg px-3 py-3 text-left transition-colors hover:border-accent hover:bg-accent/5"
+                            onClick={() => handleEditFeature(feature)}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="text-sm font-medium text-text">
+                                  {index + 1}. {feature.label?.trim() || getFeatureSummary(feature, units)}
+                                </div>
+                                <div className="mt-1 text-[11px] text-text-muted">
+                                  Target: {getFeatureTargetLabel(feature)}
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap justify-end gap-1">
+                                {!feature.enabled && (
+                                  <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                                    Disabled
+                                  </Badge>
+                                )}
+                                {conflicts.length > 0 && (
+                                  <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning">
+                                    {conflicts.some((conflict) => conflict.severity === 'error')
+                                      ? 'Conflict'
+                                      : 'Warning'}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            {conflicts.length > 0 && (
+                              <div className="mt-2 text-[11px] text-warning">{conflicts[0].message}</div>
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
+
+                <div className="mt-auto flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={onExit}>
+                    Back to Project
+                  </Button>
+                  <Button
+                    onClick={onSave}
+                    disabled={!hasUnsavedChanges || hasBlockingFeatureConflicts}
+                    className="ml-auto"
+                  >
+                    Save Part
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {isChoosingCutType && (
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-base font-semibold text-text">What kind of cut?</h3>
+                  <p className="mt-1 text-sm text-text-secondary">
+                    Pick the cut type first. The next step will walk through the right target and measurements.
+                  </p>
+                </div>
+                <div className="rounded-md border border-border bg-bg-secondary px-3 py-3 text-sm text-text-secondary">
+                  Different cuts use different workflows. End cuts focus on the part ends and angles. Notches, cutouts,
+                  and joinery start by picking the face, edge, or corner they belong on.
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      'end_cut',
+                      'corner_notch',
+                      'edge_notch',
+                      'cutout',
+                      'dado',
+                      'stopped_dado',
+                      'rabbet',
+                      'groove',
+                      'stopped_groove',
+                      'mortise'
+                    ] as OperationPreset[]
+                  ).map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      className="rounded-md border border-border bg-bg px-3 py-3 text-left transition-colors hover:border-accent hover:bg-accent/5"
+                      onClick={() => handleStartPreset(preset)}
+                    >
+                      <div className="text-sm font-semibold text-text">{getOperationPresetLabel(preset)}</div>
+                      <div className="mt-1 text-[11px] text-text-muted">{getOperationPresetHint(preset)}</div>
+                    </button>
+                  ))}
+                </div>
               </div>
-            ) : (
+            )}
+
+            {isEditingDraft && (
               <div className="min-h-0 flex-1 overflow-y-auto pr-1">
                 <div className="rounded-md border border-border bg-bg-secondary p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div>
-                      <Label className="block">Target</Label>
-                      <p className="mt-1 text-[11px] text-text-muted">
-                        Choose the exact end, edge, face, or corner before entering measurements.
-                      </p>
+                      <Label className="block">{getDraftStepTitle(inspectorDraft)}</Label>
+                      <p className="mt-1 text-[11px] text-text-muted">{getDraftStepDescription(inspectorDraft)}</p>
                     </div>
-                    <Badge variant="outline">{inspectorDraft.featureId ? 'Editing' : 'New'}</Badge>
+                    <Badge variant="outline">{panelMode === 'edit' ? 'Editing' : 'New Cut'}</Badge>
                   </div>
 
                   {inspectorDraft.mode === 'end_cut' && (
@@ -779,7 +721,7 @@ export function PartCutsWorkspace({
                             </Select>
                           </div>
                           <div>
-                            <Label htmlFor="length-mode">Reference</Label>
+                            <Label htmlFor="length-mode">Measure To</Label>
                             <Select
                               id="length-mode"
                               value={inspectorDraft.referenceMode}
@@ -822,7 +764,7 @@ export function PartCutsWorkspace({
                         )}
 
                         <div>
-                          <Label>Reference Value</Label>
+                          <Label>Length</Label>
                           <FractionInput
                             value={inspectorDraft.referenceValue}
                             onChange={(value) => setDraft({ ...inspectorDraft, referenceValue: value })}
@@ -833,12 +775,11 @@ export function PartCutsWorkspace({
                         {endCutPreviewMeasurements && (
                           <div className="rounded-md border border-border bg-bg p-3">
                             <p className="text-[12px] font-medium text-text">
-                              Derived Lengths ({endCutPreviewMeasurements.lengthMode.replace('_', ' ')})
+                              Resulting Lengths ({endCutPreviewMeasurements.lengthMode.replace('_', ' ')})
                             </p>
                             <p className="mt-1 text-[11px] text-text-muted">
-                              Control value:{' '}
-                              {formatMeasurementWithUnit(endCutPreviewMeasurements.controllingValue, units)} from the
-                              selected reference.
+                              Using: {formatMeasurementWithUnit(endCutPreviewMeasurements.controllingValue, units)} from
+                              the selected measurement reference.
                             </p>
                             <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-text-muted sm:grid-cols-3">
                               <span>
@@ -1087,34 +1028,75 @@ export function PartCutsWorkspace({
                             {draftValidationMessage}
                           </div>
                         )}
+
+                        {inspectorDraft.featureId && (
+                          <div className="rounded-md border border-border bg-bg p-3">
+                            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                              Cut Actions
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="xs"
+                                variant="outline"
+                                onClick={() => handleMoveFeature(inspectorDraft.featureId!, -1)}
+                                disabled={editingFeatureIndex <= 0}
+                              >
+                                Move Up
+                              </Button>
+                              <Button
+                                type="button"
+                                size="xs"
+                                variant="outline"
+                                onClick={() => handleMoveFeature(inspectorDraft.featureId!, 1)}
+                                disabled={editingFeatureIndex < 0 || editingFeatureIndex >= draftFeatures.length - 1}
+                              >
+                                Move Down
+                              </Button>
+                              <Button
+                                type="button"
+                                size="xs"
+                                variant="ghost"
+                                onClick={() => handleDuplicateFeature(buildFeatureFromDraft(inspectorDraft))}
+                              >
+                                Duplicate
+                              </Button>
+                              {getAvailableMirrorActions(buildFeatureFromDraft(inspectorDraft)).map((action) => (
+                                <Button
+                                  key={action}
+                                  type="button"
+                                  size="xs"
+                                  variant="ghost"
+                                  onClick={() => handleMirrorFeature(buildFeatureFromDraft(inspectorDraft), action)}
+                                >
+                                  {getMirrorActionLabel(action)}
+                                </Button>
+                              ))}
+                              <Button
+                                type="button"
+                                size="xs"
+                                variant="destructiveGhost"
+                                onClick={() => handleRemoveFeature(inspectorDraft.featureId!)}
+                              >
+                                Delete Cut
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
                 </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button type="button" size="sm" onClick={handleSaveDraft} disabled={!!draftValidationMessage}>
+                    Save Cut
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={handleCancelEditor}>
+                    Cancel
+                  </Button>
+                </div>
               </div>
             )}
-
-            <div className="mt-auto flex flex-wrap gap-2">
-              <Button type="button" size="sm" onClick={handleSaveDraft} disabled={!!draftValidationMessage}>
-                {inspectorDraft?.featureId ? 'Save Operation' : 'Add Operation'}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setDraft(selectedFeature ? buildDraftFromFeature(selectedFeature, part) : null);
-                }}
-              >
-                Reset
-              </Button>
-              <Button variant="outline" onClick={onExit} className="ml-auto">
-                Back to Project
-              </Button>
-              <Button onClick={onSave} disabled={!hasUnsavedChanges || hasBlockingFeatureConflicts}>
-                Save Part
-              </Button>
-            </div>
           </CardContent>
         </Card>
       </div>

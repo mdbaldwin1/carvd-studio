@@ -13,8 +13,9 @@ As of beads `13.2` through `13.5`, the implemented POC behavior is:
 - reordering, duplication, removal, and enable/disable all happen there
 - quick presets now seed common cut stacks and starter operations
 - mirror actions now let supported operations be copied to the opposite end or across the part axes
-- the workspace now includes a compact draft-status summary, always-visible workflow guidance, and clearer selected-operation emphasis
-- the workspace trim pass also removes duplicate selection wording, clarifies left-rail naming, and makes the main entry label more explicit
+- the workspace now uses a two-panel layout: part preview on the left, cuts list or focused single-cut editing on the right
+- adding a cut now starts with a guided `What kind of cut?` step, then moves into cut-type-specific target and measurement editing
+- selecting an existing cut card now swaps the right panel into focused single-cut edit mode instead of keeping the full stack and inspector visible at once
 - the main Properties panel is reduced to a compact cuts summary plus `Edit Cuts`
 - the preview now supports direct 3D target picking for the current POC operations, with inspector/form fallback for verification and difficult camera angles
 - the preview now also exposes direct handles for supported face-based rectangular operations, with inspector fallback for unsupported operation families
@@ -119,9 +120,29 @@ Cuts are represented as an ordered stack of operations on the part.
 
 That stack is visible, reorderable, and becomes authoritative for future overlapping-feature behavior.
 
+### One step at a time
+
+The workspace should show one primary decision at a time:
+
+1. view the current cuts list
+2. choose `Add Cut`
+3. answer `What kind of cut?`
+4. edit the selected cut in a focused form
+5. save back to the cuts list
+
+This is intentionally simpler than showing presets, stack controls, workflow copy, and the live editor all at once.
+
 ### Spatial targeting over abstract form editing
 
 The workspace should favor direct selection of ends, faces, edges, and corners in the preview.
+
+### List first, focused editing second
+
+The default right-side state is the cuts list.
+
+When the user adds or edits a cut, the right panel should switch into a focused single-cut editor.
+
+Saving returns the user to the cuts list.
 
 ### Main editor remains uncluttered
 
