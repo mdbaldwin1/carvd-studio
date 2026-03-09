@@ -88,6 +88,68 @@ describe('partFeatureGeometry', () => {
     expect(geometry.boundingBox!.min.x).toBeCloseTo(-12);
   });
 
+  it('moves a mitred end when the stored reference length changes', () => {
+    const fullLengthReference = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: {
+              horizontalAngle: 45,
+              reference: {
+                mode: 'long_point',
+                value: 24
+              }
+            }
+          }
+        ]
+      })
+    );
+
+    const shorterReference = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: {
+              horizontalAngle: 45,
+              reference: {
+                mode: 'long_point',
+                value: 20
+              }
+            }
+          }
+        ]
+      })
+    );
+
+    fullLengthReference.computeBoundingBox();
+    shorterReference.computeBoundingBox();
+
+    expect(fullLengthReference.boundingBox!.min.x).toBeCloseTo(-12);
+    expect(shorterReference.boundingBox!.min.x).toBeCloseTo(-8);
+  });
+
   it('slopes the end plane across thickness for bevel cuts', () => {
     const geometry = getPartRenderGeometry(
       createTestPart({
