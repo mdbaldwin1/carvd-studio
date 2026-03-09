@@ -56,12 +56,16 @@ function buildOuterContour(part: Part): Point2[] {
   const halfLength = part.length / 2;
   const halfWidth = part.width / 2;
   const profiles = getPartEndCutProfiles(part);
+  const leftFrontInset = profiles.left.horizontalFlip ? profiles.left.horizontalInset : 0;
+  const leftBackInset = profiles.left.horizontalFlip ? 0 : profiles.left.horizontalInset;
+  const rightFrontInset = profiles.right.horizontalFlip ? 0 : profiles.right.horizontalInset;
+  const rightBackInset = profiles.right.horizontalFlip ? profiles.right.horizontalInset : 0;
 
   return [
-    { x: -halfLength + profiles.left.baseInset, z: -halfWidth },
-    { x: halfLength - profiles.right.baseInset - profiles.right.horizontalInset, z: -halfWidth },
-    { x: halfLength - profiles.right.baseInset, z: halfWidth },
-    { x: -halfLength + profiles.left.baseInset + profiles.left.horizontalInset, z: halfWidth }
+    { x: -halfLength + profiles.left.baseInset + leftFrontInset, z: -halfWidth },
+    { x: halfLength - profiles.right.baseInset - rightFrontInset, z: -halfWidth },
+    { x: halfLength - profiles.right.baseInset - rightBackInset, z: halfWidth },
+    { x: -halfLength + profiles.left.baseInset + leftBackInset, z: halfWidth }
   ];
 }
 

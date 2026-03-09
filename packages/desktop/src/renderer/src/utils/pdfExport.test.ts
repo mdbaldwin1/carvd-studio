@@ -225,7 +225,7 @@ describe('exportCutListToCsv', () => {
     const csv = exportCutListToCsv(cutList, 'imperial');
 
     expect(csv).toContain('Operations / Notes');
-    expect(csv).toContain('Mitre 45° on Left End · Long Point reference');
+    expect(csv).toContain('Mitre 45° on Left End · Long point on Front');
   });
 
   it('separates different stock dimensions into different rows', () => {

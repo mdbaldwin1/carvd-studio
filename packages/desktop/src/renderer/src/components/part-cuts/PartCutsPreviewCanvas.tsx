@@ -50,19 +50,16 @@ export function buildPreviewPart(part: Part, draftFeatures: Part['features'], dr
   };
 }
 
-type HandleKind = 'move' | 'length' | 'width' | 'reference';
+type HandleKind = 'move' | 'length' | 'width';
 
 interface EditableHandleOverlay {
-  mode: 'rect' | 'end';
+  mode: 'rect';
   operationLabel: string;
   center?: [number, number, number];
   lengthHandle?: [number, number, number];
   widthHandle?: [number, number, number] | null;
   areaPosition?: [number, number, number];
   areaSize?: [number, number, number];
-  referenceHandle?: [number, number, number];
-  guidePosition?: [number, number, number];
-  guideSize?: [number, number, number];
 }
 
 interface ActiveDragState {
@@ -92,7 +89,7 @@ function clamp(value: number, min: number, max: number): number {
 
 function supportsPreviewHandles(draft: FeatureDraft | null): boolean {
   if (!draft) return false;
-  if (draft.mode === 'end_cut') return true;
+  if (draft.mode === 'end_cut') return false;
   return (
     SUPPORTED_HANDLE_TYPES.has(draft.cutType) && (draft.faceTarget === 'top_face' || draft.faceTarget === 'bottom_face')
   );
@@ -100,22 +97,6 @@ function supportsPreviewHandles(draft: FeatureDraft | null): boolean {
 
 function getEditableHandleOverlay(part: Part, draft: FeatureDraft | null): EditableHandleOverlay | null {
   if (!supportsPreviewHandles(draft)) return null;
-
-  if (draft.mode === 'end_cut') {
-    const x =
-      draft.targetFace === 'left_end'
-        ? part.length / 2 - draft.referenceValue
-        : -part.length / 2 + draft.referenceValue;
-    const guideStartX = draft.targetFace === 'left_end' ? -part.length / 2 : x;
-    const guideEndX = draft.targetFace === 'left_end' ? x : part.length / 2;
-    return {
-      mode: 'end',
-      operationLabel: 'End-cut reference handle',
-      referenceHandle: [x, 0, 0],
-      guidePosition: [(guideStartX + guideEndX) / 2, 0, 0],
-      guideSize: [Math.max(MIN_DIMENSION, Math.abs(guideEndX - guideStartX)), 0.02, 0.02]
-    };
-  }
 
   const feature = buildFeatureFromDraft(draft);
   if (feature.kind !== 'rect_cut') return null;
@@ -156,18 +137,6 @@ function applyHandleDelta(
 ): FeatureDraft {
   if (!supportsPreviewHandles(startDraft)) return startDraft;
 
-  if (startDraft.mode === 'end_cut') {
-    if (kind !== 'reference') return startDraft;
-    return {
-      ...startDraft,
-      referenceValue: clamp(
-        startDraft.referenceValue + (startDraft.targetFace === 'left_end' ? -deltaX : deltaX),
-        MIN_DIMENSION,
-        startDraft.cutType === 'square' ? part.length : part.length * 2
-      )
-    };
-  }
-
   const nextDraft: FeatureDraft = { ...startDraft };
   const maxLength = Math.max(MIN_DIMENSION, part.length - startDraft.placementX);
   const maxWidth = Math.max(MIN_DIMENSION, part.width - startDraft.placementZ);
@@ -193,16 +162,6 @@ function applyHandleDelta(
 
 function nudgeDraft(part: Part, draft: FeatureDraft, kind: HandleKind, direction: 1 | -1): FeatureDraft {
   const step = 0.25 * direction;
-  if (draft.mode === 'end_cut') {
-    return {
-      ...draft,
-      referenceValue: clamp(
-        draft.referenceValue + step,
-        MIN_DIMENSION,
-        draft.cutType === 'square' ? part.length : part.length * 2
-      )
-    };
-  }
   return applyHandleDelta(
     part,
     draft,
@@ -459,21 +418,17 @@ export function PartCutsPreviewCanvas({
                   type="button"
                   size="xs"
                   variant="outline"
-                  onClick={() =>
-                    onDraftChange(nudgeDraft(part, draft, draft.mode === 'end_cut' ? 'reference' : 'move', -1))
-                  }
+                  onClick={() => onDraftChange(nudgeDraft(part, draft, 'move', -1))}
                 >
-                  {draft.mode === 'end_cut' ? 'Shorten Ref' : 'Move Left'}
+                  Move Left
                 </Button>
                 <Button
                   type="button"
                   size="xs"
                   variant="outline"
-                  onClick={() =>
-                    onDraftChange(nudgeDraft(part, draft, draft.mode === 'end_cut' ? 'reference' : 'move', 1))
-                  }
+                  onClick={() => onDraftChange(nudgeDraft(part, draft, 'move', 1))}
                 >
-                  {draft.mode === 'end_cut' ? 'Lengthen Ref' : 'Move Right'}
+                  Move Right
                 </Button>
                 {draft.mode === 'rect_cut' && (
                   <Button
@@ -500,8 +455,8 @@ export function PartCutsPreviewCanvas({
           )}
           {draft && !supportsHandles && (
             <div className="rounded-md border border-border bg-bg px-3 py-3 text-left text-sm text-text-muted">
-              Adjust this operation in the inspector. Direct preview handles are currently available for face pockets ,
-              stopped channels, and end-cut reference values.
+              Adjust this operation in the inspector. Direct preview handles are currently available for face pockets
+              and stopped channels.
             </div>
           )}
         </div>

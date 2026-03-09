@@ -72,16 +72,13 @@ describe('SinglePartFeaturesCard', () => {
         parameters: expect.objectContaining({
           horizontalAngle: 22.5,
           verticalAngle: 10,
-          reference: {
-            mode: 'long_point',
-            value: 24
-          }
+          horizontalFlip: false
         })
       })
     ]);
   });
 
-  it('shows derived long-point, short-point, and centerline measurements for end cuts', () => {
+  it('shows anchored board-length measurements for end cuts', () => {
     render(
       <SinglePartFeaturesCard
         selectedPart={createTestPart({
@@ -98,11 +95,11 @@ describe('SinglePartFeaturesCard', () => {
     fireEvent.change(screen.getByLabelText('Cut Style'), { target: { value: 'mitre' } });
     fireEvent.change(screen.getByLabelText('Mitre Angle'), { target: { value: '45' } });
 
-    expect(screen.getByText(/Derived Lengths \(long point\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Control value: 24"/)).toBeInTheDocument();
+    expect(screen.getByText(/Resulting Lengths/i)).toBeInTheDocument();
+    expect(screen.getByText(/Long point stays locked to the board length/i)).toBeInTheDocument();
+    expect(screen.getByText(/Blank 24"/)).toBeInTheDocument();
     expect(screen.getByText(/Long Point 24"/)).toBeInTheDocument();
     expect(screen.getByText(/Short Point 20"/)).toBeInTheDocument();
-    expect(screen.getByText(/Centerline 22"/)).toBeInTheDocument();
   });
 
   it('can disable an existing operation without removing it', () => {

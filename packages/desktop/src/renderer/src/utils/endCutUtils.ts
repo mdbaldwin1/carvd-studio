@@ -5,6 +5,7 @@ export interface EndCutSideProfile {
   horizontalInset: number;
   verticalInset: number;
   maxInset: number;
+  horizontalFlip: boolean;
 }
 
 export interface PartEndCutProfiles {
@@ -23,41 +24,26 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function getReferenceMode(feature: EndCutFeature): EndCutFeature['lengthMode'] {
-  return feature.parameters.reference?.mode ?? feature.lengthMode;
+function getHorizontalFlip(feature: EndCutFeature): boolean {
+  return feature.parameters.horizontalFlip ?? false;
 }
 
-function getLocalReferenceInset(maxInset: number, mode: EndCutFeature['lengthMode']): number {
-  switch (mode) {
-    case 'short_point':
-      return maxInset;
-    case 'centerline':
-      return maxInset / 2;
-    case 'long_point':
-    default:
-      return 0;
-  }
+function getReferenceMode(feature: EndCutFeature): EndCutFeature['lengthMode'] {
+  return feature.parameters.reference?.mode ?? feature.lengthMode;
 }
 
 export function getEndCutReferenceValue(
   feature: EndCutFeature,
   part: Pick<{ length: number; width: number; thickness: number }, 'length' | 'width' | 'thickness'>
 ): number {
-  const horizontalInset = getFeatureHorizontalInset(feature, part.width);
-  const verticalInset = getFeatureVerticalInset(feature, part.thickness);
-  const maxInset = horizontalInset + verticalInset;
+  const measurements = getDerivedLengthMeasurements({
+    length: part.length,
+    width: part.width,
+    thickness: part.thickness,
+    features: [feature]
+  });
   const mode = getReferenceMode(feature);
-  return feature.parameters.reference?.value ?? Math.max(0, part.length - getLocalReferenceInset(maxInset, mode));
-}
-
-function getFeatureBaseInset(
-  feature: EndCutFeature,
-  part: Pick<{ length: number; width: number; thickness: number }, 'length' | 'width' | 'thickness'>,
-  maxInset: number
-): number {
-  const mode = getReferenceMode(feature);
-  const referenceValue = getEndCutReferenceValue(feature, part);
-  return clamp(part.length - referenceValue - getLocalReferenceInset(maxInset, mode), 0, part.length);
+  return getLengthReferenceValue(measurements, mode);
 }
 
 function getEnabledEndCuts(features?: PartFeature[]): EndCutFeature[] {
@@ -82,15 +68,28 @@ export function getPartEndCutProfiles(input: {
   thickness: number;
   features?: PartFeature[];
 }): PartEndCutProfiles {
-  const left: EndCutSideProfile = { baseInset: 0, horizontalInset: 0, verticalInset: 0, maxInset: 0 };
-  const right: EndCutSideProfile = { baseInset: 0, horizontalInset: 0, verticalInset: 0, maxInset: 0 };
+  const left: EndCutSideProfile = {
+    baseInset: 0,
+    horizontalInset: 0,
+    verticalInset: 0,
+    maxInset: 0,
+    horizontalFlip: false
+  };
+  const right: EndCutSideProfile = {
+    baseInset: 0,
+    horizontalInset: 0,
+    verticalInset: 0,
+    maxInset: 0,
+    horizontalFlip: false
+  };
 
   for (const feature of getEnabledEndCuts(input.features)) {
     const profile = feature.target.face === 'left_end' ? left : right;
     profile.horizontalInset = getFeatureHorizontalInset(feature, input.width);
     profile.verticalInset = getFeatureVerticalInset(feature, input.thickness);
     profile.maxInset = profile.horizontalInset + profile.verticalInset;
-    profile.baseInset = getFeatureBaseInset(feature, input, profile.maxInset);
+    profile.baseInset = 0;
+    profile.horizontalFlip = getHorizontalFlip(feature);
   }
 
   const allowedMaxInset = Math.max(0, input.length - 0.01);
@@ -128,12 +127,13 @@ export function getEndCutInsetAt(
   const halfWidth = dimensions.width / 2;
   const halfThickness = dimensions.thickness / 2;
 
-  const horizontalRatio =
+  const defaultHorizontalRatio =
     dimensions.width <= 0
       ? 0
       : side === 'left'
         ? clamp((point.z + halfWidth) / dimensions.width, 0, 1)
         : clamp((halfWidth - point.z) / dimensions.width, 0, 1);
+  const horizontalRatio = profile.horizontalFlip ? 1 - defaultHorizontalRatio : defaultHorizontalRatio;
 
   const verticalRatio =
     dimensions.thickness <= 0
@@ -152,7 +152,7 @@ export function getDerivedLengthMeasurements(input: {
   features?: PartFeature[];
 }): DerivedLengthMeasurements {
   const profiles = getPartEndCutProfiles(input);
-  const longPoint = Math.max(0, input.length - profiles.left.baseInset - profiles.right.baseInset);
+  const longPoint = Math.max(0, input.length);
   const shortPoint = Math.max(0, longPoint - profiles.left.maxInset - profiles.right.maxInset);
   return {
     blank: input.length,

@@ -23,7 +23,7 @@ import { Label } from '@renderer/components/ui/label';
 import { ScrollArea } from '@renderer/components/ui/scroll-area';
 import { Select } from '@renderer/components/ui/select';
 import { EndCutFeature, Part, PartFeature, PartFeatureTarget, RectCutFeature } from '@renderer/types';
-import { getDerivedLengthMeasurements, getLengthReferenceValue } from '@renderer/utils/endCutUtils';
+import { getDerivedLengthMeasurements } from '@renderer/utils/endCutUtils';
 import { getAvailableMirrorActions, getMirrorActionLabel, mirrorFeature } from '@renderer/utils/partFeatureActions';
 import { getPartFeatureConflicts } from '@renderer/utils/partFeatureConflicts';
 import { getPickableTargetLabel, isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
@@ -160,7 +160,7 @@ function getDraftStepTitle(draft: FeatureDraft): string {
 
 function getDraftStepDescription(draft: FeatureDraft): string {
   if (draft.mode === 'end_cut') {
-    return 'Choose the end first, then set the cut style, angle, and measured length.';
+    return 'Choose the end first, then set the cut style, angle, and direction. The part length stays fixed for the cut list.';
   }
 
   switch (draft.cutType) {
@@ -253,14 +253,7 @@ export function PartCutsWorkspace({
       features: nextFeatures
     });
 
-    return {
-      ...measurements,
-      controllingValue: getLengthReferenceValue(
-        measurements,
-        draftPreviewFeature.parameters.reference?.mode ?? draftPreviewFeature.lengthMode
-      ),
-      lengthMode: draftPreviewFeature.parameters.reference?.mode ?? draftPreviewFeature.lengthMode
-    };
+    return measurements;
   }, [draft, draftFeatures, draftPreviewFeature, part.length, part.thickness, part.width]);
 
   const featureConflicts = useMemo(() => getPartFeatureConflicts(draftFeatures, part), [draftFeatures, part]);
@@ -720,34 +713,49 @@ export function PartCutsWorkspace({
                               <option value="compound">Compound</option>
                             </Select>
                           </div>
-                          <div>
-                            <Label htmlFor="length-mode">Measure To</Label>
-                            <Select
-                              id="length-mode"
-                              value={inspectorDraft.referenceMode}
-                              onChange={(e) =>
-                                setDraft({
-                                  ...inspectorDraft,
-                                  referenceMode: e.target.value as EndCutFeature['lengthMode']
-                                })
-                              }
-                            >
-                              <option value="long_point">Long Point</option>
-                              <option value="short_point">Short Point</option>
-                              <option value="centerline">Centerline</option>
-                            </Select>
+                          <div className="rounded-md border border-border bg-bg p-3 text-[12px] text-text-secondary">
+                            The board length stays fixed at{' '}
+                            <span className="font-medium text-text">
+                              {formatMeasurementWithUnit(part.length, units)}
+                            </span>
+                            . This cut only shapes the selected end.
                           </div>
                         </div>
 
                         {(inspectorDraft.cutType === 'mitre' || inspectorDraft.cutType === 'compound') && (
-                          <div>
-                            <Label htmlFor="horizontal-angle">Mitre Angle</Label>
-                            <Input
-                              id="horizontal-angle"
-                              type="number"
-                              value={inspectorDraft.horizontalAngle}
-                              onChange={(e) => setDraft({ ...inspectorDraft, horizontalAngle: Number(e.target.value) })}
-                            />
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                              <Label htmlFor="horizontal-angle">Mitre Angle</Label>
+                              <Input
+                                id="horizontal-angle"
+                                type="number"
+                                value={inspectorDraft.horizontalAngle}
+                                onChange={(e) => {
+                                  const nextAngle = Number(e.target.value);
+                                  setDraft({
+                                    ...inspectorDraft,
+                                    horizontalAngle: Math.abs(nextAngle),
+                                    horizontalFlip: nextAngle < 0 ? true : inspectorDraft.horizontalFlip
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="horizontal-flip">Long Point On</Label>
+                              <Select
+                                id="horizontal-flip"
+                                value={inspectorDraft.horizontalFlip ? 'back' : 'front'}
+                                onChange={(e) =>
+                                  setDraft({
+                                    ...inspectorDraft,
+                                    horizontalFlip: e.target.value === 'back'
+                                  })
+                                }
+                              >
+                                <option value="front">Front</option>
+                                <option value="back">Back</option>
+                              </Select>
+                            </div>
                           </div>
                         )}
 
@@ -763,33 +771,19 @@ export function PartCutsWorkspace({
                           </div>
                         )}
 
-                        <div>
-                          <Label>Length</Label>
-                          <FractionInput
-                            value={inspectorDraft.referenceValue}
-                            onChange={(value) => setDraft({ ...inspectorDraft, referenceValue: value })}
-                            min={0.125}
-                          />
-                        </div>
-
                         {endCutPreviewMeasurements && (
                           <div className="rounded-md border border-border bg-bg p-3">
-                            <p className="text-[12px] font-medium text-text">
-                              Resulting Lengths ({endCutPreviewMeasurements.lengthMode.replace('_', ' ')})
-                            </p>
+                            <p className="text-[12px] font-medium text-text">Resulting Lengths</p>
                             <p className="mt-1 text-[11px] text-text-muted">
-                              Using: {formatMeasurementWithUnit(endCutPreviewMeasurements.controllingValue, units)} from
-                              the selected measurement reference.
+                              Long point stays locked to the board length. The angle only changes the shaped end.
                             </p>
                             <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-text-muted sm:grid-cols-3">
+                              <span>Blank {formatMeasurementWithUnit(endCutPreviewMeasurements.blank, units)}</span>
                               <span>
                                 Long Point {formatMeasurementWithUnit(endCutPreviewMeasurements.longPoint, units)}
                               </span>
                               <span>
                                 Short Point {formatMeasurementWithUnit(endCutPreviewMeasurements.shortPoint, units)}
-                              </span>
-                              <span>
-                                Centerline {formatMeasurementWithUnit(endCutPreviewMeasurements.centerline, units)}
                               </span>
                             </div>
                           </div>

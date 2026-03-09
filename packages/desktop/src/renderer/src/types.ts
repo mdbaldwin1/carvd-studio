@@ -153,6 +153,7 @@ export interface EndCutFeature extends PartFeatureBase {
   lengthMode: 'long_point' | 'short_point' | 'centerline';
   parameters: {
     horizontalAngle: number;
+    horizontalFlip?: boolean;
     verticalAngle?: number;
     reference?: {
       mode: 'long_point' | 'short_point' | 'centerline';

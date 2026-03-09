@@ -11,10 +11,7 @@ describe('partFeatureActions', () => {
       target: { type: 'face', face: 'left_end' },
       cutType: 'mitre',
       parameters: {
-        reference: {
-          mode: 'long_point',
-          value: 24
-        }
+        horizontalAngle: 45
       }
     });
     expect(features[1]).toMatchObject({
@@ -22,10 +19,7 @@ describe('partFeatureActions', () => {
       target: { type: 'face', face: 'right_end' },
       cutType: 'mitre',
       parameters: {
-        reference: {
-          mode: 'long_point',
-          value: 24
-        }
+        horizontalAngle: 45
       }
     });
   });

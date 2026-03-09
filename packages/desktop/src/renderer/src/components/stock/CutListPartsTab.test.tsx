@@ -173,7 +173,7 @@ describe('CutListPartsTab', () => {
 
       render(<CutListPartsTab {...defaultProps} cutList={cutList} />);
 
-      expect(screen.getByText('1. Mitre 45° on Left End · Long Point reference')).toBeInTheDocument();
+      expect(screen.getByText('1. Mitre 45° on Left End · Long point on Front')).toBeInTheDocument();
       expect(screen.getByText(/Cut blanks first/)).toBeInTheDocument();
     });
   });

@@ -9,12 +9,12 @@ describe('buildPreviewPart', () => {
     const previewPart = buildPreviewPart(part, [], {
       mode: 'end_cut',
       featureId: null,
+      label: '',
       enabled: true,
       targetFace: 'left_end',
       cutType: 'mitre',
-      referenceMode: 'long_point',
-      referenceValue: 24,
       horizontalAngle: 45,
+      horizontalFlip: false,
       verticalAngle: 0
     });
 
@@ -24,10 +24,7 @@ describe('buildPreviewPart', () => {
       target: { type: 'face', face: 'left_end' },
       parameters: {
         horizontalAngle: 45,
-        reference: {
-          mode: 'long_point',
-          value: 24
-        }
+        horizontalFlip: false
       }
     });
   });
@@ -55,12 +52,12 @@ describe('buildPreviewPart', () => {
     const previewPart = buildPreviewPart(part, part.features ?? [], {
       mode: 'end_cut',
       featureId: 'feature-1',
+      label: '',
       enabled: true,
       targetFace: 'left_end',
       cutType: 'compound',
-      referenceMode: 'short_point',
-      referenceValue: 22,
       horizontalAngle: 30,
+      horizontalFlip: true,
       verticalAngle: 10
     });
 
@@ -71,11 +68,8 @@ describe('buildPreviewPart', () => {
       cutType: 'compound',
       parameters: {
         horizontalAngle: 30,
-        verticalAngle: 10,
-        reference: {
-          mode: 'short_point',
-          value: 22
-        }
+        horizontalFlip: true,
+        verticalAngle: 10
       }
     });
   });

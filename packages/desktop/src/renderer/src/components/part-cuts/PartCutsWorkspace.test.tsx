@@ -62,10 +62,8 @@ describe('PartCutsWorkspace', () => {
         kind: 'end_cut',
         target: { type: 'face', face: 'left_end' },
         parameters: expect.objectContaining({
-          reference: {
-            mode: 'long_point',
-            value: 24
-          }
+          horizontalAngle: 45,
+          horizontalFlip: false
         })
       })
     ]);
@@ -113,8 +111,8 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByText('Edit Cut')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Back to Cuts' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Cut' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Measure To')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Shorten Ref' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Long Point On')).toBeInTheDocument();
+    expect(screen.getByText(/board length stays fixed/i)).toBeInTheDocument();
   });
 
   it('retargets the active draft through the preview fallback controls', () => {
@@ -174,7 +172,7 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByText(/Rabbet runs the full edge length/i)).toBeInTheDocument();
   });
 
-  it('shows preview handles for end-cut reference values in edit mode', () => {
+  it('lets users flip end-cut direction in edit mode', () => {
     render(
       <PartCutsWorkspace
         part={createTestPart({ name: 'Panel', length: 24, width: 8 })}
@@ -196,12 +194,9 @@ describe('PartCutsWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
     fireEvent.click(screen.getByText('End Cut'));
 
-    expect(screen.getByText('Preview Handles')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('24')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Shorten Ref' }));
-
-    expect(screen.getByDisplayValue('23 3/4')).toBeInTheDocument();
+    expect(screen.getByLabelText('Long Point On')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Long Point On'), { target: { value: 'back' } });
+    expect(screen.getAllByText(/Long point on Back/i).length).toBeGreaterThan(0);
   });
 
   it('shows conflict feedback in the list state', () => {

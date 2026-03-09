@@ -49,9 +49,14 @@ function toTitleCase(input: string): string {
     .join(' ');
 }
 
+function getEndCutLongPointLabel(feature: Extract<PartFeature, { kind: 'end_cut' }>): string {
+  const horizontalFlip = feature.parameters.horizontalFlip ?? false;
+  const longPointOnFront = feature.target.face === 'left_end' ? !horizontalFlip : horizontalFlip;
+  return longPointOnFront ? 'Long point on Front' : 'Long point on Back';
+}
+
 export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'metric'): string {
   if (feature.kind === 'end_cut') {
-    const referenceMode = feature.parameters.reference?.mode ?? feature.lengthMode;
     const angleBits = [];
     if (feature.cutType === 'mitre' || feature.cutType === 'compound') {
       angleBits.push(`${feature.parameters.horizontalAngle}°`);
@@ -60,11 +65,10 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
       angleBits.push(`${feature.parameters.verticalAngle}° bevel`);
     }
 
-    const referenceLabel =
-      referenceMode === 'centerline' ? 'Centerline' : referenceMode === 'short_point' ? 'Short Point' : 'Long Point';
-
     const angleText = angleBits.length > 0 ? ` ${angleBits.join(' / ')}` : '';
-    return `${toTitleCase(feature.cutType)}${angleText} on ${getFeatureTargetLabel(feature)} · ${referenceLabel} reference`;
+    const directionText =
+      feature.cutType === 'mitre' || feature.cutType === 'compound' ? ` · ${getEndCutLongPointLabel(feature)}` : '';
+    return `${toTitleCase(feature.cutType)}${angleText} on ${getFeatureTargetLabel(feature)}${directionText}`;
   }
 
   if (feature.cutType === 'dado') {

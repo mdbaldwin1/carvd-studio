@@ -23,7 +23,7 @@ import { Label } from '@renderer/components/ui/label';
 import { Select } from '@renderer/components/ui/select';
 import { EndCutFeature, Part, PartFeature, RectCutFeature } from '@renderer/types';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
-import { getDerivedLengthMeasurements, getLengthReferenceValue } from '@renderer/utils/endCutUtils';
+import { getDerivedLengthMeasurements } from '@renderer/utils/endCutUtils';
 import {
   TOP_BOTTOM_CORNER_TARGETS,
   TOP_BOTTOM_EDGE_TARGETS,
@@ -109,14 +109,7 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
       features: nextFeatures
     });
 
-    return {
-      ...measurements,
-      controllingValue: getLengthReferenceValue(
-        measurements,
-        draftPreviewFeature.parameters.reference?.mode ?? draftPreviewFeature.lengthMode
-      ),
-      lengthMode: draftPreviewFeature.parameters.reference?.mode ?? draftPreviewFeature.lengthMode
-    };
+    return measurements;
   }, [draft, draftPreviewFeature, features, selectedPart.length, selectedPart.thickness, selectedPart.width]);
 
   const startDraft = (preset: OperationPreset) =>
@@ -392,43 +385,49 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                           <option value="compound">Compound</option>
                         </Select>
                       </div>
-                      <div>
-                        <Label htmlFor="length-mode">Reference</Label>
-                        <Select
-                          id="length-mode"
-                          value={draft.referenceMode}
-                          onChange={(e) =>
-                            setDraft({
-                              ...draft,
-                              referenceMode: e.target.value as EndCutFeature['lengthMode']
-                            })
-                          }
-                        >
-                          <option value="long_point">Long Point</option>
-                          <option value="short_point">Short Point</option>
-                          <option value="centerline">Centerline</option>
-                        </Select>
+                      <div className="rounded-[var(--radius-sm)] border border-border bg-background p-3 text-[12px] text-text-muted">
+                        The board length stays fixed at{' '}
+                        <span className="font-medium text-text">
+                          {formatMeasurementWithUnit(selectedPart.length, units)}
+                        </span>
+                        . This cut only shapes the selected end.
                       </div>
                     </div>
 
-                    <div>
-                      <Label>Reference Value</Label>
-                      <FractionInput
-                        value={draft.referenceValue}
-                        onChange={(value) => setDraft({ ...draft, referenceValue: value })}
-                        min={0.125}
-                      />
-                    </div>
-
                     {(draft.cutType === 'mitre' || draft.cutType === 'compound') && (
-                      <div>
-                        <Label htmlFor="horizontal-angle">Mitre Angle</Label>
-                        <Input
-                          id="horizontal-angle"
-                          type="number"
-                          value={draft.horizontalAngle}
-                          onChange={(e) => setDraft({ ...draft, horizontalAngle: Number(e.target.value) })}
-                        />
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <Label htmlFor="horizontal-angle">Mitre Angle</Label>
+                          <Input
+                            id="horizontal-angle"
+                            type="number"
+                            value={draft.horizontalAngle}
+                            onChange={(e) => {
+                              const nextAngle = Number(e.target.value);
+                              setDraft({
+                                ...draft,
+                                horizontalAngle: Math.abs(nextAngle),
+                                horizontalFlip: nextAngle < 0 ? true : draft.horizontalFlip
+                              });
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="horizontal-flip">Long Point On</Label>
+                          <Select
+                            id="horizontal-flip"
+                            value={draft.horizontalFlip ? 'back' : 'front'}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                horizontalFlip: e.target.value === 'back'
+                              })
+                            }
+                          >
+                            <option value="front">Front</option>
+                            <option value="back">Back</option>
+                          </Select>
+                        </div>
                       </div>
                     )}
 
@@ -446,22 +445,17 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
 
                     {endCutPreviewMeasurements && (
                       <div className="rounded-[var(--radius-sm)] border border-border bg-background p-3">
-                        <p className="text-[12px] font-medium text-text">
-                          Derived Lengths ({endCutPreviewMeasurements.lengthMode.replace('_', ' ')})
-                        </p>
+                        <p className="text-[12px] font-medium text-text">Resulting Lengths</p>
                         <p className="mt-1 text-[11px] text-text-muted">
-                          Control value: {formatMeasurementWithUnit(endCutPreviewMeasurements.controllingValue, units)}{' '}
-                          from the selected reference.
+                          Long point stays locked to the board length. The angle only changes the shaped end.
                         </p>
                         <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-text-muted sm:grid-cols-3">
+                          <span>Blank {formatMeasurementWithUnit(endCutPreviewMeasurements.blank, units)}</span>
                           <span>
                             Long Point {formatMeasurementWithUnit(endCutPreviewMeasurements.longPoint, units)}
                           </span>
                           <span>
                             Short Point {formatMeasurementWithUnit(endCutPreviewMeasurements.shortPoint, units)}
-                          </span>
-                          <span>
-                            Centerline {formatMeasurementWithUnit(endCutPreviewMeasurements.centerline, units)}
                           </span>
                         </div>
                       </div>

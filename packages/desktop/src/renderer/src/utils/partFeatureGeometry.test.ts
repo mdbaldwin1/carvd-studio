@@ -88,8 +88,8 @@ describe('partFeatureGeometry', () => {
     expect(geometry.boundingBox!.min.x).toBeCloseTo(-12);
   });
 
-  it('moves a mitred end when the stored reference length changes', () => {
-    const fullLengthReference = getPartRenderGeometry(
+  it('keeps a mitred end anchored to the board length even if legacy reference data differs', () => {
+    const anchoredReference = getPartRenderGeometry(
       createTestPart({
         length: 24,
         width: 4,
@@ -116,7 +116,7 @@ describe('partFeatureGeometry', () => {
       })
     );
 
-    const shorterReference = getPartRenderGeometry(
+    const legacyShortReference = getPartRenderGeometry(
       createTestPart({
         length: 24,
         width: 4,
@@ -143,11 +143,83 @@ describe('partFeatureGeometry', () => {
       })
     );
 
-    fullLengthReference.computeBoundingBox();
-    shorterReference.computeBoundingBox();
+    anchoredReference.computeBoundingBox();
+    legacyShortReference.computeBoundingBox();
 
-    expect(fullLengthReference.boundingBox!.min.x).toBeCloseTo(-12);
-    expect(shorterReference.boundingBox!.min.x).toBeCloseTo(-8);
+    expect(anchoredReference.boundingBox!.min.x).toBeCloseTo(-12);
+    expect(legacyShortReference.boundingBox!.min.x).toBeCloseTo(-12);
+  });
+
+  it('supports flipped mitre direction without using negative geometry math', () => {
+    const defaultMitre = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 45, horizontalFlip: false }
+          }
+        ]
+      })
+    );
+
+    const flippedMitre = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 45, horizontalFlip: true }
+          }
+        ]
+      })
+    );
+
+    const defaultPositions = defaultMitre.getAttribute('position');
+    const flippedPositions = flippedMitre.getAttribute('position');
+    let defaultFrontX = Infinity;
+    let defaultBackX = Infinity;
+    let flippedFrontX = Infinity;
+    let flippedBackX = Infinity;
+
+    for (let i = 0; i < defaultPositions.count; i += 1) {
+      const x = defaultPositions.getX(i);
+      const z = defaultPositions.getZ(i);
+      if (x > 0) continue;
+      if (z < -1.9) defaultFrontX = Math.min(defaultFrontX, x);
+      if (z > 1.9) defaultBackX = Math.min(defaultBackX, x);
+    }
+
+    for (let i = 0; i < flippedPositions.count; i += 1) {
+      const x = flippedPositions.getX(i);
+      const z = flippedPositions.getZ(i);
+      if (x > 0) continue;
+      if (z < -1.9) flippedFrontX = Math.min(flippedFrontX, x);
+      if (z > 1.9) flippedBackX = Math.min(flippedBackX, x);
+    }
+
+    expect(defaultFrontX).toBeCloseTo(-8, 3);
+    expect(defaultBackX).toBeCloseTo(-12, 3);
+    expect(flippedFrontX).toBeCloseTo(-12, 3);
+    expect(flippedBackX).toBeCloseTo(-8, 3);
   });
 
   it('slopes the end plane across thickness for bevel cuts', () => {

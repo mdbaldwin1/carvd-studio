@@ -42,7 +42,7 @@ describe('AssemblyPartsList', () => {
     );
 
     expect(screen.getByText('Ops 1')).toBeInTheDocument();
-    expect(screen.getByText('Mitre 45° on Left End · Long Point reference')).toBeInTheDocument();
+    expect(screen.getByText('Mitre 45° on Left End · Long point on Front')).toBeInTheDocument();
     expect(screen.getByText('Back Rail')).toBeInTheDocument();
   });
 });

@@ -16,6 +16,8 @@ As of beads `13.2` through `13.5`, the implemented POC behavior is:
 - the workspace now uses a two-panel layout: part preview on the left, cuts list or focused single-cut editing on the right
 - adding a cut now starts with a guided `What kind of cut?` step, then moves into cut-type-specific target and measurement editing
 - selecting an existing cut card now swaps the right panel into focused single-cut edit mode instead of keeping the full stack and inspector visible at once
+- end cuts now treat the part blank dimensions as authoritative for cut-list sizing, so the editor no longer asks users to redefine end-cut reference lengths during normal mitre/bevel authoring
+- mitred end direction is now edited with an explicit long-point direction control instead of signed-angle math
 - the main Properties panel is reduced to a compact cuts summary plus `Edit Cuts`
 - the preview now supports direct 3D target picking for the current POC operations, with inspector/form fallback for verification and difficult camera angles
 - the preview now also exposes direct handles for supported face-based rectangular operations, with inspector fallback for unsupported operation families
