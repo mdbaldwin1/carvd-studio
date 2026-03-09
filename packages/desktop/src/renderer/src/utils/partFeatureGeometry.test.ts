@@ -260,6 +260,78 @@ describe('partFeatureGeometry', () => {
     expect(topLeftMinX).toBeCloseTo(-11, 3);
   });
 
+  it('supports flipped bevel direction without signed-angle geometry hacks', () => {
+    const defaultBevel = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 1,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'bevel',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 0, verticalAngle: 45, verticalFlip: false }
+          }
+        ]
+      })
+    );
+
+    const flippedBevel = getPartRenderGeometry(
+      createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 1,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'bevel',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 0, verticalAngle: 45, verticalFlip: true }
+          }
+        ]
+      })
+    );
+
+    const defaultPositions = defaultBevel.getAttribute('position');
+    const flippedPositions = flippedBevel.getAttribute('position');
+    let defaultTopLeftInnerX = -Infinity;
+    let defaultBottomLeftInnerX = -Infinity;
+    let flippedTopLeftInnerX = -Infinity;
+    let flippedBottomLeftInnerX = -Infinity;
+
+    for (let i = 0; i < defaultPositions.count; i += 1) {
+      const x = defaultPositions.getX(i);
+      const y = defaultPositions.getY(i);
+      if (x > 0) continue;
+      if (y > 0.49) defaultTopLeftInnerX = Math.max(defaultTopLeftInnerX, x);
+      if (y < -0.49) defaultBottomLeftInnerX = Math.max(defaultBottomLeftInnerX, x);
+    }
+
+    for (let i = 0; i < flippedPositions.count; i += 1) {
+      const x = flippedPositions.getX(i);
+      const y = flippedPositions.getY(i);
+      if (x > 0) continue;
+      if (y > 0.49) flippedTopLeftInnerX = Math.max(flippedTopLeftInnerX, x);
+      if (y < -0.49) flippedBottomLeftInnerX = Math.max(flippedBottomLeftInnerX, x);
+    }
+
+    expect(defaultBottomLeftInnerX).toBeCloseTo(-12, 3);
+    expect(defaultTopLeftInnerX).toBeCloseTo(-11, 3);
+    expect(flippedBottomLeftInnerX).toBeCloseTo(-11, 3);
+    expect(flippedTopLeftInnerX).toBeCloseTo(-12, 3);
+  });
+
   it('combines mitre and bevel shaping for compound cuts', () => {
     const geometry = getPartRenderGeometry(
       createTestPart({

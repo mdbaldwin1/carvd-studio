@@ -66,6 +66,7 @@ export type FeatureDraft =
       horizontalAngle: number;
       horizontalFlip: boolean;
       verticalAngle: number;
+      verticalFlip: boolean;
     }
   | {
       mode: 'rect_cut';
@@ -105,7 +106,8 @@ export function buildDraftFromPreset(
       cutType: 'mitre',
       horizontalAngle: 45,
       horizontalFlip: false,
-      verticalAngle: 0
+      verticalAngle: 0,
+      verticalFlip: false
     };
   }
 
@@ -165,7 +167,8 @@ export function buildDraftFromFeature(
       cutType: feature.cutType,
       horizontalAngle: feature.parameters.horizontalAngle,
       horizontalFlip: feature.parameters.horizontalFlip ?? false,
-      verticalAngle: feature.parameters.verticalAngle ?? 0
+      verticalAngle: feature.parameters.verticalAngle ?? 0,
+      verticalFlip: feature.parameters.verticalFlip ?? false
     };
   }
 
@@ -203,7 +206,8 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
         horizontalAngle: draft.cutType === 'bevel' ? 0 : draft.horizontalAngle,
         horizontalFlip: draft.horizontalFlip,
         verticalAngle:
-          draft.cutType === 'mitre' || draft.cutType === 'square' ? undefined : draft.verticalAngle || undefined
+          draft.cutType === 'mitre' || draft.cutType === 'square' ? undefined : draft.verticalAngle || undefined,
+        verticalFlip: draft.cutType === 'mitre' || draft.cutType === 'square' ? undefined : draft.verticalFlip
       }
     };
   }

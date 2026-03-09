@@ -6,6 +6,7 @@ export interface EndCutSideProfile {
   verticalInset: number;
   maxInset: number;
   horizontalFlip: boolean;
+  verticalFlip: boolean;
 }
 
 export interface PartEndCutProfiles {
@@ -26,6 +27,10 @@ function clamp(value: number, min: number, max: number): number {
 
 function getHorizontalFlip(feature: EndCutFeature): boolean {
   return feature.parameters.horizontalFlip ?? false;
+}
+
+function getVerticalFlip(feature: EndCutFeature): boolean {
+  return feature.parameters.verticalFlip ?? false;
 }
 
 function getReferenceMode(feature: EndCutFeature): EndCutFeature['lengthMode'] {
@@ -73,14 +78,16 @@ export function getPartEndCutProfiles(input: {
     horizontalInset: 0,
     verticalInset: 0,
     maxInset: 0,
-    horizontalFlip: false
+    horizontalFlip: false,
+    verticalFlip: false
   };
   const right: EndCutSideProfile = {
     baseInset: 0,
     horizontalInset: 0,
     verticalInset: 0,
     maxInset: 0,
-    horizontalFlip: false
+    horizontalFlip: false,
+    verticalFlip: false
   };
 
   for (const feature of getEnabledEndCuts(input.features)) {
@@ -90,6 +97,7 @@ export function getPartEndCutProfiles(input: {
     profile.maxInset = profile.horizontalInset + profile.verticalInset;
     profile.baseInset = 0;
     profile.horizontalFlip = getHorizontalFlip(feature);
+    profile.verticalFlip = getVerticalFlip(feature);
   }
 
   const allowedMaxInset = Math.max(0, input.length - 0.01);
@@ -135,12 +143,13 @@ export function getEndCutInsetAt(
         : clamp((halfWidth - point.z) / dimensions.width, 0, 1);
   const horizontalRatio = profile.horizontalFlip ? 1 - defaultHorizontalRatio : defaultHorizontalRatio;
 
-  const verticalRatio =
+  const defaultVerticalRatio =
     dimensions.thickness <= 0
       ? 0
       : side === 'left'
         ? clamp((point.y + halfThickness) / dimensions.thickness, 0, 1)
         : clamp((halfThickness - point.y) / dimensions.thickness, 0, 1);
+  const verticalRatio = profile.verticalFlip ? 1 - defaultVerticalRatio : defaultVerticalRatio;
 
   return profile.baseInset + profile.horizontalInset * horizontalRatio + profile.verticalInset * verticalRatio;
 }

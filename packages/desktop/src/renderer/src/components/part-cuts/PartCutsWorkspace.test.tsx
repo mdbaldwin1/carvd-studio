@@ -199,6 +199,35 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getAllByText(/Long point on Back/i).length).toBeGreaterThan(0);
   });
 
+  it('lets users flip bevel direction in edit mode', () => {
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Panel', length: 24, width: 8, thickness: 1 })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={vi.fn()}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={false}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByText('End Cut'));
+    fireEvent.change(screen.getByLabelText('Cut Style'), { target: { value: 'compound' } });
+    fireEvent.change(screen.getByLabelText('Bevel Angle'), { target: { value: '10' } });
+
+    expect(screen.getByLabelText('High Point On')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('High Point On'), { target: { value: 'top' } });
+    expect(screen.getAllByText(/High point on Top/i).length).toBeGreaterThan(0);
+  });
+
   it('shows conflict feedback in the list state', () => {
     const part = createTestPart({
       name: 'Leg',

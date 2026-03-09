@@ -112,6 +112,12 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
     return measurements;
   }, [draft, draftPreviewFeature, features, selectedPart.length, selectedPart.thickness, selectedPart.width]);
 
+  const isEndCutHighPointOnTop = (targetFace: 'left_end' | 'right_end', verticalFlip: boolean): boolean =>
+    targetFace === 'right_end' ? !verticalFlip : verticalFlip;
+
+  const getVerticalFlipFromHighPoint = (targetFace: 'left_end' | 'right_end', highPoint: 'top' | 'bottom'): boolean =>
+    targetFace === 'right_end' ? highPoint !== 'top' : highPoint === 'top';
+
   const startDraft = (preset: OperationPreset) =>
     setDraft(
       buildDraftFromPreset(preset, {
@@ -432,14 +438,42 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                     )}
 
                     {(draft.cutType === 'bevel' || draft.cutType === 'compound') && (
-                      <div>
-                        <Label htmlFor="vertical-angle">Bevel Angle</Label>
-                        <Input
-                          id="vertical-angle"
-                          type="number"
-                          value={draft.verticalAngle}
-                          onChange={(e) => setDraft({ ...draft, verticalAngle: Number(e.target.value) })}
-                        />
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <Label htmlFor="vertical-angle">Bevel Angle</Label>
+                          <Input
+                            id="vertical-angle"
+                            type="number"
+                            value={draft.verticalAngle}
+                            onChange={(e) => {
+                              const nextAngle = Number(e.target.value);
+                              setDraft({
+                                ...draft,
+                                verticalAngle: Math.abs(nextAngle),
+                                verticalFlip: nextAngle < 0 ? !draft.verticalFlip : draft.verticalFlip
+                              });
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="vertical-flip">High Point On</Label>
+                          <Select
+                            id="vertical-flip"
+                            value={isEndCutHighPointOnTop(draft.targetFace, draft.verticalFlip) ? 'top' : 'bottom'}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                verticalFlip: getVerticalFlipFromHighPoint(
+                                  draft.targetFace,
+                                  e.target.value as 'top' | 'bottom'
+                                )
+                              })
+                            }
+                          >
+                            <option value="top">Top</option>
+                            <option value="bottom">Bottom</option>
+                          </Select>
+                        </div>
                       </div>
                     )}
 

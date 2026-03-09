@@ -72,7 +72,35 @@ describe('SinglePartFeaturesCard', () => {
         parameters: expect.objectContaining({
           horizontalAngle: 22.5,
           verticalAngle: 10,
-          horizontalFlip: false
+          horizontalFlip: false,
+          verticalFlip: false
+        })
+      })
+    ]);
+  });
+
+  it('lets users flip bevel direction in the guided workflow', () => {
+    const onFeaturesChange = vi.fn();
+
+    render(
+      <SinglePartFeaturesCard selectedPart={createTestPart()} units="imperial" onFeaturesChange={onFeaturesChange} />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /End Cut/ }));
+    fireEvent.change(screen.getByLabelText('Cut Style'), { target: { value: 'compound' } });
+    fireEvent.change(screen.getByLabelText('Bevel Angle'), { target: { value: '10' } });
+
+    expect(screen.getByLabelText('High Point On')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('High Point On'), { target: { value: 'top' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add Operation' }));
+
+    expect(onFeaturesChange).toHaveBeenCalledWith([
+      expect.objectContaining({
+        kind: 'end_cut',
+        cutType: 'compound',
+        parameters: expect.objectContaining({
+          verticalAngle: 10,
+          verticalFlip: true
         })
       })
     ]);

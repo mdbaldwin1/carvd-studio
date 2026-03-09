@@ -55,6 +55,12 @@ function getEndCutLongPointLabel(feature: Extract<PartFeature, { kind: 'end_cut'
   return longPointOnFront ? 'Long point on Front' : 'Long point on Back';
 }
 
+function getEndCutHighPointLabel(feature: Extract<PartFeature, { kind: 'end_cut' }>): string {
+  const verticalFlip = feature.parameters.verticalFlip ?? false;
+  const highPointOnTop = feature.target.face === 'right_end' ? !verticalFlip : verticalFlip;
+  return highPointOnTop ? 'High point on Top' : 'High point on Bottom';
+}
+
 export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'metric'): string {
   if (feature.kind === 'end_cut') {
     const angleBits = [];
@@ -66,8 +72,17 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
     }
 
     const angleText = angleBits.length > 0 ? ` ${angleBits.join(' / ')}` : '';
-    const directionText =
-      feature.cutType === 'mitre' || feature.cutType === 'compound' ? ` · ${getEndCutLongPointLabel(feature)}` : '';
+    const directionBits = [];
+    if (feature.cutType === 'mitre' || feature.cutType === 'compound') {
+      directionBits.push(getEndCutLongPointLabel(feature));
+    }
+    if (
+      (feature.cutType === 'bevel' || feature.cutType === 'compound') &&
+      (feature.parameters.verticalAngle ?? 0) > 0
+    ) {
+      directionBits.push(getEndCutHighPointLabel(feature));
+    }
+    const directionText = directionBits.length > 0 ? ` · ${directionBits.join(' · ')}` : '';
     return `${toTitleCase(feature.cutType)}${angleText} on ${getFeatureTargetLabel(feature)}${directionText}`;
   }
 
