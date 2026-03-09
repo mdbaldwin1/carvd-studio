@@ -31,6 +31,25 @@ interface PartCutsPreviewCanvasProps {
   onDraftChange: (draft: FeatureDraft) => void;
 }
 
+export function buildPreviewPart(part: Part, draftFeatures: Part['features'], draft: FeatureDraft | null): Part {
+  if (!draft) {
+    return {
+      ...part,
+      features: draftFeatures ?? []
+    };
+  }
+
+  const draftFeature = buildFeatureFromDraft(draft);
+  const nextFeatures = draft.featureId
+    ? (draftFeatures ?? []).map((feature) => (feature.id === draft.featureId ? draftFeature : feature))
+    : [...(draftFeatures ?? []), draftFeature];
+
+  return {
+    ...part,
+    features: nextFeatures
+  };
+}
+
 type HandleKind = 'move' | 'length' | 'width' | 'reference';
 
 interface EditableHandleOverlay {
@@ -380,13 +399,7 @@ export function PartCutsPreviewCanvas({
   onActivateTarget,
   onDraftChange
 }: PartCutsPreviewCanvasProps) {
-  const previewPart = useMemo(
-    () => ({
-      ...part,
-      features: draftFeatures ?? []
-    }),
-    [draftFeatures, part]
-  );
+  const previewPart = useMemo(() => buildPreviewPart(part, draftFeatures, draft), [draft, draftFeatures, part]);
   const maxDimension = Math.max(part.length, part.width, part.thickness, 1);
   const activeTargetLabel = getPickableTargetLabel(hoveredTarget) ?? getPickableTargetLabel(pendingTarget);
   const fallback = shouldUseFallbackPreview();
