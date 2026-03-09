@@ -52,6 +52,11 @@ export function hasRenderablePartFeatures(part: Part): boolean {
   return getEnabledFeatures(part).length > 0;
 }
 
+function hasOnlyEndCutFeatures(part: Part): boolean {
+  const features = getEnabledFeatures(part);
+  return features.length > 0 && features.every((feature) => feature.kind === 'end_cut');
+}
+
 function buildOuterContour(part: Part): Point2[] {
   const halfLength = part.length / 2;
   const halfWidth = part.width / 2;
@@ -241,7 +246,80 @@ function getLayerGeometry(contour: Point2[], holes: Point2[][], depth: number, y
   return geometry;
 }
 
+type Point3 = { x: number; y: number; z: number };
+
+function addQuad(vertices: number[], a: Point3, b: Point3, c: Point3, d: Point3): void {
+  vertices.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z, a.x, a.y, a.z, c.x, c.y, c.z, d.x, d.y, d.z);
+}
+
+function createEndCutOnlyGeometry(part: Part): THREE.BufferGeometry {
+  const profiles = getPartEndCutProfiles(part);
+  const halfLength = part.length / 2;
+  const halfWidth = part.width / 2;
+  const halfThickness = part.thickness / 2;
+
+  const lfb = {
+    x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z: -halfWidth }),
+    y: -halfThickness,
+    z: -halfWidth
+  };
+  const lbb = {
+    x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z: halfWidth }),
+    y: -halfThickness,
+    z: halfWidth
+  };
+  const lbt = {
+    x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: halfThickness, z: halfWidth }),
+    y: halfThickness,
+    z: halfWidth
+  };
+  const lft = {
+    x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: halfThickness, z: -halfWidth }),
+    y: halfThickness,
+    z: -halfWidth
+  };
+  const rfb = {
+    x: halfLength - getEndCutInsetAt('right', profiles, part, { y: -halfThickness, z: -halfWidth }),
+    y: -halfThickness,
+    z: -halfWidth
+  };
+  const rbb = {
+    x: halfLength - getEndCutInsetAt('right', profiles, part, { y: -halfThickness, z: halfWidth }),
+    y: -halfThickness,
+    z: halfWidth
+  };
+  const rbt = {
+    x: halfLength - getEndCutInsetAt('right', profiles, part, { y: halfThickness, z: halfWidth }),
+    y: halfThickness,
+    z: halfWidth
+  };
+  const rft = {
+    x: halfLength - getEndCutInsetAt('right', profiles, part, { y: halfThickness, z: -halfWidth }),
+    y: halfThickness,
+    z: -halfWidth
+  };
+
+  const vertices: number[] = [];
+  addQuad(vertices, lfb, lft, rft, rfb);
+  addQuad(vertices, lbb, rbb, rbt, lbt);
+  addQuad(vertices, lfb, rfb, rbb, lbb);
+  addQuad(vertices, lft, lbt, rbt, rft);
+  addQuad(vertices, lfb, lbb, lbt, lft);
+  addQuad(vertices, rfb, rft, rbt, rbb);
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 function createFeatureGeometry(part: Part): THREE.BufferGeometry {
+  if (hasOnlyEndCutFeatures(part)) {
+    return createEndCutOnlyGeometry(part);
+  }
+
   let contour = buildOuterContour(part);
   const rectCuts = getEnabledFeatures(part)
     .filter((feature): feature is RectCutFeature => feature.kind === 'rect_cut')

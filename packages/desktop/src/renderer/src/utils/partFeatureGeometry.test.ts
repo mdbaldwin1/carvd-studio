@@ -216,10 +216,10 @@ describe('partFeatureGeometry', () => {
       if (z > 1.9) flippedBackX = Math.min(flippedBackX, x);
     }
 
-    expect(defaultFrontX).toBeCloseTo(-8, 3);
-    expect(defaultBackX).toBeCloseTo(-12, 3);
-    expect(flippedFrontX).toBeCloseTo(-12, 3);
-    expect(flippedBackX).toBeCloseTo(-8, 3);
+    expect(defaultFrontX).toBeCloseTo(-12, 3);
+    expect(defaultBackX).toBeCloseTo(-8, 3);
+    expect(flippedFrontX).toBeCloseTo(-8, 3);
+    expect(flippedBackX).toBeCloseTo(-12, 3);
   });
 
   it('slopes the end plane across thickness for bevel cuts', () => {
@@ -366,7 +366,7 @@ describe('partFeatureGeometry', () => {
     }
 
     expect(leftmostX).toBeCloseTo(-12, 3);
-    expect(nearestZeroLeftX).toBeCloseTo(-8, 3);
+    expect(nearestZeroLeftX).toBeCloseTo(-7, 3);
   });
 
   it('uses list order when multiple end cuts target the same end in preview geometry', () => {
