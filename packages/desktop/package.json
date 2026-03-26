@@ -101,7 +101,7 @@
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
-    "happy-dom": "^20.4.0",
+    "happy-dom": "^20.8.8",
     "jsonwebtoken": "^9.0.3",
     "playwright": "^1.58.1",
     "prettier": "^3.8.1",
