@@ -63,21 +63,41 @@ export default function SnappingPage() {
             <div>
               <p className="font-bold mb-xs">Edge Snapping</p>
               <p className="text-muted">
-                Parts automatically snap to the edges and faces of neighboring
-                parts. Move a shelf near a side panel and it snaps flush.
+                Parts automatically snap to compatible faces and edges of
+                neighboring parts, including rotated parts that are not aligned
+                to world axes.
               </p>
             </div>
             <div>
               <p className="font-bold mb-xs">Center Snapping</p>
               <p className="text-muted">
-                Parts snap to the center of other parts for easy alignment.
-                Green guide lines show alignment points.
+                Parts can snap center-to-center in one axis or two axes while
+                staying face-latched, so you can slide across a surface and
+                still get deterministic alignment.
               </p>
             </div>
             <div>
-              <p className="font-bold mb-xs">Corner Snapping</p>
+              <p className="font-bold mb-xs">Surface Anchors</p>
               <p className="text-muted">
-                Snap to corners of other parts for precise joint positioning.
+                Surface anchor snaps include centerline, midline, and
+                quarterline alignment on compatible faces. This is ideal for
+                quickly finding centered or 25%/75% placements on larger panels.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Fractional Face Anchors</p>
+              <p className="text-muted">
+                Fractional anchors evaluate 0/25/50/75/100 face positions and
+                support both one-axis and two-axis combinations for precise
+                layout work.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Feature Snapping</p>
+              <p className="text-muted">
+                In addition to face snap, Carvd can snap edge-to-edge and
+                vertex-to-face for precise joinery placement when parts are
+                tilted or rotated.
               </p>
             </div>
           </div>
@@ -100,6 +120,23 @@ export default function SnappingPage() {
               <p className="text-muted">
                 Use arrow keys to nudge selected parts by one grid unit. Hold{" "}
                 <code>Shift</code> to nudge in fixed 1-inch steps.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Camera-Aware Drag Planes</p>
+              <p className="text-muted">
+                For rotated parts, drag movement now follows the most
+                camera-facing local plane, which keeps movement and snapping
+                more predictable from different viewing angles.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Snap Presets</p>
+              <p className="text-muted">
+                App Settings include snapping presets:
+                <strong> Simple</strong>, <strong>Precision</strong>, and
+                <strong> Layout</strong>, plus toggles for surface anchors,
+                fractional anchors, and candidate indicators.
               </p>
             </div>
             <div>

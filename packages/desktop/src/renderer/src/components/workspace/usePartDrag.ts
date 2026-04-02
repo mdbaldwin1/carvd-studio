@@ -16,13 +16,20 @@ import {
   detectOriginSnaps,
   createOriginSnapLine,
   detectFaceSnaps,
+  detectSurfaceAnchorSnaps,
+  detectFractionalFaceSnaps,
+  detectFeatureSnaps,
   calculateReferenceDistances,
   calculateGroupReferenceDistances,
   getCombinedBounds
 } from '../../utils/snapToPartsUtil';
+import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
 import { LiveDimensions, snapToGrid } from './partTypes';
 import { isOrbitControls, setRightClickTarget } from './workspaceUtils';
 import { calculateWorldHalfHeight, calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
+import { isAxisAlignedRotation } from '../../utils/rotation';
+import { createAxisSnapWinners, shouldUseSnapStage, tryApplyAxisSnap, type SnapStage } from '../../utils/snapPriority';
+import { dragDebug } from '../../utils/dragDebug';
 
 /**
  * Hook encapsulating all drag (move) logic for a Part component.
@@ -57,6 +64,14 @@ export function usePartDrag(
   const justFinishedDragging = useRef(false);
   const lastDragPosition = useRef<{ x: number; y: number; z: number } | null>(null);
   const wasSnappedByParts = useRef<{ x: boolean; y: boolean; z: boolean }>({ x: false, y: false, z: false });
+  const latchedFaceSnapRef = useRef<{
+    adjustedPosition: { x: number; y: number; z: number };
+    lockAxis: 'x' | 'y' | 'z';
+    snappedX: boolean;
+    snappedY: boolean;
+    snappedZ: boolean;
+    snapLines: import('../../types').SnapLine[];
+  } | null>(null);
 
   const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const raycaster = useRef(new THREE.Raycaster());
@@ -68,88 +83,17 @@ export function usePartDrag(
   const _tempAxisX = useRef(new THREE.Vector3());
   const _tempAxisY = useRef(new THREE.Vector3());
   const _tempAxisZ = useRef(new THREE.Vector3());
+  const _tempBasisU = useRef(new THREE.Vector3());
+  const _tempBasisV = useRef(new THREE.Vector3());
   const _tempNormal = useRef(new THREE.Vector3());
   const _tempCameraTarget = useRef(new THREE.Vector3());
   const _tempDelta = useRef(new THREE.Vector3());
+  const _tempProjectedDelta = useRef(new THREE.Vector3());
 
   // RAF gating refs for coalescing pointer events to animation frame rate
   const rafIdRef = useRef<number | null>(null);
   const latestEventRef = useRef<PointerEvent | null>(null);
-
-  // Calculate axis-aligned bounding box for a part at a given position (considering rotation)
-  const getPartAABB = (p: PartType, position: { x: number; y: number; z: number }) => {
-    const bounds = getPartBoundsAtPosition(p, position);
-    return {
-      minX: bounds.minX,
-      maxX: bounds.maxX,
-      minY: bounds.minY,
-      maxY: bounds.maxY,
-      minZ: bounds.minZ,
-      maxZ: bounds.maxZ
-    };
-  };
-
-  const aabbsOverlap = (a: ReturnType<typeof getPartAABB>, b: ReturnType<typeof getPartAABB>) => {
-    const epsilon = 0.001;
-    return (
-      a.minX < b.maxX - epsilon &&
-      a.maxX > b.minX + epsilon &&
-      a.minY < b.maxY - epsilon &&
-      a.maxY > b.minY + epsilon &&
-      a.minZ < b.maxZ - epsilon &&
-      a.maxZ > b.minZ + epsilon
-    );
-  };
-
-  const wouldCauseOverlap = (
-    newPosition: { x: number; y: number; z: number },
-    allParts: PartType[],
-    selectedIds: string[],
-    delta?: { x: number; y: number; z: number }
-  ): boolean => {
-    if (part.ignoreOverlap) {
-      return false;
-    }
-
-    const movingPartIds = new Set(selectedIds.includes(part.id) ? selectedIds : [part.id]);
-
-    const thisPartAABB = getPartAABB(part, newPosition);
-    for (const other of allParts) {
-      if (movingPartIds.has(other.id)) continue;
-      if (other.ignoreOverlap) continue;
-      const otherAABB = getPartAABB(other, other.position);
-      if (aabbsOverlap(thisPartAABB, otherAABB)) {
-        return true;
-      }
-    }
-
-    if (delta && selectedIds.includes(part.id)) {
-      for (const selectedId of selectedIds) {
-        if (selectedId === part.id) continue;
-        const selectedPart = allParts.find((p) => p.id === selectedId);
-        if (!selectedPart) continue;
-        if (selectedPart.ignoreOverlap) continue;
-
-        const movedPosition = {
-          x: selectedPart.position.x + delta.x,
-          y: selectedPart.position.y + delta.y,
-          z: selectedPart.position.z + delta.z
-        };
-        const movedAABB = getPartAABB(selectedPart, movedPosition);
-
-        for (const other of allParts) {
-          if (movingPartIds.has(other.id)) continue;
-          if (other.ignoreOverlap) continue;
-          const otherAABB = getPartAABB(other, other.position);
-          if (aabbsOverlap(movedAABB, otherAABB)) {
-            return true;
-          }
-        }
-      }
-    }
-
-    return false;
-  };
+  const dragFrameCounterRef = useRef(0);
 
   const getWorldPoint = useCallback(
     (e: PointerEvent | MouseEvent): THREE.Vector3 | null => {
@@ -167,38 +111,75 @@ export function usePartDrag(
 
   type DragPlaneInfo = {
     normal: THREE.Vector3;
+    basisU: THREE.Vector3;
+    basisV: THREE.Vector3;
     axes: { x: boolean; y: boolean; z: boolean };
   };
 
   const getDragPlaneInfo = useCallback(
     (partPosition: THREE.Vector3): DragPlaneInfo => {
       _tempForward.current.set(0, 0, -1).applyQuaternion(camera.quaternion);
+      _tempNormal.current.copy(_tempForward.current).normalize();
+      planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current, partPosition);
 
-      const dotX = Math.abs(_tempForward.current.dot(_tempAxisX.current.set(1, 0, 0)));
-      const dotY = Math.abs(_tempForward.current.dot(_tempAxisY.current.set(0, 1, 0)));
-      const dotZ = Math.abs(_tempForward.current.dot(_tempAxisZ.current.set(0, 0, 1)));
+      // Build movement "virtual axes" from the part's local axes projected onto the camera-facing drag plane.
+      const localAxes = [
+        _tempAxisX.current.set(1, 0, 0).applyQuaternion(rotationQuaternion).normalize(),
+        _tempAxisY.current.set(0, 1, 0).applyQuaternion(rotationQuaternion).normalize(),
+        _tempAxisZ.current.set(0, 0, 1).applyQuaternion(rotationQuaternion).normalize()
+      ];
 
-      if (dotZ >= dotX && dotZ >= dotY) {
-        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.set(0, 0, 1), partPosition);
-        return {
-          normal: _tempNormal.current.set(0, 0, 1),
-          axes: { x: true, y: true, z: false }
-        };
-      } else if (dotX >= dotY) {
-        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.set(1, 0, 0), partPosition);
-        return {
-          normal: _tempNormal.current.set(1, 0, 0),
-          axes: { x: false, y: true, z: true }
-        };
+      const projectedAxes = localAxes
+        .map((axis) => {
+          const projected = axis.clone().addScaledVector(_tempNormal.current, -axis.dot(_tempNormal.current));
+          const len = projected.length();
+          if (len < 1e-5) return null;
+          projected.multiplyScalar(1 / len);
+          return { axis: projected, score: len };
+        })
+        .filter((entry): entry is { axis: THREE.Vector3; score: number } => entry !== null)
+        .sort((a, b) => b.score - a.score);
+
+      if (projectedAxes.length >= 2) {
+        _tempBasisU.current.copy(projectedAxes[0].axis);
+
+        // Pick a second axis that is not nearly collinear with U.
+        let second = projectedAxes[1].axis;
+        for (let i = 1; i < projectedAxes.length; i += 1) {
+          if (Math.abs(projectedAxes[i].axis.dot(_tempBasisU.current)) < 0.98) {
+            second = projectedAxes[i].axis;
+            break;
+          }
+        }
+        // Orthonormalize V against U to avoid skew/drift from non-orthogonal projected axes.
+        _tempBasisV.current.copy(second);
+        const uv = _tempBasisV.current.dot(_tempBasisU.current);
+        _tempBasisV.current.addScaledVector(_tempBasisU.current, -uv);
+        if (_tempBasisV.current.lengthSq() < 1e-8) {
+          _tempBasisV.current.copy(_tempNormal.current).cross(_tempBasisU.current);
+        }
+        _tempBasisV.current.normalize();
       } else {
-        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.set(0, 1, 0), partPosition);
-        return {
-          normal: _tempNormal.current.set(0, 1, 0),
-          axes: { x: true, y: false, z: true }
-        };
+        // Fallback basis if projection degenerates.
+        _tempBasisU.current.set(1, 0, 0);
+        if (Math.abs(_tempBasisU.current.dot(_tempNormal.current)) > 0.95) {
+          _tempBasisU.current.set(0, 1, 0);
+        }
+        _tempBasisU.current
+          .addScaledVector(_tempNormal.current, -_tempBasisU.current.dot(_tempNormal.current))
+          .normalize();
+        _tempBasisV.current.copy(_tempNormal.current).cross(_tempBasisU.current).normalize();
       }
+
+      return {
+        normal: _tempNormal.current,
+        basisU: _tempBasisU.current,
+        basisV: _tempBasisV.current,
+        // Plane constraints are encoded in basis vectors; allow world-axis updates from projected result.
+        axes: { x: true, y: true, z: true }
+      };
     },
-    [camera]
+    [camera, rotationQuaternion]
   );
 
   // Ref for cleanup of intent listeners (so the drag useEffect can remove them when it takes over)
@@ -278,6 +259,12 @@ export function usePartDrag(
         partOriginalPos: new THREE.Vector3(part.position.x, part.position.y, part.position.z)
       };
       lastDragPosition.current = { x: part.position.x, y: part.position.y, z: part.position.z };
+      dragFrameCounterRef.current = 0;
+      dragDebug('partDrag:intentStart', {
+        partId: part.id,
+        anchorPos: { x: anchorPos.x, y: anchorPos.y, z: anchorPos.z },
+        partOriginalPos: { x: part.position.x, y: part.position.y, z: part.position.z }
+      });
       if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = false;
     };
 
@@ -294,6 +281,7 @@ export function usePartDrag(
         setIsDragging(false);
         dragStart.current = null;
         lastDragPosition.current = null;
+        latchedFaceSnapRef.current = null;
         wasSnappedByParts.current = { x: false, y: false, z: false };
         useSelectionStore.getState().setDraggingPartId(null);
         useSelectionStore.getState().setActiveDragDelta(null);
@@ -305,11 +293,15 @@ export function usePartDrag(
     const removeIntentListeners = () => {
       window.removeEventListener('pointermove', handleIntentMove);
       window.removeEventListener('pointerup', handleIntentUp);
+      window.removeEventListener('pointercancel', handleIntentUp);
+      window.removeEventListener('blur', handleIntentUp);
       intentListenerCleanup.current = null;
     };
 
     window.addEventListener('pointermove', handleIntentMove);
     window.addEventListener('pointerup', handleIntentUp);
+    window.addEventListener('pointercancel', handleIntentUp);
+    window.addEventListener('blur', handleIntentUp);
     intentListenerCleanup.current = removeIntentListeners;
 
     return removeIntentListeners;
@@ -339,11 +331,26 @@ export function usePartDrag(
         const currentPoint = getWorldPoint(evt);
         if (currentPoint) {
           const delta = _tempDelta.current.copy(currentPoint).sub(dragStart.current.point);
+          dragFrameCounterRef.current += 1;
           const planeInfo = getDragPlaneInfo(dragStart.current.partPos);
 
-          let newX = planeInfo.axes.x ? dragStart.current.partPos.x + delta.x : liveDims.x;
-          let newY = planeInfo.axes.y ? dragStart.current.partPos.y + delta.y : liveDims.y;
-          let newZ = planeInfo.axes.z ? dragStart.current.partPos.z + delta.z : liveDims.z;
+          let uAmount = delta.dot(planeInfo.basisU);
+          let vAmount = delta.dot(planeInfo.basisV);
+
+          if (useAppSettingsStore.getState().settings.liveGridSnap) {
+            // Quantize movement along the drag plane's virtual basis (part-aligned at angles).
+            uAmount = snapToGrid(uAmount);
+            vAmount = snapToGrid(vAmount);
+          }
+
+          const projectedDelta = _tempProjectedDelta.current
+            .copy(planeInfo.basisU)
+            .multiplyScalar(uAmount)
+            .add(_tempBasisV.current.copy(planeInfo.basisV).multiplyScalar(vAmount));
+
+          let newX = dragStart.current.partPos.x + projectedDelta.x;
+          let newY = dragStart.current.partPos.y + projectedDelta.y;
+          let newZ = dragStart.current.partPos.z + projectedDelta.z;
 
           // Constrain to ground during move
           const worldHalfHeight = calculateWorldHalfHeight(
@@ -359,25 +366,60 @@ export function usePartDrag(
           const allParts = useProjectStore.getState().parts;
           const currentSelectedIds = useSelectionStore.getState().selectedPartIds;
           const currentSelectedGroupIds = useSelectionStore.getState().selectedGroupIds;
+          const currentGroupMembers = useProjectStore.getState().groupMembers;
           const currentReferenceIds = useSnapStore.getState().referencePartIds;
           const snapGuides = useProjectStore.getState().snapGuides;
+          const effectiveDraggingIdsSet = new Set<string>(currentSelectedIds);
+          for (const groupId of currentSelectedGroupIds) {
+            const groupPartIds = getAllDescendantPartIds(groupId, currentGroupMembers);
+            groupPartIds.forEach((id) => effectiveDraggingIdsSet.add(id));
+          }
+          // Ensure the actively dragged part is always treated as moving.
+          effectiveDraggingIdsSet.add(part.id);
+          const effectiveDraggingIds = [...effectiveDraggingIdsSet];
 
           const appSettings = useAppSettingsStore.getState().settings;
-          const { liveGridSnap, snapSensitivity, snapToOrigin } = appSettings;
+          const {
+            snapSensitivity,
+            snapToOrigin,
+            enableSurfaceAnchors,
+            enableFractionalAnchors,
+            enableGoldenRatioAnchors,
+            enableFeatureAnchors,
+            enableAxisLegacySnaps
+          } = appSettings;
 
-          if (liveGridSnap) {
-            newX = snapToGrid(newX);
-            newZ = snapToGrid(newZ);
-            const snappedY = snapToGrid(newY);
-            if (snappedY >= worldHalfHeight) {
-              newY = snappedY;
-            }
-          }
+          // Grid snap already applied in basis space above.
 
           const snapTargetParts =
             currentReferenceIds.length > 0 ? allParts.filter((p) => currentReferenceIds.includes(p.id)) : allParts;
 
           const snapLines: import('../../types').SnapLine[] = [];
+          const axisSnapWinners = createAxisSnapWinners();
+          const getFaceLockAxis = (
+            faceResult: {
+              adjustedPosition: { x: number; y: number; z: number };
+              snapLines: import('../../types').SnapLine[];
+            },
+            basePosition: { x: number; y: number; z: number }
+          ): 'x' | 'y' | 'z' => {
+            const faceLineAxis = faceResult.snapLines.find((line) => line.type === 'face')?.axis;
+            if (faceLineAxis === 'x' || faceLineAxis === 'y' || faceLineAxis === 'z') return faceLineAxis;
+            const dx = Math.abs(faceResult.adjustedPosition.x - basePosition.x);
+            const dy = Math.abs(faceResult.adjustedPosition.y - basePosition.y);
+            const dz = Math.abs(faceResult.adjustedPosition.z - basePosition.z);
+            return dx >= dy && dx >= dz ? 'x' : dy >= dz ? 'y' : 'z';
+          };
+          const tryApplyStageForAxis = (
+            axis: 'x' | 'y' | 'z',
+            stage: SnapStage,
+            apply: () => { accepted: boolean; lines?: import('../../types').SnapLine[] }
+          ) => {
+            if (!shouldUseSnapStage(axisSnapWinners[axis], stage)) return;
+            const result = apply();
+            if (!result.accepted) return;
+            tryApplyAxisSnap(axis, stage, axisSnapWinners, snapLines, result.lines ?? []);
+          };
 
           if (isSnapEnabled) {
             const cameraDistance = camera.position.distanceTo(_tempCameraTarget.current.set(newX, newY, newZ));
@@ -390,31 +432,33 @@ export function usePartDrag(
               const guideSnaps = detectGuideSnaps(draggingBounds, snapGuides, snapThreshold);
 
               if (guideSnaps.x && planeInfo.axes.x) {
-                newX += guideSnaps.x.delta;
-                const guide = snapGuides.find((g) => g.id === guideSnaps.x!.guideId);
-                if (guide) {
+                tryApplyStageForAxis('x', 'guide', () => {
+                  newX += guideSnaps.x!.delta;
+                  const guide = snapGuides.find((g) => g.id === guideSnaps.x!.guideId);
+                  if (!guide) return { accepted: false };
                   const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
-                  snapLines.push(createGuideSnapLine(guide, updatedBounds));
-                }
+                  return { accepted: true, lines: [createGuideSnapLine(guide, updatedBounds)] };
+                });
               }
               if (guideSnaps.y && planeInfo.axes.y) {
-                const snappedY = newY + guideSnaps.y.delta;
-                if (snappedY >= worldHalfHeight) {
+                tryApplyStageForAxis('y', 'guide', () => {
+                  const snappedY = newY + guideSnaps.y!.delta;
+                  if (snappedY < worldHalfHeight) return { accepted: false };
                   newY = snappedY;
                   const guide = snapGuides.find((g) => g.id === guideSnaps.y!.guideId);
-                  if (guide) {
-                    const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
-                    snapLines.push(createGuideSnapLine(guide, updatedBounds));
-                  }
-                }
+                  if (!guide) return { accepted: false };
+                  const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
+                  return { accepted: true, lines: [createGuideSnapLine(guide, updatedBounds)] };
+                });
               }
               if (guideSnaps.z && planeInfo.axes.z) {
-                newZ += guideSnaps.z.delta;
-                const guide = snapGuides.find((g) => g.id === guideSnaps.z!.guideId);
-                if (guide) {
+                tryApplyStageForAxis('z', 'guide', () => {
+                  newZ += guideSnaps.z!.delta;
+                  const guide = snapGuides.find((g) => g.id === guideSnaps.z!.guideId);
+                  if (!guide) return { accepted: false };
                   const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
-                  snapLines.push(createGuideSnapLine(guide, updatedBounds));
-                }
+                  return { accepted: true, lines: [createGuideSnapLine(guide, updatedBounds)] };
+                });
               }
             }
 
@@ -423,23 +467,28 @@ export function usePartDrag(
               const currentBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
               const originSnaps = detectOriginSnaps(currentBounds, snapThreshold);
 
-              if (originSnaps.x && planeInfo.axes.x && snapLines.filter((l) => l.axis === 'x').length === 0) {
-                newX += originSnaps.x.delta;
-                const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
-                snapLines.push(createOriginSnapLine('x', originSnaps.x.snapType, updatedBounds));
+              if (originSnaps.x && planeInfo.axes.x) {
+                tryApplyStageForAxis('x', 'origin', () => {
+                  newX += originSnaps.x!.delta;
+                  const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
+                  return { accepted: true, lines: [createOriginSnapLine('x', originSnaps.x!.snapType, updatedBounds)] };
+                });
               }
-              if (originSnaps.y && planeInfo.axes.y && snapLines.filter((l) => l.axis === 'y').length === 0) {
-                const snappedY = newY + originSnaps.y.delta;
-                if (snappedY >= worldHalfHeight) {
+              if (originSnaps.y && planeInfo.axes.y) {
+                tryApplyStageForAxis('y', 'origin', () => {
+                  const snappedY = newY + originSnaps.y!.delta;
+                  if (snappedY < worldHalfHeight) return { accepted: false };
                   newY = snappedY;
                   const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
-                  snapLines.push(createOriginSnapLine('y', originSnaps.y.snapType, updatedBounds));
-                }
+                  return { accepted: true, lines: [createOriginSnapLine('y', originSnaps.y!.snapType, updatedBounds)] };
+                });
               }
-              if (originSnaps.z && planeInfo.axes.z && snapLines.filter((l) => l.axis === 'z').length === 0) {
-                newZ += originSnaps.z.delta;
-                const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
-                snapLines.push(createOriginSnapLine('z', originSnaps.z.snapType, updatedBounds));
+              if (originSnaps.z && planeInfo.axes.z) {
+                tryApplyStageForAxis('z', 'origin', () => {
+                  newZ += originSnaps.z!.delta;
+                  const updatedBounds = getPartBoundsAtPosition(part, { x: newX, y: newY, z: newZ });
+                  return { accepted: true, lines: [createOriginSnapLine('z', originSnaps.z!.snapType, updatedBounds)] };
+                });
               }
             }
 
@@ -449,50 +498,214 @@ export function usePartDrag(
                 part,
                 { x: newX, y: newY, z: newZ },
                 snapTargetParts,
-                currentSelectedIds,
+                effectiveDraggingIds,
                 snapThreshold
               );
+              const hasFaceSnap = faceSnapResult.snappedX || faceSnapResult.snappedY || faceSnapResult.snappedZ;
+              if (hasFaceSnap) {
+                const lockAxis = getFaceLockAxis(faceSnapResult, { x: newX, y: newY, z: newZ });
+                latchedFaceSnapRef.current = {
+                  adjustedPosition: faceSnapResult.adjustedPosition,
+                  lockAxis,
+                  snappedX: faceSnapResult.snappedX,
+                  snappedY: faceSnapResult.snappedY,
+                  snappedZ: faceSnapResult.snappedZ,
+                  snapLines: faceSnapResult.snapLines
+                };
+              } else if (
+                latchedFaceSnapRef.current &&
+                faceSnapResult.closestDistance !== undefined &&
+                faceSnapResult.closestDistance < snapThreshold * 1.1
+              ) {
+                const latched = latchedFaceSnapRef.current;
+                // Break out of a latched face snap if the user drags far enough away on the latched axis.
+                const breakoutDistance = Math.max(0.12, snapThreshold * 0.6);
+                const breakX =
+                  latched.lockAxis === 'x' &&
+                  latched.snappedX &&
+                  Math.abs(newX - latched.adjustedPosition.x) > breakoutDistance;
+                const breakY =
+                  latched.lockAxis === 'y' &&
+                  latched.snappedY &&
+                  Math.abs(newY - latched.adjustedPosition.y) > breakoutDistance;
+                const breakZ =
+                  latched.lockAxis === 'z' &&
+                  latched.snappedZ &&
+                  Math.abs(newZ - latched.adjustedPosition.z) > breakoutDistance;
+                const shouldBreakLatch = breakX || breakY || breakZ;
 
-              if (faceSnapResult.snappedX && planeInfo.axes.x && snapLines.filter((l) => l.axis === 'x').length === 0) {
+                if (!shouldBreakLatch) {
+                  faceSnapResult.adjustedPosition = latched.adjustedPosition;
+                  const axis = latched.lockAxis;
+                  faceSnapResult.snappedX = axis === 'x' && latched.snappedX;
+                  faceSnapResult.snappedY = axis === 'y' && latched.snappedY;
+                  faceSnapResult.snappedZ = axis === 'z' && latched.snappedZ;
+                  faceSnapResult.snapLines = latched.snapLines;
+                } else {
+                  latchedFaceSnapRef.current = null;
+                }
+              } else {
+                latchedFaceSnapRef.current = null;
+              }
+
+              const faceBasePosition = { x: newX, y: newY, z: newZ };
+
+              // Always apply the full face correction first; axis winners below
+              // decide which world axis remains face-locked versus tangentially adjustable.
+              if (faceSnapResult.snappedX || faceSnapResult.snappedY || faceSnapResult.snappedZ) {
                 newX = faceSnapResult.adjustedPosition.x;
-                snapLines.push(...faceSnapResult.snapLines.filter((l) => l.axis === 'x'));
-              }
-              if (faceSnapResult.snappedY && planeInfo.axes.y && snapLines.filter((l) => l.axis === 'y').length === 0) {
-                const snappedY = faceSnapResult.adjustedPosition.y;
-                if (snappedY >= worldHalfHeight) {
-                  newY = snappedY;
-                  snapLines.push(...faceSnapResult.snapLines.filter((l) => l.axis === 'y'));
-                }
-              }
-              if (faceSnapResult.snappedZ && planeInfo.axes.z && snapLines.filter((l) => l.axis === 'z').length === 0) {
+                newY = faceSnapResult.adjustedPosition.y;
                 newZ = faceSnapResult.adjustedPosition.z;
-                snapLines.push(...faceSnapResult.snapLines.filter((l) => l.axis === 'z'));
               }
 
-              const snapResult = detectSnaps(
-                part,
-                { x: newX, y: newY, z: newZ },
-                snapTargetParts,
-                currentSelectedIds,
-                snapThreshold
-              );
+              const faceLockAxis = getFaceLockAxis(faceSnapResult, faceBasePosition);
+              faceSnapResult.snappedX = faceLockAxis === 'x' && faceSnapResult.snappedX;
+              faceSnapResult.snappedY = faceLockAxis === 'y' && faceSnapResult.snappedY;
+              faceSnapResult.snappedZ = faceLockAxis === 'z' && faceSnapResult.snappedZ;
 
-              if (planeInfo.axes.x && snapResult.snappedX && snapLines.filter((l) => l.axis === 'x').length === 0) {
-                newX = snapResult.adjustedPosition.x;
+              if (faceSnapResult.snappedX && planeInfo.axes.x) {
+                tryApplyStageForAxis('x', 'face', () => ({
+                  accepted: true,
+                  lines: (() => {
+                    newX = faceSnapResult.adjustedPosition.x;
+                    return faceSnapResult.snapLines.filter((l) => l.axis === 'x');
+                  })()
+                }));
               }
-              if (planeInfo.axes.y && snapResult.snappedY && snapLines.filter((l) => l.axis === 'y').length === 0) {
-                const snappedY = snapResult.adjustedPosition.y;
-                if (snappedY >= worldHalfHeight) {
+              if (faceSnapResult.snappedY && planeInfo.axes.y) {
+                tryApplyStageForAxis('y', 'face', () => {
+                  const snappedY = faceSnapResult.adjustedPosition.y;
+                  if (snappedY < worldHalfHeight) return { accepted: false };
                   newY = snappedY;
-                }
+                  return { accepted: true, lines: faceSnapResult.snapLines.filter((l) => l.axis === 'y') };
+                });
               }
-              if (planeInfo.axes.z && snapResult.snappedZ && snapLines.filter((l) => l.axis === 'z').length === 0) {
-                newZ = snapResult.adjustedPosition.z;
+              if (faceSnapResult.snappedZ && planeInfo.axes.z) {
+                tryApplyStageForAxis('z', 'face', () => ({
+                  accepted: true,
+                  lines: (() => {
+                    newZ = faceSnapResult.adjustedPosition.z;
+                    return faceSnapResult.snapLines.filter((l) => l.axis === 'z');
+                  })()
+                }));
               }
 
-              for (const line of snapResult.snapLines) {
-                if (snapLines.filter((l) => l.axis === line.axis).length === 0) {
-                  snapLines.push(line);
+              const applyAdvancedSnapResult = (snapResult: ReturnType<typeof detectFeatureSnaps>, stage: SnapStage) => {
+                if (!(snapResult.snappedX || snapResult.snappedY || snapResult.snappedZ)) return;
+                if (planeInfo.axes.x && snapResult.snappedX) {
+                  tryApplyStageForAxis('x', stage, () => ({
+                    accepted: true,
+                    lines: (() => {
+                      newX = snapResult.adjustedPosition.x;
+                      return snapResult.snapLines.filter((l) => l.axis === 'x');
+                    })()
+                  }));
+                }
+                if (planeInfo.axes.y && snapResult.snappedY) {
+                  tryApplyStageForAxis('y', stage, () => {
+                    const snappedY = snapResult.adjustedPosition.y;
+                    if (snappedY < worldHalfHeight) return { accepted: false };
+                    newY = snappedY;
+                    return { accepted: true, lines: snapResult.snapLines.filter((l) => l.axis === 'y') };
+                  });
+                }
+                if (planeInfo.axes.z && snapResult.snappedZ) {
+                  tryApplyStageForAxis('z', stage, () => ({
+                    accepted: true,
+                    lines: (() => {
+                      newZ = snapResult.adjustedPosition.z;
+                      return snapResult.snapLines.filter((l) => l.axis === 'z');
+                    })()
+                  }));
+                }
+              };
+
+              if (enableSurfaceAnchors ?? true) {
+                const surfaceSnapResult = detectSurfaceAnchorSnaps(
+                  part,
+                  { x: newX, y: newY, z: newZ },
+                  snapTargetParts,
+                  effectiveDraggingIds,
+                  snapThreshold
+                );
+                applyAdvancedSnapResult(surfaceSnapResult, 'surface');
+              }
+
+              if ((enableFractionalAnchors ?? true) || (enableGoldenRatioAnchors ?? false)) {
+                const fractionSnapResult = detectFractionalFaceSnaps(
+                  part,
+                  { x: newX, y: newY, z: newZ },
+                  snapTargetParts,
+                  effectiveDraggingIds,
+                  snapThreshold,
+                  enableGoldenRatioAnchors ?? false
+                );
+                applyAdvancedSnapResult(fractionSnapResult, 'fraction');
+              }
+
+              // Feature snaps can still help on tangential axes even while a face snap is active.
+              if (enableFeatureAnchors ?? true) {
+                const featureSnapResult = detectFeatureSnaps(
+                  part,
+                  { x: newX, y: newY, z: newZ },
+                  snapTargetParts,
+                  effectiveDraggingIds,
+                  snapThreshold
+                );
+                const featureDelta = {
+                  x: featureSnapResult.adjustedPosition.x - newX,
+                  y: featureSnapResult.adjustedPosition.y - newY,
+                  z: featureSnapResult.adjustedPosition.z - newZ
+                };
+                const featureAxesMoved =
+                  (Math.abs(featureDelta.x) > 1e-5 ? 1 : 0) +
+                  (Math.abs(featureDelta.y) > 1e-5 ? 1 : 0) +
+                  (Math.abs(featureDelta.z) > 1e-5 ? 1 : 0);
+                const featureStage: SnapStage =
+                  latchedFaceSnapRef.current && featureAxesMoved >= 2 ? 'face' : 'feature';
+                applyAdvancedSnapResult(featureSnapResult, featureStage);
+              }
+
+              // Legacy axis-based snapping is intentionally disabled for angled assemblies.
+              const axisAlignedContext =
+                isAxisAlignedRotation(part.rotation) &&
+                snapTargetParts.every((candidate) =>
+                  effectiveDraggingIds.includes(candidate.id) ? true : isAxisAlignedRotation(candidate.rotation)
+                );
+              if ((enableAxisLegacySnaps ?? true) && axisAlignedContext) {
+                const snapResult = detectSnaps(
+                  part,
+                  { x: newX, y: newY, z: newZ },
+                  snapTargetParts,
+                  effectiveDraggingIds,
+                  snapThreshold
+                );
+
+                if (planeInfo.axes.x && snapResult.snappedX) {
+                  tryApplyStageForAxis('x', 'axis', () => ({
+                    accepted: true,
+                    lines: (() => {
+                      newX = snapResult.adjustedPosition.x;
+                      return snapResult.snapLines.filter((line) => line.axis === 'x');
+                    })()
+                  }));
+                }
+                if (planeInfo.axes.y && snapResult.snappedY) {
+                  tryApplyStageForAxis('y', 'axis', () => {
+                    const snappedY = snapResult.adjustedPosition.y;
+                    if (snappedY < worldHalfHeight) return { accepted: false };
+                    newY = snappedY;
+                    return { accepted: true, lines: snapResult.snapLines.filter((line) => line.axis === 'y') };
+                  });
+                }
+                if (planeInfo.axes.z && snapResult.snappedZ) {
+                  tryApplyStageForAxis('z', 'axis', () => ({
+                    accepted: true,
+                    lines: (() => {
+                      newZ = snapResult.adjustedPosition.z;
+                      return snapResult.snapLines.filter((line) => line.axis === 'z');
+                    })()
+                  }));
                 }
               }
             }
@@ -507,7 +720,6 @@ export function usePartDrag(
             let referenceDistances: import('../../types').ReferenceDistanceIndicator[] = [];
             if (currentReferenceIds.length > 0 && !currentReferenceIds.includes(part.id)) {
               const referenceParts = allParts.filter((p) => currentReferenceIds.includes(p.id));
-              const currentGroupMembers = useProjectStore.getState().groupMembers;
 
               const effectiveDragPartIds = new Set(currentSelectedIds);
               for (const groupId of currentSelectedGroupIds) {
@@ -535,6 +747,19 @@ export function usePartDrag(
 
             // Batch snap lines + reference distances into single store update
             useSnapStore.getState().setSnapIndicators(snapLines, referenceDistances);
+            if (dragFrameCounterRef.current % 10 === 0) {
+              dragDebug('partDrag:move:snaps', {
+                partId: part.id,
+                frame: dragFrameCounterRef.current,
+                position: { x: newX, y: newY, z: newZ },
+                snappedAxes: {
+                  x: snapLines.some((l) => l.axis === 'x'),
+                  y: snapLines.some((l) => l.axis === 'y'),
+                  z: snapLines.some((l) => l.axis === 'z')
+                },
+                snapLineTypes: snapLines.map((l) => l.type)
+              });
+            }
           } else {
             useSnapStore.getState().setSnapIndicators([], []);
             wasSnappedByParts.current = { x: false, y: false, z: false };
@@ -549,29 +774,62 @@ export function usePartDrag(
           };
 
           if (stockConstraints.preventOverlap) {
-            const wouldOverlap = wouldCauseOverlap(
-              { x: newX, y: newY, z: newZ },
-              allParts,
-              currentSelectedIds,
-              proposedDelta
-            );
-
-            if (wouldOverlap) {
-              return;
+            const safeDelta = resolveSafeTranslationDelta(allParts, new Set(effectiveDraggingIds), proposedDelta);
+            if (!safeDelta) {
+              dragDebug('partDrag:move:overlapBlocked', {
+                partId: part.id,
+                frame: dragFrameCounterRef.current,
+                proposedDelta,
+                lastDragPosition: lastDragPosition.current
+              });
+              // Hold position at the last valid point instead of aborting the frame.
+              // Aborting leaves stale drag state and can make pointer-up jump back.
+              const fallback =
+                lastDragPosition.current ??
+                ({
+                  x: dragStart.current.partPos.x,
+                  y: dragStart.current.partPos.y,
+                  z: dragStart.current.partPos.z
+                } as const);
+              newX = fallback.x;
+              newY = fallback.y;
+              newZ = fallback.z;
+            } else {
+              if (
+                Math.abs(safeDelta.x - proposedDelta.x) > 1e-6 ||
+                Math.abs(safeDelta.y - proposedDelta.y) > 1e-6 ||
+                Math.abs(safeDelta.z - proposedDelta.z) > 1e-6
+              ) {
+                dragDebug('partDrag:move:overlapClamped', {
+                  partId: part.id,
+                  frame: dragFrameCounterRef.current,
+                  proposedDelta,
+                  safeDelta
+                });
+              }
+              newX = dragStart.current.partPos.x + safeDelta.x;
+              newY = dragStart.current.partPos.y + safeDelta.y;
+              newZ = dragStart.current.partPos.z + safeDelta.z;
             }
           }
 
           lastDragPosition.current = { x: newX, y: newY, z: newZ };
 
-          const partLiveX = dragStart.current.partOriginalPos.x + proposedDelta.x;
-          const partLiveY = dragStart.current.partOriginalPos.y + proposedDelta.y;
-          const partLiveZ = dragStart.current.partOriginalPos.z + proposedDelta.z;
+          const effectiveDelta = {
+            x: newX - dragStart.current.partPos.x,
+            y: newY - dragStart.current.partPos.y,
+            z: newZ - dragStart.current.partPos.z
+          };
+
+          const partLiveX = dragStart.current.partOriginalPos.x + effectiveDelta.x;
+          const partLiveY = dragStart.current.partOriginalPos.y + effectiveDelta.y;
+          const partLiveZ = dragStart.current.partOriginalPos.z + effectiveDelta.z;
           setLiveDims((prev) => ({ ...prev, x: partLiveX, y: partLiveY, z: partLiveZ }));
 
           const hasGroupSelected = currentSelectedGroupIds.length > 0;
-          const hasMultiplePartsSelected = currentSelectedIds.length > 1 && currentSelectedIds.includes(part.id);
+          const hasMultiplePartsSelected = effectiveDraggingIds.length > 1;
           if (hasGroupSelected || hasMultiplePartsSelected) {
-            useSelectionStore.getState().setActiveDragDelta(proposedDelta);
+            useSelectionStore.getState().setActiveDragDelta(effectiveDelta);
           }
         }
       });
@@ -579,9 +837,13 @@ export function usePartDrag(
 
     const handleWindowPointerUp = () => {
       if (isDragging && dragStart.current && lastDragPosition.current) {
-        const newX = wasSnappedByParts.current.x ? lastDragPosition.current.x : snapToGrid(lastDragPosition.current.x);
-        let newY = wasSnappedByParts.current.y ? lastDragPosition.current.y : snapToGrid(lastDragPosition.current.y);
-        const newZ = wasSnappedByParts.current.z ? lastDragPosition.current.z : snapToGrid(lastDragPosition.current.z);
+        const dragDistanceSq =
+          (lastDragPosition.current.x - dragStart.current.partOriginalPos.x) ** 2 +
+          (lastDragPosition.current.y - dragStart.current.partOriginalPos.y) ** 2 +
+          (lastDragPosition.current.z - dragStart.current.partOriginalPos.z) ** 2;
+        let newX = lastDragPosition.current.x;
+        let newY = lastDragPosition.current.y;
+        let newZ = lastDragPosition.current.z;
 
         const currentSelectedIds = useSelectionStore.getState().selectedPartIds;
         const currentSelectedGroupIds = useSelectionStore.getState().selectedGroupIds;
@@ -593,6 +855,14 @@ export function usePartDrag(
           y: newY - dragStart.current.partPos.y,
           z: newZ - dragStart.current.partPos.z
         };
+        dragDebug('partDrag:release:start', {
+          partId: part.id,
+          lastDragPosition: lastDragPosition.current,
+          startPartPos: dragStart.current.partPos,
+          baseDelta,
+          selectedIds: currentSelectedIds,
+          selectedGroupIds: currentSelectedGroupIds
+        });
 
         const hasGroupSelected = currentSelectedGroupIds.length > 0;
         const hasMultiplePartsSelected = currentSelectedIds.length > 1 && currentSelectedIds.includes(part.id);
@@ -636,54 +906,36 @@ export function usePartDrag(
           // Check overlap prevention for multi-part move
           const stockConstraints = useProjectStore.getState().stockConstraints;
           if (stockConstraints.preventOverlap) {
-            const movingPartIds = new Set(effectivePartIds);
-            let hasOverlap = false;
-
-            for (const movingId of effectivePartIds) {
-              const movingPart = allParts.find((p) => p.id === movingId);
-              if (!movingPart) continue;
-              if (movingPart.ignoreOverlap) continue;
-
-              const movedPosition = {
-                x: movingPart.position.x + adjustedDelta.x,
-                y: movingPart.position.y + adjustedDelta.y,
-                z: movingPart.position.z + adjustedDelta.z
-              };
-              const movedAABB = getPartAABB(movingPart, movedPosition);
-
-              for (const other of allParts) {
-                if (movingPartIds.has(other.id)) continue;
-                if (other.ignoreOverlap) continue;
-                const otherAABB = getPartAABB(other, other.position);
-                if (aabbsOverlap(movedAABB, otherAABB)) {
-                  hasOverlap = true;
-                  break;
-                }
-              }
-              if (hasOverlap) break;
-            }
-
-            if (hasOverlap) {
-              setLiveDims({
-                x: part.position.x,
-                y: part.position.y,
-                z: part.position.z,
-                length: liveDims.length,
-                width: liveDims.width,
-                thickness: liveDims.thickness
+            const safeDelta = resolveSafeTranslationDelta(allParts, new Set(effectivePartIds), adjustedDelta);
+            if (!safeDelta) {
+              dragDebug('partDrag:release:multi:noSafeDelta', {
+                partId: part.id,
+                adjustedDelta,
+                fallbackToPreview: true
               });
+              // Keep the last previewed drag delta instead of reverting.
+              // Final overlap solve can fail near exact-contact due to precision.
+              moveSelectedParts(adjustedDelta);
+              useSelectionStore.getState().setActiveDragDelta(null);
               setIsDragging(false);
               dragStart.current = null;
               lastDragPosition.current = null;
-              useSelectionStore.getState().setActiveDragDelta(null);
+              latchedFaceSnapRef.current = null;
+              wasSnappedByParts.current = { x: false, y: false, z: false };
+              justFinishedDragging.current = dragDistanceSq > 1e-4;
               useSelectionStore.getState().setDraggingPartId(null);
               if (isOrbitControls(controls)) controls.enabled = true;
               useSnapStore.getState().setActiveSnapLines([]);
               useSnapStore.getState().updateReferenceDistances();
               return;
             }
+            dragDebug('partDrag:release:multi:safeDelta', { partId: part.id, adjustedDelta, safeDelta });
+            adjustedDelta.x = safeDelta.x;
+            adjustedDelta.y = safeDelta.y;
+            adjustedDelta.z = safeDelta.z;
           }
 
+          dragDebug('partDrag:release:multi:commit', { partId: part.id, delta: adjustedDelta });
           moveSelectedParts(adjustedDelta);
           useSelectionStore.getState().setActiveDragDelta(null);
         } else {
@@ -699,28 +951,43 @@ export function usePartDrag(
           // Check overlap prevention for final snapped position
           const stockConstraints = useProjectStore.getState().stockConstraints;
           if (stockConstraints.preventOverlap) {
-            const wouldOverlap = wouldCauseOverlap({ x: newX, y: newY, z: newZ }, allParts, currentSelectedIds);
-            if (wouldOverlap) {
-              setLiveDims({
-                x: part.position.x,
-                y: part.position.y,
-                z: part.position.z,
-                length: liveDims.length,
-                width: liveDims.width,
-                thickness: liveDims.thickness
+            const safeDelta = resolveSafeTranslationDelta(
+              allParts,
+              new Set(effectivePartIds.length > 0 ? effectivePartIds : [part.id]),
+              { x: baseDelta.x, y: newY - dragStart.current.partPos.y, z: baseDelta.z }
+            );
+            if (!safeDelta) {
+              dragDebug('partDrag:release:single:noSafeDelta', {
+                partId: part.id,
+                fallbackPosition: { x: newX, y: newY, z: newZ }
+              });
+              // Commit the last validated preview position to avoid jump-back.
+              updatePart(part.id, {
+                position: { x: newX, y: newY, z: newZ }
               });
               setIsDragging(false);
               dragStart.current = null;
               lastDragPosition.current = null;
+              latchedFaceSnapRef.current = null;
               wasSnappedByParts.current = { x: false, y: false, z: false };
+              justFinishedDragging.current = dragDistanceSq > 1e-4;
               useSelectionStore.getState().setDraggingPartId(null);
               if (isOrbitControls(controls)) controls.enabled = true;
               useSnapStore.getState().setActiveSnapLines([]);
               useSnapStore.getState().updateReferenceDistances();
               return;
             }
+            dragDebug('partDrag:release:single:safeDelta', {
+              partId: part.id,
+              baseDelta,
+              safeDelta
+            });
+            newX = dragStart.current.partPos.x + safeDelta.x;
+            newY = dragStart.current.partPos.y + safeDelta.y;
+            newZ = dragStart.current.partPos.z + safeDelta.z;
           }
 
+          dragDebug('partDrag:release:single:commit', { partId: part.id, position: { x: newX, y: newY, z: newZ } });
           updatePart(part.id, {
             position: { x: newX, y: newY, z: newZ }
           });
@@ -729,8 +996,10 @@ export function usePartDrag(
         setIsDragging(false);
         dragStart.current = null;
         lastDragPosition.current = null;
+        latchedFaceSnapRef.current = null;
         wasSnappedByParts.current = { x: false, y: false, z: false };
-        justFinishedDragging.current = true;
+        // Only suppress the next click if this was a real drag movement.
+        justFinishedDragging.current = dragDistanceSq > 1e-4;
         useSelectionStore.getState().setDraggingPartId(null);
         if (isOrbitControls(controls)) controls.enabled = true;
         useSnapStore.getState().setActiveSnapLines([]);
@@ -740,9 +1009,13 @@ export function usePartDrag(
 
     window.addEventListener('pointermove', handleWindowPointerMove);
     window.addEventListener('pointerup', handleWindowPointerUp);
+    window.addEventListener('pointercancel', handleWindowPointerUp);
+    window.addEventListener('blur', handleWindowPointerUp);
     return () => {
       window.removeEventListener('pointermove', handleWindowPointerMove);
       window.removeEventListener('pointerup', handleWindowPointerUp);
+      window.removeEventListener('pointercancel', handleWindowPointerUp);
+      window.removeEventListener('blur', handleWindowPointerUp);
       if (rafIdRef.current !== null) {
         window.cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
@@ -818,7 +1091,7 @@ export function usePartDrag(
     let anchorPos: THREE.Vector3;
 
     const hasGroupSelected = currentSelectedGroupIds.length > 0;
-    const isInSelectedGroup = groupToSelectOnClick && currentSelectedGroupIds.includes(groupToSelectOnClick);
+    const isInSelectedGroup = ancestorGroupIds.some((groupId) => currentSelectedGroupIds.includes(groupId));
     const hasMultipleParts = currentSelectedPartIds.length > 1;
 
     // Group-selected part drag should use the thresholded group-drag path (same as InstancedParts).
@@ -870,6 +1143,12 @@ export function usePartDrag(
         partOriginalPos: partOriginalPos
       };
       lastDragPosition.current = { x: partOriginalPos.x, y: partOriginalPos.y, z: partOriginalPos.z };
+      dragFrameCounterRef.current = 0;
+      dragDebug('partDrag:start', {
+        partId: part.id,
+        anchorPos: { x: anchorPos.x, y: anchorPos.y, z: anchorPos.z },
+        partOriginalPos: { x: partOriginalPos.x, y: partOriginalPos.y, z: partOriginalPos.z }
+      });
       if (isOrbitControls(controls)) controls.enabled = false;
     }
   };

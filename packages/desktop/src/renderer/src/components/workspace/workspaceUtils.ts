@@ -50,6 +50,7 @@ let globalRightClickTarget: {
   worldPosition?: { x: number; y: number; z: number };
   guideId?: string;
 } | null = null;
+let lastPartPointerInteractionAt = 0;
 
 export function setRightClickTarget(target: typeof globalRightClickTarget) {
   globalRightClickTarget = target;
@@ -61,6 +62,14 @@ export function getRightClickTarget() {
 
 export function clearRightClickTarget() {
   globalRightClickTarget = null;
+}
+
+export function markPartPointerInteraction() {
+  lastPartPointerInteractionAt = performance.now();
+}
+
+export function hadRecentPartPointerInteraction(windowMs = 140): boolean {
+  return performance.now() - lastPartPointerInteractionAt <= windowMs;
 }
 
 // Module-level reusable objects for getPartAABB calculations.

@@ -19,7 +19,7 @@ export const docPages: DocPage[] = [
     title: "Interface Overview",
     section: "Getting Started",
     searchText:
-      "workspace viewport camera controls sidebar properties panel header selection box select orbit zoom pan focus",
+      "workspace viewport camera controls sidebar properties panel header selection box select orbit zoom pan focus rotation snap step precise angles multi-select shared handles",
   },
   {
     slug: "first-project",
@@ -34,7 +34,7 @@ export const docPages: DocPage[] = [
     title: "Working with Parts",
     section: "Core Features",
     searchText:
-      "part dimensions length width thickness position color grain direction duplicate copy paste delete notes overlap joinery",
+      "part dimensions length width thickness position rotation custom angle precise rotate angle snap snap step reset rotation color grain direction duplicate copy paste delete notes overlap joinery",
   },
   {
     slug: "stock",
@@ -92,7 +92,7 @@ export const docPages: DocPage[] = [
     title: "Keyboard Shortcuts",
     section: "Reference",
     searchText:
-      "hotkeys keyboard commands undo redo copy paste duplicate group ungroup movement navigation tools",
+      "hotkeys keyboard commands undo redo copy paste duplicate group ungroup movement navigation tools rotate rotation custom angles precise rotate angle snap shift drag ring",
   },
   {
     slug: "settings",

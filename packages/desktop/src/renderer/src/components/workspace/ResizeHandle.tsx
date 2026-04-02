@@ -1,7 +1,7 @@
 import { ThreeEvent } from '@react-three/fiber';
 import { memo, useState } from 'react';
 import { LiveDimensions, HandlePosition, RESIZE_COLORS } from './partTypes';
-import { RESIZE_HANDLE_GEOMETRY, RESIZE_OUTLINE_MATERIAL } from './partGeometry';
+import { RESIZE_HANDLE_GEOMETRY } from './partGeometry';
 
 export const ResizeHandle = memo(
   function ResizeHandle({
@@ -24,6 +24,13 @@ export const ResizeHandle = memo(
     const halfLength = liveDims.length / 2;
     const halfThickness = liveDims.thickness / 2;
     const halfWidth = liveDims.width / 2;
+
+    // Scale visual handle size with part size, but keep sane min/max bounds.
+    // This prevents handles from covering thin/small parts while remaining usable.
+    const minPartDimension = Math.min(liveDims.length, liveDims.width, liveDims.thickness);
+    const visualHandleSize = Math.max(0.12, Math.min(0.32, minPartDimension * 0.22));
+    const visualScale = visualHandleSize / 0.45; // 0.45 = base geometry size
+    const hitScale = Math.max(0.68, visualScale * 1.35);
 
     // Positions relative to center (group position handles world offset)
     const handleX = handlePos.x === 0 ? 0 : handlePos.x * halfLength;
@@ -48,13 +55,13 @@ export const ResizeHandle = memo(
     // Bolder colors for different handle types
     const baseColor = handlePos.type === 'corner' ? RESIZE_COLORS.corner : RESIZE_COLORS.edge;
     const isActive = hovered || isResizing;
+    const activeScaleBoost = isActive ? 1.16 : 1;
 
     return (
       <group position={[handleX, handleY, handleZ]}>
-        {/* Dark outline for contrast on any background */}
-        <mesh scale={1.15} geometry={RESIZE_HANDLE_GEOMETRY} material={RESIZE_OUTLINE_MATERIAL} />
-        {/* Main handle */}
+        {/* Larger near-invisible hit target keeps handles easy to grab even when visually scaled down */}
         <mesh
+          scale={hitScale}
           geometry={RESIZE_HANDLE_GEOMETRY}
           onPointerDown={(e) => {
             e.stopPropagation();
@@ -70,10 +77,31 @@ export const ResizeHandle = memo(
             if (!isResizing) document.body.style.cursor = 'auto';
           }}
         >
-          <meshStandardMaterial
+          <meshBasicMaterial transparent opacity={0.02} depthWrite={false} />
+        </mesh>
+
+        {/* Soft halo instead of dark outline so theme colors remain readable */}
+        <mesh scale={visualScale * 1.12} geometry={RESIZE_HANDLE_GEOMETRY}>
+          <meshBasicMaterial
             color={isActive ? RESIZE_COLORS.hover : baseColor}
-            emissive={isActive ? baseColor : '#000000'}
-            emissiveIntensity={isActive ? 0.3 : 0}
+            transparent
+            opacity={isActive ? 0.2 : 0.12}
+            depthWrite={false}
+          />
+        </mesh>
+        {/* Extra hover glow to make handle focus obvious */}
+        {isActive && (
+          <mesh scale={visualScale * 1.35} geometry={RESIZE_HANDLE_GEOMETRY}>
+            <meshBasicMaterial color={RESIZE_COLORS.hover} transparent opacity={0.18} depthWrite={false} />
+          </mesh>
+        )}
+        {/* Main handle */}
+        <mesh scale={visualScale * activeScaleBoost} geometry={RESIZE_HANDLE_GEOMETRY}>
+          <meshBasicMaterial
+            color={isActive ? RESIZE_COLORS.hover : baseColor}
+            transparent
+            opacity={isActive ? 0.88 : 0.78}
+            depthWrite={false}
           />
         </mesh>
       </group>
