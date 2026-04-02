@@ -1,4 +1,5 @@
 import { FractionInput } from '@renderer/components/common/FractionInput';
+import { PartCutsPreviewCanvas } from '@renderer/components/part-cuts/PartCutsPreviewCanvas';
 import {
   applyTargetToFeatureDraft,
   buildDraftFromFeature,
@@ -6,14 +7,18 @@ import {
   buildFeatureFromDraft,
   CORNER_TARGETS,
   duplicateFeature,
+  EDGE_NOTCH_SIDE_LABELS,
+  EDGE_NOTCH_SIDES,
   EDGE_TARGETS,
+  edgeNotchSideToTarget,
+  edgeTargetToSide,
   END_TARGETS,
   FACE_TARGETS,
   FeatureDraft,
   getFeatureDraftTarget,
+  normalizeRectCutDraft,
   OperationPreset
 } from '@renderer/components/part-features/partFeatureEditorState';
-import { PartCutsPreviewCanvas } from '@renderer/components/part-cuts/PartCutsPreviewCanvas';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@renderer/components/ui/card';
@@ -24,10 +29,10 @@ import { ScrollArea } from '@renderer/components/ui/scroll-area';
 import { Select } from '@renderer/components/ui/select';
 import { EndCutFeature, Part, PartFeature, PartFeatureTarget, RectCutFeature } from '@renderer/types';
 import { getDerivedLengthMeasurements } from '@renderer/utils/endCutUtils';
+import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
+import { getPickableTargetLabel, isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
 import { getAvailableMirrorActions, getMirrorActionLabel, mirrorFeature } from '@renderer/utils/partFeatureActions';
 import { getPartFeatureConflicts } from '@renderer/utils/partFeatureConflicts';
-import { getPickableTargetLabel, isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
-import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import {
   CORNER_LABELS,
   EDGE_LABELS,
@@ -41,6 +46,14 @@ import {
   TOP_BOTTOM_FACE_TARGETS,
   validateRectCutFeature
 } from '@renderer/utils/rectCutUtils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@renderer/components/ui/dropdown-menu';
+import { MoreHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface PartCutsWorkspaceProps {
@@ -81,7 +94,8 @@ function getSelectedTargetLabel(draft: FeatureDraft | null): string | null {
   if (!draft) return null;
   if (draft.mode === 'end_cut') return FACE_LABELS[draft.targetFace];
   if (draft.cutType === 'corner_notch') return CORNER_LABELS[draft.cornerTarget];
-  if (draft.cutType === 'edge_notch' || draft.cutType === 'rabbet') return EDGE_LABELS[draft.edgeTarget];
+  if (draft.cutType === 'edge_notch') return EDGE_NOTCH_SIDE_LABELS[edgeTargetToSide(draft.edgeTarget)];
+  if (draft.cutType === 'rabbet') return EDGE_LABELS[draft.edgeTarget];
   return FACE_LABELS[draft.faceTarget];
 }
 
@@ -219,7 +233,7 @@ export function PartCutsWorkspace({
   }, [draft]);
 
   const availableEdgeTargets = useMemo(() => {
-    if (!draft || draft.mode !== 'rect_cut' || !['edge_notch', 'rabbet'].includes(draft.cutType)) return EDGE_TARGETS;
+    if (!draft || draft.mode !== 'rect_cut' || draft.cutType !== 'rabbet') return EDGE_TARGETS;
     return draft.depthMode === 'blind' ? TOP_BOTTOM_EDGE_TARGETS : EDGE_TARGETS;
   }, [draft]);
 
@@ -331,7 +345,7 @@ export function PartCutsWorkspace({
   };
 
   const handleMirrorFeature = (feature: PartFeature, action: ReturnType<typeof getAvailableMirrorActions>[number]) => {
-    const mirrored = mirrorFeature(feature, action);
+    const mirrored = mirrorFeature(feature, action, part);
     const sourceIndex = draftFeatures.findIndex((entry) => entry.id === feature.id);
     const nextFeatures = [...draftFeatures];
     nextFeatures.splice(sourceIndex + 1, 0, mirrored);
@@ -348,12 +362,25 @@ export function PartCutsWorkspace({
     onDraftFeaturesChange(nextFeatures);
   };
 
+  const updateRectDraft = (
+    updater:
+      | Partial<Extract<FeatureDraft, { mode: 'rect_cut' }>>
+      | ((draft: Extract<FeatureDraft, { mode: 'rect_cut' }>) => Extract<FeatureDraft, { mode: 'rect_cut' }>)
+  ) => {
+    setDraft((current) => {
+      if (!current || current.mode !== 'rect_cut') return current;
+      const next = typeof updater === 'function' ? updater(current) : { ...current, ...updater };
+      return normalizeRectCutDraft(next, {
+        partLength: part.length,
+        partWidth: part.width,
+        partThickness: part.thickness
+      });
+    });
+  };
+
   const inspectorDraft = panelMode === 'list' ? null : draft;
   const isChoosingCutType = panelMode === 'add' && !draft;
   const isEditingDraft = !!inspectorDraft;
-  const editingFeatureIndex = inspectorDraft?.featureId
-    ? draftFeatures.findIndex((feature) => feature.id === inspectorDraft.featureId)
-    : -1;
 
   useEffect(() => {
     const nextTarget = inspectorDraft ? getFeatureDraftTarget(inspectorDraft) : null;
@@ -365,7 +392,16 @@ export function PartCutsWorkspace({
   const handlePreviewTargetActivation = (target: PartFeatureTarget | null) => {
     onPendingTargetChange(target);
     if (!target || !inspectorDraft || !isTargetValidForDraft(target, inspectorDraft)) return;
-    setDraft(applyTargetToFeatureDraft(inspectorDraft, target));
+    const nextDraft = applyTargetToFeatureDraft(inspectorDraft, target);
+    setDraft(
+      nextDraft.mode === 'rect_cut'
+        ? normalizeRectCutDraft(nextDraft, {
+            partLength: part.length,
+            partWidth: part.width,
+            partThickness: part.thickness
+          })
+        : nextDraft
+    );
   };
 
   const handleCancelEditor = () => {
@@ -391,6 +427,20 @@ export function PartCutsWorkspace({
       ? inspectorDraft.sizeWidth
       : inspectorDraft.sizeLength
     : null;
+  const inspectorUsesBlindOnlyDepth =
+    inspectorDraft?.mode === 'rect_cut' &&
+    ['dado', 'stopped_dado', 'rabbet', 'groove', 'stopped_groove', 'mortise'].includes(inspectorDraft.cutType);
+  const inspectorHidesDepthSelector =
+    inspectorUsesBlindOnlyDepth ||
+    (inspectorDraft?.mode === 'rect_cut' &&
+      (inspectorDraft.cutType === 'corner_notch' || inspectorDraft.cutType === 'edge_notch'));
+  const inspectorUsesDerivedCrossWidth =
+    inspectorDraft?.mode === 'rect_cut' && ['dado', 'stopped_dado', 'rabbet'].includes(inspectorDraft.cutType);
+  const preservedEndCutReferenceNote =
+    inspectorDraft?.mode === 'end_cut' &&
+    (inspectorDraft.lengthMode !== 'long_point' || inspectorDraft.referenceMode !== null)
+      ? `This cut keeps its saved ${inspectorDraft.referenceMode ?? inspectorDraft.lengthMode.replace('_', ' ')} reference while you edit it.`
+      : null;
 
   return (
     <div className="app-main flex min-h-0 flex-1 bg-bg">
@@ -414,7 +464,17 @@ export function PartCutsWorkspace({
                 pendingTarget={pendingTarget}
                 onHoverTarget={onHoveredTargetChange}
                 onActivateTarget={handlePreviewTargetActivation}
-                onDraftChange={setDraft}
+                onDraftChange={(nextDraft) =>
+                  setDraft(
+                    nextDraft.mode === 'rect_cut'
+                      ? normalizeRectCutDraft(nextDraft, {
+                          partLength: part.length,
+                          partWidth: part.width,
+                          partThickness: part.thickness
+                        })
+                      : nextDraft
+                  )
+                }
               />
 
               {(selectedTargetLabel || activeTargetLabel || selectedFeatureSummary) && (
@@ -497,40 +557,94 @@ export function PartCutsWorkspace({
                       draftFeatures.map((feature, index) => {
                         const conflicts = conflictsByFeatureId.get(feature.id) ?? [];
                         return (
-                          <button
+                          <div
                             key={feature.id}
-                            type="button"
-                            className="w-full rounded-md border border-border bg-bg px-3 py-3 text-left transition-colors hover:border-accent hover:bg-accent/5"
-                            onClick={() => handleEditFeature(feature)}
+                            className="flex items-start gap-2 rounded-md border border-border bg-bg px-3 py-3 transition-colors hover:border-accent hover:bg-accent/5"
                           >
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-medium text-text">
-                                  {index + 1}. {feature.label?.trim() || getFeatureSummary(feature, units)}
-                                </div>
-                                <div className="mt-1 text-[11px] text-text-muted">
-                                  Target: {getFeatureTargetLabel(feature)}
-                                </div>
-                              </div>
-                              <div className="flex flex-wrap justify-end gap-1">
-                                {!feature.enabled && (
-                                  <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                                    Disabled
-                                  </Badge>
-                                )}
-                                {conflicts.length > 0 && (
-                                  <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning">
-                                    {conflicts.some((conflict) => conflict.severity === 'error')
-                                      ? 'Conflict'
-                                      : 'Warning'}
-                                  </Badge>
-                                )}
-                              </div>
+                            <div className="pt-0.5">
+                              <Checkbox
+                                checked={feature.enabled}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  onDraftFeaturesChange(
+                                    draftFeatures.map((f) =>
+                                      f.id === feature.id ? { ...f, enabled: e.target.checked } : f
+                                    )
+                                  );
+                                }}
+                              />
                             </div>
-                            {conflicts.length > 0 && (
-                              <div className="mt-2 text-[11px] text-warning">{conflicts[0].message}</div>
-                            )}
-                          </button>
+                            <button
+                              type="button"
+                              className="flex-1 text-left"
+                              onClick={() => handleEditFeature(feature)}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-medium text-text">
+                                    {index + 1}. {feature.label?.trim() || getFeatureSummary(feature, units)}
+                                  </div>
+                                  <div className="mt-1 text-[11px] text-text-muted">
+                                    Target: {getFeatureTargetLabel(feature)}
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap justify-end gap-1">
+                                  {conflicts.length > 0 && (
+                                    <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning">
+                                      {conflicts.some((conflict) => conflict.severity === 'error')
+                                        ? 'Conflict'
+                                        : 'Warning'}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              {conflicts.length > 0 && (
+                                <div className="mt-2 text-[11px] text-warning">{conflicts[0].message}</div>
+                              )}
+                            </button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="mt-0.5 shrink-0 rounded p-1 text-text-muted transition-colors hover:bg-accent/10 hover:text-text"
+                                  onClick={(e) => e.stopPropagation()}
+                                  aria-label={`Actions for cut ${index + 1}`}
+                                >
+                                  <MoreHorizontal className="h-3.5 w-3.5" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => handleMoveFeature(feature.id, -1)}
+                                  disabled={index === 0}
+                                >
+                                  Move Up
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleMoveFeature(feature.id, 1)}
+                                  disabled={index === draftFeatures.length - 1}
+                                >
+                                  Move Down
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleDuplicateFeature(feature)}>
+                                  Duplicate
+                                </DropdownMenuItem>
+                                {getAvailableMirrorActions(feature).map((action) => (
+                                  <DropdownMenuItem key={action} onClick={() => handleMirrorFeature(feature, action)}>
+                                    {getMirrorActionLabel(action)}
+                                  </DropdownMenuItem>
+                                ))}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => handleRemoveFeature(feature.id)}
+                                >
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         );
                       })
                     )}
@@ -559,10 +673,6 @@ export function PartCutsWorkspace({
                   <p className="mt-1 text-sm text-text-secondary">
                     Pick the cut type first. The next step will walk through the right target and measurements.
                   </p>
-                </div>
-                <div className="rounded-md border border-border bg-bg-secondary px-3 py-3 text-sm text-text-secondary">
-                  Different cuts use different workflows. End cuts focus on the part ends and angles. Notches, cutouts,
-                  and joinery start by picking the face, edge, or corner they belong on.
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {(
@@ -630,7 +740,7 @@ export function PartCutsWorkspace({
                           size="xs"
                           variant="outline"
                           active={inspectorDraft.cornerTarget === target}
-                          onClick={() => setDraft({ ...inspectorDraft, cornerTarget: target })}
+                          onClick={() => updateRectDraft({ cornerTarget: target })}
                         >
                           {CORNER_LABELS[target]}
                         </Button>
@@ -638,23 +748,39 @@ export function PartCutsWorkspace({
                     </div>
                   )}
 
-                  {inspectorDraft.mode === 'rect_cut' &&
-                    (inspectorDraft.cutType === 'edge_notch' || inspectorDraft.cutType === 'rabbet') && (
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        {availableEdgeTargets.map((target) => (
-                          <Button
-                            key={target}
-                            type="button"
-                            size="xs"
-                            variant="outline"
-                            active={inspectorDraft.edgeTarget === target}
-                            onClick={() => setDraft({ ...inspectorDraft, edgeTarget: target })}
-                          >
-                            {EDGE_LABELS[target]}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
+                  {inspectorDraft.mode === 'rect_cut' && inspectorDraft.cutType === 'edge_notch' && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {EDGE_NOTCH_SIDES.map((side) => (
+                        <Button
+                          key={side}
+                          type="button"
+                          size="xs"
+                          variant="outline"
+                          active={edgeTargetToSide(inspectorDraft.edgeTarget) === side}
+                          onClick={() => updateRectDraft({ edgeTarget: edgeNotchSideToTarget(side) })}
+                        >
+                          {EDGE_NOTCH_SIDE_LABELS[side]}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+
+                  {inspectorDraft.mode === 'rect_cut' && inspectorDraft.cutType === 'rabbet' && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {availableEdgeTargets.map((target) => (
+                        <Button
+                          key={target}
+                          type="button"
+                          size="xs"
+                          variant="outline"
+                          active={inspectorDraft.edgeTarget === target}
+                          onClick={() => updateRectDraft({ edgeTarget: target })}
+                        >
+                          {EDGE_LABELS[target]}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
 
                   {inspectorDraft.mode === 'rect_cut' &&
                     ['cutout', 'dado', 'stopped_dado', 'groove', 'stopped_groove', 'mortise'].includes(
@@ -668,7 +794,7 @@ export function PartCutsWorkspace({
                             size="xs"
                             variant="outline"
                             active={inspectorDraft.faceTarget === target}
-                            onClick={() => setDraft({ ...inspectorDraft, faceTarget: target })}
+                            onClick={() => updateRectDraft({ faceTarget: target })}
                           >
                             {FACE_LABELS[target]}
                           </Button>
@@ -677,55 +803,34 @@ export function PartCutsWorkspace({
                     )}
 
                   <div className="mt-4 space-y-3">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="feature-label">Label (optional)</Label>
-                        <Input
-                          id="feature-label"
-                          value={inspectorDraft.label}
-                          onChange={(e) => setDraft({ ...inspectorDraft, label: e.target.value })}
-                          placeholder="Face-frame left stile"
-                        />
-                      </div>
-                      <div className="flex items-end gap-2">
-                        <label className="flex items-center gap-2 text-[12px] text-text">
-                          <Checkbox
-                            checked={inspectorDraft.enabled}
-                            onChange={(e) => setDraft({ ...inspectorDraft, enabled: e.target.checked })}
-                          />
-                          Enable this operation
-                        </label>
-                      </div>
+                    <div>
+                      <Label htmlFor="feature-label">Label (optional)</Label>
+                      <Input
+                        id="feature-label"
+                        value={inspectorDraft.label}
+                        onChange={(e) => setDraft({ ...inspectorDraft, label: e.target.value })}
+                        placeholder="Face-frame left stile"
+                      />
                     </div>
 
                     {inspectorDraft.mode === 'end_cut' && (
                       <>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div>
-                            <Label htmlFor="end-cut-type">Cut Style</Label>
-                            <Select
-                              id="end-cut-type"
-                              value={inspectorDraft.cutType}
-                              onChange={(e) =>
-                                setDraft({
-                                  ...inspectorDraft,
-                                  cutType: e.target.value as EndCutFeature['cutType']
-                                })
-                              }
-                            >
-                              <option value="square">Square</option>
-                              <option value="mitre">Mitre</option>
-                              <option value="bevel">Bevel</option>
-                              <option value="compound">Compound</option>
-                            </Select>
-                          </div>
-                          <div className="rounded-md border border-border bg-bg p-3 text-[12px] text-text-secondary">
-                            The board length stays fixed at{' '}
-                            <span className="font-medium text-text">
-                              {formatMeasurementWithUnit(part.length, units)}
-                            </span>
-                            . This cut only shapes the selected end.
-                          </div>
+                        <div>
+                          <Label htmlFor="end-cut-type">Cut Style</Label>
+                          <Select
+                            id="end-cut-type"
+                            value={inspectorDraft.cutType}
+                            onChange={(e) =>
+                              setDraft({
+                                ...inspectorDraft,
+                                cutType: e.target.value as EndCutFeature['cutType']
+                              })
+                            }
+                          >
+                            <option value="mitre">Mitre</option>
+                            <option value="bevel">Bevel</option>
+                            <option value="compound">Compound</option>
+                          </Select>
                         </div>
 
                         {(inspectorDraft.cutType === 'mitre' || inspectorDraft.cutType === 'compound') && (
@@ -814,7 +919,8 @@ export function PartCutsWorkspace({
                           <div className="rounded-md border border-border bg-bg p-3">
                             <p className="text-[12px] font-medium text-text">Resulting Lengths</p>
                             <p className="mt-1 text-[11px] text-text-muted">
-                              Long point stays locked to the board length. The angle only changes the shaped end.
+                              {preservedEndCutReferenceNote ??
+                                'Long point stays locked to the board length. The angle only changes the shaped end.'}
                             </p>
                             <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-text-muted sm:grid-cols-3">
                               <span>Blank {formatMeasurementWithUnit(endCutPreviewMeasurements.blank, units)}</span>
@@ -833,53 +939,33 @@ export function PartCutsWorkspace({
                     {inspectorDraft.mode === 'rect_cut' && (
                       <>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div>
-                            <Label htmlFor="rect-cut-type">Removal Type</Label>
-                            <Select
-                              id="rect-cut-type"
-                              value={inspectorDraft.cutType}
-                              onChange={(e) =>
-                                setDraft({
-                                  ...inspectorDraft,
-                                  cutType: e.target.value as RectCutFeature['cutType']
-                                })
-                              }
-                            >
-                              <option value="corner_notch">Corner Notch</option>
-                              <option value="edge_notch">Edge Notch</option>
-                              <option value="cutout">Cutout</option>
-                              <option value="dado">Dado</option>
-                              <option value="stopped_dado">Stopped Dado</option>
-                              <option value="rabbet">Rabbet</option>
-                              <option value="groove">Groove</option>
-                              <option value="stopped_groove">Stopped Groove</option>
-                              <option value="mortise">Mortise</option>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label htmlFor="depth-mode">Depth</Label>
-                            <Select
-                              id="depth-mode"
-                              value={inspectorDraft.depthMode}
-                              disabled={
-                                inspectorDraft.cutType === 'dado' ||
-                                inspectorDraft.cutType === 'stopped_dado' ||
-                                inspectorDraft.cutType === 'rabbet' ||
-                                inspectorDraft.cutType === 'groove' ||
-                                inspectorDraft.cutType === 'stopped_groove' ||
-                                inspectorDraft.cutType === 'mortise'
-                              }
-                              onChange={(e) =>
-                                setDraft({
-                                  ...inspectorDraft,
-                                  depthMode: e.target.value as RectCutFeature['parameters']['depthMode']
-                                })
-                              }
-                            >
-                              <option value="through">Through</option>
-                              <option value="blind">Blind</option>
-                            </Select>
-                          </div>
+                          {inspectorUsesBlindOnlyDepth ? (
+                            <div>
+                              <Label>Depth</Label>
+                              <div className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text">
+                                Blind only
+                                <p className="mt-1 text-[11px] text-text-muted">
+                                  This operation cuts from one face into the blank and does not pass through.
+                                </p>
+                              </div>
+                            </div>
+                          ) : !inspectorHidesDepthSelector ? (
+                            <div>
+                              <Label htmlFor="depth-mode">Depth</Label>
+                              <Select
+                                id="depth-mode"
+                                value={inspectorDraft.depthMode}
+                                onChange={(e) =>
+                                  updateRectDraft({
+                                    depthMode: e.target.value as RectCutFeature['parameters']['depthMode']
+                                  })
+                                }
+                              >
+                                <option value="through">Through</option>
+                                <option value="blind">Blind</option>
+                              </Select>
+                            </div>
+                          ) : null}
                         </div>
 
                         {inspectorDraft.cutType === 'cutout' && (
@@ -941,7 +1027,7 @@ export function PartCutsWorkspace({
                                       : inspectorDraft.sizeLength
                               }
                               onChange={(value) =>
-                                setDraft(
+                                updateRectDraft(
                                   inspectorDraft.cutType === 'rabbet'
                                     ? {
                                         ...inspectorDraft,
@@ -971,28 +1057,24 @@ export function PartCutsWorkspace({
                                       ? 'Groove Width'
                                       : 'Cross-Cut Width'}
                             </Label>
-                            <FractionInput
-                              value={
-                                inspectorDraft.cutType === 'dado'
-                                  ? part.width
-                                  : inspectorDraft.cutType === 'stopped_dado'
-                                    ? part.width
-                                    : inspectorDraft.cutType === 'rabbet'
-                                      ? rabbetRunsAlongLength
-                                        ? part.length
-                                        : part.width
-                                      : inspectorDraft.cutType === 'groove'
-                                        ? inspectorDraft.sizeWidth
-                                        : inspectorDraft.sizeWidth
-                              }
-                              onChange={(value) => setDraft({ ...inspectorDraft, sizeWidth: value })}
-                              min={0.125}
-                              disabled={
-                                inspectorDraft.cutType === 'dado' ||
-                                inspectorDraft.cutType === 'stopped_dado' ||
-                                inspectorDraft.cutType === 'rabbet'
-                              }
-                            />
+                            {inspectorUsesDerivedCrossWidth ? (
+                              <div className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text">
+                                {formatMeasurementWithUnit(
+                                  inspectorDraft.cutType === 'rabbet'
+                                    ? rabbetRunsAlongLength
+                                      ? part.length
+                                      : part.width
+                                    : part.width,
+                                  units
+                                )}
+                              </div>
+                            ) : (
+                              <FractionInput
+                                value={inspectorDraft.sizeWidth}
+                                onChange={(value) => updateRectDraft({ sizeWidth: value })}
+                                min={0.125}
+                              />
+                            )}
                             {['dado', 'stopped_dado', 'rabbet', 'groove'].includes(inspectorDraft.cutType) && (
                               <p className="mt-1 text-[11px] text-text-muted">
                                 {inspectorDraft.cutType === 'dado'
@@ -1012,13 +1094,42 @@ export function PartCutsWorkspace({
                             <Label>Blind Depth</Label>
                             <FractionInput
                               value={inspectorDraft.depth}
-                              onChange={(value) => setDraft({ ...inspectorDraft, depth: value })}
+                              onChange={(value) => updateRectDraft({ depth: value })}
                               min={0.125}
                             />
                           </div>
                         )}
 
+                        {inspectorDraft.cutType === 'edge_notch' && (
+                          <div>
+                            <Label>
+                              {edgeTargetToSide(inspectorDraft.edgeTarget) === 'front' ||
+                              edgeTargetToSide(inspectorDraft.edgeTarget) === 'back'
+                                ? 'Offset Along Length'
+                                : 'Offset Across Width'}
+                            </Label>
+                            <FractionInput
+                              value={
+                                edgeTargetToSide(inspectorDraft.edgeTarget) === 'front' ||
+                                edgeTargetToSide(inspectorDraft.edgeTarget) === 'back'
+                                  ? inspectorDraft.placementX
+                                  : inspectorDraft.placementZ
+                              }
+                              onChange={(value) => {
+                                const side = edgeTargetToSide(inspectorDraft.edgeTarget);
+                                updateRectDraft(
+                                  side === 'front' || side === 'back'
+                                    ? { placementX: value, placementZ: 0 }
+                                    : { placementX: 0, placementZ: value }
+                                );
+                              }}
+                              min={0}
+                            />
+                          </div>
+                        )}
+
                         {inspectorDraft.cutType !== 'corner_notch' &&
+                          inspectorDraft.cutType !== 'edge_notch' &&
                           inspectorDraft.cutType !== 'dado' &&
                           inspectorDraft.cutType !== 'rabbet' &&
                           inspectorDraft.cutType !== 'groove' && (
@@ -1027,7 +1138,7 @@ export function PartCutsWorkspace({
                                 <Label>Offset Along Length</Label>
                                 <FractionInput
                                   value={inspectorDraft.placementX}
-                                  onChange={(value) => setDraft({ ...inspectorDraft, placementX: value })}
+                                  onChange={(value) => updateRectDraft({ placementX: value })}
                                   min={0}
                                 />
                               </div>
@@ -1035,7 +1146,7 @@ export function PartCutsWorkspace({
                                 <Label>Offset Across Width</Label>
                                 <FractionInput
                                   value={inspectorDraft.placementZ}
-                                  onChange={(value) => setDraft({ ...inspectorDraft, placementZ: value })}
+                                  onChange={(value) => updateRectDraft({ placementZ: value })}
                                   min={0}
                                   disabled={inspectorDraft.cutType === 'stopped_dado'}
                                 />
@@ -1059,61 +1170,6 @@ export function PartCutsWorkspace({
                         {draftValidationMessage && (
                           <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-[11px] text-danger">
                             {draftValidationMessage}
-                          </div>
-                        )}
-
-                        {inspectorDraft.featureId && (
-                          <div className="rounded-md border border-border bg-bg p-3">
-                            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-                              Cut Actions
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                size="xs"
-                                variant="outline"
-                                onClick={() => handleMoveFeature(inspectorDraft.featureId!, -1)}
-                                disabled={editingFeatureIndex <= 0}
-                              >
-                                Move Up
-                              </Button>
-                              <Button
-                                type="button"
-                                size="xs"
-                                variant="outline"
-                                onClick={() => handleMoveFeature(inspectorDraft.featureId!, 1)}
-                                disabled={editingFeatureIndex < 0 || editingFeatureIndex >= draftFeatures.length - 1}
-                              >
-                                Move Down
-                              </Button>
-                              <Button
-                                type="button"
-                                size="xs"
-                                variant="ghost"
-                                onClick={() => handleDuplicateFeature(buildFeatureFromDraft(inspectorDraft))}
-                              >
-                                Duplicate
-                              </Button>
-                              {getAvailableMirrorActions(buildFeatureFromDraft(inspectorDraft)).map((action) => (
-                                <Button
-                                  key={action}
-                                  type="button"
-                                  size="xs"
-                                  variant="ghost"
-                                  onClick={() => handleMirrorFeature(buildFeatureFromDraft(inspectorDraft), action)}
-                                >
-                                  {getMirrorActionLabel(action)}
-                                </Button>
-                              ))}
-                              <Button
-                                type="button"
-                                size="xs"
-                                variant="destructiveGhost"
-                                onClick={() => handleRemoveFeature(inspectorDraft.featureId!)}
-                              >
-                                Delete Cut
-                              </Button>
-                            </div>
                           </div>
                         )}
                       </>

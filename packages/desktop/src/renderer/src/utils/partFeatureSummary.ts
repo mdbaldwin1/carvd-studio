@@ -26,19 +26,36 @@ export const EDGE_LABELS: Record<EdgeTarget, string> = {
 };
 
 export const CORNER_LABELS: Record<CornerTarget, string> = {
-  front_top_left_corner: 'Front-Top-Left Corner',
-  front_top_right_corner: 'Front-Top-Right Corner',
-  front_bottom_left_corner: 'Front-Bottom-Left Corner',
-  front_bottom_right_corner: 'Front-Bottom-Right Corner',
-  back_top_left_corner: 'Back-Top-Left Corner',
-  back_top_right_corner: 'Back-Top-Right Corner',
-  back_bottom_left_corner: 'Back-Bottom-Left Corner',
-  back_bottom_right_corner: 'Back-Bottom-Right Corner'
+  front_left_corner: 'Front-Left Corner',
+  front_right_corner: 'Front-Right Corner',
+  back_left_corner: 'Back-Left Corner',
+  back_right_corner: 'Back-Right Corner'
+};
+
+const EDGE_NOTCH_SIDE_DISPLAY: Record<string, string> = {
+  front: 'Front Side',
+  back: 'Back Side',
+  left: 'Left Side',
+  right: 'Right Side'
 };
 
 export function getFeatureTargetLabel(feature: PartFeature): string {
   if (feature.target.type === 'face') return FACE_LABELS[feature.target.face];
-  if (feature.target.type === 'edge') return EDGE_LABELS[feature.target.edge];
+  if (feature.target.type === 'edge') {
+    // Edge notches show simplified side labels
+    if (feature.kind === 'rect_cut' && feature.cutType === 'edge_notch') {
+      const edge = feature.target.edge;
+      const side = edge.includes('front')
+        ? 'front'
+        : edge.includes('back')
+          ? 'back'
+          : edge.includes('left')
+            ? 'left'
+            : 'right';
+      return EDGE_NOTCH_SIDE_DISPLAY[side];
+    }
+    return EDGE_LABELS[feature.target.edge];
+  }
   return CORNER_LABELS[feature.target.corner];
 }
 

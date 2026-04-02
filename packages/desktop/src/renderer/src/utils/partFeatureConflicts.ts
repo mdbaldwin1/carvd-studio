@@ -1,13 +1,13 @@
 import { Part, PartFeature, RectCutFeature } from '@renderer/types';
-import { getResolvedRectCutFeature, isBottomTarget, isTopTarget } from '@renderer/utils/rectCutUtils';
 import { getFeatureTargetLabel } from '@renderer/utils/partFeatureSummary';
+import { getResolvedRectCutFeature, isBottomTarget, isTopTarget } from '@renderer/utils/rectCutUtils';
 
 export interface PartFeatureConflict {
   featureId: string;
   featureIndex: number;
   relatedFeatureId?: string;
   relatedFeatureIndex?: number;
-  code: 'duplicate_end_cut' | 'rect_overlap' | 'rect_consumed' | 'rect_anchor_removed';
+  code: 'duplicate_end_cut' | 'rect_overlap' | 'rect_consumed' | 'rect_anchor_removed' | 'rect_depth_intersection';
   severity: 'warning' | 'error';
   message: string;
 }
@@ -20,6 +20,7 @@ interface RectBounds {
 }
 
 type ReachableSurface = 'top' | 'bottom';
+type DepthInterval = { min: number; max: number };
 
 function overlaps(a: RectBounds, b: RectBounds): boolean {
   return a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
@@ -57,7 +58,7 @@ function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length'
 
   if (resolvedFeature.cutType === 'corner_notch') {
     if (resolvedFeature.target.type !== 'corner') return null;
-    const right = resolvedFeature.target.corner.includes('_right_');
+    const right = resolvedFeature.target.corner.includes('right');
     const back = resolvedFeature.target.corner.startsWith('back_');
     return {
       minX: right ? part.length - sizeLength : 0,
@@ -107,7 +108,7 @@ function getReachableSurfaces(feature: RectCutFeature, resolvedFeature: RectCutF
 function sharesReachableSurface(
   priorFeature: RectCutFeature,
   currentFeature: RectCutFeature,
-  part: Pick<Part, 'length' | 'width'>
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
 ): boolean {
   const priorResolved = getResolvedRectCutFeature(priorFeature, { ...part, thickness: 1 });
   const currentResolved = getResolvedRectCutFeature(currentFeature, { ...part, thickness: 1 });
@@ -120,16 +121,65 @@ function sharesReachableSurface(
   return false;
 }
 
+function getDepthInterval(feature: RectCutFeature, part: Pick<Part, 'thickness'>): DepthInterval {
+  const depth =
+    getResolvedRectCutFeature(feature, { length: 1, width: 1, thickness: part.thickness }).parameters.depthMode ===
+    'through'
+      ? part.thickness
+      : (feature.parameters.depth ?? 0);
+  const clampedDepth = Math.max(0, Math.min(part.thickness, depth));
+
+  if (feature.parameters.depthMode === 'through') {
+    return { min: 0, max: part.thickness };
+  }
+
+  if (isTopTarget(feature)) {
+    return { min: Math.max(0, part.thickness - clampedDepth), max: part.thickness };
+  }
+
+  if (isBottomTarget(feature)) {
+    return { min: 0, max: clampedDepth };
+  }
+
+  return { min: 0, max: part.thickness };
+}
+
+function intervalsOverlap(a: DepthInterval, b: DepthInterval): boolean {
+  return a.min < b.max && a.max > b.min;
+}
+
+function isOpposingBlindIntersection(
+  priorFeature: RectCutFeature,
+  currentFeature: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): boolean {
+  if (priorFeature.parameters.depthMode !== 'blind' || currentFeature.parameters.depthMode !== 'blind') return false;
+
+  const priorResolved = getResolvedRectCutFeature(priorFeature, part);
+  const currentResolved = getResolvedRectCutFeature(currentFeature, part);
+  const priorSurfaces = getReachableSurfaces(priorFeature, priorResolved);
+  const currentSurfaces = getReachableSurfaces(currentFeature, currentResolved);
+
+  const isOpposed =
+    (priorSurfaces.has('top') && currentSurfaces.has('bottom')) ||
+    (priorSurfaces.has('bottom') && currentSurfaces.has('top'));
+  if (!isOpposed) return false;
+
+  return intervalsOverlap(getDepthInterval(priorResolved, part), getDepthInterval(currentResolved, part));
+}
+
 function isAnchorDependent(feature: RectCutFeature): boolean {
   return feature.cutType === 'rabbet' || feature.cutType === 'edge_notch' || feature.cutType === 'corner_notch';
 }
 
 export function getPartFeatureConflicts(
   features: PartFeature[],
-  part: Pick<Part, 'length' | 'width'>
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
 ): PartFeatureConflict[] {
   const conflicts: PartFeatureConflict[] = [];
-  const enabledFeatures = features.filter((feature) => feature.enabled).map((feature, index) => ({ feature, index }));
+  const enabledFeatures = features
+    .map((feature, index) => ({ feature, index }))
+    .filter(({ feature }) => feature.enabled);
   const endCutsByFace = new Map<'left_end' | 'right_end', { featureId: string; featureIndex: number; label: string }>();
   const priorRectCuts: Array<{ feature: RectCutFeature; index: number }> = [];
 
@@ -138,7 +188,7 @@ export function getPartFeatureConflicts(
       const face = feature.target.face;
       const prior = endCutsByFace.get(face);
       if (prior) {
-        const message = `Operation ${index + 1} and Operation ${prior.featureIndex + 1} both use ${getFeatureTargetLabel(feature)}. Only one enabled end cut per end is supported in this POC.`;
+        const message = `Operation ${index + 1} and Operation ${prior.featureIndex + 1} both use ${getFeatureTargetLabel(feature)}. Only one enabled end cut per end is currently supported.`;
         conflicts.push({
           featureId: feature.id,
           featureIndex: index,
@@ -194,6 +244,10 @@ export function getPartFeatureConflicts(
           severity = 'error';
           message = `Operation ${index + 1} starts inside material already removed by Operation ${prior.index + 1}.`;
         }
+      } else if (isOpposingBlindIntersection(prior.feature, feature, part)) {
+        code = 'rect_depth_intersection';
+        severity = 'error';
+        message = `Operation ${index + 1} intersects Operation ${prior.index + 1} from the opposite face. Combined depths remove the same interior material.`;
       }
 
       conflicts.push({

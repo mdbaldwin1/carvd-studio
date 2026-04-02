@@ -6,6 +6,7 @@ See also:
 
 - `part-cuts-workspace-spec.md` for the dedicated cuts-mode editing contract
 - `part-feature-sequential-spec.md` for ordered operation behavior
+- `part-cuts-hardening-spec.md` for the production-hardening rules that supersede the original POC mirroring math
 
 ## Purpose
 
@@ -103,6 +104,10 @@ If the mirrored result would create a duplicate enabled end cut on that end, the
 ### Rectangular removals
 
 Rectangular mirroring reflects both target identity and placement.
+
+The original POC draft below described mirroring as sign inversion of authored offsets. That is retained here only as the original POC contract.
+
+For production-hardening work, use `part-cuts-hardening-spec.md` instead: mirror results must be computed from blank-aware reflected footprints, not raw sign flips.
 
 #### Mirror Across Length
 

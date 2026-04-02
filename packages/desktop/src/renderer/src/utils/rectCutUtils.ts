@@ -19,14 +19,10 @@ export const TOP_BOTTOM_EDGE_TARGETS: EdgeTarget[] = [
   'bottom_right_edge'
 ];
 export const TOP_BOTTOM_CORNER_TARGETS: CornerTarget[] = [
-  'front_top_left_corner',
-  'front_top_right_corner',
-  'front_bottom_left_corner',
-  'front_bottom_right_corner',
-  'back_top_left_corner',
-  'back_top_right_corner',
-  'back_bottom_left_corner',
-  'back_bottom_right_corner'
+  'front_left_corner',
+  'front_right_corner',
+  'back_left_corner',
+  'back_right_corner'
 ];
 
 function cloneRectCutFeature(feature: RectCutFeature): RectCutFeature {
@@ -212,16 +208,16 @@ export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPrevie
         supported: false,
         reason:
           feature.cutType === 'dado'
-            ? 'POC dado previews currently support only top and bottom face targets.'
+            ? 'Dado previews currently support only top and bottom face targets.'
             : feature.cutType === 'stopped_dado'
-              ? 'POC stopped dado previews currently support only top and bottom face targets.'
+              ? 'Stopped dado previews currently support only top and bottom face targets.'
               : feature.cutType === 'groove'
-                ? 'POC groove previews currently support only top and bottom face targets.'
+                ? 'Groove previews currently support only top and bottom face targets.'
                 : feature.cutType === 'stopped_groove'
-                  ? 'POC stopped groove previews currently support only top and bottom face targets.'
+                  ? 'Stopped groove previews currently support only top and bottom face targets.'
                   : feature.cutType === 'mortise'
-                    ? 'POC mortise previews currently support only top and bottom face targets.'
-                    : 'POC cutout previews currently support only top and bottom face targets.'
+                    ? 'Mortise previews currently support only top and bottom face targets.'
+                    : 'Cutout previews currently support only top and bottom face targets.'
       };
     }
     return { supported: true };
@@ -249,7 +245,7 @@ export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPrevie
 
   return {
     supported: false,
-    reason: 'Blind notch previews currently support only top or bottom edge/corner targets in this POC.'
+    reason: 'Blind notch previews currently support only top or bottom edge and corner targets.'
   };
 }
 
@@ -275,7 +271,7 @@ export function validateRectCutFeature(
     if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
       return 'Dado must target the top or bottom face.';
     }
-    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Dado must use blind depth in this POC.';
+    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Dado currently uses blind depth only.';
     if (resolvedFeature.placement.x < 0) return 'Dado offset cannot be negative.';
     if (resolvedFeature.placement.x + sizeLength > part.length) return 'Dado width runs past the blank.';
   }
@@ -284,7 +280,7 @@ export function validateRectCutFeature(
     if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
       return 'Stopped dado must target the top or bottom face.';
     }
-    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Stopped dado must use blind depth in this POC.';
+    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Stopped dado currently uses blind depth only.';
     if (resolvedFeature.placement.x < 0) return 'Stopped dado offset cannot be negative.';
     if (resolvedFeature.placement.x + sizeLength > part.length) return 'Stopped dado run extends past the blank.';
   }
@@ -293,7 +289,7 @@ export function validateRectCutFeature(
     if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
       return 'Groove must target the top or bottom face.';
     }
-    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Groove must use blind depth in this POC.';
+    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Groove currently uses blind depth only.';
     if (resolvedFeature.placement.z < 0) return 'Groove offset cannot be negative.';
     if (resolvedFeature.placement.z + sizeWidth > part.width) return 'Groove width runs past the blank.';
   }
@@ -302,7 +298,7 @@ export function validateRectCutFeature(
     if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
       return 'Stopped groove must target the top or bottom face.';
     }
-    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Stopped groove must use blind depth in this POC.';
+    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Stopped groove currently uses blind depth only.';
     if (resolvedFeature.placement.x < 0 || resolvedFeature.placement.z < 0) {
       return 'Stopped groove offsets cannot be negative.';
     }
@@ -314,7 +310,7 @@ export function validateRectCutFeature(
     if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
       return 'Mortise must target the top or bottom face.';
     }
-    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Mortise must use blind depth in this POC.';
+    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Mortise currently uses blind depth only.';
   }
 
   if (
@@ -331,7 +327,7 @@ export function validateRectCutFeature(
     if (resolvedFeature.target.type !== 'edge' || !TOP_BOTTOM_EDGE_TARGETS.includes(resolvedFeature.target.edge)) {
       return 'Rabbet must target a supported top or bottom edge.';
     }
-    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Rabbet must use blind depth in this POC.';
+    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Rabbet currently uses blind depth only.';
   }
 
   if (resolvedFeature.cutType === 'edge_notch' || resolvedFeature.cutType === 'rabbet') {

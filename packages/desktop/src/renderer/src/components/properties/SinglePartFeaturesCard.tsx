@@ -6,7 +6,10 @@ import {
   buildFeatureFromDraft,
   CORNER_TARGETS,
   duplicateFeature,
-  EDGE_TARGETS,
+  EDGE_NOTCH_SIDE_LABELS,
+  EDGE_NOTCH_SIDES,
+  edgeNotchSideToTarget,
+  edgeTargetToSide,
   END_TARGETS,
   FACE_TARGETS,
   FeatureDraft,
@@ -21,22 +24,29 @@ import { Checkbox } from '@renderer/components/ui/checkbox';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { Select } from '@renderer/components/ui/select';
-import { EndCutFeature, Part, PartFeature, RectCutFeature } from '@renderer/types';
-import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
-import { getDerivedLengthMeasurements } from '@renderer/utils/endCutUtils';
 import {
-  TOP_BOTTOM_CORNER_TARGETS,
-  TOP_BOTTOM_EDGE_TARGETS,
-  TOP_BOTTOM_FACE_TARGETS,
-  validateRectCutFeature
-} from '@renderer/utils/rectCutUtils';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@renderer/components/ui/dropdown-menu';
+import { EndCutFeature, Part, PartFeature, RectCutFeature } from '@renderer/types';
+import { getDerivedLengthMeasurements } from '@renderer/utils/endCutUtils';
+import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
+import { getAvailableMirrorActions, getMirrorActionLabel, mirrorFeature } from '@renderer/utils/partFeatureActions';
 import {
   CORNER_LABELS,
-  EDGE_LABELS,
   FACE_LABELS,
   getFeatureSummary,
   getFeatureTargetLabel
 } from '@renderer/utils/partFeatureSummary';
+import {
+  TOP_BOTTOM_CORNER_TARGETS,
+  TOP_BOTTOM_FACE_TARGETS,
+  validateRectCutFeature
+} from '@renderer/utils/rectCutUtils';
+import { MoreHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 interface SinglePartFeaturesCardProps {
@@ -78,11 +88,6 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
   const availableCornerTargets = useMemo(() => {
     if (!draft || draft.mode !== 'rect_cut' || draft.cutType !== 'corner_notch') return CORNER_TARGETS;
     return draft.depthMode === 'blind' ? TOP_BOTTOM_CORNER_TARGETS : CORNER_TARGETS;
-  }, [draft]);
-
-  const availableEdgeTargets = useMemo(() => {
-    if (!draft || draft.mode !== 'rect_cut' || draft.cutType !== 'edge_notch') return EDGE_TARGETS;
-    return draft.depthMode === 'blind' ? TOP_BOTTOM_EDGE_TARGETS : EDGE_TARGETS;
   }, [draft]);
 
   const availableFaceTargets = useMemo(() => {
@@ -147,6 +152,25 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
 
   const handleDuplicateFeature = (feature: PartFeature) => {
     onFeaturesChange([...features, duplicateFeature(feature)]);
+  };
+
+  const handleMirrorFeature = (feature: PartFeature, action: ReturnType<typeof getAvailableMirrorActions>[number]) => {
+    const mirrored = mirrorFeature(feature, action, selectedPart);
+    const sourceIndex = features.findIndex((f) => f.id === feature.id);
+    const next = [...features];
+    next.splice(sourceIndex + 1, 0, mirrored);
+    onFeaturesChange(next);
+  };
+
+  const handleMoveFeature = (featureId: string, direction: -1 | 1) => {
+    const fromIndex = features.findIndex((f) => f.id === featureId);
+    if (fromIndex < 0) return;
+    const toIndex = fromIndex + direction;
+    if (toIndex < 0 || toIndex >= features.length) return;
+    const next = [...features];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    onFeaturesChange(next);
   };
 
   return (
@@ -242,7 +266,7 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                       Live
                     </label>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 flex items-center gap-2">
                     <Button
                       type="button"
                       size="xs"
@@ -251,17 +275,42 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                     >
                       Edit
                     </Button>
-                    <Button type="button" size="xs" variant="ghost" onClick={() => handleDuplicateFeature(feature)}>
-                      Duplicate
-                    </Button>
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="destructiveGhost"
-                      onClick={() => handleRemoveFeature(feature.id)}
-                    >
-                      Remove
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="rounded p-1 text-text-muted transition-colors hover:bg-accent/10 hover:text-text"
+                          aria-label={`Actions for operation ${index + 1}`}
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem onClick={() => handleMoveFeature(feature.id, -1)} disabled={index === 0}>
+                          Move Up
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleMoveFeature(feature.id, 1)}
+                          disabled={index === features.length - 1}
+                        >
+                          Move Down
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleDuplicateFeature(feature)}>Duplicate</DropdownMenuItem>
+                        {getAvailableMirrorActions(feature).map((action) => (
+                          <DropdownMenuItem key={action} onClick={() => handleMirrorFeature(feature, action)}>
+                            {getMirrorActionLabel(action)}
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => handleRemoveFeature(feature.id)}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               ))}
@@ -316,16 +365,16 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
 
               {draft.mode === 'rect_cut' && draft.cutType === 'edge_notch' && (
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  {availableEdgeTargets.map((target) => (
+                  {EDGE_NOTCH_SIDES.map((side) => (
                     <Button
-                      key={target}
+                      key={side}
                       type="button"
                       size="xs"
                       variant="outline"
-                      active={draft.edgeTarget === target}
-                      onClick={() => setDraft({ ...draft, edgeTarget: target })}
+                      active={edgeTargetToSide(draft.edgeTarget) === side}
+                      onClick={() => setDraft({ ...draft, edgeTarget: edgeNotchSideToTarget(side) })}
                     >
-                      {EDGE_LABELS[target]}
+                      {EDGE_NOTCH_SIDE_LABELS[side]}
                     </Button>
                   ))}
                 </div>
@@ -385,7 +434,6 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                             })
                           }
                         >
-                          <option value="square">Square</option>
                           <option value="mitre">Mitre</option>
                           <option value="bevel">Bevel</option>
                           <option value="compound">Compound</option>
@@ -500,39 +548,24 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                 {draft.mode === 'rect_cut' && (
                   <>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="rect-cut-type">Removal Type</Label>
-                        <Select
-                          id="rect-cut-type"
-                          value={draft.cutType}
-                          onChange={(e) =>
-                            setDraft({
-                              ...draft,
-                              cutType: e.target.value as RectCutFeature['cutType']
-                            })
-                          }
-                        >
-                          <option value="corner_notch">Corner Notch</option>
-                          <option value="edge_notch">Edge Notch</option>
-                          <option value="cutout">Cutout</option>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="depth-mode">Depth</Label>
-                        <Select
-                          id="depth-mode"
-                          value={draft.depthMode}
-                          onChange={(e) =>
-                            setDraft({
-                              ...draft,
-                              depthMode: e.target.value as RectCutFeature['parameters']['depthMode']
-                            })
-                          }
-                        >
-                          <option value="through">Through</option>
-                          <option value="blind">Blind</option>
-                        </Select>
-                      </div>
+                      {draft.cutType !== 'corner_notch' && draft.cutType !== 'edge_notch' && (
+                        <div>
+                          <Label htmlFor="depth-mode">Depth</Label>
+                          <Select
+                            id="depth-mode"
+                            value={draft.depthMode}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                depthMode: e.target.value as RectCutFeature['parameters']['depthMode']
+                              })
+                            }
+                          >
+                            <option value="through">Through</option>
+                            <option value="blind">Blind</option>
+                          </Select>
+                        </div>
+                      )}
                     </div>
 
                     {draft.cutType === 'cutout' && (
@@ -571,7 +604,35 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                       </div>
                     )}
 
-                    {draft.cutType !== 'corner_notch' && (
+                    {draft.cutType === 'edge_notch' && (
+                      <div>
+                        <Label>
+                          {edgeTargetToSide(draft.edgeTarget) === 'front' ||
+                          edgeTargetToSide(draft.edgeTarget) === 'back'
+                            ? 'Offset Along Length'
+                            : 'Offset Across Width'}
+                        </Label>
+                        <FractionInput
+                          value={
+                            edgeTargetToSide(draft.edgeTarget) === 'front' ||
+                            edgeTargetToSide(draft.edgeTarget) === 'back'
+                              ? draft.placementX
+                              : draft.placementZ
+                          }
+                          onChange={(value) => {
+                            const side = edgeTargetToSide(draft.edgeTarget);
+                            setDraft(
+                              side === 'front' || side === 'back'
+                                ? { ...draft, placementX: value, placementZ: 0 }
+                                : { ...draft, placementX: 0, placementZ: value }
+                            );
+                          }}
+                          min={0}
+                        />
+                      </div>
+                    )}
+
+                    {draft.cutType !== 'corner_notch' && draft.cutType !== 'edge_notch' && (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
                           <Label>Offset Along Length</Label>
@@ -591,14 +652,6 @@ export function SinglePartFeaturesCard({ selectedPart, units, onFeaturesChange }
                         </div>
                       </div>
                     )}
-
-                    {draft.depthMode === 'blind' &&
-                      (draft.cutType === 'corner_notch' || draft.cutType === 'edge_notch') && (
-                        <p className="text-[11px] text-text-muted">
-                          Blind notch previews currently support top or bottom targets so the recess direction stays
-                          unambiguous.
-                        </p>
-                      )}
 
                     {draftValidationMessage && (
                       <div className="rounded-[var(--radius-sm)] border border-danger/30 bg-danger/5 p-3 text-[11px] text-danger">

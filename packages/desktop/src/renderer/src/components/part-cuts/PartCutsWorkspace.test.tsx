@@ -112,7 +112,6 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByRole('button', { name: 'Back to Cuts' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Cut' })).toBeInTheDocument();
     expect(screen.getByLabelText('Long Point On')).toBeInTheDocument();
-    expect(screen.getByText(/board length stays fixed/i)).toBeInTheDocument();
   });
 
   it('retargets the active draft through the preview fallback controls', () => {
@@ -167,9 +166,43 @@ describe('PartCutsWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
     fireEvent.click(screen.getByText('Dado'));
     expect(screen.getByText(/Dado spans the full board width/i)).toBeInTheDocument();
+  });
 
-    fireEvent.change(screen.getByLabelText('Removal Type'), { target: { value: 'rabbet' } });
-    expect(screen.getByText(/Rabbet runs the full edge length/i)).toBeInTheDocument();
+  it('normalizes blind-only operations when switching from a through cut', () => {
+    const onDraftFeaturesChange = vi.fn();
+
+    render(
+      <PartCutsWorkspace
+        part={createTestPart({ name: 'Panel', length: 24, width: 8, thickness: 0.75 })}
+        draftFeatures={[]}
+        units="imperial"
+        selectedFeatureId={null}
+        hoveredTarget={null}
+        pendingTarget={null}
+        onSelectFeature={vi.fn()}
+        onDraftFeaturesChange={onDraftFeaturesChange}
+        onHoveredTargetChange={vi.fn()}
+        onPendingTargetChange={vi.fn()}
+        onExit={vi.fn()}
+        onSave={vi.fn()}
+        hasUnsavedChanges={false}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByText('Rabbet'));
+
+    expect(screen.getByText('Blind only')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
+
+    expect(onDraftFeaturesChange).toHaveBeenCalledWith([
+      expect.objectContaining({
+        cutType: 'rabbet',
+        target: { type: 'edge', edge: 'top_front_edge' },
+        parameters: expect.objectContaining({ depthMode: 'blind' })
+      })
+    ]);
   });
 
   it('lets users flip end-cut direction in edit mode', () => {

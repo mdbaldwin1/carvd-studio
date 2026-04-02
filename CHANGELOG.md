@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Part Cuts workflow hardening (POC)** — Hardened custom cuts so cut-type switches normalize immediately into valid drafts, mirror actions reflect against the blank instead of negating offsets, existing end cuts preserve stored measurement semantics on edit/save, opposing-face blind intersections are now flagged, and constrained fields/entry-point copy are clearer throughout Part Cuts.
 - **Anchored end-cut semantics in Part Cuts (POC)** — End cuts now keep the part length authoritative for cut-list sizing, remove reference-length editing from the main workflow, and use explicit long-point direction control for mitres instead of forcing users to think in long/short/centerline reference math.
 - **Guided two-panel Part Cuts workflow (POC)** — Simplified the cuts workspace into a left-side part preview plus a right-side cuts list/editor, added a guided `What kind of cut?` add step, and changed cut editing to a focused single-cut workflow that returns to the cut list after save.
 - **Expanded preview handles in Part Cuts (POC)** — Direct preview handles now cover stored end-cut reference values in addition to face pockets and stopped channels, and new end-cut operations created from the cuts workspace or inspectors now persist an explicit `{ mode, value }` reference object alongside legacy compatibility fields.

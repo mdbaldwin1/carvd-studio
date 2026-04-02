@@ -1,13 +1,13 @@
-import { Button } from '@renderer/components/ui/button';
 import { MultiSelectionProperties } from '@renderer/components/properties/MultiSelectionProperties';
 import { NoSelectionProperties } from '@renderer/components/properties/NoSelectionProperties';
+import { SingleGroupProperties } from '@renderer/components/properties/SingleGroupProperties';
 import { SinglePartAdvancedCard } from '@renderer/components/properties/SinglePartAdvancedCard';
 import { SinglePartBasicsCard } from '@renderer/components/properties/SinglePartBasicsCard';
 import { SinglePartCutsSummaryCard } from '@renderer/components/properties/SinglePartCutsSummaryCard';
 import { SinglePartMaterialCard } from '@renderer/components/properties/SinglePartMaterialCard';
 import { SinglePartNotesCard } from '@renderer/components/properties/SinglePartNotesCard';
-import { SingleGroupProperties } from '@renderer/components/properties/SingleGroupProperties';
 import { EditStockModal } from '@renderer/components/stock/EditStockModal';
+import { Button } from '@renderer/components/ui/button';
 import { useEffectiveStockConstraints } from '@renderer/hooks/useEffectiveStockConstraints';
 import { useStockLibrary } from '@renderer/hooks/useStockLibrary';
 import { useAssemblyEditingStore } from '@renderer/store/assemblyEditingStore';
@@ -497,7 +497,7 @@ export function PropertiesPanel() {
         selectedPart={selectedPart}
         units={units}
         isDimensionConstrained={isDimensionConstrained}
-        assignedStock={assignedStock}
+        assignedStock={assignedStock || null}
         onNameChange={(name) => updatePart(selectedPart.id, { name })}
         onLengthChange={handleLengthChange}
         onWidthChange={handleWidthChange}

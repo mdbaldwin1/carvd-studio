@@ -1,32 +1,33 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { ThreeEvent } from '@react-three/fiber';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Part as PartType } from '../../types';
-import { useProjectStore, getAllDescendantPartIds } from '../../store/projectStore';
+import { useAppSettingsStore } from '../../store/appSettingsStore';
+import { getAllDescendantPartIds, useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
-import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { useUIStore } from '../../store/uiStore';
-import {
-  detectSnaps,
-  calculateSnapThreshold,
-  detectGuideSnaps,
-  createGuideSnapLine,
-  getPartBoundsAtPosition,
-  detectOriginSnaps,
-  createOriginSnapLine,
-  detectFaceSnaps,
-  detectFeatureSnaps,
-  calculateReferenceDistances,
-  calculateGroupReferenceDistances,
-  getCombinedBounds
-} from '../../utils/snapToPartsUtil';
+import { Part as PartType } from '../../types';
+import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
-import { LiveDimensions, snapToGrid } from './partTypes';
-import { isOrbitControls, setRightClickTarget } from './workspaceUtils';
-import { calculateWorldHalfHeight, calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 import { isAxisAlignedRotation } from '../../utils/rotation';
 import { createAxisSnapWinners, shouldUseSnapStage, tryApplyAxisSnap, type SnapStage } from '../../utils/snapPriority';
+import {
+  calculateGroupReferenceDistances,
+  calculateReferenceDistances,
+  calculateSnapThreshold,
+  createGuideSnapLine,
+  createOriginSnapLine,
+  detectFaceSnaps,
+  detectFeatureMateSnaps,
+  detectFeatureSnaps,
+  detectGuideSnaps,
+  detectOriginSnaps,
+  detectSnaps,
+  getCombinedBounds,
+  getPartBoundsAtPosition
+} from '../../utils/snapToPartsUtil';
+import { LiveDimensions, snapToGrid } from './partTypes';
+import { isOrbitControls, setRightClickTarget } from './workspaceUtils';
 
 /**
  * Hook encapsulating all drag (move) logic for a Part component.
@@ -307,11 +308,12 @@ export function usePartDrag(
           let newZ = dragStart.current.partPos.z + projectedDelta.z;
 
           // Constrain to ground during move
-          const worldHalfHeight = calculateWorldHalfHeight(
-            rotationQuaternion,
+          const worldHalfHeight = calculateWorldHalfHeightFromDegrees(
+            part.rotation,
             liveDims.length,
             liveDims.thickness,
-            liveDims.width
+            liveDims.width,
+            part.features
           );
           newY = Math.max(worldHalfHeight, newY);
 
@@ -502,6 +504,44 @@ export function usePartDrag(
                 }));
               }
 
+              // Feature-mating snaps: detect when the dragged part fits into a socket
+              // (dado, groove, mortise, etc.) on a nearby part. Mate priority > face so
+              // the insertion axis overrides face alignment when appropriate.
+              const mateSnapResult = detectFeatureMateSnaps(
+                part,
+                { x: newX, y: newY, z: newZ },
+                snapTargetParts,
+                effectiveDraggingIds,
+                snapThreshold
+              );
+              if (mateSnapResult.snappedX || mateSnapResult.snappedY || mateSnapResult.snappedZ) {
+                if (planeInfo.axes.x && mateSnapResult.snappedX) {
+                  tryApplyStageForAxis('x', 'mate', () => ({
+                    accepted: true,
+                    lines: (() => {
+                      newX = mateSnapResult.adjustedPosition.x;
+                      return mateSnapResult.snapLines.filter((l) => l.axis === 'x');
+                    })()
+                  }));
+                }
+                if (planeInfo.axes.y && mateSnapResult.snappedY) {
+                  tryApplyStageForAxis('y', 'mate', () => {
+                    const snappedY = mateSnapResult.adjustedPosition.y;
+                    if (snappedY < worldHalfHeight) return { accepted: false };
+                    newY = snappedY;
+                    return { accepted: true, lines: mateSnapResult.snapLines.filter((l) => l.axis === 'y') };
+                  });
+                }
+                if (planeInfo.axes.z && mateSnapResult.snappedZ) {
+                  tryApplyStageForAxis('z', 'mate', () => ({
+                    accepted: true,
+                    lines: (() => {
+                      newZ = mateSnapResult.adjustedPosition.z;
+                      return mateSnapResult.snapLines.filter((l) => l.axis === 'z');
+                    })()
+                  }));
+                }
+              }
               // Feature snaps can still help on tangential axes even while a face snap is active.
               // Per-axis arbitration keeps face wins on their axis (face priority > feature).
               const featureSnapResult = detectFeatureSnaps(
@@ -655,6 +695,7 @@ export function usePartDrag(
           const partLiveX = dragStart.current.partOriginalPos.x + effectiveDelta.x;
           const partLiveY = dragStart.current.partOriginalPos.y + effectiveDelta.y;
           const partLiveZ = dragStart.current.partOriginalPos.z + effectiveDelta.z;
+
           setLiveDims((prev) => ({ ...prev, x: partLiveX, y: partLiveY, z: partLiveZ }));
 
           const hasGroupSelected = currentSelectedGroupIds.length > 0;
@@ -760,11 +801,12 @@ export function usePartDrag(
           useSelectionStore.getState().setActiveDragDelta(null);
         } else {
           // Single part - apply ground constraint just to this one
-          const singlePartWorldHalfHeight = calculateWorldHalfHeight(
-            rotationQuaternion,
+          const singlePartWorldHalfHeight = calculateWorldHalfHeightFromDegrees(
+            part.rotation,
             liveDims.length,
             liveDims.thickness,
-            liveDims.width
+            liveDims.width,
+            part.features
           );
           newY = Math.max(singlePartWorldHalfHeight, newY);
 

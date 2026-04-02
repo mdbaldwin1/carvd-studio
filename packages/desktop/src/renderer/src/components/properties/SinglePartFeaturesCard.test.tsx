@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { SinglePartFeaturesCard } from './SinglePartFeaturesCard';
-import { createTestPart } from '../../../../../tests/helpers/factories';
 import { useProjectStore } from '@renderer/store/projectStore';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createTestPart } from '../../../../../tests/helpers/factories';
+import { SinglePartFeaturesCard } from './SinglePartFeaturesCard';
 
 describe('SinglePartFeaturesCard', () => {
   beforeEach(() => {
@@ -45,7 +45,7 @@ describe('SinglePartFeaturesCard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Corner Notch/ }));
 
-    expect(screen.getByRole('button', { name: 'Back-Bottom-Left Corner' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back-Left Corner' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Left End' })).not.toBeInTheDocument();
   });
 
@@ -142,7 +142,7 @@ describe('SinglePartFeaturesCard', () => {
               kind: 'rect_cut',
               version: 1,
               enabled: true,
-              target: { type: 'corner', corner: 'back_bottom_left_corner' },
+              target: { type: 'corner', corner: 'back_left_corner' },
               reference: { primaryFrom: 'min', secondaryFrom: 'min' },
               cutType: 'corner_notch',
               parameters: {
@@ -178,7 +178,7 @@ describe('SinglePartFeaturesCard', () => {
     expect(screen.queryByRole('button', { name: 'Front Face' })).not.toBeInTheDocument();
   });
 
-  it('restricts blind edge notches to top/bottom targets', () => {
+  it('shows simplified 4-side picker for edge notches with no depth dropdown', () => {
     render(
       <SinglePartFeaturesCard
         selectedPart={createTestPart({ thickness: 0.75 })}
@@ -188,10 +188,19 @@ describe('SinglePartFeaturesCard', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Edge Notch/ }));
-    fireEvent.change(screen.getByLabelText('Depth'), { target: { value: 'blind' } });
 
-    expect(screen.getByRole('button', { name: 'Top-Front Edge' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Front-Left Edge' })).not.toBeInTheDocument();
-    expect(screen.getByText(/Blind notch previews currently support top or bottom targets/i)).toBeInTheDocument();
+    // Shows 4 side buttons instead of 12 edge targets
+    expect(screen.getByRole('button', { name: 'Front' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Left' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Right' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Top-Front Edge' })).not.toBeInTheDocument();
+
+    // No depth dropdown (edge notches are always through)
+    expect(screen.queryByLabelText('Depth')).not.toBeInTheDocument();
+
+    // Single offset input shown
+    expect(screen.getByText('Offset Along Length')).toBeInTheDocument();
+    expect(screen.queryByText('Offset Across Width')).not.toBeInTheDocument();
   });
 });

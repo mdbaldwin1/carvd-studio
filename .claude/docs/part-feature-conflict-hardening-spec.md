@@ -6,6 +6,7 @@ See also:
 
 - `part-feature-sequential-spec.md` for the broader ordered-operation model
 - `part-cuts-workspace-spec.md` for cuts-mode save and feedback behavior
+- `part-cuts-hardening-spec.md` for the follow-on production hardening rules that extend conflict handling beyond the original POC surface model
 
 ## Purpose
 
@@ -26,6 +27,8 @@ The POC should keep a conservative conflict model.
 If a same-part interaction is clearly supported and deterministic, allow it and warn when order matters.
 
 If a later operation depends on material or an anchor surface that is already gone, raise an error instead of pretending the stack is still reliable.
+
+This file captures the original POC hardening pass. The later production-hardening pass may extend these rules, especially for opposing-face blind intersections and user-visible operation numbering.
 
 ## New Conflict Classes
 

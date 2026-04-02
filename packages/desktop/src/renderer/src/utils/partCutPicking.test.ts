@@ -14,8 +14,8 @@ describe('partCutPicking', () => {
 
     const targets = getPickableTargetDefinitions(part);
 
-    expect(targets).toHaveLength(26);
-    expect(new Set(targets.map((target) => target.key)).size).toBe(26);
+    expect(targets).toHaveLength(22);
+    expect(new Set(targets.map((target) => target.key)).size).toBe(22);
   });
 
   it('limits end cuts to the two end faces', () => {
@@ -27,13 +27,16 @@ describe('partCutPicking', () => {
     expect(isTargetValidForDraft({ type: 'edge', edge: 'top_front_edge' }, draft)).toBe(false);
   });
 
-  it('limits blind edge notches to top and bottom reachable edges', () => {
+  it('limits edge notches to the four canonical side targets', () => {
     const draft = buildDraftFromPreset('edge_notch');
-    draft.depthMode = 'blind';
 
     expect(isTargetValidForDraft({ type: 'edge', edge: 'top_front_edge' }, draft)).toBe(true);
-    expect(isTargetValidForDraft({ type: 'edge', edge: 'bottom_right_edge' }, draft)).toBe(true);
+    expect(isTargetValidForDraft({ type: 'edge', edge: 'top_back_edge' }, draft)).toBe(true);
+    expect(isTargetValidForDraft({ type: 'edge', edge: 'top_left_edge' }, draft)).toBe(true);
+    expect(isTargetValidForDraft({ type: 'edge', edge: 'top_right_edge' }, draft)).toBe(true);
+    expect(isTargetValidForDraft({ type: 'edge', edge: 'bottom_front_edge' }, draft)).toBe(false);
     expect(isTargetValidForDraft({ type: 'edge', edge: 'front_left_edge' }, draft)).toBe(false);
+    expect(isTargetValidForDraft({ type: 'face', face: 'top_face' }, draft)).toBe(false);
   });
 
   it('limits cutouts to top and bottom faces', () => {

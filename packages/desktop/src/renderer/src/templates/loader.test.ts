@@ -1,11 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
-  loadTemplateFromJSON,
-  loadAssemblyFromJSON,
-  getTemplateMetadata,
+  AssemblyDefinition,
   getAssemblyMetadata,
-  TemplateDefinition,
-  AssemblyDefinition
+  getTemplateMetadata,
+  loadAssemblyFromJSON,
+  loadTemplateFromJSON,
+  TemplateDefinition
 } from './loader';
 
 // Mock uuid to have predictable IDs in tests
@@ -503,7 +503,7 @@ describe('loader', () => {
                   kind: 'rect_cut',
                   version: 1,
                   enabled: true,
-                  target: { type: 'corner', corner: 'back_bottom_left_corner' },
+                  target: { type: 'corner', corner: 'back_left_corner' },
                   reference: { primaryFrom: 'min', secondaryFrom: 'min' },
                   cutType: 'corner_notch',
                   parameters: {

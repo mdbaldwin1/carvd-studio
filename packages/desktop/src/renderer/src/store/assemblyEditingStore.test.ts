@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  createTestGroup,
+  createTestGroupMember,
+  createTestPart,
+  createTestStock
+} from '../../../../tests/helpers/factories';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
 import { useProjectStore } from './projectStore';
 import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useUIStore } from './uiStore';
-import {
-  createTestPart,
-  createTestStock,
-  createTestGroup,
-  createTestGroupMember
-} from '../../../../tests/helpers/factories';
 
 const resetStores = () => {
   const store = useProjectStore.getState();
@@ -283,7 +283,7 @@ describe('assemblyEditingStore', () => {
               kind: 'rect_cut',
               version: 1,
               enabled: true,
-              target: { type: 'corner', corner: 'front_bottom_right_corner' },
+              target: { type: 'corner', corner: 'front_right_corner' },
               reference: { primaryFrom: 'max', secondaryFrom: 'min' },
               cutType: 'corner_notch',
               parameters: {

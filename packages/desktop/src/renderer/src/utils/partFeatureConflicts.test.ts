@@ -209,4 +209,100 @@ describe('getPartFeatureConflicts', () => {
       conflicts.every((conflict) => conflict.code !== 'rect_consumed' && conflict.code !== 'rect_anchor_removed')
     ).toBe(true);
   });
+
+  it('flags opposing-face blind cuts that intersect through the thickness', () => {
+    const part = createTestPart({
+      width: 8,
+      thickness: 0.75,
+      features: [
+        {
+          id: 'feature-1',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mortise',
+          parameters: {
+            size: { length: 4, width: 2 },
+            depthMode: 'blind',
+            depth: 0.5
+          },
+          placement: { x: 1, z: 2 }
+        },
+        {
+          id: 'feature-2',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'bottom_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mortise',
+          parameters: {
+            size: { length: 4, width: 2 },
+            depthMode: 'blind',
+            depth: 0.4
+          },
+          placement: { x: 1, z: 2 }
+        }
+      ]
+    });
+
+    const conflicts = getPartFeatureConflicts(part.features ?? [], part);
+    expect(
+      conflicts.some(
+        (conflict) =>
+          conflict.featureId === 'feature-2' &&
+          conflict.code === 'rect_depth_intersection' &&
+          conflict.severity === 'error'
+      )
+    ).toBe(true);
+  });
+
+  it('uses authored operation numbering even when disabled cuts exist earlier in the list', () => {
+    const part = createTestPart({
+      features: [
+        {
+          id: 'feature-0',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: false,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'cutout',
+          parameters: {
+            size: { length: 1, width: 1 },
+            depthMode: 'through'
+          },
+          placement: { x: 0, z: 0 }
+        },
+        {
+          id: 'feature-1',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mitre',
+          lengthMode: 'long_point',
+          parameters: { horizontalAngle: 45 }
+        },
+        {
+          id: 'feature-2',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'bevel',
+          lengthMode: 'long_point',
+          parameters: { horizontalAngle: 0, verticalAngle: 15 }
+        }
+      ]
+    });
+
+    const conflicts = getPartFeatureConflicts(part.features ?? [], part);
+    expect(conflicts[0]?.message).toContain('Operation 3');
+    expect(conflicts[0]?.message).toContain('Operation 2');
+  });
 });

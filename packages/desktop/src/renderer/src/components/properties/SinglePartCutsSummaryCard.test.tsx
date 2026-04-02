@@ -9,7 +9,7 @@ describe('SinglePartCutsSummaryCard', () => {
     render(<SinglePartCutsSummaryCard selectedPart={createTestPart()} units="imperial" onEditCuts={onEditCuts} />);
 
     expect(screen.getByText('No operations authored yet.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Open Cuts Workspace' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Part Cuts' }));
     expect(onEditCuts).toHaveBeenCalled();
   });
 

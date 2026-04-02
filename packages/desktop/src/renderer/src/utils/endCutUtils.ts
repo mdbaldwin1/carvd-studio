@@ -56,13 +56,13 @@ function getEnabledEndCuts(features?: PartFeature[]): EndCutFeature[] {
 }
 
 function getFeatureHorizontalInset(feature: EndCutFeature, width: number): number {
-  if (feature.cutType === 'square' || feature.cutType === 'bevel' || width <= 0) return 0;
+  if (feature.cutType === 'bevel' || width <= 0) return 0;
   const angle = Math.abs(feature.parameters.horizontalAngle || 0);
   return Math.max(0, Math.tan((angle * Math.PI) / 180) * width);
 }
 
 function getFeatureVerticalInset(feature: EndCutFeature, thickness: number): number {
-  if (feature.cutType === 'square' || feature.cutType === 'mitre' || thickness <= 0) return 0;
+  if (feature.cutType === 'mitre' || thickness <= 0) return 0;
   const angle = Math.abs(feature.parameters.verticalAngle || 0);
   return Math.max(0, Math.tan((angle * Math.PI) / 180) * thickness);
 }

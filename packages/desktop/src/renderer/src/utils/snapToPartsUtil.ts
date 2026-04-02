@@ -1,6 +1,13 @@
 import * as THREE from 'three';
-import { Part, SnapLine, SnapDistanceIndicator, SnapGuide, ReferenceDistanceIndicator } from '../types';
-import { getPartWorldAABB } from './partFeatureGeometry';
+import { Part, RectCutFeature, ReferenceDistanceIndicator, SnapDistanceIndicator, SnapGuide, SnapLine } from '../types';
+import { getPartEndCutProfiles } from './endCutUtils';
+import {
+  getPartContourSubBoxes,
+  getPartLocalBoundingBox,
+  getPartLocalConvexVertices,
+  getPartWorldAABB
+} from './partFeatureGeometry';
+import { getRectCutDepth, getResolvedRectCutFeature, isTopTarget } from './rectCutUtils';
 
 // Module-level reusable objects for getPartBounds calculations.
 // Safe because JS is single-threaded and callers only see the returned plain PartBounds object.
@@ -20,6 +27,8 @@ export interface PartBounds {
   centerY: number;
   centerZ: number;
 }
+
+type Vec3 = { x: number; y: number; z: number };
 
 export interface PartOBB {
   center: { x: number; y: number; z: number };
@@ -87,38 +96,105 @@ export function getPartBoundsAtPosition(part: Part, position: { x: number; y: nu
   return getPartBounds(tempPart);
 }
 
-export function getPartOBB(part: Part, position: { x: number; y: number; z: number } = part.position): PartOBB {
-  _boundsEuler.set(
-    (part.rotation.x * Math.PI) / 180,
-    (part.rotation.y * Math.PI) / 180,
-    (part.rotation.z * Math.PI) / 180,
-    'XYZ'
-  );
-  _boundsQuat.setFromEuler(_boundsEuler);
+/** Compute rotation matrix columns from Euler XYZ angles (degrees). */
+function eulerToAxes(rotation: { x: number; y: number; z: number }): {
+  ax0: number;
+  ax1: number;
+  ax2: number;
+  ay0: number;
+  ay1: number;
+  ay2: number;
+  az0: number;
+  az1: number;
+  az2: number;
+} {
+  const rx = (rotation.x * Math.PI) / 180;
+  const ry = (rotation.y * Math.PI) / 180;
+  const rz = (rotation.z * Math.PI) / 180;
+  const c1 = Math.cos(rx),
+    s1 = Math.sin(rx);
+  const c2 = Math.cos(ry),
+    s2 = Math.sin(ry);
+  const c3 = Math.cos(rz),
+    s3 = Math.sin(rz);
+  // R = Rz(rz) * Ry(ry) * Rx(rx), columns = local axes in world space
+  return {
+    ax0: c2 * c3,
+    ax1: c2 * s3,
+    ax2: -s2,
+    ay0: s1 * s2 * c3 - c1 * s3,
+    ay1: s1 * s2 * s3 + c1 * c3,
+    ay2: s1 * c2,
+    az0: c1 * s2 * c3 + s1 * s3,
+    az1: c1 * s2 * s3 - s1 * c3,
+    az2: c1 * c2
+  };
+}
 
-  const qx = _boundsQuat.x;
-  const qy = _boundsQuat.y;
-  const qz = _boundsQuat.z;
-  const qw = _boundsQuat.w;
-  const xx = qx * qx;
-  const yy = qy * qy;
-  const zz = qz * qz;
-  const xy = qx * qy;
-  const xz = qx * qz;
-  const yz = qy * qz;
-  const wx = qw * qx;
-  const wy = qw * qy;
-  const wz = qw * qz;
+export function getPartOBB(part: Part, position: { x: number; y: number; z: number } = part.position): PartOBB {
+  const { ax0, ax1, ax2, ay0, ay1, ay2, az0, az1, az2 } = eulerToAxes(part.rotation);
+
+  // Use feature-aware local bounding box so end cuts, bevels, and
+  // through-cut notches shrink the OBB instead of leaving ghost volume.
+  const localBox = getPartLocalBoundingBox(part);
+  const halfX = (localBox.max.x - localBox.min.x) / 2;
+  const halfY = (localBox.max.y - localBox.min.y) / 2;
+  const halfZ = (localBox.max.z - localBox.min.z) / 2;
+
+  // Local center offset (non-zero when features make the box asymmetric,
+  // e.g. a bevel on only one end shifts the box center toward the other end)
+  const lcx = (localBox.min.x + localBox.max.x) / 2;
+  const lcy = (localBox.min.y + localBox.max.y) / 2;
+  const lcz = (localBox.min.z + localBox.max.z) / 2;
 
   return {
-    center: { x: position.x, y: position.y, z: position.z },
+    center: {
+      x: position.x + ax0 * lcx + ay0 * lcy + az0 * lcz,
+      y: position.y + ax1 * lcx + ay1 * lcy + az1 * lcz,
+      z: position.z + ax2 * lcx + ay2 * lcy + az2 * lcz
+    },
     axes: [
-      { x: 1 - 2 * (yy + zz), y: 2 * (xy + wz), z: 2 * (xz - wy) },
-      { x: 2 * (xy - wz), y: 1 - 2 * (xx + zz), z: 2 * (yz + wx) },
-      { x: 2 * (xz + wy), y: 2 * (yz - wx), z: 1 - 2 * (xx + yy) }
+      { x: ax0, y: ax1, z: ax2 },
+      { x: ay0, y: ay1, z: ay2 },
+      { x: az0, y: az1, z: az2 }
     ],
-    halfExtents: [part.length / 2, part.thickness / 2, part.width / 2]
+    halfExtents: [halfX, halfY, halfZ]
   };
+}
+
+/**
+ * Return one or more OBBs that tile the actual material of a part.
+ * For simple boxes this returns a single OBB identical to getPartOBB().
+ * For parts with through-depth corner/edge notches the L/U-shaped contour
+ * is decomposed into axis-aligned sub-rectangles so the empty notch area
+ * is excluded — preventing "ghost corner" overlap.
+ */
+export function getPartSubOBBs(part: Part, position: { x: number; y: number; z: number } = part.position): PartOBB[] {
+  const subBoxes = getPartContourSubBoxes(part);
+
+  if (subBoxes.length <= 1) {
+    return [getPartOBB(part, position)];
+  }
+
+  const { ax0, ax1, ax2, ay0, ay1, ay2, az0, az1, az2 } = eulerToAxes(part.rotation);
+
+  const halfThickness = part.thickness / 2;
+  const axes: PartOBB['axes'] = [
+    { x: ax0, y: ax1, z: ax2 },
+    { x: ay0, y: ay1, z: ay2 },
+    { x: az0, y: az1, z: az2 }
+  ];
+
+  // Negate contour Z to match the rotateX(-π/2) applied by the render geometry.
+  return subBoxes.map((box) => ({
+    center: {
+      x: position.x + ax0 * box.centerX + az0 * -box.centerZ,
+      y: position.y + ax1 * box.centerX + az1 * -box.centerZ,
+      z: position.z + ax2 * box.centerX + az2 * -box.centerZ
+    },
+    axes,
+    halfExtents: [box.halfX, halfThickness, box.halfZ] as [number, number, number]
+  }));
 }
 
 export function obbsOverlap(
@@ -136,6 +212,15 @@ export function obbsOverlap(
     [0, 0, 0],
     [0, 0, 0]
   ];
+  // absRExact: no epsilon inflation — used for face axes where epsilon
+  // would cause face-touching parts to falsely report overlap.
+  const absRExact = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0]
+  ];
+  // absR: epsilon-inflated — used only for cross-product axes to handle
+  // near-parallel axis numerical instability.
   const absR = [
     [0, 0, 0],
     [0, 0, 0],
@@ -145,7 +230,8 @@ export function obbsOverlap(
   for (let i = 0; i < 3; i += 1) {
     for (let j = 0; j < 3; j += 1) {
       R[i][j] = dot(a.axes[i], b.axes[j]);
-      absR[i][j] = Math.abs(R[i][j]) + epsilon;
+      absRExact[i][j] = Math.abs(R[i][j]);
+      absR[i][j] = absRExact[i][j] + epsilon;
     }
   }
 
@@ -156,9 +242,11 @@ export function obbsOverlap(
   };
   const t = [dot(tWorld, a.axes[0]), dot(tWorld, a.axes[1]), dot(tWorld, a.axes[2])];
 
+  // Face axes of A — use exact absR (no epsilon inflation)
   for (let i = 0; i < 3; i += 1) {
     const ra = a.halfExtents[i];
-    const rb = b.halfExtents[0] * absR[i][0] + b.halfExtents[1] * absR[i][1] + b.halfExtents[2] * absR[i][2];
+    const rb =
+      b.halfExtents[0] * absRExact[i][0] + b.halfExtents[1] * absRExact[i][1] + b.halfExtents[2] * absRExact[i][2];
     const proj = Math.abs(t[i]);
     const limit = ra + rb;
     if (touchingCountsAsOverlap) {
@@ -168,8 +256,10 @@ export function obbsOverlap(
     }
   }
 
+  // Face axes of B — use exact absR (no epsilon inflation)
   for (let j = 0; j < 3; j += 1) {
-    const ra = a.halfExtents[0] * absR[0][j] + a.halfExtents[1] * absR[1][j] + a.halfExtents[2] * absR[2][j];
+    const ra =
+      a.halfExtents[0] * absRExact[0][j] + a.halfExtents[1] * absRExact[1][j] + a.halfExtents[2] * absRExact[2][j];
     const rb = b.halfExtents[j];
     const proj = Math.abs(t[0] * R[0][j] + t[1] * R[1][j] + t[2] * R[2][j]);
     const limit = ra + rb;
@@ -195,6 +285,239 @@ export function obbsOverlap(
   }
 
   return true;
+}
+
+export interface ConvexShape {
+  /** World-space vertices of the convex hull. */
+  vertices: Vec3[];
+  /** Unique face normals in world space (used as SAT test axes). */
+  normals: Vec3[];
+}
+
+/**
+ * Build a world-space convex shape for a part.
+ * The local convex vertices already account for end cuts (bevels etc.).
+ */
+export function getPartConvexShape(
+  part: Part,
+  position: { x: number; y: number; z: number } = part.position
+): ConvexShape {
+  _boundsEuler.set(
+    (part.rotation.x * Math.PI) / 180,
+    (part.rotation.y * Math.PI) / 180,
+    (part.rotation.z * Math.PI) / 180,
+    'XYZ'
+  );
+  _boundsQuat.setFromEuler(_boundsEuler);
+
+  const qx = _boundsQuat.x;
+  const qy = _boundsQuat.y;
+  const qz = _boundsQuat.z;
+  const qw = _boundsQuat.w;
+  const xx = qx * qx;
+  const yy = qy * qy;
+  const zz = qz * qz;
+  const xy = qx * qy;
+  const xz = qx * qz;
+  const yz = qy * qz;
+  const wx = qw * qx;
+  const wy = qw * qy;
+  const wz = qw * qz;
+
+  const r00 = 1 - 2 * (yy + zz);
+  const r01 = 2 * (xy - wz);
+  const r02 = 2 * (xz + wy);
+  const r10 = 2 * (xy + wz);
+  const r11 = 1 - 2 * (xx + zz);
+  const r12 = 2 * (yz - wx);
+  const r20 = 2 * (xz - wy);
+  const r21 = 2 * (yz + wx);
+  const r22 = 1 - 2 * (xx + yy);
+
+  const localVerts = getPartLocalConvexVertices(part);
+
+  // Transform vertices to world space
+  const vertices: Vec3[] = localVerts.map((v) => ({
+    x: position.x + r00 * v.x + r01 * v.y + r02 * v.z,
+    y: position.y + r10 * v.x + r11 * v.y + r12 * v.z,
+    z: position.z + r20 * v.x + r21 * v.y + r22 * v.z
+  }));
+
+  // Compute face normals from the convex hull faces.
+  // For a beveled box the faces are: ±Y (top/bottom), ±Z (front/back),
+  // the uncut end face, and 1-2 bevel faces. We derive normals from
+  // the local box axes plus any bevel cut normals.
+  const localNormals: Vec3[] = [
+    { x: 1, y: 0, z: 0 },
+    { x: 0, y: 1, z: 0 },
+    { x: 0, y: 0, z: 1 }
+  ];
+
+  // Add bevel face normals by computing cross products of adjacent edge vectors
+  // on the bevel face. For a left bevel the face lies on vertices where x is
+  // adjusted by getEndCutInsetAt — the normal points in the -X direction with
+  // a Y component. We compute it from the actual local vertices.
+  addBevelNormals(localVerts, part, localNormals);
+
+  // Rotate all normals into world space
+  const normals: Vec3[] = localNormals.map((n) => ({
+    x: r00 * n.x + r01 * n.y + r02 * n.z,
+    y: r10 * n.x + r11 * n.y + r12 * n.z,
+    z: r20 * n.x + r21 * n.y + r22 * n.z
+  }));
+
+  return { vertices, normals };
+}
+
+/** Detect bevel faces and add their normals to the list. */
+function addBevelNormals(_localVerts: Vec3[], part: Part, normals: Vec3[]): void {
+  const halfThickness = part.thickness / 2;
+  const profiles = getPartEndCutProfiles(part);
+
+  // For a left bevel: the face goes from (-halfLength, refY) to
+  // (-halfLength + verticalInset, oppositeY). The face normal is
+  // perpendicular to the bevel slope in the X-Y plane.
+  if (profiles.left.verticalInset > 0) {
+    // Bevel edge direction in local X-Y plane
+    const dx = profiles.left.verticalInset; // inset along X
+    const dy = 2 * halfThickness; // full thickness along Y
+    // Normal is perpendicular: rotate 90° CW in X-Y → (dy, -dx) pointing outward (-X)
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len > 1e-9) {
+      // The outward normal for the left end bevel points toward -X
+      normals.push({ x: -dy / len, y: dx / len, z: 0 });
+    }
+  }
+
+  if (profiles.right.verticalInset > 0) {
+    const dx = profiles.right.verticalInset;
+    const dy = 2 * halfThickness;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len > 1e-9) {
+      // The outward normal for the right end bevel points toward +X
+      normals.push({ x: dy / len, y: -dx / len, z: 0 });
+    }
+  }
+
+  // For horizontal insets (mitres), the face normal has a Z component.
+  // These are already handled by buildOuterContour adjusting the X-Z shape,
+  // but we add explicit normals for the mitre faces for completeness.
+  if (profiles.left.horizontalInset > 0) {
+    const dx = profiles.left.horizontalInset;
+    const dz = part.width;
+    const len = Math.sqrt(dx * dx + dz * dz);
+    if (len > 1e-9) {
+      normals.push({ x: -dz / len, y: 0, z: dx / len });
+    }
+  }
+
+  if (profiles.right.horizontalInset > 0) {
+    const dx = profiles.right.horizontalInset;
+    const dz = part.width;
+    const len = Math.sqrt(dx * dx + dz * dz);
+    if (len > 1e-9) {
+      normals.push({ x: dz / len, y: 0, z: -dx / len });
+    }
+  }
+}
+
+/**
+ * SAT overlap test for two convex polyhedra defined by their vertices and
+ * face normals. Also tests cross-product axes from pairs of edge directions.
+ *
+ * Returns true when the shapes overlap (share interior volume).
+ */
+export function convexShapesOverlap(
+  a: ConvexShape,
+  b: ConvexShape,
+  separationTolerance = 1e-8,
+  touchingCountsAsOverlap = true
+): boolean {
+  // Collect all SAT test axes: face normals from both shapes
+  // plus cross products of unique edge directions.
+  const axes: Vec3[] = [...a.normals, ...b.normals];
+
+  // Derive unique edge directions from each shape's vertices.
+  const edgesA = convexEdgeDirections(a.vertices);
+  const edgesB = convexEdgeDirections(b.vertices);
+
+  // Cross-product axes
+  for (const ea of edgesA) {
+    for (const eb of edgesB) {
+      const cx = ea.y * eb.z - ea.z * eb.y;
+      const cy = ea.z * eb.x - ea.x * eb.z;
+      const cz = ea.x * eb.y - ea.y * eb.x;
+      const len2 = cx * cx + cy * cy + cz * cz;
+      if (len2 > 1e-12) {
+        const inv = 1 / Math.sqrt(len2);
+        axes.push({ x: cx * inv, y: cy * inv, z: cz * inv });
+      }
+    }
+  }
+
+  for (const axis of axes) {
+    let aMin = Infinity;
+    let aMax = -Infinity;
+    for (const v of a.vertices) {
+      const d = v.x * axis.x + v.y * axis.y + v.z * axis.z;
+      if (d < aMin) aMin = d;
+      if (d > aMax) aMax = d;
+    }
+
+    let bMin = Infinity;
+    let bMax = -Infinity;
+    for (const v of b.vertices) {
+      const d = v.x * axis.x + v.y * axis.y + v.z * axis.z;
+      if (d < bMin) bMin = d;
+      if (d > bMax) bMax = d;
+    }
+
+    const gap = Math.max(aMin - bMax, bMin - aMax);
+    if (touchingCountsAsOverlap) {
+      if (gap > 0) return false;
+    } else {
+      if (gap >= -separationTolerance) return false;
+    }
+  }
+
+  return true;
+}
+
+/** Extract unique edge directions (normalized) from a convex vertex set. */
+function convexEdgeDirections(vertices: Vec3[]): Vec3[] {
+  const n = vertices.length;
+  const dirs: Vec3[] = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < n; i += 1) {
+    for (let j = i + 1; j < n; j += 1) {
+      let dx = vertices[j].x - vertices[i].x;
+      let dy = vertices[j].y - vertices[i].y;
+      let dz = vertices[j].z - vertices[i].z;
+      const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (len < 1e-9) continue;
+      dx /= len;
+      dy /= len;
+      dz /= len;
+      // Canonical direction (ensure first non-zero component is positive)
+      if (
+        dx < -1e-9 ||
+        (Math.abs(dx) < 1e-9 && dy < -1e-9) ||
+        (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9 && dz < -1e-9)
+      ) {
+        dx = -dx;
+        dy = -dy;
+        dz = -dz;
+      }
+      const key = `${dx.toFixed(6)},${dy.toFixed(6)},${dz.toFixed(6)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        dirs.push({ x: dx, y: dy, z: dz });
+      }
+    }
+  }
+
+  return dirs;
 }
 
 // Calculate combined bounding box for multiple parts
@@ -1992,8 +2315,6 @@ export function detectFaceSnaps(
   };
 }
 
-type Vec3 = { x: number; y: number; z: number };
-
 type OrientedFace = {
   normal: Vec3;
   center: Vec3;
@@ -2016,50 +2337,14 @@ function addScaledVec(base: Vec3, dir: Vec3, scale: number): Vec3 {
 }
 
 function getPartFaces(part: Part, position: { x: number; y: number; z: number }): OrientedFace[] {
-  _boundsEuler.set(
-    (part.rotation.x * Math.PI) / 180,
-    (part.rotation.y * Math.PI) / 180,
-    (part.rotation.z * Math.PI) / 180,
-    'XYZ'
-  );
-  _boundsQuat.setFromEuler(_boundsEuler);
+  // Use the OBB which already accounts for features (bevels, end cuts, notches)
+  // so face snap positions match the actual bounding geometry.
+  const obb = getPartOBB(part, position);
+  const [axisX, axisY, axisZ] = obb.axes;
+  const [halfLength, halfThickness, halfWidth] = obb.halfExtents;
+  const partCenter = obb.center;
 
-  const qx = _boundsQuat.x;
-  const qy = _boundsQuat.y;
-  const qz = _boundsQuat.z;
-  const qw = _boundsQuat.w;
-  const xx = qx * qx;
-  const yy = qy * qy;
-  const zz = qz * qz;
-  const xy = qx * qy;
-  const xz = qx * qz;
-  const yz = qy * qz;
-  const wx = qw * qx;
-  const wy = qw * qy;
-  const wz = qw * qz;
-
-  const axisX: Vec3 = {
-    x: 1 - 2 * (yy + zz),
-    y: 2 * (xy + wz),
-    z: 2 * (xz - wy)
-  };
-  const axisY: Vec3 = {
-    x: 2 * (xy - wz),
-    y: 1 - 2 * (xx + zz),
-    z: 2 * (yz + wx)
-  };
-  const axisZ: Vec3 = {
-    x: 2 * (xz + wy),
-    y: 2 * (yz - wx),
-    z: 1 - 2 * (xx + yy)
-  };
-
-  const halfLength = part.length / 2;
-  const halfThickness = part.thickness / 2;
-  const halfWidth = part.width / 2;
-  const partCenter: Vec3 = { x: position.x, y: position.y, z: position.z };
-
-  return [
+  const faces: OrientedFace[] = [
     {
       normal: axisX,
       center: addScaledVec(partCenter, axisX, halfLength),
@@ -2109,6 +2394,111 @@ function getPartFaces(part: Part, position: { x: number; y: number; z: number })
       half2: halfThickness
     }
   ];
+
+  // Add bevel / compound end cut faces so the face snap can align the actual
+  // angled surface rather than the bounding-box edge.
+  addBevelSnapFaces(faces, part, partCenter, axisX, axisY, axisZ, halfLength, halfThickness, halfWidth);
+
+  return faces;
+}
+
+/**
+ * Append oriented-face entries for each bevel / compound end-cut face so the
+ * face snap system can align the actual angled surface.
+ *
+ * A bevel face in local space runs from one edge of the end face to the
+ * opposite (shifted by the vertical inset). Its center, normal, and tangent
+ * vectors are computed in local space and then rotated to world space using
+ * the OBB axes (which already encode the part's rotation).
+ */
+function addBevelSnapFaces(
+  faces: OrientedFace[],
+  part: Part,
+  partCenter: Vec3,
+  axisX: Vec3,
+  axisY: Vec3,
+  axisZ: Vec3,
+  halfLength: number,
+  halfThickness: number,
+  halfWidth: number
+): void {
+  const profiles = getPartEndCutProfiles(part);
+
+  for (const side of ['left', 'right'] as const) {
+    const profile = side === 'left' ? profiles.left : profiles.right;
+    if (profile.verticalInset <= 0) continue;
+
+    const vi = profile.verticalInset;
+    const thickness = 2 * halfThickness;
+
+    // The bevel slope length in the X-Y plane
+    const slopeLen = Math.sqrt(vi * vi + thickness * thickness);
+    const halfSlope = slopeLen / 2;
+
+    // Local bevel face normal (perpendicular to slope, pointing outward).
+    // For verticalFlip=false: slope goes from (-hl, -ht) to (-hl+vi, +ht), normal points -X/+Y
+    // For verticalFlip=true: slope goes from (-hl, +ht) to (-hl+vi, -ht), normal points -X/-Y
+    let localNormal: Vec3;
+    let localTangentSlope: Vec3;
+    if (side === 'left') {
+      if (profile.verticalFlip) {
+        // Slope: (-hl, +ht) → (-hl+vi, -ht). Edge dir = (vi, -thickness).
+        // Outward normal rotated 90° CW in XY: (-thickness → normal_x, -vi → ?)
+        // Normal = perpendicular pointing outward (-X side) = (-thickness/sl, -vi/sl, 0)
+        localNormal = { x: -thickness / slopeLen, y: -vi / slopeLen, z: 0 };
+        localTangentSlope = { x: vi / slopeLen, y: -thickness / slopeLen, z: 0 };
+      } else {
+        // Slope: (-hl, -ht) → (-hl+vi, +ht). Edge dir = (vi, thickness).
+        // Normal pointing outward (-X side) = (-thickness/sl, vi/sl, 0)
+        localNormal = { x: -thickness / slopeLen, y: vi / slopeLen, z: 0 };
+        localTangentSlope = { x: vi / slopeLen, y: thickness / slopeLen, z: 0 };
+      }
+    } else {
+      if (profile.verticalFlip) {
+        // Right side, flip: slope from (+hl, -ht) → (+hl-vi, +ht).
+        localNormal = { x: thickness / slopeLen, y: vi / slopeLen, z: 0 };
+        localTangentSlope = { x: -vi / slopeLen, y: thickness / slopeLen, z: 0 };
+      } else {
+        // Right side, no flip: slope from (+hl, +ht) → (+hl-vi, -ht).
+        localNormal = { x: thickness / slopeLen, y: -vi / slopeLen, z: 0 };
+        localTangentSlope = { x: -vi / slopeLen, y: -thickness / slopeLen, z: 0 };
+      }
+    }
+
+    // Local center of the bevel face: midpoint of the slope edge
+    const midInset = vi / 2;
+    const localCenterX = side === 'left' ? -halfLength + midInset : halfLength - midInset;
+    const localCenterY = 0; // Midpoint of thickness range
+
+    // Transform local vectors to world space via OBB axes:
+    // world = axisX * local.x + axisY * local.y + axisZ * local.z
+    const worldNormal: Vec3 = {
+      x: axisX.x * localNormal.x + axisY.x * localNormal.y + axisZ.x * localNormal.z,
+      y: axisX.y * localNormal.x + axisY.y * localNormal.y + axisZ.y * localNormal.z,
+      z: axisX.z * localNormal.x + axisY.z * localNormal.y + axisZ.z * localNormal.z
+    };
+
+    const worldTangentSlope: Vec3 = {
+      x: axisX.x * localTangentSlope.x + axisY.x * localTangentSlope.y,
+      y: axisX.y * localTangentSlope.x + axisY.y * localTangentSlope.y,
+      z: axisX.z * localTangentSlope.x + axisY.z * localTangentSlope.y
+    };
+
+    const worldCenter: Vec3 = {
+      x: partCenter.x + axisX.x * localCenterX + axisY.x * localCenterY,
+      y: partCenter.y + axisX.y * localCenterX + axisY.y * localCenterY,
+      z: partCenter.z + axisX.z * localCenterX + axisY.z * localCenterY
+    };
+
+    faces.push({
+      normal: worldNormal,
+      center: worldCenter,
+      tangent1: worldTangentSlope,
+      tangent2: axisZ,
+      half1: halfSlope,
+      half2: halfWidth
+    });
+  }
 }
 
 function projectFaceInterval(face: OrientedFace, axis: Vec3): { min: number; max: number } {
@@ -2353,6 +2743,11 @@ export function detectFeatureSnaps(
         const offset = subVec(vertex, face.center);
         const planeDistance = dotVec(offset, face.normal);
         const absDistance = Math.abs(planeDistance);
+        // Skip near-coincident projections — the vertex is already on this
+        // face (e.g. after a face snap). Allowing near-zero distances here
+        // would poison bestDistance and block useful edge-edge snaps on
+        // tangential axes.
+        if (absDistance <= 1e-3) continue;
         if (absDistance >= bestDistance) continue;
 
         const projected = subVec(vertex, mulVec(face.normal, planeDistance));
@@ -2473,4 +2868,336 @@ function createFaceSnapLine(
       };
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Feature-mating snap system
+// ---------------------------------------------------------------------------
+// A FeatureSocket represents a pocket/slot opening on a part's surface
+// where another part can be inserted (dado, groove, mortise, rabbet, etc.).
+// The abstraction is intentionally generic so future feature types (dowels,
+// dovetails, etc.) can produce sockets with the same interface.
+
+export interface FeatureSocket {
+  hostPartId: string;
+  featureId: string;
+  /** World-space center of the socket opening */
+  openingCenter: Vec3;
+  /** Normal pointing OUT of the socket (away from insertion) */
+  openingNormal: Vec3;
+  /** First tangent spanning the opening face */
+  tangent1: Vec3;
+  /** Second tangent spanning the opening face */
+  tangent2: Vec3;
+  /** Half-extent of opening along tangent1 */
+  halfExtent1: number;
+  /** Half-extent of opening along tangent2 */
+  halfExtent2: number;
+  /** Depth of the socket (along -openingNormal) */
+  depth: number;
+}
+
+// Tolerance for dimension matching (inches) — parts whose dimension is within
+// this tolerance of the socket opening are considered a "tight fit".
+const MATE_DIM_TOLERANCE = 0.03;
+// Cosine threshold for axis alignment — OBB axis must be roughly parallel to
+// socket normal / tangents to be considered for mating.
+const MATE_ALIGN_THRESHOLD = 0.85;
+
+/**
+ * Compute feature sockets for a part's enabled rect_cut features.
+ * Currently handles features targeting top / bottom faces.
+ * The architecture allows future feature types (dowels, dovetails) to
+ * generate sockets through the same FeatureSocket interface.
+ */
+export function getPartFeatureSockets(part: Part): FeatureSocket[] {
+  const features = part.features;
+  if (!features || features.length === 0) return [];
+
+  // Build rotation matrix once (same logic as getPartOBB).
+  _boundsEuler.set(
+    (part.rotation.x * Math.PI) / 180,
+    (part.rotation.y * Math.PI) / 180,
+    (part.rotation.z * Math.PI) / 180,
+    'XYZ'
+  );
+  _boundsQuat.setFromEuler(_boundsEuler);
+  const qx = _boundsQuat.x;
+  const qy = _boundsQuat.y;
+  const qz = _boundsQuat.z;
+  const qw = _boundsQuat.w;
+  const xx = qx * qx;
+  const yy = qy * qy;
+  const zz = qz * qz;
+  const xy = qx * qy;
+  const xz = qx * qz;
+  const yz = qy * qz;
+  const wx = qw * qx;
+  const wy = qw * qy;
+  const wz = qw * qz;
+
+  // Local axes in world space
+  const axX: Vec3 = { x: 1 - 2 * (yy + zz), y: 2 * (xy + wz), z: 2 * (xz - wy) };
+  const axY: Vec3 = { x: 2 * (xy - wz), y: 1 - 2 * (xx + zz), z: 2 * (yz + wx) };
+  const axZ: Vec3 = { x: 2 * (xz + wy), y: 2 * (yz - wx), z: 1 - 2 * (xx + yy) };
+
+  const halfLength = part.length / 2;
+  const halfWidth = part.width / 2;
+  const halfThick = part.thickness / 2;
+
+  const sockets: FeatureSocket[] = [];
+
+  for (const feature of features) {
+    if (!feature.enabled) continue;
+    if (feature.kind !== 'rect_cut') continue;
+
+    const rectFeature = feature as RectCutFeature;
+    const resolved = getResolvedRectCutFeature(rectFeature, part);
+
+    // Currently only support top/bottom face targets
+    if (resolved.target.type !== 'face') continue;
+    const isTop = isTopTarget(resolved);
+    const isBottom = !isTop && resolved.target.face === 'bottom_face';
+    if (!isTop && !isBottom) continue;
+
+    const depth = getRectCutDepth(resolved, part.thickness);
+    if (depth <= 0) continue;
+
+    // Local-space opening rectangle
+    const startX = -halfLength + resolved.placement.x;
+    const endX = startX + resolved.parameters.size.length;
+    const startZ = -halfWidth + resolved.placement.z;
+    const endZ = startZ + resolved.parameters.size.width;
+    const localCenterX = (startX + endX) / 2;
+    const localCenterZ = (startZ + endZ) / 2;
+    const localCenterY = isTop ? halfThick : -halfThick;
+
+    // Transform to world space
+    const worldCenter: Vec3 = {
+      x: part.position.x + axX.x * localCenterX + axY.x * localCenterY + axZ.x * localCenterZ,
+      y: part.position.y + axX.y * localCenterX + axY.y * localCenterY + axZ.y * localCenterZ,
+      z: part.position.z + axX.z * localCenterX + axY.z * localCenterY + axZ.z * localCenterZ
+    };
+
+    // Opening normal: +Y for top, -Y for bottom, in world space
+    const openingNormal: Vec3 = isTop ? { x: axY.x, y: axY.y, z: axY.z } : { x: -axY.x, y: -axY.y, z: -axY.z };
+
+    sockets.push({
+      hostPartId: part.id,
+      featureId: feature.id,
+      openingCenter: worldCenter,
+      openingNormal,
+      tangent1: axX, // along part length
+      tangent2: axZ, // along part width
+      halfExtent1: resolved.parameters.size.length / 2,
+      halfExtent2: resolved.parameters.size.width / 2,
+      depth
+    });
+  }
+
+  return sockets;
+}
+
+export interface MateSnapResult extends SnapResult {
+  mateHostPartId?: string;
+}
+
+/**
+ * Detect feature-mating snaps: when a dragged part's cross-section fits
+ * inside the socket of a nearby part's rect cut feature (dado, groove,
+ * mortise, rabbet, etc.), snap the part into position.
+ *
+ * The function is intentionally agnostic to the specific feature type;
+ * it only inspects the FeatureSocket geometry. This makes it extensible
+ * for future feature types (dowels, dovetails, etc.).
+ */
+export function detectFeatureMateSnaps(
+  draggingPart: Part,
+  currentPosition: Vec3,
+  allParts: Part[],
+  draggingPartIds: string[],
+  snapThreshold: number
+): MateSnapResult {
+  const draggingOBB = getPartOBB(draggingPart, currentPosition);
+  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
+  const nearParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
+
+  let bestDelta: Vec3 | undefined;
+  let bestDistance = Infinity;
+  let bestHostPartId: string | undefined;
+
+  for (const hostPart of nearParts) {
+    const sockets = getPartFeatureSockets(hostPart);
+    if (sockets.length === 0) continue;
+
+    for (const socket of sockets) {
+      const match = findBestMateMatch(draggingOBB, socket, snapThreshold);
+      if (!match || match.distance >= bestDistance) continue;
+      bestDistance = match.distance;
+      bestDelta = match.delta;
+      bestHostPartId = hostPart.id;
+    }
+  }
+
+  if (!bestDelta) {
+    return {
+      adjustedPosition: currentPosition,
+      snappedX: false,
+      snappedY: false,
+      snappedZ: false,
+      snapLines: []
+    };
+  }
+
+  const adjustedPosition = addVec(currentPosition, bestDelta);
+  const snappedX = Math.abs(bestDelta.x) > 1e-5;
+  const snappedY = Math.abs(bestDelta.y) > 1e-5;
+  const snappedZ = Math.abs(bestDelta.z) > 1e-5;
+  const axis = dominantAxisFromDelta(bestDelta);
+
+  return {
+    adjustedPosition,
+    snappedX,
+    snappedY,
+    snappedZ,
+    snapLines: [
+      {
+        axis,
+        type: 'face',
+        start: { x: currentPosition.x, y: currentPosition.y, z: currentPosition.z },
+        end: { x: adjustedPosition.x, y: adjustedPosition.y, z: adjustedPosition.z },
+        snapValue: axis === 'x' ? adjustedPosition.x : axis === 'y' ? adjustedPosition.y : adjustedPosition.z
+      }
+    ],
+    mateHostPartId: bestHostPartId
+  };
+}
+
+/**
+ * Try to match the dragged part's OBB against a single socket.
+ * Returns the snap delta and metric distance if a valid mate exists, or undefined.
+ */
+function findBestMateMatch(
+  draggingOBB: PartOBB,
+  socket: FeatureSocket,
+  snapThreshold: number
+): { delta: Vec3; distance: number } | undefined {
+  const [axisX, axisY, axisZ] = draggingOBB.axes;
+  const [hx, hy, hz] = draggingOBB.halfExtents;
+
+  // Try each of the dragged part's OBB axes as the potential insertion axis
+  const candidates = [
+    {
+      axis: axisX,
+      halfExt: hx,
+      cross: [
+        { axis: axisY, half: hy },
+        { axis: axisZ, half: hz }
+      ]
+    },
+    {
+      axis: axisY,
+      halfExt: hy,
+      cross: [
+        { axis: axisX, half: hx },
+        { axis: axisZ, half: hz }
+      ]
+    },
+    {
+      axis: axisZ,
+      halfExt: hz,
+      cross: [
+        { axis: axisX, half: hx },
+        { axis: axisY, half: hy }
+      ]
+    }
+  ];
+
+  let bestResult: { delta: Vec3; distance: number } | undefined;
+  let bestDist = Infinity;
+
+  for (const cand of candidates) {
+    const alignment = dotVec(cand.axis, socket.openingNormal);
+    if (Math.abs(alignment) < MATE_ALIGN_THRESHOLD) continue;
+
+    // Determine which cross-section axis maps to which socket tangent
+    const cs0AlignT1 = Math.abs(dotVec(cand.cross[0].axis, socket.tangent1));
+    const cs0AlignT2 = Math.abs(dotVec(cand.cross[0].axis, socket.tangent2));
+
+    let socketHE1: number;
+    let socketHE2: number;
+    let csHalf1: number;
+    let csHalf2: number;
+    let snapT1: Vec3;
+    let snapT2: Vec3;
+
+    if (cs0AlignT1 >= cs0AlignT2) {
+      socketHE1 = socket.halfExtent1;
+      socketHE2 = socket.halfExtent2;
+      csHalf1 = cand.cross[0].half;
+      csHalf2 = cand.cross[1].half;
+      snapT1 = socket.tangent1;
+      snapT2 = socket.tangent2;
+    } else {
+      socketHE1 = socket.halfExtent2;
+      socketHE2 = socket.halfExtent1;
+      csHalf1 = cand.cross[0].half;
+      csHalf2 = cand.cross[1].half;
+      snapT1 = socket.tangent2;
+      snapT2 = socket.tangent1;
+    }
+
+    // Both cross-section dimensions must fit within the socket opening
+    const fits1 = 2 * csHalf1 <= 2 * socketHE1 + MATE_DIM_TOLERANCE;
+    const fits2 = 2 * csHalf2 <= 2 * socketHE2 + MATE_DIM_TOLERANCE;
+    if (!fits1 || !fits2) continue;
+
+    // At least one dimension must be a snug/tight fit
+    const tight1 = Math.abs(2 * csHalf1 - 2 * socketHE1) < MATE_DIM_TOLERANCE;
+    const tight2 = Math.abs(2 * csHalf2 - 2 * socketHE2) < MATE_DIM_TOLERANCE;
+    if (!tight1 && !tight2) continue;
+
+    // --- Insertion axis delta ---
+    // The entering face of the dragged part should sit at the socket floor.
+    const n = socket.openingNormal;
+    const sign = alignment > 0 ? 1 : -1;
+    const partCenterAlongN = dotVec(draggingOBB.center, n);
+    const enterFaceAlongN = partCenterAlongN - sign * cand.halfExt;
+    const openingAlongN = dotVec(socket.openingCenter, n);
+    const floorAlongN = openingAlongN - socket.depth;
+
+    // Only snap when the part is reasonably close to the socket surface.
+    const distFromSurface = enterFaceAlongN - openingAlongN;
+    if (distFromSurface < -socket.depth - snapThreshold) continue;
+    if (distFromSurface > snapThreshold) continue;
+
+    const insertionDelta = floorAlongN - enterFaceAlongN;
+    let delta = mulVec(n, insertionDelta);
+
+    // --- Cross-section centering for tight-fit dimensions ---
+    if (tight1) {
+      const partAlongT1 = dotVec(draggingOBB.center, snapT1);
+      const socketAlongT1 = dotVec(socket.openingCenter, snapT1);
+      const dt1 = socketAlongT1 - partAlongT1;
+      if (Math.abs(dt1) <= snapThreshold) {
+        delta = addVec(delta, mulVec(snapT1, dt1));
+      }
+    }
+    if (tight2) {
+      const partAlongT2 = dotVec(draggingOBB.center, snapT2);
+      const socketAlongT2 = dotVec(socket.openingCenter, snapT2);
+      const dt2 = socketAlongT2 - partAlongT2;
+      if (Math.abs(dt2) <= snapThreshold) {
+        delta = addVec(delta, mulVec(snapT2, dt2));
+      }
+    }
+
+    const distance = lenVec(delta);
+    if (distance < bestDist) {
+      bestDist = distance;
+      bestResult = { delta, distance };
+    }
+  }
+
+  return bestResult;
 }

@@ -25,7 +25,7 @@ describe('partFeatureActions', () => {
   });
 
   it('builds paired corner reliefs and constrained joinery presets', () => {
-    const cornerPair = buildFeaturesFromPreset('top_front_corners');
+    const cornerPair = buildFeaturesFromPreset('front_corners');
     const dado = buildFeaturesFromPreset('centered_dado');
     const rabbet = buildFeaturesFromPreset('top_front_rabbet');
 
@@ -33,12 +33,12 @@ describe('partFeatureActions', () => {
     expect(cornerPair[0]).toMatchObject({
       kind: 'rect_cut',
       cutType: 'corner_notch',
-      target: { type: 'corner', corner: 'front_top_left_corner' }
+      target: { type: 'corner', corner: 'front_left_corner' }
     });
     expect(cornerPair[1]).toMatchObject({
       kind: 'rect_cut',
       cutType: 'corner_notch',
-      target: { type: 'corner', corner: 'front_top_right_corner' }
+      target: { type: 'corner', corner: 'front_right_corner' }
     });
     expect(dado[0]).toMatchObject({
       kind: 'rect_cut',
@@ -85,21 +85,22 @@ describe('partFeatureActions', () => {
         kind: 'rect_cut',
         version: 1,
         enabled: true,
-        target: { type: 'corner', corner: 'front_top_left_corner' },
-        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
-        cutType: 'corner_notch',
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'min' },
+        cutType: 'cutout',
         parameters: {
-          size: { length: 0.75, width: 0.75 },
+          size: { length: 4, width: 2 },
           depthMode: 'through'
         },
-        placement: { x: 2, z: 0 }
+        placement: { x: 2, z: 1 }
       },
-      'across_length'
+      'across_length',
+      { length: 24, width: 8, thickness: 0.75 }
     );
 
     expect(mirrored).toMatchObject({
-      target: { type: 'corner', corner: 'front_top_right_corner' },
-      placement: { x: -2, z: 0 }
+      target: { type: 'face', face: 'top_face' },
+      placement: { x: 18, z: 1 }
     });
   });
 });

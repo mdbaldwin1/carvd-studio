@@ -1,26 +1,26 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  useProjectStore,
-  validatePartsForCutList,
-  getContainingGroupId,
-  getAllDescendantPartIds,
-  getAllDescendantGroupIds,
-  getAncestorGroupIds,
-  isDescendantOf
-} from './projectStore';
-import { useLicenseStore } from './licenseStore';
+  createTestAssembly,
+  createTestGroupMember,
+  createTestPart,
+  createTestProject,
+  createTestStock
+} from '../../../../tests/helpers/factories';
+import type { CutList, Stock } from '../types';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
+import { useLicenseStore } from './licenseStore';
+import {
+  getAllDescendantGroupIds,
+  getAllDescendantPartIds,
+  getAncestorGroupIds,
+  getContainingGroupId,
+  isDescendantOf,
+  useProjectStore,
+  validatePartsForCutList
+} from './projectStore';
 import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useUIStore } from './uiStore';
-import {
-  createTestPart,
-  createTestStock,
-  createTestGroupMember,
-  createTestProject,
-  createTestAssembly
-} from '../../../../tests/helpers/factories';
-import type { CutList, Stock } from '../types';
 
 // Helper to reset store state before each test
 const resetStore = () => {
@@ -1293,7 +1293,7 @@ describe('projectStore', () => {
               kind: 'rect_cut',
               version: 1,
               enabled: true,
-              target: { type: 'corner', corner: 'back_bottom_left_corner' },
+              target: { type: 'corner', corner: 'back_left_corner' },
               reference: { primaryFrom: 'min', secondaryFrom: 'min' },
               cutType: 'corner_notch',
               parameters: {

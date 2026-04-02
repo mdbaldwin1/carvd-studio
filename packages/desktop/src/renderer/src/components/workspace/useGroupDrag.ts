@@ -7,29 +7,30 @@
  */
 import { useCallback, useRef } from 'react';
 import * as THREE from 'three';
-import { useProjectStore, getAllDescendantPartIds } from '../../store/projectStore';
+import { useAppSettingsStore } from '../../store/appSettingsStore';
+import { getAllDescendantPartIds, useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
-import { useAppSettingsStore } from '../../store/appSettingsStore';
+import type { Part } from '../../types';
+import { applyGroupAxisCandidate } from '../../utils/groupDragSnapArbitration';
+import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
+import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
+import { createAxisSnapWinners } from '../../utils/snapPriority';
 import {
-  getCombinedBounds,
   calculateSnapThreshold,
-  detectGuideSnaps,
   createGuideSnapLine,
-  detectOriginSnaps,
   createOriginSnapLine,
   detectFaceSnaps,
+  detectFeatureMateSnaps,
   detectFeatureSnaps,
+  detectGuideSnaps,
+  detectOriginSnaps,
   detectSnaps,
+  getCombinedBounds,
   type PartBounds
 } from '../../utils/snapToPartsUtil';
-import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
-import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 import { snapToGrid } from './partTypes';
 import { isOrbitControls } from './workspaceUtils';
-import type { Part } from '../../types';
-import { createAxisSnapWinners } from '../../utils/snapPriority';
-import { applyGroupAxisCandidate } from '../../utils/groupDragSnapArbitration';
 
 // Pre-allocated objects — reused every frame, zero GC pressure
 const _plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -197,7 +198,6 @@ export function useGroupDrag(
           const snapLines: import('../../types').SnapLine[] = [];
           const axisSnapWinners = createAxisSnapWinners();
           const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled && !evt.altKey;
-
           if (isSnapEnabled && initialBoundsRef.current) {
             const cameraDistance = camera.position.distanceTo(_intersection.set(newX, newY, newZ));
             const snapThreshold = calculateSnapThreshold(cameraDistance, snapSensitivity);
@@ -376,6 +376,51 @@ export function useGroupDrag(
               );
             }
 
+            const mateProxyPosition = {
+              x: anchorPosRef.current.x + workingDelta.x,
+              y: anchorPosRef.current.y + workingDelta.y,
+              z: anchorPosRef.current.z + workingDelta.z
+            };
+            const mateSnapResult = detectFeatureMateSnaps(
+              proxyPart,
+              mateProxyPosition,
+              parts,
+              [...movingIds],
+              snapThreshold
+            );
+            if (axes.x && mateSnapResult.snappedX) {
+              applyGroupAxisCandidate(
+                'x',
+                'mate',
+                workingDelta,
+                mateSnapResult.adjustedPosition.x - anchorPosRef.current.x,
+                axisSnapWinners,
+                snapLines,
+                mateSnapResult.snapLines.filter((line) => line.axis === 'x')
+              );
+            }
+            if (axes.y && mateSnapResult.snappedY) {
+              applyGroupAxisCandidate(
+                'y',
+                'mate',
+                workingDelta,
+                mateSnapResult.adjustedPosition.y - anchorPosRef.current.y,
+                axisSnapWinners,
+                snapLines,
+                mateSnapResult.snapLines.filter((line) => line.axis === 'y')
+              );
+            }
+            if (axes.z && mateSnapResult.snappedZ) {
+              applyGroupAxisCandidate(
+                'z',
+                'mate',
+                workingDelta,
+                mateSnapResult.adjustedPosition.z - anchorPosRef.current.z,
+                axisSnapWinners,
+                snapLines,
+                mateSnapResult.snapLines.filter((line) => line.axis === 'z')
+              );
+            }
             const featureProxyPosition = {
               x: anchorPosRef.current.x + workingDelta.x,
               y: anchorPosRef.current.y + workingDelta.y,

@@ -65,6 +65,12 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
   const length = Math.max(0.001, max.x - min.x);
   const thickness = Math.max(0.001, max.y - min.y);
   const width = Math.max(0.001, max.z - min.z);
+
+  // The geometry extrusion pipeline (rotateX(-π/2)) maps contour Z → -world Z,
+  // so "front" (contour min.z) renders at +Z and "back" (contour max.z) at -Z.
+  // Use these corrected boundaries for pick-target positioning.
+  const frontZ = max.z;
+  const backZ = min.z;
   const faceDepth = Math.max(Math.min(Math.min(length, thickness, width) * 0.04, 0.18), 0.06);
   const edgeThickness = Math.max(Math.min(Math.min(length, thickness, width) * 0.14, 0.35), 0.16);
   const cornerSize = Math.max(edgeThickness * 1.3, 0.22);
@@ -120,7 +126,7 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'face',
       label: FACE_LABELS.front_face,
       priority: 1,
-      position: [centerX, centerY, min.z - faceDepth / 3],
+      position: [centerX, centerY, frontZ + faceDepth / 3],
       rotation: [0, 0, 0],
       size: [length, thickness, faceDepth],
       color: FACE_COLOR
@@ -131,7 +137,7 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'face',
       label: FACE_LABELS.back_face,
       priority: 1,
-      position: [centerX, centerY, max.z + faceDepth / 3],
+      position: [centerX, centerY, backZ - faceDepth / 3],
       rotation: [0, 0, 0],
       size: [length, thickness, faceDepth],
       color: FACE_COLOR
@@ -142,9 +148,10 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.top_front_edge,
       priority: 2,
-      position: [centerX, max.y + edgeThickness / 3, min.z - edgeThickness / 3],
+      // Also used as face-style "Front Side" pick target for edge notches
+      position: [centerX, centerY, frontZ + faceDepth / 3],
       rotation: [0, 0, 0],
-      size: [length, edgeThickness, edgeThickness],
+      size: [length, thickness, faceDepth],
       color: EDGE_COLOR
     },
     {
@@ -153,9 +160,10 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.top_back_edge,
       priority: 2,
-      position: [centerX, max.y + edgeThickness / 3, max.z + edgeThickness / 3],
+      // Also used as face-style "Back Side" pick target for edge notches
+      position: [centerX, centerY, backZ - faceDepth / 3],
       rotation: [0, 0, 0],
-      size: [length, edgeThickness, edgeThickness],
+      size: [length, thickness, faceDepth],
       color: EDGE_COLOR
     },
     {
@@ -164,7 +172,7 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.bottom_front_edge,
       priority: 2,
-      position: [centerX, min.y - edgeThickness / 3, min.z - edgeThickness / 3],
+      position: [centerX, min.y - edgeThickness / 3, frontZ + edgeThickness / 3],
       rotation: [0, 0, 0],
       size: [length, edgeThickness, edgeThickness],
       color: EDGE_COLOR
@@ -175,7 +183,7 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.bottom_back_edge,
       priority: 2,
-      position: [centerX, min.y - edgeThickness / 3, max.z + edgeThickness / 3],
+      position: [centerX, min.y - edgeThickness / 3, backZ - edgeThickness / 3],
       rotation: [0, 0, 0],
       size: [length, edgeThickness, edgeThickness],
       color: EDGE_COLOR
@@ -186,9 +194,10 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.top_left_edge,
       priority: 2,
-      position: [min.x - edgeThickness / 3, max.y + edgeThickness / 3, centerZ],
+      // Also used as face-style "Left Side" pick target for edge notches
+      position: [min.x - faceDepth / 3, centerY, centerZ],
       rotation: [0, 0, 0],
-      size: [edgeThickness, edgeThickness, width],
+      size: [faceDepth, thickness, width],
       color: EDGE_COLOR
     },
     {
@@ -197,9 +206,10 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.top_right_edge,
       priority: 2,
-      position: [max.x + edgeThickness / 3, max.y + edgeThickness / 3, centerZ],
+      // Also used as face-style "Right Side" pick target for edge notches
+      position: [max.x + faceDepth / 3, centerY, centerZ],
       rotation: [0, 0, 0],
-      size: [edgeThickness, edgeThickness, width],
+      size: [faceDepth, thickness, width],
       color: EDGE_COLOR
     },
     {
@@ -230,7 +240,7 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.front_left_edge,
       priority: 2,
-      position: [min.x - edgeThickness / 3, centerY, min.z - edgeThickness / 3],
+      position: [min.x - edgeThickness / 3, centerY, frontZ + edgeThickness / 3],
       rotation: [0, 0, 0],
       size: [edgeThickness, thickness, edgeThickness],
       color: EDGE_COLOR
@@ -241,7 +251,7 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.front_right_edge,
       priority: 2,
-      position: [max.x + edgeThickness / 3, centerY, min.z - edgeThickness / 3],
+      position: [max.x + edgeThickness / 3, centerY, frontZ + edgeThickness / 3],
       rotation: [0, 0, 0],
       size: [edgeThickness, thickness, edgeThickness],
       color: EDGE_COLOR
@@ -252,7 +262,7 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.back_left_edge,
       priority: 2,
-      position: [min.x - edgeThickness / 3, centerY, max.z + edgeThickness / 3],
+      position: [min.x - edgeThickness / 3, centerY, backZ - edgeThickness / 3],
       rotation: [0, 0, 0],
       size: [edgeThickness, thickness, edgeThickness],
       color: EDGE_COLOR
@@ -263,95 +273,51 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.back_right_edge,
       priority: 2,
-      position: [max.x + edgeThickness / 3, centerY, max.z + edgeThickness / 3],
+      position: [max.x + edgeThickness / 3, centerY, backZ - edgeThickness / 3],
       rotation: [0, 0, 0],
       size: [edgeThickness, thickness, edgeThickness],
       color: EDGE_COLOR
     },
     {
-      key: toKey(cornerTarget('front_top_left_corner')),
-      target: cornerTarget('front_top_left_corner'),
+      key: toKey(cornerTarget('front_left_corner')),
+      target: cornerTarget('front_left_corner'),
       family: 'corner',
-      label: CORNER_LABELS.front_top_left_corner,
+      label: CORNER_LABELS.front_left_corner,
       priority: 3,
-      position: [min.x - cornerSize / 4, max.y + cornerSize / 4, min.z - cornerSize / 4],
+      position: [min.x - cornerSize / 4, centerY, frontZ + cornerSize / 4],
       rotation: [0, 0, 0],
       size: [cornerSize, cornerSize, cornerSize],
       color: CORNER_COLOR
     },
     {
-      key: toKey(cornerTarget('front_top_right_corner')),
-      target: cornerTarget('front_top_right_corner'),
+      key: toKey(cornerTarget('front_right_corner')),
+      target: cornerTarget('front_right_corner'),
       family: 'corner',
-      label: CORNER_LABELS.front_top_right_corner,
+      label: CORNER_LABELS.front_right_corner,
       priority: 3,
-      position: [max.x + cornerSize / 4, max.y + cornerSize / 4, min.z - cornerSize / 4],
+      position: [max.x + cornerSize / 4, centerY, frontZ + cornerSize / 4],
       rotation: [0, 0, 0],
       size: [cornerSize, cornerSize, cornerSize],
       color: CORNER_COLOR
     },
     {
-      key: toKey(cornerTarget('front_bottom_left_corner')),
-      target: cornerTarget('front_bottom_left_corner'),
+      key: toKey(cornerTarget('back_left_corner')),
+      target: cornerTarget('back_left_corner'),
       family: 'corner',
-      label: CORNER_LABELS.front_bottom_left_corner,
+      label: CORNER_LABELS.back_left_corner,
       priority: 3,
-      position: [min.x - cornerSize / 4, min.y - cornerSize / 4, min.z - cornerSize / 4],
+      position: [min.x - cornerSize / 4, centerY, backZ - cornerSize / 4],
       rotation: [0, 0, 0],
       size: [cornerSize, cornerSize, cornerSize],
       color: CORNER_COLOR
     },
     {
-      key: toKey(cornerTarget('front_bottom_right_corner')),
-      target: cornerTarget('front_bottom_right_corner'),
+      key: toKey(cornerTarget('back_right_corner')),
+      target: cornerTarget('back_right_corner'),
       family: 'corner',
-      label: CORNER_LABELS.front_bottom_right_corner,
+      label: CORNER_LABELS.back_right_corner,
       priority: 3,
-      position: [max.x + cornerSize / 4, min.y - cornerSize / 4, min.z - cornerSize / 4],
-      rotation: [0, 0, 0],
-      size: [cornerSize, cornerSize, cornerSize],
-      color: CORNER_COLOR
-    },
-    {
-      key: toKey(cornerTarget('back_top_left_corner')),
-      target: cornerTarget('back_top_left_corner'),
-      family: 'corner',
-      label: CORNER_LABELS.back_top_left_corner,
-      priority: 3,
-      position: [min.x - cornerSize / 4, max.y + cornerSize / 4, max.z + cornerSize / 4],
-      rotation: [0, 0, 0],
-      size: [cornerSize, cornerSize, cornerSize],
-      color: CORNER_COLOR
-    },
-    {
-      key: toKey(cornerTarget('back_top_right_corner')),
-      target: cornerTarget('back_top_right_corner'),
-      family: 'corner',
-      label: CORNER_LABELS.back_top_right_corner,
-      priority: 3,
-      position: [max.x + cornerSize / 4, max.y + cornerSize / 4, max.z + cornerSize / 4],
-      rotation: [0, 0, 0],
-      size: [cornerSize, cornerSize, cornerSize],
-      color: CORNER_COLOR
-    },
-    {
-      key: toKey(cornerTarget('back_bottom_left_corner')),
-      target: cornerTarget('back_bottom_left_corner'),
-      family: 'corner',
-      label: CORNER_LABELS.back_bottom_left_corner,
-      priority: 3,
-      position: [min.x - cornerSize / 4, min.y - cornerSize / 4, max.z + cornerSize / 4],
-      rotation: [0, 0, 0],
-      size: [cornerSize, cornerSize, cornerSize],
-      color: CORNER_COLOR
-    },
-    {
-      key: toKey(cornerTarget('back_bottom_right_corner')),
-      target: cornerTarget('back_bottom_right_corner'),
-      family: 'corner',
-      label: CORNER_LABELS.back_bottom_right_corner,
-      priority: 3,
-      position: [max.x + cornerSize / 4, min.y - cornerSize / 4, max.z + cornerSize / 4],
+      position: [max.x + cornerSize / 4, centerY, backZ - cornerSize / 4],
       rotation: [0, 0, 0],
       size: [cornerSize, cornerSize, cornerSize],
       color: CORNER_COLOR
@@ -374,8 +340,13 @@ export function isTargetValidForDraft(target: PartFeatureTarget, draft: FeatureD
 
   if (draft.cutType === 'edge_notch') {
     if (target.type !== 'edge') return false;
-    if (draft.depthMode === 'through') return true;
-    return target.edge.includes('top') || target.edge.includes('bottom');
+    // Only accept canonical side targets (top_front/back/left/right)
+    return (
+      target.edge === 'top_front_edge' ||
+      target.edge === 'top_back_edge' ||
+      target.edge === 'top_left_edge' ||
+      target.edge === 'top_right_edge'
+    );
   }
 
   return target.type === 'face' && (target.face === 'top_face' || target.face === 'bottom_face');

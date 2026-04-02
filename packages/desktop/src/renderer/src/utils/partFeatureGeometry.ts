@@ -75,7 +75,7 @@ function buildOuterContour(part: Part): Point2[] {
 }
 
 function getCornerKey(feature: RectCutFeature): 'left_front' | 'right_front' | 'right_back' | 'left_back' {
-  const target = feature.target.type === 'corner' ? feature.target.corner : 'front_bottom_left_corner';
+  const target = feature.target.type === 'corner' ? feature.target.corner : 'front_left_corner';
   const left = target.includes('left');
   const front = target.includes('front');
   if (left && front) return 'left_front';
@@ -102,12 +102,12 @@ function applyCornerNotch(contour: Point2[], feature: RectCutFeature): Point2[] 
     case 'left_front': {
       const z = clamp(-halfWidth + sizeZ, lf.z, lb.z);
       const leftIn = linePointAtZ(lf, lb, z);
-      return [{ x: lf.x + sizeX, z: lf.z }, { x: lf.x + sizeX, z }, leftIn, rf, rb, lb];
+      return [{ x: lf.x + sizeX, z: lf.z }, rf, rb, lb, leftIn, { x: lf.x + sizeX, z }];
     }
     case 'right_front': {
       const z = clamp(-halfWidth + sizeZ, rf.z, rb.z);
       const rightIn = linePointAtZ(rf, rb, z);
-      return [lf, { x: rf.x - sizeX, z: rf.z }, rightIn, { x: rf.x - sizeX, z }, rb, lb];
+      return [lf, { x: rf.x - sizeX, z: rf.z }, { x: rf.x - sizeX, z }, rightIn, rb, lb];
     }
     case 'right_back': {
       const z = clamp(halfWidth - sizeZ, rf.z, rb.z);
@@ -131,67 +131,70 @@ function applyEdgeNotch(contour: Point2[], feature: RectCutFeature): Point2[] {
   const halfWidth = Math.abs(rf.z - rb.z) / 2;
   const family = mapEdgeFamily(feature);
 
+  // Threshold for considering the notch flush with a corner.
+  // When flush, the corner vertex is omitted so the extruded wall
+  // correctly shows the cutout (like a corner notch).
+  const flush = 0.001;
+
   if (family === 'front') {
-    const startX = clamp(minX + feature.placement.x, lf.x + 0.001, rf.x - sizeX - 0.001);
-    const endX = clamp(startX + sizeX, startX + 0.001, rf.x - 0.001);
-    return [
-      lf,
-      { x: startX, z: lf.z },
-      { x: startX, z: lf.z + sizeZ },
-      { x: endX, z: lf.z + sizeZ },
-      { x: endX, z: lf.z },
-      rf,
-      rb,
-      lb
-    ];
+    const startX = clamp(minX + feature.placement.x, lf.x, rf.x - sizeX);
+    const endX = clamp(startX + sizeX, startX, rf.x);
+    const flushLeft = startX <= lf.x + flush;
+    const flushRight = endX >= rf.x - flush;
+    const pts: Point2[] = [];
+    if (!flushLeft) pts.push(lf, { x: startX, z: lf.z });
+    pts.push({ x: startX, z: lf.z + sizeZ }, { x: endX, z: lf.z + sizeZ });
+    if (!flushRight) pts.push({ x: endX, z: lf.z }, rf);
+    pts.push(rb, lb);
+    return pts;
   }
 
   if (family === 'back') {
-    const startX = clamp(minX + feature.placement.x, lb.x + 0.001, rb.x - sizeX - 0.001);
-    const endX = clamp(startX + sizeX, startX + 0.001, rb.x - 0.001);
-    return [
-      lf,
-      rf,
-      rb,
-      { x: endX, z: rb.z },
-      { x: endX, z: rb.z - sizeZ },
-      { x: startX, z: rb.z - sizeZ },
-      { x: startX, z: rb.z },
-      lb
-    ];
+    const startX = clamp(minX + feature.placement.x, lb.x, rb.x - sizeX);
+    const endX = clamp(startX + sizeX, startX, rb.x);
+    const flushLeft = startX <= lb.x + flush;
+    const flushRight = endX >= rb.x - flush;
+    const pts: Point2[] = [];
+    pts.push(lf, rf);
+    if (!flushRight) pts.push(rb, { x: endX, z: rb.z });
+    pts.push({ x: endX, z: rb.z - sizeZ }, { x: startX, z: rb.z - sizeZ });
+    if (!flushLeft) pts.push({ x: startX, z: rb.z }, lb);
+    // When flushLeft, omit lb — closing edge goes directly from notch interior to lf
+    return pts;
   }
 
   if (family === 'left') {
-    const startZ = clamp(-halfWidth + feature.placement.z, lf.z + 0.001, lb.z - sizeZ - 0.001);
-    const endZ = clamp(startZ + sizeZ, startZ + 0.001, lb.z - 0.001);
+    const startZ = clamp(-halfWidth + feature.placement.z, lf.z, lb.z - sizeZ);
+    const endZ = clamp(startZ + sizeZ, startZ, lb.z);
+    const flushFront = startZ <= lf.z + flush;
+    const flushBack = endZ >= lb.z - flush;
     const pStart = linePointAtZ(lf, lb, startZ);
     const pEnd = linePointAtZ(lf, lb, endZ);
-    return [
-      lf,
-      rf,
-      rb,
-      lb,
-      { x: pEnd.x, z: endZ },
-      { x: pEnd.x + sizeX, z: endZ },
-      { x: pStart.x + sizeX, z: startZ },
-      { x: pStart.x, z: startZ }
-    ];
+    const pts: Point2[] = [];
+    if (!flushFront) pts.push(lf);
+    pts.push(rf, rb);
+    if (!flushBack) pts.push(lb, { x: pEnd.x, z: endZ });
+    // When flushBack, omit lb — closing edge goes directly from rb to notch interior
+    pts.push({ x: pEnd.x + sizeX, z: endZ }, { x: pStart.x + sizeX, z: startZ });
+    if (!flushFront) pts.push({ x: pStart.x, z: startZ });
+    return pts;
   }
 
-  const startZ = clamp(-halfWidth + feature.placement.z, rf.z + 0.001, rb.z - sizeZ - 0.001);
-  const endZ = clamp(startZ + sizeZ, startZ + 0.001, rb.z - 0.001);
+  // right
+  const startZ = clamp(-halfWidth + feature.placement.z, rf.z, rb.z - sizeZ);
+  const endZ = clamp(startZ + sizeZ, startZ, rb.z);
+  const flushFront = startZ <= rf.z + flush;
+  const flushBack = endZ >= rb.z - flush;
   const pStart = linePointAtZ(rf, rb, startZ);
   const pEnd = linePointAtZ(rf, rb, endZ);
-  return [
-    lf,
-    rf,
-    { x: pStart.x, z: startZ },
-    { x: pStart.x - sizeX, z: startZ },
-    { x: pEnd.x - sizeX, z: endZ },
-    { x: pEnd.x, z: endZ },
-    rb,
-    lb
-  ];
+  const pts: Point2[] = [];
+  pts.push(lf);
+  if (!flushFront) pts.push(rf, { x: pStart.x, z: startZ });
+  pts.push({ x: pStart.x - sizeX, z: startZ }, { x: pEnd.x - sizeX, z: endZ });
+  if (!flushBack) pts.push({ x: pEnd.x, z: endZ }, rb);
+  // When flushBack, omit rb — closing edge connects notch interior to lb directly
+  pts.push(lb);
+  return pts;
 }
 
 function shapeFromContour(contour: Point2[], holes: Point2[][]): THREE.Shape {
@@ -231,6 +234,86 @@ function getRectCutHole(feature: RectCutFeature, part: Part): Point2[] | null {
     { x: endX, z: endZ },
     { x: endX, z: startZ }
   ];
+}
+
+/**
+ * Apply a through-depth cutout as a contour modification when it's flush
+ * with one or more edges. Returns the modified contour, or null if the
+ * cutout is fully interior (should be kept as a hole instead).
+ */
+function applyCutoutToContour(contour: Point2[], feature: RectCutFeature, part: Part): Point2[] | null {
+  const halfLength = part.length / 2;
+  const halfWidth = part.width / 2;
+  const flush = 0.001;
+
+  const rawSX = -halfLength + feature.placement.x;
+  const rawSZ = -halfWidth + feature.placement.z;
+  const rawEX = rawSX + feature.parameters.size.length;
+  const rawEZ = rawSZ + feature.parameters.size.width;
+
+  const fl = rawSX <= -halfLength + flush;
+  const fr = rawEX >= halfLength - flush;
+  const ff = rawSZ <= -halfWidth + flush;
+  const fb = rawEZ >= halfWidth - flush;
+
+  if (!fl && !fr && !ff && !fb) return null; // fully interior → use hole
+
+  // Opposite-edge or 3+ edge flush creates disconnected regions — keep as hole
+  const flushCount = [fl, fr, ff, fb].filter(Boolean).length;
+  if (flushCount >= 3) return null;
+  if (flushCount === 2 && ((fl && fr) || (ff && fb))) return null;
+
+  const sx = Math.max(-halfLength, rawSX);
+  const sz = Math.max(-halfWidth, rawSZ);
+  const ex = Math.min(halfLength, rawEX);
+  const ez = Math.min(halfWidth, rawEZ);
+
+  const lf = contour[0] ?? { x: -halfLength, z: -halfWidth };
+  const rf = contour[1] ?? { x: halfLength, z: -halfWidth };
+  const rb = contour[2] ?? { x: halfLength, z: halfWidth };
+  const lb = contour[3] ?? { x: -halfLength, z: halfWidth };
+
+  const pts: Point2[] = [];
+
+  // Walk CCW around the outer rect: lf → rf → rb → lb.
+  // At each edge, if the cutout is flush, route inward through the cutout.
+  // At each corner, skip it if the cutout covers both adjacent edges.
+  // When two adjacent edges are both flush (corner cutout), only the FIRST
+  // edge (in CCW order) emits the routing — the second just continues past.
+
+  // --- Front edge (lf → rf) ---
+  if (!(fl && ff)) pts.push(lf);
+  if (ff && !fl) {
+    // Route through cutout on front edge (left edge didn't already route)
+    pts.push({ x: sx, z: lf.z }, { x: sx, z: ez }, { x: ex, z: ez });
+    if (!fr) pts.push({ x: ex, z: lf.z });
+  }
+
+  // --- Right edge (rf → rb) ---
+  if (!(ff && fr)) pts.push(rf);
+  if (fr && !ff) {
+    // Route through cutout on right edge (front edge didn't already route)
+    pts.push({ x: rf.x, z: sz }, { x: sx, z: sz }, { x: sx, z: ez });
+    if (!fb) pts.push({ x: rf.x, z: ez });
+  }
+
+  // --- Back edge (rb → lb) ---
+  if (!(fr && fb)) pts.push(rb);
+  if (fb && !fr) {
+    // Route through cutout on back edge (right edge didn't already route)
+    pts.push({ x: ex, z: rb.z }, { x: ex, z: sz }, { x: sx, z: sz });
+    if (!fl) pts.push({ x: sx, z: rb.z });
+  }
+
+  // --- Left edge (lb → lf) ---
+  if (!(fb && fl)) pts.push(lb);
+  if (fl && !fb) {
+    // Route through cutout on left edge (back edge didn't already route)
+    pts.push({ x: lf.x, z: ez }, { x: ex, z: ez }, { x: ex, z: sz });
+    if (!ff) pts.push({ x: lf.x, z: sz });
+  }
+
+  return pts.length >= 3 ? pts : null;
 }
 
 function getLayerGeometry(contour: Point2[], holes: Point2[][], depth: number, yMin: number): THREE.BufferGeometry {
@@ -373,6 +456,16 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
         continue;
       }
 
+      // Through-depth cutouts flush with an edge become contour modifications
+      // so the extruded sidewall correctly shows the opening.
+      if (feature.parameters.depthMode === 'through') {
+        const flushed = applyCutoutToContour(layerContour, feature, part);
+        if (flushed) {
+          layerContour = flushed;
+          continue;
+        }
+      }
+
       const hole = getRectCutHole(feature, part);
       if (hole) layerHoles.push(hole);
     }
@@ -441,6 +534,10 @@ function getFeatureContour(part: Part): Point2[] {
       contour = applyCornerNotch(contour, feature);
     } else if (feature.cutType === 'edge_notch' || feature.cutType === 'rabbet') {
       contour = applyEdgeNotch(contour, feature);
+    } else {
+      // Through cutouts flush with an edge modify the contour
+      const flushed = applyCutoutToContour(contour, feature, part);
+      if (flushed) contour = flushed;
     }
   }
 
@@ -459,6 +556,80 @@ export function getPartRenderGeometry(part: Part): THREE.BufferGeometry {
   const geometry = createFeatureGeometry(part);
   geometryCache.set(key, geometry);
   return geometry;
+}
+
+/**
+ * Return convex-hull vertices in local part space, accounting for vertical
+ * end cuts (bevels, compound mitres) that remove material along the Y axis.
+ * For plain boxes or parts with only horizontal cuts the result is the 8 box
+ * corners derived from the 2D feature contour. When vertical insets are
+ * present the left/right X positions are adjusted per cross-section corner,
+ * and duplicate vertices are removed to keep the hull minimal.
+ */
+export function getPartLocalConvexVertices(part: Part): Array<{ x: number; y: number; z: number }> {
+  const contour = hasRenderablePartFeatures(part) ? getFeatureContour(part) : buildOuterContour(part);
+  const halfThickness = part.thickness / 2;
+
+  const profiles = getPartEndCutProfiles(part);
+  const hasVertical = profiles.left.verticalInset > 0 || profiles.right.verticalInset > 0;
+
+  if (!hasVertical) {
+    // Fast path: just extrude the 2D contour at ±halfThickness
+    const verts: Array<{ x: number; y: number; z: number }> = [];
+    for (const p of contour) {
+      verts.push({ x: p.x, y: -halfThickness, z: p.z });
+      verts.push({ x: p.x, y: halfThickness, z: p.z });
+    }
+    return verts;
+  }
+
+  // With vertical insets, the left/right X extent depends on the (y,z) position.
+  // The 2D contour already accounts for horizontal insets (mitres). We need to
+  // further adjust the X coordinates of left-end and right-end contour points
+  // at each Y level.
+  const halfLength = part.length / 2;
+  const verts: Array<{ x: number; y: number; z: number }> = [];
+  const seen = new Set<string>();
+
+  for (const p of contour) {
+    for (const y of [-halfThickness, halfThickness]) {
+      let x = p.x;
+
+      // Adjust left-end vertices
+      if (profiles.left.maxInset > 0) {
+        const leftBaseX =
+          -halfLength +
+          getEndCutInsetAt('left', profiles, part, {
+            y: profiles.left.verticalFlip ? halfThickness : -halfThickness,
+            z: p.z
+          });
+        if (Math.abs(x - leftBaseX) < 1e-6) {
+          x = -halfLength + getEndCutInsetAt('left', profiles, part, { y, z: p.z });
+        }
+      }
+
+      // Adjust right-end vertices
+      if (profiles.right.maxInset > 0) {
+        const rightBaseX =
+          halfLength -
+          getEndCutInsetAt('right', profiles, part, {
+            y: profiles.right.verticalFlip ? -halfThickness : halfThickness,
+            z: p.z
+          });
+        if (Math.abs(x - rightBaseX) < 1e-6) {
+          x = halfLength - getEndCutInsetAt('right', profiles, part, { y, z: p.z });
+        }
+      }
+
+      const key = `${x.toFixed(8)},${y.toFixed(8)},${p.z.toFixed(8)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        verts.push({ x, y, z: p.z });
+      }
+    }
+  }
+
+  return verts;
 }
 
 export function getPartLocalBoundingBox(part: Part): { min: THREE.Vector3; max: THREE.Vector3 } {
@@ -552,6 +723,255 @@ export function getPartLocalCorners(part: Part): THREE.Vector3[] {
     new THREE.Vector3(max.x, max.y, min.z),
     new THREE.Vector3(max.x, max.y, max.z)
   ];
+}
+
+export interface ContourSubBox {
+  centerX: number;
+  centerZ: number;
+  halfX: number;
+  halfZ: number;
+}
+
+/**
+ * Decompose the part's 2D feature contour into axis-aligned sub-rectangles.
+ * For simple boxes this returns one rectangle. For parts with through-depth
+ * corner/edge notches it returns multiple smaller rectangles that tile the
+ * actual material area — eliminating "ghost corners" from the bounding box.
+ */
+export function getPartContourSubBoxes(part: Part): ContourSubBox[] {
+  const contour = hasRenderablePartFeatures(part) ? getFeatureContour(part) : buildOuterContour(part);
+
+  const xSet = new Set<number>();
+  const zSet = new Set<number>();
+  for (const p of contour) {
+    xSet.add(snapCoord(p.x));
+    zSet.add(snapCoord(p.z));
+  }
+  const xs = [...xSet].sort((a, b) => a - b);
+  const zs = [...zSet].sort((a, b) => a - b);
+
+  if (xs.length <= 2 && zs.length <= 2) {
+    return [
+      {
+        centerX: (xs[0] + xs[xs.length - 1]) / 2,
+        centerZ: (zs[0] + zs[zs.length - 1]) / 2,
+        halfX: (xs[xs.length - 1] - xs[0]) / 2,
+        halfZ: (zs[zs.length - 1] - zs[0]) / 2
+      }
+    ];
+  }
+
+  // Shrink each sub-box by a tiny epsilon so that sub-boxes from different
+  // parts sharing an exact wall have a micro-gap. This prevents the OBB SAT
+  // test's epsilon-inflated cross-product axes from creating false overlaps
+  // at shared walls while being physically negligible (~0.00001 inches).
+  const WALL_SHRINK = 1e-5;
+
+  const boxes: ContourSubBox[] = [];
+  for (let i = 0; i < xs.length - 1; i++) {
+    for (let j = 0; j < zs.length - 1; j++) {
+      const cx = (xs[i] + xs[i + 1]) / 2;
+      const cz = (zs[j] + zs[j + 1]) / 2;
+      if (pointInPolygon(cx, cz, contour)) {
+        boxes.push({
+          centerX: cx,
+          centerZ: cz,
+          halfX: (xs[i + 1] - xs[i]) / 2 - WALL_SHRINK,
+          halfZ: (zs[j + 1] - zs[j]) / 2 - WALL_SHRINK
+        });
+      }
+    }
+  }
+
+  if (boxes.length === 0) {
+    return [
+      {
+        centerX: (xs[0] + xs[xs.length - 1]) / 2,
+        centerZ: (zs[0] + zs[zs.length - 1]) / 2,
+        halfX: (xs[xs.length - 1] - xs[0]) / 2,
+        halfZ: (zs[zs.length - 1] - zs[0]) / 2
+      }
+    ];
+  }
+
+  return boxes;
+}
+
+function snapCoord(v: number): number {
+  return Math.round(v * 1e6) / 1e6;
+}
+
+function pointInPolygon(px: number, pz: number, poly: Point2[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const zi = poly[i].z;
+    const zj = poly[j].z;
+    if (zi > pz !== zj > pz) {
+      const xCross = poly[i].x + ((pz - zi) / (zj - zi)) * (poly[j].x - poly[i].x);
+      if (px < xCross) {
+        inside = !inside;
+      }
+    }
+  }
+  return inside;
+}
+
+/**
+ * Return the 2D contour of a part in world XZ coordinates.
+ * Accounts for through-depth features (corner notches, edge notches, rabbets)
+ * and rotation. For axis-aligned parts this is a simple translate; for rotated
+ * parts the local contour vertices are rotated about Y.
+ */
+export function getPartWorldContour(
+  part: Part,
+  position: { x: number; y: number; z: number } = part.position
+): Point2[] {
+  const contour = hasRenderablePartFeatures(part) ? getFeatureContour(part) : buildOuterContour(part);
+
+  // Compute rotation about Y (parts lie flat, so Y rotation is the relevant one).
+  // For axis-aligned parts (rotation 0,0,0) this is a no-op.
+  const rad = ((part.rotation.y ?? 0) * Math.PI) / 180;
+  // For general XYZ Euler rotations, compute the full XZ projection.
+  const rx = ((part.rotation.x ?? 0) * Math.PI) / 180;
+  const rz = ((part.rotation.z ?? 0) * Math.PI) / 180;
+
+  // The 2D contour uses +Z = "back" but the 3D geometry applies rotateX(-π/2)
+  // which negates Z.  Negate here so the overlap contour matches the rendered mesh.
+
+  // Fast path: no rotation
+  if (Math.abs(rx) < 1e-9 && Math.abs(rad) < 1e-9 && Math.abs(rz) < 1e-9) {
+    return contour.map((p) => ({ x: p.x + position.x, z: -p.z + position.z }));
+  }
+
+  // General rotation: use Euler XYZ → rotation matrix, project onto XZ
+  const cx = Math.cos(rx),
+    sx = Math.sin(rx);
+  const cy = Math.cos(rad),
+    sy = Math.sin(rad);
+  const cz = Math.cos(rz),
+    sz = Math.sin(rz);
+
+  // Rotation matrix columns for X and Z (we only need XZ projection)
+  const m00 = cy * cz + sy * sx * sz;
+  const m02 = -sy * cx;
+  const m20 = sy * cz - cy * sx * sz;
+  const m22 = cy * cx;
+
+  // Negate contour Z to match the rotateX(-π/2) applied by the render geometry.
+  return contour.map((p) => ({
+    x: m00 * p.x + m02 * -p.z + position.x,
+    z: m20 * p.x + m22 * -p.z + position.z
+  }));
+}
+
+/**
+ * Check if two world-space 2D polygons overlap.
+ * Uses edge-edge intersection plus containment checks.
+ * Returns false for touching (shared edge/vertex) when touchingIsOverlap is false.
+ */
+export function worldContoursOverlap(polyA: Point2[], polyB: Point2[], tolerance = 1e-8): boolean {
+  // 1. Check edge-edge intersections (catches most overlap cases)
+  for (let i = 0; i < polyA.length; i++) {
+    const a1 = polyA[i];
+    const a2 = polyA[(i + 1) % polyA.length];
+    for (let j = 0; j < polyB.length; j++) {
+      const b1 = polyB[j];
+      const b2 = polyB[(j + 1) % polyB.length];
+      if (edgesProperlyIntersect(a1, a2, b1, b2, tolerance)) return true;
+    }
+  }
+
+  // 2. Check containment: is any vertex of A strictly inside B, or vice versa?
+  //    (If edges don't cross, one polygon might be entirely inside the other.)
+  for (const v of polyA) {
+    if (strictPointInPolygon(v.x, v.z, polyB, tolerance)) return true;
+  }
+  for (const v of polyB) {
+    if (strictPointInPolygon(v.x, v.z, polyA, tolerance)) return true;
+  }
+
+  // 3. Shared-boundary case: when two L-shaped polygons interlock, all vertices
+  //    may lie exactly on the other polygon's edges (collinear shared edges).
+  //    Test the center of the bounding-box overlap — if it's strictly inside
+  //    both polygons, they share a 2D area.
+  const aMinX = Math.min(...polyA.map((p) => p.x));
+  const aMaxX = Math.max(...polyA.map((p) => p.x));
+  const aMinZ = Math.min(...polyA.map((p) => p.z));
+  const aMaxZ = Math.max(...polyA.map((p) => p.z));
+  const bMinX = Math.min(...polyB.map((p) => p.x));
+  const bMaxX = Math.max(...polyB.map((p) => p.x));
+  const bMinZ = Math.min(...polyB.map((p) => p.z));
+  const bMaxZ = Math.max(...polyB.map((p) => p.z));
+
+  const overlapMinX = Math.max(aMinX, bMinX);
+  const overlapMaxX = Math.min(aMaxX, bMaxX);
+  const overlapMinZ = Math.max(aMinZ, bMinZ);
+  const overlapMaxZ = Math.min(aMaxZ, bMaxZ);
+
+  if (overlapMaxX - overlapMinX > tolerance && overlapMaxZ - overlapMinZ > tolerance) {
+    const cx = (overlapMinX + overlapMaxX) / 2;
+    const cz = (overlapMinZ + overlapMaxZ) / 2;
+    if (pointInPolygon(cx, cz, polyA) && pointInPolygon(cx, cz, polyB)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Check if two line segments properly intersect (cross each other, not just touch). */
+function edgesProperlyIntersect(a1: Point2, a2: Point2, b1: Point2, b2: Point2, eps: number): boolean {
+  const d1 = cross2d(b1, b2, a1);
+  const d2 = cross2d(b1, b2, a2);
+  const d3 = cross2d(a1, a2, b1);
+  const d4 = cross2d(a1, a2, b2);
+
+  // Segments properly cross: products have opposite signs (strictly)
+  if (d1 * d2 < -eps * eps && d3 * d4 < -eps * eps) return true;
+
+  return false;
+}
+
+/** Signed area of triangle (p1, p2, p3) × 2. Positive if CCW. */
+function cross2d(p1: Point2, p2: Point2, p3: Point2): number {
+  return (p2.x - p1.x) * (p3.z - p1.z) - (p2.z - p1.z) * (p3.x - p1.x);
+}
+
+/** Point-in-polygon with tolerance: returns true only if point is strictly inside (not on edge). */
+function strictPointInPolygon(px: number, pz: number, poly: Point2[], eps: number): boolean {
+  // First check if point is on or very near any edge — treat as NOT inside
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    if (pointNearSegment(px, pz, poly[i], poly[j], eps)) return false;
+  }
+  // Standard ray-casting
+  return pointInPolygon(px, pz, poly);
+}
+
+/** Check if point (px, pz) is within eps distance of segment (a, b). */
+function pointNearSegment(px: number, pz: number, a: Point2, b: Point2, eps: number): boolean {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const len2 = dx * dx + dz * dz;
+  if (len2 < 1e-18) return Math.abs(px - a.x) < eps && Math.abs(pz - a.z) < eps;
+  const t = Math.max(0, Math.min(1, ((px - a.x) * dx + (pz - a.z) * dz) / len2));
+  const projX = a.x + t * dx;
+  const projZ = a.z + t * dz;
+  const dist2 = (px - projX) ** 2 + (pz - projZ) ** 2;
+  return dist2 < eps * eps;
+}
+
+/**
+ * Quick Y-axis overlap check for two parts.
+ * Returns true if their thickness ranges overlap (strictly, not touching).
+ */
+export function partsOverlapOnYAxis(a: Part, b: Part, tolerance = 1e-8): boolean {
+  const aMinY = a.position.y - a.thickness / 2;
+  const aMaxY = a.position.y + a.thickness / 2;
+  const bMinY = b.position.y - b.thickness / 2;
+  const bMaxY = b.position.y + b.thickness / 2;
+
+  // Overlap if ranges intersect (with tolerance for touching)
+  return aMinY < bMaxY - tolerance && bMinY < aMaxY - tolerance;
 }
 
 export function clearPartGeometryCache(): void {

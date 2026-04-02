@@ -222,7 +222,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
       </MenuLabel>
       <MenuItemButton onClick={handleCenter}>Center View</MenuItemButton>
       <MenuItemButton onClick={handleCopy}>Copy</MenuItemButton>
-      {singleSelectedPart && <MenuItemButton onClick={handleEditCuts}>Edit Cuts...</MenuItemButton>}
+      {singleSelectedPart && <MenuItemButton onClick={handleEditCuts}>Edit Part Cuts...</MenuItemButton>}
       <MenuItemButton
         onClick={handleSaveAsAssembly}
         disabled={!canUseAssemblies}

@@ -1,14 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-
-vi.unmock('three');
+import { createTestPart } from '../../../../tests/helpers/factories';
 import {
   clearPartGeometryCache,
   getPartRenderGeometry,
   getPartWorldAABB,
+  getPartWorldContour,
   getPartWorldHalfHeight,
   hasRenderablePartFeatures
 } from './partFeatureGeometry';
-import { createTestPart } from '../../../../tests/helpers/factories';
+
+vi.unmock('three');
 
 describe('partFeatureGeometry', () => {
   afterEach(() => {
@@ -518,7 +519,7 @@ describe('partFeatureGeometry', () => {
             kind: 'rect_cut',
             version: 1,
             enabled: true,
-            target: { type: 'corner', corner: 'front_bottom_left_corner' },
+            target: { type: 'corner', corner: 'front_left_corner' },
             reference: { primaryFrom: 'min', secondaryFrom: 'min' },
             cutType: 'corner_notch',
             parameters: {
@@ -728,5 +729,381 @@ describe('partFeatureGeometry', () => {
     );
 
     expect(halfHeight).toBeGreaterThan(0);
+  });
+
+  describe('world contour Z-negation', () => {
+    it('negates contour Z for axis-aligned parts', () => {
+      const part = createTestPart({
+        length: 6,
+        width: 4,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [
+          {
+            id: 'notch',
+            kind: 'rect_cut' as const,
+            version: 1,
+            enabled: true,
+            cutType: 'corner_notch' as const,
+            target: { type: 'corner' as const, corner: 'front_left_corner' as const },
+            reference: { primaryFrom: 'min' as const },
+            placement: { x: 0, z: 0 },
+            parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: null as never }
+          }
+        ]
+      });
+      const contour = getPartWorldContour(part);
+      // front_left_corner notch removes local z=[-2,0], x=[-3,-1]
+      // After Z negation: notch renders at z=[0,2], arm at z=[-2,0]
+      const zValues = contour.map((p) => p.z);
+      expect(Math.min(...zValues)).toBeCloseTo(-2);
+      expect(Math.max(...zValues)).toBeCloseTo(2);
+      // The notch vertex at local (-1, 0) should negate to world (-1, 0)
+      expect(contour.some((p) => Math.abs(p.x - -1) < 0.01 && Math.abs(p.z - 0) < 0.01)).toBe(true);
+    });
+  });
+
+  describe('flush edge notch geometry', () => {
+    it('omits corner vertex when front edge notch is flush left', () => {
+      const geometry = getPartRenderGeometry(
+        createTestPart({
+          length: 6,
+          width: 4,
+          thickness: 0.75,
+          features: [
+            {
+              id: 'edge-notch',
+              kind: 'rect_cut' as const,
+              version: 1,
+              enabled: true,
+              cutType: 'edge_notch' as const,
+              target: { type: 'edge' as const, edge: 'top_front_edge' as const },
+              reference: { primaryFrom: 'min' as const },
+              placement: { x: 0, z: 0 },
+              parameters: { size: { length: 2, width: 1 }, depthMode: 'through' as const }
+            }
+          ]
+        })
+      );
+      geometry.computeBoundingBox();
+      // Should not crash and should produce valid geometry
+      expect(geometry.boundingBox).not.toBeNull();
+      const positions = geometry.getAttribute('position');
+      expect(positions.count).toBeGreaterThan(0);
+    });
+
+    it('omits corner vertex when front edge notch is flush right', () => {
+      const geometry = getPartRenderGeometry(
+        createTestPart({
+          length: 6,
+          width: 4,
+          thickness: 0.75,
+          features: [
+            {
+              id: 'edge-notch',
+              kind: 'rect_cut' as const,
+              version: 1,
+              enabled: true,
+              cutType: 'edge_notch' as const,
+              target: { type: 'edge' as const, edge: 'top_front_edge' as const },
+              reference: { primaryFrom: 'min' as const },
+              placement: { x: 4, z: 0 },
+              parameters: { size: { length: 2, width: 1 }, depthMode: 'through' as const }
+            }
+          ]
+        })
+      );
+      geometry.computeBoundingBox();
+      expect(geometry.boundingBox).not.toBeNull();
+    });
+
+    it('handles edge notch spanning entire front edge', () => {
+      const geometry = getPartRenderGeometry(
+        createTestPart({
+          length: 6,
+          width: 4,
+          thickness: 0.75,
+          features: [
+            {
+              id: 'edge-notch',
+              kind: 'rect_cut' as const,
+              version: 1,
+              enabled: true,
+              cutType: 'edge_notch' as const,
+              target: { type: 'edge' as const, edge: 'top_front_edge' as const },
+              reference: { primaryFrom: 'min' as const },
+              placement: { x: 0, z: 0 },
+              parameters: { size: { length: 6, width: 1 }, depthMode: 'through' as const }
+            }
+          ]
+        })
+      );
+      geometry.computeBoundingBox();
+      expect(geometry.boundingBox).not.toBeNull();
+    });
+  });
+
+  describe('flush cutout geometry', () => {
+    it('renders through cutout flush with one edge without crashing', () => {
+      const geometry = getPartRenderGeometry(
+        createTestPart({
+          length: 4,
+          width: 4,
+          thickness: 1,
+          features: [
+            {
+              id: 'cutout',
+              kind: 'rect_cut' as const,
+              version: 1,
+              enabled: true,
+              cutType: 'cutout' as const,
+              target: { type: 'face' as const, face: 'top_face' as const },
+              reference: { primaryFrom: 'min' as const },
+              placement: { x: 0, z: 0 },
+              parameters: { size: { length: 1, width: 1 }, depthMode: 'through' as const }
+            }
+          ]
+        })
+      );
+      geometry.computeBoundingBox();
+      expect(geometry.boundingBox).not.toBeNull();
+    });
+
+    it('renders through cutout flush with two adjacent edges (corner)', () => {
+      const geometry = getPartRenderGeometry(
+        createTestPart({
+          length: 4,
+          width: 4,
+          thickness: 1,
+          features: [
+            {
+              id: 'cutout',
+              kind: 'rect_cut' as const,
+              version: 1,
+              enabled: true,
+              cutType: 'cutout' as const,
+              target: { type: 'face' as const, face: 'top_face' as const },
+              reference: { primaryFrom: 'min' as const },
+              placement: { x: 3, z: 3 },
+              parameters: { size: { length: 1, width: 1 }, depthMode: 'through' as const }
+            }
+          ]
+        })
+      );
+      geometry.computeBoundingBox();
+      expect(geometry.boundingBox).not.toBeNull();
+      const positions = geometry.getAttribute('position');
+      expect(positions.count).toBeGreaterThan(0);
+    });
+
+    it('keeps interior cutout as a hole (not contour modification)', () => {
+      const geometry = getPartRenderGeometry(
+        createTestPart({
+          length: 6,
+          width: 6,
+          thickness: 0.75,
+          features: [
+            {
+              id: 'cutout',
+              kind: 'rect_cut' as const,
+              version: 1,
+              enabled: true,
+              cutType: 'cutout' as const,
+              target: { type: 'face' as const, face: 'top_face' as const },
+              reference: { primaryFrom: 'min' as const },
+              placement: { x: 2, z: 2 },
+              parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const }
+            }
+          ]
+        })
+      );
+      geometry.computeBoundingBox();
+      expect(geometry.boundingBox).not.toBeNull();
+      // Interior cutout should still produce a full-size bounding box
+      expect(geometry.boundingBox!.max.x).toBeCloseTo(3);
+      expect(geometry.boundingBox!.min.x).toBeCloseTo(-3);
+    });
+  });
+
+  describe('all cut types produce valid geometry', () => {
+    const cutConfigs = [
+      {
+        name: 'corner notch',
+        feature: {
+          id: 'f1',
+          kind: 'rect_cut' as const,
+          version: 1,
+          enabled: true,
+          cutType: 'corner_notch' as const,
+          target: { type: 'corner' as const, corner: 'front_left_corner' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 0, z: 0 },
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const }
+        }
+      },
+      {
+        name: 'edge notch (front)',
+        feature: {
+          id: 'f2',
+          kind: 'rect_cut' as const,
+          version: 1,
+          enabled: true,
+          cutType: 'edge_notch' as const,
+          target: { type: 'edge' as const, edge: 'top_front_edge' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 1, z: 0 },
+          parameters: { size: { length: 2, width: 1 }, depthMode: 'through' as const }
+        }
+      },
+      {
+        name: 'edge notch (left)',
+        feature: {
+          id: 'f3',
+          kind: 'rect_cut' as const,
+          version: 1,
+          enabled: true,
+          cutType: 'edge_notch' as const,
+          target: { type: 'edge' as const, edge: 'top_left_edge' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 0, z: 1 },
+          parameters: { size: { length: 1, width: 2 }, depthMode: 'through' as const }
+        }
+      },
+      {
+        name: 'through cutout (interior)',
+        feature: {
+          id: 'f4',
+          kind: 'rect_cut' as const,
+          version: 1,
+          enabled: true,
+          cutType: 'cutout' as const,
+          target: { type: 'face' as const, face: 'top_face' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 1, z: 1 },
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const }
+        }
+      },
+      {
+        name: 'blind cutout',
+        feature: {
+          id: 'f5',
+          kind: 'rect_cut' as const,
+          version: 1,
+          enabled: true,
+          cutType: 'cutout' as const,
+          target: { type: 'face' as const, face: 'top_face' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 1, z: 1 },
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'blind' as const, depth: 0.25 }
+        }
+      },
+      {
+        name: 'dado',
+        feature: {
+          id: 'f6',
+          kind: 'rect_cut' as const,
+          version: 1,
+          enabled: true,
+          cutType: 'dado' as const,
+          target: { type: 'face' as const, face: 'top_face' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 2, z: 0 },
+          parameters: { size: { length: 0.75, width: 4 }, depthMode: 'blind' as const, depth: 0.25 }
+        }
+      },
+      {
+        name: 'stopped dado',
+        feature: {
+          id: 'f7',
+          kind: 'rect_cut' as const,
+          version: 1,
+          enabled: true,
+          cutType: 'stopped_dado' as const,
+          target: { type: 'face' as const, face: 'top_face' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 1, z: 0 },
+          parameters: { size: { length: 3, width: 4 }, depthMode: 'blind' as const, depth: 0.25 }
+        }
+      },
+      {
+        name: 'rabbet (front edge)',
+        feature: {
+          id: 'f8',
+          kind: 'rect_cut' as const,
+          version: 1,
+          enabled: true,
+          cutType: 'rabbet' as const,
+          target: { type: 'edge' as const, edge: 'top_front_edge' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 0, z: 0 },
+          parameters: { size: { length: 6, width: 0.5 }, depthMode: 'blind' as const, depth: 0.375 }
+        }
+      },
+      {
+        name: 'groove',
+        feature: {
+          id: 'f9',
+          kind: 'rect_cut' as const,
+          version: 1,
+          enabled: true,
+          cutType: 'groove' as const,
+          target: { type: 'face' as const, face: 'top_face' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 0, z: 1 },
+          parameters: { size: { length: 6, width: 0.5 }, depthMode: 'blind' as const, depth: 0.25 }
+        }
+      },
+      {
+        name: 'stopped groove',
+        feature: {
+          id: 'f10',
+          kind: 'rect_cut' as const,
+          version: 1,
+          enabled: true,
+          cutType: 'stopped_groove' as const,
+          target: { type: 'face' as const, face: 'top_face' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 1, z: 1 },
+          parameters: { size: { length: 4, width: 0.5 }, depthMode: 'blind' as const, depth: 0.25 }
+        }
+      },
+      {
+        name: 'mortise',
+        feature: {
+          id: 'f11',
+          kind: 'rect_cut' as const,
+          version: 1,
+          enabled: true,
+          cutType: 'mortise' as const,
+          target: { type: 'face' as const, face: 'top_face' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 1.5, z: 1 },
+          parameters: { size: { length: 2, width: 0.75 }, depthMode: 'blind' as const, depth: 0.5 }
+        }
+      }
+    ];
+
+    for (const config of cutConfigs) {
+      it(`produces valid geometry for ${config.name}`, () => {
+        const geometry = getPartRenderGeometry(
+          createTestPart({
+            length: 6,
+            width: 4,
+            thickness: 0.75,
+            features: [config.feature as any]
+          })
+        );
+        geometry.computeBoundingBox();
+        expect(geometry.boundingBox).not.toBeNull();
+        const positions = geometry.getAttribute('position');
+        expect(positions.count).toBeGreaterThan(0);
+        // No NaN or Infinity in vertex positions
+        for (let i = 0; i < positions.count; i++) {
+          expect(Number.isFinite(positions.getX(i))).toBe(true);
+          expect(Number.isFinite(positions.getY(i))).toBe(true);
+          expect(Number.isFinite(positions.getZ(i))).toBe(true);
+        }
+      });
+    }
   });
 });

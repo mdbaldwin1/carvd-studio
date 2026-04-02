@@ -25,7 +25,7 @@ export function SinglePartCutsSummaryCard({ selectedPart, units, onEditCuts }: S
   const conflictSummary = conflicts[0]?.message ?? null;
 
   return (
-    <Card>
+    <Card className="mb-4">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-3">
           <CardTitle>Part Cuts</CardTitle>
@@ -57,7 +57,7 @@ export function SinglePartCutsSummaryCard({ selectedPart, units, onEditCuts }: S
           )}
         </div>
         <Button size="sm" className="w-full" onClick={onEditCuts}>
-          Open Cuts Workspace
+          Edit Part Cuts
         </Button>
       </CardContent>
     </Card>

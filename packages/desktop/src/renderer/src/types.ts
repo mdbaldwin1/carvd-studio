@@ -114,15 +114,7 @@ export type EdgeTarget =
   | 'back_left_edge'
   | 'back_right_edge';
 
-export type CornerTarget =
-  | 'front_top_left_corner'
-  | 'front_top_right_corner'
-  | 'front_bottom_left_corner'
-  | 'front_bottom_right_corner'
-  | 'back_top_left_corner'
-  | 'back_top_right_corner'
-  | 'back_bottom_left_corner'
-  | 'back_bottom_right_corner';
+export type CornerTarget = 'front_left_corner' | 'front_right_corner' | 'back_left_corner' | 'back_right_corner';
 
 export type PartFeatureTarget =
   | { type: 'face'; face: FaceTarget }
@@ -149,7 +141,7 @@ export interface PartFeatureBase {
 export interface EndCutFeature extends PartFeatureBase {
   kind: 'end_cut';
   target: { type: 'face'; face: 'left_end' | 'right_end' };
-  cutType: 'square' | 'mitre' | 'bevel' | 'compound';
+  cutType: 'mitre' | 'bevel' | 'compound';
   lengthMode: 'long_point' | 'short_point' | 'centerline';
   parameters: {
     horizontalAngle: number;

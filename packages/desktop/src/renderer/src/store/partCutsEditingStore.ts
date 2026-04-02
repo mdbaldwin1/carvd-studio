@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { PartFeature, PartFeatureTarget } from '../types';
+import { clearPartGeometryCache } from '../utils/partFeatureGeometry';
 import { clonePartFeatures } from '../utils/partFeatures';
+import { useCameraStore } from './cameraStore';
 
 function featuresEqual(a: PartFeature[], b: PartFeature[]): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -91,7 +93,7 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
 
   cancelExit: () => set({ showExitDialog: false }),
 
-  finishEditing: () =>
+  finishEditing: () => {
     set({
       isEditingPartCuts: false,
       sourcePartId: null,
@@ -101,7 +103,14 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
       hoveredTarget: null,
       pendingTarget: null,
       showExitDialog: false
-    }),
+    });
+    // Clear geometry cache so the main workspace doesn't use stale meshes
+    clearPartGeometryCache();
+    // Restore the main workspace camera position on re-mount
+    if (useCameraStore.getState().cameraState) {
+      useCameraStore.setState({ pendingCameraRestore: true });
+    }
+  },
 
   hasUnsavedDraftChanges: (sourceFeatures = []) => {
     const { draftFeatures } = get();

@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { useClipboardStore } from './clipboardStore';
+import { useLicenseStore } from './licenseStore';
 import { useProjectStore } from './projectStore';
 import { useSelectionStore } from './selectionStore';
-import { useLicenseStore } from './licenseStore';
 import { useUIStore } from './uiStore';
 
 // Helper to reset store state before each test
@@ -182,7 +182,7 @@ describe('clipboardStore', () => {
             kind: 'rect_cut',
             version: 1,
             enabled: true,
-            target: { type: 'corner', corner: 'back_bottom_left_corner' },
+            target: { type: 'corner', corner: 'back_left_corner' },
             reference: { primaryFrom: 'min', secondaryFrom: 'min' },
             cutType: 'corner_notch',
             parameters: {

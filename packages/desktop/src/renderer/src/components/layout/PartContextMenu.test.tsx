@@ -137,7 +137,7 @@ describe('PartContextMenu', () => {
     const onClose = vi.fn();
     render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={onClose} />);
 
-    fireEvent.click(screen.getByText('Edit Cuts...'));
+    fireEvent.click(screen.getByText('Edit Part Cuts...'));
 
     expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
     expect(usePartCutsEditingStore.getState().sourcePartId).toBe('p1');
@@ -147,7 +147,7 @@ describe('PartContextMenu', () => {
   it('hides Edit Cuts for multi-select', () => {
     useSelectionStore.setState({ selectedPartIds: ['p1', 'p2'] });
     render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={vi.fn()} />);
-    expect(screen.queryByText('Edit Cuts...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Edit Part Cuts...')).not.toBeInTheDocument();
   });
 
   it('renders Save as Assembly button', () => {

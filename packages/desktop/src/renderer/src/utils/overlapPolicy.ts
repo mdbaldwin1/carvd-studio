@@ -1,11 +1,42 @@
 import { Part } from '../types';
-import { getPartOBB, obbsOverlap } from './snapToPartsUtil';
+import { getPartEndCutProfiles } from './endCutUtils';
+import {
+  getPartWorldContour,
+  hasRenderablePartFeatures,
+  partsOverlapOnYAxis,
+  worldContoursOverlap
+} from './partFeatureGeometry';
+import { convexShapesOverlap, getPartConvexShape, getPartOBB, getPartSubOBBs, obbsOverlap } from './snapToPartsUtil';
 
 const OBB_EPSILON = 1e-6;
 const OBB_SEPARATION_TOLERANCE = 1e-8;
+const CONTOUR_TOLERANCE = 1e-6;
 const MIN_SAFE_FRACTION = 1e-3;
 const SAFE_SEARCH_STEPS = 14;
 type TranslationDelta = { x: number; y: number; z: number };
+
+function hasVerticalEndCuts(part: Part): boolean {
+  const profiles = getPartEndCutProfiles(part);
+  return profiles.left.verticalInset > 0 || profiles.right.verticalInset > 0;
+}
+
+function hasNonRectangularContour(part: Part): boolean {
+  if (!hasRenderablePartFeatures(part)) return false;
+  const features = (part.features ?? []).filter((f) => f.enabled);
+  return features.some(
+    (f) => f.kind === 'rect_cut' && (f as { parameters: { depthMode: string } }).parameters.depthMode === 'through'
+  );
+}
+
+/** True when the part lies flat (only rotated around Y, if at all). */
+function isFlat(part: Part): boolean {
+  const rx = Math.abs(part.rotation.x % 360);
+  const rz = Math.abs(part.rotation.z % 360);
+  return (
+    (rx < 0.01 || Math.abs(rx - 180) < 0.01 || Math.abs(rx - 360) < 0.01) &&
+    (rz < 0.01 || Math.abs(rz - 180) < 0.01 || Math.abs(rz - 360) < 0.01)
+  );
+}
 
 export function overlapCheckEnabled(a: Part, b: Part): boolean {
   // If either part explicitly allows overlap, the pair is exempt.
@@ -14,7 +45,44 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
 
 export function partsOverlap(a: Part, b: Part): boolean {
   if (!overlapCheckEnabled(a, b)) return false;
-  return obbsOverlap(getPartOBB(a), getPartOBB(b), OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false);
+
+  // Use convex shape SAT when either part has vertical end cuts (bevels,
+  // compounds) that remove material along the Y axis — OBB cannot represent
+  // the angled face and creates a "ghost corner".
+  if (hasVerticalEndCuts(a) || hasVerticalEndCuts(b)) {
+    return convexShapesOverlap(getPartConvexShape(a), getPartConvexShape(b), OBB_SEPARATION_TOLERANCE, false);
+  }
+
+  // For flat parts with through-depth features (corner notches, edge notches, etc.),
+  // use direct 2D polygon intersection on the actual contour shape.
+  // This is exact for any contour geometry — no sub-box approximation.
+  // Non-flat parts (rotated around X or Z) fall through to the sub-OBB path
+  // because the 2D contour projection doesn't work for tilted parts.
+  if (hasNonRectangularContour(a) || hasNonRectangularContour(b)) {
+    if (isFlat(a) && isFlat(b)) {
+      if (!partsOverlapOnYAxis(a, b, CONTOUR_TOLERANCE)) return false;
+      const contourA = getPartWorldContour(a);
+      const contourB = getPartWorldContour(b);
+      return worldContoursOverlap(contourA, contourB, CONTOUR_TOLERANCE);
+    }
+
+    // Non-flat featured parts: use sub-OBB decomposition which handles 3D rotation
+    const obbsA = getPartSubOBBs(a);
+    const obbsB = getPartSubOBBs(b);
+    for (const obbA of obbsA) {
+      for (const obbB of obbsB) {
+        if (obbsOverlap(obbA, obbB, OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Simple rectangular parts: fast OBB test
+  const obbA = getPartOBB(a);
+  const obbB = getPartOBB(b);
+  return obbsOverlap(obbA, obbB, OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false);
 }
 
 export function wouldOverlapWithAny(part: Part, parts: Part[]): boolean {
@@ -39,7 +107,12 @@ export function wouldTransformedPartsOverlap(parts: Part[], transformedPartsById
   return false;
 }
 
-export function wouldTranslationCauseOverlap(parts: Part[], movingIds: Set<string>, delta: TranslationDelta): boolean {
+export function wouldTranslationCauseOverlap(
+  parts: Part[],
+  movingIds: Set<string>,
+  delta: TranslationDelta,
+  exemptIds?: Set<string>
+): boolean {
   for (const p of parts) {
     if (!movingIds.has(p.id)) continue;
 
@@ -54,6 +127,7 @@ export function wouldTranslationCauseOverlap(parts: Part[], movingIds: Set<strin
 
     for (const other of parts) {
       if (movingIds.has(other.id)) continue;
+      if (exemptIds && exemptIds.has(other.id)) continue;
       if (partsOverlap(movedPart, other)) {
         return true;
       }
@@ -66,9 +140,10 @@ export function wouldTranslationCauseOverlap(parts: Part[], movingIds: Set<strin
 export function resolveSafeTranslationDelta(
   parts: Part[],
   movingIds: Set<string>,
-  proposedDelta: TranslationDelta
+  proposedDelta: TranslationDelta,
+  exemptIds?: Set<string>
 ): TranslationDelta | null {
-  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta)) {
+  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta, exemptIds)) {
     return proposedDelta;
   }
 
@@ -88,7 +163,7 @@ export function resolveSafeTranslationDelta(
       z: safe.z,
       [axis]: safe[axis] + axisTarget
     };
-    if (!wouldTranslationCauseOverlap(parts, movingIds, fullAxisCandidate)) {
+    if (!wouldTranslationCauseOverlap(parts, movingIds, fullAxisCandidate, exemptIds)) {
       safe[axis] += axisTarget;
       continue;
     }
@@ -104,7 +179,7 @@ export function resolveSafeTranslationDelta(
         [axis]: safe[axis] + axisTarget * mid
       };
 
-      if (wouldTranslationCauseOverlap(parts, movingIds, axisCandidate)) {
+      if (wouldTranslationCauseOverlap(parts, movingIds, axisCandidate, exemptIds)) {
         high = mid;
       } else {
         low = mid;
@@ -118,6 +193,29 @@ export function resolveSafeTranslationDelta(
 
   const movedDistance = Math.abs(safe.x) + Math.abs(safe.y) + Math.abs(safe.z);
   if (movedDistance < 1e-6) return null;
+
+  // Final verification: the per-axis binary search resolves each axis
+  // independently, but the combined result could overlap when the collision
+  // boundary is non-convex (e.g. L-shaped sub-OBB regions). If the combined
+  // result overlaps, zero out the later-resolved axes one at a time until
+  // the result is safe.
+  if (wouldTranslationCauseOverlap(parts, movingIds, safe, exemptIds)) {
+    // Try dropping axes in reverse resolution order (smallest delta first).
+    // The dominant axis is most likely safe on its own.
+    const reverseAxes = [...axes].reverse();
+    for (const dropAxis of reverseAxes) {
+      safe[dropAxis] = 0;
+      if (!wouldTranslationCauseOverlap(parts, movingIds, safe, exemptIds)) {
+        break;
+      }
+    }
+    // If still overlapping after dropping all minor axes, reject entirely.
+    if (wouldTranslationCauseOverlap(parts, movingIds, safe, exemptIds)) {
+      return null;
+    }
+    const reducedDistance = Math.abs(safe.x) + Math.abs(safe.y) + Math.abs(safe.z);
+    if (reducedDistance < 1e-6) return null;
+  }
 
   return safe;
 }

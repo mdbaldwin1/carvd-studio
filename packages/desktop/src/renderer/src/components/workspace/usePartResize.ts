@@ -1,19 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { ThreeEvent } from '@react-three/fiber';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Part as PartType } from '../../types';
+import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useSnapStore } from '../../store/snapStore';
-import { useAppSettingsStore } from '../../store/appSettingsStore';
+import { Part as PartType } from '../../types';
+import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 import {
   calculateSnapThreshold,
-  detectDimensionSnaps,
   createDimensionMatchSnapLine,
+  detectDimensionSnaps,
   getPartBoundsAtPosition
 } from '../../utils/snapToPartsUtil';
-import { LiveDimensions, HandlePosition, snapToGrid } from './partTypes';
+import { HandlePosition, LiveDimensions, snapToGrid } from './partTypes';
 import { isOrbitControls } from './workspaceUtils';
-import { calculateWorldHalfHeight } from '../../utils/mathPool';
 
 /**
  * Hook encapsulating all resize logic for a Part component.
@@ -311,7 +311,13 @@ export function usePartResize(
     newZ = snapToGrid(newZ);
 
     // Keep part above ground
-    const worldHalfHeight = calculateWorldHalfHeight(rotationQuaternion, newLength, newThickness, newWidth);
+    const worldHalfHeight = calculateWorldHalfHeightFromDegrees(
+      part.rotation,
+      newLength,
+      newThickness,
+      newWidth,
+      part.features
+    );
     newY = Math.max(worldHalfHeight, newY);
 
     updatePart(part.id, {

@@ -1,10 +1,10 @@
 import { CornerTarget, EdgeTarget, EndCutFeature, FaceTarget, PartFeature, RectCutFeature } from '@renderer/types';
 import { clonePartFeature } from '@renderer/utils/partFeatures';
+import { getResolvedRectCutFeature } from '@renderer/utils/rectCutUtils';
 
 export type WorkspacePreset =
   | 'mitre_both_ends'
   | 'bevel_both_ends'
-  | 'square_both_ends'
   | 'compound_both_ends'
   | 'top_cutout'
   | 'bottom_cutout'
@@ -13,10 +13,10 @@ export type WorkspacePreset =
   | 'top_back_rabbet'
   | 'top_front_edge_notch'
   | 'top_back_edge_notch'
-  | 'top_front_left_corner_notch'
-  | 'top_front_right_corner_notch'
-  | 'top_front_corners'
-  | 'bottom_front_corners';
+  | 'front_left_corner_notch'
+  | 'front_right_corner_notch'
+  | 'front_corners'
+  | 'back_corners';
 
 export type MirrorAction = 'opposite_end' | 'across_length' | 'across_width';
 
@@ -85,11 +85,6 @@ export function buildFeaturesFromPreset(preset: WorkspacePreset, _defaults?: { p
         buildEndCut('left_end', 'bevel', { horizontalAngle: 0, verticalAngle: 15 }),
         buildEndCut('right_end', 'bevel', { horizontalAngle: 0, verticalAngle: 15 })
       ];
-    case 'square_both_ends':
-      return [
-        buildEndCut('left_end', 'square', { horizontalAngle: 0 }),
-        buildEndCut('right_end', 'square', { horizontalAngle: 0 })
-      ];
     case 'compound_both_ends':
       return [
         buildEndCut('left_end', 'compound', { horizontalAngle: 45, verticalAngle: 15 }),
@@ -150,50 +145,50 @@ export function buildFeaturesFromPreset(preset: WorkspacePreset, _defaults?: { p
           { length: 1.5, width: 0.75 }
         )
       ];
-    case 'top_front_left_corner_notch':
+    case 'front_left_corner_notch':
       return [
         buildRectCut(
           'corner_notch',
-          { type: 'corner', corner: 'front_top_left_corner' },
+          { type: 'corner', corner: 'front_left_corner' },
           { x: 0, z: 0 },
           { length: 0.75, width: 0.75 }
         )
       ];
-    case 'top_front_right_corner_notch':
+    case 'front_right_corner_notch':
       return [
         buildRectCut(
           'corner_notch',
-          { type: 'corner', corner: 'front_top_right_corner' },
+          { type: 'corner', corner: 'front_right_corner' },
           { x: 0, z: 0 },
           { length: 0.75, width: 0.75 }
         )
       ];
-    case 'top_front_corners':
+    case 'front_corners':
       return [
         buildRectCut(
           'corner_notch',
-          { type: 'corner', corner: 'front_top_left_corner' },
+          { type: 'corner', corner: 'front_left_corner' },
           { x: 0, z: 0 },
           { length: 0.75, width: 0.75 }
         ),
         buildRectCut(
           'corner_notch',
-          { type: 'corner', corner: 'front_top_right_corner' },
+          { type: 'corner', corner: 'front_right_corner' },
           { x: 0, z: 0 },
           { length: 0.75, width: 0.75 }
         )
       ];
-    case 'bottom_front_corners':
+    case 'back_corners':
       return [
         buildRectCut(
           'corner_notch',
-          { type: 'corner', corner: 'front_bottom_left_corner' },
+          { type: 'corner', corner: 'back_left_corner' },
           { x: 0, z: 0 },
           { length: 0.75, width: 0.75 }
         ),
         buildRectCut(
           'corner_notch',
-          { type: 'corner', corner: 'front_bottom_right_corner' },
+          { type: 'corner', corner: 'back_right_corner' },
           { x: 0, z: 0 },
           { length: 0.75, width: 0.75 }
         )
@@ -202,25 +197,17 @@ export function buildFeaturesFromPreset(preset: WorkspacePreset, _defaults?: { p
 }
 
 const LENGTH_CORNER_MAP: Record<CornerTarget, CornerTarget> = {
-  front_top_left_corner: 'front_top_right_corner',
-  front_top_right_corner: 'front_top_left_corner',
-  front_bottom_left_corner: 'front_bottom_right_corner',
-  front_bottom_right_corner: 'front_bottom_left_corner',
-  back_top_left_corner: 'back_top_right_corner',
-  back_top_right_corner: 'back_top_left_corner',
-  back_bottom_left_corner: 'back_bottom_right_corner',
-  back_bottom_right_corner: 'back_bottom_left_corner'
+  front_left_corner: 'front_right_corner',
+  front_right_corner: 'front_left_corner',
+  back_left_corner: 'back_right_corner',
+  back_right_corner: 'back_left_corner'
 };
 
 const WIDTH_CORNER_MAP: Record<CornerTarget, CornerTarget> = {
-  front_top_left_corner: 'back_top_left_corner',
-  front_top_right_corner: 'back_top_right_corner',
-  front_bottom_left_corner: 'back_bottom_left_corner',
-  front_bottom_right_corner: 'back_bottom_right_corner',
-  back_top_left_corner: 'front_top_left_corner',
-  back_top_right_corner: 'front_top_right_corner',
-  back_bottom_left_corner: 'front_bottom_left_corner',
-  back_bottom_right_corner: 'front_bottom_right_corner'
+  front_left_corner: 'back_left_corner',
+  front_right_corner: 'back_right_corner',
+  back_left_corner: 'front_left_corner',
+  back_right_corner: 'front_right_corner'
 };
 
 const LENGTH_EDGE_MAP: Partial<Record<EdgeTarget, EdgeTarget>> = {
@@ -274,7 +261,20 @@ function mirrorCornerTarget(
 
 export function getAvailableMirrorActions(feature: PartFeature): MirrorAction[] {
   if (feature.kind === 'end_cut') return ['opposite_end'];
-  return ['across_length', 'across_width'];
+  switch (feature.cutType) {
+    case 'dado':
+    case 'stopped_dado':
+      return ['across_length'];
+    case 'groove':
+      return ['across_width'];
+    case 'rabbet':
+      if (feature.target.type !== 'edge') return [];
+      return feature.target.edge.includes('front') || feature.target.edge.includes('back')
+        ? ['across_width']
+        : ['across_length'];
+    default:
+      return ['across_length', 'across_width'];
+  }
 }
 
 export function getMirrorActionLabel(action: MirrorAction): string {
@@ -288,7 +288,11 @@ export function getMirrorActionLabel(action: MirrorAction): string {
   }
 }
 
-export function mirrorFeature(feature: PartFeature, action: MirrorAction): PartFeature {
+export function mirrorFeature(
+  feature: PartFeature,
+  action: MirrorAction,
+  part?: Pick<{ length: number; width: number; thickness: number }, 'length' | 'width' | 'thickness'>
+): PartFeature {
   const mirrored = clonePartFeature(feature);
   mirrored.id = generateFeatureId();
   mirrored.label = getMirroredLabel(feature.label, action);
@@ -312,9 +316,35 @@ export function mirrorFeature(feature: PartFeature, action: MirrorAction): PartF
     throw new Error('Rectangular removals do not support opposite-end mirroring');
   }
 
+  if (!part) {
+    throw new Error('Part dimensions are required to mirror rectangular removals');
+  }
+
+  const resolved = getResolvedRectCutFeature(feature, part);
+  const alongLength =
+    feature.target.type === 'edge' && (feature.target.edge.includes('front') || feature.target.edge.includes('back'));
+  const mirroredX =
+    action === 'across_length'
+      ? Math.max(0, part.length - resolved.placement.x - resolved.parameters.size.length)
+      : resolved.placement.x;
+  const mirroredZ =
+    action === 'across_width'
+      ? Math.max(0, part.width - resolved.placement.z - resolved.parameters.size.width)
+      : resolved.placement.z;
+
   mirrored.placement = {
-    x: action === 'across_length' ? -feature.placement.x : feature.placement.x,
-    z: action === 'across_width' ? -feature.placement.z : feature.placement.z
+    x:
+      feature.target.type === 'edge' && !alongLength
+        ? 0
+        : feature.cutType === 'corner_notch' || feature.cutType === 'groove'
+          ? 0
+          : mirroredX,
+    z:
+      feature.cutType === 'corner_notch' || feature.cutType === 'dado' || feature.cutType === 'stopped_dado'
+        ? 0
+        : feature.target.type === 'edge' && alongLength
+          ? 0
+          : mirroredZ
   };
 
   if (feature.target.type === 'edge') {
@@ -346,8 +376,6 @@ export function getWorkspacePresetLabel(preset: WorkspacePreset): string {
       return 'Mitre Both Ends';
     case 'bevel_both_ends':
       return 'Bevel Both Ends';
-    case 'square_both_ends':
-      return 'Square Both Ends';
     case 'compound_both_ends':
       return 'Compound Both Ends';
     case 'top_cutout':
@@ -364,14 +392,14 @@ export function getWorkspacePresetLabel(preset: WorkspacePreset): string {
       return 'Top Front Edge Notch';
     case 'top_back_edge_notch':
       return 'Top Back Edge Notch';
-    case 'top_front_left_corner_notch':
-      return 'Top Front Left Corner';
-    case 'top_front_right_corner_notch':
-      return 'Top Front Right Corner';
-    case 'top_front_corners':
-      return 'Top Front Corners';
-    case 'bottom_front_corners':
-      return 'Bottom Front Corners';
+    case 'front_left_corner_notch':
+      return 'Front Left Corner';
+    case 'front_right_corner_notch':
+      return 'Front Right Corner';
+    case 'front_corners':
+      return 'Front Corners';
+    case 'back_corners':
+      return 'Back Corners';
   }
 }
 
@@ -381,8 +409,6 @@ export function getWorkspacePresetHint(preset: WorkspacePreset): string {
       return 'Adds matching 45° mitres to both ends.';
     case 'bevel_both_ends':
       return 'Adds matching 15° bevels to both ends.';
-    case 'square_both_ends':
-      return 'Restores both ends as explicit square cuts.';
     case 'compound_both_ends':
       return 'Adds matching compound cuts to both ends.';
     case 'top_cutout':
@@ -399,13 +425,13 @@ export function getWorkspacePresetHint(preset: WorkspacePreset): string {
       return 'Starts a notch from the top front edge.';
     case 'top_back_edge_notch':
       return 'Starts a notch from the top back edge.';
-    case 'top_front_left_corner_notch':
-      return 'Starts a top front left corner relief notch.';
-    case 'top_front_right_corner_notch':
-      return 'Starts a top front right corner relief notch.';
-    case 'top_front_corners':
-      return 'Adds matching relief notches to both top front corners.';
-    case 'bottom_front_corners':
-      return 'Adds matching relief notches to both bottom front corners.';
+    case 'front_left_corner_notch':
+      return 'Starts a front left corner relief notch.';
+    case 'front_right_corner_notch':
+      return 'Starts a front right corner relief notch.';
+    case 'front_corners':
+      return 'Adds matching relief notches to both front corners.';
+    case 'back_corners':
+      return 'Adds matching relief notches to both back corners.';
   }
 }

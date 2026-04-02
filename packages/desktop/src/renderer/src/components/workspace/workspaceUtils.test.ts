@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Use real Three.js so rotation math actually works in getPartAABB tests
 vi.unmock('three');
 
 import {
   LIGHTING_PRESETS,
-  isOrbitControls,
-  setRightClickTarget,
-  getRightClickTarget,
   clearRightClickTarget,
-  getPartAABB
+  getPartAABB,
+  getRightClickTarget,
+  isOrbitControls,
+  setRightClickTarget
 } from './workspaceUtils';
 
 // ============================================================
@@ -257,7 +257,7 @@ describe('workspaceUtils', () => {
             kind: 'rect_cut',
             version: 1,
             enabled: true,
-            target: { type: 'corner', corner: 'front_bottom_left_corner' },
+            target: { type: 'corner', corner: 'front_left_corner' },
             reference: { primaryFrom: 'min', secondaryFrom: 'min' },
             cutType: 'corner_notch',
             parameters: {
