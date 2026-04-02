@@ -69,7 +69,9 @@ export default function PartsPage() {
               </p>
             </div>
             <div>
-              <p className="font-bold mb-xs">Custom Angles for Legs, Braces, and Tilted Parts</p>
+              <p className="font-bold mb-xs">
+                Custom Angles for Legs, Braces, and Tilted Parts
+              </p>
               <p className="text-muted">
                 To set a part to an exact non-90° angle, select it and enter the
                 value directly in the matching Rotation input. For example, a

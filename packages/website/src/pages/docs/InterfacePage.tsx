@@ -108,9 +108,9 @@ export default function InterfacePage() {
             <div>
               <p className="font-bold mb-xs">Rotate Selections Together</p>
               <p className="text-muted">
-                When multiple parts or a group are selected, the shared
-                rotation handles appear at the center of the selection so the
-                whole set can be rotated together.
+                When multiple parts or a group are selected, the shared rotation
+                handles appear at the center of the selection so the whole set
+                can be rotated together.
               </p>
             </div>
           </div>
