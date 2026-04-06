@@ -585,9 +585,13 @@ function App() {
 
   // Part deletion confirmation
   const parts = useProjectStore((s) => s.parts);
+  const groups = useProjectStore((s) => s.groups);
   const pendingDeletePartIds = useUIStore((s) => s.pendingDeletePartIds);
+  const pendingDeleteGroupIds = useUIStore((s) => s.pendingDeleteGroupIds);
   const confirmDeleteParts = useProjectStore((s) => s.confirmDeleteParts);
+  const confirmDeleteGroups = useProjectStore((s) => s.confirmDeleteGroups);
   const cancelDeleteParts = useUIStore((s) => s.cancelDeleteParts);
+  const cancelDeleteGroups = useUIStore((s) => s.cancelDeleteGroups);
 
   // Cut list modal
   const openCutListModal = useUIStore((s) => s.openCutListModal);
@@ -641,6 +645,13 @@ function App() {
       confirmDeleteParts();
     }
   }, [pendingDeletePartIds, appSettings.confirmBeforeDelete, confirmDeleteParts]);
+
+  useEffect(() => {
+    if (pendingDeleteGroupIds && !appSettings.confirmBeforeDelete) {
+      // Skip confirmation, delete immediately
+      confirmDeleteGroups();
+    }
+  }, [pendingDeleteGroupIds, appSettings.confirmBeforeDelete, confirmDeleteGroups]);
 
   // Modal state
   const [isStockLibraryOpen, setIsStockLibraryOpen] = useState(false);
@@ -724,6 +735,9 @@ function App() {
   // Get names of parts pending deletion for the confirmation message
   const pendingDeletePartNames = pendingDeletePartIds
     ? parts.filter((p) => pendingDeletePartIds.includes(p.id)).map((p) => p.name)
+    : [];
+  const pendingDeleteGroupNames = pendingDeleteGroupIds
+    ? groups.filter((g) => pendingDeleteGroupIds.includes(g.id)).map((g) => g.name)
     : [];
 
   // Determine if we should show the main editor or a full-screen overlay
@@ -930,6 +944,22 @@ function App() {
           variant="danger"
           onConfirm={confirmDeleteParts}
           onCancel={cancelDeleteParts}
+        />
+
+        {/* Delete Group(s) Confirmation - only shown when confirmBeforeDelete is enabled */}
+        <ConfirmDialog
+          isOpen={pendingDeleteGroupIds !== null && appSettings.confirmBeforeDelete}
+          title={pendingDeleteGroupIds?.length === 1 ? 'Delete Group?' : 'Delete Groups?'}
+          message={
+            pendingDeleteGroupIds?.length === 1
+              ? `Are you sure you want to delete "${pendingDeleteGroupNames[0]}" and all its contents?`
+              : `Are you sure you want to delete ${pendingDeleteGroupIds?.length} groups and all their contents?`
+          }
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          variant="danger"
+          onConfirm={confirmDeleteGroups}
+          onCancel={cancelDeleteGroups}
         />
 
         {/* Trial Expired Modal */}

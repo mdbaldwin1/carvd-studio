@@ -60,23 +60,25 @@ export const HANDLE_POSITIONS: HandlePosition[] = [
 
 export const HANDLE_SIZE = 0.45; // Slightly larger for better visibility
 
-// Bolder resize handle colors for better visibility
+// Resize handle colors aligned to Twilight Studio theme tokens
 export const RESIZE_COLORS = {
-  corner: '#ffcc44', // Bright gold for corners
-  edge: '#44aaff', // Bright blue for edges
-  hover: '#ffffff' // White on hover
+  corner: '#fbb040', // --color-primary (Gold)
+  edge: '#077187', // --color-reference (Cerulean)
+  hover: '#aea4bf' // --color-accent (Lilac Ash)
 };
 
 // Rotation handle - flat ring with arrow on each face
 export const ROTATION_HANDLE_SIZE = 0.55; // Slightly larger
-export const ROTATION_RING_THICKNESS = 0.12; // Thicker ring (was 0.08)
+export const ROTATION_RING_THICKNESS = 0.1;
+export const ROTATION_RING_RADIUS_MIN = 0.24;
+export const ROTATION_RING_RADIUS_MAX = 0.95;
 
-// Bolder, more saturated rotation colors
+// Rotation colors aligned to theme palette
 export const ROTATION_COLORS = {
-  x: '#ff4444', // Bright red for X
-  y: '#44ff44', // Bright green for Y
-  z: '#4499ff', // Bright blue for Z
-  hover: '#ffffff'
+  x: '#fbb040', // Gold
+  y: '#077187', // Cerulean
+  z: '#2ec4b6', // Turquoise (higher contrast than lilac)
+  hover: '#ffeecf' // Papaya Whip
 };
 
 // Distance-based LOD: grain arrows hidden beyond 150 inches (~12 feet)

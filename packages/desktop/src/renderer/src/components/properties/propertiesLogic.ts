@@ -2,6 +2,7 @@ import { STOCK_COLORS } from '@renderer/constants';
 import { Part, Stock } from '@renderer/types';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import { getPartBounds } from '@renderer/utils/snapToPartsUtil';
+import { partsOverlap, wouldOverlapWithAny } from '@renderer/utils/overlapPolicy';
 
 export function getConstraintWarnings(part: Part, stocks: Stock[], units: 'imperial' | 'metric'): string[] {
   const warnings: string[] = [];
@@ -70,12 +71,10 @@ export function getOverlappingParts(part: Part, parts: Part[]): string[] {
   }
 
   const overlapping: string[] = [];
-  const partAABB = getPartAABB(part);
 
   for (const other of parts) {
-    if (other.id === part.id || other.ignoreOverlap) continue;
-    const otherAABB = getPartAABB(other);
-    if (aabbsOverlap(partAABB, otherAABB)) {
+    if (other.id === part.id) continue;
+    if (partsOverlap(part, other)) {
       overlapping.push(other.name);
     }
   }
@@ -85,16 +84,7 @@ export function getOverlappingParts(part: Part, parts: Part[]): string[] {
 
 export function wouldPartOverlap(part: Part, newPosition: Part['position'], parts: Part[]): boolean {
   const testPart: Part = { ...part, position: newPosition };
-  const testAABB = getPartAABB(testPart);
-
-  for (const other of parts) {
-    if (other.id === part.id) continue;
-    const otherAABB = getPartAABB(other);
-    if (aabbsOverlap(testAABB, otherAABB)) {
-      return true;
-    }
-  }
-  return false;
+  return wouldOverlapWithAny(testPart, parts);
 }
 
 export function buildStockDataFromUpdates(updates: Partial<Stock>, colorIndex: number): Partial<Stock> {

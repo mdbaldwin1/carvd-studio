@@ -20,7 +20,8 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const parts = useProjectStore((s) => s.parts);
   const copySelectedParts = useClipboardStore((s) => s.copySelectedParts);
-  const deleteSelectedParts = useProjectStore((s) => s.deleteSelectedParts);
+  const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
+  const requestDeleteGroups = useUIStore((s) => s.requestDeleteGroups);
   const resetSelectedPartsToStock = useProjectStore((s) => s.resetSelectedPartsToStock);
   const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
@@ -32,7 +33,6 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const editingGroupId = useSelectionStore((s) => s.editingGroupId);
   const createGroup = useProjectStore((s) => s.createGroup);
   const removeFromGroup = useProjectStore((s) => s.removeFromGroup);
-  const deleteGroup = useProjectStore((s) => s.deleteGroup);
   const addToGroup = useProjectStore((s) => s.addToGroup);
   const mergeGroups = useProjectStore((s) => s.mergeGroups);
   const openSaveAssemblyModal = useUIStore((s) => s.openSaveAssemblyModal);
@@ -94,13 +94,12 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   };
 
   const handleDelete = () => {
-    // Delete selected groups first (recursive mode deletes group and all contents)
-    for (const groupId of selectedGroupIds) {
-      deleteGroup(groupId, 'recursive');
+    if (selectedGroupIds.length > 0) {
+      requestDeleteGroups(selectedGroupIds);
     }
-    // Then delete any directly selected parts (that weren't in deleted groups)
+    // Then request delete any directly selected parts (that weren't in deleted groups)
     if (selectedPartIds.length > 0) {
-      deleteSelectedParts();
+      requestDeleteParts(selectedPartIds);
     }
     onClose();
   };
@@ -142,7 +141,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const handleUngroup = () => {
     if (groupToUngroup) {
       // If we're in edit mode, pass the parent group so children move to parent instead of top-level
-      deleteGroup(groupToUngroup, 'ungroup', isInEditMode ? editingGroupId : null);
+      useProjectStore.getState().deleteGroup(groupToUngroup, 'ungroup', isInEditMode ? editingGroupId : null);
     }
     onClose();
   };

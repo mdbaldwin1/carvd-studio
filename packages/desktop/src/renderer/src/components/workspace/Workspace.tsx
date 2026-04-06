@@ -18,10 +18,12 @@ import { MultiSelectionDimensions } from './MultiSelectionDimensions';
 import { PartsRenderer } from './PartsRenderer';
 import { PerfMonitor } from './PerfMonitor';
 import { ReferenceDistanceIndicators } from './ReferenceDistanceIndicators';
+import { GroupRotationHandles } from './GroupRotationHandles';
 import { SceneBackground } from './SceneBackground';
 import { SnapAlignmentLines } from './SnapAlignmentLines';
 import { SnapGuides } from './SnapGuides';
 import { ThumbnailCaptureHandler } from './ThumbnailCaptureHandler';
+import { installDragDebugTools } from '../../utils/dragDebug';
 import {
   LIGHTING_PRESETS,
   isOrbitControls,
@@ -56,6 +58,10 @@ function useEffectiveTheme(): 'light' | 'dark' {
 }
 
 export function Workspace() {
+  useEffect(() => {
+    installDragDebugTools();
+  }, []);
+
   const debugSelection = (...args: unknown[]) => {
     if (import.meta.env.DEV) {
       const entry = { ts: new Date().toISOString(), args };
@@ -86,6 +92,8 @@ export function Workspace() {
   const pendingCameraRestore = useCameraStore((s) => s.pendingCameraRestore);
   const clearPendingCameraRestore = useCameraStore((s) => s.clearPendingCameraRestore);
   const editingGroupId = useSelectionStore((s) => s.editingGroupId);
+  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
+  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const exitGroup = useSelectionStore((s) => s.exitGroup);
   const lightingMode = useAppSettingsStore((s) => s.settings.lightingMode) || 'default';
   const brightnessMultiplier = useAppSettingsStore((s) => s.settings.brightnessMultiplier) ?? 1.0;
@@ -177,13 +185,34 @@ export function Workspace() {
   const lastBackgroundDoubleClickAt = useRef(0);
   // Track right-click position and time to distinguish right-click vs right-drag (for pan)
   const rightClickDownPos = useRef<{ x: number; y: number; time: number } | null>(null);
-  const leftClickDownPos = useRef<{ x: number; y: number; time: number } | null>(null);
+  const leftClickDownPos = useRef<{
+    x: number;
+    y: number;
+    time: number;
+    selectedPartIds: string[];
+    selectedGroupIds: string[];
+  } | null>(null);
   const lastSelectionApplyAtRef = useRef(0);
+  const previousSelectionKeyRef = useRef<string | null>(null);
   const lastPartDrillAtRef = useRef(0);
 
   const markSelectionApplied = () => {
     lastSelectionApplyAtRef.current = performance.now();
   };
+
+  // Part/instanced handlers can update selection before this workspace-level
+  // native fallback runs; track those updates so fallback does not overwrite them.
+  useEffect(() => {
+    const key = `${[...selectedPartIds].sort().join(',')}|${[...selectedGroupIds].sort().join(',')}`;
+    if (previousSelectionKeyRef.current === null) {
+      previousSelectionKeyRef.current = key;
+      return;
+    }
+    if (previousSelectionKeyRef.current !== key) {
+      previousSelectionKeyRef.current = key;
+      markSelectionApplied();
+    }
+  }, [selectedPartIds, selectedGroupIds]);
 
   const getHitPartId = useCallback(
     (clientX: number, clientY: number): string | null => {
@@ -195,6 +224,10 @@ export function Workspace() {
       const hits = raycasterRef.current.intersectObjects(scene.children, true);
 
       for (const hit of hits) {
+        if (hit.object.userData?.blocksPartSelection) {
+          return null;
+        }
+
         const partId = (hit.object.userData?.partId as string | undefined) ?? null;
         if (partId) return partId;
 
@@ -204,24 +237,24 @@ export function Workspace() {
         }
       }
 
-      // Fallback: screen-space hit test from project parts.
-      // This path does not depend on mesh/instance raycast internals.
-      const pointerScreenX = clientX;
-      const pointerScreenY = clientY;
+      // Fallback: precise ray-vs-rotated-box hit test from project parts.
+      // This avoids the false positives that came from projected screen-space
+      // bounding boxes selecting clicks near, but not on, a part.
       let bestPartId: string | null = null;
-      let bestDepth = Infinity;
-      const marginPx = 2;
-
-      const corners = Array.from({ length: 8 }, () => new THREE.Vector3());
-      const center = new THREE.Vector3();
+      let bestDistance = Infinity;
       const euler = new THREE.Euler();
       const quat = new THREE.Quaternion();
+      const inverseMatrix = new THREE.Matrix4();
+      const worldMatrix = new THREE.Matrix4();
+      const ray = raycasterRef.current.ray.clone();
+      const localRay = new THREE.Ray();
+      const intersectionPoint = new THREE.Vector3();
+      const worldIntersectionPoint = new THREE.Vector3();
+      const unitScale = new THREE.Vector3(1, 1, 1);
+      const partCenter = new THREE.Vector3();
+      const localBounds = new THREE.Box3();
 
       for (const part of parts) {
-        const halfLength = part.length / 2;
-        const halfThickness = part.thickness / 2;
-        const halfWidth = part.width / 2;
-
         euler.set(
           (part.rotation.x * Math.PI) / 180,
           (part.rotation.y * Math.PI) / 180,
@@ -229,42 +262,21 @@ export function Workspace() {
           'XYZ'
         );
         quat.setFromEuler(euler);
-        center.set(part.position.x, part.position.y, part.position.z);
 
-        corners[0].set(-halfLength, -halfThickness, -halfWidth);
-        corners[1].set(-halfLength, -halfThickness, halfWidth);
-        corners[2].set(-halfLength, halfThickness, -halfWidth);
-        corners[3].set(-halfLength, halfThickness, halfWidth);
-        corners[4].set(halfLength, -halfThickness, -halfWidth);
-        corners[5].set(halfLength, -halfThickness, halfWidth);
-        corners[6].set(halfLength, halfThickness, -halfWidth);
-        corners[7].set(halfLength, halfThickness, halfWidth);
+        partCenter.set(part.position.x, part.position.y, part.position.z);
+        worldMatrix.compose(partCenter, quat, unitScale);
+        inverseMatrix.copy(worldMatrix).invert();
+        localRay.copy(ray).applyMatrix4(inverseMatrix);
 
-        let minX = Infinity;
-        let maxX = -Infinity;
-        let minY = Infinity;
-        let maxY = -Infinity;
+        localBounds.min.set(-part.length / 2, -part.thickness / 2, -part.width / 2);
+        localBounds.max.set(part.length / 2, part.thickness / 2, part.width / 2);
 
-        for (const c of corners) {
-          c.applyQuaternion(quat).add(center).project(camera);
-          const sx = ((c.x + 1) / 2) * rect.width + rect.left;
-          const sy = ((-c.y + 1) / 2) * rect.height + rect.top;
-          minX = Math.min(minX, sx);
-          maxX = Math.max(maxX, sx);
-          minY = Math.min(minY, sy);
-          maxY = Math.max(maxY, sy);
-        }
+        if (!localRay.intersectBox(localBounds, intersectionPoint)) continue;
 
-        const contains =
-          pointerScreenX >= minX - marginPx &&
-          pointerScreenX <= maxX + marginPx &&
-          pointerScreenY >= minY - marginPx &&
-          pointerScreenY <= maxY + marginPx;
-        if (!contains) continue;
-
-        const depth = center.clone().project(camera).z;
-        if (depth < bestDepth) {
-          bestDepth = depth;
+        worldIntersectionPoint.copy(intersectionPoint).applyMatrix4(worldMatrix);
+        const distance = ray.origin.distanceTo(worldIntersectionPoint);
+        if (distance < bestDistance) {
+          bestDistance = distance;
           bestPartId = part.id;
         }
       }
@@ -397,7 +409,34 @@ export function Workspace() {
 
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button === 0) {
-        leftClickDownPos.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+        const selectionState = useSelectionStore.getState();
+        leftClickDownPos.current = {
+          x: e.clientX,
+          y: e.clientY,
+          time: Date.now(),
+          selectedPartIds: [...selectionState.selectedPartIds].sort(),
+          selectedGroupIds: [...selectionState.selectedGroupIds].sort()
+        };
+
+        const hitPartId = getHitPartId(e.clientX, e.clientY);
+        if (hitPartId) {
+          const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+          const isModKey = isMac ? e.metaKey : e.ctrlKey;
+          const isAdditiveSelection = e.shiftKey || isModKey;
+
+          if (!isAdditiveSelection) {
+            const projectState = useProjectStore.getState();
+            const hitContext = getPartGroupContext(hitPartId, projectState.groupMembers, selectionState.editingGroupId);
+            const isAlreadySelected =
+              selectionState.selectedPartIds.includes(hitPartId) ||
+              hitContext.ancestorGroupIds.some((groupId) => selectionState.selectedGroupIds.includes(groupId));
+
+            if (!isAlreadySelected) {
+              debugSelection('native:mousedown:left:apply-selection', { x: e.clientX, y: e.clientY, hitPartId });
+              selectFromPartHit(hitPartId, false);
+            }
+          }
+        }
       }
       if (e.button === 2) {
         rightClickDownPos.current = { x: e.clientX, y: e.clientY, time: Date.now() };
@@ -408,28 +447,52 @@ export function Workspace() {
           hitPartId
         });
         if (hitPartId) {
-          selectFromPartHit(hitPartId, false);
+          const selectionState = useSelectionStore.getState();
+          const projectState = useProjectStore.getState();
+          const hitContext = getPartGroupContext(hitPartId, projectState.groupMembers, selectionState.editingGroupId);
+          const isAlreadySelected =
+            selectionState.selectedPartIds.includes(hitPartId) ||
+            hitContext.ancestorGroupIds.some((groupId) => selectionState.selectedGroupIds.includes(groupId));
+
+          if (!isAlreadySelected) {
+            selectFromPartHit(hitPartId, false);
+          }
           setRightClickTarget({ type: 'part' });
-          debugSelection('native:mousedown:right:setTarget', { targetType: 'part', hitPartId });
+          debugSelection('native:mousedown:right:setTarget', {
+            targetType: 'part',
+            hitPartId,
+            isAlreadySelected
+          });
         }
       }
     };
 
     const handleMouseUp = (e: MouseEvent) => {
       if (e.button === 0 && leftClickDownPos.current) {
+        const currentSelection = useSelectionStore.getState();
+        const startSelection = leftClickDownPos.current;
+        const currentPartIds = [...currentSelection.selectedPartIds].sort();
+        const currentGroupIds = [...currentSelection.selectedGroupIds].sort();
+        const selectionChangedDuringClick =
+          startSelection.selectedPartIds.length !== currentPartIds.length ||
+          startSelection.selectedGroupIds.length !== currentGroupIds.length ||
+          startSelection.selectedPartIds.some((id, idx) => id !== currentPartIds[idx]) ||
+          startSelection.selectedGroupIds.some((id, idx) => id !== currentGroupIds[idx]);
+
         const dx = e.clientX - leftClickDownPos.current.x;
         const dy = e.clientY - leftClickDownPos.current.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         const elapsed = Date.now() - leftClickDownPos.current.time;
 
         // Native selection fallback for simple clicks.
-        if (distance <= 5 && elapsed <= 500) {
+        if (distance <= 5 && elapsed <= 500 && !selectionChangedDuringClick) {
           const hitPartId = getHitPartId(e.clientX, e.clientY);
           debugSelection('native:mouseup:left', {
             x: e.clientX,
             y: e.clientY,
             distance,
             elapsed,
+            selectionChangedDuringClick,
             hitPartId
           });
           if (hitPartId) {
@@ -439,6 +502,13 @@ export function Workspace() {
           } else {
             debugSelection('native:mouseup:left:no-part-hit');
           }
+        } else if (distance <= 5 && elapsed <= 500 && selectionChangedDuringClick) {
+          debugSelection('native:mouseup:left:skipped-selection-already-changed', {
+            x: e.clientX,
+            y: e.clientY,
+            distance,
+            elapsed
+          });
         }
         leftClickDownPos.current = null;
       }
@@ -518,7 +588,9 @@ export function Workspace() {
       pointerNdcRef.current.set(ndcX, ndcY);
       raycasterRef.current.setFromCamera(pointerNdcRef.current, camera);
       const hits = raycasterRef.current.intersectObjects(scene.children, true);
-      return hits.some((hit) => {
+      const hitsInteractiveObject = hits.some((hit) => {
+        if (hit.object.userData?.blocksPartSelection) return true;
+
         const partId = hit.object.userData?.partId as string | undefined;
         if (partId) return true;
 
@@ -527,8 +599,40 @@ export function Workspace() {
 
         return false;
       });
+
+      if (hitsInteractiveObject) return true;
+
+      const euler = new THREE.Euler();
+      const quat = new THREE.Quaternion();
+      const inverseMatrix = new THREE.Matrix4();
+      const worldMatrix = new THREE.Matrix4();
+      const ray = raycasterRef.current.ray.clone();
+      const localRay = new THREE.Ray();
+      const intersectionPoint = new THREE.Vector3();
+      const unitScale = new THREE.Vector3(1, 1, 1);
+      const partCenter = new THREE.Vector3();
+      const localBounds = new THREE.Box3();
+
+      return parts.some((part) => {
+        euler.set(
+          (part.rotation.x * Math.PI) / 180,
+          (part.rotation.y * Math.PI) / 180,
+          (part.rotation.z * Math.PI) / 180,
+          'XYZ'
+        );
+        quat.setFromEuler(euler);
+        partCenter.set(part.position.x, part.position.y, part.position.z);
+        worldMatrix.compose(partCenter, quat, unitScale);
+        inverseMatrix.copy(worldMatrix).invert();
+        localRay.copy(ray).applyMatrix4(inverseMatrix);
+
+        localBounds.min.set(-part.length / 2, -part.thickness / 2, -part.width / 2);
+        localBounds.max.set(part.length / 2, part.thickness / 2, part.width / 2);
+
+        return localRay.intersectBox(localBounds, intersectionPoint) !== null;
+      });
     },
-    [camera, gl, scene]
+    [camera, gl, parts, scene]
   );
 
   // Click on empty space to deselect (only if not box selecting and not after drag)
@@ -698,15 +802,7 @@ export function Workspace() {
   useEffect(() => {
     if (!isBoxSelecting) return;
 
-    const handlePointerMove = (e: PointerEvent) => {
-      const newEnd = { x: e.clientX, y: e.clientY };
-      boxEndRef.current = newEnd;
-      if (boxStartRef.current) {
-        setSelectionBox({ start: boxStartRef.current, end: newEnd });
-      }
-    };
-
-    const handlePointerUp = () => {
+    const finishBoxSelection = () => {
       if (boxStartRef.current && boxEndRef.current) {
         // Calculate which parts are within the selection box
         const selectedIds = getPartsInSelectionBox(boxStartRef.current, boxEndRef.current);
@@ -730,12 +826,28 @@ export function Workspace() {
       }
     };
 
+    const handlePointerMove = (e: PointerEvent) => {
+      const newEnd = { x: e.clientX, y: e.clientY };
+      boxEndRef.current = newEnd;
+      if (boxStartRef.current) {
+        setSelectionBox({ start: boxStartRef.current, end: newEnd });
+      }
+    };
+
+    const handlePointerUp = () => {
+      finishBoxSelection();
+    };
+
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    window.addEventListener('blur', handlePointerUp);
 
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+      window.removeEventListener('blur', handlePointerUp);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isBoxSelecting, controls, selectParts, clearSelection, setSelectionBox, setSelectedSidebarStockId]);
@@ -910,6 +1022,9 @@ export function Workspace() {
 
       {/* All parts — hybrid instanced + individual rendering */}
       <PartsRenderer />
+
+      {/* Group-wide rotation handles */}
+      <GroupRotationHandles />
 
       {/* Multi-selection bounding box dimensions */}
       <MultiSelectionDimensions />
