@@ -1,6 +1,11 @@
-import { Html, Line } from '@react-three/drei';
+import { Line, Text } from '@react-three/drei';
+import { Suspense } from 'react';
 import { memo } from 'react';
+import * as THREE from 'three';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
+import labelFontUrl from '../../assets/fonts/NotoSans-Variable.ttf?url';
+
+const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
 
 // Blueprint-style dimension label component
 export const DimensionLabel = memo(
@@ -42,14 +47,39 @@ export const DimensionLabel = memo(
     ];
     const offsetEnd: [number, number, number] = [end[0] + offsetVec[0], end[1] + offsetVec[1], end[2] + offsetVec[2]];
     const labelPos: [number, number, number] = [midX + offsetVec[0], midY + offsetVec[1], midZ + offsetVec[2]];
+    const labelText = formatMeasurementWithUnit(value, units);
+    const lineLength = Math.sqrt(
+      (offsetEnd[0] - offsetStart[0]) ** 2 + (offsetEnd[1] - offsetStart[1]) ** 2 + (offsetEnd[2] - offsetStart[2]) ** 2
+    );
+    const lineDir: [number, number, number] = [
+      (offsetEnd[0] - offsetStart[0]) / Math.max(lineLength, 1e-6),
+      (offsetEnd[1] - offsetStart[1]) / Math.max(lineLength, 1e-6),
+      (offsetEnd[2] - offsetStart[2]) / Math.max(lineLength, 1e-6)
+    ];
+    const labelGap = Math.max(0.48, Math.min(0.82, 0.32 + labelText.length * 0.043));
+    const halfGap = Math.min(labelGap * 0.5, lineLength * 0.45);
+    const lineLeftEnd: [number, number, number] = [
+      labelPos[0] - lineDir[0] * halfGap,
+      labelPos[1] - lineDir[1] * halfGap,
+      labelPos[2] - lineDir[2] * halfGap
+    ];
+    const lineRightStart: [number, number, number] = [
+      labelPos[0] + lineDir[0] * halfGap,
+      labelPos[1] + lineDir[1] * halfGap,
+      labelPos[2] + lineDir[2] * halfGap
+    ];
+    const textQuaternion = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      new THREE.Vector3(offsetVec[0], offsetVec[1], offsetVec[2]).normalize()
+    );
 
     // Calculate tick direction (perpendicular to both the line and offset direction)
-    const lineDir: [number, number, number] = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
+    const dimDir: [number, number, number] = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
     // Cross product of line direction and offset direction gives tick direction
     const tickDir: [number, number, number] = [
-      lineDir[1] * offsetVec[2] - lineDir[2] * offsetVec[1],
-      lineDir[2] * offsetVec[0] - lineDir[0] * offsetVec[2],
-      lineDir[0] * offsetVec[1] - lineDir[1] * offsetVec[0]
+      dimDir[1] * offsetVec[2] - dimDir[2] * offsetVec[1],
+      dimDir[2] * offsetVec[0] - dimDir[0] * offsetVec[2],
+      dimDir[0] * offsetVec[1] - dimDir[1] * offsetVec[0]
     ];
     const tickLen = Math.sqrt(tickDir[0] ** 2 + tickDir[1] ** 2 + tickDir[2] ** 2);
     const tickLength = 0.3;
@@ -64,11 +94,13 @@ export const DimensionLabel = memo(
 
     return (
       <group>
-        {/* Main dimension line */}
-        <Line points={[offsetStart, offsetEnd]} color={color} lineWidth={1.5} />
+        {/* Main dimension line with centered gap at the label */}
+        <Line raycast={NOOP_RAYCAST} points={[offsetStart, lineLeftEnd]} color={color} lineWidth={1.5} />
+        <Line raycast={NOOP_RAYCAST} points={[lineRightStart, offsetEnd]} color={color} lineWidth={1.5} />
 
         {/* Start extension line */}
         <Line
+          raycast={NOOP_RAYCAST}
           points={[
             [start[0] + offsetVec[0] * 0.2, start[1] + offsetVec[1] * 0.2, start[2] + offsetVec[2] * 0.2],
             [
@@ -83,6 +115,7 @@ export const DimensionLabel = memo(
 
         {/* End extension line */}
         <Line
+          raycast={NOOP_RAYCAST}
           points={[
             [end[0] + offsetVec[0] * 0.2, end[1] + offsetVec[1] * 0.2, end[2] + offsetVec[2] * 0.2],
             [offsetEnd[0] + offsetVec[0] * 0.15, offsetEnd[1] + offsetVec[1] * 0.15, offsetEnd[2] + offsetVec[2] * 0.15]
@@ -93,6 +126,7 @@ export const DimensionLabel = memo(
 
         {/* Start tick mark (perpendicular to dimension line) */}
         <Line
+          raycast={NOOP_RAYCAST}
           points={[
             [
               offsetStart[0] - normalizedTick[0],
@@ -107,6 +141,7 @@ export const DimensionLabel = memo(
 
         {/* End tick mark */}
         <Line
+          raycast={NOOP_RAYCAST}
           points={[
             [offsetEnd[0] - normalizedTick[0], offsetEnd[1] - normalizedTick[1], offsetEnd[2] - normalizedTick[2]],
             [offsetEnd[0] + normalizedTick[0], offsetEnd[1] + normalizedTick[1], offsetEnd[2] + normalizedTick[2]]
@@ -115,24 +150,23 @@ export const DimensionLabel = memo(
           lineWidth={1.5}
         />
 
-        {/* Dimension text */}
-        <Html position={labelPos} center zIndexRange={[0, 50]} style={{ pointerEvents: 'none' }}>
-          <div
-            style={{
-              color: color,
-              fontSize: '13px',
-              fontWeight: 'bold',
-              fontFamily: 'monospace',
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              padding: '2px 6px',
-              borderRadius: '3px',
-              whiteSpace: 'nowrap',
-              userSelect: 'none'
-            }}
+        {/* Dimension text (3D mesh so depth/occlusion is consistent with scene geometry) */}
+        <Suspense fallback={null}>
+          <Text
+            raycast={NOOP_RAYCAST}
+            position={labelPos}
+            quaternion={textQuaternion}
+            font={labelFontUrl}
+            fontSize={0.34}
+            color={color}
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.018}
+            outlineColor="#000000"
           >
-            {formatMeasurementWithUnit(value, units)}
-          </div>
-        </Html>
+            {labelText}
+          </Text>
+        </Suspense>
       </group>
     );
   },

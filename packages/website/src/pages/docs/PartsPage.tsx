@@ -61,6 +61,57 @@ export default function PartsPage() {
               </p>
             </div>
             <div>
+              <p className="font-bold mb-xs">Rotation (X, Y, Z)</p>
+              <p className="text-muted">
+                Use the Rotation section for precise angles on each axis. Fast
+                90° turns are still available with <code>X</code>,{" "}
+                <code>Y</code>, and <code>Z</code> while selecting a part.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">
+                Custom Angles for Legs, Braces, and Tilted Parts
+              </p>
+              <p className="text-muted">
+                To set a part to an exact non-90° angle, select it and enter the
+                value directly in the matching Rotation input. For example, a
+                bench leg that leans inward can use a small custom angle on the
+                relevant axis instead of repeated 90° turns.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Drag-to-Rotate Grab Handle</p>
+              <p className="text-muted">
+                Drag the grab handle that appears just outside each rotation
+                ring to rotate continuously. Hold <code>Shift</code> while
+                dragging for finer control without snap.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Rotate Multiple Parts Together</p>
+              <p className="text-muted">
+                When multiple parts (or a group) are selected, a shared set of
+                rotation handles appears at the selection center so you can
+                rotate the whole set together.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Angle Snap</p>
+              <p className="text-muted">
+                Enable or disable angle snap directly in the Rotation section
+                and set the snap step (for example <code>15°</code>,{" "}
+                <code>5°</code>, or <code>1°</code>) to match your workflow.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Reset Rotation</p>
+              <p className="text-muted">
+                Use <code>Reset</code> in the Rotation section to return the
+                selected part to <code>0°, 0°, 0°</code> without editing each
+                axis manually.
+              </p>
+            </div>
+            <div>
               <p className="font-bold mb-xs">Stock Material</p>
               <p className="text-muted">
                 The material this part will be cut from. Used for cut list

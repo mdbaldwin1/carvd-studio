@@ -40,8 +40,8 @@ export default function InterfacePage() {
             </p>
             <p>
               <strong>Properties Panel</strong> — Right panel showing
-              dimensions, position, stock material, and other settings for the
-              selected part.
+              dimensions, position, precise rotation controls, stock material,
+              angle snap options, and other settings for the selected part.
             </p>
             <p>
               <strong>Header</strong> — Top bar with project/template/assembly
@@ -103,6 +103,14 @@ export default function InterfacePage() {
               <p className="font-bold mb-xs">Deselect</p>
               <p className="text-muted">
                 Press <code>Escape</code> or click empty space
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Rotate Selections Together</p>
+              <p className="text-muted">
+                When multiple parts or a group are selected, the shared rotation
+                handles appear at the center of the selection so the whole set
+                can be rotated together.
               </p>
             </div>
           </div>

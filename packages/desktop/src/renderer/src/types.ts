@@ -85,7 +85,7 @@ export interface Assembly {
   modifiedAt: string;
 }
 
-export type RotationAngle = 0 | 90 | 180 | 270;
+export type RotationAngle = number;
 
 export interface Rotation3D {
   x: RotationAngle;
@@ -100,7 +100,7 @@ export interface Part {
   width: number;
   thickness: number;
   position: { x: number; y: number; z: number };
-  rotation: Rotation3D; // degrees around each axis (90° increments)
+  rotation: Rotation3D; // degrees around each axis
   stockId: string | null; // assigned stock (null = unassigned)
   grainSensitive: boolean;
   grainDirection: 'length' | 'width'; // which way the grain runs on this part
@@ -181,6 +181,7 @@ export interface StockConstraintSettings {
 // App-level settings (persisted via electron-store)
 // Snap sensitivity presets
 export type SnapSensitivity = 'tight' | 'normal' | 'loose';
+export type AdvancedSnapPreset = 'simple' | 'precision' | 'layout';
 
 export interface AppSettings {
   defaultUnits: 'imperial' | 'metric';
@@ -195,6 +196,17 @@ export interface AppSettings {
   snapSensitivity: SnapSensitivity; // How close parts need to be to snap
   snapToOrigin: boolean; // Snap to workspace origin (X=0, Y=0, Z=0 planes)
   dimensionSnapSameTypeOnly: boolean; // Only match same dimension types (length to length, etc.)
+  advancedSnapPreset?: AdvancedSnapPreset; // Preset profile for advanced snap behavior
+  enableSurfaceAnchors?: boolean; // Enable center/midline/quarterline surface anchors
+  enableFractionalAnchors?: boolean; // Enable 0/25/50/75/100 fractional face anchors
+  enableGoldenRatioAnchors?: boolean; // Enable 38.2%/61.8% golden-ratio anchors on faces
+  enableFeatureAnchors?: boolean; // Enable edge/vertex/midpoint/extension feature snapping
+  enableLayoutSnaps?: boolean; // Master toggle for equal-spacing/distribution/pattern layout snaps
+  enableEqualSpacingSnap?: boolean; // Enable equal spacing snaps
+  enableDistributionSnap?: boolean; // Enable distribution interval snaps
+  enablePatternSnap?: boolean; // Enable pattern/repeat snaps
+  enableAxisLegacySnaps?: boolean; // Enable legacy axis edge/center snaps
+  showSnapCandidates?: boolean; // Show candidate indicators in addition to winning snaps
   // Display settings
   lightingMode?: LightingMode; // Lighting preset for 3D workspace (default | bright | studio | dramatic)
   brightnessMultiplier?: number; // Brightness multiplier (0.25 to 2.0, default 1.0)
@@ -244,6 +256,20 @@ export interface Clipboard {
 export interface SnapLine {
   axis: 'x' | 'y' | 'z'; // Which axis this line is along
   type: 'edge' | 'center' | 'face' | 'equal-spacing' | 'dimension-match'; // Type of snap
+  // Optional semantic family/subtype metadata for rendering and arbitration debug
+  family?:
+    | 'guide'
+    | 'origin'
+    | 'face'
+    | 'surface-anchor'
+    | 'surface-fraction'
+    | 'feature'
+    | 'equal-spacing'
+    | 'dimension-match'
+    | 'axis';
+  subtype?: string;
+  state?: 'candidate' | 'winner' | 'latched';
+  priority?: number;
   // Line start and end points in world space
   start: { x: number; y: number; z: number };
   end: { x: number; y: number; z: number };

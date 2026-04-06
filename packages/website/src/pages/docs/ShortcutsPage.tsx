@@ -118,6 +118,18 @@ export default function ShortcutsPage() {
               <span className="text-muted">Rotate 90°</span>
               <code>X / Y / Z</code>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Precise Rotate</span>
+              <code>Properties → Rotation</code>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Set Custom Angle Snap Step</span>
+              <code>Properties → Rotation → Step</code>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted">Fine Drag Rotate</span>
+              <code>Shift + Drag Ring</code>
+            </div>
           </div>
         </div>
 
