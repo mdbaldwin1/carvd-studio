@@ -35,7 +35,7 @@ jobs:
           NODE_ENV: 'test'
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         with:
           files: ./packages/desktop/coverage/lcov.info
           flags: unittests
@@ -104,7 +104,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ matrix.os }}
           path: packages/desktop/playwright-report/
@@ -165,7 +165,7 @@ jobs:
           NODE_ENV: 'test'
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         with:
           files: ./packages/website/coverage/lcov.info
           flags: website
@@ -202,7 +202,7 @@ jobs:
 
       - name: Upload test results
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: website-playwright-report
           path: packages/website/playwright-report/
