@@ -1,62 +1,8 @@
 version: 2
 updates:
-  # Desktop app dependencies
-  - package-ecosystem: "npm"
-    directory: "/packages/desktop"
-    target-branch: "develop"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-    open-pull-requests-limit: 5
-    groups:
-      # Group Electron-related updates
-      electron:
-        patterns:
-          - "electron"
-          - "electron-*"
-      # Group testing dependencies
-      testing:
-        patterns:
-          - "*vitest*"
-          - "*playwright*"
-          - "*testing-library*"
-      # Group Three.js and related
-      threejs:
-        patterns:
-          - "three"
-          - "@types/three"
-    labels:
-      - "dependencies"
-      - "desktop"
-
-  # Website dependencies
-  - package-ecosystem: "npm"
-    directory: "/packages/website"
-    target-branch: "develop"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-    open-pull-requests-limit: 5
-    groups:
-      react:
-        patterns:
-          - "react"
-          - "react-dom"
-          - "@types/react"
-          - "@types/react-dom"
-          - "react-router-dom"
-      testing:
-        patterns:
-          - "*vitest*"
-          - "*playwright*"
-          - "*testing-library*"
-    labels:
-      - "dependencies"
-      - "website"
-
   # Root workspace dependencies
+  # This repo uses a single root package-lock.json, so npm updates need to be
+  # generated from "/" to keep package manifests and the lockfile in sync.
   - package-ecosystem: "npm"
     directory: "/"
     target-branch: "develop"
@@ -64,7 +10,37 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 8
+    groups:
+      electron:
+        patterns:
+          - "electron"
+          - "electron-*"
+      vite-react:
+        patterns:
+          - "vite"
+          - "@vitejs/plugin-react"
+      testing:
+        patterns:
+          - "*vitest*"
+          - "*playwright*"
+          - "*testing-library*"
+          - "happy-dom"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "react-router-dom"
+          - "react-virtuoso"
+      rendering:
+        patterns:
+          - "three"
+          - "@types/three"
+      vercel:
+        patterns:
+          - "@vercel/*"
     labels:
       - "dependencies"
       - "workspace"
