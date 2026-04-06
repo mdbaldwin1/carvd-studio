@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Transitive dependency security refresh** — Refreshed the npm lockfile and applied targeted override resolutions for vulnerable transitive chains (`dompurify`, `lodash`, `lodash-es`, `undici`, `tar`, `@xmldom/xmldom`, and `minimatch`) so the current Dependabot alert set is cleared on `develop`.
 - **Snapping settings expanded with presets and anchor toggles** — App Settings now expose advanced snap controls (`Simple`/`Precision`/`Layout` preset, surface-anchor toggle, fractional-anchor toggle, candidate-indicator toggle), and drag pipelines respect those preferences in both single-part and group drag flows.
 - **Ghost display mode readability** — Increased Ghost/translucent part opacity and added outline rendering so part silhouettes are easier to read while staying semi-transparent.
 - **Rotation model generalized beyond 90° increments** — Internal rotation typing and transformation utilities now support arbitrary angles while preserving fast `X/Y/Z` keyboard rotations for intuitive quick-turn workflows.
