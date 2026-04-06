@@ -27,11 +27,20 @@ export function wouldOverlapWithAny(part: Part, parts: Part[]): boolean {
 }
 
 export function wouldTransformedPartsOverlap(parts: Part[], transformedPartsById: Map<string, Part>): boolean {
-  const effectiveParts = parts.map((p) => transformedPartsById.get(p.id) ?? p);
+  if (transformedPartsById.size === 0) return false;
 
-  for (let i = 0; i < effectiveParts.length; i += 1) {
-    for (let j = i + 1; j < effectiveParts.length; j += 1) {
-      if (partsOverlap(effectiveParts[i], effectiveParts[j])) {
+  const effectivePartsById = new Map(parts.map((p) => [p.id, transformedPartsById.get(p.id) ?? p]));
+
+  for (const [transformedId, transformedPart] of transformedPartsById) {
+    for (const other of parts) {
+      if (other.id === transformedId) continue;
+
+      // Pairs that do not involve a transformed part are unrelated to this
+      // update and should not block valid changes elsewhere in the project.
+      if (other.id < transformedId && transformedPartsById.has(other.id)) continue;
+
+      const effectiveOther = effectivePartsById.get(other.id);
+      if (effectiveOther && partsOverlap(transformedPart, effectiveOther)) {
         return true;
       }
     }
