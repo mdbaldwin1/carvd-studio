@@ -224,6 +224,10 @@ export function Workspace() {
       const hits = raycasterRef.current.intersectObjects(scene.children, true);
 
       for (const hit of hits) {
+        if (hit.object.userData?.blocksPartSelection) {
+          return null;
+        }
+
         const partId = (hit.object.userData?.partId as string | undefined) ?? null;
         if (partId) return partId;
 
@@ -233,24 +237,24 @@ export function Workspace() {
         }
       }
 
-      // Fallback: screen-space hit test from project parts.
-      // This path does not depend on mesh/instance raycast internals.
-      const pointerScreenX = clientX;
-      const pointerScreenY = clientY;
+      // Fallback: precise ray-vs-rotated-box hit test from project parts.
+      // This avoids the false positives that came from projected screen-space
+      // bounding boxes selecting clicks near, but not on, a part.
       let bestPartId: string | null = null;
-      let bestDepth = Infinity;
-      const marginPx = 2;
-
-      const corners = Array.from({ length: 8 }, () => new THREE.Vector3());
-      const center = new THREE.Vector3();
+      let bestDistance = Infinity;
       const euler = new THREE.Euler();
       const quat = new THREE.Quaternion();
+      const inverseMatrix = new THREE.Matrix4();
+      const worldMatrix = new THREE.Matrix4();
+      const ray = raycasterRef.current.ray.clone();
+      const localRay = new THREE.Ray();
+      const intersectionPoint = new THREE.Vector3();
+      const worldIntersectionPoint = new THREE.Vector3();
+      const unitScale = new THREE.Vector3(1, 1, 1);
+      const partCenter = new THREE.Vector3();
+      const localBounds = new THREE.Box3();
 
       for (const part of parts) {
-        const halfLength = part.length / 2;
-        const halfThickness = part.thickness / 2;
-        const halfWidth = part.width / 2;
-
         euler.set(
           (part.rotation.x * Math.PI) / 180,
           (part.rotation.y * Math.PI) / 180,
@@ -258,42 +262,21 @@ export function Workspace() {
           'XYZ'
         );
         quat.setFromEuler(euler);
-        center.set(part.position.x, part.position.y, part.position.z);
 
-        corners[0].set(-halfLength, -halfThickness, -halfWidth);
-        corners[1].set(-halfLength, -halfThickness, halfWidth);
-        corners[2].set(-halfLength, halfThickness, -halfWidth);
-        corners[3].set(-halfLength, halfThickness, halfWidth);
-        corners[4].set(halfLength, -halfThickness, -halfWidth);
-        corners[5].set(halfLength, -halfThickness, halfWidth);
-        corners[6].set(halfLength, halfThickness, -halfWidth);
-        corners[7].set(halfLength, halfThickness, halfWidth);
+        partCenter.set(part.position.x, part.position.y, part.position.z);
+        worldMatrix.compose(partCenter, quat, unitScale);
+        inverseMatrix.copy(worldMatrix).invert();
+        localRay.copy(ray).applyMatrix4(inverseMatrix);
 
-        let minX = Infinity;
-        let maxX = -Infinity;
-        let minY = Infinity;
-        let maxY = -Infinity;
+        localBounds.min.set(-part.length / 2, -part.thickness / 2, -part.width / 2);
+        localBounds.max.set(part.length / 2, part.thickness / 2, part.width / 2);
 
-        for (const c of corners) {
-          c.applyQuaternion(quat).add(center).project(camera);
-          const sx = ((c.x + 1) / 2) * rect.width + rect.left;
-          const sy = ((-c.y + 1) / 2) * rect.height + rect.top;
-          minX = Math.min(minX, sx);
-          maxX = Math.max(maxX, sx);
-          minY = Math.min(minY, sy);
-          maxY = Math.max(maxY, sy);
-        }
+        if (!localRay.intersectBox(localBounds, intersectionPoint)) continue;
 
-        const contains =
-          pointerScreenX >= minX - marginPx &&
-          pointerScreenX <= maxX + marginPx &&
-          pointerScreenY >= minY - marginPx &&
-          pointerScreenY <= maxY + marginPx;
-        if (!contains) continue;
-
-        const depth = center.clone().project(camera).z;
-        if (depth < bestDepth) {
-          bestDepth = depth;
+        worldIntersectionPoint.copy(intersectionPoint).applyMatrix4(worldMatrix);
+        const distance = ray.origin.distanceTo(worldIntersectionPoint);
+        if (distance < bestDistance) {
+          bestDistance = distance;
           bestPartId = part.id;
         }
       }
@@ -605,7 +588,9 @@ export function Workspace() {
       pointerNdcRef.current.set(ndcX, ndcY);
       raycasterRef.current.setFromCamera(pointerNdcRef.current, camera);
       const hits = raycasterRef.current.intersectObjects(scene.children, true);
-      return hits.some((hit) => {
+      const hitsInteractiveObject = hits.some((hit) => {
+        if (hit.object.userData?.blocksPartSelection) return true;
+
         const partId = hit.object.userData?.partId as string | undefined;
         if (partId) return true;
 
@@ -614,8 +599,40 @@ export function Workspace() {
 
         return false;
       });
+
+      if (hitsInteractiveObject) return true;
+
+      const euler = new THREE.Euler();
+      const quat = new THREE.Quaternion();
+      const inverseMatrix = new THREE.Matrix4();
+      const worldMatrix = new THREE.Matrix4();
+      const ray = raycasterRef.current.ray.clone();
+      const localRay = new THREE.Ray();
+      const intersectionPoint = new THREE.Vector3();
+      const unitScale = new THREE.Vector3(1, 1, 1);
+      const partCenter = new THREE.Vector3();
+      const localBounds = new THREE.Box3();
+
+      return parts.some((part) => {
+        euler.set(
+          (part.rotation.x * Math.PI) / 180,
+          (part.rotation.y * Math.PI) / 180,
+          (part.rotation.z * Math.PI) / 180,
+          'XYZ'
+        );
+        quat.setFromEuler(euler);
+        partCenter.set(part.position.x, part.position.y, part.position.z);
+        worldMatrix.compose(partCenter, quat, unitScale);
+        inverseMatrix.copy(worldMatrix).invert();
+        localRay.copy(ray).applyMatrix4(inverseMatrix);
+
+        localBounds.min.set(-part.length / 2, -part.thickness / 2, -part.width / 2);
+        localBounds.max.set(part.length / 2, part.thickness / 2, part.width / 2);
+
+        return localRay.intersectBox(localBounds, intersectionPoint) !== null;
+      });
     },
-    [camera, gl, scene]
+    [camera, gl, parts, scene]
   );
 
   // Click on empty space to deselect (only if not box selecting and not after drag)

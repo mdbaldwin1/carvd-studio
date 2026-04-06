@@ -73,6 +73,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Unrelated project overlaps no longer freeze valid rotations** — Overlap-prevention checks for store-driven transforms now only evaluate collision pairs involving the part(s) being changed, so pre-existing overlaps elsewhere in a project no longer block rotation handles, 90° face rotates, or rotation input edits on unrelated parts.
+- **Rotation handles no longer steal nearby part clicks** — Rotation rings, connector stems, and drag knobs now block the workspace’s native part-selection fallback so clicking near or on those controls no longer re-selects the underlying part by accident.
+- **Part selection no longer uses loose screen boxes** — The workspace’s native click fallback now uses a precise ray-vs-rotated-box test instead of projected screen-space bounding boxes, so clicks near a part no longer count as selecting it.
 - **Angled movement + rotation axis UX hardening** — Non-90° part drag now uses orthonormalized virtual axes, group drag now mirrors angled virtual-axis behavior from the grabbed part context, and rotation-handle axis locking now uses pointer-down world-point projection for more reliable camera-angle axis selection.
 - **Angled group drag snap/movement regressions** — Group dragging now uses the same camera-projected drag plane model as single-part drag (removing camera-axis lock jumps), axis-legacy group snaps are automatically skipped in non-axis-aligned contexts, and final placement now preserves snapped axes instead of always re-quantizing to grid on drop.
 - **Layout snap commit flags for axis snaps** — `detectSnaps` now marks distribution/pattern layout snaps as snapped axes, so those snaps are consistently applied by drag handlers and no longer show visual snap lines without committing the matching axis move.

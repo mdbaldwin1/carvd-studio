@@ -162,6 +162,11 @@ export const RotationHandle = memo(
       return Math.atan2(clientY - center.y, clientX - center.x);
     };
 
+    const stopWorkspaceSelection = (e: ThreeEvent<MouseEvent | PointerEvent>) => {
+      e.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation();
+    };
+
     const getProjectedScreenPoint = useCallback(
       (world: THREE.Vector3): { x: number; y: number } => {
         _projected.current.copy(world).project(camera);
@@ -446,10 +451,11 @@ export const RotationHandle = memo(
             geometry={ROTATION_HIT_GEOMETRY}
             material={ROTATION_HIT_MATERIAL}
             rotation={[0, 0, glyphRollZ]}
+            userData={{ blocksPartSelection: true }}
             onPointerOver={handleRingPointerOver}
             onPointerOut={handleRingPointerOut}
             onClick={(e) => {
-              e.stopPropagation();
+              stopWorkspaceSelection(e);
               onRotate(axis);
             }}
           />
@@ -482,14 +488,24 @@ export const RotationHandle = memo(
 
         <group quaternion={faceQuaternion}>
           {/* Connector from ring to external grab handle */}
-          <line geometry={connectorGeometry}>
+          <line
+            geometry={connectorGeometry}
+            userData={{ blocksPartSelection: true }}
+            onPointerDown={stopWorkspaceSelection}
+            onClick={stopWorkspaceSelection}
+          >
             <lineBasicMaterial color={grabColor} transparent opacity={0.85} />
           </line>
 
           {/* External grab handle for drag rotation */}
           <group position={grabPosition}>
             <mesh
-              onPointerDown={handlePointerDown}
+              userData={{ blocksPartSelection: true }}
+              onPointerDown={(e) => {
+                stopWorkspaceSelection(e);
+                handlePointerDown(e);
+              }}
+              onClick={stopWorkspaceSelection}
               onPointerOver={handleGrabPointerOver}
               onPointerOut={handleGrabPointerOut}
               renderOrder={1000}
@@ -498,7 +514,12 @@ export const RotationHandle = memo(
               <meshBasicMaterial transparent opacity={0.001} depthTest={false} depthWrite={false} />
             </mesh>
             <mesh
-              onPointerDown={handlePointerDown}
+              userData={{ blocksPartSelection: true }}
+              onPointerDown={(e) => {
+                stopWorkspaceSelection(e);
+                handlePointerDown(e);
+              }}
+              onClick={stopWorkspaceSelection}
               onPointerOver={handleGrabPointerOver}
               onPointerOut={handleGrabPointerOut}
               renderOrder={1001}
