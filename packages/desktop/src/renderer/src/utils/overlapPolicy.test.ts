@@ -50,6 +50,21 @@ describe('overlapPolicy', () => {
     expect(wouldTransformedPartsOverlap([a, b], transformed)).toBe(true);
   });
 
+  it('ignores unrelated existing overlaps when evaluating a transformed part', () => {
+    const blockerA = createPart({ id: 'a', length: 10, position: { x: 0, y: 0.5, z: 0 } });
+    const blockerB = createPart({ id: 'b', length: 10, position: { x: 5, y: 0.5, z: 0 } });
+    const movable = createPart({ id: 'c', length: 4, width: 4, position: { x: 30, y: 0.5, z: 0 } });
+    const parts = [blockerA, blockerB, movable];
+
+    expect(partsOverlap(blockerA, blockerB)).toBe(true);
+    expect(partsOverlap(movable, blockerA)).toBe(false);
+    expect(partsOverlap(movable, blockerB)).toBe(false);
+
+    const transformed = new Map<string, Part>([['c', { ...movable, rotation: { x: 0, y: 0, z: 45 } }]]);
+
+    expect(wouldTransformedPartsOverlap(parts, transformed)).toBe(false);
+  });
+
   it('resolves a safe translation delta before collision', () => {
     const moving = createPart({ id: 'moving', length: 4, position: { x: 0, y: 0.5, z: 0 } });
     const target = createPart({ id: 'target', length: 4, position: { x: 12, y: 0.5, z: 0 } });
