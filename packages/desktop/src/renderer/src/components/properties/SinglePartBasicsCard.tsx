@@ -63,13 +63,7 @@ export function SinglePartBasicsCard({
       y: editingRotationAxis === 'y' ? current.y : String(selectedPart.rotation.y),
       z: editingRotationAxis === 'z' ? current.z : String(selectedPart.rotation.z)
     }));
-  }, [
-    editingRotationAxis,
-    selectedPart.id,
-    selectedPart.rotation.x,
-    selectedPart.rotation.y,
-    selectedPart.rotation.z
-  ]);
+  }, [editingRotationAxis, selectedPart.id, selectedPart.rotation.x, selectedPart.rotation.y, selectedPart.rotation.z]);
 
   const commitRotationDraft = (axis: 'x' | 'y' | 'z') => {
     const draftValue = rotationDrafts[axis].trim();
