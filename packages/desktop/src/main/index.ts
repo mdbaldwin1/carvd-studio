@@ -311,7 +311,7 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     trafficLightPosition: isMac ? { x: 16, y: 14 } : undefined,
     icon: appIconPath ?? undefined,
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
+      preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
       // SECURITY NOTE: Sandbox is disabled because the preload script requires
