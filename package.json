@@ -44,7 +44,7 @@
     "@typescript-eslint/typescript-estree": {
       "minimatch": "9.0.7"
     },
-    "@xmldom/xmldom": "0.8.12",
+    "@xmldom/xmldom": "0.8.13",
     "app-builder-lib": {
       "minimatch": "10.2.3"
     },
