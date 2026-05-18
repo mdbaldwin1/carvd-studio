@@ -56,7 +56,13 @@ export function SnapGuides() {
         return (
           <group key={guide.id}>
             {/* Semi-transparent plane - interactive for context menu */}
-            <mesh position={position} rotation={rotation} onPointerDown={(e) => handleGuidePointerDown(e, guide.id)}>
+            <mesh
+              position={position}
+              rotation={rotation}
+              onPointerDown={(e) => handleGuidePointerDown(e, guide.id)}
+              // ADR-002: descriptor lets the hit-test service resolve this guide.
+              userData={{ hitTarget: { kind: 'snap-guide', guideId: guide.id } }}
+            >
               <planeGeometry args={[GUIDE_SIZE, GUIDE_SIZE]} />
               <meshBasicMaterial
                 color={axisColors[guide.axis]}

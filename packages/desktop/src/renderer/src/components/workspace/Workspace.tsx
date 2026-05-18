@@ -24,14 +24,9 @@ import { SnapAlignmentLines } from './SnapAlignmentLines';
 import { SnapGuides } from './SnapGuides';
 import { ThumbnailCaptureHandler } from './ThumbnailCaptureHandler';
 import { installDragDebugTools } from '../../utils/dragDebug';
-import { hasInteractiveHitAt as resolveHasInteractiveHitAt, resolveHitTarget } from '../../interaction/hitTest';
-import {
-  LIGHTING_PRESETS,
-  isOrbitControls,
-  setRightClickTarget,
-  getRightClickTarget,
-  clearRightClickTarget
-} from './workspaceUtils';
+import { hasInteractiveHitAt as resolveHasInteractiveHitAt } from '../../interaction/hitTest';
+import { useCanvasPointerSession } from '../../interaction/useCanvasPointerSession';
+import { LIGHTING_PRESETS, isOrbitControls, setRightClickTarget } from './workspaceUtils';
 
 declare global {
   interface Window {
@@ -93,8 +88,6 @@ export function Workspace() {
   const pendingCameraRestore = useCameraStore((s) => s.pendingCameraRestore);
   const clearPendingCameraRestore = useCameraStore((s) => s.clearPendingCameraRestore);
   const editingGroupId = useSelectionStore((s) => s.editingGroupId);
-  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
-  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const exitGroup = useSelectionStore((s) => s.exitGroup);
   const lightingMode = useAppSettingsStore((s) => s.settings.lightingMode) || 'default';
   const brightnessMultiplier = useAppSettingsStore((s) => s.settings.brightnessMultiplier) ?? 1.0;
@@ -178,61 +171,35 @@ export function Workspace() {
     };
   }, [controls, camera, setCameraState]);
 
-  // Track mouse position to distinguish click vs drag (for camera orbit)
+  // ADR-003: pointer state lives inside the session controller in
+  // `useCanvasPointerSession` below. The legacy cross-handler refs
+  // (`leftClickDownPos`, `rightClickDownPos`, `previousSelectionKeyRef`) are
+  // gone — the state machine is the single source of truth for click vs drag
+  // classification and double-click timing.
+  //
+  // `pointerDownPos` is kept because R3F per-mesh ground/sky handlers below
+  // still use it to distinguish a deliberate empty-click from an orbit drag.
+  // `lastSelectionApplyAtRef` is kept for the same reason — it suppresses
+  // empty-click deselect for 250ms after a selection was applied, protecting
+  // the click-vs-bubble race between the per-mesh part handler and the per-mesh
+  // ground handler. The session controller's `onClick` updates this ref via
+  // `markSelectionApplied` so the guard still works.
+  // (Those R3F paths migrate to the controller in §4 alongside tool solvers.)
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
   // Guard against double-processing the same background double-click via bubbling/overlap.
   const lastBackgroundDoubleClickAt = useRef(0);
-  // Track right-click position and time to distinguish right-click vs right-drag (for pan)
-  const rightClickDownPos = useRef<{ x: number; y: number; time: number } | null>(null);
-  const leftClickDownPos = useRef<{
-    x: number;
-    y: number;
-    time: number;
-    selectedPartIds: string[];
-    selectedGroupIds: string[];
-  } | null>(null);
   const lastSelectionApplyAtRef = useRef(0);
-  const previousSelectionKeyRef = useRef<string | null>(null);
   const lastPartDrillAtRef = useRef(0);
 
   const markSelectionApplied = () => {
     lastSelectionApplyAtRef.current = performance.now();
   };
 
-  // Part/instanced handlers can update selection before this workspace-level
-  // native fallback runs; track those updates so fallback does not overwrite them.
-  useEffect(() => {
-    const key = `${[...selectedPartIds].sort().join(',')}|${[...selectedGroupIds].sort().join(',')}`;
-    if (previousSelectionKeyRef.current === null) {
-      previousSelectionKeyRef.current = key;
-      return;
-    }
-    if (previousSelectionKeyRef.current !== key) {
-      previousSelectionKeyRef.current = key;
-      markSelectionApplied();
-    }
-  }, [selectedPartIds, selectedGroupIds]);
-
-  // ADR-002: hit-testing is centralized in `src/renderer/src/interaction/hitTest.ts`.
-  // `getHitPartId` returns the part the click landed on (if any). All other
-  // hit-target kinds (handles, snap guides, overlays, ground, sky) are ignored
-  // here — this function is only for "what part did the user click."
-  const getHitPartId = useCallback(
-    (clientX: number, clientY: number): string | null => {
-      const rect = gl.domElement.getBoundingClientRect();
-      const target = resolveHitTarget(
-        { clientX, clientY },
-        {
-          camera,
-          scene,
-          canvasRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-          parts
-        }
-      );
-      return target?.kind === 'part-body' ? target.partId : null;
-    },
-    [camera, gl, scene, parts]
-  );
+  // ADR-003: `getHitPartId` is no longer needed at the Workspace level — the
+  // session controller's hit-test runs inside `useCanvasPointerSession` and
+  // delivers typed `HitTarget` results to the click/contextmenu handlers.
+  // `selectFromPartHit` / `drillFromPartHit` are still called from those
+  // handlers, but they now receive `partId` from the session action directly.
 
   const selectFromPartHit = useCallback(
     (partId: string, additive: boolean) => {
@@ -339,307 +306,101 @@ export function Workspace() {
     [enterGroup, selectGroup, selectPart, setSelectedSidebarStockId]
   );
 
-  // Prevent native context menu and trigger our own. Listener is on `window` rather
-  // than `gl.domElement` so it still fires when the right-click lands on an overlay
-  // HTML element (drei <Html> labels, dimension chips, reference rulers) that sits
-  // on top of the canvas. The canvas's own DOM listener would miss those because the
-  // overlays render via portal in document.body, outside the canvas's bubble path.
-  // We gate by checking that the click position is inside the canvas viewport rect,
-  // so non-workspace UI (sidebar, modals, headers) keeps its own right-click behavior.
-  useEffect(() => {
-    const canvas = gl.domElement;
-
-    // Reset the right-click target at the start of every pointerdown gesture so a
-    // value left over from a previous interaction can't be misread. The R3F pointer
-    // handlers on Part / InstancedParts / SnapGuides / ground / sky run in bubble
-    // phase and overwrite this with the actual target if the gesture hits a 3D mesh.
-    // For right-clicks that land on HTML overlays (no R3F hit), the target stays
-    // null and preventContextMenu falls back to a fresh raycast.
-    const resetTargetOnPointerDown = () => {
-      clearRightClickTarget();
-    };
-    window.addEventListener('pointerdown', resetTargetOnPointerDown, true);
-
-    const preventContextMenu = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
-        // Right-click outside workspace area — let it pass to whoever owns it.
-        return;
-      }
-
-      e.preventDefault();
-
-      // Consume the right-click target eagerly so it can never leak into a later
-      // gesture. The target is set by R3F pointerdown handlers (Part / InstancedParts /
-      // SnapGuides / ground / sky) at the start of THIS gesture; we use it once here
-      // and discard, regardless of whether mouseup eventually clears it.
-      const target = getRightClickTarget();
-      clearRightClickTarget();
-
-      debugSelection('contextmenu:fired', {
-        x: e.clientX,
-        y: e.clientY,
-        button: e.button,
-        ctrlKey: e.ctrlKey,
-        metaKey: e.metaKey,
-        target,
-        eventTarget: (e.target as HTMLElement | null)?.tagName ?? null,
-        currentSelection: useSelectionStore.getState().selectedPartIds,
-        currentContextMenu: useUIStore.getState().contextMenu
-      });
-      if (target) {
-        if (target.type === 'guide' && target.guideId) {
-          openContextMenu({
-            x: e.clientX,
-            y: e.clientY,
-            type: 'guide',
-            guideId: target.guideId
-          });
-        } else if (target.type === 'part') {
-          openContextMenu({ x: e.clientX, y: e.clientY, type: 'part' });
-        } else {
-          openContextMenu({
-            x: e.clientX,
-            y: e.clientY,
-            type: 'background',
-            worldPosition: target.worldPosition
-          });
+  // ADR-003: pointer events are routed through the session controller. Hook
+  // owns all native canvas + window listeners (pointerdown/up/move/cancel,
+  // blur, escape, contextmenu) and emits typed semantic actions back to us.
+  //
+  // Per-mesh R3F handlers in Part.tsx / InstancedParts.tsx still apply
+  // selection eagerly on pointerdown — the controller's `onClick` is the
+  // fallback for clicks that R3F's per-mesh path didn't already handle (e.g.
+  // when orbit/drag detection ate the R3F click). The controller is
+  // authoritative for double-click, context menu, and empty-space clicks.
+  useCanvasPointerSession({
+    canvas: gl.domElement,
+    camera,
+    scene,
+    parts,
+    handlers: {
+      onClick: (action) => {
+        // Mirror the legacy native-mouseup fallback: skip additive (the per-mesh
+        // R3F handler already toggled selection; re-toggling would net zero).
+        const isAdditive = action.modifiers.shift || action.modifiers.meta || action.modifiers.ctrl;
+        if (isAdditive) {
+          debugSelection('session:click:additive-skipped');
+          return;
         }
-        debugSelection('contextmenu:opened-from-target', { type: target.type });
-        return;
-      }
-
-      // No R3F-captured target — usually because the right-click landed on an HTML
-      // overlay rather than a 3D object, or because the gesture (e.g. ctrl+left-click
-      // on macOS) didn't fire a button=2 pointerdown. Resolve the actual target by
-      // raycasting at the click coordinates against the 3D scene.
-      const hitPartId = getHitPartId(e.clientX, e.clientY);
-      debugSelection('contextmenu:fallback-raycast', { hitPartId });
-      if (hitPartId) {
-        const selectionState = useSelectionStore.getState();
-        const projectState = useProjectStore.getState();
-        const hitContext = getPartGroupContext(hitPartId, projectState.groupMembers, selectionState.editingGroupId);
-        const isAlreadySelected =
-          selectionState.selectedPartIds.includes(hitPartId) ||
-          hitContext.ancestorGroupIds.some((groupId) => selectionState.selectedGroupIds.includes(groupId));
-
-        if (!isAlreadySelected) {
-          selectFromPartHit(hitPartId, false);
+        if (action.hit?.kind === 'part-body') {
+          debugSelection('session:click:part-fallback', { partId: action.hit.partId });
+          selectFromPartHit(action.hit.partId, false);
         }
-
-        openContextMenu({ x: e.clientX, y: e.clientY, type: 'part' });
-        debugSelection('contextmenu:opened-from-fallback');
-      } else {
-        // Empty workspace area — open the background context menu so the gesture
-        // still does something useful (Add Guide, etc.).
-        openContextMenu({ x: e.clientX, y: e.clientY, type: 'background' });
-        debugSelection('contextmenu:opened-background-empty');
-      }
-    };
-    window.addEventListener('contextmenu', preventContextMenu);
-    debugSelection('contextmenu:listener-attached');
-    return () => {
-      window.removeEventListener('contextmenu', preventContextMenu);
-      window.removeEventListener('pointerdown', resetTargetOnPointerDown, true);
-      debugSelection('contextmenu:listener-detached');
-    };
-  }, [gl, getHitPartId, openContextMenu, selectFromPartHit]);
-
-  // Track right-click for our custom context menu (fires on mouseup, not mousedown)
-  useEffect(() => {
-    const canvas = gl.domElement;
-
-    const handleMouseDown = (e: MouseEvent) => {
-      if (e.button === 0) {
-        const selectionState = useSelectionStore.getState();
-        leftClickDownPos.current = {
-          x: e.clientX,
-          y: e.clientY,
-          time: Date.now(),
-          selectedPartIds: [...selectionState.selectedPartIds].sort(),
-          selectedGroupIds: [...selectionState.selectedGroupIds].sort()
-        };
-
-        const hitPartId = getHitPartId(e.clientX, e.clientY);
-        if (hitPartId) {
-          const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
-          const isModKey = isMac ? e.metaKey : e.ctrlKey;
-          const isAdditiveSelection = e.shiftKey || isModKey;
-
-          if (!isAdditiveSelection) {
-            const projectState = useProjectStore.getState();
-            const hitContext = getPartGroupContext(hitPartId, projectState.groupMembers, selectionState.editingGroupId);
-            const isAlreadySelected =
-              selectionState.selectedPartIds.includes(hitPartId) ||
-              hitContext.ancestorGroupIds.some((groupId) => selectionState.selectedGroupIds.includes(groupId));
-
-            if (!isAlreadySelected) {
-              debugSelection('native:mousedown:left:apply-selection', { x: e.clientX, y: e.clientY, hitPartId });
-              selectFromPartHit(hitPartId, false);
-            }
-          }
+        // ground / sky / null are handled by the R3F per-mesh
+        // handleBackgroundClick / handleSkyClick paths (which run via the R3F
+        // event system) — we don't duplicate the deselect logic here.
+      },
+      onDoubleClick: (action) => {
+        if (action.hit?.kind === 'part-body') {
+          debugSelection('session:dblclick:part', { partId: action.hit.partId });
+          drillFromPartHit(action.hit.partId);
         }
-      }
-      if (e.button === 2) {
-        rightClickDownPos.current = { x: e.clientX, y: e.clientY, time: Date.now() };
-        const hitPartId = getHitPartId(e.clientX, e.clientY);
-        debugSelection('native:mousedown:right', {
-          x: e.clientX,
-          y: e.clientY,
-          hitPartId
+      },
+      onContextMenu: (action) => {
+        debugSelection('session:contextmenu', {
+          x: action.clientX,
+          y: action.clientY,
+          hit: action.hit?.kind ?? null
         });
-        if (hitPartId) {
-          const selectionState = useSelectionStore.getState();
+        if (action.hit?.kind === 'snap-guide') {
+          openContextMenu({
+            x: action.clientX,
+            y: action.clientY,
+            type: 'guide',
+            guideId: action.hit.guideId
+          });
+          return;
+        }
+        if (action.hit?.kind === 'part-body') {
+          // Ensure the part is selected (matching the legacy fallback) so the
+          // part context menu acts on the right target.
+          const selection = useSelectionStore.getState();
           const projectState = useProjectStore.getState();
-          const hitContext = getPartGroupContext(hitPartId, projectState.groupMembers, selectionState.editingGroupId);
+          const hitContext = getPartGroupContext(
+            action.hit.partId,
+            projectState.groupMembers,
+            selection.editingGroupId
+          );
           const isAlreadySelected =
-            selectionState.selectedPartIds.includes(hitPartId) ||
-            hitContext.ancestorGroupIds.some((groupId) => selectionState.selectedGroupIds.includes(groupId));
-
+            selection.selectedPartIds.includes(action.hit.partId) ||
+            hitContext.ancestorGroupIds.some((groupId) => selection.selectedGroupIds.includes(groupId));
           if (!isAlreadySelected) {
-            selectFromPartHit(hitPartId, false);
+            selectFromPartHit(action.hit.partId, false);
           }
-          setRightClickTarget({ type: 'part' });
-          debugSelection('native:mousedown:right:setTarget', {
-            targetType: 'part',
-            hitPartId,
-            isAlreadySelected
-          });
+          openContextMenu({ x: action.clientX, y: action.clientY, type: 'part' });
+          return;
         }
-      }
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      if (e.button === 0 && leftClickDownPos.current) {
-        const currentSelection = useSelectionStore.getState();
-        const startSelection = leftClickDownPos.current;
-        const currentPartIds = [...currentSelection.selectedPartIds].sort();
-        const currentGroupIds = [...currentSelection.selectedGroupIds].sort();
-        const selectionChangedDuringClick =
-          startSelection.selectedPartIds.length !== currentPartIds.length ||
-          startSelection.selectedGroupIds.length !== currentGroupIds.length ||
-          startSelection.selectedPartIds.some((id, idx) => id !== currentPartIds[idx]) ||
-          startSelection.selectedGroupIds.some((id, idx) => id !== currentGroupIds[idx]);
-
-        const dx = e.clientX - leftClickDownPos.current.x;
-        const dy = e.clientY - leftClickDownPos.current.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const elapsed = Date.now() - leftClickDownPos.current.time;
-
-        // Native selection fallback for simple clicks.
-        if (distance <= 5 && elapsed <= 500 && !selectionChangedDuringClick) {
-          const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
-          const isModKey = isMac ? e.metaKey : e.ctrlKey;
-          const isAdditive = e.shiftKey || isModKey;
-
-          // For additive (shift / cmd) clicks the R3F per-mesh pointerdown handler
-          // already toggled selection; running selectFromPartHit again here would
-          // toggle a second time and net to no change. Only reapply non-additive
-          // selection from this fallback (which is idempotent — re-selecting the
-          // same part is a no-op).
-          if (isAdditive) {
-            debugSelection('native:mouseup:left:additive-skipped');
-          } else {
-            const hitPartId = getHitPartId(e.clientX, e.clientY);
-            debugSelection('native:mouseup:left', {
-              x: e.clientX,
-              y: e.clientY,
-              distance,
-              elapsed,
-              selectionChangedDuringClick,
-              hitPartId
-            });
-            if (hitPartId) {
-              selectFromPartHit(hitPartId, false);
-            } else {
-              debugSelection('native:mouseup:left:no-part-hit');
-            }
-          }
-        } else if (distance <= 5 && elapsed <= 500 && selectionChangedDuringClick) {
-          debugSelection('native:mouseup:left:skipped-selection-already-changed', {
-            x: e.clientX,
-            y: e.clientY,
-            distance,
-            elapsed
+        if (action.hit?.kind === 'ground' || action.hit?.kind === 'sky') {
+          openContextMenu({
+            x: action.clientX,
+            y: action.clientY,
+            type: 'background',
+            worldPosition: action.hit.worldPoint
           });
+          return;
         }
-        leftClickDownPos.current = null;
+        // Click landed on empty space or a non-context-menu target (e.g. a
+        // handle). Open the background context menu so the gesture still does
+        // something useful (Add Guide, etc.).
+        openContextMenu({ x: action.clientX, y: action.clientY, type: 'background' });
       }
+    }
+  });
 
-      if (e.button === 2 && rightClickDownPos.current) {
-        const dx = e.clientX - rightClickDownPos.current.x;
-        const dy = e.clientY - rightClickDownPos.current.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const elapsed = Date.now() - rightClickDownPos.current.time;
-
-        // Only show context menu if it was a quick click (not a pan)
-        if (distance <= 5 && elapsed <= 500) {
-          // Show context menu based on what was targeted on mousedown
-          const target = getRightClickTarget();
-          debugSelection('native:mouseup:right', {
-            x: e.clientX,
-            y: e.clientY,
-            distance,
-            elapsed,
-            target
-          });
-          if (target) {
-            if (target.type === 'guide' && target.guideId) {
-              openContextMenu({
-                x: e.clientX,
-                y: e.clientY,
-                type: 'guide',
-                guideId: target.guideId
-              });
-            } else if (target.type === 'part') {
-              openContextMenu({ x: e.clientX, y: e.clientY, type: 'part' });
-            } else {
-              openContextMenu({
-                x: e.clientX,
-                y: e.clientY,
-                type: 'background',
-                worldPosition: target.worldPosition
-              });
-            }
-          } else {
-            debugSelection('native:mouseup:right:no-target');
-          }
-        }
-        rightClickDownPos.current = null;
-        clearRightClickTarget();
-      }
-    };
-
-    const handleDoubleClick = (e: MouseEvent) => {
-      if (e.button !== 0) return;
-      if ((e as MouseEvent & { __carvdPartDblClickHandled?: boolean }).__carvdPartDblClickHandled) {
-        debugSelection('native:dblclick:left:skipped-already-handled');
-        return;
-      }
-      const hitPartId = getHitPartId(e.clientX, e.clientY);
-      debugSelection('native:dblclick:left', { x: e.clientX, y: e.clientY, hitPartId });
-      if (hitPartId) {
-        drillFromPartHit(hitPartId);
-      }
-    };
-
-    const handleWindowBlur = () => {
-      leftClickDownPos.current = null;
-      rightClickDownPos.current = null;
-      clearRightClickTarget();
-    };
-
-    canvas.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('blur', handleWindowBlur);
-    canvas.addEventListener('dblclick', handleDoubleClick);
-    return () => {
-      canvas.removeEventListener('mousedown', handleMouseDown);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('blur', handleWindowBlur);
-      canvas.removeEventListener('dblclick', handleDoubleClick);
-    };
-  }, [gl, openContextMenu, getHitPartId, selectFromPartHit, drillFromPartHit]);
+  // The legacy contextmenu + mousedown/mouseup/dblclick/blur useEffect blocks
+  // that lived here are deleted: the hook above owns all of those paths.
+  // Cross-handler refs (leftClickDownPos, rightClickDownPos,
+  // lastSelectionApplyAtRef, previousSelectionKeyRef, lastPartDrillAtRef) and
+  // their bookkeeping useEffect are likewise gone — the state machine inside
+  // the controller is now the single source of truth for click vs drag and
+  // double-click timing.
 
   // ADR-002: delegates to the hit-test service. Used by background-click and
   // empty-space-click paths to decide whether to clear the selection.
