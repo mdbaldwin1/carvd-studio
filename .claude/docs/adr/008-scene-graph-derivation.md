@@ -117,7 +117,7 @@ Out of scope for §1a. World transforms (the multiplication of nested local rota
 ## Open questions
 
 - **NodeId uniqueness when parts and groups have the same string id.** Today, part IDs and group IDs are both UUIDs; collisions are astronomically unlikely. The adapter assumes uniqueness across both spaces. If a project ever loads with a collision, the adapter throws (defensive — better than silent corruption). Document the invariant in the type comment.
-- **Cycle detection.** A malformed `groupMembers` can in theory create a cycle (group A contains group B contains group A). The adapter logs a `console.warn` during build; runtime traversals (`descendantPartIds`, `ancestorGroupIds`) carry a visited set so they terminate without throwing. This matches the legacy `getAllDescendantPartIds` behavior of silently handling cyclic data — the UI must keep rendering even when the project file is malformed. Tests cover both build-time logging and runtime termination.
+- **Cycle detection.** A malformed `groupMembers` can in theory create a cycle (group A contains group B contains group A). The adapter detects this during build and reports it; consumers see an error, not an infinite loop. Tests cover this case.
 - **Feature nodes for custom-cuts (§6).** When custom cuts adds end-cuts / bevels / drill patterns, those become feature nodes parented to a part. Defer the type extension to ADR-010 (`Part definition dual-format migration`).
 
 ## References

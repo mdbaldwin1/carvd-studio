@@ -80,13 +80,10 @@ export interface BuildWorkspaceSceneGraphInput {
  * Three.js, no store hooks. Callers should wrap in `useMemo` so the graph is
  * only rebuilt when its inputs change.
  *
- * Validation behavior:
- *   - Duplicate ids across parts and groups (throws — real corruption).
- *   - Cycles in the group hierarchy (tolerated — runtime traversals carry a
- *     visited set, logged via `console.warn`). This matches the legacy
- *     `getAllDescendantPartIds` behavior of silently handling malformed
- *     cyclic group data without breaking the UI.
- *   - Orphan group members (silently skipped).
+ * Detects:
+ *   - Duplicate ids across parts and groups (throws).
+ *   - Cycles in the group hierarchy (throws — better than infinite loop).
+ *   - Orphan group members (skipped; logged via `console.warn` in DEV).
  */
 export function buildWorkspaceSceneGraph(input: BuildWorkspaceSceneGraphInput): WorkspaceSceneGraph {
   // Step 1: validate id uniqueness across parts + groups.
@@ -162,22 +159,18 @@ export function buildWorkspaceSceneGraph(input: BuildWorkspaceSceneGraphInput): 
   function descendantPartIds(id: NodeId): ReadonlyArray<string> {
     const cached = descendantCache.get(id);
     if (cached) return cached;
-    // Visited set guards against malformed cyclic group data (see
-    // `detectCycles`). Once a group is in `visited`, we don't recurse back
-    // through it.
-    const result = collectDescendantPartIds(id, new Set());
-    descendantCache.set(id, result);
-    return result;
-  }
-
-  function collectDescendantPartIds(id: NodeId, visited: Set<NodeId>): string[] {
-    if (visited.has(id)) return [];
-    visited.add(id);
 
     const node = nodes.get(id);
-    if (!node) return [];
+    if (!node) {
+      descendantCache.set(id, []);
+      return [];
+    }
 
-    if (node.kind === 'part') return [node.id];
+    if (node.kind === 'part') {
+      const result = [node.id];
+      descendantCache.set(id, result);
+      return result;
+    }
 
     const out: string[] = [];
     for (const childId of node.childIds) {
@@ -186,9 +179,10 @@ export function buildWorkspaceSceneGraph(input: BuildWorkspaceSceneGraphInput): 
       if (child.kind === 'part') {
         out.push(child.id);
       } else {
-        out.push(...collectDescendantPartIds(child.id, visited));
+        out.push(...descendantPartIds(child.id));
       }
     }
+    descendantCache.set(id, out);
     return out;
   }
 
@@ -197,11 +191,8 @@ export function buildWorkspaceSceneGraph(input: BuildWorkspaceSceneGraphInput): 
     if (cached) return cached;
 
     const out: NodeId[] = [];
-    const visited = new Set<NodeId>();
     let current = nodes.get(id);
     while (current && current.parentId !== null) {
-      if (visited.has(current.parentId)) break; // cycle guard
-      visited.add(current.parentId);
       out.unshift(current.parentId);
       current = nodes.get(current.parentId);
     }
@@ -219,15 +210,11 @@ export function buildWorkspaceSceneGraph(input: BuildWorkspaceSceneGraphInput): 
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Cycle detection (tolerant)
-//
-// Cycles in `groupMembers` are malformed but tolerated — the UI must keep
-// rendering. Build-time detection logs the cycle; runtime traversals
-// (descendantPartIds, ancestorGroupIds) carry a visited set so they
-// terminate. Matches the legacy `getAllDescendantPartIds` behavior.
+// Cycle detection
 // ─────────────────────────────────────────────────────────────────────────────
 
 function detectCycles(groups: ReadonlyArray<Group>, childrenByGroup: ReadonlyMap<NodeId, ReadonlyArray<NodeId>>): void {
+  // Standard three-color DFS: WHITE = unvisited, GRAY = in-progress, BLACK = done.
   const color = new Map<NodeId, 'gray' | 'black'>();
 
   function visit(groupId: NodeId, path: NodeId[]): void {
@@ -235,8 +222,7 @@ function detectCycles(groups: ReadonlyArray<Group>, childrenByGroup: ReadonlyMap
     if (current === 'black') return;
     if (current === 'gray') {
       const cycle = [...path, groupId].join(' -> ');
-      console.warn(`[sceneGraph] cycle detected in group hierarchy: ${cycle}`);
-      return;
+      throw new Error(`buildWorkspaceSceneGraph: cycle detected in group hierarchy (${cycle})`);
     }
     color.set(groupId, 'gray');
     const childIds = childrenByGroup.get(groupId) ?? [];

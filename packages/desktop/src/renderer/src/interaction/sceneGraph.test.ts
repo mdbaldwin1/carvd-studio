@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Group, GroupMember, Part } from '../types';
 import { fixtureProject } from '../../../../tests/fixtures';
 import { buildWorkspaceSceneGraph } from './sceneGraph';
@@ -189,54 +189,16 @@ describe('buildWorkspaceSceneGraph', () => {
       expect(() => buildWorkspaceSceneGraph({ parts, groups, groupMembers: [] })).toThrow(/both a part and a group/);
     });
 
-    it('cycle in group hierarchy is tolerated (warns, does not throw)', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      try {
-        const groups = [makeGroup('a'), makeGroup('b')];
-        const members = [makeMember('m1', 'a', 'b', 'group'), makeMember('m2', 'b', 'a', 'group')];
-        const graph = buildWorkspaceSceneGraph({ parts: [], groups, groupMembers: members });
-        // Build succeeds, runtime traversal terminates.
-        expect(graph.descendantPartIds('a')).toEqual([]);
-        expect(graph.descendantPartIds('b')).toEqual([]);
-        // ancestorGroupIds also terminates on the cyclic chain.
-        const aAncestors = graph.ancestorGroupIds('a');
-        expect(aAncestors.length).toBeLessThan(100);
-        expect(warnSpy).toHaveBeenCalled();
-      } finally {
-        warnSpy.mockRestore();
-      }
+    it('cycle in group hierarchy throws', () => {
+      const groups = [makeGroup('a'), makeGroup('b')];
+      const members = [makeMember('m1', 'a', 'b', 'group'), makeMember('m2', 'b', 'a', 'group')];
+      expect(() => buildWorkspaceSceneGraph({ parts: [], groups, groupMembers: members })).toThrow(/cycle detected/);
     });
 
-    it('self-cycle is tolerated (warns, does not throw)', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      try {
-        const groups = [makeGroup('a')];
-        const members = [makeMember('m1', 'a', 'a', 'group')];
-        const graph = buildWorkspaceSceneGraph({ parts: [], groups, groupMembers: members });
-        expect(graph.descendantPartIds('a')).toEqual([]);
-        expect(warnSpy).toHaveBeenCalled();
-      } finally {
-        warnSpy.mockRestore();
-      }
-    });
-
-    it('part is reachable from a group even when sibling groups cycle', () => {
-      // The legacy `getAllDescendantPartIds` returned reachable parts even
-      // when malformed group data formed cycles. Match that.
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      try {
-        const parts = [makePart('p1')];
-        const groups = [makeGroup('a'), makeGroup('b')];
-        const members = [
-          makeMember('m1', 'a', 'b', 'group'),
-          makeMember('m2', 'b', 'a', 'group'),
-          makeMember('m3', 'a', 'p1', 'part')
-        ];
-        const graph = buildWorkspaceSceneGraph({ parts, groups, groupMembers: members });
-        expect(graph.descendantPartIds('a')).toEqual(['p1']);
-      } finally {
-        warnSpy.mockRestore();
-      }
+    it('self-cycle throws', () => {
+      const groups = [makeGroup('a')];
+      const members = [makeMember('m1', 'a', 'a', 'group')];
+      expect(() => buildWorkspaceSceneGraph({ parts: [], groups, groupMembers: members })).toThrow(/cycle detected/);
     });
   });
 
