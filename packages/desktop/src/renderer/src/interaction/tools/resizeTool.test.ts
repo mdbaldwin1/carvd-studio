@@ -1,0 +1,162 @@
+import { describe, expect, it, vi } from 'vitest';
+
+// Use the real three.js for the rotation quaternion math the resize tool consumes.
+vi.unmock('three');
+vi.mock('three', async () => await vi.importActual('three'));
+
+import * as THREE from 'three';
+import type { AppSettings, Part } from '../../types';
+import { resizeTool, type ResizeToolInput } from './resizeTool';
+
+function makePart(overrides?: Partial<Part>): Part {
+  return {
+    id: 'p1',
+    name: 'p1',
+    length: 24,
+    width: 12,
+    thickness: 0.75,
+    position: { x: 0, y: 0.375, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 },
+    stockId: null,
+    grainSensitive: false,
+    grainDirection: 'length',
+    color: '#fff',
+    ...overrides
+  };
+}
+
+const SETTINGS: AppSettings = {
+  units: 'imperial',
+  defaultStock: 'plywood',
+  theme: 'dark',
+  gridSize: 0.0625,
+  snapDistance: 0.125,
+  snapEnabled: false,
+  snapSensitivity: 1.0,
+  showGrid: true,
+  enableAxisLegacySnaps: false,
+  enableSurfaceAnchors: false,
+  enableFractionalAnchors: false,
+  enableGoldenRatioAnchors: false,
+  enableFeatureAnchors: false,
+  snapToOrigin: false,
+  displayMode: 'solid',
+  lightingMode: 'default',
+  brightnessMultiplier: 1.0
+} as AppSettings;
+
+function makeInput(overrides?: Partial<ResizeToolInput>): ResizeToolInput {
+  const part = overrides?.part ?? makePart();
+  return {
+    part,
+    handlePos: { x: 1, y: 0, z: 0, type: 'edge-x' },
+    localDelta: { x: 0, y: 0, z: 0 },
+    partPosition: { ...part.position },
+    startingDimensions: {
+      length: part.length,
+      width: part.width,
+      thickness: part.thickness
+    },
+    constrainDimensions: false,
+    rotationQuaternion: new THREE.Quaternion(),
+    referenceParts: [],
+    referencePartIds: [],
+    groupMembers: [],
+    snapToPartsEnabled: false,
+    appSettings: SETTINGS,
+    units: 'imperial',
+    cameraDistance: 50,
+    ...overrides
+  };
+}
+
+describe('resizeTool', () => {
+  describe('lifecycle', () => {
+    it('begin captures starting dimensions and position', () => {
+      const part = makePart({ length: 24, width: 12, thickness: 0.75 });
+      const state = resizeTool.begin(makeInput({ part }));
+      expect(state.startingDimensions).toEqual({ length: 24, width: 12, thickness: 0.75 });
+      expect(state.startingPosition).toEqual(part.position);
+      expect(state.latchedRelationId).toBeNull();
+      expect(state.latchedAxis).toBeNull();
+    });
+
+    it('update with zero delta returns the starting dimensions', () => {
+      const part = makePart();
+      const input = makeInput({ part });
+      const state = resizeTool.begin(input);
+      const { preview } = resizeTool.update(input, state);
+      expect(preview.dimensions).toEqual({ length: 24, width: 12, thickness: 0.75 });
+    });
+
+    it('update with a +x edge handle drag extends the length', () => {
+      const part = makePart();
+      const input = makeInput({
+        part,
+        handlePos: { x: 1, y: 0, z: 0, type: 'edge-x' },
+        localDelta: { x: 4, y: 0, z: 0 }
+      });
+      const state = resizeTool.begin(input);
+      const { preview } = resizeTool.update(input, state);
+      // Edge-x with handle x=1 extends length by localDelta.x; the part center
+      // shifts by half that to keep the opposite face fixed.
+      expect(preview.dimensions.length).toBeCloseTo(28, 3);
+      expect(preview.dimensions.width).toBe(12);
+      expect(preview.dimensions.thickness).toBe(0.75);
+    });
+
+    it('commit produces a single updatePartDimensions instruction', () => {
+      const part = makePart();
+      const input = makeInput({
+        part,
+        handlePos: { x: 1, y: 0, z: 0, type: 'edge-x' },
+        localDelta: { x: 4, y: 0, z: 0 }
+      });
+      const state = resizeTool.begin(input);
+      const { preview } = resizeTool.update(input, state);
+      const instructions = resizeTool.commit(state, preview);
+      expect(instructions).toHaveLength(1);
+      expect(instructions[0]).toMatchObject({
+        kind: 'updatePartDimensions',
+        partId: 'p1',
+        dimensions: preview.dimensions,
+        position: preview.position
+      });
+    });
+
+    it('cancel does not throw', () => {
+      const state = resizeTool.begin(makeInput());
+      expect(() => resizeTool.cancel(state)).not.toThrow();
+    });
+  });
+
+  describe('invariant: commit dimensions/position match the final preview', () => {
+    it('after a mid-drag update + a final update, commit reflects the final preview only', () => {
+      const part = makePart();
+      let input = makeInput({
+        part,
+        handlePos: { x: 1, y: 0, z: 0, type: 'edge-x' },
+        localDelta: { x: 2, y: 0, z: 0 }
+      });
+      let state = resizeTool.begin(input);
+      const mid = resizeTool.update(input, state);
+      state = mid.state;
+
+      input = makeInput({
+        part,
+        handlePos: { x: 1, y: 0, z: 0, type: 'edge-x' },
+        localDelta: { x: 5, y: 0, z: 0 }
+      });
+      const final = resizeTool.update(input, state);
+      state = final.state;
+
+      const instructions = resizeTool.commit(state, final.preview);
+      const ins = instructions[0];
+      expect(ins).toMatchObject({
+        kind: 'updatePartDimensions',
+        dimensions: final.preview.dimensions,
+        position: final.preview.position
+      });
+    });
+  });
+});
