@@ -11,7 +11,7 @@ Each significant architectural decision made during the interaction-architecture
 | 003 | SessionController state machine           | §3    | Accepted    |
 | 004 | Tool solver interface contract            | §4    | Accepted    |
 | 005 | Overlay model derivation policy           | §10   | Accepted    |
-| 006 | Constraint pipeline ordering              | §8    | Not started |
+| 006 | Constraint pipeline ordering              | §8    | Accepted    |
 | 007 | Store ownership graph                     | §12   | Not started |
 | 008 | Scene graph derivation vs persistence     | §1    | Accepted    |
 | 009 | Geometry bundle cache invalidation policy | §5    | Accepted    |
