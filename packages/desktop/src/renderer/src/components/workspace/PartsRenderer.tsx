@@ -90,22 +90,15 @@ export function PartsRenderer() {
     selectedSidebarStockId
   ]);
 
-  // Split parts into instanced (bulk) vs individual (interactive)
+  // Split parts into instanced (bulk) vs individual (interactive).
+  //
+  // The previous "shouldForceIndividualFallback" branch is intentionally gone:
+  // it was a workaround for an instanced-raycast bounding-sphere bug, not a
+  // performance optimization. ADR-002 (hit-testing service) makes instanced
+  // hits reliable, so the workaround is unnecessary and actively harmful — it
+  // forces every part into individual rendering for scenes ≤ 500 parts, which
+  // costs us draw calls and re-renders.
   const { instancedParts, individualParts } = useMemo(() => {
-    // Robustness fallback: when nothing is selected/hovered, some environments can
-    // intermittently fail to render instanced-only parts after drag+deselect.
-    // Prefer individual meshes for normal-sized scenes to keep interaction reliable.
-    const shouldForceIndividualFallback =
-      selectedPartIds.length === 0 &&
-      selectedGroupIds.length === 0 &&
-      hoveredPartId === null &&
-      dragIntentPartId === null &&
-      draggingPartId === null &&
-      parts.length <= 500;
-    if (shouldForceIndividualFallback) {
-      return { instancedParts: [], individualParts: parts };
-    }
-
     // In Ghost mode, render all parts individually so unselected parts get
     // the same edge-outline treatment as selected parts.
     if (displayMode === 'translucent') {
@@ -122,29 +115,15 @@ export function PartsRenderer() {
       }
     }
     return { instancedParts: instanced, individualParts: individual };
-  }, [
-    parts,
-    individualPartIdSet,
-    displayMode,
-    selectedPartIds,
-    selectedGroupIds,
-    hoveredPartId,
-    dragIntentPartId,
-    draggingPartId
-  ]);
-
-  // Defensive fallback: never allow render split to drop all parts when project has parts.
-  const hasRenderDropout = parts.length > 0 && instancedParts.length + individualParts.length === 0;
-  const effectiveInstancedParts = hasRenderDropout ? [] : instancedParts;
-  const effectiveIndividualParts = hasRenderDropout ? parts : individualParts;
+  }, [parts, individualPartIdSet, displayMode]);
 
   return (
     <>
       {/* Bulk rendering — single draw call for all non-interactive parts */}
-      <InstancedParts parts={effectiveInstancedParts} totalPartCount={parts.length} />
+      <InstancedParts parts={instancedParts} totalPartCount={parts.length} />
 
       {/* Individual rendering — full interactivity with handles, edges, labels */}
-      {effectiveIndividualParts.map((part) => (
+      {individualParts.map((part) => (
         <Part
           key={part.id}
           part={part}

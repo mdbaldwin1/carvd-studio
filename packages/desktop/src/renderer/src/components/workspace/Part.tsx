@@ -436,7 +436,11 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
           onPointerDown={handlePointerDown}
           onPointerOver={handlePointerOver}
           onPointerOut={handlePointerOut}
-          userData={{ partId: part.id }}
+          // ADR-002: descriptor schema so the hit-test service can resolve this mesh.
+          userData={{
+            partId: part.id,
+            hitTarget: { kind: 'part-body', nodeId: part.id, partId: part.id }
+          }}
         >
           <boxGeometry args={dims} />
           {displayMode === 'solid' && <meshStandardMaterial color={part.color} />}
@@ -487,6 +491,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
           HANDLE_POSITIONS.map((handlePos, idx) => (
             <ResizeHandle
               key={idx}
+              partId={part.id}
               liveDims={liveDims}
               handlePos={handlePos}
               onResizeStart={handleResizeStart}
@@ -498,6 +503,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
         {showSinglePartRotationHandles && (
           <>
             <RotationHandle
+              partId={part.id}
               liveDims={liveDims}
               axis="y"
               side={1}
@@ -507,6 +513,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               onRotateEnd={handleRotateEnd}
             />
             <RotationHandle
+              partId={part.id}
               liveDims={liveDims}
               axis="y"
               side={-1}
@@ -516,6 +523,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               onRotateEnd={handleRotateEnd}
             />
             <RotationHandle
+              partId={part.id}
               liveDims={liveDims}
               axis="x"
               side={1}
@@ -525,6 +533,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               onRotateEnd={handleRotateEnd}
             />
             <RotationHandle
+              partId={part.id}
               liveDims={liveDims}
               axis="x"
               side={-1}
@@ -534,6 +543,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               onRotateEnd={handleRotateEnd}
             />
             <RotationHandle
+              partId={part.id}
               liveDims={liveDims}
               axis="z"
               side={1}
@@ -543,6 +553,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               onRotateEnd={handleRotateEnd}
             />
             <RotationHandle
+              partId={part.id}
               liveDims={liveDims}
               axis="z"
               side={-1}

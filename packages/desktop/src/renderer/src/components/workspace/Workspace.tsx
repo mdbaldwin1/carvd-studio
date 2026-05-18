@@ -24,6 +24,7 @@ import { SnapAlignmentLines } from './SnapAlignmentLines';
 import { SnapGuides } from './SnapGuides';
 import { ThumbnailCaptureHandler } from './ThumbnailCaptureHandler';
 import { installDragDebugTools } from '../../utils/dragDebug';
+import { hasInteractiveHitAt as resolveHasInteractiveHitAt, resolveHitTarget } from '../../interaction/hitTest';
 import {
   LIGHTING_PRESETS,
   isOrbitControls,
@@ -101,8 +102,6 @@ export function Workspace() {
   const effectiveTheme = useEffectiveTheme();
 
   const { camera, gl, controls, scene } = useThree();
-  const raycasterRef = useRef(new THREE.Raycaster());
-  const pointerNdcRef = useRef(new THREE.Vector2());
 
   // Drag-box selection state
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);
@@ -214,76 +213,23 @@ export function Workspace() {
     }
   }, [selectedPartIds, selectedGroupIds]);
 
+  // ADR-002: hit-testing is centralized in `src/renderer/src/interaction/hitTest.ts`.
+  // `getHitPartId` returns the part the click landed on (if any). All other
+  // hit-target kinds (handles, snap guides, overlays, ground, sky) are ignored
+  // here — this function is only for "what part did the user click."
   const getHitPartId = useCallback(
     (clientX: number, clientY: number): string | null => {
       const rect = gl.domElement.getBoundingClientRect();
-      const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
-      const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
-      pointerNdcRef.current.set(ndcX, ndcY);
-      raycasterRef.current.setFromCamera(pointerNdcRef.current, camera);
-      const hits = raycasterRef.current.intersectObjects(scene.children, true);
-
-      for (const hit of hits) {
-        if (hit.object.userData?.blocksPartSelection) {
-          continue;
+      const target = resolveHitTarget(
+        { clientX, clientY },
+        {
+          camera,
+          scene,
+          canvasRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+          parts
         }
-
-        const partId = (hit.object.userData?.partId as string | undefined) ?? null;
-        if (partId) return partId;
-
-        const partIdByInstance = hit.object.userData?.partIdByInstance as string[] | undefined;
-        if (hit.instanceId !== undefined && partIdByInstance?.[hit.instanceId]) {
-          return partIdByInstance[hit.instanceId];
-        }
-      }
-
-      // Fallback: precise ray-vs-rotated-box hit test from project parts.
-      // This avoids the false positives that came from projected screen-space
-      // bounding boxes selecting clicks near, but not on, a part.
-      let bestPartId: string | null = null;
-      let bestDistance = Infinity;
-      const euler = new THREE.Euler();
-      const quat = new THREE.Quaternion();
-      const inverseMatrix = new THREE.Matrix4();
-      const worldMatrix = new THREE.Matrix4();
-      const ray = raycasterRef.current.ray.clone();
-      const localRay = new THREE.Ray();
-      const intersectionPoint = new THREE.Vector3();
-      const worldIntersectionPoint = new THREE.Vector3();
-      const unitScale = new THREE.Vector3(1, 1, 1);
-      const partCenter = new THREE.Vector3();
-      const localBounds = new THREE.Box3();
-
-      for (const part of parts) {
-        euler.set(
-          (part.rotation.x * Math.PI) / 180,
-          (part.rotation.y * Math.PI) / 180,
-          (part.rotation.z * Math.PI) / 180,
-          'XYZ'
-        );
-        quat.setFromEuler(euler);
-
-        partCenter.set(part.position.x, part.position.y, part.position.z);
-        worldMatrix.compose(partCenter, quat, unitScale);
-        inverseMatrix.copy(worldMatrix).invert();
-        localRay.copy(ray).applyMatrix4(inverseMatrix);
-
-        localBounds.min.set(-part.length / 2, -part.thickness / 2, -part.width / 2);
-        localBounds.max.set(part.length / 2, part.thickness / 2, part.width / 2);
-
-        if (!localRay.intersectBox(localBounds, intersectionPoint)) continue;
-
-        worldIntersectionPoint.copy(intersectionPoint).applyMatrix4(worldMatrix);
-        const distance = ray.origin.distanceTo(worldIntersectionPoint);
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          bestPartId = part.id;
-        }
-      }
-
-      if (bestPartId) return bestPartId;
-
-      return null;
+      );
+      return target?.kind === 'part-body' ? target.partId : null;
     },
     [camera, gl, scene, parts]
   );
@@ -695,57 +641,20 @@ export function Workspace() {
     };
   }, [gl, openContextMenu, getHitPartId, selectFromPartHit, drillFromPartHit]);
 
+  // ADR-002: delegates to the hit-test service. Used by background-click and
+  // empty-space-click paths to decide whether to clear the selection.
   const hasInteractiveHitAt = useCallback(
     (clientX: number, clientY: number): boolean => {
       const rect = gl.domElement.getBoundingClientRect();
-      const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
-      const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
-      pointerNdcRef.current.set(ndcX, ndcY);
-      raycasterRef.current.setFromCamera(pointerNdcRef.current, camera);
-      const hits = raycasterRef.current.intersectObjects(scene.children, true);
-      const hitsInteractiveObject = hits.some((hit) => {
-        if (hit.object.userData?.blocksPartSelection) return true;
-
-        const partId = hit.object.userData?.partId as string | undefined;
-        if (partId) return true;
-
-        const partIdByInstance = hit.object.userData?.partIdByInstance as string[] | undefined;
-        if (hit.instanceId !== undefined && partIdByInstance?.[hit.instanceId]) return true;
-
-        return false;
-      });
-
-      if (hitsInteractiveObject) return true;
-
-      const euler = new THREE.Euler();
-      const quat = new THREE.Quaternion();
-      const inverseMatrix = new THREE.Matrix4();
-      const worldMatrix = new THREE.Matrix4();
-      const ray = raycasterRef.current.ray.clone();
-      const localRay = new THREE.Ray();
-      const intersectionPoint = new THREE.Vector3();
-      const unitScale = new THREE.Vector3(1, 1, 1);
-      const partCenter = new THREE.Vector3();
-      const localBounds = new THREE.Box3();
-
-      return parts.some((part) => {
-        euler.set(
-          (part.rotation.x * Math.PI) / 180,
-          (part.rotation.y * Math.PI) / 180,
-          (part.rotation.z * Math.PI) / 180,
-          'XYZ'
-        );
-        quat.setFromEuler(euler);
-        partCenter.set(part.position.x, part.position.y, part.position.z);
-        worldMatrix.compose(partCenter, quat, unitScale);
-        inverseMatrix.copy(worldMatrix).invert();
-        localRay.copy(ray).applyMatrix4(inverseMatrix);
-
-        localBounds.min.set(-part.length / 2, -part.thickness / 2, -part.width / 2);
-        localBounds.max.set(part.length / 2, part.thickness / 2, part.width / 2);
-
-        return localRay.intersectBox(localBounds, intersectionPoint) !== null;
-      });
+      return resolveHasInteractiveHitAt(
+        { clientX, clientY },
+        {
+          camera,
+          scene,
+          canvasRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+          parts
+        }
+      );
     },
     [camera, gl, parts, scene]
   );
@@ -1101,7 +1010,8 @@ export function Workspace() {
         onClick={handleBackgroundClick}
         onDoubleClick={handleBackgroundDoubleClick}
         onPointerDown={handleBackgroundPointerDown}
-        userData={{ isGround: true }}
+        // ADR-002: hitTarget descriptor for the hit-test service.
+        userData={{ isGround: true, hitTarget: { kind: 'ground' } }}
       >
         <planeGeometry args={[200, 200]} />
         <meshBasicMaterial visible={false} />
@@ -1117,7 +1027,8 @@ export function Workspace() {
         }}
         onClick={handleSkyClick}
         onDoubleClick={handleBackgroundDoubleClick}
-        userData={{ isSky: true }}
+        // ADR-002: hitTarget descriptor for the hit-test service.
+        userData={{ isSky: true, hitTarget: { kind: 'sky' } }}
         renderOrder={-1}
       >
         <sphereGeometry args={[500, 8, 6]} />

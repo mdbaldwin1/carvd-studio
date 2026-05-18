@@ -20,6 +20,7 @@ import { resolvePartInteractionPreview } from '../../utils/interactionOverlay';
 import { getPartGroupContext } from './partClickHandler';
 import { markPartPointerInteraction, setRightClickTarget } from './workspaceUtils';
 import { useGroupDrag } from './useGroupDrag';
+import { setHitTargetDescriptor } from '../../interaction/hitTest';
 
 // Pre-allocated objects at module scope — reused every update, zero GC pressure
 const _matrix = new THREE.Matrix4();
@@ -92,6 +93,8 @@ export function InstancedParts({ parts, totalPartCount }: InstancedPartsProps) {
       }
       mesh.userData.partIdByInstance = [];
       mesh.userData.isInstancedParts = true;
+      // ADR-002: clear the hit-target descriptor too — no parts, nothing to hit.
+      setHitTargetDescriptor(mesh, null);
       mesh.boundingSphere = null;
       return;
     }
@@ -143,6 +146,12 @@ export function InstancedParts({ parts, totalPartCount }: InstancedPartsProps) {
     // Expose instance->part mapping for native workspace raycast fallbacks.
     mesh.userData.partIdByInstance = partIdByIndex;
     mesh.userData.isInstancedParts = true;
+    // ADR-002: descriptor schema for the hit-test service.
+    setHitTargetDescriptor(mesh, {
+      kind: 'part-body-instanced',
+      nodeId: 'instanced-parts',
+      partIdByInstance: partIdByIndex
+    });
 
     // Bounding sphere derived from the (now-current) instance matrices and the
     // unit-cube geometry's local-space bounds. Never override geometry.boundingSphere.

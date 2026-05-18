@@ -102,6 +102,7 @@ export function GroupRotationHandles() {
   return (
     <group position={[pivot.x, pivot.y, pivot.z]}>
       <RotationHandle
+        partId={null}
         liveDims={liveDims}
         axis="x"
         side={1}
@@ -111,6 +112,7 @@ export function GroupRotationHandles() {
         onRotateEnd={handleRotateEnd}
       />
       <RotationHandle
+        partId={null}
         liveDims={liveDims}
         axis="x"
         side={-1}
@@ -120,6 +122,7 @@ export function GroupRotationHandles() {
         onRotateEnd={handleRotateEnd}
       />
       <RotationHandle
+        partId={null}
         liveDims={liveDims}
         axis="y"
         side={1}
@@ -129,6 +132,7 @@ export function GroupRotationHandles() {
         onRotateEnd={handleRotateEnd}
       />
       <RotationHandle
+        partId={null}
         liveDims={liveDims}
         axis="y"
         side={-1}
@@ -138,6 +142,7 @@ export function GroupRotationHandles() {
         onRotateEnd={handleRotateEnd}
       />
       <RotationHandle
+        partId={null}
         liveDims={liveDims}
         axis="z"
         side={1}
@@ -147,6 +152,7 @@ export function GroupRotationHandles() {
         onRotateEnd={handleRotateEnd}
       />
       <RotationHandle
+        partId={null}
         liveDims={liveDims}
         axis="z"
         side={-1}

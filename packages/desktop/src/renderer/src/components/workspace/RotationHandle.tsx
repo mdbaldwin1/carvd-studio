@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useCameraStore } from '../../store/cameraStore';
 import { LiveDimensions, ROTATION_COLORS, ROTATION_HANDLE_SIZE, ROTATION_RING_THICKNESS } from './partTypes';
+import type { HitTargetDescriptor } from '../../interaction/hitTest';
 import {
   ROTATION_HIT_GEOMETRY,
   ROTATION_HIT_MATERIAL,
@@ -16,6 +17,7 @@ import { chooseBestRotationAxisCandidate } from './rotationAxisSelection';
 
 export const RotationHandle = memo(
   function RotationHandle({
+    partId,
     liveDims,
     axis,
     side,
@@ -24,6 +26,7 @@ export const RotationHandle = memo(
     onRotateStart,
     onRotateEnd
   }: {
+    partId: string | null;
     liveDims: LiveDimensions;
     axis: 'x' | 'y' | 'z';
     side: 1 | -1; // Which side of the axis (+1 or -1)
@@ -439,6 +442,16 @@ export const RotationHandle = memo(
       }
     };
 
+    // ADR-002: descriptor for the hit-test service. Same shape across the
+    // four meshes that own this handle's pointer events.
+    const hitDescriptor: HitTargetDescriptor = {
+      kind: 'rotation-handle',
+      nodeId: partId ?? `rotation-${axis}-${side}`,
+      partId,
+      axis,
+      side
+    };
+
     return (
       <group ref={groupRef} position={facePosition}>
         {/* Invisible ring hit area stays for easier click-to-rotate, but drag uses grab handle */}
@@ -447,7 +460,7 @@ export const RotationHandle = memo(
             geometry={ROTATION_HIT_GEOMETRY}
             material={ROTATION_HIT_MATERIAL}
             rotation={[0, 0, glyphRollZ]}
-            userData={{ blocksPartSelection: true }}
+            userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}
             onPointerOver={handleRingPointerOver}
             onPointerOut={handleRingPointerOut}
             onClick={(e) => {
@@ -486,7 +499,7 @@ export const RotationHandle = memo(
           {/* Connector from ring to external grab handle */}
           <line
             geometry={connectorGeometry}
-            userData={{ blocksPartSelection: true }}
+            userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}
             onPointerDown={stopWorkspaceSelection}
             onClick={stopWorkspaceSelection}
           >
@@ -496,7 +509,7 @@ export const RotationHandle = memo(
           {/* External grab handle for drag rotation */}
           <group position={grabPosition}>
             <mesh
-              userData={{ blocksPartSelection: true }}
+              userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}
               onPointerDown={(e) => {
                 stopWorkspaceSelection(e);
                 handlePointerDown(e);
@@ -510,7 +523,7 @@ export const RotationHandle = memo(
               <meshBasicMaterial transparent opacity={0.001} depthTest={false} depthWrite={false} />
             </mesh>
             <mesh
-              userData={{ blocksPartSelection: true }}
+              userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}
               onPointerDown={(e) => {
                 stopWorkspaceSelection(e);
                 handlePointerDown(e);

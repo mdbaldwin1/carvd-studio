@@ -3,16 +3,19 @@ import { memo, useState } from 'react';
 import * as THREE from 'three';
 import { LiveDimensions, HandlePosition, RESIZE_COLORS } from './partTypes';
 import { RESIZE_HANDLE_GEOMETRY } from './partGeometry';
+import type { HitTargetDescriptor } from '../../interaction/hitTest';
 
 const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
 
 export const ResizeHandle = memo(
   function ResizeHandle({
+    partId,
     liveDims,
     handlePos,
     onResizeStart,
     isResizing
   }: {
+    partId: string;
     liveDims: LiveDimensions;
     handlePos: HandlePosition;
     onResizeStart: (handlePos: HandlePosition, e: ThreeEvent<PointerEvent>) => void;
@@ -60,11 +63,19 @@ export const ResizeHandle = memo(
     const isActive = hovered || isResizing;
     const activeScaleBoost = isActive ? 1.16 : 1;
 
+    // ADR-002: descriptor for the hit-test service.
+    const hitDescriptor: HitTargetDescriptor = {
+      kind: 'resize-handle',
+      nodeId: partId,
+      partId,
+      handle: { x: handlePos.x, y: handlePos.y, z: handlePos.z, type: handlePos.type }
+    };
+
     return (
       <group position={[handleX, handleY, handleZ]}>
         {/* Larger near-invisible hit target keeps handles easy to grab even when visually scaled down */}
         <mesh
-          userData={{ blocksPartSelection: true }}
+          userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}
           scale={hitScale}
           geometry={RESIZE_HANDLE_GEOMETRY}
           onPointerDown={(e) => {

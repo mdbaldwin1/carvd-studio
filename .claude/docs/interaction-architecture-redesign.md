@@ -33,6 +33,7 @@ The branch has already addressed part of what this review called out:
 - move and resize both publish session-driven reference rulers
 - typed move and resize ruler edits now flow through shared relation semantics
 - active reference targets now latch across near-equal candidates instead of flickering
+- **Phase §11 Hit-Testing Layer is complete** ([ADR-002](./adr/002-hit-testing-service.md)): a single `resolveHitTarget` service replaces five scattered raycast paths; every interactive mesh publishes a typed `HitTarget` descriptor on its `userData.hitTarget`. The `shouldForceIndividualFallback` rendering workaround is deleted — instanced parts are now hittable correctly without it. Engine tests (22 cases) lock in the four bug classes below plus every `HitTarget` kind.
 
 The remaining risks are still real, especially around deeper group geometry, richer feature-aware references, and eventual custom-cut support, but the interaction model is no longer in the same fragmented state that motivated this review.
 
