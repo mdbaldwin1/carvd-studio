@@ -12,6 +12,7 @@
   "license": "ISC",
   "author": "Michael Baldwin",
   "scripts": {
+    "predev": "node scripts/ensure-dev-runtime.cjs",
     "dev": "unset ELECTRON_RUN_AS_NODE && electron-vite dev",
     "dev:debug": "unset ELECTRON_RUN_AS_NODE && electron-vite dev --inspect",
     "build": "electron-vite build",
