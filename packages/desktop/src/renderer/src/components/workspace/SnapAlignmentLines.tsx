@@ -1,22 +1,26 @@
 import { Html, Line } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useProjectStore } from '../../store/projectStore';
-import { useSnapStore } from '../../store/snapStore';
-import { useCameraStore } from '../../store/cameraStore';
 import { SnapLine } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
+import type { SnapOverlayData } from '../../interaction/overlayModel';
 
-// Component that renders snap alignment lines during drag operations
-export function SnapAlignmentLines() {
+interface SnapAlignmentLinesProps {
+  /** Snap slice from the OverlayModel. `null` hides the overlay entirely. */
+  data: SnapOverlayData | null;
+  units: 'imperial' | 'metric';
+  displayMode: 'solid' | 'translucent' | 'wireframe';
+}
+
+// ADR-005: SnapAlignmentLines is a pure prop consumer. Workspace computes the
+// overlay model and passes the snap slice + units + displayMode down. The
+// component does not read from stores.
+export function SnapAlignmentLines({ data, units, displayMode }: SnapAlignmentLinesProps) {
   const { camera } = useThree();
-  const activeSnapLines = useSnapStore((s) => s.activeSnapLines);
-  const snapPulseAt = useSnapStore((s) => s.snapPulseAt);
-  const snapLabelPosition = useSnapStore((s) => s.snapLabelPosition);
-  const units = useProjectStore((s) => s.units);
-  const displayMode = useCameraStore((s) => s.displayMode);
 
-  if (activeSnapLines.length === 0) return null;
+  if (!data) return null;
+
+  const { lines: activeSnapLines, pulseAt: snapPulseAt, labelPosition: snapLabelPosition } = data;
 
   const now = performance.now();
   const pulseAge = now - snapPulseAt;

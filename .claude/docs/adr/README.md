@@ -10,7 +10,7 @@ Each significant architectural decision made during the interaction-architecture
 | 002 | Hit-testing service architecture          | §11   | Accepted    |
 | 003 | SessionController state machine           | §3    | Accepted    |
 | 004 | Tool solver interface contract            | §4    | Accepted    |
-| 005 | Overlay model derivation policy           | §10   | Not started |
+| 005 | Overlay model derivation policy           | §10   | Accepted    |
 | 006 | Constraint pipeline ordering              | §8    | Not started |
 | 007 | Store ownership graph                     | §12   | Not started |
 | 008 | Scene graph derivation vs persistence     | §1    | Not started |

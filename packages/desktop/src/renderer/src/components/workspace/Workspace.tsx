@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GRID_SIZE } from '../../constants';
 import { useProjectStore } from '../../store/projectStore';
+import { useSnapStore } from '../../store/snapStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
@@ -26,6 +27,7 @@ import { ThumbnailCaptureHandler } from './ThumbnailCaptureHandler';
 import { installDragDebugTools } from '../../utils/dragDebug';
 import { hasInteractiveHitAt as resolveHasInteractiveHitAt } from '../../interaction/hitTest';
 import { useCanvasPointerSession } from '../../interaction/useCanvasPointerSession';
+import { computeOverlayModel } from '../../interaction/overlayModel';
 import { LIGHTING_PRESETS, isOrbitControls } from './workspaceUtils';
 
 declare global {
@@ -72,6 +74,13 @@ export function Workspace() {
   };
 
   const parts = useProjectStore((s) => s.parts);
+  const units = useProjectStore((s) => s.units);
+  // ADR-005: overlay model derivation reads snap state here once instead of
+  // each overlay component re-subscribing independently.
+  const snapActiveLines = useSnapStore((s) => s.activeSnapLines);
+  const snapPulseAt = useSnapStore((s) => s.snapPulseAt);
+  const snapLabelPosition = useSnapStore((s) => s.snapLabelPosition);
+  const displayMode = useCameraStore((s) => s.displayMode);
   const clearSelection = useSelectionStore((s) => s.clearSelection);
   const selectPart = useSelectionStore((s) => s.selectPart);
   const selectGroup = useSelectionStore((s) => s.selectGroup);
@@ -93,6 +102,22 @@ export function Workspace() {
   const brightnessMultiplier = useAppSettingsStore((s) => s.settings.brightnessMultiplier) ?? 1.0;
   const lightingPreset = LIGHTING_PRESETS[lightingMode];
   const effectiveTheme = useEffectiveTheme();
+
+  // ADR-005: single derivation point for every overlay's display data.
+  // Memoize so child overlay components only re-render when their slice
+  // identity changes.
+  const overlayModel = useMemo(
+    () =>
+      computeOverlayModel({
+        activeSession: null, // §10b will thread through useInteractionStore
+        snap: {
+          activeSnapLines: snapActiveLines,
+          snapPulseAt,
+          snapLabelPosition
+        }
+      }),
+    [snapActiveLines, snapPulseAt, snapLabelPosition]
+  );
 
   const { camera, gl, controls, scene } = useThree();
 
@@ -840,8 +865,8 @@ export function Workspace() {
       {/* Multi-selection bounding box dimensions */}
       <MultiSelectionDimensions />
 
-      {/* Snap alignment lines */}
-      <SnapAlignmentLines />
+      {/* Snap alignment lines — consumes the snap slot of OverlayModel (ADR-005) */}
+      <SnapAlignmentLines data={overlayModel.snap} units={units} displayMode={displayMode} />
 
       {/* Reference distance indicators */}
       <ReferenceDistanceIndicators />
