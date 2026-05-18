@@ -6,7 +6,7 @@
 // `references` and `dimensions` slots are stubbed so the model can grow
 // without API churn when §10b migrates the remaining components.
 
-import type { SnapLine } from '../types';
+import type { GroupMember, Part, SnapLine } from '../types';
 import type { InteractionSession } from '../store/interactionStore';
 import type { Vec3 } from './tools/toolSolver';
 
@@ -35,13 +35,25 @@ export interface ReferenceOverlayData {
 }
 
 /**
- * Placeholder for §10b. The multi-selection dimension overlay derives from
- * selectionStore + projectStore. Filled in when MultiSelectionDimensions
- * migrates.
+ * Inputs the multi-selection-dimensions overlay needs to compute its bounding
+ * box + per-axis gap labels. The expensive AABB and gap math stays in the
+ * component (`useMemo`-based) — this slot is dependency injection plus the
+ * single "should this overlay render at all?" gate.
+ *
+ * The slot is `null` when an interaction session is active (we hide bounding
+ * dimensions during drag/resize/rotate to keep the canvas readable). It is
+ * also `null` when the selection is too small to need a bounding box.
  */
-export interface DimensionOverlayData {
-  readonly placeholder: true;
+export interface DimensionOverlayInputs {
+  parts: ReadonlyArray<Part>;
+  selectedPartIds: ReadonlyArray<string>;
+  selectedGroupIds: ReadonlyArray<string>;
+  groupMembers: ReadonlyArray<GroupMember>;
+  units: 'imperial' | 'metric';
 }
+
+/** Backwards-compatible alias. */
+export type DimensionOverlayData = DimensionOverlayInputs;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OverlayModel
@@ -53,7 +65,7 @@ export interface DimensionOverlayData {
 export interface OverlayModel {
   snap: SnapOverlayData | null;
   references: ReferenceOverlayData | null;
-  dimensions: DimensionOverlayData | null;
+  dimensions: DimensionOverlayInputs | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,7 +81,18 @@ export interface ComputeOverlayModelInput {
     snapPulseAt: number;
     snapLabelPosition: Vec3 | null;
   };
-  // Reserved for §10b — selection, parts/groupMembers, references, units, etc.
+  /** Selection state used to derive multi-selection dimension overlays. */
+  selection: {
+    selectedPartIds: ReadonlyArray<string>;
+    selectedGroupIds: ReadonlyArray<string>;
+  };
+  /** Project state used to derive overlays that depend on parts/groups. */
+  project: {
+    parts: ReadonlyArray<Part>;
+    groupMembers: ReadonlyArray<GroupMember>;
+    units: 'imperial' | 'metric';
+  };
+  // Reserved for §10b-2 — reference rulers from snapStore + interactionStore.
 }
 
 /**
@@ -80,8 +103,8 @@ export interface ComputeOverlayModelInput {
 export function computeOverlayModel(input: ComputeOverlayModelInput): OverlayModel {
   return {
     snap: deriveSnapOverlay(input),
-    references: null, // §10b
-    dimensions: null // §10b
+    references: null, // §10b-2
+    dimensions: deriveDimensionOverlay(input)
   };
 }
 
@@ -94,5 +117,26 @@ function deriveSnapOverlay(input: ComputeOverlayModelInput): SnapOverlayData | n
     lines: [...input.snap.activeSnapLines],
     pulseAt: input.snap.snapPulseAt,
     labelPosition: input.snap.snapLabelPosition
+  };
+}
+
+function deriveDimensionOverlay(input: ComputeOverlayModelInput): DimensionOverlayInputs | null {
+  // Hide bounding-box dimensions while an interaction is active — the gestures
+  // own the canvas's measurement attention during drag/resize/rotate.
+  if (input.activeSession !== null) return null;
+
+  // The minimum-entities gate (single group vs ≥2 parts) lives in the
+  // component because it needs the resolved measurement entities, which the
+  // component computes via useMemo. The slot only gates on session activity
+  // and "is there any selection at all" — cheap to check here.
+  const hasSelection = input.selection.selectedPartIds.length > 0 || input.selection.selectedGroupIds.length > 0;
+  if (!hasSelection) return null;
+
+  return {
+    parts: input.project.parts,
+    selectedPartIds: input.selection.selectedPartIds,
+    selectedGroupIds: input.selection.selectedGroupIds,
+    groupMembers: input.project.groupMembers,
+    units: input.project.units
   };
 }

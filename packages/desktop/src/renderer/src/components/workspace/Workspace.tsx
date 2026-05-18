@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { GRID_SIZE } from '../../constants';
 import { useProjectStore } from '../../store/projectStore';
 import { useSnapStore } from '../../store/snapStore';
+import { useInteractionStore } from '../../store/interactionStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
@@ -75,12 +76,16 @@ export function Workspace() {
 
   const parts = useProjectStore((s) => s.parts);
   const units = useProjectStore((s) => s.units);
+  const groupMembers = useProjectStore((s) => s.groupMembers);
   // ADR-005: overlay model derivation reads snap state here once instead of
   // each overlay component re-subscribing independently.
   const snapActiveLines = useSnapStore((s) => s.activeSnapLines);
   const snapPulseAt = useSnapStore((s) => s.snapPulseAt);
   const snapLabelPosition = useSnapStore((s) => s.snapLabelPosition);
   const displayMode = useCameraStore((s) => s.displayMode);
+  const selectedPartIdsForOverlay = useSelectionStore((s) => s.selectedPartIds);
+  const selectedGroupIdsForOverlay = useSelectionStore((s) => s.selectedGroupIds);
+  const activeSessionForOverlay = useInteractionStore((s) => s.activeSession);
   const clearSelection = useSelectionStore((s) => s.clearSelection);
   const selectPart = useSelectionStore((s) => s.selectPart);
   const selectGroup = useSelectionStore((s) => s.selectGroup);
@@ -109,14 +114,33 @@ export function Workspace() {
   const overlayModel = useMemo(
     () =>
       computeOverlayModel({
-        activeSession: null, // §10b will thread through useInteractionStore
+        activeSession: activeSessionForOverlay,
         snap: {
           activeSnapLines: snapActiveLines,
           snapPulseAt,
           snapLabelPosition
+        },
+        selection: {
+          selectedPartIds: selectedPartIdsForOverlay,
+          selectedGroupIds: selectedGroupIdsForOverlay
+        },
+        project: {
+          parts,
+          groupMembers,
+          units
         }
       }),
-    [snapActiveLines, snapPulseAt, snapLabelPosition]
+    [
+      activeSessionForOverlay,
+      snapActiveLines,
+      snapPulseAt,
+      snapLabelPosition,
+      selectedPartIdsForOverlay,
+      selectedGroupIdsForOverlay,
+      parts,
+      groupMembers,
+      units
+    ]
   );
 
   const { camera, gl, controls, scene } = useThree();
@@ -862,8 +886,8 @@ export function Workspace() {
       {/* Group-wide rotation handles */}
       <GroupRotationHandles />
 
-      {/* Multi-selection bounding box dimensions */}
-      <MultiSelectionDimensions />
+      {/* Multi-selection bounding box dimensions — OverlayModel dimensions slot (ADR-005) */}
+      <MultiSelectionDimensions data={overlayModel.dimensions} />
 
       {/* Snap alignment lines — consumes the snap slot of OverlayModel (ADR-005) */}
       <SnapAlignmentLines data={overlayModel.snap} units={units} displayMode={displayMode} />

@@ -1,28 +1,40 @@
 import { useThree } from '@react-three/fiber';
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { useProjectStore } from '../../store/projectStore';
-import { useSelectionStore } from '../../store/selectionStore';
-import { useInteractionStore } from '../../store/interactionStore';
 import { resolveMeasurementSelectionEntities } from '../../utils/interactionSelection';
-import { shouldHideMeasurementOverlays } from '../../utils/interactionOverlay';
 import { getProjectedMeasurementLength, resolveMeasurementOverlayLayout } from '../../utils/measurementOverlayLayout';
 import { getBoundingBoxDimensionPlacements } from '../../utils/measurementPlacement';
 import { getBoundingMeasurementPriority } from '../../utils/measurementPriority';
 import { DimensionLabel } from './DimensionLabel';
 import { getPartAABB } from './workspaceUtils';
+import type { DimensionOverlayInputs } from '../../interaction/overlayModel';
 
 const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
 
-// Component that shows overall bounding box dimensions when multiple parts are selected
-export function MultiSelectionDimensions() {
+interface MultiSelectionDimensionsProps {
+  /** Dimensions slot from the OverlayModel. `null` hides the overlay. */
+  data: DimensionOverlayInputs | null;
+}
+
+// Stable empty defaults so hooks can run unconditionally when `data` is null.
+const EMPTY_PARTS: DimensionOverlayInputs['parts'] = [];
+const EMPTY_STRINGS: ReadonlyArray<string> = [];
+const EMPTY_GROUP_MEMBERS: DimensionOverlayInputs['groupMembers'] = [];
+
+// ADR-005: MultiSelectionDimensions is a pure prop consumer. The slot in
+// OverlayModel gates rendering on `activeSession === null && hasSelection`;
+// the heavy AABB / gap computation memoized below stays in the component.
+export function MultiSelectionDimensions({ data }: MultiSelectionDimensionsProps) {
   const { camera, size } = useThree();
-  const parts = useProjectStore((s) => s.parts);
-  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
-  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
-  const groupMembers = useProjectStore((s) => s.groupMembers);
-  const activeSession = useInteractionStore((s) => s.activeSession);
-  const units = useProjectStore((s) => s.units);
+
+  // Rules of Hooks: hooks must run unconditionally. Read inputs through
+  // stable empty defaults so the hook signatures stay constant when `data`
+  // is null; we early-return after the hook prelude.
+  const parts = data?.parts ?? EMPTY_PARTS;
+  const selectedPartIds = data?.selectedPartIds ?? EMPTY_STRINGS;
+  const selectedGroupIds = data?.selectedGroupIds ?? EMPTY_STRINGS;
+  const groupMembers = data?.groupMembers ?? EMPTY_GROUP_MEMBERS;
+  const units = data?.units ?? 'imperial';
 
   const measurementEntities = useMemo(() => {
     return resolveMeasurementSelectionEntities({ selectedPartIds, selectedGroupIds }, groupMembers);
@@ -234,8 +246,12 @@ export function MultiSelectionDimensions() {
     );
   }, [boundsData, camera, size.height, size.width]);
 
+  // ADR-005: the OverlayModel slot already gates on `activeSession === null`
+  // and "has selection." All we need at the component level is "the bounds
+  // computation produced a result" (i.e. ≥ minEntities for the selection
+  // shape).
+  if (!data) return null;
   if (!boundsData) return null;
-  if (shouldHideMeasurementOverlays(activeSession)) return null;
 
   const { minX, maxX, minY, maxY, minZ, maxZ, gaps } = boundsData;
   const sizeX = maxX - minX;
