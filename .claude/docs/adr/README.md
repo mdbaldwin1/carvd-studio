@@ -8,7 +8,7 @@ Each significant architectural decision made during the interaction-architecture
 | --- | ----------------------------------------- | ----- | ----------- |
 | 001 | Selection is not undoable                 | P0    | Accepted    |
 | 002 | Hit-testing service architecture          | §11   | Accepted    |
-| 003 | SessionController state machine           | §3    | Not started |
+| 003 | SessionController state machine           | §3    | Accepted    |
 | 004 | Tool solver interface contract            | §4    | Not started |
 | 005 | Overlay model derivation policy           | §10   | Not started |
 | 006 | Constraint pipeline ordering              | §8    | Not started |
