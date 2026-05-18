@@ -23,34 +23,35 @@ Make the workspace interaction model architecturally solid before the custom-cut
 - All 8 blueprint phases are in scope.
 - Selection changes are **not** undoable. zundo wraps `projectStore` only. ADR-001.
 - Sequential execution, single engineer.
-- Custom-cuts gate: Tier 0 + Tier 1 + §1 Scene Graph + §5 Geometry Query Layer must complete before `develop` merges into `codex/poc-part-features-plan`. §6 Part Shape Model is the merge.
+- **All work stays on `codex/interaction-architecture-review` until the whole blueprint is ready to release.** No phase-by-phase PRs to develop. One giant PR at the end, then squash-merge to develop and release. The branch accumulates the full redesign before any of it lands on develop or main.
+- Custom-cuts gate: Tier 0 + Tier 1 + §1 Scene Graph + §5 Geometry Query Layer must complete before `develop` merges into `codex/poc-part-features-plan`. §6 Part Shape Model is the merge. Since develop won't move until this branch lands, custom-cuts effectively rebases onto this branch at the §6 step.
 
 ## Sequencing
 
 ```
-Week 1:      Land current branch (PR open / squash to develop)
-Weeks 1-2:   P0 + §11 spec
-Weeks 2-3:   §11 Hit-Test build
-Weeks 3-6:   §3 Session Controller
-Weeks 6-7:   §4 Tool Solvers
-Weeks 7-8:   §10 Overlay Engine
-Weeks 8-9:   §8 Constraint Engine
-Week 9:      §12 Store cleanup
-══════════════ ◇ Custom-cuts merge gate ══════════════
-Weeks 10-11: §1 Scene Graph
-Weeks 11-13: §5 Geometry Query Layer
-Weeks 13-15: §6 Part Shape Model (merges with custom-cuts)
-Weeks 15-17: §7 Snap Engine
-Weeks 17-18: §9 Collision and Fit
+Week 0:      P0 prep (ADR dir, test strategy, ADR-001, perf baseline, fixtures)
+Weeks 1-2:   §11 Hit-Test
+Weeks 2-5:   §3 Session Controller
+Weeks 5-6:   §4 Tool Solvers
+Weeks 6-7:   §10 Overlay Engine
+Weeks 7-8:   §8 Constraint Engine
+Week 8:      §12 Store cleanup
+══════════════ ◇ Custom-cuts merge gate (this branch state) ══════════════
+Weeks 9-10:  §1 Scene Graph
+Weeks 10-12: §5 Geometry Query Layer
+Weeks 12-14: §6 Part Shape Model (merges with custom-cuts)
+Weeks 14-16: §7 Snap Engine
+Weeks 16-17: §9 Collision and Fit
+Week 18:     Final QA, /ultrareview, single PR to develop, release
 ```
 
-~4.5 months end-to-end. Custom-cuts can ship in week ~14 with §6 baked in.
+~4.5 months end-to-end. Custom-cuts rebases onto this branch around week ~14 with §6 baked in.
 
 ## Pre-work (P0) — before any phase work begins
 
-### P0.1 — Land current branch
+### P0.1 — Branch strategy locked in
 
-Squash-merge `codex/interaction-architecture-review` to `develop` per [AGENTS.md](../../AGENTS.md). This PR.
+All blueprint work accumulates on `codex/interaction-architecture-review`. No phase PRs to develop. Single giant PR at the end. Internal commits use conventional prefixes; final PR will summarize across phases.
 
 ### P0.2 — ADR directory
 
@@ -455,13 +456,14 @@ Specifically required up front:
 
 ## Process
 
-- One bead per child item. Each child bead is a PR.
-- Target ≤500 lines diff per PR. Split if larger.
-- `/ultrareview` on every phase epic before merge.
-- Squash-merge to `develop` per AGENTS.md.
-- Conventional commit prefixes (`feat`/`fix`/`perf`/`chore`/`docs`/`test`/`refactor`).
+- One bead per child item. Each child bead becomes 1+ commit(s) on this branch (not a separate PR).
+- Conventional commit prefixes per AGENTS.md (`feat`/`fix`/`perf`/`chore`/`docs`/`test`/`refactor`). Phase epic + child bead ID in commit body.
+- Target ≤500 lines diff per commit where practical. Split if larger.
+- After each phase epic: run typecheck + lint + tests + perf comparison vs P0.5 baseline. Branch must stay green.
+- `/ultrareview` runs once at the end of the whole branch (Week 18), before the single PR to develop.
+- Squash-merge that final PR to `develop` per AGENTS.md.
 - No two phases in parallel.
-- Tier-end release: develop → main merge commit, version bump, release notes link to ADRs.
+- Single release at the end: develop → main merge commit, version bump, release notes link to ADRs.
 - Spec doc / ADR per phase BEFORE code.
 
 ## Risk register
