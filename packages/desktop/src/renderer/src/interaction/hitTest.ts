@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import type { Part } from '../types';
+import type { GeometryCache } from './geometry/cache';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Hit target types — the discriminated union covers every interactive thing a
@@ -199,6 +200,12 @@ export interface HitTestContext {
   parts: ReadonlyArray<Part>;
   /** Optional overlay registry. If omitted, no DOM-space overlay checks run. */
   overlayRegistry?: OverlayRegistry;
+  /**
+   * Optional ADR-009 geometry cache. When provided, the rotated-box fallback
+   * reads bounds from `bundle.hitProxy.localAabb`. When omitted, the fallback
+   * derives bounds inline (legacy path). Tests typically omit it.
+   */
+  geometryCache?: GeometryCache;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -296,8 +303,17 @@ function classifyFromDescriptor(descriptor: HitTargetDescriptor, intersection: T
  * Manual ray-vs-rotated-box fallback. Runs only when the scene raycast misses
  * (e.g. an instanced mesh momentarily has a stale bounding sphere). Returns the
  * nearest part to the ray origin or `null`.
+ *
+ * ADR-009: when a `geometryCache` is provided, local bounds come from
+ * `bundle.hitProxy.localAabb` (versioned, cached per-part). When omitted, the
+ * fallback derives bounds inline. Both paths produce identical results for
+ * box parts — the cache is the seam custom cuts (§6) will use to ship
+ * non-box hit proxies without changing this function.
  */
-function rotatedBoxFallback(parts: ReadonlyArray<Part>): { partId: string; worldPoint: Vec3 } | null {
+function rotatedBoxFallback(
+  parts: ReadonlyArray<Part>,
+  geometryCache: GeometryCache | undefined
+): { partId: string; worldPoint: Vec3 } | null {
   let bestPartId: string | null = null;
   let bestDistance = Infinity;
   let bestPoint: Vec3 | null = null;
@@ -316,8 +332,14 @@ function rotatedBoxFallback(parts: ReadonlyArray<Part>): { partId: string; world
     _inverseMatrix.copy(_worldMatrix).invert();
     _localRay.copy(ray).applyMatrix4(_inverseMatrix);
 
-    _localBounds.min.set(-part.length / 2, -part.thickness / 2, -part.width / 2);
-    _localBounds.max.set(part.length / 2, part.thickness / 2, part.width / 2);
+    if (geometryCache) {
+      const aabb = geometryCache.get(part).hitProxy.localAabb;
+      _localBounds.min.set(aabb.min.x, aabb.min.y, aabb.min.z);
+      _localBounds.max.set(aabb.max.x, aabb.max.y, aabb.max.z);
+    } else {
+      _localBounds.min.set(-part.length / 2, -part.thickness / 2, -part.width / 2);
+      _localBounds.max.set(part.length / 2, part.thickness / 2, part.width / 2);
+    }
 
     if (!_localRay.intersectBox(_localBounds, _intersectionLocal)) continue;
 
@@ -387,7 +409,7 @@ export function resolveHitTarget(screen: ScreenPoint, context: HitTestContext): 
   // 3. Rotated-box fallback over parts. Catches the edge cases where an
   // InstancedMesh's bounding sphere is momentarily stale relative to its
   // instances — better than going silent.
-  const fallback = rotatedBoxFallback(context.parts);
+  const fallback = rotatedBoxFallback(context.parts, context.geometryCache);
   if (fallback) {
     return {
       kind: 'part-body',

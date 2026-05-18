@@ -17,6 +17,7 @@ import {
   type HitTestContext,
   type ScreenPoint
 } from './hitTest';
+import { createGeometryCache } from './geometry/cache';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test harness — builds a real Three.js scene with an orthographic camera
@@ -599,5 +600,79 @@ describe('createOverlayRegistry', () => {
     reg.register({ overlayId: 'b', rect: { left: 20, top: 20, right: 30, bottom: 30 } });
     reg.clear();
     expect(reg.list()).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADR-009: rotated-box fallback consults the geometry cache when provided
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('rotatedBoxFallback with geometry cache', () => {
+  it('matches the inline fallback when bounds come from bundle.hitProxy', () => {
+    // Same setup as the InstancedMesh stale-bounding-sphere regression test
+    // above: scene raycast misses (forced via off-axis boundingSphere), the
+    // fallback catches the hit. With a cache present, the fallback reads
+    // local bounds from bundle.hitProxy.localAabb instead of deriving them
+    // inline; the result must be identical for box parts.
+    const partA = makePart({ id: 'A', position: { x: 0, y: 0.5, z: 0 } });
+    const geometry = new THREE.BoxGeometry(20, 1, 20);
+    const material = new THREE.MeshBasicMaterial();
+    const instanced = new THREE.InstancedMesh(geometry, material, 1);
+    const m = new THREE.Matrix4();
+    m.setPosition(0, 0.5, 0);
+    instanced.setMatrixAt(0, m);
+    instanced.instanceMatrix.needsUpdate = true;
+    instanced.boundingSphere = new THREE.Sphere(new THREE.Vector3(10000, 10000, 10000), 0.0001);
+    setHitTargetDescriptor(instanced, {
+      kind: 'part-body-instanced',
+      nodeId: 'inst',
+      partIdByInstance: ['A']
+    });
+
+    const scene = makeScene([instanced]);
+    const cache = createGeometryCache();
+    const ctxWithCache: HitTestContext = {
+      camera: makeTopDownCamera(),
+      scene,
+      canvasRect: canvasRect(),
+      parts: [partA],
+      geometryCache: cache
+    };
+
+    const result = resolveHitTarget(clientFromWorldXZ(0, 0), ctxWithCache);
+    expect(result).toMatchObject({ kind: 'part-body', partId: 'A' });
+    // Bundle was actually consulted.
+    expect(cache.size()).toBe(1);
+  });
+
+  it('returns identical hits with vs. without the cache (same part, same scene)', () => {
+    // For a box part, the cached hitProxy.localAabb matches the inline
+    // derivation exactly. This guards the contract: enabling the cache does
+    // not change hit-test outcomes for boxes.
+    const part = makePart({
+      id: 'p',
+      position: { x: 0, y: 0.5, z: 0 },
+      rotation: { x: 0, y: 30, z: 0 }
+    });
+    const mesh = makePartMesh(part, { kind: 'part-body', nodeId: 'p', partId: 'p' });
+    // Force the scene raycast to miss so we exercise the fallback in both runs.
+    mesh.geometry.computeBoundingSphere();
+    mesh.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(10000, 10000, 10000), 0.0001);
+    const scene = makeScene([mesh]);
+
+    const ctxInline = makeContext(scene, [part]);
+    const ctxCached: HitTestContext = { ...ctxInline, geometryCache: createGeometryCache() };
+
+    const inlineResult = resolveHitTarget(clientFromWorldXZ(0, 0), ctxInline);
+    const cachedResult = resolveHitTarget(clientFromWorldXZ(0, 0), ctxCached);
+    expect(inlineResult?.kind).toBe('part-body');
+    expect(cachedResult?.kind).toBe('part-body');
+    if (inlineResult?.kind === 'part-body' && cachedResult?.kind === 'part-body') {
+      expect(cachedResult.partId).toBe(inlineResult.partId);
+      // World points within float epsilon.
+      expect(cachedResult.worldPoint.x).toBeCloseTo(inlineResult.worldPoint.x, 5);
+      expect(cachedResult.worldPoint.y).toBeCloseTo(inlineResult.worldPoint.y, 5);
+      expect(cachedResult.worldPoint.z).toBeCloseTo(inlineResult.worldPoint.z, 5);
+    }
   });
 });

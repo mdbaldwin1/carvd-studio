@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 import type { Camera, Object3D } from 'three';
 import type { Part } from '../types';
 import { type HitTarget, resolveHitTarget, type OverlayRegistry } from './hitTest';
+import { createGeometryCache, type GeometryCache } from './geometry/cache';
 import {
   createSessionController,
   type SessionAction,
@@ -74,6 +75,15 @@ export function useCanvasPointerSession(params: UseCanvasPointerSessionParams): 
     controllerRef.current = createSessionController(config);
   }
 
+  // ADR-009: one geometry cache per pointer-session lifetime. The hit-test
+  // rotated-box fallback reads bundle.hitProxy from this cache. Survives
+  // across renders; invalidates entries automatically on dimension/rotation
+  // change via the bundle's versionKey.
+  const geometryCacheRef = useRef<GeometryCache | null>(null);
+  if (!geometryCacheRef.current) {
+    geometryCacheRef.current = createGeometryCache();
+  }
+
   useEffect(() => {
     if (disabled) return;
     if (!canvas || !camera || !scene) return;
@@ -89,7 +99,8 @@ export function useCanvasPointerSession(params: UseCanvasPointerSessionParams): 
           scene,
           canvasRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
           parts: partsRef.current,
-          overlayRegistry
+          overlayRegistry,
+          geometryCache: geometryCacheRef.current!
         }
       );
     }
