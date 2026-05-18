@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import * as THREE from 'three';
-import { useProjectStore, getContainingGroupId, getAllDescendantPartIds } from '../store/projectStore';
+import { useProjectStore, getContainingGroupId } from '../store/projectStore';
+import { useWorkspaceSceneGraph } from '../interaction/useWorkspaceSceneGraph';
 import { useClipboardStore } from '../store/clipboardStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useSnapStore } from '../store/snapStore';
@@ -31,6 +32,8 @@ export function useKeyboardShortcuts() {
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
   const groupMembers = useProjectStore((s) => s.groupMembers);
   const groups = useProjectStore((s) => s.groups);
+  // ADR-008: read group descendants from the scene graph adapter.
+  const sceneGraph = useWorkspaceSceneGraph();
   const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const editingGroupId = useSelectionStore((s) => s.editingGroupId);
   const createGroup = useProjectStore((s) => s.createGroup);
@@ -48,7 +51,7 @@ export function useKeyboardShortcuts() {
       // Calculate effective selected parts (directly selected + parts from selected groups)
       const effectivePartIds = new Set(selectedPartIds);
       for (const groupId of selectedGroupIds) {
-        const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
+        const groupPartIds = sceneGraph.descendantPartIds(groupId);
         groupPartIds.forEach((id) => effectivePartIds.add(id));
       }
 
@@ -380,6 +383,7 @@ export function useKeyboardShortcuts() {
     referencePartIds,
     groupMembers,
     groups,
+    sceneGraph,
     selectedGroupIds,
     editingGroupId,
     createGroup,
