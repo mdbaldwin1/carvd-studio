@@ -12,9 +12,11 @@ import { ThreeEvent, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Part } from '../../types';
 import { useSelectionStore } from '../../store/selectionStore';
+import { useInteractionStore } from '../../store/interactionStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { useUIStore } from '../../store/uiStore';
+import { resolvePartInteractionPreview } from '../../utils/interactionOverlay';
 import { getPartGroupContext } from './partClickHandler';
 import { markPartPointerInteraction, setRightClickTarget } from './workspaceUtils';
 import { useGroupDrag } from './useGroupDrag';
@@ -32,11 +34,9 @@ interface InstancedPartsProps {
   parts: Part[];
   /** Total parts in the project — used as the stable allocation size to avoid re-mounting */
   totalPartCount: number;
-  /** IDs of parts affected by the current drag (selected parts + group descendants) */
-  dragAffectedPartIds: Set<string>;
 }
 
-export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: InstancedPartsProps) {
+export function InstancedParts({ parts, totalPartCount }: InstancedPartsProps) {
   const { camera, gl, controls } = useThree();
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const outlineMeshRef = useRef<THREE.InstancedMesh>(null);
@@ -53,7 +53,7 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
   const displayMode = useCameraStore((s) => s.displayMode);
 
   // Drag delta for parts being dragged by someone else (group drag)
-  const activeDragDelta = useSelectionStore((s) => s.activeDragDelta);
+  const activeSession = useInteractionStore((s) => s.activeSession);
 
   // Actions
   const selectPart = useSelectionStore((s) => s.selectPart);
@@ -71,7 +71,10 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
   // Part ID by instance index — used to resolve instanceId from pointer events
   const partIdByIndex = useMemo(() => parts.map((p) => p.id), [parts]);
 
-  // Update instance matrices and colors whenever parts change
+  // Update instance matrices, colors, and bounding sphere whenever parts change.
+  // Matrix and bounding-sphere updates MUST be in the same effect — three.js raycast
+  // uses `mesh.boundingSphere` for coarse rejection, so a stale sphere makes the
+  // raycast skip valid instances and clicks fall through to the ground.
   useEffect(() => {
     const mesh = meshRef.current;
     const outlineMesh = outlineMeshRef.current;
@@ -89,6 +92,7 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
       }
       mesh.userData.partIdByInstance = [];
       mesh.userData.isInstancedParts = true;
+      mesh.boundingSphere = null;
       return;
     }
 
@@ -105,15 +109,9 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
       _quaternion.setFromEuler(_euler);
 
       // Scale = part dimensions (unit cube scaled to actual size)
-      _scale.set(part.length, part.thickness, part.width);
-
-      // Position (apply drag delta for parts in the selected group)
-      _position.set(part.position.x, part.position.y, part.position.z);
-      if (activeDragDelta && dragAffectedPartIds.has(part.id)) {
-        _position.x += activeDragDelta.x;
-        _position.y += activeDragDelta.y;
-        _position.z += activeDragDelta.z;
-      }
+      const preview = resolvePartInteractionPreview(part, activeSession);
+      _scale.set(preview.dimensions.length, preview.dimensions.thickness, preview.dimensions.width);
+      _position.set(preview.position.x, preview.position.y, preview.position.z);
 
       _matrix.compose(_position, _quaternion, _scale);
       mesh.setMatrixAt(i, _matrix);
@@ -145,29 +143,11 @@ export function InstancedParts({ parts, totalPartCount, dragAffectedPartIds }: I
     // Expose instance->part mapping for native workspace raycast fallbacks.
     mesh.userData.partIdByInstance = partIdByIndex;
     mesh.userData.isInstancedParts = true;
-  }, [parts, activeDragDelta, dragAffectedPartIds, displayMode, partIdByIndex]);
 
-  // Compute bounding sphere for frustum culling
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh || parts.length === 0) return;
-
-    const box = new THREE.Box3();
-    const tempBox = new THREE.Box3();
-    const center = new THREE.Vector3();
-    const size = new THREE.Vector3();
-
-    for (const part of parts) {
-      center.set(part.position.x, part.position.y, part.position.z);
-      size.set(part.length, part.thickness, part.width);
-      tempBox.setFromCenterAndSize(center, size);
-      box.union(tempBox);
-    }
-
-    mesh.geometry.boundingBox = box;
-    mesh.geometry.boundingSphere = new THREE.Sphere();
-    box.getBoundingSphere(mesh.geometry.boundingSphere);
-  }, [parts]);
+    // Bounding sphere derived from the (now-current) instance matrices and the
+    // unit-cube geometry's local-space bounds. Never override geometry.boundingSphere.
+    mesh.computeBoundingSphere();
+  }, [parts, activeSession, displayMode, partIdByIndex]);
 
   // === Interaction handlers ===
 

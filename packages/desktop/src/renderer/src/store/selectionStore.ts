@@ -14,7 +14,7 @@ interface SelectionStoreState {
   // Part selection
   selectedPartIds: string[];
   hoveredPartId: string | null;
-  transformMode: 'translate' | 'scale';
+  transformMode: 'translate' | 'rotate' | 'scale';
   activeDragDelta: { x: number; y: number; z: number } | null;
   selectionBox: {
     start: { x: number; y: number };
@@ -39,7 +39,7 @@ interface SelectionStoreState {
 
   // Actions - Hover/UI
   setHoveredPart: (id: string | null) => void;
-  setTransformMode: (mode: 'translate' | 'scale') => void;
+  setTransformMode: (mode: 'translate' | 'rotate' | 'scale') => void;
   setActiveDragDelta: (delta: { x: number; y: number; z: number } | null) => void;
   setSelectionBox: (box: { start: { x: number; y: number }; end: { x: number; y: number } } | null) => void;
   setDragIntent: (intent: DragIntent) => void;

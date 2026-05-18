@@ -6,6 +6,7 @@ import { useProjectStore, generateCopyName, getAllDescendantPartIds } from './pr
 import { useLicenseStore } from './licenseStore';
 import { useSelectionStore } from './selectionStore';
 import { useUIStore } from './uiStore';
+import { resolveSelectedGroupIdsWithDescendants } from '../utils/interactionSelection';
 
 interface ClipboardStoreState {
   clipboard: Clipboard;
@@ -27,20 +28,8 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
     // Collect all parts to copy (directly selected + parts from selected groups)
     const partIdsToCopy = new Set(selectedPartIds);
 
-    // Helper to collect all descendant groups recursively
-    const collectDescendantGroupIds = (groupId: string, collected: Set<string>) => {
-      collected.add(groupId);
-      const childGroups = groupMembers.filter((gm) => gm.groupId === groupId && gm.memberType === 'group');
-      for (const child of childGroups) {
-        collectDescendantGroupIds(child.memberId, collected);
-      }
-    };
-
     // Collect all groups to copy (selected groups + their descendants)
-    const groupIdsToCopy = new Set<string>();
-    for (const groupId of selectedGroupIds) {
-      collectDescendantGroupIds(groupId, groupIdsToCopy);
-    }
+    const groupIdsToCopy = new Set(resolveSelectedGroupIdsWithDescendants(selectedGroupIds, groupMembers));
 
     // Add all parts from copied groups
     for (const groupId of groupIdsToCopy) {

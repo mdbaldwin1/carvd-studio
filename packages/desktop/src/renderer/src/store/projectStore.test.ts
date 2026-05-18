@@ -12,6 +12,7 @@ import { useLicenseStore } from './licenseStore';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
 import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
+import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
 import {
   createTestPart,
@@ -50,6 +51,7 @@ const resetStore = () => {
     referencePartIds: [],
     activeReferenceDistances: []
   });
+  useInteractionStore.getState().endSession();
   useAssemblyEditingStore.setState({
     isEditingAssembly: false,
     editingAssemblyId: null,

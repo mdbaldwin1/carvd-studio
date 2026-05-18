@@ -225,7 +225,7 @@ export function Workspace() {
 
       for (const hit of hits) {
         if (hit.object.userData?.blocksPartSelection) {
-          return null;
+          continue;
         }
 
         const partId = (hit.object.userData?.partId as string | undefined) ?? null;
@@ -393,15 +393,111 @@ export function Workspace() {
     [enterGroup, selectGroup, selectPart, setSelectedSidebarStockId]
   );
 
-  // Prevent native context menu on canvas - we'll show our own on mouseup
+  // Prevent native context menu and trigger our own. Listener is on `window` rather
+  // than `gl.domElement` so it still fires when the right-click lands on an overlay
+  // HTML element (drei <Html> labels, dimension chips, reference rulers) that sits
+  // on top of the canvas. The canvas's own DOM listener would miss those because the
+  // overlays render via portal in document.body, outside the canvas's bubble path.
+  // We gate by checking that the click position is inside the canvas viewport rect,
+  // so non-workspace UI (sidebar, modals, headers) keeps its own right-click behavior.
   useEffect(() => {
     const canvas = gl.domElement;
-    const preventContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
+
+    // Reset the right-click target at the start of every pointerdown gesture so a
+    // value left over from a previous interaction can't be misread. The R3F pointer
+    // handlers on Part / InstancedParts / SnapGuides / ground / sky run in bubble
+    // phase and overwrite this with the actual target if the gesture hits a 3D mesh.
+    // For right-clicks that land on HTML overlays (no R3F hit), the target stays
+    // null and preventContextMenu falls back to a fresh raycast.
+    const resetTargetOnPointerDown = () => {
+      clearRightClickTarget();
     };
-    canvas.addEventListener('contextmenu', preventContextMenu);
-    return () => canvas.removeEventListener('contextmenu', preventContextMenu);
-  }, [gl]);
+    window.addEventListener('pointerdown', resetTargetOnPointerDown, true);
+
+    const preventContextMenu = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+        // Right-click outside workspace area — let it pass to whoever owns it.
+        return;
+      }
+
+      e.preventDefault();
+
+      // Consume the right-click target eagerly so it can never leak into a later
+      // gesture. The target is set by R3F pointerdown handlers (Part / InstancedParts /
+      // SnapGuides / ground / sky) at the start of THIS gesture; we use it once here
+      // and discard, regardless of whether mouseup eventually clears it.
+      const target = getRightClickTarget();
+      clearRightClickTarget();
+
+      debugSelection('contextmenu:fired', {
+        x: e.clientX,
+        y: e.clientY,
+        button: e.button,
+        ctrlKey: e.ctrlKey,
+        metaKey: e.metaKey,
+        target,
+        eventTarget: (e.target as HTMLElement | null)?.tagName ?? null,
+        currentSelection: useSelectionStore.getState().selectedPartIds,
+        currentContextMenu: useUIStore.getState().contextMenu
+      });
+      if (target) {
+        if (target.type === 'guide' && target.guideId) {
+          openContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            type: 'guide',
+            guideId: target.guideId
+          });
+        } else if (target.type === 'part') {
+          openContextMenu({ x: e.clientX, y: e.clientY, type: 'part' });
+        } else {
+          openContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            type: 'background',
+            worldPosition: target.worldPosition
+          });
+        }
+        debugSelection('contextmenu:opened-from-target', { type: target.type });
+        return;
+      }
+
+      // No R3F-captured target — usually because the right-click landed on an HTML
+      // overlay rather than a 3D object, or because the gesture (e.g. ctrl+left-click
+      // on macOS) didn't fire a button=2 pointerdown. Resolve the actual target by
+      // raycasting at the click coordinates against the 3D scene.
+      const hitPartId = getHitPartId(e.clientX, e.clientY);
+      debugSelection('contextmenu:fallback-raycast', { hitPartId });
+      if (hitPartId) {
+        const selectionState = useSelectionStore.getState();
+        const projectState = useProjectStore.getState();
+        const hitContext = getPartGroupContext(hitPartId, projectState.groupMembers, selectionState.editingGroupId);
+        const isAlreadySelected =
+          selectionState.selectedPartIds.includes(hitPartId) ||
+          hitContext.ancestorGroupIds.some((groupId) => selectionState.selectedGroupIds.includes(groupId));
+
+        if (!isAlreadySelected) {
+          selectFromPartHit(hitPartId, false);
+        }
+
+        openContextMenu({ x: e.clientX, y: e.clientY, type: 'part' });
+        debugSelection('contextmenu:opened-from-fallback');
+      } else {
+        // Empty workspace area — open the background context menu so the gesture
+        // still does something useful (Add Guide, etc.).
+        openContextMenu({ x: e.clientX, y: e.clientY, type: 'background' });
+        debugSelection('contextmenu:opened-background-empty');
+      }
+    };
+    window.addEventListener('contextmenu', preventContextMenu);
+    debugSelection('contextmenu:listener-attached');
+    return () => {
+      window.removeEventListener('contextmenu', preventContextMenu);
+      window.removeEventListener('pointerdown', resetTargetOnPointerDown, true);
+      debugSelection('contextmenu:listener-detached');
+    };
+  }, [gl, getHitPartId, openContextMenu, selectFromPartHit]);
 
   // Track right-click for our custom context menu (fires on mouseup, not mousedown)
   useEffect(() => {
@@ -486,21 +582,32 @@ export function Workspace() {
 
         // Native selection fallback for simple clicks.
         if (distance <= 5 && elapsed <= 500 && !selectionChangedDuringClick) {
-          const hitPartId = getHitPartId(e.clientX, e.clientY);
-          debugSelection('native:mouseup:left', {
-            x: e.clientX,
-            y: e.clientY,
-            distance,
-            elapsed,
-            selectionChangedDuringClick,
-            hitPartId
-          });
-          if (hitPartId) {
-            const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
-            const isModKey = isMac ? e.metaKey : e.ctrlKey;
-            selectFromPartHit(hitPartId, e.shiftKey || isModKey);
+          const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+          const isModKey = isMac ? e.metaKey : e.ctrlKey;
+          const isAdditive = e.shiftKey || isModKey;
+
+          // For additive (shift / cmd) clicks the R3F per-mesh pointerdown handler
+          // already toggled selection; running selectFromPartHit again here would
+          // toggle a second time and net to no change. Only reapply non-additive
+          // selection from this fallback (which is idempotent — re-selecting the
+          // same part is a no-op).
+          if (isAdditive) {
+            debugSelection('native:mouseup:left:additive-skipped');
           } else {
-            debugSelection('native:mouseup:left:no-part-hit');
+            const hitPartId = getHitPartId(e.clientX, e.clientY);
+            debugSelection('native:mouseup:left', {
+              x: e.clientX,
+              y: e.clientY,
+              distance,
+              elapsed,
+              selectionChangedDuringClick,
+              hitPartId
+            });
+            if (hitPartId) {
+              selectFromPartHit(hitPartId, false);
+            } else {
+              debugSelection('native:mouseup:left:no-part-hit');
+            }
           }
         } else if (distance <= 5 && elapsed <= 500 && selectionChangedDuringClick) {
           debugSelection('native:mouseup:left:skipped-selection-already-changed', {
@@ -570,12 +677,20 @@ export function Workspace() {
       }
     };
 
+    const handleWindowBlur = () => {
+      leftClickDownPos.current = null;
+      rightClickDownPos.current = null;
+      clearRightClickTarget();
+    };
+
     canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('blur', handleWindowBlur);
     canvas.addEventListener('dblclick', handleDoubleClick);
     return () => {
       canvas.removeEventListener('mousedown', handleMouseDown);
-      canvas.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('blur', handleWindowBlur);
       canvas.removeEventListener('dblclick', handleDoubleClick);
     };
   }, [gl, openContextMenu, getHitPartId, selectFromPartHit, drillFromPartHit]);
@@ -646,6 +761,26 @@ export function Workspace() {
       return;
     }
 
+    // Additive (shift / cmd) click on empty space should preserve the existing
+    // selection. Without this, missing a part while shift+clicking would wipe
+    // out everything the user just multi-selected.
+    const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+    const isModKey = isMac ? e.nativeEvent.metaKey : e.nativeEvent.ctrlKey;
+    if (e.nativeEvent.shiftKey || isModKey) {
+      pointerDownPos.current = null;
+      debugSelection('background:click:additive-preserve-selection');
+      return;
+    }
+
+    // Suppress deselect while a context menu is open. Trackpad right-click can
+    // emit a paired left button event, and clearing selection here would unmount
+    // the just-opened part menu (which depends on selectedPartIds).
+    if (useUIStore.getState().contextMenu) {
+      pointerDownPos.current = null;
+      debugSelection('background:click:suppressed-context-menu-open');
+      return;
+    }
+
     if (performance.now() - lastSelectionApplyAtRef.current < 250) {
       pointerDownPos.current = null;
       debugSelection('background:click:suppressed-after-selection');
@@ -702,6 +837,22 @@ export function Workspace() {
 
     // Only clear selection if we tracked a pointer-down on the sky
     if (!pointerDownPos.current) {
+      return;
+    }
+
+    // Preserve selection on additive (shift / cmd) click — same reason as ground.
+    const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+    const isModKey = isMac ? e.nativeEvent.metaKey : e.nativeEvent.ctrlKey;
+    if (e.nativeEvent.shiftKey || isModKey) {
+      pointerDownPos.current = null;
+      debugSelection('sky:click:additive-preserve-selection');
+      return;
+    }
+
+    // Suppress deselect while a context menu is open (see handleBackgroundClick).
+    if (useUIStore.getState().contextMenu) {
+      pointerDownPos.current = null;
+      debugSelection('sky:click:suppressed-context-menu-open');
       return;
     }
 

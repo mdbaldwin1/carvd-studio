@@ -177,10 +177,13 @@ export function SnapAlignmentLines() {
               fontSize: '10px',
               fontWeight: 'bold',
               fontFamily: 'monospace',
-              backgroundColor: 'rgba(0,0,0,0.78)',
+              backgroundColor: 'rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
               padding: '2px 6px',
               borderRadius: '4px',
-              border: '1px solid #00d9ff'
+              border: '1px solid #00d9ff',
+              textShadow: '0 0 3px rgba(0,0,0,0.85)'
             }}
           >
             SNAP LOCK
@@ -233,7 +236,7 @@ export function SnapAlignmentLines() {
                   : [(line.start.x + line.end.x) / 2, (line.start.y + line.end.y) / 2, (line.start.z + line.end.z) / 2]
               }
               center
-              occlude={displayMode === 'solid' ? 'blending' : false}
+              occlude={displayMode === 'solid'}
               zIndexRange={[0, 40]}
               style={{ pointerEvents: 'none' }}
             >
@@ -243,12 +246,15 @@ export function SnapAlignmentLines() {
                   fontSize: '10px',
                   fontWeight: 'bold',
                   fontFamily: 'monospace',
-                  backgroundColor: 'rgba(0, 0, 0, 0.82)',
+                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                  backdropFilter: 'blur(4px)',
+                  WebkitBackdropFilter: 'blur(4px)',
                   padding: '1px 5px',
                   borderRadius: '3px',
                   whiteSpace: 'nowrap',
                   userSelect: 'none',
-                  border: `1px solid ${getLineColor(line)}`
+                  border: `1px solid ${getLineColor(line)}`,
+                  textShadow: '0 0 3px rgba(0,0,0,0.85)'
                 }}
               >
                 {getSnapToken(line)}
@@ -306,7 +312,7 @@ export function SnapAlignmentLines() {
                 <Html
                   position={[indicator.labelPosition.x, indicator.labelPosition.y, indicator.labelPosition.z]}
                   center
-                  occlude={displayMode === 'solid' ? 'blending' : false}
+                  occlude={displayMode === 'solid'}
                   zIndexRange={[0, 50]}
                   style={{ pointerEvents: 'none' }}
                 >
@@ -316,12 +322,15 @@ export function SnapAlignmentLines() {
                       fontSize: '11px',
                       fontWeight: 'bold',
                       fontFamily: 'monospace',
-                      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                      backdropFilter: 'blur(4px)',
+                      WebkitBackdropFilter: 'blur(4px)',
                       padding: isDimensionMatch ? '3px 8px' : '2px 5px',
                       borderRadius: '3px',
                       whiteSpace: 'nowrap',
                       userSelect: 'none',
                       border: `1px solid ${labelColor}`,
+                      textShadow: '0 0 3px rgba(0,0,0,0.85)',
                       boxShadow: isDimensionMatch ? '0 2px 4px rgba(0,0,0,0.3)' : 'none'
                     }}
                   >

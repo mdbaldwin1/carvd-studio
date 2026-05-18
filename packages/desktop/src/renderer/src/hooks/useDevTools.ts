@@ -6,8 +6,13 @@
 import { useEffect } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useSelectionStore } from '../store/selectionStore';
+import { useUIStore } from '../store/uiStore';
+import { useInteractionStore } from '../store/interactionStore';
+import { useSnapStore } from '../store/snapStore';
+import { useCameraStore } from '../store/cameraStore';
 import { generateSeedProject, generateStockLibraryItems } from '../utils/seedData';
 import { installDragDebugTools } from '../utils/dragDebug';
+import { getRightClickTarget } from '../components/workspace/workspaceUtils';
 
 // Colors for randomized test parts
 const TEST_PART_COLORS = ['#c4a574', '#f5deb3', '#8B4513', '#DEB887', '#D2691E', '#CD853F'];
@@ -27,6 +32,7 @@ declare global {
       disableDragDebug: () => void;
       clearDragDebugLogs: () => void;
       getDragDebugLogs: () => unknown[];
+      debugInteraction: () => void;
     };
   }
 }
@@ -39,6 +45,13 @@ export function useDevTools() {
     // Only expose in development
     if (import.meta.env.DEV) {
       installDragDebugTools();
+      // Expose stores for console-driven introspection and external automation.
+      (window as unknown as Record<string, unknown>).useProjectStore = useProjectStore;
+      (window as unknown as Record<string, unknown>).useSelectionStore = useSelectionStore;
+      (window as unknown as Record<string, unknown>).useUIStore = useUIStore;
+      (window as unknown as Record<string, unknown>).useInteractionStore = useInteractionStore;
+      (window as unknown as Record<string, unknown>).useSnapStore = useSnapStore;
+      (window as unknown as Record<string, unknown>).useCameraStore = useCameraStore;
       window.carvdDev = {
         /**
          * Load the seed project (Simple Writing Desk)
@@ -253,6 +266,53 @@ export function useDevTools() {
          */
         getDragDebugLogs: () => {
           return window.dumpDragDebugLogs?.() ?? [];
+        },
+
+        /**
+         * Dump interaction-related state — run when right-click / selection / context menu
+         * is misbehaving. Prints stores + module-level globals + canvas listener health.
+         * Call from console: carvdDev.debugInteraction()
+         */
+        debugInteraction: () => {
+          const selection = useSelectionStore.getState();
+          const ui = useUIStore.getState();
+          const interaction = useInteractionStore.getState();
+          const snap = useSnapStore.getState();
+          const project = useProjectStore.getState();
+          const canvas = document.querySelector('canvas');
+
+          console.group('=== Interaction State Snapshot ===');
+          console.log('selection', {
+            selectedPartIds: selection.selectedPartIds,
+            selectedGroupIds: selection.selectedGroupIds,
+            hoveredPartId: selection.hoveredPartId,
+            editingGroupId: selection.editingGroupId,
+            draggingPartId: selection.draggingPartId,
+            dragIntent: selection.dragIntent,
+            activeDragDelta: selection.activeDragDelta
+          });
+          console.log('ui', {
+            contextMenu: ui.contextMenu,
+            selectedSidebarStockId: ui.selectedSidebarStockId
+          });
+          console.log('interaction', { activeSession: interaction.activeSession });
+          console.log('snap', {
+            referencePartIds: snap.referencePartIds,
+            activeSnapLines: snap.activeSnapLines.length,
+            activeReferenceDistances: snap.activeReferenceDistances.length,
+            snapToPartsEnabled: snap.snapToPartsEnabled
+          });
+          console.log('project', {
+            partCount: project.parts.length,
+            snapGuideCount: project.snapGuides.length
+          });
+          console.log('globalRightClickTarget', getRightClickTarget());
+          console.log('canvas', canvas ? { exists: true, tagName: canvas.tagName } : { exists: false });
+          console.log(
+            '__selectionDebugLogs (last 20)',
+            (window as unknown as { __selectionDebugLogs?: unknown[] }).__selectionDebugLogs?.slice(-20)
+          );
+          console.groupEnd();
         }
       };
 
@@ -268,6 +328,7 @@ export function useDevTools() {
       console.log('   carvdDev.disableDragDebug()      - Disable drag/snap deep logging');
       console.log('   carvdDev.clearDragDebugLogs()    - Clear drag/snap debug logs');
       console.log('   carvdDev.getDragDebugLogs()      - Get drag/snap debug logs');
+      console.log('   carvdDev.debugInteraction()      - Dump interaction state when something is broken');
     }
 
     return () => {

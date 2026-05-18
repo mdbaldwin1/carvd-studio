@@ -1,5 +1,14 @@
 import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { join, normalize, isAbsolute, dirname } from 'path';
+
+// Enable CDP for automation when explicitly opted in via env. Off in normal dev,
+// so it doesn't keep a debugging port open by default. Set CARVD_REMOTE_DEBUG=1
+// before `npm run dev` to expose renderer CDP at port 9333 (used by tests/scripts/*.mjs).
+// Note: 9229 is reserved for the Node inspector electron-vite enables on the main
+// process, so we use a separate port for the renderer.
+if (process.env.CARVD_REMOTE_DEBUG === '1') {
+  app.commandLine.appendSwitch('remote-debugging-port', '9333');
+}
 import { existsSync } from 'fs';
 import { readFile, writeFile, unlink, access, readdir, mkdir, stat } from 'fs/promises';
 import { pathToFileURL } from 'url';

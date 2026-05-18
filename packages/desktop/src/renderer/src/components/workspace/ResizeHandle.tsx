@@ -1,7 +1,10 @@
 import { ThreeEvent } from '@react-three/fiber';
 import { memo, useState } from 'react';
+import * as THREE from 'three';
 import { LiveDimensions, HandlePosition, RESIZE_COLORS } from './partTypes';
 import { RESIZE_HANDLE_GEOMETRY } from './partGeometry';
+
+const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
 
 export const ResizeHandle = memo(
   function ResizeHandle({
@@ -61,9 +64,11 @@ export const ResizeHandle = memo(
       <group position={[handleX, handleY, handleZ]}>
         {/* Larger near-invisible hit target keeps handles easy to grab even when visually scaled down */}
         <mesh
+          userData={{ blocksPartSelection: true }}
           scale={hitScale}
           geometry={RESIZE_HANDLE_GEOMETRY}
           onPointerDown={(e) => {
+            if (e.nativeEvent.button !== 0) return;
             e.stopPropagation();
             onResizeStart(handlePos, e);
           }}
@@ -81,7 +86,7 @@ export const ResizeHandle = memo(
         </mesh>
 
         {/* Soft halo instead of dark outline so theme colors remain readable */}
-        <mesh scale={visualScale * 1.12} geometry={RESIZE_HANDLE_GEOMETRY}>
+        <mesh raycast={NOOP_RAYCAST} scale={visualScale * 1.12} geometry={RESIZE_HANDLE_GEOMETRY}>
           <meshBasicMaterial
             color={isActive ? RESIZE_COLORS.hover : baseColor}
             transparent
@@ -91,12 +96,12 @@ export const ResizeHandle = memo(
         </mesh>
         {/* Extra hover glow to make handle focus obvious */}
         {isActive && (
-          <mesh scale={visualScale * 1.35} geometry={RESIZE_HANDLE_GEOMETRY}>
+          <mesh raycast={NOOP_RAYCAST} scale={visualScale * 1.35} geometry={RESIZE_HANDLE_GEOMETRY}>
             <meshBasicMaterial color={RESIZE_COLORS.hover} transparent opacity={0.18} depthWrite={false} />
           </mesh>
         )}
         {/* Main handle */}
-        <mesh scale={visualScale * activeScaleBoost} geometry={RESIZE_HANDLE_GEOMETRY}>
+        <mesh raycast={NOOP_RAYCAST} scale={visualScale * activeScaleBoost} geometry={RESIZE_HANDLE_GEOMETRY}>
           <meshBasicMaterial
             color={isActive ? RESIZE_COLORS.hover : baseColor}
             transparent

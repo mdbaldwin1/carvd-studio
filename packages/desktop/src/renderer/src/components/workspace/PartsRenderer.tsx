@@ -30,7 +30,7 @@ export function PartsRenderer() {
   // Build the set of part IDs that need individual rendering.
   // Group-selected parts stay in the InstancedMesh for performance — only directly
   // selected, hovered, or reference parts pop out as individual <Part> components.
-  const { individualPartIdSet, dragAffectedPartIds } = useMemo(() => {
+  const { individualPartIdSet } = useMemo(() => {
     const individualIds = new Set<string>();
 
     // Directly selected parts (need handles, labels, drag)
@@ -77,15 +77,7 @@ export function PartsRenderer() {
     }
 
     // Drag-affected: all parts that move when the selection is dragged
-    const dragAffected = new Set<string>();
-    for (const id of selectedPartIds) {
-      dragAffected.add(id);
-    }
-    for (const id of groupSelected) {
-      dragAffected.add(id);
-    }
-
-    return { individualPartIdSet: individualIds, dragAffectedPartIds: dragAffected };
+    return { individualPartIdSet: individualIds };
   }, [
     parts,
     selectedPartIds,
@@ -149,11 +141,7 @@ export function PartsRenderer() {
   return (
     <>
       {/* Bulk rendering — single draw call for all non-interactive parts */}
-      <InstancedParts
-        parts={effectiveInstancedParts}
-        totalPartCount={parts.length}
-        dragAffectedPartIds={dragAffectedPartIds}
-      />
+      <InstancedParts parts={effectiveInstancedParts} totalPartCount={parts.length} />
 
       {/* Individual rendering — full interactivity with handles, edges, labels */}
       {effectiveIndividualParts.map((part) => (

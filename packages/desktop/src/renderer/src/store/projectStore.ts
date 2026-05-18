@@ -30,6 +30,14 @@ import { useLicenseStore } from './licenseStore';
 import { rotateAroundWorldAxis } from '../utils/rotation';
 import { getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
+import {
+  getAllDescendantGroupIds as getAllDescendantGroupIdsFromSelection,
+  getAllDescendantPartIds as getAllDescendantPartIdsFromSelection,
+  getAncestorGroupIds as getAncestorGroupIdsFromSelection,
+  getContainingGroupId as getContainingGroupIdFromSelection,
+  resolveSelectedGroupIdsWithDescendants,
+  resolveTransformSelectedPartIds
+} from '../utils/interactionSelection';
 import { dragDebug } from '../utils/dragDebug';
 
 interface ProjectState {
@@ -231,65 +239,9 @@ function maybeShowOverlapClampToast() {
 }
 
 /** Find which group a part belongs to, or null if ungrouped. */
-export const getContainingGroupId = (partId: string, groupMembers: GroupMember[]): string | null => {
-  const member = groupMembers.find((gm) => gm.memberType === 'part' && gm.memberId === partId);
-  return member ? member.groupId : null;
-};
-
-/**
- * Get all descendant part IDs from a group, recursively including nested groups.
- * Memoized: caches results per groupMembers array reference to avoid repeated traversals.
- */
-let _descendantCache: WeakRef<GroupMember[]> | null = null;
-let _descendantResults: Map<string, string[]> = new Map();
-
-export const getAllDescendantPartIds = (groupId: string, groupMembers: GroupMember[]): string[] => {
-  // Invalidate cache if groupMembers array changed
-  if (!_descendantCache || _descendantCache.deref() !== groupMembers) {
-    _descendantCache = new WeakRef(groupMembers);
-    _descendantResults = new Map();
-  }
-
-  const cached = _descendantResults.get(groupId);
-  if (cached) return cached;
-
-  const collect = (currentGroupId: string, visited: Set<string>): string[] => {
-    if (visited.has(currentGroupId)) return [];
-    const nextVisited = new Set(visited);
-    nextVisited.add(currentGroupId);
-
-    const partIds: string[] = [];
-    const members = groupMembers.filter((gm) => gm.groupId === currentGroupId);
-
-    for (const member of members) {
-      if (member.memberType === 'part') {
-        partIds.push(member.memberId);
-      } else {
-        // Nested group - recurse (cycle-safe)
-        partIds.push(...collect(member.memberId, nextVisited));
-      }
-    }
-
-    return partIds;
-  };
-
-  const partIds = collect(groupId, new Set());
-
-  _descendantResults.set(groupId, partIds);
-  return partIds;
-};
-
-/** Get all descendant group IDs recursively, including the given group itself. */
-export const getAllDescendantGroupIds = (groupId: string, groupMembers: GroupMember[]): string[] => {
-  const groupIds: string[] = [groupId];
-  const members = groupMembers.filter((gm) => gm.groupId === groupId);
-  for (const member of members) {
-    if (member.memberType === 'group') {
-      groupIds.push(...getAllDescendantGroupIds(member.memberId, groupMembers));
-    }
-  }
-  return groupIds;
-};
+export const getContainingGroupId = getContainingGroupIdFromSelection;
+export const getAllDescendantPartIds = getAllDescendantPartIdsFromSelection;
+export const getAllDescendantGroupIds = getAllDescendantGroupIdsFromSelection;
 
 const getDuplicateOffset = (partsToDuplicate: Part[]): { x: number; y: number; z: number } => {
   if (partsToDuplicate.length === 0) return { x: 2, y: 0, z: 2 };
@@ -319,24 +271,7 @@ const getDuplicateOffset = (partsToDuplicate: Part[]): { x: number; y: number; z
 };
 
 /** Get all ancestor group IDs for a part, walking up the group hierarchy (for auto-expand). */
-export const getAncestorGroupIds = (partId: string, groupMembers: GroupMember[]): string[] => {
-  const ancestors: string[] = [];
-  let currentId: string | null = partId;
-  let currentType: 'part' | 'group' = 'part';
-
-  while (currentId) {
-    const member = groupMembers.find((gm) => gm.memberType === currentType && gm.memberId === currentId);
-    if (member) {
-      ancestors.push(member.groupId);
-      currentId = member.groupId;
-      currentType = 'group';
-    } else {
-      break;
-    }
-  }
-
-  return ancestors;
-};
+export const getAncestorGroupIds = getAncestorGroupIdsFromSelection;
 
 /** Check if a group is a descendant of another group (to prevent circular references). */
 export const isDescendantOf = (
@@ -621,39 +556,9 @@ export const useProjectStore = create<ProjectState>()(
       moveSelectedParts: (delta) => {
         const { groupMembers, parts, stockConstraints } = get();
         const { selectedPartIds, selectedGroupIds, editingGroupId } = useSelectionStore.getState();
-
-        // Determine which parts to move
-        let partIdsToMove: Set<string>;
-
-        if (editingGroupId !== null) {
-          // Inside a group (Figma-style "entered") - move explicitly selected parts
-          // and all parts from selected sub-groups
-          partIdsToMove = new Set(selectedPartIds);
-
-          // Also include all parts from selected groups (e.g., nested groups within the editing context)
-          for (const groupId of selectedGroupIds) {
-            const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
-            groupPartIds.forEach((id) => partIdsToMove.add(id));
-          }
-        } else {
-          // Not inside a group - expand selection to include all group members
-          partIdsToMove = new Set(selectedPartIds);
-
-          // For each selected part, check if it's in a group and add all group members
-          for (const partId of selectedPartIds) {
-            const containingGroupId = getContainingGroupId(partId, groupMembers);
-            if (containingGroupId) {
-              const groupPartIds = getAllDescendantPartIds(containingGroupId, groupMembers);
-              groupPartIds.forEach((id) => partIdsToMove.add(id));
-            }
-          }
-
-          // Also include all parts from selected groups
-          for (const groupId of selectedGroupIds) {
-            const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
-            groupPartIds.forEach((id) => partIdsToMove.add(id));
-          }
-        }
+        const partIdsToMove = new Set(
+          resolveTransformSelectedPartIds({ selectedPartIds, selectedGroupIds, editingGroupId }, groupMembers)
+        );
 
         if (partIdsToMove.size === 0) return;
 
@@ -702,28 +607,9 @@ export const useProjectStore = create<ProjectState>()(
       rotateSelectedParts: (axis, degrees, pivot) => {
         const { groupMembers, parts, stockConstraints } = get();
         const { selectedPartIds, selectedGroupIds, editingGroupId } = useSelectionStore.getState();
-
-        let partIdsToRotate: Set<string>;
-        if (editingGroupId !== null) {
-          partIdsToRotate = new Set(selectedPartIds);
-          for (const groupId of selectedGroupIds) {
-            const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
-            groupPartIds.forEach((id) => partIdsToRotate.add(id));
-          }
-        } else {
-          partIdsToRotate = new Set(selectedPartIds);
-          for (const partId of selectedPartIds) {
-            const containingGroupId = getContainingGroupId(partId, groupMembers);
-            if (containingGroupId) {
-              const groupPartIds = getAllDescendantPartIds(containingGroupId, groupMembers);
-              groupPartIds.forEach((id) => partIdsToRotate.add(id));
-            }
-          }
-          for (const groupId of selectedGroupIds) {
-            const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
-            groupPartIds.forEach((id) => partIdsToRotate.add(id));
-          }
-        }
+        const partIdsToRotate = new Set(
+          resolveTransformSelectedPartIds({ selectedPartIds, selectedGroupIds, editingGroupId }, groupMembers)
+        );
 
         if (partIdsToRotate.size === 0 || Math.abs(degrees) < 1e-6) return;
 
@@ -1133,20 +1019,8 @@ export const useProjectStore = create<ProjectState>()(
         // Collect all parts to include (directly selected + parts from selected groups)
         const partIdsToInclude = new Set(selectedPartIds);
 
-        // Helper to collect all descendant groups recursively
-        const collectDescendantGroupIds = (groupId: string, collected: Set<string>) => {
-          collected.add(groupId);
-          const childGroups = groupMembers.filter((gm) => gm.groupId === groupId && gm.memberType === 'group');
-          for (const child of childGroups) {
-            collectDescendantGroupIds(child.memberId, collected);
-          }
-        };
-
         // Collect all groups to include (selected groups + their descendants)
-        const groupIdsToInclude = new Set<string>();
-        for (const groupId of selectedGroupIds) {
-          collectDescendantGroupIds(groupId, groupIdsToInclude);
-        }
+        const groupIdsToInclude = new Set(resolveSelectedGroupIdsWithDescendants(selectedGroupIds, groupMembers));
 
         // Add all parts from included groups
         for (const groupId of groupIdsToInclude) {

@@ -3,6 +3,7 @@ import { useSnapStore } from './snapStore';
 import { useProjectStore } from './projectStore';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
 import { useSelectionStore } from './selectionStore';
+import { useInteractionStore } from './interactionStore';
 
 // Helper to reset store state before each test
 const resetStores = () => {
@@ -23,6 +24,7 @@ const resetStores = () => {
     referencePartIds: [],
     activeReferenceDistances: []
   });
+  useInteractionStore.getState().endSession();
 };
 
 describe('snapStore', () => {

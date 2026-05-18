@@ -5,12 +5,13 @@ import { Part as PartType } from '../../types';
 import { useProjectStore } from '../../store/projectStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
+import { useInteractionStore } from '../../store/interactionStore';
 import {
-  calculateSnapThreshold,
-  detectDimensionSnaps,
-  createDimensionMatchSnapLine,
-  getPartBoundsAtPosition
-} from '../../utils/snapToPartsUtil';
+  beginResizeInteractionSession,
+  clearMoveInteractionPreview,
+  publishResizeInteractionPreview
+} from '../../utils/interactionSession';
+import { solveResizePreview } from '../../utils/interactionResizePreview';
 import { LiveDimensions, HandlePosition, snapToGrid } from './partTypes';
 import { isOrbitControls } from './workspaceUtils';
 import { calculateWorldHalfHeight } from '../../utils/mathPool';
@@ -116,140 +117,47 @@ export function usePartResize(
     const worldDelta = _tempWorldDelta.current.copy(currentPoint).sub(startPoint);
     const localDelta = worldToLocal(worldDelta);
 
-    let newLength = partLength;
-    let newWidth = partWidth;
-    let newThickness = partThickness;
-
-    const resizingDimensions = {
-      length: false,
-      width: false,
-      thickness: false
-    };
-
     // Get constraint settings from store
     const stockConstraints = useProjectStore.getState().stockConstraints;
     const stocks = useProjectStore.getState().stocks;
     const assignedStock = part.stockId ? stocks.find((s) => s.id === part.stockId) : null;
-    const isDimensionConstrained = stockConstraints.constrainDimensions && !!assignedStock;
-
-    const maxLength = isDimensionConstrained && assignedStock ? assignedStock.length : Infinity;
-    const maxWidth = isDimensionConstrained && assignedStock && !part.glueUpPanel ? assignedStock.width : Infinity;
-    const maxThickness = isDimensionConstrained && assignedStock ? assignedStock.thickness : Infinity;
-
-    if (handlePos.type === 'corner') {
-      newLength = Math.min(maxLength, Math.max(0.5, partLength + localDelta.x * handlePos.x));
-      newThickness = Math.min(maxThickness, Math.max(0.25, partThickness + localDelta.y * handlePos.y));
-      newWidth = Math.min(maxWidth, Math.max(0.5, partWidth + localDelta.z * handlePos.z));
-      resizingDimensions.length = true;
-      resizingDimensions.thickness = true;
-      resizingDimensions.width = true;
-    } else {
-      if (handlePos.x !== 0) {
-        newLength = Math.min(maxLength, Math.max(0.5, partLength + localDelta.x * handlePos.x));
-        resizingDimensions.length = true;
-      }
-      if (handlePos.y !== 0) {
-        newThickness = Math.min(maxThickness, Math.max(0.25, partThickness + localDelta.y * handlePos.y));
-        resizingDimensions.thickness = true;
-      }
-      if (handlePos.z !== 0) {
-        newWidth = Math.min(maxWidth, Math.max(0.5, partWidth + localDelta.z * handlePos.z));
-        resizingDimensions.width = true;
-      }
-    }
 
     // Apply dimension matching snap if enabled
     const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled;
     const allParts = useProjectStore.getState().parts;
     const currentReferenceIds = useSnapStore.getState().referencePartIds;
+    const currentGroupMembers = useProjectStore.getState().groupMembers;
+    const currentActiveReferenceState = useInteractionStore.getState().activeSession?.referenceState ?? null;
     const units = useProjectStore.getState().units;
 
     const appSettings = useAppSettingsStore.getState().settings;
-    const { snapSensitivity, dimensionSnapSameTypeOnly } = appSettings;
+    const cameraDistance = camera.position.distanceTo(_tempCameraTarget.current.set(partPos.x, partPos.y, partPos.z));
+    const preview = solveResizePreview({
+      part,
+      handlePos,
+      localDelta: { x: localDelta.x, y: localDelta.y, z: localDelta.z },
+      partPosition: { x: partPos.x, y: partPos.y, z: partPos.z },
+      startingDimensions: {
+        length: partLength,
+        width: partWidth,
+        thickness: partThickness
+      },
+      assignedStock,
+      constrainDimensions: stockConstraints.constrainDimensions,
+      rotationQuaternion,
+      referenceParts: allParts,
+      referencePartIds: currentReferenceIds,
+      groupMembers: currentGroupMembers,
+      latchedRelationId: currentActiveReferenceState?.activeRelationId ?? null,
+      latchedAxis: currentActiveReferenceState?.latchedAxis ?? null,
+      snapToPartsEnabled: isSnapEnabled,
+      appSettings,
+      units,
+      cameraDistance
+    });
 
-    const snapTargetParts =
-      currentReferenceIds.length > 0 ? allParts.filter((p) => currentReferenceIds.includes(p.id)) : allParts;
-
-    if (isSnapEnabled) {
-      const cameraDistance = camera.position.distanceTo(_tempCameraTarget.current.set(partPos.x, partPos.y, partPos.z));
-      const snapThreshold = calculateSnapThreshold(cameraDistance, snapSensitivity);
-
-      const dimensionSnaps = detectDimensionSnaps(
-        { length: newLength, width: newWidth, thickness: newThickness },
-        resizingDimensions,
-        snapTargetParts,
-        part.id,
-        snapThreshold,
-        dimensionSnapSameTypeOnly,
-        units,
-        true // Enable standard dimension snapping
-      );
-
-      const snapLines: import('../../types').SnapLine[] = [];
-      const snappedDimensions = { length: false, width: false, thickness: false };
-
-      for (const snap of dimensionSnaps) {
-        if (snap.dimension === 'length') {
-          newLength = snap.targetValue;
-          snappedDimensions.length = true;
-        } else if (snap.dimension === 'width') {
-          newWidth = snap.targetValue;
-          snappedDimensions.width = true;
-        } else if (snap.dimension === 'thickness') {
-          newThickness = snap.targetValue;
-          snappedDimensions.thickness = true;
-        }
-
-        const tempPart = {
-          ...part,
-          length: newLength,
-          width: newWidth,
-          thickness: newThickness
-        };
-        const resizingBounds = getPartBoundsAtPosition(tempPart, partPos);
-        const snapLine = createDimensionMatchSnapLine(snap, resizingBounds);
-
-        snapLine.dimensionMatchInfo = {
-          isStandard: snap.isStandardDimension,
-          sourcePart: snap.matchedPartName ?? undefined,
-          sourceDimension: snap.matchedDimension ?? undefined
-        };
-
-        if (snap.matchedPartBounds && !snap.isStandardDimension) {
-          const labelPos = snapLine.distanceIndicators![0].labelPosition;
-          snapLine.connectorLine = {
-            start: labelPos,
-            end: {
-              x: snap.matchedPartBounds.centerX,
-              y: snap.matchedPartBounds.maxY + 0.5,
-              z: snap.matchedPartBounds.centerZ
-            }
-          };
-        }
-
-        snapLines.push(snapLine);
-      }
-
-      snappedDimensionsRef.current = snappedDimensions;
-
-      // Batch snap lines + reference distances into single store update
-      useSnapStore.getState().setSnapIndicators(snapLines, []);
-    } else {
-      useSnapStore.getState().setSnapIndicators([], []);
-      snappedDimensionsRef.current = { length: false, width: false, thickness: false };
-    }
-
-    // Calculate the world-space center offset to keep the fixed corner/edge in place
-    _tempLocalOffset.current.set(
-      ((newLength - partLength) / 2) * handlePos.x,
-      ((newThickness - partThickness) / 2) * handlePos.y,
-      ((newWidth - partWidth) / 2) * handlePos.z
-    );
-    _tempWorldOffset.current.copy(_tempLocalOffset.current).applyQuaternion(rotationQuaternion);
-
-    const newX = partPos.x + _tempWorldOffset.current.x;
-    const newY = partPos.y + _tempWorldOffset.current.y;
-    const newZ = partPos.z + _tempWorldOffset.current.z;
+    snappedDimensionsRef.current = preview.snappedDimensions;
+    useSnapStore.getState().setSnapIndicators(preview.snapLines, []);
 
     // Note: We don't clamp to ground during live resize to avoid the "opposite direction"
     // bug where clamping position but not dimensions causes inconsistent behavior.
@@ -257,13 +165,26 @@ export function usePartResize(
 
     setLiveDims((prev) => ({
       ...prev,
-      x: newX,
-      y: newY,
-      z: newZ,
-      length: newLength,
-      width: newWidth,
-      thickness: newThickness
+      x: preview.position.x,
+      y: preview.position.y,
+      z: preview.position.z,
+      length: preview.dimensions.length,
+      width: preview.dimensions.width,
+      thickness: preview.dimensions.thickness
     }));
+    publishResizeInteractionPreview({
+      dimensions: {
+        length: preview.dimensions.length,
+        width: preview.dimensions.width,
+        thickness: preview.dimensions.thickness
+      },
+      position: {
+        x: preview.position.x,
+        y: preview.position.y,
+        z: preview.position.z
+      },
+      referenceState: preview.referenceState
+    });
   };
 
   const finishResize = () => {
@@ -326,7 +247,10 @@ export function usePartResize(
     resizeStart.current = null;
     if (isOrbitControls(controls)) controls.enabled = true;
     document.body.style.cursor = 'auto';
-    useSnapStore.getState().setActiveSnapLines([]);
+    clearMoveInteractionPreview({
+      clearSelectionDragDelta: false,
+      clearReferenceDistances: true
+    });
     useSnapStore.getState().updateReferenceDistances();
   };
 
@@ -394,6 +318,21 @@ export function usePartResize(
           partWidth: part.width,
           partThickness: part.thickness
         };
+        beginResizeInteractionSession({
+          affectedPartIds: [part.id],
+          primaryPartId: part.id,
+          handle: handlePos,
+          initialDimensions: {
+            length: part.length,
+            width: part.width,
+            thickness: part.thickness
+          },
+          initialPosition: {
+            x: part.position.x,
+            y: part.position.y,
+            z: part.position.z
+          }
+        });
         if (isOrbitControls(controls)) controls.enabled = false;
       }
     },
@@ -401,6 +340,7 @@ export function usePartResize(
       part.position.x,
       part.position.y,
       part.position.z,
+      part.id,
       part.length,
       part.width,
       part.thickness,

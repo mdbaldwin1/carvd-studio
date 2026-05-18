@@ -164,7 +164,6 @@ export const RotationHandle = memo(
 
     const stopWorkspaceSelection = (e: ThreeEvent<MouseEvent | PointerEvent>) => {
       e.stopPropagation();
-      e.nativeEvent.stopImmediatePropagation();
     };
 
     const getProjectedScreenPoint = useCallback(
@@ -270,9 +269,6 @@ export const RotationHandle = memo(
     const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
       if (e.nativeEvent.button !== 0) return;
       e.stopPropagation();
-      if (typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-        e.nativeEvent.stopImmediatePropagation();
-      }
       if (typeof e.target.setPointerCapture === 'function') {
         e.target.setPointerCapture(e.pointerId);
       }

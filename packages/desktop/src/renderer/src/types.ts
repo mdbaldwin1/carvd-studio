@@ -303,6 +303,22 @@ export interface ReferenceDistanceIndicator {
   labelPosition: { x: number; y: number; z: number };
 }
 
+export interface ReferenceRuler {
+  id: string;
+  relationId: string;
+  kind: 'passive' | 'active' | 'hovered' | 'editing';
+  editMode: 'move' | 'resize-size' | 'resize-gap';
+  axis: 'x' | 'y' | 'z' | null;
+  type: 'edge-to-edge' | 'edge-offset';
+  fromPartId: string;
+  toPartId: string;
+  start: { x: number; y: number; z: number };
+  end: { x: number; y: number; z: number };
+  distance: number;
+  labelPosition: { x: number; y: number; z: number };
+  priority: number;
+}
+
 // ============================================================
 // Cut List Types
 // ============================================================

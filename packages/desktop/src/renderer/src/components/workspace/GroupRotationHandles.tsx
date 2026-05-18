@@ -1,9 +1,17 @@
 import { useMemo, useCallback } from 'react';
 import { useThree } from '@react-three/fiber';
 import { useShallow } from 'zustand/shallow';
-import { useProjectStore, getAllDescendantPartIds, getContainingGroupId } from '../../store/projectStore';
+import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
+import { useInteractionStore } from '../../store/interactionStore';
 import { getCombinedBounds } from '../../utils/snapToPartsUtil';
+import { resolveTransformSelectedPartIds } from '../../utils/interactionSelection';
+import { shouldHideGroupTransformHandles } from '../../utils/interactionOverlay';
+import {
+  beginRotateInteractionSession,
+  clearMoveInteractionPreview,
+  publishRotateInteractionPreview
+} from '../../utils/interactionSession';
 import { LiveDimensions } from './partTypes';
 import { RotationHandle } from './RotationHandle';
 import { isOrbitControls } from './workspaceUtils';
@@ -13,38 +21,17 @@ export function GroupRotationHandles() {
   const parts = useProjectStore((s) => s.parts);
   const groupMembers = useProjectStore((s) => s.groupMembers);
   const rotateSelectedParts = useProjectStore((s) => s.rotateSelectedParts);
-  const { selectedPartIds, selectedGroupIds, editingGroupId, activeDragDelta } = useSelectionStore(
+  const { selectedPartIds, selectedGroupIds, editingGroupId } = useSelectionStore(
     useShallow((s) => ({
       selectedPartIds: s.selectedPartIds,
       selectedGroupIds: s.selectedGroupIds,
-      editingGroupId: s.editingGroupId,
-      activeDragDelta: s.activeDragDelta
+      editingGroupId: s.editingGroupId
     }))
   );
+  const activeSession = useInteractionStore((s) => s.activeSession);
 
   const selectedIds = useMemo(() => {
-    let partIdsToRotate: Set<string>;
-    if (editingGroupId !== null) {
-      partIdsToRotate = new Set(selectedPartIds);
-      for (const groupId of selectedGroupIds) {
-        const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
-        groupPartIds.forEach((id) => partIdsToRotate.add(id));
-      }
-    } else {
-      partIdsToRotate = new Set(selectedPartIds);
-      for (const partId of selectedPartIds) {
-        const containingGroupId = getContainingGroupId(partId, groupMembers);
-        if (containingGroupId) {
-          const groupPartIds = getAllDescendantPartIds(containingGroupId, groupMembers);
-          groupPartIds.forEach((id) => partIdsToRotate.add(id));
-        }
-      }
-      for (const groupId of selectedGroupIds) {
-        const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
-        groupPartIds.forEach((id) => partIdsToRotate.add(id));
-      }
-    }
-    return [...partIdsToRotate];
+    return resolveTransformSelectedPartIds({ selectedPartIds, selectedGroupIds, editingGroupId }, groupMembers);
   }, [editingGroupId, groupMembers, selectedGroupIds, selectedPartIds]);
 
   const selectedParts = useMemo(() => parts.filter((p) => selectedIds.includes(p.id)), [parts, selectedIds]);
@@ -67,28 +54,50 @@ export function GroupRotationHandles() {
   const handleRotate = useCallback(
     (axis: 'x' | 'y' | 'z') => {
       if (!pivot) return;
+      beginRotateInteractionSession({
+        affectedPartIds: selectedIds,
+        primaryPartId: selectedIds[0] ?? null,
+        pivot,
+        axis,
+        initialDegrees: 90
+      });
       rotateSelectedParts(axis, 90, pivot);
+      clearMoveInteractionPreview({
+        clearSelectionDragDelta: false,
+        clearReferenceDistances: false
+      });
     },
-    [pivot, rotateSelectedParts]
+    [pivot, rotateSelectedParts, selectedIds]
   );
 
   const handleRotateDelta = useCallback(
     (axis: 'x' | 'y' | 'z', degrees: number) => {
       if (!pivot || Math.abs(degrees) < 0.01) return;
       rotateSelectedParts(axis, degrees, pivot);
+      publishRotateInteractionPreview({ axis, degreesDelta: degrees });
     },
     [pivot, rotateSelectedParts]
   );
 
   const handleRotateStart = useCallback(() => {
     if (isOrbitControls(controls)) controls.enabled = false;
-  }, [controls]);
+    if (!pivot || selectedIds.length === 0) return;
+    beginRotateInteractionSession({
+      affectedPartIds: selectedIds,
+      primaryPartId: selectedIds[0] ?? null,
+      pivot
+    });
+  }, [controls, pivot, selectedIds]);
 
   const handleRotateEnd = useCallback(() => {
     if (isOrbitControls(controls)) controls.enabled = true;
+    clearMoveInteractionPreview({
+      clearSelectionDragDelta: false,
+      clearReferenceDistances: false
+    });
   }, [controls]);
 
-  if (!liveDims || !pivot || activeDragDelta) return null;
+  if (!liveDims || !pivot || shouldHideGroupTransformHandles(activeSession)) return null;
 
   return (
     <group position={[pivot.x, pivot.y, pivot.z]}>

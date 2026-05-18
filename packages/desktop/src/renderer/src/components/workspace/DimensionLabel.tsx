@@ -1,4 +1,4 @@
-import { Line, Text } from '@react-three/drei';
+import { Billboard, Line, Text } from '@react-three/drei';
 import { Suspense } from 'react';
 import { memo } from 'react';
 import * as THREE from 'three';
@@ -16,7 +16,12 @@ export const DimensionLabel = memo(
     offsetDir,
     offset = 1.5,
     color = '#ffffff',
-    units
+    units,
+    fontSize = 0.42,
+    lineWidth = 1.5,
+    tickLength = 0.3,
+    billboard = true,
+    hidden = false
   }: {
     start: [number, number, number];
     end: [number, number, number];
@@ -25,7 +30,14 @@ export const DimensionLabel = memo(
     offset?: number;
     color?: string;
     units: 'imperial' | 'metric';
+    fontSize?: number;
+    lineWidth?: number;
+    tickLength?: number;
+    billboard?: boolean;
+    hidden?: boolean;
   }) {
+    if (hidden) return null;
+
     // Calculate the midpoint for the label
     const midX = (start[0] + end[0]) / 2;
     const midY = (start[1] + end[1]) / 2;
@@ -56,7 +68,8 @@ export const DimensionLabel = memo(
       (offsetEnd[1] - offsetStart[1]) / Math.max(lineLength, 1e-6),
       (offsetEnd[2] - offsetStart[2]) / Math.max(lineLength, 1e-6)
     ];
-    const labelGap = Math.max(0.48, Math.min(0.82, 0.32 + labelText.length * 0.043));
+    const estimatedTextWidth = fontSize * (1.9 + labelText.length * 0.34);
+    const labelGap = Math.min(Math.max(estimatedTextWidth, fontSize * 2.35), lineLength * 0.72);
     const halfGap = Math.min(labelGap * 0.5, lineLength * 0.45);
     const lineLeftEnd: [number, number, number] = [
       labelPos[0] - lineDir[0] * halfGap,
@@ -82,7 +95,6 @@ export const DimensionLabel = memo(
       dimDir[0] * offsetVec[1] - dimDir[1] * offsetVec[0]
     ];
     const tickLen = Math.sqrt(tickDir[0] ** 2 + tickDir[1] ** 2 + tickDir[2] ** 2);
-    const tickLength = 0.3;
     const normalizedTick: [number, number, number] =
       tickLen > 0
         ? [
@@ -95,8 +107,8 @@ export const DimensionLabel = memo(
     return (
       <group>
         {/* Main dimension line with centered gap at the label */}
-        <Line raycast={NOOP_RAYCAST} points={[offsetStart, lineLeftEnd]} color={color} lineWidth={1.5} />
-        <Line raycast={NOOP_RAYCAST} points={[lineRightStart, offsetEnd]} color={color} lineWidth={1.5} />
+        <Line raycast={NOOP_RAYCAST} points={[offsetStart, lineLeftEnd]} color={color} lineWidth={lineWidth} />
+        <Line raycast={NOOP_RAYCAST} points={[lineRightStart, offsetEnd]} color={color} lineWidth={lineWidth} />
 
         {/* Start extension line */}
         <Line
@@ -110,7 +122,7 @@ export const DimensionLabel = memo(
             ]
           ]}
           color={color}
-          lineWidth={1}
+          lineWidth={Math.max(1, lineWidth * 0.66)}
         />
 
         {/* End extension line */}
@@ -121,7 +133,7 @@ export const DimensionLabel = memo(
             [offsetEnd[0] + offsetVec[0] * 0.15, offsetEnd[1] + offsetVec[1] * 0.15, offsetEnd[2] + offsetVec[2] * 0.15]
           ]}
           color={color}
-          lineWidth={1}
+          lineWidth={Math.max(1, lineWidth * 0.66)}
         />
 
         {/* Start tick mark (perpendicular to dimension line) */}
@@ -136,7 +148,7 @@ export const DimensionLabel = memo(
             [offsetStart[0] + normalizedTick[0], offsetStart[1] + normalizedTick[1], offsetStart[2] + normalizedTick[2]]
           ]}
           color={color}
-          lineWidth={1.5}
+          lineWidth={lineWidth}
         />
 
         {/* End tick mark */}
@@ -147,25 +159,42 @@ export const DimensionLabel = memo(
             [offsetEnd[0] + normalizedTick[0], offsetEnd[1] + normalizedTick[1], offsetEnd[2] + normalizedTick[2]]
           ]}
           color={color}
-          lineWidth={1.5}
+          lineWidth={lineWidth}
         />
 
         {/* Dimension text (3D mesh so depth/occlusion is consistent with scene geometry) */}
         <Suspense fallback={null}>
-          <Text
-            raycast={NOOP_RAYCAST}
-            position={labelPos}
-            quaternion={textQuaternion}
-            font={labelFontUrl}
-            fontSize={0.34}
-            color={color}
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.018}
-            outlineColor="#000000"
-          >
-            {labelText}
-          </Text>
+          {billboard ? (
+            <Billboard position={labelPos} follow lockX={false} lockY={false} lockZ={false}>
+              <Text
+                raycast={NOOP_RAYCAST}
+                font={labelFontUrl}
+                fontSize={fontSize}
+                color={color}
+                anchorX="center"
+                anchorY="middle"
+                outlineWidth={Math.max(0.016, fontSize * 0.05)}
+                outlineColor="#000000"
+              >
+                {labelText}
+              </Text>
+            </Billboard>
+          ) : (
+            <Text
+              raycast={NOOP_RAYCAST}
+              position={labelPos}
+              quaternion={textQuaternion}
+              font={labelFontUrl}
+              fontSize={fontSize}
+              color={color}
+              anchorX="center"
+              anchorY="middle"
+              outlineWidth={Math.max(0.016, fontSize * 0.05)}
+              outlineColor="#000000"
+            >
+              {labelText}
+            </Text>
+          )}
         </Suspense>
       </group>
     );
@@ -175,6 +204,11 @@ export const DimensionLabel = memo(
     prev.offset === next.offset &&
     prev.color === next.color &&
     prev.units === next.units &&
+    prev.fontSize === next.fontSize &&
+    prev.lineWidth === next.lineWidth &&
+    prev.tickLength === next.tickLength &&
+    prev.billboard === next.billboard &&
+    prev.hidden === next.hidden &&
     prev.start[0] === next.start[0] &&
     prev.start[1] === next.start[1] &&
     prev.start[2] === next.start[2] &&

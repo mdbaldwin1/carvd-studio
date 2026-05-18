@@ -58,8 +58,17 @@ export function ContextMenu() {
   useEffect(() => {
     if (!contextMenu) return;
 
+    if (import.meta.env.DEV) {
+      console.info('[ContextMenu] mounted', { contextMenu });
+    }
+
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        if (import.meta.env.DEV) {
+          console.info('[ContextMenu] click-outside fires close', {
+            target: (e.target as HTMLElement)?.tagName
+          });
+        }
         closeContextMenu();
       }
     };
@@ -72,11 +81,17 @@ export function ContextMenu() {
 
     // Use setTimeout to avoid closing immediately from the same click that opened it
     const timer = setTimeout(() => {
+      if (import.meta.env.DEV) {
+        console.info('[ContextMenu] click-outside listener attached');
+      }
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
     }, 0);
 
     return () => {
+      if (import.meta.env.DEV) {
+        console.info('[ContextMenu] effect cleanup');
+      }
       clearTimeout(timer);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
