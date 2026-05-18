@@ -13,7 +13,7 @@ Each significant architectural decision made during the interaction-architecture
 | 005 | Overlay model derivation policy           | §10   | Accepted    |
 | 006 | Constraint pipeline ordering              | §8    | Not started |
 | 007 | Store ownership graph                     | §12   | Not started |
-| 008 | Scene graph derivation vs persistence     | §1    | Not started |
+| 008 | Scene graph derivation vs persistence     | §1    | Accepted    |
 | 009 | Geometry bundle cache invalidation policy | §5    | Not started |
 | 010 | Part definition dual-format migration     | §6    | Not started |
 | 011 | Snap anchor graph + arbitration           | §7    | Not started |
