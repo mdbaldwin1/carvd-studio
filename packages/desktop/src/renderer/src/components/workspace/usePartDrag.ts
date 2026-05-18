@@ -15,7 +15,7 @@ import {
 } from '../../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
 import { LiveDimensions, snapToGrid } from './partTypes';
-import { isOrbitControls, setRightClickTarget } from './workspaceUtils';
+import { isOrbitControls } from './workspaceUtils';
 import { calculateWorldHalfHeight } from '../../utils/mathPool';
 import { dragDebug } from '../../utils/dragDebug';
 import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
@@ -812,7 +812,8 @@ export function usePartDrag(
         }
         useUIStore.getState().setSelectedSidebarStockId(null);
       }
-      setRightClickTarget({ type: 'part' });
+      // ADR-003: right-click contextmenu now routed via the session
+      // controller's onContextMenu using the hit-target descriptor.
       return;
     }
 

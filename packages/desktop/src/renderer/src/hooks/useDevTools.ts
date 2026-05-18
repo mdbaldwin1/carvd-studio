@@ -12,7 +12,6 @@ import { useSnapStore } from '../store/snapStore';
 import { useCameraStore } from '../store/cameraStore';
 import { generateSeedProject, generateStockLibraryItems } from '../utils/seedData';
 import { installDragDebugTools } from '../utils/dragDebug';
-import { getRightClickTarget } from '../components/workspace/workspaceUtils';
 
 // Colors for randomized test parts
 const TEST_PART_COLORS = ['#c4a574', '#f5deb3', '#8B4513', '#DEB887', '#D2691E', '#CD853F'];
@@ -306,7 +305,6 @@ export function useDevTools() {
             partCount: project.parts.length,
             snapGuideCount: project.snapGuides.length
           });
-          console.log('globalRightClickTarget', getRightClickTarget());
           console.log('canvas', canvas ? { exists: true, tagName: canvas.tagName } : { exists: false });
           console.log(
             '__selectionDebugLogs (last 20)',

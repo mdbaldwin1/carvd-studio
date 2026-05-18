@@ -18,7 +18,7 @@ import { useCameraStore } from '../../store/cameraStore';
 import { useUIStore } from '../../store/uiStore';
 import { resolvePartInteractionPreview } from '../../utils/interactionOverlay';
 import { getPartGroupContext } from './partClickHandler';
-import { markPartPointerInteraction, setRightClickTarget } from './workspaceUtils';
+import { markPartPointerInteraction } from './workspaceUtils';
 import { useGroupDrag } from './useGroupDrag';
 import { setHitTargetDescriptor } from '../../interaction/hitTest';
 
@@ -245,7 +245,7 @@ export function InstancedParts({ parts, totalPartCount }: InstancedPartsProps) {
           }
         }
         setSelectedSidebarStockId(null);
-        setRightClickTarget({ type: 'part' });
+        // ADR-003: right-click contextmenu routes through the session controller.
         return;
       }
 

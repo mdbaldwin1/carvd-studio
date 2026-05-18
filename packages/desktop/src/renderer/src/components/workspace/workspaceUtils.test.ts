@@ -1,16 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Use real Three.js so rotation math actually works in getPartAABB tests
 vi.unmock('three');
 
-import {
-  LIGHTING_PRESETS,
-  isOrbitControls,
-  setRightClickTarget,
-  getRightClickTarget,
-  clearRightClickTarget,
-  getPartAABB
-} from './workspaceUtils';
+import { LIGHTING_PRESETS, isOrbitControls, getPartAABB } from './workspaceUtils';
 
 // ============================================================
 // Tests
@@ -62,51 +55,9 @@ describe('workspaceUtils', () => {
     });
   });
 
-  describe('right-click target management', () => {
-    beforeEach(() => {
-      clearRightClickTarget();
-    });
-
-    it('starts with null target', () => {
-      expect(getRightClickTarget()).toBeNull();
-    });
-
-    it('sets and gets a background target', () => {
-      setRightClickTarget({ type: 'background' });
-      expect(getRightClickTarget()).toEqual({ type: 'background' });
-    });
-
-    it('sets and gets a part target', () => {
-      setRightClickTarget({ type: 'part' });
-      expect(getRightClickTarget()).toEqual({ type: 'part' });
-    });
-
-    it('sets and gets a guide target with position', () => {
-      setRightClickTarget({
-        type: 'guide',
-        worldPosition: { x: 1, y: 2, z: 3 },
-        guideId: 'guide-1'
-      });
-      const target = getRightClickTarget();
-      expect(target).toEqual({
-        type: 'guide',
-        worldPosition: { x: 1, y: 2, z: 3 },
-        guideId: 'guide-1'
-      });
-    });
-
-    it('clears the target', () => {
-      setRightClickTarget({ type: 'part' });
-      clearRightClickTarget();
-      expect(getRightClickTarget()).toBeNull();
-    });
-
-    it('overwrites previous target', () => {
-      setRightClickTarget({ type: 'part' });
-      setRightClickTarget({ type: 'background' });
-      expect(getRightClickTarget()!.type).toBe('background');
-    });
-  });
+  // Right-click target globals were removed in Phase 3b cleanup — context
+  // menu routing now flows through the session controller and hit-test
+  // service. See ADR-002 + ADR-003.
 
   describe('getPartAABB', () => {
     it('calculates AABB for un-rotated part at origin', () => {

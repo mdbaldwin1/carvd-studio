@@ -26,7 +26,7 @@ import { ThumbnailCaptureHandler } from './ThumbnailCaptureHandler';
 import { installDragDebugTools } from '../../utils/dragDebug';
 import { hasInteractiveHitAt as resolveHasInteractiveHitAt } from '../../interaction/hitTest';
 import { useCanvasPointerSession } from '../../interaction/useCanvasPointerSession';
-import { LIGHTING_PRESETS, isOrbitControls, setRightClickTarget } from './workspaceUtils';
+import { LIGHTING_PRESETS, isOrbitControls } from './workspaceUtils';
 
 declare global {
   interface Window {
@@ -485,21 +485,12 @@ export function Workspace() {
     debugSelection('background:click:cleared-selection');
   };
 
-  // Track what was right-clicked on pointer down (for context menu on mouseup)
-  const handleGroundRightClick = (e: ThreeEvent<PointerEvent>) => {
-    if (e.nativeEvent.button === 2) {
-      e.stopPropagation();
-      const worldPosition = e.point ? { x: e.point.x, y: 0, z: e.point.z } : { x: 0, y: 0, z: 0 };
-      setRightClickTarget({ type: 'background', worldPosition });
-    }
-  };
-
-  const handleSkyRightClick = (e: ThreeEvent<PointerEvent>) => {
-    if (e.nativeEvent.button === 2) {
-      const worldPosition = e.point ? { x: e.point.x, y: e.point.y, z: e.point.z } : { x: 0, y: 0, z: 0 };
-      setRightClickTarget({ type: 'background', worldPosition });
-    }
-  };
+  // ADR-002 + ADR-003: right-click target resolution is handled by the
+  // hit-test service via the session controller's onContextMenu. The
+  // workspaceUtils right-click-target globals are gone; the per-mesh
+  // ground/sky right-click handlers below are now no-ops kept only so the
+  // pointerdown plumbing remains symmetrical until §4b consolidates these
+  // paths into the controller too.
 
   // Click on sky to deselect (similar to ground click)
   const handleSkyClick = (e: ThreeEvent<MouseEvent>) => {
@@ -592,9 +583,11 @@ export function Workspace() {
     // Always track pointer position for click detection
     handleBackgroundPointerDownForClick(e);
 
-    // Track right-click target for context menu
+    // Right-click on ground: the session controller's onContextMenu resolves
+    // this via the hit-test service and opens the background menu with the
+    // world position. Nothing to do here at the per-mesh level.
     if (e.nativeEvent.button === 2) {
-      handleGroundRightClick(e);
+      e.stopPropagation();
       return;
     }
 
@@ -780,12 +773,7 @@ export function Workspace() {
 
       {/* Sky sphere (catches clicks that miss everything else) */}
       <mesh
-        onPointerDown={(e) => {
-          handleBackgroundPointerDownForClick(e);
-          if (e.nativeEvent.button === 2) {
-            handleSkyRightClick(e);
-          }
-        }}
+        onPointerDown={handleBackgroundPointerDownForClick}
         onClick={handleSkyClick}
         onDoubleClick={handleBackgroundDoubleClick}
         // ADR-002: hitTarget descriptor for the hit-test service.

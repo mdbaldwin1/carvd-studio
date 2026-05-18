@@ -1,7 +1,5 @@
 import { Line } from '@react-three/drei';
-import { ThreeEvent } from '@react-three/fiber';
 import { useProjectStore } from '../../store/projectStore';
-import { setRightClickTarget } from './workspaceUtils';
 
 // Component that renders persistent snap guides
 export function SnapGuides() {
@@ -20,13 +18,9 @@ export function SnapGuides() {
     z: '#4dabf7'
   };
 
-  // Track right-click on guide for context menu (shown on mouseup by Workspace)
-  const handleGuidePointerDown = (e: ThreeEvent<PointerEvent>, guideId: string) => {
-    if (e.nativeEvent.button === 2) {
-      e.stopPropagation();
-      setRightClickTarget({ type: 'guide', guideId });
-    }
-  };
+  // ADR-002 + ADR-003: right-click on a guide is routed through the
+  // session controller's onContextMenu via the userData.hitTarget
+  // descriptor on each guide mesh. No per-mesh handler needed.
 
   return (
     <group>
@@ -55,11 +49,10 @@ export function SnapGuides() {
 
         return (
           <group key={guide.id}>
-            {/* Semi-transparent plane - interactive for context menu */}
+            {/* Semi-transparent plane - hit-target tag drives context menu routing */}
             <mesh
               position={position}
               rotation={rotation}
-              onPointerDown={(e) => handleGuidePointerDown(e, guide.id)}
               // ADR-002: descriptor lets the hit-test service resolve this guide.
               userData={{ hitTarget: { kind: 'snap-guide', guideId: guide.id } }}
             >

@@ -43,25 +43,13 @@ export function isOrbitControls(controls: THREE.EventDispatcher<object> | null):
   return controls !== null && 'enabled' in controls;
 }
 
-// Module-level tracking for right-click context menu
-// Shared between Workspace, SnapGuides, and Part
-let globalRightClickTarget: {
-  type: 'background' | 'part' | 'guide';
-  worldPosition?: { x: number; y: number; z: number };
-  guideId?: string;
-} | null = null;
-
-export function setRightClickTarget(target: typeof globalRightClickTarget) {
-  globalRightClickTarget = target;
-}
-
-export function getRightClickTarget() {
-  return globalRightClickTarget;
-}
-
-export function clearRightClickTarget() {
-  globalRightClickTarget = null;
-}
+// ADR-002 + ADR-003: the right-click target globals
+// (setRightClickTarget / getRightClickTarget / clearRightClickTarget) that
+// used to live here are gone. The hit-test service resolves right-click
+// targets via userData.hitTarget descriptors, and the session controller's
+// onContextMenu handler reads them directly. The globals were the bridge
+// between per-mesh R3F handlers and the workspace contextmenu listener;
+// neither side needs the bridge anymore.
 
 export function markPartPointerInteraction() {
   // Reserved hook for part-owned pointer interactions.
