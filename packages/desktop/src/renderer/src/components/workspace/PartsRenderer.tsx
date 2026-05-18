@@ -7,17 +7,17 @@
  * and drag support. Everything else is rendered in a single InstancedMesh draw call.
  */
 import { useMemo } from 'react';
-import { useProjectStore, getAllDescendantPartIds } from '../../store/projectStore';
+import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { Part } from './Part';
 import { InstancedParts } from './InstancedParts';
+import { useWorkspaceSceneGraph } from '../../interaction/useWorkspaceSceneGraph';
 
 export function PartsRenderer() {
   const parts = useProjectStore((s) => s.parts);
-  const groupMembers = useProjectStore((s) => s.groupMembers);
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const hoveredPartId = useSelectionStore((s) => s.hoveredPartId);
@@ -26,6 +26,8 @@ export function PartsRenderer() {
   const displayMode = useCameraStore((s) => s.displayMode);
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
   const selectedSidebarStockId = useUIStore((s) => s.selectedSidebarStockId);
+  // ADR-008: read group descendants from the scene graph adapter.
+  const sceneGraph = useWorkspaceSceneGraph();
 
   // Build the set of part IDs that need individual rendering.
   // Group-selected parts stay in the InstancedMesh for performance — only directly
@@ -64,12 +66,13 @@ export function PartsRenderer() {
       }
     }
 
-    // Group-selected parts: stay instanced (no individual rendering needed)
-    const groupSelected = new Set<string>();
+    // Group-selected parts: stay instanced (no individual rendering needed).
+    // ADR-008: descendantPartIds comes from the scene graph adapter — same
+    // semantics as legacy getAllDescendantPartIds, memoized once per scene
+    // build.
     for (const groupId of selectedGroupIds) {
-      const descendantIds = getAllDescendantPartIds(groupId, groupMembers);
+      const descendantIds = sceneGraph.descendantPartIds(groupId);
       for (const id of descendantIds) {
-        groupSelected.add(id);
         // Keep selected-group parts as individual meshes so drag hit-testing is
         // consistent across the full visible surface (no instanced edge cases).
         individualIds.add(id);
@@ -86,7 +89,7 @@ export function PartsRenderer() {
     referencePartIds,
     dragIntentPartId,
     draggingPartId,
-    groupMembers,
+    sceneGraph,
     selectedSidebarStockId
   ]);
 
