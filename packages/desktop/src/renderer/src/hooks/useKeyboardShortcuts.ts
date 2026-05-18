@@ -238,9 +238,12 @@ export function useKeyboardShortcuts() {
           break;
 
         case 'r':
-          // R = Toggle reference parts for snapping
-          if (hasSelection) {
-            toggleReference(selectedPartIds);
+          // R = Toggle reference parts for snapping. Uses `effectivePartIds`
+          // (which expands selected groups to their descendant parts) so that
+          // clicking a part inside a group — which auto-selects the group,
+          // not the part — still toggles every part in the group on `r`.
+          if (hasSelection && effectivePartIds.size > 0) {
+            toggleReference([...effectivePartIds]);
           }
           break;
 
