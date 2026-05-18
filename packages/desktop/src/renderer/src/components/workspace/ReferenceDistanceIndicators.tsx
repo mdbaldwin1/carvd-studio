@@ -8,47 +8,43 @@ import React, { useState } from 'react';
 import { Line, Html } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { useProjectStore } from '../../store/projectStore';
-import { useSnapStore } from '../../store/snapStore';
-import { useCameraStore } from '../../store/cameraStore';
 import { formatMeasurementWithUnit, parseInput } from '../../utils/fractions';
-import { useInteractionStore } from '../../store/interactionStore';
-import { shouldHideReferenceDistanceIndicators } from '../../utils/interactionOverlay';
 import { getProjectedMeasurementLength, resolveMeasurementOverlayLayout } from '../../utils/measurementOverlayLayout';
 import { getReferenceLabelPosition } from '../../utils/measurementPlacement';
 import { getReferenceDistancePriority } from '../../utils/measurementPriority';
 import { ReferenceRuler } from '../../types';
 import { Input } from '@renderer/components/ui/input';
-import { calculateMoveDeltaForReferenceRelation, referenceRelationToRuler } from '../../utils/referenceRelations';
+import { calculateMoveDeltaForReferenceRelation } from '../../utils/referenceRelations';
 import { resolveResizePositionFromDimensions } from '../../utils/interactionResizePreview';
 import { clearMoveInteractionPreview } from '../../utils/interactionSession';
 import * as THREE from 'three';
+import type { ReferenceOverlayInputs } from '../../interaction/overlayModel';
 
-export function ReferenceDistanceIndicators(): React.ReactElement | null {
+interface ReferenceDistanceIndicatorsProps {
+  /** References slot from the OverlayModel. `null` hides the overlay. */
+  data: ReferenceOverlayInputs | null;
+}
+
+// ADR-005: ReferenceDistanceIndicators is a (mostly) pure prop consumer. The
+// slot in OverlayModel carries every piece of state the component reads. The
+// component still reads `moveSelectedParts` / `updatePart` from projectStore
+// because those are imperative action references (stable, do not trigger
+// re-renders) used inside the inline edit submit handler.
+export function ReferenceDistanceIndicators({ data }: ReferenceDistanceIndicatorsProps): React.ReactElement | null {
   const { camera, size } = useThree();
-  const activeReferenceDistances = useSnapStore((s) => s.activeReferenceDistances);
-  const activeReferenceRulers = useSnapStore((s) => s.activeReferenceRulers);
-  const activeSession = useInteractionStore((s) => s.activeSession);
-  const units = useProjectStore((s) => s.units);
-  const parts = useProjectStore((s) => s.parts);
+  // Stable action references — reading these does not subscribe to state.
   const moveSelectedParts = useProjectStore((s) => s.moveSelectedParts);
   const updatePart = useProjectStore((s) => s.updatePart);
-  const displayMode = useCameraStore((s) => s.displayMode);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
 
-  const sessionRulers = activeSession?.referenceState.candidateRelations.length
-    ? activeSession.referenceState.candidateRelations.map((relation) =>
-        referenceRelationToRuler(
-          relation,
-          relation.id === activeSession.referenceState.activeRelationId ? 'active' : 'passive'
-        )
-      )
-    : [];
-  const rulers = sessionRulers.length > 0 ? sessionRulers : activeReferenceRulers;
+  if (!data) return null;
+
+  const { rulers, legacyIndicators, activeSession, parts, units, displayMode } = data;
   const sessionRelationsById = new Map(
     activeSession?.referenceState.candidateRelations.map((relation) => [relation.id, relation] as const) ?? []
   );
-  const legacyIndicatorsById = new Map(activeReferenceDistances.map((indicator) => [indicator.id, indicator] as const));
+  const legacyIndicatorsById = new Map(legacyIndicators.map((indicator) => [indicator.id, indicator] as const));
   const activeRuler = rulers.find((ruler) => ruler.kind === 'active') ?? rulers[0] ?? null;
   const hasEditableRuler = rulers.some((ruler) => {
     if (ruler.editMode === 'move') return true;
@@ -61,8 +57,6 @@ export function ReferenceDistanceIndicators(): React.ReactElement | null {
           : activeSession.handle?.z;
     return Boolean(handleAxisValue);
   });
-
-  if (rulers.length === 0 || shouldHideReferenceDistanceIndicators(activeSession)) return null;
 
   const viewport = { width: size.width, height: size.height };
   const labelLayout = resolveMeasurementOverlayLayout(

@@ -48,6 +48,11 @@ function makeInput(overrides?: Partial<ComputeOverlayModelInput>): ComputeOverla
       groupMembers: [],
       units: 'imperial'
     },
+    references: {
+      activeReferenceRulers: [],
+      activeReferenceDistances: []
+    },
+    displayMode: 'solid',
     ...overrides
   };
 }
@@ -167,9 +172,63 @@ describe('computeOverlayModel', () => {
   });
 
   describe('references slot', () => {
-    it('is null until §10b-2 migrates ReferenceDistanceIndicators', () => {
+    it('is null when there are no rulers from any source', () => {
       const model = computeOverlayModel(makeInput());
       expect(model.references).toBeNull();
+    });
+
+    it('falls back to snapStore activeReferenceRulers when no session is active', () => {
+      const idleRuler = {
+        id: 'r1',
+        relationId: 'r1',
+        type: 'edge-to-edge',
+        kind: 'passive',
+        editMode: 'move',
+        axis: 'x',
+        distance: 5,
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 5, y: 0, z: 0 },
+        labelPosition: { x: 2.5, y: 0, z: 0 }
+      } as unknown as Parameters<typeof computeOverlayModel>[0]['references']['activeReferenceRulers'][number];
+
+      const model = computeOverlayModel(
+        makeInput({
+          references: {
+            activeReferenceRulers: [idleRuler],
+            activeReferenceDistances: []
+          }
+        })
+      );
+      expect(model.references).not.toBeNull();
+      expect(model.references?.rulers).toHaveLength(1);
+      expect(model.references?.activeSession).toBeNull();
+    });
+
+    it('exposes units + displayMode at the slot level', () => {
+      const idleRuler = {
+        id: 'r1',
+        relationId: 'r1',
+        type: 'edge-to-edge',
+        kind: 'passive',
+        editMode: 'move',
+        axis: 'x',
+        distance: 5,
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 5, y: 0, z: 0 },
+        labelPosition: { x: 2.5, y: 0, z: 0 }
+      } as unknown as Parameters<typeof computeOverlayModel>[0]['references']['activeReferenceRulers'][number];
+      const model = computeOverlayModel(
+        makeInput({
+          references: {
+            activeReferenceRulers: [idleRuler],
+            activeReferenceDistances: []
+          },
+          project: { parts: [], groupMembers: [], units: 'metric' },
+          displayMode: 'translucent'
+        })
+      );
+      expect(model.references?.units).toBe('metric');
+      expect(model.references?.displayMode).toBe('translucent');
     });
   });
 

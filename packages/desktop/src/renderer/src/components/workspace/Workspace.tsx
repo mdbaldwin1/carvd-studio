@@ -82,6 +82,8 @@ export function Workspace() {
   const snapActiveLines = useSnapStore((s) => s.activeSnapLines);
   const snapPulseAt = useSnapStore((s) => s.snapPulseAt);
   const snapLabelPosition = useSnapStore((s) => s.snapLabelPosition);
+  const activeReferenceRulers = useSnapStore((s) => s.activeReferenceRulers);
+  const activeReferenceDistances = useSnapStore((s) => s.activeReferenceDistances);
   const displayMode = useCameraStore((s) => s.displayMode);
   const selectedPartIdsForOverlay = useSelectionStore((s) => s.selectedPartIds);
   const selectedGroupIdsForOverlay = useSelectionStore((s) => s.selectedGroupIds);
@@ -128,7 +130,12 @@ export function Workspace() {
           parts,
           groupMembers,
           units
-        }
+        },
+        references: {
+          activeReferenceRulers,
+          activeReferenceDistances
+        },
+        displayMode
       }),
     [
       activeSessionForOverlay,
@@ -139,7 +146,10 @@ export function Workspace() {
       selectedGroupIdsForOverlay,
       parts,
       groupMembers,
-      units
+      units,
+      activeReferenceRulers,
+      activeReferenceDistances,
+      displayMode
     ]
   );
 
@@ -893,7 +903,8 @@ export function Workspace() {
       <SnapAlignmentLines data={overlayModel.snap} units={units} displayMode={displayMode} />
 
       {/* Reference distance indicators */}
-      <ReferenceDistanceIndicators />
+      {/* Reference rulers — OverlayModel references slot (ADR-005) */}
+      <ReferenceDistanceIndicators data={overlayModel.references} />
 
       {/* Persistent snap guides */}
       <SnapGuides />

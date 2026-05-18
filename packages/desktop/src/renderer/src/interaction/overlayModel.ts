@@ -6,8 +6,10 @@
 // `references` and `dimensions` slots are stubbed so the model can grow
 // without API churn when §10b migrates the remaining components.
 
-import type { GroupMember, Part, SnapLine } from '../types';
+import type { GroupMember, Part, ReferenceDistanceIndicator, ReferenceRuler, SnapLine } from '../types';
 import type { InteractionSession } from '../store/interactionStore';
+import { shouldHideReferenceDistanceIndicators } from '../utils/interactionOverlay';
+import { referenceRelationToRuler } from '../utils/referenceRelations';
 import type { Vec3 } from './tools/toolSolver';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,14 +27,31 @@ export interface SnapOverlayData {
 }
 
 /**
- * Placeholder for §10b. The reference-distance overlay derives from
- * `snapStore.activeReferenceRulers` + `interactionStore.activeSession.referenceState`.
- * Filled in when ReferenceDistanceIndicators migrates.
+ * Inputs the reference-distance-indicators overlay needs.
+ *
+ * Two ruler sources exist: an "active session" set derived from
+ * `interactionStore.activeSession.referenceState.candidateRelations` (used while
+ * a move/resize is in flight), and a legacy idle set from
+ * `snapStore.activeReferenceRulers`. The slot exposes a single resolved
+ * `rulers` list — the active set takes priority when non-empty. The component
+ * doesn't reproduce the priority logic.
+ *
+ * The slot also exposes `legacyIndicators` and `activeSession` because the
+ * component's inline edit + resize handler paths need them; carrying them
+ * here removes those store reads from the component without rewriting the
+ * edit flow (which has its own state and writes back to projectStore).
  */
-export interface ReferenceOverlayData {
-  // Intentionally empty — see §10b.
-  readonly placeholder: true;
+export interface ReferenceOverlayInputs {
+  rulers: ReferenceRuler[];
+  legacyIndicators: ReadonlyArray<ReferenceDistanceIndicator>;
+  activeSession: InteractionSession | null;
+  parts: ReadonlyArray<Part>;
+  units: 'imperial' | 'metric';
+  displayMode: 'solid' | 'wireframe' | 'translucent';
 }
+
+/** Backwards-compatible alias. */
+export type ReferenceOverlayData = ReferenceOverlayInputs;
 
 /**
  * Inputs the multi-selection-dimensions overlay needs to compute its bounding
@@ -64,7 +83,7 @@ export type DimensionOverlayData = DimensionOverlayInputs;
 
 export interface OverlayModel {
   snap: SnapOverlayData | null;
-  references: ReferenceOverlayData | null;
+  references: ReferenceOverlayInputs | null;
   dimensions: DimensionOverlayInputs | null;
 }
 
@@ -92,7 +111,13 @@ export interface ComputeOverlayModelInput {
     groupMembers: ReadonlyArray<GroupMember>;
     units: 'imperial' | 'metric';
   };
-  // Reserved for §10b-2 — reference rulers from snapStore + interactionStore.
+  /** Reference-overlay state read from `snapStore`. */
+  references: {
+    activeReferenceRulers: ReadonlyArray<ReferenceRuler>;
+    activeReferenceDistances: ReadonlyArray<ReferenceDistanceIndicator>;
+  };
+  /** Camera display mode (drives line/label occlusion). */
+  displayMode: 'solid' | 'wireframe' | 'translucent';
 }
 
 /**
@@ -103,7 +128,7 @@ export interface ComputeOverlayModelInput {
 export function computeOverlayModel(input: ComputeOverlayModelInput): OverlayModel {
   return {
     snap: deriveSnapOverlay(input),
-    references: null, // §10b-2
+    references: deriveReferenceOverlay(input),
     dimensions: deriveDimensionOverlay(input)
   };
 }
@@ -117,6 +142,37 @@ function deriveSnapOverlay(input: ComputeOverlayModelInput): SnapOverlayData | n
     lines: [...input.snap.activeSnapLines],
     pulseAt: input.snap.snapPulseAt,
     labelPosition: input.snap.snapLabelPosition
+  };
+}
+
+function deriveReferenceOverlay(input: ComputeOverlayModelInput): ReferenceOverlayInputs | null {
+  // The component used to gate visibility via `shouldHideReferenceDistanceIndicators`;
+  // we honor the same predicate here so the slot is null when the overlay
+  // should not render at all.
+  if (shouldHideReferenceDistanceIndicators(input.activeSession)) return null;
+
+  // Resolved rulers: prefer the active-session candidates when present (they
+  // carry the active/passive distinction); fall back to the snap-store list
+  // for idle reference distances.
+  const sessionRulers = input.activeSession?.referenceState.candidateRelations.length
+    ? input.activeSession.referenceState.candidateRelations.map((relation) =>
+        referenceRelationToRuler(
+          relation,
+          relation.id === input.activeSession?.referenceState.activeRelationId ? 'active' : 'passive'
+        )
+      )
+    : [];
+  const rulers = sessionRulers.length > 0 ? sessionRulers : [...input.references.activeReferenceRulers];
+
+  if (rulers.length === 0) return null;
+
+  return {
+    rulers,
+    legacyIndicators: input.references.activeReferenceDistances,
+    activeSession: input.activeSession,
+    parts: input.project.parts,
+    units: input.project.units,
+    displayMode: input.displayMode
   };
 }
 
