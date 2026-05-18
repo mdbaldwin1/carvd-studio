@@ -12,7 +12,7 @@ Each significant architectural decision made during the interaction-architecture
 | 004 | Tool solver interface contract            | §4    | Accepted    |
 | 005 | Overlay model derivation policy           | §10   | Accepted    |
 | 006 | Constraint pipeline ordering              | §8    | Accepted    |
-| 007 | Store ownership graph                     | §12   | Not started |
+| 007 | Store ownership graph                     | §12   | Accepted    |
 | 008 | Scene graph derivation vs persistence     | §1    | Accepted    |
 | 009 | Geometry bundle cache invalidation policy | §5    | Accepted    |
 | 010 | Part definition dual-format migration     | §6    | Not started |
