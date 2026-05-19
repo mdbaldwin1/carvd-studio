@@ -169,7 +169,11 @@ export function getPartBoundsAtPosition(
   return getPartBounds(tempPart, geometryCache);
 }
 
-export function getPartOBB(part: Part, position: { x: number; y: number; z: number } = part.position): PartOBB {
+export function getPartOBB(
+  part: Part,
+  position: { x: number; y: number; z: number } = part.position,
+  geometryCache?: GeometryCache
+): PartOBB {
   _boundsEuler.set(
     (part.rotation.x * Math.PI) / 180,
     (part.rotation.y * Math.PI) / 180,
@@ -192,6 +196,24 @@ export function getPartOBB(part: Part, position: { x: number; y: number; z: numb
   const wy = qw * qy;
   const wz = qw * qz;
 
+  // ADR-009: half-extents come from the bundle when a cache is provided.
+  // For box parts the result is identical to the inline derivation; the seam
+  // is in place for §6 custom-cut bundles to ship different extents (e.g. a
+  // beveled end whose OBB shrinks along one axis).
+  let halfL: number;
+  let halfT: number;
+  let halfW: number;
+  if (geometryCache) {
+    const bundle = geometryCache.get(part);
+    halfL = bundle.bounds.localObb.halfExtents.x;
+    halfT = bundle.bounds.localObb.halfExtents.y;
+    halfW = bundle.bounds.localObb.halfExtents.z;
+  } else {
+    halfL = part.length / 2;
+    halfT = part.thickness / 2;
+    halfW = part.width / 2;
+  }
+
   return {
     center: { x: position.x, y: position.y, z: position.z },
     axes: [
@@ -199,7 +221,7 @@ export function getPartOBB(part: Part, position: { x: number; y: number; z: numb
       { x: 2 * (xy - wz), y: 1 - 2 * (xx + zz), z: 2 * (yz + wx) },
       { x: 2 * (xz + wy), y: 2 * (yz - wx), z: 1 - 2 * (xx + yy) }
     ],
-    halfExtents: [part.length / 2, part.thickness / 2, part.width / 2]
+    halfExtents: [halfL, halfT, halfW]
   };
 }
 

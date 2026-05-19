@@ -13,7 +13,7 @@ vi.mock('three', async () => await vi.importActual('three'));
 
 import type { Part } from '../types';
 import { createGeometryCache } from '../interaction/geometry/cache';
-import { getPartBounds, getPartBoundsAtPosition } from './snapToPartsUtil';
+import { getPartBounds, getPartBoundsAtPosition, getPartOBB, type PartOBB } from './snapToPartsUtil';
 
 function makePart(overrides: Partial<Part> = {}): Part {
   return {
@@ -109,5 +109,63 @@ describe('getPartBoundsAtPosition bundle parity', () => {
     const hypothetical = { x: 20, y: 0.5, z: 7 };
     const cache = createGeometryCache();
     expectBoundsEqual(getPartBoundsAtPosition(part, hypothetical), getPartBoundsAtPosition(part, hypothetical, cache));
+  });
+});
+
+function expectObbEqual(a: PartOBB, b: PartOBB, precision = 6) {
+  expect(a.center.x).toBeCloseTo(b.center.x, precision);
+  expect(a.center.y).toBeCloseTo(b.center.y, precision);
+  expect(a.center.z).toBeCloseTo(b.center.z, precision);
+  for (let i = 0; i < 3; i++) {
+    expect(a.axes[i].x).toBeCloseTo(b.axes[i].x, precision);
+    expect(a.axes[i].y).toBeCloseTo(b.axes[i].y, precision);
+    expect(a.axes[i].z).toBeCloseTo(b.axes[i].z, precision);
+    expect(a.halfExtents[i]).toBeCloseTo(b.halfExtents[i], precision);
+  }
+}
+
+describe('getPartOBB bundle parity', () => {
+  it('axis-aligned box at origin', () => {
+    const part = makePart();
+    const cache = createGeometryCache();
+    expectObbEqual(getPartOBB(part), getPartOBB(part, part.position, cache));
+  });
+
+  it('axis-aligned box at offset position', () => {
+    const part = makePart({ position: { x: 12, y: 0.375, z: -8 } });
+    const cache = createGeometryCache();
+    expectObbEqual(getPartOBB(part), getPartOBB(part, part.position, cache));
+  });
+
+  it('90° Y rotation', () => {
+    const part = makePart({ rotation: { x: 0, y: 90, z: 0 } });
+    const cache = createGeometryCache();
+    expectObbEqual(getPartOBB(part), getPartOBB(part, part.position, cache));
+  });
+
+  it('three-axis rotation with non-uniform dimensions', () => {
+    const part = makePart({
+      length: 36,
+      width: 4,
+      thickness: 1.5,
+      rotation: { x: 15, y: 70, z: -25 }
+    });
+    const cache = createGeometryCache();
+    expectObbEqual(getPartOBB(part), getPartOBB(part, part.position, cache));
+  });
+
+  it('hypothetical position parameter still respected', () => {
+    const part = makePart();
+    const hypothetical = { x: 100, y: 50, z: -25 };
+    const cache = createGeometryCache();
+    expectObbEqual(getPartOBB(part, hypothetical), getPartOBB(part, hypothetical, cache));
+  });
+
+  it('reuses cached bundle across repeat calls', () => {
+    const part = makePart();
+    const cache = createGeometryCache();
+    getPartOBB(part, part.position, cache);
+    getPartOBB(part, part.position, cache);
+    expect(cache.size()).toBe(1);
   });
 });
