@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Part, SnapLine, SnapDistanceIndicator, SnapGuide, ReferenceDistanceIndicator } from '../types';
+import type { GeometryCache } from '../interaction/geometry/cache';
 
 // Module-level reusable objects for getPartBounds calculations.
 // Safe because JS is single-threaded and callers only see the returned plain PartBounds object.
@@ -73,8 +74,14 @@ function withSnapFamily(lines: SnapLine[], family: NonNullable<SnapLine['family'
   }));
 }
 
-// Calculate axis-aligned bounding box for a part in world space
-export function getPartBounds(part: Part): PartBounds {
+// Calculate axis-aligned bounding box for a part in world space.
+//
+// ADR-009: when a `geometryCache` is provided, the part's 8 local-space
+// corners come from `bundle.snapGraph.corners` (which is the seam custom-cuts
+// will use to ship non-cuboid corner sets). For box parts the corners are
+// identical to the inline derivation; this overload is opt-in to keep every
+// existing caller working unchanged.
+export function getPartBounds(part: Part, geometryCache?: GeometryCache): PartBounds {
   _boundsEuler.set(
     (part.rotation.x * Math.PI) / 180,
     (part.rotation.y * Math.PI) / 180,
@@ -83,19 +90,34 @@ export function getPartBounds(part: Part): PartBounds {
   );
   _boundsQuat.setFromEuler(_boundsEuler);
 
-  const halfLength = part.length / 2;
-  const halfThickness = part.thickness / 2;
-  const halfWidth = part.width / 2;
-
-  // Set corner values in-place (no new allocations)
-  _boundsCorners[0].set(-halfLength, -halfThickness, -halfWidth);
-  _boundsCorners[1].set(-halfLength, -halfThickness, halfWidth);
-  _boundsCorners[2].set(-halfLength, halfThickness, -halfWidth);
-  _boundsCorners[3].set(-halfLength, halfThickness, halfWidth);
-  _boundsCorners[4].set(halfLength, -halfThickness, -halfWidth);
-  _boundsCorners[5].set(halfLength, -halfThickness, halfWidth);
-  _boundsCorners[6].set(halfLength, halfThickness, -halfWidth);
-  _boundsCorners[7].set(halfLength, halfThickness, halfWidth);
+  if (geometryCache) {
+    const bundle = geometryCache.get(part);
+    // Bundle corners are local-space; write each into the pre-allocated
+    // working buffer.
+    const cornerCount = bundle.snapGraph.corners.length;
+    if (cornerCount !== 8) {
+      // Box parts have exactly 8 corners; if a custom-cut bundle introduces
+      // a different count later, fall back to inline math to preserve box
+      // semantics until the snap engine learns about non-box geometry.
+      return getPartBoundsInline(part);
+    }
+    for (let i = 0; i < 8; i++) {
+      const local = bundle.snapGraph.corners[i].point;
+      _boundsCorners[i].set(local.x, local.y, local.z);
+    }
+  } else {
+    const halfLength = part.length / 2;
+    const halfThickness = part.thickness / 2;
+    const halfWidth = part.width / 2;
+    _boundsCorners[0].set(-halfLength, -halfThickness, -halfWidth);
+    _boundsCorners[1].set(-halfLength, -halfThickness, halfWidth);
+    _boundsCorners[2].set(-halfLength, halfThickness, -halfWidth);
+    _boundsCorners[3].set(-halfLength, halfThickness, halfWidth);
+    _boundsCorners[4].set(halfLength, -halfThickness, -halfWidth);
+    _boundsCorners[5].set(halfLength, -halfThickness, halfWidth);
+    _boundsCorners[6].set(halfLength, halfThickness, -halfWidth);
+    _boundsCorners[7].set(halfLength, halfThickness, halfWidth);
+  }
 
   _boundsPosition.set(part.position.x, part.position.y, part.position.z);
 
@@ -131,10 +153,20 @@ export function getPartBounds(part: Part): PartBounds {
   };
 }
 
+// Inline-only path. Used by getPartBounds when a bundle is unexpectedly
+// non-box (defensive fallback).
+function getPartBoundsInline(part: Part): PartBounds {
+  return getPartBounds(part);
+}
+
 // Calculate bounds for a part at a hypothetical position (for live drag)
-export function getPartBoundsAtPosition(part: Part, position: { x: number; y: number; z: number }): PartBounds {
+export function getPartBoundsAtPosition(
+  part: Part,
+  position: { x: number; y: number; z: number },
+  geometryCache?: GeometryCache
+): PartBounds {
   const tempPart = { ...part, position };
-  return getPartBounds(tempPart);
+  return getPartBounds(tempPart, geometryCache);
 }
 
 export function getPartOBB(part: Part, position: { x: number; y: number; z: number } = part.position): PartOBB {
