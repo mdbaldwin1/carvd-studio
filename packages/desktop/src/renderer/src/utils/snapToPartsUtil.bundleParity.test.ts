@@ -13,7 +13,14 @@ vi.mock('three', async () => await vi.importActual('three'));
 
 import type { Part } from '../types';
 import { createGeometryCache } from '../interaction/geometry/cache';
-import { getPartBounds, getPartBoundsAtPosition, getPartOBB, type PartOBB } from './snapToPartsUtil';
+import {
+  getCombinedBounds,
+  getCombinedBoundsAtPosition,
+  getPartBounds,
+  getPartBoundsAtPosition,
+  getPartOBB,
+  type PartOBB
+} from './snapToPartsUtil';
 
 function makePart(overrides: Partial<Part> = {}): Part {
   return {
@@ -167,5 +174,74 @@ describe('getPartOBB bundle parity', () => {
     getPartOBB(part, part.position, cache);
     getPartOBB(part, part.position, cache);
     expect(cache.size()).toBe(1);
+  });
+});
+
+describe('getCombinedBounds bundle parity', () => {
+  it('empty parts list returns the empty sentinel', () => {
+    const cache = createGeometryCache();
+    expectBoundsEqual(getCombinedBounds([]), getCombinedBounds([], cache));
+  });
+
+  it('single part matches getPartBounds', () => {
+    const part = makePart({ position: { x: 3, y: 1, z: -2 } });
+    const cache = createGeometryCache();
+    expectBoundsEqual(getCombinedBounds([part]), getCombinedBounds([part], cache));
+  });
+
+  it('two axis-aligned parts at distinct positions', () => {
+    const partA = makePart({ id: 'a', position: { x: 0, y: 0.375, z: 0 } });
+    const partB = makePart({ id: 'b', position: { x: 30, y: 0.375, z: 0 } });
+    const cache = createGeometryCache();
+    expectBoundsEqual(getCombinedBounds([partA, partB]), getCombinedBounds([partA, partB], cache));
+  });
+
+  it('mixed-rotation multi-part combined bounds', () => {
+    const partA = makePart({
+      id: 'a',
+      position: { x: 0, y: 0.5, z: 0 },
+      rotation: { x: 0, y: 30, z: 0 }
+    });
+    const partB = makePart({
+      id: 'b',
+      position: { x: 14, y: 0.5, z: 5 },
+      rotation: { x: 0, y: -45, z: 0 },
+      length: 18,
+      width: 6,
+      thickness: 1
+    });
+    const cache = createGeometryCache();
+    expectBoundsEqual(getCombinedBounds([partA, partB]), getCombinedBounds([partA, partB], cache));
+  });
+
+  it('cache amortizes across multiple parts (cache size equals unique parts)', () => {
+    const partA = makePart({ id: 'a' });
+    const partB = makePart({ id: 'b', position: { x: 30, y: 0.375, z: 0 } });
+    const cache = createGeometryCache();
+    getCombinedBounds([partA, partB], cache);
+    expect(cache.size()).toBe(2);
+  });
+});
+
+describe('getCombinedBoundsAtPosition bundle parity', () => {
+  it('shifted multi-part bounds match', () => {
+    const partA = makePart({ id: 'a', position: { x: 0, y: 0.5, z: 0 } });
+    const partB = makePart({ id: 'b', position: { x: 10, y: 0.5, z: 0 } });
+    const delta = { x: 5, y: 0, z: -3 };
+    const cache = createGeometryCache();
+    expectBoundsEqual(
+      getCombinedBoundsAtPosition([partA, partB], delta),
+      getCombinedBoundsAtPosition([partA, partB], delta, cache)
+    );
+  });
+
+  it('zero delta is a passthrough', () => {
+    const partA = makePart({ id: 'a' });
+    const partB = makePart({ id: 'b', position: { x: 10, y: 0.5, z: 0 } });
+    const cache = createGeometryCache();
+    expectBoundsEqual(
+      getCombinedBoundsAtPosition([partA, partB], { x: 0, y: 0, z: 0 }),
+      getCombinedBoundsAtPosition([partA, partB], { x: 0, y: 0, z: 0 }, cache)
+    );
   });
 });

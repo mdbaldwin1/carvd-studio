@@ -301,8 +301,9 @@ export function obbsOverlap(
   return true;
 }
 
-// Calculate combined bounding box for multiple parts
-export function getCombinedBounds(parts: Part[]): PartBounds {
+// Calculate combined bounding box for multiple parts.
+// ADR-009: opt-in bundle path threaded through `getPartBounds`.
+export function getCombinedBounds(parts: Part[], geometryCache?: GeometryCache): PartBounds {
   if (parts.length === 0) {
     return {
       id: 'empty',
@@ -326,7 +327,7 @@ export function getCombinedBounds(parts: Part[]): PartBounds {
     maxZ = -Infinity;
 
   for (const part of parts) {
-    const bounds = getPartBounds(part);
+    const bounds = getPartBounds(part, geometryCache);
     minX = Math.min(minX, bounds.minX);
     maxX = Math.max(maxX, bounds.maxX);
     minY = Math.min(minY, bounds.minY);
@@ -350,7 +351,11 @@ export function getCombinedBounds(parts: Part[]): PartBounds {
 }
 
 // Calculate combined bounding box for parts at adjusted positions
-export function getCombinedBoundsAtPosition(parts: Part[], delta: { x: number; y: number; z: number }): PartBounds {
+export function getCombinedBoundsAtPosition(
+  parts: Part[],
+  delta: { x: number; y: number; z: number },
+  geometryCache?: GeometryCache
+): PartBounds {
   if (parts.length === 0) {
     return {
       id: 'empty',
@@ -382,7 +387,7 @@ export function getCombinedBoundsAtPosition(parts: Part[], delta: { x: number; y
         z: part.position.z + delta.z
       }
     };
-    const bounds = getPartBounds(adjustedPart);
+    const bounds = getPartBounds(adjustedPart, geometryCache);
     minX = Math.min(minX, bounds.minX);
     maxX = Math.max(maxX, bounds.maxX);
     minY = Math.min(minY, bounds.minY);
