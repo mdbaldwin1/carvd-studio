@@ -78,6 +78,13 @@ export function usePartDrag(
   const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const raycaster = useRef(new THREE.Raycaster());
 
+  // ADR-009: one geometry cache per hook lifetime. Bundles for the dragged
+  // part (and any reference parts the snap engine touches once §5b proper
+  // migrations land) are built once and reused across every constraint
+  // pipeline call within this drag session. The cache invalidates per part
+  // automatically on dimension/rotation change via the bundle version key.
+  const geometryCacheRef = useRef(createGeometryCache());
+
   // Reusable objects for hot-path calculations (avoids GC pressure during drag)
   const _tempVec2 = useRef(new THREE.Vector2());
   const _tempIntersection = useRef(new THREE.Vector3());
@@ -406,7 +413,7 @@ export function usePartDrag(
                 stocks: [],
                 groupMembers: []
               },
-              geometryCache: createGeometryCache()
+              geometryCache: geometryCacheRef.current
             },
             [groundConstraint]
           );
@@ -751,7 +758,7 @@ export function usePartDrag(
                 groupMembers: [],
                 preventOverlap: stockConstraints.preventOverlap
               },
-              geometryCache: createGeometryCache()
+              geometryCache: geometryCacheRef.current
             },
             [groundConstraint, collisionConstraint]
           );
