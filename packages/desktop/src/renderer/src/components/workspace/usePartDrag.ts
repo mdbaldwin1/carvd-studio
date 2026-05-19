@@ -17,6 +17,9 @@ import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
 import { LiveDimensions, snapToGrid } from './partTypes';
 import { isOrbitControls } from './workspaceUtils';
 import { calculateWorldHalfHeight } from '../../utils/mathPool';
+import { applyConstraints } from '../../interaction/constraints/pipeline';
+import { groundConstraint } from '../../interaction/constraints/groundConstraint';
+import { createGeometryCache } from '../../interaction/geometry/cache';
 import { dragDebug } from '../../utils/dragDebug';
 import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
 import { solvePartMoveSnapPreview } from '../../utils/interactionMovePreview';
@@ -369,14 +372,51 @@ export function usePartDrag(
           let newY = dragStart.current.partPos.y + projectedDelta.y;
           let newZ = dragStart.current.partPos.z + projectedDelta.z;
 
-          // Constrain to ground during move
+          // The snap solver below still needs `worldHalfHeight` as a scalar
+          // for its in-snap ground rejection. Compute it here so both the
+          // constraint pipeline and the snap solver see the same value.
           const worldHalfHeight = calculateWorldHalfHeight(
             rotationQuaternion,
             liveDims.length,
             liveDims.thickness,
             liveDims.width
           );
-          newY = Math.max(worldHalfHeight, newY);
+
+          // ADR-006: ground clamp through the constraint pipeline. Uses the
+          // current `liveDims` (which may differ from `part.length/width/
+          // thickness` during a concurrent resize-then-move) so the rotated
+          // AABB computed inside groundConstraint reflects the live shape.
+          const previewPart: PartType = {
+            ...part,
+            length: liveDims.length,
+            thickness: liveDims.thickness,
+            width: liveDims.width
+          };
+          const groundResult = applyConstraints(
+            {
+              candidate: {
+                kind: 'move',
+                delta: projectedDelta,
+                positions: new Map([[part.id, { x: newX, y: newY, z: newZ }]])
+              },
+              startingParts: [previewPart],
+              project: {
+                parts: useProjectStore.getState().parts,
+                stocks: [],
+                groupMembers: []
+              },
+              geometryCache: createGeometryCache()
+            },
+            [groundConstraint]
+          );
+          if (groundResult.adjusted.kind === 'move') {
+            const adjusted = groundResult.adjusted.positions.get(part.id);
+            if (adjusted) {
+              newX = adjusted.x;
+              newY = adjusted.y;
+              newZ = adjusted.z;
+            }
+          }
 
           // Apply snap-to-parts if enabled (Alt key temporarily bypasses snapping)
           const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled && !evt.altKey;
