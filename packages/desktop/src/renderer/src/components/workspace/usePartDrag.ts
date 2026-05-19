@@ -724,14 +724,38 @@ export function usePartDrag(
           moveSelectedParts(constrainedMultiDelta.delta);
           clearMoveInteractionPreview();
         } else {
-          // Single part - apply ground constraint just to this one
-          const singlePartWorldHalfHeight = calculateWorldHalfHeight(
-            rotationQuaternion,
-            liveDims.length,
-            liveDims.thickness,
-            liveDims.width
+          // ADR-006: single-part release ground clamp through the pipeline.
+          const releasePart: PartType = {
+            ...part,
+            length: liveDims.length,
+            thickness: liveDims.thickness,
+            width: liveDims.width
+          };
+          const releaseGround = applyConstraints(
+            {
+              candidate: {
+                kind: 'move',
+                delta: { x: newX - part.position.x, y: newY - part.position.y, z: newZ - part.position.z },
+                positions: new Map([[part.id, { x: newX, y: newY, z: newZ }]])
+              },
+              startingParts: [releasePart],
+              project: {
+                parts: useProjectStore.getState().parts,
+                stocks: [],
+                groupMembers: []
+              },
+              geometryCache: createGeometryCache()
+            },
+            [groundConstraint]
           );
-          newY = Math.max(singlePartWorldHalfHeight, newY);
+          if (releaseGround.adjusted.kind === 'move') {
+            const adjusted = releaseGround.adjusted.positions.get(part.id);
+            if (adjusted) {
+              newX = adjusted.x;
+              newY = adjusted.y;
+              newZ = adjusted.z;
+            }
+          }
 
           // Check overlap prevention for final snapped position
           const stockConstraints = useProjectStore.getState().stockConstraints;
