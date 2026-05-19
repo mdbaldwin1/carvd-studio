@@ -8,8 +8,10 @@ import { useSnapStore } from '../store/snapStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
 import { Rotation3D } from '../types';
-import { calculateWorldHalfHeightFromDegrees } from '../utils/mathPool';
 import { rotateAroundWorldAxis } from '../utils/rotation';
+import { applyConstraints } from '../interaction/constraints/pipeline';
+import { groundConstraint } from '../interaction/constraints/groundConstraint';
+import { createGeometryCache } from '../interaction/geometry/cache';
 
 export function useKeyboardShortcuts() {
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
@@ -133,28 +135,37 @@ export function useKeyboardShortcuts() {
           });
         }
 
-        // Ground constraint: ensure no part goes below ground after rotation
-        // Find the minimum Y position considering part dimensions and rotation
-        let minY = Infinity;
-        for (let i = 0; i < selectedParts.length; i++) {
-          const part = selectedParts[i];
-          const update = updates[i];
-          const effectiveHalfHeight = calculateWorldHalfHeightFromDegrees(
-            update.changes.rotation,
-            part.length,
-            part.thickness,
-            part.width
-          );
+        // ADR-006: ground clamp runs through the constraint pipeline. For
+        // the 'rotate' candidate kind, `groundConstraint.apply` lifts every
+        // part uniformly by the deepest dip — same semantics as the legacy
+        // inline loop, now shared with every other transform path.
+        const constraintResult = applyConstraints(
+          {
+            candidate: {
+              kind: 'rotate',
+              updates: updates.map((u) => ({
+                partId: u.id,
+                position: u.changes.position,
+                rotation: u.changes.rotation
+              }))
+            },
+            startingParts: selectedParts,
+            project: {
+              parts,
+              stocks: [],
+              groupMembers
+            },
+            geometryCache: createGeometryCache()
+          },
+          [groundConstraint]
+        );
 
-          const bottomY = update.changes.position.y - effectiveHalfHeight;
-          minY = Math.min(minY, bottomY);
-        }
-
-        // If any part is below ground, shift all parts up
-        if (minY < 0) {
-          const shiftUp = -minY;
-          for (const update of updates) {
-            update.changes.position.y += shiftUp;
+        if (constraintResult.adjusted.kind === 'rotate') {
+          for (let i = 0; i < updates.length; i++) {
+            const adjusted = constraintResult.adjusted.updates.find((u) => u.partId === updates[i].id);
+            if (adjusted) {
+              updates[i].changes.position = adjusted.position;
+            }
           }
         }
 
