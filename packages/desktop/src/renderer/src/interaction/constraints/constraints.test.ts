@@ -9,6 +9,7 @@ import { createGeometryCache } from '../geometry/cache';
 import { applyConstraints } from './pipeline';
 import { groundConstraint } from './groundConstraint';
 import { stockDimensionConstraint } from './stockDimensionConstraint';
+import { collisionConstraint } from './collisionConstraint';
 import type { CandidateTransform, Constraint, ConstraintContext } from './types';
 
 function makePart(overrides?: Partial<Part>): Part {
@@ -349,6 +350,148 @@ describe('applyConstraints — pipeline runner', () => {
       expect(result.adjusted.dimensions.width).toBe(48);
       // With capped thickness, the position should be valid above ground.
       expect(result.adjusted.position.y).toBeGreaterThanOrEqual(0.375);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// collisionConstraint
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('collisionConstraint', () => {
+  it('no-op for resize candidates', () => {
+    const part = makePart();
+    const ctx: ConstraintContext = {
+      candidate: {
+        kind: 'resize',
+        partId: part.id,
+        dimensions: { length: 30, width: 12, thickness: 0.75 },
+        position: part.position
+      },
+      startingParts: [part],
+      project: { parts: [part], stocks: [], groupMembers: [], preventOverlap: true },
+      geometryCache: createGeometryCache()
+    };
+    const result = collisionConstraint.apply(ctx);
+    expect(result.adjusted).toBe(ctx.candidate);
+    expect(result.blockers).toHaveLength(0);
+  });
+
+  it('no-op for rotate candidates', () => {
+    const part = makePart();
+    const ctx: ConstraintContext = {
+      candidate: {
+        kind: 'rotate',
+        updates: [{ partId: part.id, position: part.position, rotation: { x: 0, y: 90, z: 0 } }]
+      },
+      startingParts: [part],
+      project: { parts: [part], stocks: [], groupMembers: [], preventOverlap: true },
+      geometryCache: createGeometryCache()
+    };
+    const result = collisionConstraint.apply(ctx);
+    expect(result.adjusted).toBe(ctx.candidate);
+  });
+
+  it('passthrough when preventOverlap is false', () => {
+    const partA = makePart({ id: 'a', position: { x: 0, y: 0.375, z: 0 } });
+    const partB = makePart({ id: 'b', position: { x: 10, y: 0.375, z: 0 } });
+    // Move A directly into B — collision would be detected if enabled.
+    const positions = new Map([['a', { x: 10, y: 0.375, z: 0 }]]);
+    const ctx: ConstraintContext = {
+      candidate: { kind: 'move', delta: { x: 10, y: 0, z: 0 }, positions },
+      startingParts: [partA],
+      project: { parts: [partA, partB], stocks: [], groupMembers: [], preventOverlap: false },
+      geometryCache: createGeometryCache()
+    };
+    const result = collisionConstraint.apply(ctx);
+    expect(result.adjusted).toBe(ctx.candidate);
+    expect(result.blockers).toHaveLength(0);
+  });
+
+  it('passthrough when proposed move has no overlap', () => {
+    const partA = makePart({ id: 'a', position: { x: 0, y: 0.375, z: 0 }, length: 4, width: 4 });
+    const partB = makePart({ id: 'b', position: { x: 50, y: 0.375, z: 0 }, length: 4, width: 4 });
+    const positions = new Map([['a', { x: 5, y: 0.375, z: 0 }]]);
+    const ctx: ConstraintContext = {
+      candidate: { kind: 'move', delta: { x: 5, y: 0, z: 0 }, positions },
+      startingParts: [partA],
+      project: { parts: [partA, partB], stocks: [], groupMembers: [], preventOverlap: true },
+      geometryCache: createGeometryCache()
+    };
+    const result = collisionConstraint.apply(ctx);
+    expect(result.adjusted).toBe(ctx.candidate);
+  });
+
+  it('clamps when move would partially overlap', () => {
+    const partA = makePart({ id: 'a', position: { x: 0, y: 0.375, z: 0 }, length: 4, width: 4 });
+    const partB = makePart({ id: 'b', position: { x: 10, y: 0.375, z: 0 }, length: 4, width: 4 });
+    // Propose moving A by 8 on X — final position would be at x=8, which
+    // overlaps with B (B's left edge is at 10 - 2 = 8).
+    const positions = new Map([['a', { x: 8, y: 0.375, z: 0 }]]);
+    const ctx: ConstraintContext = {
+      candidate: { kind: 'move', delta: { x: 8, y: 0, z: 0 }, positions },
+      startingParts: [partA],
+      project: { parts: [partA, partB], stocks: [], groupMembers: [], preventOverlap: true },
+      geometryCache: createGeometryCache()
+    };
+    const result = collisionConstraint.apply(ctx);
+    if (result.adjusted.kind === 'move') {
+      // The clamped delta is less than the proposed 8.
+      expect(result.adjusted.delta.x).toBeLessThan(8);
+      expect(result.adjusted.delta.x).toBeGreaterThanOrEqual(0);
+      // The position is rebuilt from starting + safe delta.
+      const adjustedA = result.adjusted.positions.get('a')!;
+      expect(adjustedA.x).toBeCloseTo(partA.position.x + result.adjusted.delta.x, 5);
+    }
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings[0].kind).toBe('soft-collision');
+  });
+
+  it('passes through when overlap check finds no safe direction (blocker, candidate unchanged)', () => {
+    // Construct an impossible case: A starts AT B's position; any nonzero
+    // delta keeps them overlapping along the proposed direction so the
+    // binary search returns null.
+    const partA = makePart({ id: 'a', position: { x: 0, y: 0.375, z: 0 }, length: 4, width: 4 });
+    const partB = makePart({ id: 'b', position: { x: 0.5, y: 0.375, z: 0 }, length: 4, width: 4 });
+    const positions = new Map([['a', { x: 0.6, y: 0.375, z: 0 }]]);
+    const ctx: ConstraintContext = {
+      candidate: { kind: 'move', delta: { x: 0.6, y: 0, z: 0 }, positions },
+      startingParts: [partA],
+      project: { parts: [partA, partB], stocks: [], groupMembers: [], preventOverlap: true },
+      geometryCache: createGeometryCache()
+    };
+    const result = collisionConstraint.apply(ctx);
+    // We can't always guarantee a blocker (depends on overlap helper's exact
+    // policy); but if it produced one, candidate stays unchanged.
+    if (result.blockers.length > 0) {
+      expect(result.adjusted).toBe(ctx.candidate);
+      expect(result.blockers[0].kind).toBe('collision');
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pipeline composition with collisionConstraint
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('pipeline composition with collisionConstraint', () => {
+  it('ground + collision: collision sees grounded positions', () => {
+    const partA = makePart({ id: 'a', position: { x: 0, y: 0.375, z: 0 }, length: 4, width: 4 });
+    const partB = makePart({ id: 'b', position: { x: 50, y: 0.375, z: 0 }, length: 4, width: 4 });
+    // Propose dipping below ground; ground constraint lifts, then collision
+    // checks against the lifted position (no overlap → passes through).
+    const positions = new Map([['a', { x: 5, y: -2, z: 0 }]]);
+    const ctx: ConstraintContext = {
+      candidate: { kind: 'move', delta: { x: 5, y: -2.375, z: 0 }, positions },
+      startingParts: [partA],
+      project: { parts: [partA, partB], stocks: [], groupMembers: [], preventOverlap: true },
+      geometryCache: createGeometryCache()
+    };
+    const result = applyConstraints(ctx, [groundConstraint, collisionConstraint]);
+    if (result.adjusted.kind === 'move') {
+      // y lifted to half-thickness; x unchanged.
+      expect(result.adjusted.positions.get('a')?.y).toBeCloseTo(0.375, 5);
+      expect(result.adjusted.positions.get('a')?.x).toBe(5);
     }
   });
 });

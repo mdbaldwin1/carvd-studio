@@ -53,6 +53,13 @@ export interface ProjectStateSlice {
   stocks: ReadonlyArray<Stock>;
   /** Group membership for cross-part constraints. */
   groupMembers: ReadonlyArray<GroupMember>;
+  /**
+   * Whether overlap prevention is enabled (mirrors
+   * `projectStore.stockConstraints.preventOverlap`). Read by collisionConstraint.
+   * When `undefined`, collision is treated as enabled (safe default for hosts
+   * that don't pass it through; preserves existing inline behavior).
+   */
+  preventOverlap?: boolean;
 }
 
 export interface ConstraintContext {
