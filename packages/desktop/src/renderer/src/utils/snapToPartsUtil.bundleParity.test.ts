@@ -14,8 +14,10 @@ vi.mock('three', async () => await vi.importActual('three'));
 import type { Part } from '../types';
 import { createGeometryCache } from '../interaction/geometry/cache';
 import {
+  detectSnaps,
   getCombinedBounds,
   getCombinedBoundsAtPosition,
+  getNearestParts,
   getPartBounds,
   getPartBoundsAtPosition,
   getPartOBB,
@@ -243,5 +245,62 @@ describe('getCombinedBoundsAtPosition bundle parity', () => {
       getCombinedBoundsAtPosition([partA, partB], { x: 0, y: 0, z: 0 }),
       getCombinedBoundsAtPosition([partA, partB], { x: 0, y: 0, z: 0 }, cache)
     );
+  });
+});
+
+describe('getNearestParts bundle parity', () => {
+  it('returns the same part ranking with vs. without cache', () => {
+    const dragging = makePart({ id: 'd', position: { x: 0, y: 0.5, z: 0 } });
+    const partA = makePart({ id: 'a', position: { x: 5, y: 0.5, z: 0 } });
+    const partB = makePart({ id: 'b', position: { x: 50, y: 0.5, z: 0 } });
+    const partC = makePart({ id: 'c', position: { x: 0, y: 0.5, z: 8 } });
+    const partD = makePart({ id: 'd-far', position: { x: 100, y: 0.5, z: 100 } });
+    const draggingBounds = getPartBounds(dragging);
+    const cache = createGeometryCache();
+    const inline = getNearestParts(draggingBounds, [dragging, partA, partB, partC, partD], ['d'], 3);
+    const cached = getNearestParts(draggingBounds, [dragging, partA, partB, partC, partD], ['d'], 3, cache);
+    expect(inline.map((p) => p.id)).toEqual(cached.map((p) => p.id));
+  });
+
+  it('respects maxParts when cached', () => {
+    const dragging = makePart({ id: 'd' });
+    const others = Array.from({ length: 10 }, (_, i) =>
+      makePart({ id: `p${i}`, position: { x: (i + 1) * 5, y: 0.5, z: 0 } })
+    );
+    const draggingBounds = getPartBounds(dragging);
+    const cache = createGeometryCache();
+    expect(getNearestParts(draggingBounds, [dragging, ...others], ['d'], 4, cache)).toHaveLength(4);
+  });
+});
+
+describe('detectSnaps bundle parity', () => {
+  it('produces the same snap result with vs. without cache', () => {
+    const dragging = makePart({ id: 'd', position: { x: 0, y: 0.5, z: 0 } });
+    const target = makePart({
+      id: 't',
+      // Touching distance: target left edge meets dragging right edge.
+      position: { x: 24, y: 0.5, z: 0 }
+    });
+    const cache = createGeometryCache();
+    const inline = detectSnaps(dragging, { x: 0, y: 0.5, z: 0 }, [dragging, target], ['d'], 0.5);
+    const cached = detectSnaps(dragging, { x: 0, y: 0.5, z: 0 }, [dragging, target], ['d'], 0.5, cache);
+    // Identical adjusted positions modulo float noise
+    expect(cached.adjustedPosition.x).toBeCloseTo(inline.adjustedPosition.x, 5);
+    expect(cached.adjustedPosition.y).toBeCloseTo(inline.adjustedPosition.y, 5);
+    expect(cached.adjustedPosition.z).toBeCloseTo(inline.adjustedPosition.z, 5);
+    expect(cached.snappedX).toBe(inline.snappedX);
+    expect(cached.snappedY).toBe(inline.snappedY);
+    expect(cached.snappedZ).toBe(inline.snappedZ);
+    expect(cached.snapLines.length).toBe(inline.snapLines.length);
+  });
+
+  it('caches reference parts so size grows with unique parts touched', () => {
+    const dragging = makePart({ id: 'd', position: { x: 0, y: 0.5, z: 0 } });
+    const partA = makePart({ id: 'a', position: { x: 24, y: 0.5, z: 0 } });
+    const partB = makePart({ id: 'b', position: { x: 0, y: 0.5, z: 12 } });
+    const cache = createGeometryCache();
+    detectSnaps(dragging, { x: 0, y: 0.5, z: 0 }, [dragging, partA, partB], ['d'], 0.5, cache);
+    // dragging + partA + partB = 3 unique parts touched
+    expect(cache.size()).toBe(3);
   });
 });

@@ -671,7 +671,8 @@ export function getNearestParts(
   draggingBounds: PartBounds,
   allParts: Part[],
   draggingPartIds: string[],
-  maxParts: number = 10
+  maxParts: number = 10,
+  geometryCache?: GeometryCache
 ): Part[] {
   // Filter out the parts being dragged
   const otherParts = allParts.filter((p) => !draggingPartIds.includes(p.id));
@@ -679,7 +680,7 @@ export function getNearestParts(
   // Calculate distances and sort.
   // Prefer true box-to-box gap over center distance so large pieces with nearby faces are not missed.
   const partsWithDistance = otherParts.map((part) => {
-    const bounds = getPartBounds(part);
+    const bounds = getPartBounds(part, geometryCache);
     const gapX =
       draggingBounds.maxX < bounds.minX
         ? bounds.minX - draggingBounds.maxX
@@ -1215,16 +1216,17 @@ export function detectSnaps(
   currentPosition: { x: number; y: number; z: number },
   allParts: Part[],
   draggingPartIds: string[],
-  snapThreshold: number = 0.5 // Default threshold in inches
+  snapThreshold: number = 0.5, // Default threshold in inches
+  geometryCache?: GeometryCache
 ): SnapResult {
   // Get bounds of dragging part at current position
-  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
+  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition, geometryCache);
 
   // Find nearest parts to check for snaps
-  const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
+  const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds, 10, geometryCache);
 
   // Get bounds for all target parts
-  const targetBounds = nearestParts.map((p) => getPartBounds(p));
+  const targetBounds = nearestParts.map((p) => getPartBounds(p, geometryCache));
 
   // Check for snaps on each axis
   const xSnap = checkAxisSnaps(
