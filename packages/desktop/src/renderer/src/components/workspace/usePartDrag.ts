@@ -19,6 +19,7 @@ import { isOrbitControls } from './workspaceUtils';
 import { calculateWorldHalfHeight } from '../../utils/mathPool';
 import { applyConstraints } from '../../interaction/constraints/pipeline';
 import { groundConstraint } from '../../interaction/constraints/groundConstraint';
+import { collisionConstraint } from '../../interaction/constraints/collisionConstraint';
 import { createGeometryCache } from '../../interaction/geometry/cache';
 import { dragDebug } from '../../utils/dragDebug';
 import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
@@ -724,14 +725,19 @@ export function usePartDrag(
           moveSelectedParts(constrainedMultiDelta.delta);
           clearMoveInteractionPreview();
         } else {
-          // ADR-006: single-part release ground clamp through the pipeline.
+          // ADR-006: single-part release runs ground + collision in one
+          // pipeline call. groundConstraint lifts the part to the floor if
+          // needed; collisionConstraint clamps the delta to the nearest safe
+          // position along the drag direction (or surfaces a blocker when no
+          // safe motion exists).
           const releasePart: PartType = {
             ...part,
             length: liveDims.length,
             thickness: liveDims.thickness,
             width: liveDims.width
           };
-          const releaseGround = applyConstraints(
+          const stockConstraints = useProjectStore.getState().stockConstraints;
+          const releaseResult = applyConstraints(
             {
               candidate: {
                 kind: 'move',
@@ -740,60 +746,54 @@ export function usePartDrag(
               },
               startingParts: [releasePart],
               project: {
-                parts: useProjectStore.getState().parts,
+                parts: allParts,
                 stocks: [],
-                groupMembers: []
+                groupMembers: [],
+                preventOverlap: stockConstraints.preventOverlap
               },
               geometryCache: createGeometryCache()
             },
-            [groundConstraint]
+            [groundConstraint, collisionConstraint]
           );
-          if (releaseGround.adjusted.kind === 'move') {
-            const adjusted = releaseGround.adjusted.positions.get(part.id);
+
+          const collisionBlocked = releaseResult.blockers.some((b) => b.constraintName === 'collision');
+          if (collisionBlocked) {
+            dragDebug('partDrag:release:single:noSafeDelta', {
+              partId: part.id,
+              fallbackPosition: { x: newX, y: newY, z: newZ }
+            });
+            // Commit the last validated preview position to avoid jump-back.
+            updatePart(part.id, {
+              position: { x: newX, y: newY, z: newZ }
+            });
+            clearMoveInteractionPreview();
+            setIsDragging(false);
+            dragStart.current = null;
+            lastDragPosition.current = null;
+            latchedFaceSnapRef.current = null;
+            wasSnappedByParts.current = { x: false, y: false, z: false };
+            markJustFinishedDragging(dragDistanceSq > 1e-4);
+            useSelectionStore.getState().setDraggingPartId(null);
+            if (isOrbitControls(controls)) controls.enabled = true;
+            useSnapStore.getState().updateReferenceDistances();
+            return;
+          }
+
+          if (releaseResult.adjusted.kind === 'move') {
+            const adjusted = releaseResult.adjusted.positions.get(part.id);
             if (adjusted) {
               newX = adjusted.x;
               newY = adjusted.y;
               newZ = adjusted.z;
             }
-          }
-
-          // Check overlap prevention for final snapped position
-          const stockConstraints = useProjectStore.getState().stockConstraints;
-          if (stockConstraints.preventOverlap) {
-            const safeDelta = resolveSafeTranslationDelta(
-              allParts,
-              new Set(effectivePartIds.length > 0 ? effectivePartIds : [part.id]),
-              { x: baseDelta.x, y: newY - dragStart.current.partPos.y, z: baseDelta.z }
-            );
-            if (!safeDelta) {
-              dragDebug('partDrag:release:single:noSafeDelta', {
-                partId: part.id,
-                fallbackPosition: { x: newX, y: newY, z: newZ }
-              });
-              // Commit the last validated preview position to avoid jump-back.
-              updatePart(part.id, {
-                position: { x: newX, y: newY, z: newZ }
-              });
-              clearMoveInteractionPreview();
-              setIsDragging(false);
-              dragStart.current = null;
-              lastDragPosition.current = null;
-              latchedFaceSnapRef.current = null;
-              wasSnappedByParts.current = { x: false, y: false, z: false };
-              markJustFinishedDragging(dragDistanceSq > 1e-4);
-              useSelectionStore.getState().setDraggingPartId(null);
-              if (isOrbitControls(controls)) controls.enabled = true;
-              useSnapStore.getState().updateReferenceDistances();
-              return;
-            }
-            dragDebug('partDrag:release:single:safeDelta', {
+            dragDebug('partDrag:release:single:pipelineApplied', {
               partId: part.id,
               baseDelta,
-              safeDelta
+              adjustedDelta: releaseResult.adjusted.delta,
+              clamped: releaseResult.warnings.some(
+                (w) => w.constraintName === 'collision' && w.kind === 'soft-collision'
+              )
             });
-            newX = dragStart.current.partPos.x + safeDelta.x;
-            newY = dragStart.current.partPos.y + safeDelta.y;
-            newZ = dragStart.current.partPos.z + safeDelta.z;
           }
 
           dragDebug('partDrag:release:single:commit', { partId: part.id, position: { x: newX, y: newY, z: newZ } });
