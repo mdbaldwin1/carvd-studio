@@ -1,8 +1,10 @@
 import type { GroupMember, Part } from '../types';
-import * as THREE from 'three';
 import { resolveSafeTranslationDelta } from './overlapPolicy';
 import { getCombinedBounds } from './snapToPartsUtil';
 import { type InteractionSelectionInput, resolveTransformSelectedPartIds } from './interactionSelection';
+import { applyConstraints } from '../interaction/constraints/pipeline';
+import { groundConstraint } from '../interaction/constraints/groundConstraint';
+import { createGeometryCache } from '../interaction/geometry/cache';
 
 export interface MoveSelectionResolution {
   affectedPartIds: string[];
@@ -23,31 +25,9 @@ export interface ConstrainedMoveDeltaResult {
   usedFallbackDelta: boolean;
 }
 
-const _upVector = new THREE.Vector3(0, 1, 0);
-const _localX = new THREE.Vector3();
-const _localY = new THREE.Vector3();
-const _localZ = new THREE.Vector3();
-const _euler = new THREE.Euler();
-const _quaternion = new THREE.Quaternion();
-
-function calculatePartWorldHalfHeight(part: Part): number {
-  _euler.set(
-    (part.rotation.x * Math.PI) / 180,
-    (part.rotation.y * Math.PI) / 180,
-    (part.rotation.z * Math.PI) / 180,
-    'XYZ'
-  );
-  _quaternion.setFromEuler(_euler);
-  _localX.set(1, 0, 0).applyQuaternion(_quaternion);
-  _localY.set(0, 1, 0).applyQuaternion(_quaternion);
-  _localZ.set(0, 0, 1).applyQuaternion(_quaternion);
-
-  return (
-    Math.abs(_localX.x * _upVector.x + _localX.y * _upVector.y + _localX.z * _upVector.z) * (part.length / 2) +
-    Math.abs(_localY.x * _upVector.x + _localY.y * _upVector.y + _localY.z * _upVector.z) * (part.thickness / 2) +
-    Math.abs(_localZ.x * _upVector.x + _localZ.y * _upVector.y + _localZ.z * _upVector.z) * (part.width / 2)
-  );
-}
+// `calculatePartWorldHalfHeight` retired in §8b-group — the rotation-aware
+// world half-height math is now inside `groundConstraint` via `getPartAABB`.
+// Pre-allocated three.js objects (`_upVector` etc.) likewise removed.
 
 export function resolveMoveSelection(
   selection: InteractionSelectionInput,
@@ -90,23 +70,37 @@ export function applyGroundConstraintToDelta(
   movingPartIds: Iterable<string>,
   proposedDelta: TranslationDelta
 ): TranslationDelta {
-  let maxYAdjustment = 0;
-  const movingPartIdSet = new Set(movingPartIds);
+  // ADR-006: delegate to the constraint pipeline. Callers (today:
+  // resolveConstrainedMoveDelta → useGroupDrag) keep their signature; the
+  // ground-clamp math now goes through groundConstraint so multi-part group
+  // drag shares the same code path as single-part drag, resize, and rotate.
+  const movingIdSet = new Set(movingPartIds);
+  const movingParts = parts.filter((p) => movingIdSet.has(p.id));
+  if (movingParts.length === 0) return proposedDelta;
 
-  for (const part of parts) {
-    if (!movingPartIdSet.has(part.id)) continue;
-
-    const halfHeight = calculatePartWorldHalfHeight(part);
-    const projectedY = part.position.y + proposedDelta.y;
-    const adjustment = Math.max(0, halfHeight - projectedY);
-    maxYAdjustment = Math.max(maxYAdjustment, adjustment);
+  const positions = new Map<string, { x: number; y: number; z: number }>();
+  for (const part of movingParts) {
+    positions.set(part.id, {
+      x: part.position.x + proposedDelta.x,
+      y: part.position.y + proposedDelta.y,
+      z: part.position.z + proposedDelta.z
+    });
   }
 
-  return {
-    x: proposedDelta.x,
-    y: proposedDelta.y + maxYAdjustment,
-    z: proposedDelta.z
-  };
+  const result = applyConstraints(
+    {
+      candidate: { kind: 'move', delta: proposedDelta, positions },
+      startingParts: movingParts,
+      project: { parts, stocks: [], groupMembers: [] },
+      geometryCache: createGeometryCache()
+    },
+    [groundConstraint]
+  );
+
+  if (result.adjusted.kind === 'move') {
+    return result.adjusted.delta;
+  }
+  return proposedDelta;
 }
 
 export function resolveConstrainedMoveDelta(
