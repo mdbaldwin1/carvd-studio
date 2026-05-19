@@ -1,9 +1,9 @@
 import type { GroupMember, Part } from '../types';
-import { resolveSafeTranslationDelta } from './overlapPolicy';
 import { getCombinedBounds } from './snapToPartsUtil';
 import { type InteractionSelectionInput, resolveTransformSelectedPartIds } from './interactionSelection';
 import { applyConstraints } from '../interaction/constraints/pipeline';
 import { groundConstraint } from '../interaction/constraints/groundConstraint';
+import { collisionConstraint } from '../interaction/constraints/collisionConstraint';
 import { createGeometryCache } from '../interaction/geometry/cache';
 
 export interface MoveSelectionResolution {
@@ -112,32 +112,52 @@ export function resolveConstrainedMoveDelta(
     fallbackDeltaOnOverlap?: TranslationDelta | null;
   }
 ): ConstrainedMoveDeltaResult {
-  const groundedDelta = applyGroundConstraintToDelta(parts, movingPartIds, proposedDelta);
+  // ADR-006: ground + collision both go through the constraint pipeline.
+  // Public contract (return shape with overlapBlocked / overlapClamped /
+  // usedFallbackDelta flags) preserved so useGroupDrag and any other
+  // caller keep working without code changes.
   const movingIdSet = new Set(movingPartIds);
+  const movingParts = parts.filter((p) => movingIdSet.has(p.id));
 
-  if (!options?.preventOverlap) {
+  if (movingParts.length === 0) {
     return {
-      delta: groundedDelta,
+      delta: proposedDelta,
       overlapBlocked: false,
       overlapClamped: false,
       usedFallbackDelta: false
     };
   }
 
-  const safeDelta = resolveSafeTranslationDelta(parts, movingIdSet, groundedDelta);
-  if (safeDelta) {
-    return {
-      delta: safeDelta,
-      overlapBlocked: false,
-      overlapClamped:
-        Math.abs(safeDelta.x - groundedDelta.x) > 1e-6 ||
-        Math.abs(safeDelta.y - groundedDelta.y) > 1e-6 ||
-        Math.abs(safeDelta.z - groundedDelta.z) > 1e-6,
-      usedFallbackDelta: false
-    };
+  const positions = new Map<string, { x: number; y: number; z: number }>();
+  for (const part of movingParts) {
+    positions.set(part.id, {
+      x: part.position.x + proposedDelta.x,
+      y: part.position.y + proposedDelta.y,
+      z: part.position.z + proposedDelta.z
+    });
   }
 
-  if (options.fallbackDeltaOnOverlap) {
+  const result = applyConstraints(
+    {
+      candidate: { kind: 'move', delta: proposedDelta, positions },
+      startingParts: movingParts,
+      project: {
+        parts,
+        stocks: [],
+        groupMembers: [],
+        preventOverlap: options?.preventOverlap ?? false
+      },
+      geometryCache: createGeometryCache()
+    },
+    [groundConstraint, collisionConstraint]
+  );
+
+  const adjustedDelta = result.adjusted.kind === 'move' ? result.adjusted.delta : proposedDelta;
+  const overlapBlocked = result.blockers.some((b) => b.constraintName === 'collision');
+  const overlapClamped =
+    !overlapBlocked && result.warnings.some((w) => w.constraintName === 'collision' && w.kind === 'soft-collision');
+
+  if (overlapBlocked && options?.fallbackDeltaOnOverlap) {
     return {
       delta: options.fallbackDeltaOnOverlap,
       overlapBlocked: true,
@@ -147,9 +167,9 @@ export function resolveConstrainedMoveDelta(
   }
 
   return {
-    delta: groundedDelta,
-    overlapBlocked: true,
-    overlapClamped: false,
+    delta: adjustedDelta,
+    overlapBlocked,
+    overlapClamped,
     usedFallbackDelta: false
   };
 }
