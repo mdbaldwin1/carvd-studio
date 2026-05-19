@@ -14,7 +14,9 @@ import {
 import { solveResizePreview } from '../../utils/interactionResizePreview';
 import { LiveDimensions, HandlePosition, snapToGrid } from './partTypes';
 import { isOrbitControls } from './workspaceUtils';
-import { calculateWorldHalfHeight } from '../../utils/mathPool';
+import { applyConstraints } from '../../interaction/constraints/pipeline';
+import { groundConstraint } from '../../interaction/constraints/groundConstraint';
+import { createGeometryCache } from '../../interaction/geometry/cache';
 
 /**
  * Hook encapsulating all resize logic for a Part component.
@@ -231,9 +233,35 @@ export function usePartResize(
     newY = snapToGrid(newY);
     newZ = snapToGrid(newZ);
 
-    // Keep part above ground
-    const worldHalfHeight = calculateWorldHalfHeight(rotationQuaternion, newLength, newThickness, newWidth);
-    newY = Math.max(worldHalfHeight, newY);
+    // ADR-006: ground clamp runs through the constraint pipeline. The
+    // groundConstraint computes the resized part's world-space minY via the
+    // rotated AABB and lifts the position if it would dip below ground —
+    // same intent as the legacy `worldHalfHeight = max(...) ; newY = max(halfHeight, newY)`
+    // path, now sharing the pipeline with every other transform consumer.
+    const groundResult = applyConstraints(
+      {
+        candidate: {
+          kind: 'resize',
+          partId: part.id,
+          dimensions: { length: newLength, width: newWidth, thickness: newThickness },
+          position: { x: newX, y: newY, z: newZ }
+        },
+        startingParts: [part],
+        project: {
+          parts: useProjectStore.getState().parts,
+          stocks: useProjectStore.getState().stocks,
+          groupMembers: useProjectStore.getState().groupMembers
+        },
+        geometryCache: createGeometryCache()
+      },
+      [groundConstraint]
+    );
+
+    if (groundResult.adjusted.kind === 'resize') {
+      newX = groundResult.adjusted.position.x;
+      newY = groundResult.adjusted.position.y;
+      newZ = groundResult.adjusted.position.z;
+    }
 
     updatePart(part.id, {
       length: newLength,
