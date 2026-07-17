@@ -60,6 +60,8 @@ export interface MoveToolPreview {
   snapLines: SnapLine[];
   /** Which axes ended up snapped. */
   snappedAxes: { x: boolean; y: boolean; z: boolean };
+  /** Latched face-snap state after this update. */
+  nextLatchedFaceSnap: LatchedFaceSnapState | null;
   /** Constraint-pipeline input that exactly matches this preview. */
   candidate: Extract<CandidateTransform, { kind: 'move' }>;
 }
@@ -67,7 +69,8 @@ export interface MoveToolPreview {
 function buildPreviewFromSolve(
   input: MoveToolInput,
   state: MoveToolState,
-  solverResult: PartMovePreviewResult
+  solverResult: PartMovePreviewResult,
+  nextLatchedFaceSnap: LatchedFaceSnapState | null
 ): MoveToolPreview {
   const delta = {
     x: solverResult.position.x - state.initialPrimaryPosition.x,
@@ -91,6 +94,7 @@ function buildPreviewFromSolve(
     positions,
     snapLines: solverResult.snapLines,
     snappedAxes: solverResult.snappedAxes,
+    nextLatchedFaceSnap,
     candidate: { kind: 'move', delta, positions }
   };
 }
@@ -136,7 +140,7 @@ export const moveTool: ToolSolver<MoveToolInput, MoveToolState, MoveToolPreview>
       ...state,
       latchedFaceSnap: solverResult.nextLatchedFaceSnap
     };
-    const preview = buildPreviewFromSolve(input, nextState, solverResult);
+    const preview = buildPreviewFromSolve(input, nextState, solverResult, nextState.latchedFaceSnap);
     return { preview, state: nextState };
   },
 

@@ -184,5 +184,26 @@ describe('moveTool', () => {
       const result2 = moveTool.update(input, result1.state);
       expect(result2.state).toBeDefined();
     });
+
+    it('preview exposes the next latched face snap state consumed by hooks', () => {
+      const part = makePart({ id: 'p' });
+      const input = makeInput({ part });
+      const state = moveTool.begin(input);
+      const seededState = {
+        ...state,
+        latchedFaceSnap: {
+          adjustedPosition: { x: 1, y: 0.375, z: 0 },
+          lockAxis: 'x' as const,
+          snappedX: true,
+          snappedY: false,
+          snappedZ: false,
+          snapLines: []
+        }
+      };
+
+      const result = moveTool.update(input, seededState);
+
+      expect(result.preview.nextLatchedFaceSnap).toBe(result.state.latchedFaceSnap);
+    });
   });
 });
