@@ -14,6 +14,7 @@ import type { AppSettings, Part, SnapGuide, SnapLine } from '../../types';
 import { solvePartMoveSnapPreview, type PartMovePreviewResult } from '../../utils/interactionMovePreview';
 import type { LatchedFaceSnapState } from '../../utils/interactionSnap';
 import type { SnapResult } from '../../utils/snapToPartsUtil';
+import type { CandidateTransform } from '../constraints/types';
 import type { CommitInstruction, ToolSolver, Vec3 } from './toolSolver';
 
 export interface MoveToolInput {
@@ -59,6 +60,8 @@ export interface MoveToolPreview {
   snapLines: SnapLine[];
   /** Which axes ended up snapped. */
   snappedAxes: { x: boolean; y: boolean; z: boolean };
+  /** Constraint-pipeline input that exactly matches this preview. */
+  candidate: Extract<CandidateTransform, { kind: 'move' }>;
 }
 
 function buildPreviewFromSolve(
@@ -87,7 +90,8 @@ function buildPreviewFromSolve(
     delta,
     positions,
     snapLines: solverResult.snapLines,
-    snappedAxes: solverResult.snappedAxes
+    snappedAxes: solverResult.snappedAxes,
+    candidate: { kind: 'move', delta, positions }
   };
 }
 

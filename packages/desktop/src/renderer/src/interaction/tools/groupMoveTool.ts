@@ -9,6 +9,7 @@
 import type { AppSettings, Part, SnapGuide, SnapLine } from '../../types';
 import { solveGroupMoveSnapPreview } from '../../utils/interactionMovePreview';
 import type { PartBounds } from '../../utils/snapToPartsUtil';
+import type { CandidateTransform } from '../constraints/types';
 import type { CommitInstruction, ToolSolver, Vec3 } from './toolSolver';
 
 export interface GroupMoveToolInput {
@@ -46,6 +47,8 @@ export interface GroupMoveToolPreview {
   snapLines: SnapLine[];
   /** Which axes ended up snapped. */
   snappedAxes: { x: boolean; y: boolean; z: boolean };
+  /** Constraint-pipeline input that exactly matches this preview. */
+  candidate: Extract<CandidateTransform, { kind: 'move' }>;
 }
 
 export const groupMoveTool: ToolSolver<GroupMoveToolInput, GroupMoveToolState, GroupMoveToolPreview> = {
@@ -89,7 +92,8 @@ export const groupMoveTool: ToolSolver<GroupMoveToolInput, GroupMoveToolState, G
         delta: result.delta,
         positions,
         snapLines: result.snapLines,
-        snappedAxes: result.snappedAxes
+        snappedAxes: result.snappedAxes,
+        candidate: { kind: 'move', delta: result.delta, positions }
       },
       state
     };

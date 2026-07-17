@@ -96,6 +96,24 @@ describe('moveTool', () => {
       expect(preview.positions.get('b')).toEqual({ x: 14, y: 0.375, z: 0 });
     });
 
+    it('update exposes a constraint-ready move candidate matching the preview', () => {
+      const primary = makePart({ id: 'a', position: { x: 0, y: 0.375, z: 0 } });
+      const other = makePart({ id: 'b', position: { x: 10, y: 0.375, z: 0 } });
+      const input = makeInput({
+        part: primary,
+        position: { x: 4, y: 0.375, z: 2 },
+        alsoMoving: [other]
+      });
+      const state = moveTool.begin(input);
+      const { preview } = moveTool.update(input, state);
+
+      expect(preview.candidate).toEqual({
+        kind: 'move',
+        delta: preview.delta,
+        positions: preview.positions
+      });
+    });
+
     it('commit produces one updatePartPosition per moving part', () => {
       const primary = makePart({ id: 'a' });
       const other = makePart({ id: 'b', position: { x: 10, y: 0.375, z: 0 } });

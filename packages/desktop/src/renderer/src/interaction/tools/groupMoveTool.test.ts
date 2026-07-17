@@ -125,6 +125,19 @@ describe('groupMoveTool', () => {
       expect(preview.positions.get('b')).toEqual({ x: 19, y: 0.375, z: 3 });
     });
 
+    it('update exposes a constraint-ready move candidate matching the preview', () => {
+      const baseInput = makeInput();
+      const state = groupMoveTool.begin(baseInput);
+      const moved = { ...baseInput, delta: { x: 5, y: 0, z: 3 } };
+      const { preview } = groupMoveTool.update(moved, state);
+
+      expect(preview.candidate).toEqual({
+        kind: 'move',
+        delta: preview.delta,
+        positions: preview.positions
+      });
+    });
+
     it('commit produces a single updateGroupPositions with all members', () => {
       const baseInput = makeInput();
       const state = groupMoveTool.begin(baseInput);
