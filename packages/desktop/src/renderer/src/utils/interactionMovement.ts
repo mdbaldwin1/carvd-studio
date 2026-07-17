@@ -1,4 +1,4 @@
-import type { GroupMember, Part, Stock } from '../types';
+import type { GroupMember, Part, Rotation3D, Stock } from '../types';
 import { getCombinedBounds } from './snapToPartsUtil';
 import { type InteractionSelectionInput, resolveTransformSelectedPartIds } from './interactionSelection';
 import { applyConstraints } from '../interaction/constraints/pipeline';
@@ -45,6 +45,10 @@ export interface SinglePartPreviewMoveResult {
 
 export interface ResizeReleaseMoveResult {
   position: TranslationDelta;
+}
+
+export interface RotateBatchGroundingResult {
+  updates: Array<{ partId: string; position: TranslationDelta; rotation: Rotation3D }>;
 }
 
 // `calculatePartWorldHalfHeight` retired in §8b-group — the rotation-aware
@@ -360,4 +364,41 @@ export function resolveResizeReleaseMove({
     return { position: proposedPosition };
   }
   return { position: result.adjusted.position };
+}
+
+export function resolveRotateBatchGrounding({
+  startingParts,
+  projectParts,
+  groupMembers,
+  updates,
+  geometryCache
+}: {
+  startingParts: Part[];
+  projectParts: Part[];
+  groupMembers: GroupMember[];
+  updates: Array<{ partId: string; position: TranslationDelta; rotation: Rotation3D }>;
+  geometryCache?: GeometryCache;
+}): RotateBatchGroundingResult {
+  const result = applyConstraints(
+    {
+      candidate: {
+        kind: 'rotate',
+        updates
+      },
+      startingParts,
+      project: {
+        parts: projectParts,
+        stocks: [],
+        groupMembers
+      },
+      geometryCache: geometryCache ?? createGeometryCache()
+    },
+    [groundConstraint]
+  );
+
+  if (result.adjusted.kind !== 'rotate') {
+    return { updates };
+  }
+
+  return { updates: result.adjusted.updates };
 }

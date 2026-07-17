@@ -6,6 +6,7 @@ import {
   resolveGroupReleaseMove,
   resolveMoveSelection,
   resolveResizeReleaseMove,
+  resolveRotateBatchGrounding,
   resolveSinglePartPreviewMove,
   resolveSinglePartReleaseMove
 } from './interactionMovement';
@@ -286,5 +287,29 @@ describe('interactionMovement', () => {
     });
 
     expect(result.position.y).toBeGreaterThanOrEqual(1);
+  });
+
+  it('resolves batch rotation positions through the ground constraint', () => {
+    const part = {
+      ...parts[0],
+      id: 'rotated',
+      thickness: 2,
+      position: { x: 0, y: 1, z: 0 }
+    };
+
+    const result = resolveRotateBatchGrounding({
+      startingParts: [part],
+      projectParts: [part],
+      groupMembers: [],
+      updates: [
+        {
+          partId: part.id,
+          position: { x: 0, y: -0.25, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 }
+        }
+      ]
+    });
+
+    expect(result.updates[0].position.y).toBeGreaterThanOrEqual(1);
   });
 });

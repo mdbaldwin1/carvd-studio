@@ -9,11 +9,9 @@ import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
 import { getContainingGroupId } from '../utils/interactionSelection';
 import { Rotation3D } from '../types';
-import { applyConstraints } from '../interaction/constraints/pipeline';
-import { groundConstraint } from '../interaction/constraints/groundConstraint';
-import { createGeometryCache } from '../interaction/geometry/cache';
 import { rotationTool } from '../interaction/tools/rotationTool';
 import { applyCommitInstructions } from '../interaction/tools/toolSolver';
+import { resolveRotateBatchGrounding } from '../utils/interactionMovement';
 
 export function useKeyboardShortcuts() {
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
@@ -143,33 +141,21 @@ export function useKeyboardShortcuts() {
         // the 'rotate' candidate kind, `groundConstraint.apply` lifts every
         // part uniformly by the deepest dip — same semantics as the legacy
         // inline loop, now shared with every other transform path.
-        const constraintResult = applyConstraints(
-          {
-            candidate: {
-              kind: 'rotate',
-              updates: updates.map((u) => ({
-                partId: u.id,
-                position: u.changes.position,
-                rotation: u.changes.rotation
-              }))
-            },
-            startingParts: selectedParts,
-            project: {
-              parts,
-              stocks: [],
-              groupMembers
-            },
-            geometryCache: createGeometryCache()
-          },
-          [groundConstraint]
-        );
+        const grounded = resolveRotateBatchGrounding({
+          startingParts: selectedParts,
+          projectParts: parts,
+          groupMembers,
+          updates: updates.map((u) => ({
+            partId: u.id,
+            position: u.changes.position,
+            rotation: u.changes.rotation
+          }))
+        });
 
-        if (constraintResult.adjusted.kind === 'rotate') {
-          for (let i = 0; i < updates.length; i++) {
-            const adjusted = constraintResult.adjusted.updates.find((u) => u.partId === updates[i].id);
-            if (adjusted) {
-              updates[i].changes.position = adjusted.position;
-            }
+        for (let i = 0; i < updates.length; i++) {
+          const adjusted = grounded.updates.find((u) => u.partId === updates[i].id);
+          if (adjusted) {
+            updates[i].changes.position = adjusted.position;
           }
         }
 
