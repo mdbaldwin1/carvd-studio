@@ -6,7 +6,7 @@ vi.mock('three', async () => await vi.importActual('three'));
 
 import * as THREE from 'three';
 import type { AppSettings, Part } from '../../types';
-import { resizeTool, type ResizeToolInput } from './resizeTool';
+import { createResizeCommitPreview, resizeTool, type ResizeToolInput } from './resizeTool';
 
 function makePart(overrides?: Partial<Part>): Part {
   return {
@@ -159,6 +159,28 @@ describe('resizeTool', () => {
       expect(instructions).toHaveLength(1);
       expect(instructions[0]).toMatchObject({
         kind: 'updatePartDimensions',
+        partId: 'p1',
+        dimensions: preview.dimensions,
+        position: preview.position
+      });
+    });
+
+    it('createResizeCommitPreview builds a commit-ready resize preview', () => {
+      const preview = createResizeCommitPreview({
+        partId: 'p1',
+        dimensions: { length: 18, width: 6, thickness: 1.5 },
+        position: { x: 2, y: 0.75, z: -3 },
+        snappedDimensions: { length: true, width: false, thickness: true }
+      });
+
+      expect(preview).toMatchObject({
+        partId: 'p1',
+        dimensions: { length: 18, width: 6, thickness: 1.5 },
+        position: { x: 2, y: 0.75, z: -3 },
+        snappedDimensions: { length: true, width: false, thickness: true }
+      });
+      expect(preview.candidate).toEqual({
+        kind: 'resize',
         partId: 'p1',
         dimensions: preview.dimensions,
         position: preview.position

@@ -16,7 +16,7 @@ import { isOrbitControls } from './workspaceUtils';
 import { applyConstraints } from '../../interaction/constraints/pipeline';
 import { groundConstraint } from '../../interaction/constraints/groundConstraint';
 import { createGeometryCache } from '../../interaction/geometry/cache';
-import { resizeTool, type ResizeToolPreview, type ResizeToolState } from '../../interaction/tools/resizeTool';
+import { createResizeCommitPreview, resizeTool, type ResizeToolState } from '../../interaction/tools/resizeTool';
 import { applyCommitInstructions } from '../../interaction/tools/toolSolver';
 
 /**
@@ -271,21 +271,12 @@ export function usePartResize(
       newZ = groundResult.adjusted.position.z;
     }
 
-    const commitPreview: ResizeToolPreview = {
+    const commitPreview = createResizeCommitPreview({
       partId: part.id,
       dimensions: { length: newLength, width: newWidth, thickness: newThickness },
       position: { x: newX, y: newY, z: newZ },
-      snapLines: [],
-      referenceState: undefined,
-      resizingDimensions: { length: true, width: true, thickness: true },
-      snappedDimensions,
-      candidate: {
-        kind: 'resize',
-        partId: part.id,
-        dimensions: { length: newLength, width: newWidth, thickness: newThickness },
-        position: { x: newX, y: newY, z: newZ }
-      }
-    };
+      snappedDimensions
+    });
     const commitState =
       resizeToolStateRef.current ??
       ({

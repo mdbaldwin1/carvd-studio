@@ -75,6 +75,34 @@ export interface ResizeToolPreview {
   candidate: Extract<CandidateTransform, { kind: 'resize' }>;
 }
 
+export function createResizeCommitPreview({
+  partId,
+  dimensions,
+  position,
+  snappedDimensions
+}: {
+  partId: string;
+  dimensions: PartDimensions;
+  position: Vec3;
+  snappedDimensions: ResizePreviewResult['snappedDimensions'];
+}): ResizeToolPreview {
+  return {
+    partId,
+    dimensions,
+    position,
+    snapLines: [],
+    referenceState: undefined,
+    resizingDimensions: { length: true, width: true, thickness: true },
+    snappedDimensions,
+    candidate: {
+      kind: 'resize',
+      partId,
+      dimensions,
+      position
+    }
+  };
+}
+
 export const resizeTool: ToolSolver<ResizeToolInput, ResizeToolState, ResizeToolPreview> = {
   begin(input) {
     return {
