@@ -5,6 +5,7 @@ import {
   resolveConstrainedMoveDelta,
   resolveGroupReleaseMove,
   resolveMoveSelection,
+  resolveResizeReleaseMove,
   resolveSinglePartPreviewMove,
   resolveSinglePartReleaseMove
 } from './interactionMovement';
@@ -263,5 +264,27 @@ describe('interactionMovement', () => {
 
     expect(result.position.y).toBeGreaterThanOrEqual(1);
     expect(result.delta).toEqual({ x: 1, y: 0, z: 0 });
+  });
+
+  it('resolves a resize release position through the ground constraint', () => {
+    const part = {
+      ...parts[0],
+      id: 'resized',
+      length: 4,
+      width: 4,
+      thickness: 1,
+      position: { x: 0, y: 0.5, z: 0 }
+    };
+
+    const result = resolveResizeReleaseMove({
+      part,
+      projectParts: [part],
+      stocks: [],
+      groupMembers: [],
+      dimensions: { length: 4, width: 4, thickness: 2 },
+      proposedPosition: { x: 0, y: 0.25, z: 0 }
+    });
+
+    expect(result.position.y).toBeGreaterThanOrEqual(1);
   });
 });

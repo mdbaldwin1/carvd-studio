@@ -13,9 +13,6 @@ import {
 } from '../../utils/interactionSession';
 import { LiveDimensions, HandlePosition, snapToGrid } from './partTypes';
 import { isOrbitControls } from './workspaceUtils';
-import { applyConstraints } from '../../interaction/constraints/pipeline';
-import { groundConstraint } from '../../interaction/constraints/groundConstraint';
-import { createGeometryCache } from '../../interaction/geometry/cache';
 import {
   createResizeCommitPreview,
   createResizeCommitState,
@@ -23,6 +20,7 @@ import {
   type ResizeToolState
 } from '../../interaction/tools/resizeTool';
 import { applyCommitInstructions } from '../../interaction/tools/toolSolver';
+import { resolveResizeReleaseMove } from '../../utils/interactionMovement';
 
 /**
  * Hook encapsulating all resize logic for a Part component.
@@ -251,30 +249,17 @@ export function usePartResize(
     // rotated AABB and lifts the position if it would dip below ground —
     // same intent as the legacy `worldHalfHeight = max(...) ; newY = max(halfHeight, newY)`
     // path, now sharing the pipeline with every other transform consumer.
-    const groundResult = applyConstraints(
-      {
-        candidate: {
-          kind: 'resize',
-          partId: part.id,
-          dimensions: { length: newLength, width: newWidth, thickness: newThickness },
-          position: { x: newX, y: newY, z: newZ }
-        },
-        startingParts: [part],
-        project: {
-          parts: useProjectStore.getState().parts,
-          stocks: useProjectStore.getState().stocks,
-          groupMembers: useProjectStore.getState().groupMembers
-        },
-        geometryCache: createGeometryCache()
-      },
-      [groundConstraint]
-    );
-
-    if (groundResult.adjusted.kind === 'resize') {
-      newX = groundResult.adjusted.position.x;
-      newY = groundResult.adjusted.position.y;
-      newZ = groundResult.adjusted.position.z;
-    }
+    const groundResult = resolveResizeReleaseMove({
+      part,
+      projectParts: useProjectStore.getState().parts,
+      stocks: useProjectStore.getState().stocks,
+      groupMembers: useProjectStore.getState().groupMembers,
+      dimensions: { length: newLength, width: newWidth, thickness: newThickness },
+      proposedPosition: { x: newX, y: newY, z: newZ }
+    });
+    newX = groundResult.position.x;
+    newY = groundResult.position.y;
+    newZ = groundResult.position.z;
 
     const commitPreview = createResizeCommitPreview({
       partId: part.id,

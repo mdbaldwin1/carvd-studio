@@ -1,10 +1,11 @@
-import type { GroupMember, Part } from '../types';
+import type { GroupMember, Part, Stock } from '../types';
 import { getCombinedBounds } from './snapToPartsUtil';
 import { type InteractionSelectionInput, resolveTransformSelectedPartIds } from './interactionSelection';
 import { applyConstraints } from '../interaction/constraints/pipeline';
 import { groundConstraint } from '../interaction/constraints/groundConstraint';
 import { collisionConstraint } from '../interaction/constraints/collisionConstraint';
 import { createGeometryCache, type GeometryCache } from '../interaction/geometry/cache';
+import type { PartDimensions } from '../interaction/tools/toolSolver';
 
 export interface MoveSelectionResolution {
   affectedPartIds: string[];
@@ -40,6 +41,10 @@ export interface SinglePartReleaseMoveResult {
 export interface SinglePartPreviewMoveResult {
   position: TranslationDelta;
   delta: TranslationDelta;
+}
+
+export interface ResizeReleaseMoveResult {
+  position: TranslationDelta;
 }
 
 // `calculatePartWorldHalfHeight` retired in §8b-group — the rotation-aware
@@ -313,4 +318,46 @@ export function resolveSinglePartPreviewMove({
     position: result.adjusted.positions.get(part.id) ?? proposedPosition,
     delta: result.adjusted.delta
   };
+}
+
+export function resolveResizeReleaseMove({
+  part,
+  projectParts,
+  stocks,
+  groupMembers,
+  dimensions,
+  proposedPosition,
+  geometryCache
+}: {
+  part: Part;
+  projectParts: Part[];
+  stocks: Stock[];
+  groupMembers: GroupMember[];
+  dimensions: PartDimensions;
+  proposedPosition: TranslationDelta;
+  geometryCache?: GeometryCache;
+}): ResizeReleaseMoveResult {
+  const result = applyConstraints(
+    {
+      candidate: {
+        kind: 'resize',
+        partId: part.id,
+        dimensions,
+        position: proposedPosition
+      },
+      startingParts: [part],
+      project: {
+        parts: projectParts,
+        stocks,
+        groupMembers
+      },
+      geometryCache: geometryCache ?? createGeometryCache()
+    },
+    [groundConstraint]
+  );
+
+  if (result.adjusted.kind !== 'resize') {
+    return { position: proposedPosition };
+  }
+  return { position: result.adjusted.position };
 }
