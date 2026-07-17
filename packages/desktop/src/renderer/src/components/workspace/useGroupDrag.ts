@@ -20,6 +20,7 @@ import { dragDebug } from '../../utils/dragDebug';
 import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
 import {
   createGroupMoveCommitPreview,
+  createGroupMoveCommitState,
   groupMoveTool,
   type GroupMoveToolState
 } from '../../interaction/tools/groupMoveTool';
@@ -479,13 +480,10 @@ export function useGroupDrag(
 
         const commitState =
           groupMoveToolStateRef.current ??
-          ({
-            initialPositions: new Map(
-              parts
-                .filter((part) => partIds.has(part.id))
-                .map((part) => [part.id, { x: part.position.x, y: part.position.y, z: part.position.z }])
-            )
-          } satisfies GroupMoveToolState);
+          createGroupMoveCommitState({
+            fallbackParts: parts,
+            affectedPartIds: partIds
+          });
         const commitPreview = createGroupMoveCommitPreview({
           delta: snappedDelta,
           state: commitState,

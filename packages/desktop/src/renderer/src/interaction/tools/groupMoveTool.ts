@@ -51,6 +51,22 @@ export interface GroupMoveToolPreview {
   candidate: Extract<CandidateTransform, { kind: 'move' }>;
 }
 
+export function createGroupMoveCommitState({
+  fallbackParts,
+  affectedPartIds
+}: {
+  fallbackParts: ReadonlyArray<Part>;
+  affectedPartIds: ReadonlySet<string>;
+}): GroupMoveToolState {
+  return {
+    initialPositions: new Map(
+      fallbackParts
+        .filter((part) => affectedPartIds.has(part.id))
+        .map((part) => [part.id, { x: part.position.x, y: part.position.y, z: part.position.z }])
+    )
+  };
+}
+
 export function createGroupMoveCommitPreview({
   delta,
   state,

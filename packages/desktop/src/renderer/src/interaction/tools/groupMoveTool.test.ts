@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { AppSettings, Part, SnapGuide } from '../../types';
 import { getPartBounds } from '../../utils/snapToPartsUtil';
-import { createGroupMoveCommitPreview, groupMoveTool, type GroupMoveToolInput } from './groupMoveTool';
+import {
+  createGroupMoveCommitPreview,
+  createGroupMoveCommitState,
+  groupMoveTool,
+  type GroupMoveToolInput
+} from './groupMoveTool';
 
 function makePart(overrides?: Partial<Part>): Part {
   return {
@@ -172,6 +177,23 @@ describe('groupMoveTool', () => {
       expect(preview.positions.get('b')).toEqual({ x: 16, y: 0.375, z: -4 });
       expect(preview.snappedAxes).toEqual({ x: true, y: false, z: false });
       expect(preview.candidate).toEqual({ kind: 'move', delta: preview.delta, positions: preview.positions });
+    });
+
+    it('createGroupMoveCommitState falls back to current positions for affected parts', () => {
+      const currentParts = [
+        makePart({ id: 'a', position: { x: 1, y: 0.375, z: 2 } }),
+        makePart({ id: 'b', position: { x: 5, y: 0.375, z: 8 } }),
+        makePart({ id: 'ignored', position: { x: 100, y: 0.375, z: 100 } })
+      ];
+
+      const state = createGroupMoveCommitState({
+        fallbackParts: currentParts,
+        affectedPartIds: new Set(['a', 'b'])
+      });
+
+      expect(state.initialPositions.get('a')).toEqual({ x: 1, y: 0.375, z: 2 });
+      expect(state.initialPositions.get('b')).toEqual({ x: 5, y: 0.375, z: 8 });
+      expect(state.initialPositions.has('ignored')).toBe(false);
     });
 
     it('cancel does not throw', () => {
