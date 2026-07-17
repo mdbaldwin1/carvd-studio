@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { LiveDimensions, HandlePosition, RESIZE_COLORS } from './partTypes';
 import { RESIZE_HANDLE_GEOMETRY } from './partGeometry';
 import type { HitTargetDescriptor } from '../../interaction/hitTest';
+import { resetWorkspaceCursor, setWorkspaceCursor } from './workspaceUtils';
 
 const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
 
@@ -86,11 +87,11 @@ export const ResizeHandle = memo(
           onPointerOver={(e) => {
             e.stopPropagation();
             setHovered(true);
-            document.body.style.cursor = cursor;
+            setWorkspaceCursor(cursor);
           }}
           onPointerOut={() => {
             setHovered(false);
-            if (!isResizing) document.body.style.cursor = 'auto';
+            if (!isResizing) resetWorkspaceCursor();
           }}
         >
           <meshBasicMaterial transparent opacity={0.02} depthWrite={false} />

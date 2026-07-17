@@ -14,7 +14,7 @@ import {
   ROTATION_RING_ARC_LENGTH
 } from './partGeometry';
 import { chooseBestRotationAxisCandidate } from './rotationAxisSelection';
-import { bindWindowPointerSession } from './workspaceUtils';
+import { bindWindowPointerSession, resetWorkspaceCursor, setWorkspaceCursor } from './workspaceUtils';
 
 export const RotationHandle = memo(
   function RotationHandle({
@@ -303,7 +303,7 @@ export const RotationHandle = memo(
       setDisplayAngle(0);
       setIsDragging(true);
       onRotateStart();
-      document.body.style.cursor = 'grabbing';
+      setWorkspaceCursor('grabbing');
     };
 
     const handleWindowPointerMove = useCallback(
@@ -370,7 +370,7 @@ export const RotationHandle = memo(
           setIsDragging(false);
         }
         onRotateEnd();
-        document.body.style.cursor = cursor;
+        setWorkspaceCursor(cursor);
       },
       [onRotateEnd]
     );
@@ -428,14 +428,14 @@ export const RotationHandle = memo(
       e.stopPropagation();
       setRingHovered(true);
       if (!isDragging && !grabHovered) {
-        document.body.style.cursor = 'pointer';
+        setWorkspaceCursor('pointer');
       }
     };
 
     const handleRingPointerOut = () => {
       setRingHovered(false);
       if (!isDragging && !grabHovered) {
-        document.body.style.cursor = 'auto';
+        resetWorkspaceCursor();
       }
     };
 
@@ -443,14 +443,14 @@ export const RotationHandle = memo(
       e.stopPropagation();
       setGrabHovered(true);
       if (!isDragging) {
-        document.body.style.cursor = 'pointer';
+        setWorkspaceCursor('pointer');
       }
     };
 
     const handleGrabPointerOut = () => {
       setGrabHovered(false);
       if (!isDragging && !ringHovered) {
-        document.body.style.cursor = 'auto';
+        resetWorkspaceCursor();
       }
     };
 

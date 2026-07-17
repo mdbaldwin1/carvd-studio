@@ -19,7 +19,7 @@ import { useUIStore } from '../../store/uiStore';
 import { resolvePartInteractionPreview } from '../../utils/interactionOverlay';
 import { resetSelectionDragState } from '../../utils/interactionSession';
 import { getPartGroupContext } from './partClickHandler';
-import { markPartPointerInteraction } from './workspaceUtils';
+import { markPartPointerInteraction, resetWorkspaceCursor, setWorkspaceCursor } from './workspaceUtils';
 import { useGroupDrag } from './useGroupDrag';
 import { setHitTargetDescriptor } from '../../interaction/hitTest';
 
@@ -184,7 +184,7 @@ export function InstancedParts({ parts, totalPartCount }: InstancedPartsProps) {
             const ctx = getGroupContext(partId);
             if (!ctx.isOutsideEditingContext) {
               setHoveredPart(partId);
-              document.body.style.cursor = 'move';
+              setWorkspaceCursor('move');
             }
           }
         }
@@ -196,7 +196,7 @@ export function InstancedParts({ parts, totalPartCount }: InstancedPartsProps) {
   const handlePointerOut = useCallback(() => {
     lastHoveredInstanceRef.current = undefined;
     setHoveredPart(null);
-    document.body.style.cursor = 'auto';
+    resetWorkspaceCursor();
   }, [setHoveredPart]);
 
   const handlePointerDown = useCallback(

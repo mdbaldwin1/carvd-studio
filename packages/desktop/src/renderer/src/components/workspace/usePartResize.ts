@@ -16,6 +16,7 @@ import {
   bindWindowPointerSession,
   createPointerRafQueue,
   pauseOrbitControls,
+  resetWorkspaceCursor,
   resumeOrbitControls
 } from './workspaceUtils';
 import {
@@ -281,7 +282,7 @@ export function usePartResize(
     resizeToolStateRef.current = null;
     resizeStart.current = null;
     resumeOrbitControls(controls);
-    document.body.style.cursor = 'auto';
+    resetWorkspaceCursor();
     clearTransformInteractionPreviewKeepingSelectionDelta();
     useSnapStore.getState().updateReferenceDistances();
   };

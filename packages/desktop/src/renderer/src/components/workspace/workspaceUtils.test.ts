@@ -8,6 +8,8 @@ import {
   isOrbitControls,
   pauseOrbitControls,
   resumeOrbitControls,
+  resetWorkspaceCursor,
+  setWorkspaceCursor,
   getPartAABB,
   bindWindowPointerSession,
   createPointerRafQueue
@@ -87,6 +89,18 @@ describe('workspaceUtils', () => {
       expect(() => pauseOrbitControls(null)).not.toThrow();
       expect(() => resumeOrbitControls(notControls as never)).not.toThrow();
       expect('enabled' in notControls).toBe(false);
+    });
+  });
+
+  describe('workspace cursor helpers', () => {
+    it('sets and resets the body cursor on the provided target', () => {
+      const target = { body: { style: { cursor: 'auto' } } };
+
+      setWorkspaceCursor('grabbing', target);
+      expect(target.body.style.cursor).toBe('grabbing');
+
+      resetWorkspaceCursor(target);
+      expect(target.body.style.cursor).toBe('auto');
     });
   });
 

@@ -56,6 +56,16 @@ export function resumeOrbitControls(controls: THREE.EventDispatcher<object> | nu
   }
 }
 
+type CursorTarget = { body: { style: { cursor: string } } };
+
+export function setWorkspaceCursor(cursor: string, target: CursorTarget = document): void {
+  target.body.style.cursor = cursor;
+}
+
+export function resetWorkspaceCursor(target: CursorTarget = document): void {
+  setWorkspaceCursor('auto', target);
+}
+
 // ADR-002 + ADR-003: the right-click target globals
 // (setRightClickTarget / getRightClickTarget / clearRightClickTarget) that
 // used to live here are gone. The hit-test service resolves right-click

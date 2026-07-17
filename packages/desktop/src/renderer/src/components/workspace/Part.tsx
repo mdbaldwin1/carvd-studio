@@ -30,7 +30,7 @@ import { RotationHandle } from './RotationHandle';
 import { useGroupDrag } from './useGroupDrag';
 import { usePartDrag } from './usePartDrag';
 import { usePartResize } from './usePartResize';
-import { pauseOrbitControls, resumeOrbitControls } from './workspaceUtils';
+import { pauseOrbitControls, resetWorkspaceCursor, resumeOrbitControls, setWorkspaceCursor } from './workspaceUtils';
 
 // Decorative edges should never consume pointer hits.
 const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
@@ -243,14 +243,14 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
     e.stopPropagation();
     setHoveredPart(part.id);
     if (!isDragging && !isResizing) {
-      document.body.style.cursor = 'move';
+      setWorkspaceCursor('move');
     }
   };
 
   const handlePointerOut = () => {
     setHoveredPart(null);
     if (!isDragging && !isResizing) {
-      document.body.style.cursor = 'auto';
+      resetWorkspaceCursor();
     }
   };
 
