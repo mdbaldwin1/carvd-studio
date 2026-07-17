@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { AppSettings, Part, SnapGuide } from '../../types';
-import { moveTool, type MoveToolInput } from './moveTool';
+import { createMoveCommitPreview, moveTool, type MoveToolInput } from './moveTool';
 
 function makePart(overrides?: Partial<Part>): Part {
   return {
@@ -138,6 +138,22 @@ describe('moveTool', () => {
         partId: 'b',
         position: { x: 14, y: 0.375, z: 0 }
       });
+    });
+
+    it('createMoveCommitPreview builds a commit-ready single-part release preview', () => {
+      const part = makePart({ id: 'a', position: { x: 1, y: 0.375, z: 2 } });
+      const state = moveTool.begin(makeInput({ part }));
+
+      const preview = createMoveCommitPreview({
+        partId: part.id,
+        position: { x: 4, y: 0.375, z: -1 },
+        state
+      });
+
+      expect(preview.primaryPosition).toEqual({ x: 4, y: 0.375, z: -1 });
+      expect(preview.delta).toEqual({ x: 3, y: 0, z: -3 });
+      expect(preview.positions.get(part.id)).toEqual({ x: 4, y: 0.375, z: -1 });
+      expect(preview.candidate).toEqual({ kind: 'move', delta: preview.delta, positions: preview.positions });
     });
 
     it('cancel does not throw and returns nothing', () => {

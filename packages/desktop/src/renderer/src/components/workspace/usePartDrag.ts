@@ -21,7 +21,7 @@ import { applyConstraints } from '../../interaction/constraints/pipeline';
 import { groundConstraint } from '../../interaction/constraints/groundConstraint';
 import { collisionConstraint } from '../../interaction/constraints/collisionConstraint';
 import { createGeometryCache } from '../../interaction/geometry/cache';
-import { moveTool, type MoveToolPreview, type MoveToolState } from '../../interaction/tools/moveTool';
+import { createMoveCommitPreview, moveTool, type MoveToolState } from '../../interaction/tools/moveTool';
 import { applyCommitInstructions, type Vec3 } from '../../interaction/tools/toolSolver';
 import { dragDebug } from '../../utils/dragDebug';
 import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
@@ -712,21 +712,6 @@ export function usePartDrag(
         const hasMultiplePartsSelected = effectivePartIds.length > 1;
         const shouldMoveMultiple = hasGroupSelected || hasMultiplePartsSelected;
         const commitSinglePartMove = (position: Vec3) => {
-          const delta = {
-            x: position.x - dragStart.current!.partPos.x,
-            y: position.y - dragStart.current!.partPos.y,
-            z: position.z - dragStart.current!.partPos.z
-          };
-          const positions = new Map([[part.id, position]]);
-          const commitPreview: MoveToolPreview = {
-            primaryPosition: position,
-            delta,
-            positions,
-            snapLines: [],
-            snappedAxes: { x: false, y: false, z: false },
-            nextLatchedFaceSnap: moveToolStateRef.current?.latchedFaceSnap ?? null,
-            candidate: { kind: 'move', delta, positions }
-          };
           const commitState =
             moveToolStateRef.current ??
             ({
@@ -734,6 +719,7 @@ export function usePartDrag(
               initialOtherPositions: new Map(),
               latchedFaceSnap: null
             } satisfies MoveToolState);
+          const commitPreview = createMoveCommitPreview({ partId: part.id, position, state: commitState });
           applyCommitInstructions(moveTool.commit(commitState, commitPreview), { updatePart });
         };
 

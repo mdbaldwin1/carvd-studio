@@ -99,6 +99,32 @@ function buildPreviewFromSolve(
   };
 }
 
+export function createMoveCommitPreview({
+  partId,
+  position,
+  state
+}: {
+  partId: string;
+  position: Vec3;
+  state: MoveToolState;
+}): MoveToolPreview {
+  const delta = {
+    x: position.x - state.initialPrimaryPosition.x,
+    y: position.y - state.initialPrimaryPosition.y,
+    z: position.z - state.initialPrimaryPosition.z
+  };
+  const positions = new Map<string, Vec3>([[partId, position]]);
+  return {
+    primaryPosition: position,
+    delta,
+    positions,
+    snapLines: [],
+    snappedAxes: { x: false, y: false, z: false },
+    nextLatchedFaceSnap: state.latchedFaceSnap,
+    candidate: { kind: 'move', delta, positions }
+  };
+}
+
 export const moveTool: ToolSolver<MoveToolInput, MoveToolState, MoveToolPreview> = {
   begin(input) {
     const initialOtherPositions = new Map<string, Vec3>();
