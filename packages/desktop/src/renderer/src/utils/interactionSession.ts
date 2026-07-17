@@ -1,6 +1,7 @@
 import type { ReferenceDistanceIndicator, SnapLine } from '../types';
 import { useInteractionStore } from '../store/interactionStore';
 import { useSelectionStore } from '../store/selectionStore';
+import type { DragIntent } from '../store/selectionStore';
 import { useSnapStore } from '../store/snapStore';
 import type { InteractionSelectionEntity } from './interactionSelection';
 import type { ReferenceRelation } from './referenceRelations';
@@ -77,6 +78,15 @@ export function resetSelectionDragState(): void {
   selection.clearDragIntent();
   selection.setDraggingPartId(null);
   selection.setActiveDragDelta(null);
+}
+
+export function consumeTransformDragIntent(partId: string): DragIntent | null {
+  const selection = useSelectionStore.getState();
+  const intent = selection.dragIntent;
+  if (!intent || intent.partId !== partId) return null;
+
+  selection.clearDragIntent();
+  return intent;
 }
 
 export function publishSelectionDragDelta(delta: Delta3D): void {

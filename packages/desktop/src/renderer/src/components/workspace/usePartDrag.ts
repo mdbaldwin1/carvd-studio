@@ -39,6 +39,7 @@ import {
 } from '../../utils/interactionMovement';
 import {
   beginMoveInteractionSession,
+  consumeTransformDragIntent,
   clearTransformDraggingPart,
   clearTransformInteractionPreview,
   clearTransformInteractionPreviewKeepingReferenceDistances,
@@ -249,12 +250,11 @@ export function usePartDrag(
   // Uses a threshold to distinguish clicks from drags and attaches window listeners
   // synchronously to avoid race conditions with quick clicks.
   useEffect(() => {
-    const { dragIntent, clearDragIntent } = useSelectionStore.getState();
-    if (!dragIntent || dragIntent.partId !== part.id) return;
+    const dragIntent = consumeTransformDragIntent(part.id);
+    if (!dragIntent) return;
 
     // Keep this part rendered individually, then consume the intent
     markTransformDraggingPart(part.id);
-    clearDragIntent();
 
     // Use the stored world point as the drag start reference
     let startPoint: THREE.Vector3 | null = null;
