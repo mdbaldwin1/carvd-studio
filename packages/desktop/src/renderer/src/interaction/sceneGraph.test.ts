@@ -117,6 +117,9 @@ describe('buildWorkspaceSceneGraph', () => {
       expect(graph.descendantPartIds('g-outer')).toEqual(['p-leaf']);
       expect(graph.descendantPartIds('g-middle')).toEqual(['p-leaf']);
       expect(graph.descendantPartIds('g-inner')).toEqual(['p-leaf']);
+      expect(graph.descendantGroupIds('g-outer')).toEqual(['g-middle', 'g-inner']);
+      expect(graph.descendantGroupIds('g-middle')).toEqual(['g-inner']);
+      expect(graph.descendantGroupIds('g-inner')).toEqual([]);
 
       // Ancestor chain — outermost first.
       expect(graph.ancestorGroupIds('p-leaf')).toEqual(['g-outer', 'g-middle', 'g-inner']);
@@ -136,6 +139,9 @@ describe('buildWorkspaceSceneGraph', () => {
       const graph = buildWorkspaceSceneGraph({ parts, groups, groupMembers: members });
       expect(graph.descendantPartIds('g-outer').sort()).toEqual(['p-a', 'p-b', 'p-c']);
       expect(graph.descendantPartIds('g-inner').sort()).toEqual(['p-b', 'p-c']);
+      expect(graph.descendantGroupIds('g-outer')).toEqual(['g-inner']);
+      expect(graph.descendantGroupIds('p-a')).toEqual([]);
+      expect(graph.descendantGroupIds('ghost')).toEqual([]);
     });
   });
 
@@ -198,6 +204,7 @@ describe('buildWorkspaceSceneGraph', () => {
         // Build succeeds, runtime traversal terminates.
         expect(graph.descendantPartIds('a')).toEqual([]);
         expect(graph.descendantPartIds('b')).toEqual([]);
+        expect(graph.descendantGroupIds('a').length).toBeLessThan(100);
         // ancestorGroupIds also terminates on the cyclic chain.
         const aAncestors = graph.ancestorGroupIds('a');
         expect(aAncestors.length).toBeLessThan(100);

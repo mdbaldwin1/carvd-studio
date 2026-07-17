@@ -57,6 +57,12 @@ export interface WorkspaceSceneGraph {
    */
   descendantPartIds(id: NodeId): ReadonlyArray<string>;
   /**
+   * Group IDs reachable below a group node in tree order.
+   * - For a `part` node or unknown id: `[]`.
+   * - Does not include the input group id itself.
+   */
+  descendantGroupIds(id: NodeId): ReadonlyArray<NodeId>;
+  /**
    * Group IDs on the parent chain, **outermost first**. (i.e. closest ancestor
    * is the last element.) Empty array for top-level nodes or unknown ids.
    */
@@ -157,6 +163,7 @@ export function buildWorkspaceSceneGraph(input: BuildWorkspaceSceneGraphInput): 
 
   // Step 6: memoized traversals via closure caches.
   const descendantCache = new Map<NodeId, ReadonlyArray<string>>();
+  const descendantGroupCache = new Map<NodeId, ReadonlyArray<NodeId>>();
   const ancestorCache = new Map<NodeId, ReadonlyArray<NodeId>>();
 
   function descendantPartIds(id: NodeId): ReadonlyArray<string> {
@@ -192,6 +199,31 @@ export function buildWorkspaceSceneGraph(input: BuildWorkspaceSceneGraphInput): 
     return out;
   }
 
+  function descendantGroupIds(id: NodeId): ReadonlyArray<NodeId> {
+    const cached = descendantGroupCache.get(id);
+    if (cached) return cached;
+    const result = collectDescendantGroupIds(id, new Set());
+    descendantGroupCache.set(id, result);
+    return result;
+  }
+
+  function collectDescendantGroupIds(id: NodeId, visited: Set<NodeId>): NodeId[] {
+    if (visited.has(id)) return [];
+    visited.add(id);
+
+    const node = nodes.get(id);
+    if (!node || node.kind === 'part') return [];
+
+    const out: NodeId[] = [];
+    for (const childId of node.childIds) {
+      const child = nodes.get(childId);
+      if (!child || child.kind !== 'group') continue;
+      out.push(child.id);
+      out.push(...collectDescendantGroupIds(child.id, visited));
+    }
+    return out;
+  }
+
   function ancestorGroupIds(id: NodeId): ReadonlyArray<NodeId> {
     const cached = ancestorCache.get(id);
     if (cached) return cached;
@@ -213,6 +245,7 @@ export function buildWorkspaceSceneGraph(input: BuildWorkspaceSceneGraphInput): 
     nodes,
     rootIds,
     descendantPartIds,
+    descendantGroupIds,
     ancestorGroupIds,
     findNode: (id) => nodes.get(id)
   };

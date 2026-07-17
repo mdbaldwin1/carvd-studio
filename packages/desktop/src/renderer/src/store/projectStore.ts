@@ -261,6 +261,23 @@ const getSceneGraphDescendantPartIds = ({
     groupMembers
   }).descendantPartIds(groupId);
 
+const getSceneGraphDescendantGroupIds = ({
+  groupId,
+  parts,
+  groups,
+  groupMembers
+}: {
+  groupId: string;
+  parts: Part[];
+  groups: Group[];
+  groupMembers: GroupMember[];
+}): readonly string[] =>
+  buildWorkspaceSceneGraph({
+    parts,
+    groups,
+    groupMembers
+  }).descendantGroupIds(groupId);
+
 const getDuplicateOffset = (partsToDuplicate: Part[]): { x: number; y: number; z: number } => {
   if (partsToDuplicate.length === 0) return { x: 2, y: 0, z: 2 };
 
@@ -1528,7 +1545,10 @@ export const useProjectStore = create<ProjectState>()(
       deleteGroup: (groupId, mode, targetParentGroupId) => {
         const { parts, groups, groupMembers } = get();
 
-        const descendantGroupIds = getAllDescendantGroupIds(groupId, groupMembers);
+        const descendantGroupIds = [
+          groupId,
+          ...getSceneGraphDescendantGroupIds({ groupId, parts, groups, groupMembers })
+        ];
         const descendantPartIds = getSceneGraphDescendantPartIds({ groupId, parts, groups, groupMembers });
 
         if (mode === 'ungroup') {
@@ -1721,15 +1741,10 @@ export const useProjectStore = create<ProjectState>()(
         if (mode === 'deep') {
           // Collect all descendant group IDs
           const descendantGroupIds = new Set<string>();
-          const collectDescendantGroups = (gId: string) => {
-            const children = groupMembers.filter((gm) => gm.groupId === gId && gm.memberType === 'group');
-            for (const child of children) {
-              descendantGroupIds.add(child.memberId);
-              collectDescendantGroups(child.memberId);
-            }
-          };
           for (const groupId of groupIds) {
-            collectDescendantGroups(groupId);
+            getSceneGraphDescendantGroupIds({ groupId, parts, groups, groupMembers }).forEach((id) =>
+              descendantGroupIds.add(id)
+            );
           }
 
           // Remove nested groups from groups array and their memberships
