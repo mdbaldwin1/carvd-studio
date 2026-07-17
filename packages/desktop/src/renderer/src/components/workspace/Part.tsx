@@ -12,7 +12,7 @@ import { Part as PartType } from '../../types';
 import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 import {
   beginRotateInteractionSession,
-  clearMoveInteractionPreview,
+  clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances,
   publishRotateInteractionPreview
 } from '../../utils/interactionSession';
 import { resolvePartInteractionPreview, shouldHideMeasurementOverlays } from '../../utils/interactionOverlay';
@@ -276,10 +276,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
         initialDegrees: 90
       });
       applyLocalRotation(axis, 90);
-      clearMoveInteractionPreview({
-        clearSelectionDragDelta: false,
-        clearReferenceDistances: false
-      });
+      clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances();
     },
     [applyLocalRotation, part.id, part.position.x, part.position.y, part.position.z]
   );
@@ -303,10 +300,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
 
   const handleRotateEnd = useCallback(() => {
     if (controls) controls.enabled = true;
-    clearMoveInteractionPreview({
-      clearSelectionDragDelta: false,
-      clearReferenceDistances: false
-    });
+    clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances();
   }, [controls]);
 
   // Use live dimensions for rendering

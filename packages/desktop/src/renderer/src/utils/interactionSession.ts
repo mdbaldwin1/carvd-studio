@@ -147,3 +147,26 @@ export function clearMoveInteractionPreview(params?: {
     useSnapStore.getState().setActiveSnapLines([]);
   }
 }
+
+export function clearTransformInteractionPreview(): void {
+  clearMoveInteractionPreview();
+}
+
+export function clearTransformInteractionPreviewKeepingReferenceDistances(): void {
+  clearMoveInteractionPreview({
+    clearReferenceDistances: false
+  });
+}
+
+export function clearTransformInteractionPreviewKeepingSelectionDelta(): void {
+  clearMoveInteractionPreview({
+    clearSelectionDragDelta: false
+  });
+}
+
+export function clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances(): void {
+  clearMoveInteractionPreview({
+    clearSelectionDragDelta: false,
+    clearReferenceDistances: false
+  });
+}

@@ -16,7 +16,7 @@ import { ReferenceRuler } from '../../types';
 import { Input } from '@renderer/components/ui/input';
 import { calculateMoveDeltaForReferenceRelation } from '../../utils/referenceRelations';
 import { resolveResizePositionFromDimensions } from '../../utils/interactionResizePreview';
-import { clearMoveInteractionPreview } from '../../utils/interactionSession';
+import { clearTransformInteractionPreviewKeepingSelectionDelta } from '../../utils/interactionSession';
 import * as THREE from 'three';
 import type { ReferenceOverlayInputs } from '../../interaction/overlayModel';
 
@@ -217,10 +217,7 @@ export function ReferenceDistanceIndicators({ data }: ReferenceDistanceIndicator
       thickness: nextDimensions.thickness,
       position: nextPosition
     });
-    clearMoveInteractionPreview({
-      clearSelectionDragDelta: false,
-      clearReferenceDistances: true
-    });
+    clearTransformInteractionPreviewKeepingSelectionDelta();
     setEditingId(null);
   };
 

@@ -34,7 +34,8 @@ import {
 } from '../../utils/interactionMovement';
 import {
   beginMoveInteractionSession,
-  clearMoveInteractionPreview,
+  clearTransformInteractionPreview,
+  clearTransformInteractionPreviewKeepingReferenceDistances,
   publishMoveInteractionPreview
 } from '../../utils/interactionSession';
 import { resolveReferenceEntities, resolveSelectionEntities } from '../../utils/interactionSelection';
@@ -118,12 +119,12 @@ export function usePartDrag(
     wasSnappedByParts.current = { x: false, y: false, z: false };
   };
 
-  const finishDragState = (didMove: boolean, previewOptions?: Parameters<typeof clearMoveInteractionPreview>[0]) => {
+  const finishDragState = (didMove: boolean, clearPreview = clearTransformInteractionPreview) => {
     setIsDragging(false);
     resetDragRefs();
     markJustFinishedDragging(didMove);
     useSelectionStore.getState().setDraggingPartId(null);
-    clearMoveInteractionPreview(previewOptions);
+    clearPreview();
     if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = true;
   };
 
@@ -327,10 +328,7 @@ export function usePartDrag(
         // Safety net: drag was started but second useEffect hasn't attached its listeners yet.
         // Do minimal cleanup to prevent stuck drag state.
         removeIntentListeners();
-        finishDragState(false, {
-          clearSelectionDragDelta: true,
-          clearReferenceDistances: false
-        });
+        finishDragState(false, clearTransformInteractionPreviewKeepingReferenceDistances);
       }
     };
 
@@ -743,7 +741,7 @@ export function usePartDrag(
 
           dragDebug('partDrag:release:multi:commit', { partId: part.id, delta: constrainedMultiDelta.delta });
           moveSelectedParts(constrainedMultiDelta.delta);
-          clearMoveInteractionPreview();
+          clearTransformInteractionPreview();
         } else {
           // ADR-006: single-part release runs ground + collision in one
           // pipeline call. groundConstraint lifts the part to the floor if
@@ -804,12 +802,12 @@ export function usePartDrag(
     return () => {
       unbindPointerSession();
       pointerRafQueue.cancel();
-      clearMoveInteractionPreview();
+      clearTransformInteractionPreview();
     };
     // Depend only on the *dimension* fields of liveDims, not the position fields.
     // Position fields (x/y/z) update on every drag frame via setLiveDims, and
     // re-running this effect each frame would tear down the move session via
-    // clearMoveInteractionPreview() in the cleanup, breaking the multi-part preview
+    // clearTransformInteractionPreview() in the cleanup, breaking the multi-part preview
     // because subsequent updateMoveSessionDelta() calls no-op against a null session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDragging, liveDims.length, liveDims.width, liveDims.thickness, markJustFinishedDragging]);

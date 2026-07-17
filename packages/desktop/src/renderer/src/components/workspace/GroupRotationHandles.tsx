@@ -9,7 +9,7 @@ import { resolveTransformSelectedPartIds } from '../../utils/interactionSelectio
 import { shouldHideGroupTransformHandles } from '../../utils/interactionOverlay';
 import {
   beginRotateInteractionSession,
-  clearMoveInteractionPreview,
+  clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances,
   publishRotateInteractionPreview
 } from '../../utils/interactionSession';
 import { LiveDimensions } from './partTypes';
@@ -62,10 +62,7 @@ export function GroupRotationHandles() {
         initialDegrees: 90
       });
       rotateSelectedParts(axis, 90, pivot);
-      clearMoveInteractionPreview({
-        clearSelectionDragDelta: false,
-        clearReferenceDistances: false
-      });
+      clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances();
     },
     [pivot, rotateSelectedParts, selectedIds]
   );
@@ -91,10 +88,7 @@ export function GroupRotationHandles() {
 
   const handleRotateEnd = useCallback(() => {
     if (isOrbitControls(controls)) controls.enabled = true;
-    clearMoveInteractionPreview({
-      clearSelectionDragDelta: false,
-      clearReferenceDistances: false
-    });
+    clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances();
   }, [controls]);
 
   if (!liveDims || !pivot || shouldHideGroupTransformHandles(activeSession)) return null;

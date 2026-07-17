@@ -8,7 +8,7 @@ import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { useInteractionStore } from '../../store/interactionStore';
 import {
   beginResizeInteractionSession,
-  clearMoveInteractionPreview,
+  clearTransformInteractionPreviewKeepingSelectionDelta,
   publishResizeInteractionPreview
 } from '../../utils/interactionSession';
 import { LiveDimensions, HandlePosition, snapToGrid } from './partTypes';
@@ -277,10 +277,7 @@ export function usePartResize(
     resizeStart.current = null;
     if (isOrbitControls(controls)) controls.enabled = true;
     document.body.style.cursor = 'auto';
-    clearMoveInteractionPreview({
-      clearSelectionDragDelta: false,
-      clearReferenceDistances: true
-    });
+    clearTransformInteractionPreviewKeepingSelectionDelta();
     useSnapStore.getState().updateReferenceDistances();
   };
 

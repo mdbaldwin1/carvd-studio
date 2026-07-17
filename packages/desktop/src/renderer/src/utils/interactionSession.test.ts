@@ -6,6 +6,10 @@ import {
   beginMoveInteractionSession,
   beginRotateInteractionSession,
   beginResizeInteractionSession,
+  clearTransformInteractionPreview,
+  clearTransformInteractionPreviewKeepingReferenceDistances,
+  clearTransformInteractionPreviewKeepingSelectionDelta,
+  clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances,
   clearMoveInteractionPreview,
   publishMoveInteractionPreview,
   publishResizeInteractionPreview,
@@ -80,6 +84,45 @@ describe('interactionSession', () => {
     expect(useInteractionStore.getState().activeSession).toBeNull();
     expect(useSelectionStore.getState().activeDragDelta).toBeNull();
     expect(useSnapStore.getState().activeSnapLines).toEqual([]);
+  });
+
+  it('clears transform previews with named cleanup intents', () => {
+    useSelectionStore.getState().setActiveDragDelta({ x: 9, y: 0, z: 0 });
+    beginMoveInteractionSession({ affectedPartIds: ['p1'] });
+    useSnapStore
+      .getState()
+      .setSnapIndicators(
+        [{ axis: 'x', type: 'face', start: { x: 0, y: 0, z: 0 }, end: { x: 1, y: 1, z: 1 }, snapValue: 1 }],
+        []
+      );
+
+    clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances();
+
+    expect(useInteractionStore.getState().activeSession).toBeNull();
+    expect(useSelectionStore.getState().activeDragDelta).toEqual({ x: 9, y: 0, z: 0 });
+    expect(useSnapStore.getState().activeSnapLines).toEqual([]);
+
+    beginMoveInteractionSession({ affectedPartIds: ['p1'] });
+    clearTransformInteractionPreviewKeepingSelectionDelta();
+
+    expect(useSelectionStore.getState().activeDragDelta).toEqual({ x: 9, y: 0, z: 0 });
+    expect(useSnapStore.getState().activeReferenceDistances).toEqual([]);
+
+    useSelectionStore.getState().setActiveDragDelta({ x: 3, y: 0, z: 0 });
+    beginMoveInteractionSession({ affectedPartIds: ['p1'] });
+    useSnapStore.getState().setSnapIndicators([], [{ id: 'r1' } as never]);
+
+    clearTransformInteractionPreviewKeepingReferenceDistances();
+
+    expect(useSelectionStore.getState().activeDragDelta).toBeNull();
+    expect(useSnapStore.getState().activeReferenceDistances).toHaveLength(1);
+
+    beginMoveInteractionSession({ affectedPartIds: ['p1'] });
+    clearTransformInteractionPreview();
+
+    expect(useInteractionStore.getState().activeSession).toBeNull();
+    expect(useSelectionStore.getState().activeDragDelta).toBeNull();
+    expect(useSnapStore.getState().activeReferenceDistances).toEqual([]);
   });
 
   it('begins and updates a shared rotate interaction session', () => {

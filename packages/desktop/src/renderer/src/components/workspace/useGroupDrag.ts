@@ -31,7 +31,7 @@ import {
 import { applyCommitInstructions } from '../../interaction/tools/toolSolver';
 import {
   beginMoveInteractionSession,
-  clearMoveInteractionPreview,
+  clearTransformInteractionPreviewKeepingReferenceDistances,
   publishMoveInteractionPreview
 } from '../../utils/interactionSession';
 import { resolveReferenceEntities, resolveSelectionEntities } from '../../utils/interactionSelection';
@@ -517,10 +517,7 @@ export function useGroupDrag(
         unbindPointerSession();
         cleanupRef.current = null;
         resetGroupDragRefs();
-        clearMoveInteractionPreview({
-          clearSelectionDragDelta: true,
-          clearReferenceDistances: false
-        });
+        clearTransformInteractionPreviewKeepingReferenceDistances();
         if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = true;
       };
 
