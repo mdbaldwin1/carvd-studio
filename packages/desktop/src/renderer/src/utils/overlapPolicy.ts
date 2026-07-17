@@ -1,6 +1,7 @@
 import { Part } from '../types';
 import { getPartOBB, obbsOverlap } from './snapToPartsUtil';
 import { dragDebug } from './dragDebug';
+import type { GeometryCache } from '../interaction/geometry/cache';
 
 const OBB_EPSILON = 1e-6;
 const OBB_SEPARATION_TOLERANCE = 1e-8;
@@ -13,20 +14,30 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
   return !a.ignoreOverlap && !b.ignoreOverlap;
 }
 
-export function partsOverlap(a: Part, b: Part): boolean {
+export function partsOverlap(a: Part, b: Part, geometryCache?: GeometryCache): boolean {
   if (!overlapCheckEnabled(a, b)) return false;
-  return obbsOverlap(getPartOBB(a), getPartOBB(b), OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false);
+  return obbsOverlap(
+    getPartOBB(a, a.position, geometryCache),
+    getPartOBB(b, b.position, geometryCache),
+    OBB_EPSILON,
+    OBB_SEPARATION_TOLERANCE,
+    false
+  );
 }
 
-export function wouldOverlapWithAny(part: Part, parts: Part[]): boolean {
+export function wouldOverlapWithAny(part: Part, parts: Part[], geometryCache?: GeometryCache): boolean {
   for (const other of parts) {
     if (other.id === part.id) continue;
-    if (partsOverlap(part, other)) return true;
+    if (partsOverlap(part, other, geometryCache)) return true;
   }
   return false;
 }
 
-export function wouldTransformedPartsOverlap(parts: Part[], transformedPartsById: Map<string, Part>): boolean {
+export function wouldTransformedPartsOverlap(
+  parts: Part[],
+  transformedPartsById: Map<string, Part>,
+  geometryCache?: GeometryCache
+): boolean {
   if (transformedPartsById.size === 0) return false;
 
   const effectivePartsById = new Map(parts.map((p) => [p.id, transformedPartsById.get(p.id) ?? p]));
@@ -40,7 +51,7 @@ export function wouldTransformedPartsOverlap(parts: Part[], transformedPartsById
       if (other.id < transformedId && transformedPartsById.has(other.id)) continue;
 
       const effectiveOther = effectivePartsById.get(other.id);
-      if (effectiveOther && partsOverlap(transformedPart, effectiveOther)) {
+      if (effectiveOther && partsOverlap(transformedPart, effectiveOther, geometryCache)) {
         return true;
       }
     }
@@ -49,7 +60,12 @@ export function wouldTransformedPartsOverlap(parts: Part[], transformedPartsById
   return false;
 }
 
-export function wouldTranslationCauseOverlap(parts: Part[], movingIds: Set<string>, delta: TranslationDelta): boolean {
+export function wouldTranslationCauseOverlap(
+  parts: Part[],
+  movingIds: Set<string>,
+  delta: TranslationDelta,
+  geometryCache?: GeometryCache
+): boolean {
   for (const p of parts) {
     if (!movingIds.has(p.id)) continue;
 
@@ -64,7 +80,7 @@ export function wouldTranslationCauseOverlap(parts: Part[], movingIds: Set<strin
 
     for (const other of parts) {
       if (movingIds.has(other.id)) continue;
-      if (partsOverlap(movedPart, other)) {
+      if (partsOverlap(movedPart, other, geometryCache)) {
         return true;
       }
     }
@@ -76,9 +92,10 @@ export function wouldTranslationCauseOverlap(parts: Part[], movingIds: Set<strin
 export function resolveSafeTranslationDelta(
   parts: Part[],
   movingIds: Set<string>,
-  proposedDelta: TranslationDelta
+  proposedDelta: TranslationDelta,
+  geometryCache?: GeometryCache
 ): TranslationDelta | null {
-  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta)) {
+  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta, geometryCache)) {
     return proposedDelta;
   }
 
@@ -93,7 +110,7 @@ export function resolveSafeTranslationDelta(
       y: proposedDelta.y * mid,
       z: proposedDelta.z * mid
     };
-    if (wouldTranslationCauseOverlap(parts, movingIds, candidate)) {
+    if (wouldTranslationCauseOverlap(parts, movingIds, candidate, geometryCache)) {
       high = mid;
     } else {
       low = mid;

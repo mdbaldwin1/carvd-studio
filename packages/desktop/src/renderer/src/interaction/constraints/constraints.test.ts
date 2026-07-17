@@ -457,6 +457,22 @@ describe('collisionConstraint', () => {
     expect(result.warnings[0].kind).toBe('soft-collision');
   });
 
+  it('uses the shared geometry cache when checking move collisions', () => {
+    const partA = makePart({ id: 'a', position: { x: 0, y: 0.375, z: 0 }, length: 4, width: 4 });
+    const partB = makePart({ id: 'b', position: { x: 10, y: 0.375, z: 0 }, length: 4, width: 4 });
+    const positions = new Map([['a', { x: 8, y: 0.375, z: 0 }]]);
+    const ctx: ConstraintContext = {
+      candidate: { kind: 'move', delta: { x: 8, y: 0, z: 0 }, positions },
+      startingParts: [partA],
+      project: { parts: [partA, partB], stocks: [], groupMembers: [], preventOverlap: true },
+      geometryCache: createGeometryCache()
+    };
+
+    collisionConstraint.apply(ctx);
+
+    expect(ctx.geometryCache.size()).toBeGreaterThan(0);
+  });
+
   it('passes through when overlap check finds no safe direction (blocker, candidate unchanged)', () => {
     // Construct an impossible case: A starts AT B's position; any nonzero
     // delta keeps them overlapping along the proposed direction so the

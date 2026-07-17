@@ -38,7 +38,12 @@ export const collisionConstraint: Constraint = {
     // positions) and a proposed delta. The candidate's `delta` is the
     // proposed translation; we pass parts from project state at their
     // current (committed) positions.
-    const safeDelta = resolveSafeTranslationDelta([...ctx.project.parts], movingIds, candidate.delta);
+    const safeDelta = resolveSafeTranslationDelta(
+      [...ctx.project.parts],
+      movingIds,
+      candidate.delta,
+      ctx.geometryCache
+    );
 
     if (safeDelta === null) {
       // No safe motion exists — the proposed move would overlap with
