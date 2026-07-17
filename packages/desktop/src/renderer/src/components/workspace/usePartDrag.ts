@@ -21,9 +21,9 @@ import { applyConstraints } from '../../interaction/constraints/pipeline';
 import { groundConstraint } from '../../interaction/constraints/groundConstraint';
 import { collisionConstraint } from '../../interaction/constraints/collisionConstraint';
 import { createGeometryCache } from '../../interaction/geometry/cache';
+import { moveTool, type MoveToolState } from '../../interaction/tools/moveTool';
 import { dragDebug } from '../../utils/dragDebug';
 import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
-import { solvePartMoveSnapPreview } from '../../utils/interactionMovePreview';
 import {
   beginMoveInteractionSession,
   clearMoveInteractionPreview,
@@ -74,6 +74,7 @@ export function usePartDrag(
     snappedZ: boolean;
     snapLines: import('../../types').SnapLine[];
   } | null>(null);
+  const moveToolStateRef = useRef<MoveToolState | null>(null);
 
   const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const raycaster = useRef(new THREE.Raycaster());
@@ -308,6 +309,7 @@ export function usePartDrag(
         dragStart.current = null;
         lastDragPosition.current = null;
         latchedFaceSnapRef.current = null;
+        moveToolStateRef.current = null;
         wasSnappedByParts.current = { x: false, y: false, z: false };
         useSelectionStore.getState().setDraggingPartId(null);
         clearMoveInteractionPreview({
@@ -459,7 +461,7 @@ export function usePartDrag(
           if (isSnapEnabled) {
             const cameraDistance = camera.position.distanceTo(_tempCameraTarget.current.set(newX, newY, newZ));
             const snapThreshold = calculateSnapThreshold(cameraDistance, snapSensitivity);
-            const preview = solvePartMoveSnapPreview({
+            const toolInput = {
               part,
               position: { x: newX, y: newY, z: newZ },
               axes: planeInfo.axes,
@@ -482,10 +484,16 @@ export function usePartDrag(
                   (Math.abs(featureDelta.z) > 1e-5 ? 1 : 0);
                 return latchedFaceSnapRef.current && featureAxesMoved >= 2 ? 'face' : 'feature';
               }
-            });
-            newX = preview.position.x;
-            newY = preview.position.y;
-            newZ = preview.position.z;
+            };
+            if (!moveToolStateRef.current) {
+              moveToolStateRef.current = moveTool.begin(toolInput);
+            }
+            const toolResult = moveTool.update(toolInput, moveToolStateRef.current);
+            moveToolStateRef.current = toolResult.state;
+            const preview = toolResult.preview;
+            newX = preview.primaryPosition.x;
+            newY = preview.primaryPosition.y;
+            newZ = preview.primaryPosition.z;
             latchedFaceSnapRef.current = preview.nextLatchedFaceSnap;
             snapLines.push(...preview.snapLines);
             wasSnappedByParts.current = preview.snappedAxes;
@@ -504,6 +512,7 @@ export function usePartDrag(
             }
           } else {
             wasSnappedByParts.current = { x: false, y: false, z: false };
+            moveToolStateRef.current = null;
           }
 
           const previewDelta = {
@@ -713,6 +722,7 @@ export function usePartDrag(
             dragStart.current = null;
             lastDragPosition.current = null;
             latchedFaceSnapRef.current = null;
+            moveToolStateRef.current = null;
             wasSnappedByParts.current = { x: false, y: false, z: false };
             markJustFinishedDragging(dragDistanceSq > 1e-4);
             useSelectionStore.getState().setDraggingPartId(null);
@@ -778,6 +788,7 @@ export function usePartDrag(
             dragStart.current = null;
             lastDragPosition.current = null;
             latchedFaceSnapRef.current = null;
+            moveToolStateRef.current = null;
             wasSnappedByParts.current = { x: false, y: false, z: false };
             markJustFinishedDragging(dragDistanceSq > 1e-4);
             useSelectionStore.getState().setDraggingPartId(null);
@@ -813,6 +824,7 @@ export function usePartDrag(
         dragStart.current = null;
         lastDragPosition.current = null;
         latchedFaceSnapRef.current = null;
+        moveToolStateRef.current = null;
         wasSnappedByParts.current = { x: false, y: false, z: false };
         // Only suppress the next click if this was a real drag movement.
         markJustFinishedDragging(dragDistanceSq > 1e-4);
