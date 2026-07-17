@@ -185,7 +185,8 @@ export function resolveGroupReleaseMove({
   selection,
   proposedDelta,
   fallbackDeltaOnOverlap,
-  preventOverlap
+  preventOverlap,
+  primaryPartId
 }: {
   parts: Part[];
   groupMembers: GroupMember[];
@@ -193,8 +194,9 @@ export function resolveGroupReleaseMove({
   proposedDelta: TranslationDelta;
   fallbackDeltaOnOverlap: TranslationDelta;
   preventOverlap: boolean;
+  primaryPartId?: string;
 }): GroupReleaseMoveResult {
-  const affectedPartIds = new Set(resolveMoveSelection(selection, parts, groupMembers).affectedPartIds);
+  const affectedPartIds = new Set(resolveMoveSelection(selection, parts, groupMembers, primaryPartId).affectedPartIds);
   return {
     affectedPartIds,
     constrained: resolveConstrainedMoveDelta(parts, affectedPartIds, proposedDelta, {

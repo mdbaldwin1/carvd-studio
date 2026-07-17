@@ -204,4 +204,23 @@ describe('interactionMovement', () => {
     expect(result.constrained.delta).toEqual({ x: 3, y: 0, z: 2 });
     expect(result.constrained.overlapBlocked).toBe(false);
   });
+
+  it('includes the primary part when resolving a part release move', () => {
+    const result = resolveGroupReleaseMove({
+      parts,
+      groupMembers,
+      selection: {
+        selectedPartIds: [],
+        selectedGroupIds: [],
+        editingGroupId: null
+      },
+      primaryPartId: 'p-parent',
+      proposedDelta: { x: 1, y: 0, z: 0 },
+      fallbackDeltaOnOverlap: { x: 1, y: 0, z: 0 },
+      preventOverlap: false
+    });
+
+    expect([...result.affectedPartIds]).toEqual(['p-parent']);
+    expect(result.constrained.delta).toEqual({ x: 1, y: 0, z: 0 });
+  });
 });

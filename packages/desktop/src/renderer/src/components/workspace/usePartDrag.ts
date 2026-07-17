@@ -29,7 +29,7 @@ import {
 } from '../../interaction/tools/moveTool';
 import { applyCommitInstructions, type Vec3 } from '../../interaction/tools/toolSolver';
 import { dragDebug } from '../../utils/dragDebug';
-import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
+import { resolveGroupReleaseMove, resolveMoveSelection } from '../../utils/interactionMovement';
 import {
   beginMoveInteractionSession,
   clearMoveInteractionPreview,
@@ -728,10 +728,20 @@ export function usePartDrag(
 
         if (shouldMoveMultiple && effectivePartIds.length > 0) {
           // Check overlap prevention for multi-part move
-          const constrainedMultiDelta = resolveConstrainedMoveDelta(allParts, effectivePartIds, baseDelta, {
+          const releaseMove = resolveGroupReleaseMove({
+            parts: allParts,
+            groupMembers: currentGroupMembers,
+            selection: {
+              selectedPartIds: currentSelectedIds,
+              selectedGroupIds: currentSelectedGroupIds,
+              editingGroupId: useSelectionStore.getState().editingGroupId
+            },
+            primaryPartId: part.id,
+            proposedDelta: baseDelta,
             preventOverlap: useProjectStore.getState().stockConstraints.preventOverlap,
             fallbackDeltaOnOverlap: baseDelta
           });
+          const constrainedMultiDelta = releaseMove.constrained;
           if (constrainedMultiDelta.overlapBlocked) {
             dragDebug('partDrag:release:multi:noSafeDelta', {
               partId: part.id,
