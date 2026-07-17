@@ -8,10 +8,10 @@ import { useSnapStore } from '../store/snapStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
 import { Rotation3D } from '../types';
-import { rotateAroundWorldAxis } from '../utils/rotation';
 import { applyConstraints } from '../interaction/constraints/pipeline';
 import { groundConstraint } from '../interaction/constraints/groundConstraint';
 import { createGeometryCache } from '../interaction/geometry/cache';
+import { rotationTool } from '../interaction/tools/rotationTool';
 
 export function useKeyboardShortcuts() {
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
@@ -79,10 +79,12 @@ export function useKeyboardShortcuts() {
         // For single part selection, just rotate in place (around its own center)
         if (selectedParts.length === 1) {
           const part = selectedParts[0];
-          const newRotation = rotateAroundWorldAxis(part.rotation, axis, 90);
+          const input = { part, axis, degrees: 90, space: 'world' as const };
+          const state = rotationTool.begin(input);
+          const { preview } = rotationTool.update(input, state);
 
           updatePart(part.id, {
-            rotation: newRotation
+            rotation: preview.rotation
           });
           return;
         }
@@ -120,7 +122,9 @@ export function useKeyboardShortcuts() {
           const newPosition = center.clone().add(offset);
 
           // 2. Rotate the part's own orientation around world axis
-          const newRotation = rotateAroundWorldAxis(part.rotation, axis, 90);
+          const input = { part, axis, degrees: 90, space: 'world' as const };
+          const state = rotationTool.begin(input);
+          const { preview } = rotationTool.update(input, state);
 
           updates.push({
             id: part.id,
@@ -130,7 +134,7 @@ export function useKeyboardShortcuts() {
                 y: newPosition.y,
                 z: newPosition.z
               },
-              rotation: newRotation
+              rotation: preview.rotation
             }
           });
         }

@@ -5,7 +5,7 @@ vi.unmock('three');
 vi.mock('three', async () => await vi.importActual('three'));
 
 import type { Part } from '../../types';
-import { rotateAroundLocalAxis } from '../../utils/rotation';
+import { rotateAroundLocalAxis, rotateAroundWorldAxis } from '../../utils/rotation';
 import { rotationTool, type RotationToolInput } from './rotationTool';
 
 function makePart(overrides?: Partial<Part>): Part {
@@ -44,6 +44,16 @@ describe('rotationTool', () => {
     const { preview } = rotationTool.update(input, state);
 
     expect(preview.rotation).toEqual(rotateAroundLocalAxis(part.rotation, 'x', 45));
+  });
+
+  it('updates world-axis rotation using the shared rotation math', () => {
+    const part = makePart({ rotation: { x: 10, y: 20, z: 30 } });
+    const input = makeInput({ part, axis: 'y', degrees: 90, space: 'world' });
+    const state = rotationTool.begin(input);
+
+    const { preview } = rotationTool.update(input, state);
+
+    expect(preview.rotation).toEqual(rotateAroundWorldAxis(part.rotation, 'y', 90));
   });
 
   it('commit emits a single updatePartRotation instruction matching preview', () => {
