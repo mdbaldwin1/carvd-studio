@@ -84,7 +84,7 @@ type CommitInstruction =
 ### Phase §4 follow-up (separate commit)
 
 - **Refactor hooks** to delegate solver work to the tools. `usePartDrag` becomes a pointer-event shell that calls `moveTool.update` each frame and `moveTool.commit` at release. Same for `useGroupDrag` → `groupMoveTool`, `usePartResize` → `resizeTool`. Hooks become ~150 LOC each.
-- **Extract rotation tool** from `RotationHandle`. Requires separating viewport-projection math (which stays in the component) from rotation math (which moves into a pure `rotateTool`). New work, not a wrapper.
+- **Extract rotation tool** from direct rotation call sites. Viewport-projection math stays in `RotationHandle`, while part/world rotation math flows through a pure `rotationTool`.
 - **Wire session controller** to dispatch `dragstart` to the right tool based on the `HitTarget` kind:
   - `part-body` (with selection containing the part) → `moveTool` or `groupMoveTool`
   - `resize-handle` → `resizeTool`
@@ -122,5 +122,5 @@ type CommitInstruction =
 - Audit: [interaction-architecture-redesign.md](../interaction-architecture-redesign.md) — Finding 3 "Single-part drag and group drag are two different engines"
 - Execution plan: [interaction-architecture-execution-plan.md](../interaction-architecture-execution-plan.md) §4 Phase 4
 - Existing solvers: `interactionMovePreview.ts`, `interactionResizePreview.ts`
-- Existing hooks (to be refactored in §4b): `usePartDrag.ts`, `useGroupDrag.ts`, `usePartResize.ts`, `RotationHandle.tsx`
+- Existing hooks (partially refactored in §4b): `usePartDrag.ts`, `useGroupDrag.ts`, `usePartResize.ts`, `RotationHandle.tsx`
 - Related ADR: ADR-006 (Constraint pipeline ordering) — will plug into `ToolSolver.update`
