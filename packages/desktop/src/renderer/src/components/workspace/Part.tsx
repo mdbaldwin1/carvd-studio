@@ -19,7 +19,8 @@ import { resolvePartInteractionPreview, shouldHideMeasurementOverlays } from '..
 import { getProjectedMeasurementLength, resolveMeasurementOverlayLayout } from '../../utils/measurementOverlayLayout';
 import { getPartDimensionPlacements } from '../../utils/measurementPlacement';
 import { getPartDimensionPriority } from '../../utils/measurementPriority';
-import { rotateAroundLocalAxis } from '../../utils/rotation';
+import { rotationTool } from '../../interaction/tools/rotationTool';
+import { applyCommitInstructions } from '../../interaction/tools/toolSolver';
 import { DimensionLabel } from './DimensionLabel';
 import { GrainDirectionArrow } from './GrainDirectionArrow';
 import { getPartGroupContext } from './partClickHandler';
@@ -257,10 +258,10 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
     (axis: 'x' | 'y' | 'z', degrees: number) => {
       const latestPart = useProjectStore.getState().parts.find((p) => p.id === part.id);
       if (!latestPart) return;
-      const newRotation = rotateAroundLocalAxis(latestPart.rotation, axis, degrees);
-      updatePart(part.id, {
-        rotation: newRotation
-      });
+      const input = { part: latestPart, axis, degrees, space: 'local' as const };
+      const state = rotationTool.begin(input);
+      const { preview } = rotationTool.update(input, state);
+      applyCommitInstructions(rotationTool.commit(state, preview), { updatePart });
     },
     [part.id, updatePart]
   );
