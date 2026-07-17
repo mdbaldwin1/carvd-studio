@@ -17,6 +17,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { useUIStore } from '../../store/uiStore';
 import { resolvePartInteractionPreview } from '../../utils/interactionOverlay';
+import { resetSelectionDragState } from '../../utils/interactionSession';
 import { getPartGroupContext } from './partClickHandler';
 import { markPartPointerInteraction } from './workspaceUtils';
 import { useGroupDrag } from './useGroupDrag';
@@ -206,10 +207,7 @@ export function InstancedParts({ parts, totalPartCount }: InstancedPartsProps) {
 
       // Defensive reset: if a stale drag state survived a prior interaction, clear it
       // before processing a fresh pointer down selection/drag path.
-      const sel = useSelectionStore.getState();
-      sel.clearDragIntent();
-      sel.setDraggingPartId(null);
-      sel.setActiveDragDelta(null);
+      resetSelectionDragState();
 
       const partId = partIdByIndex[e.instanceId];
       if (!partId) return;

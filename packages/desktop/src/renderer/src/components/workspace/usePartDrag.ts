@@ -39,8 +39,11 @@ import {
 } from '../../utils/interactionMovement';
 import {
   beginMoveInteractionSession,
+  clearTransformDraggingPart,
   clearTransformInteractionPreview,
   clearTransformInteractionPreviewKeepingReferenceDistances,
+  markTransformDraggingPart,
+  publishSelectionDragDelta,
   publishMoveInteractionPreview
 } from '../../utils/interactionSession';
 import { resolveReferenceEntities, resolveSelectionEntities } from '../../utils/interactionSelection';
@@ -128,7 +131,7 @@ export function usePartDrag(
     setIsDragging(false);
     resetDragRefs();
     markJustFinishedDragging(didMove);
-    useSelectionStore.getState().setDraggingPartId(null);
+    clearTransformDraggingPart();
     clearPreview();
     resumeOrbitControls(controls);
   };
@@ -246,11 +249,11 @@ export function usePartDrag(
   // Uses a threshold to distinguish clicks from drags and attaches window listeners
   // synchronously to avoid race conditions with quick clicks.
   useEffect(() => {
-    const { dragIntent, clearDragIntent, setDraggingPartId } = useSelectionStore.getState();
+    const { dragIntent, clearDragIntent } = useSelectionStore.getState();
     if (!dragIntent || dragIntent.partId !== part.id) return;
 
     // Keep this part rendered individually, then consume the intent
-    setDraggingPartId(part.id);
+    markTransformDraggingPart(part.id);
     clearDragIntent();
 
     // Use the stored world point as the drag start reference
@@ -260,7 +263,7 @@ export function usePartDrag(
     }
 
     if (!startPoint) {
-      useSelectionStore.getState().setDraggingPartId(null);
+      clearTransformDraggingPart();
       return;
     }
 
@@ -328,7 +331,7 @@ export function usePartDrag(
       if (!dragStarted) {
         // Click without drag — clean up drag intent state
         removeIntentListeners();
-        useSelectionStore.getState().setDraggingPartId(null);
+        clearTransformDraggingPart();
       } else {
         // Safety net: drag was started but second useEffect hasn't attached its listeners yet.
         // Do minimal cleanup to prevent stuck drag state.
@@ -645,7 +648,7 @@ export function usePartDrag(
         const hasGroupSelected = currentSelectedGroupIds.length > 0;
         const hasMultiplePartsSelected = effectiveDraggingIds.length > 1;
         if (hasGroupSelected || hasMultiplePartsSelected) {
-          useSelectionStore.getState().setActiveDragDelta(effectiveDelta);
+          publishSelectionDragDelta(effectiveDelta);
         }
       }
     });

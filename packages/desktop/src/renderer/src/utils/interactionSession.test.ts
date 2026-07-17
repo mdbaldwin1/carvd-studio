@@ -11,9 +11,13 @@ import {
   clearTransformInteractionPreviewKeepingSelectionDelta,
   clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances,
   clearMoveInteractionPreview,
+  clearTransformDraggingPart,
+  markTransformDraggingPart,
+  publishSelectionDragDelta,
   publishMoveInteractionPreview,
   publishResizeInteractionPreview,
-  publishRotateInteractionPreview
+  publishRotateInteractionPreview,
+  resetSelectionDragState
 } from './interactionSession';
 
 describe('interactionSession', () => {
@@ -123,6 +127,34 @@ describe('interactionSession', () => {
     expect(useInteractionStore.getState().activeSession).toBeNull();
     expect(useSelectionStore.getState().activeDragDelta).toBeNull();
     expect(useSnapStore.getState().activeReferenceDistances).toEqual([]);
+  });
+
+  it('names selection drag-state lifecycle operations', () => {
+    useSelectionStore.getState().setDragIntent({
+      partId: 'p1',
+      pointerId: 1,
+      screenX: 10,
+      screenY: 20,
+      worldPoint: { x: 1, y: 2, z: 3 },
+      shiftKey: false,
+      metaKey: false,
+      ctrlKey: false
+    });
+    markTransformDraggingPart('p1');
+    publishSelectionDragDelta({ x: 1, y: 0, z: 0 });
+
+    clearTransformDraggingPart();
+
+    expect(useSelectionStore.getState().draggingPartId).toBeNull();
+    expect(useSelectionStore.getState().dragIntent?.partId).toBe('p1');
+    expect(useSelectionStore.getState().activeDragDelta).toEqual({ x: 1, y: 0, z: 0 });
+
+    markTransformDraggingPart('p2');
+    resetSelectionDragState();
+
+    expect(useSelectionStore.getState().draggingPartId).toBeNull();
+    expect(useSelectionStore.getState().dragIntent).toBeNull();
+    expect(useSelectionStore.getState().activeDragDelta).toBeNull();
   });
 
   it('begins and updates a shared rotate interaction session', () => {

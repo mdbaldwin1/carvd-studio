@@ -64,6 +64,25 @@ export function beginResizeInteractionSession(params: {
   useInteractionStore.getState().beginResizeSession(params);
 }
 
+export function markTransformDraggingPart(partId: string): void {
+  useSelectionStore.getState().setDraggingPartId(partId);
+}
+
+export function clearTransformDraggingPart(): void {
+  useSelectionStore.getState().setDraggingPartId(null);
+}
+
+export function resetSelectionDragState(): void {
+  const selection = useSelectionStore.getState();
+  selection.clearDragIntent();
+  selection.setDraggingPartId(null);
+  selection.setActiveDragDelta(null);
+}
+
+export function publishSelectionDragDelta(delta: Delta3D): void {
+  useSelectionStore.getState().setActiveDragDelta(delta);
+}
+
 export function publishMoveInteractionPreview(params: {
   delta: Delta3D;
   snapLines: SnapLine[];
