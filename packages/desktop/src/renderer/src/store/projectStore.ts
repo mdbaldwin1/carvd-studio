@@ -27,9 +27,9 @@ import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useClipboardStore } from './clipboardStore';
 import { useLicenseStore } from './licenseStore';
-import { rotateAroundWorldAxis } from '../utils/rotation';
 import { getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
+import { rotationTool } from '../interaction/tools/rotationTool';
 import {
   getAllDescendantGroupIds as getAllDescendantGroupIdsFromSelection,
   getAllDescendantPartIds as getAllDescendantPartIdsFromSelection,
@@ -640,6 +640,9 @@ export const useProjectStore = create<ProjectState>()(
             z: p.position.z - pivot.z
           };
           const rotatedRel = rotateVecAroundAxis(rel);
+          const rotationInput = { part: p, axis, degrees, space: 'world' as const };
+          const rotationState = rotationTool.begin(rotationInput);
+          const rotationPreview = rotationTool.update(rotationInput, rotationState).preview;
           transformed.set(p.id, {
             ...p,
             position: {
@@ -647,7 +650,7 @@ export const useProjectStore = create<ProjectState>()(
               y: pivot.y + rotatedRel.y,
               z: pivot.z + rotatedRel.z
             },
-            rotation: rotateAroundWorldAxis(p.rotation, axis, degrees)
+            rotation: rotationPreview.rotation
           });
         }
 
