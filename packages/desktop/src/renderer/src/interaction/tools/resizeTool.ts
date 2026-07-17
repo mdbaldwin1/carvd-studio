@@ -9,6 +9,7 @@ import type * as THREE from 'three';
 import type { AppSettings, GroupMember, Part, SnapLine, Stock } from '../../types';
 import { solveResizePreview, type ResizePreviewResult } from '../../utils/interactionResizePreview';
 import type { HandlePosition } from '../../components/workspace/partTypes';
+import type { CandidateTransform } from '../constraints/types';
 import type { CommitInstruction, ToolSolver, Vec3, PartDimensions } from './toolSolver';
 
 export interface ResizeToolInput {
@@ -68,6 +69,8 @@ export interface ResizeToolPreview {
   resizingDimensions: ResizePreviewResult['resizingDimensions'];
   /** Which dimensions snapped (vs. user-driven). */
   snappedDimensions: ResizePreviewResult['snappedDimensions'];
+  /** Constraint-pipeline input that exactly matches this preview. */
+  candidate: Extract<CandidateTransform, { kind: 'resize' }>;
 }
 
 export const resizeTool: ToolSolver<ResizeToolInput, ResizeToolState, ResizeToolPreview> = {
@@ -117,7 +120,17 @@ export const resizeTool: ToolSolver<ResizeToolInput, ResizeToolState, ResizeTool
       position: result.position,
       snapLines: result.snapLines,
       resizingDimensions: result.resizingDimensions,
-      snappedDimensions: result.snappedDimensions
+      snappedDimensions: result.snappedDimensions,
+      candidate: {
+        kind: 'resize',
+        partId: input.part.id,
+        dimensions: {
+          length: result.dimensions.length,
+          width: result.dimensions.width,
+          thickness: result.dimensions.thickness
+        },
+        position: result.position
+      }
     };
 
     return { preview, state: nextState };

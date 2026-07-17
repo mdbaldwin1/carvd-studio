@@ -105,6 +105,24 @@ describe('resizeTool', () => {
       expect(preview.dimensions.thickness).toBe(0.75);
     });
 
+    it('update exposes a constraint-ready resize candidate matching the preview', () => {
+      const part = makePart();
+      const input = makeInput({
+        part,
+        handlePos: { x: 1, y: 0, z: 0, type: 'edge-x' },
+        localDelta: { x: 4, y: 0, z: 0 }
+      });
+      const state = resizeTool.begin(input);
+      const { preview } = resizeTool.update(input, state);
+
+      expect(preview.candidate).toEqual({
+        kind: 'resize',
+        partId: part.id,
+        dimensions: preview.dimensions,
+        position: preview.position
+      });
+    });
+
     it('commit produces a single updatePartDimensions instruction', () => {
       const part = makePart();
       const input = makeInput({
