@@ -19,6 +19,7 @@ import type { Part } from '../../types';
 import { dragDebug } from '../../utils/dragDebug';
 import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
 import { groupMoveTool, type GroupMoveToolState } from '../../interaction/tools/groupMoveTool';
+import { applyCommitInstructions } from '../../interaction/tools/toolSolver';
 import {
   beginMoveInteractionSession,
   clearMoveInteractionPreview,
@@ -472,10 +473,26 @@ export function useGroupDrag(
         snappedDelta.y = constrainedRelease.delta.y;
         snappedDelta.z = constrainedRelease.delta.z;
 
-        // Commit the move
-        const moveSelectedParts = useProjectStore.getState().moveSelectedParts;
+        const finalPositions = new Map<string, { x: number; y: number; z: number }>();
+        for (const part of parts) {
+          if (!partIds.has(part.id)) continue;
+          finalPositions.set(part.id, {
+            x: part.position.x + snappedDelta.x,
+            y: part.position.y + snappedDelta.y,
+            z: part.position.z + snappedDelta.z
+          });
+        }
+        const commitPreview = {
+          delta: snappedDelta,
+          positions: finalPositions,
+          snapLines: [],
+          snappedAxes: wasSnappedByPartsRef.current,
+          candidate: { kind: 'move' as const, delta: snappedDelta, positions: finalPositions }
+        };
+        const commitState = groupMoveToolStateRef.current ?? { initialPositions: new Map() };
+        const { batchUpdateParts, updatePart } = useProjectStore.getState();
         dragDebug('groupDrag:release:commit', { snappedDelta });
-        moveSelectedParts(snappedDelta);
+        applyCommitInstructions(groupMoveTool.commit(commitState, commitPreview), { updatePart, batchUpdateParts });
         cleanup();
       };
 
