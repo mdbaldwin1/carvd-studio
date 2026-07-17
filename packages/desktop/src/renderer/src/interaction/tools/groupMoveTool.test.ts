@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AppSettings, Part, SnapGuide } from '../../types';
 import { getPartBounds } from '../../utils/snapToPartsUtil';
-import { groupMoveTool, type GroupMoveToolInput } from './groupMoveTool';
+import { createGroupMoveCommitPreview, groupMoveTool, type GroupMoveToolInput } from './groupMoveTool';
 
 function makePart(overrides?: Partial<Part>): Part {
   return {
@@ -155,6 +155,23 @@ describe('groupMoveTool', () => {
           position: { x: 5, y: 0.375, z: 0 }
         });
       }
+    });
+
+    it('createGroupMoveCommitPreview builds a commit-ready release preview from final delta', () => {
+      const baseInput = makeInput();
+      const state = groupMoveTool.begin(baseInput);
+
+      const preview = createGroupMoveCommitPreview({
+        delta: { x: 2, y: 0, z: -4 },
+        state,
+        snappedAxes: { x: true, y: false, z: false }
+      });
+
+      expect(preview.delta).toEqual({ x: 2, y: 0, z: -4 });
+      expect(preview.positions.get('a')).toEqual({ x: 2, y: 0.375, z: -4 });
+      expect(preview.positions.get('b')).toEqual({ x: 16, y: 0.375, z: -4 });
+      expect(preview.snappedAxes).toEqual({ x: true, y: false, z: false });
+      expect(preview.candidate).toEqual({ kind: 'move', delta: preview.delta, positions: preview.positions });
     });
 
     it('cancel does not throw', () => {

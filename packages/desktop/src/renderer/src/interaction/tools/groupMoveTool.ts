@@ -51,6 +51,32 @@ export interface GroupMoveToolPreview {
   candidate: Extract<CandidateTransform, { kind: 'move' }>;
 }
 
+export function createGroupMoveCommitPreview({
+  delta,
+  state,
+  snappedAxes
+}: {
+  delta: Vec3;
+  state: GroupMoveToolState;
+  snappedAxes: { x: boolean; y: boolean; z: boolean };
+}): GroupMoveToolPreview {
+  const positions = new Map<string, Vec3>();
+  for (const [partId, initial] of state.initialPositions) {
+    positions.set(partId, {
+      x: initial.x + delta.x,
+      y: initial.y + delta.y,
+      z: initial.z + delta.z
+    });
+  }
+  return {
+    delta,
+    positions,
+    snapLines: [],
+    snappedAxes,
+    candidate: { kind: 'move', delta, positions }
+  };
+}
+
 export const groupMoveTool: ToolSolver<GroupMoveToolInput, GroupMoveToolState, GroupMoveToolPreview> = {
   begin(input) {
     const initialPositions = new Map<string, Vec3>();

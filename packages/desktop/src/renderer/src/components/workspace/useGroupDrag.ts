@@ -18,7 +18,11 @@ import { isOrbitControls } from './workspaceUtils';
 import type { Part } from '../../types';
 import { dragDebug } from '../../utils/dragDebug';
 import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
-import { groupMoveTool, type GroupMoveToolState } from '../../interaction/tools/groupMoveTool';
+import {
+  createGroupMoveCommitPreview,
+  groupMoveTool,
+  type GroupMoveToolState
+} from '../../interaction/tools/groupMoveTool';
 import { applyCommitInstructions } from '../../interaction/tools/toolSolver';
 import {
   beginMoveInteractionSession,
@@ -473,23 +477,20 @@ export function useGroupDrag(
         snappedDelta.y = constrainedRelease.delta.y;
         snappedDelta.z = constrainedRelease.delta.z;
 
-        const finalPositions = new Map<string, { x: number; y: number; z: number }>();
-        for (const part of parts) {
-          if (!partIds.has(part.id)) continue;
-          finalPositions.set(part.id, {
-            x: part.position.x + snappedDelta.x,
-            y: part.position.y + snappedDelta.y,
-            z: part.position.z + snappedDelta.z
-          });
-        }
-        const commitPreview = {
+        const commitState =
+          groupMoveToolStateRef.current ??
+          ({
+            initialPositions: new Map(
+              parts
+                .filter((part) => partIds.has(part.id))
+                .map((part) => [part.id, { x: part.position.x, y: part.position.y, z: part.position.z }])
+            )
+          } satisfies GroupMoveToolState);
+        const commitPreview = createGroupMoveCommitPreview({
           delta: snappedDelta,
-          positions: finalPositions,
-          snapLines: [],
-          snappedAxes: wasSnappedByPartsRef.current,
-          candidate: { kind: 'move' as const, delta: snappedDelta, positions: finalPositions }
-        };
-        const commitState = groupMoveToolStateRef.current ?? { initialPositions: new Map() };
+          state: commitState,
+          snappedAxes: wasSnappedByPartsRef.current
+        });
         const { batchUpdateParts, updatePart } = useProjectStore.getState();
         dragDebug('groupDrag:release:commit', { snappedDelta });
         applyCommitInstructions(groupMoveTool.commit(commitState, commitPreview), { updatePart, batchUpdateParts });
