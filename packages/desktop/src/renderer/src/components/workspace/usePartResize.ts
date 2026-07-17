@@ -16,7 +16,8 @@ import { isOrbitControls } from './workspaceUtils';
 import { applyConstraints } from '../../interaction/constraints/pipeline';
 import { groundConstraint } from '../../interaction/constraints/groundConstraint';
 import { createGeometryCache } from '../../interaction/geometry/cache';
-import { resizeTool, type ResizeToolState } from '../../interaction/tools/resizeTool';
+import { resizeTool, type ResizeToolPreview, type ResizeToolState } from '../../interaction/tools/resizeTool';
+import { applyCommitInstructions } from '../../interaction/tools/toolSolver';
 
 /**
  * Hook encapsulating all resize logic for a Part component.
@@ -270,12 +271,30 @@ export function usePartResize(
       newZ = groundResult.adjusted.position.z;
     }
 
-    updatePart(part.id, {
-      length: newLength,
-      width: newWidth,
-      thickness: newThickness,
-      position: { x: newX, y: newY, z: newZ }
-    });
+    const commitPreview: ResizeToolPreview = {
+      partId: part.id,
+      dimensions: { length: newLength, width: newWidth, thickness: newThickness },
+      position: { x: newX, y: newY, z: newZ },
+      snapLines: [],
+      referenceState: undefined,
+      resizingDimensions: { length: true, width: true, thickness: true },
+      snappedDimensions,
+      candidate: {
+        kind: 'resize',
+        partId: part.id,
+        dimensions: { length: newLength, width: newWidth, thickness: newThickness },
+        position: { x: newX, y: newY, z: newZ }
+      }
+    };
+    const commitState =
+      resizeToolStateRef.current ??
+      ({
+        startingDimensions: { length: partLength, width: partWidth, thickness: partThickness },
+        startingPosition: { x: partPos.x, y: partPos.y, z: partPos.z },
+        latchedRelationId: null,
+        latchedAxis: null
+      } satisfies ResizeToolState);
+    applyCommitInstructions(resizeTool.commit(commitState, commitPreview), { updatePart });
 
     setIsResizing(false);
     snappedDimensionsRef.current = { length: false, width: false, thickness: false };
