@@ -29,7 +29,7 @@ import { installDragDebugTools } from '../../utils/dragDebug';
 import { hasInteractiveHitAt as resolveHasInteractiveHitAt } from '../../interaction/hitTest';
 import { useCanvasPointerSession } from '../../interaction/useCanvasPointerSession';
 import { computeOverlayModel } from '../../interaction/overlayModel';
-import { LIGHTING_PRESETS, isOrbitControls } from './workspaceUtils';
+import { LIGHTING_PRESETS, bindWindowPointerSession, isOrbitControls } from './workspaceUtils';
 
 declare global {
   interface Window {
@@ -714,16 +714,13 @@ export function Workspace() {
       finishBoxSelection();
     };
 
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
-    window.addEventListener('blur', handlePointerUp);
+    const unbindPointerSession = bindWindowPointerSession(window, {
+      onMove: handlePointerMove,
+      onEnd: handlePointerUp
+    });
 
     return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerUp);
-      window.removeEventListener('blur', handlePointerUp);
+      unbindPointerSession();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isBoxSelecting, controls, selectParts, clearSelection, setSelectionBox, setSelectedSidebarStockId]);

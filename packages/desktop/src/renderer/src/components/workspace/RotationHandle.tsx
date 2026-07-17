@@ -14,6 +14,7 @@ import {
   ROTATION_RING_ARC_LENGTH
 } from './partGeometry';
 import { chooseBestRotationAxisCandidate } from './rotationAxisSelection';
+import { bindWindowPointerSession } from './workspaceUtils';
 
 export const RotationHandle = memo(
   function RotationHandle({
@@ -382,18 +383,22 @@ export const RotationHandle = memo(
       const handleWindowPointerUp = (e: PointerEvent) => {
         finishDrag(e.pointerId);
       };
-      const handleWindowPointerCancel = (e: PointerEvent) => {
-        finishDrag(e.pointerId);
-      };
 
-      window.addEventListener('pointermove', handleWindowPointerMove, { passive: false });
-      window.addEventListener('pointerup', handleWindowPointerUp, { passive: true });
-      window.addEventListener('pointercancel', handleWindowPointerCancel, { passive: true });
+      const unbindPointerSession = bindWindowPointerSession(window, {
+        onMove: handleWindowPointerMove,
+        onEnd: (event) => {
+          if (event && typeof event === 'object' && 'pointerId' in event) {
+            handleWindowPointerUp(event as PointerEvent);
+            return;
+          }
+          finishDrag();
+        },
+        moveOptions: { passive: false },
+        endOptions: { passive: true }
+      });
 
       return () => {
-        window.removeEventListener('pointermove', handleWindowPointerMove);
-        window.removeEventListener('pointerup', handleWindowPointerUp);
-        window.removeEventListener('pointercancel', handleWindowPointerCancel);
+        unbindPointerSession();
       };
     }, [finishDrag, handleWindowPointerMove, isDragging]);
 

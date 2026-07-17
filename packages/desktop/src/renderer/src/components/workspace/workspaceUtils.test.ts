@@ -93,6 +93,27 @@ describe('workspaceUtils', () => {
       expect(target.removeEventListener).toHaveBeenCalledWith('pointercancel', onEnd);
       expect(target.removeEventListener).toHaveBeenCalledWith('blur', onEnd);
     });
+
+    it('passes listener options when provided', () => {
+      const target = {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn()
+      };
+      const onMove = vi.fn();
+      const onEnd = vi.fn();
+
+      bindWindowPointerSession(target, {
+        onMove,
+        onEnd,
+        moveOptions: { passive: false },
+        endOptions: { passive: true }
+      });
+
+      expect(target.addEventListener).toHaveBeenCalledWith('pointermove', onMove, { passive: false });
+      expect(target.addEventListener).toHaveBeenCalledWith('pointerup', onEnd, { passive: true });
+      expect(target.addEventListener).toHaveBeenCalledWith('pointercancel', onEnd, { passive: true });
+      expect(target.addEventListener).toHaveBeenCalledWith('blur', onEnd, { passive: true });
+    });
   });
 
   describe('createPointerRafQueue', () => {

@@ -57,8 +57,16 @@ export function markPartPointerInteraction() {
 }
 
 export interface WindowPointerSessionTarget {
-  addEventListener(type: 'pointermove' | 'pointerup' | 'pointercancel' | 'blur', listener: unknown): void;
-  removeEventListener(type: 'pointermove' | 'pointerup' | 'pointercancel' | 'blur', listener: unknown): void;
+  addEventListener(
+    type: 'pointermove' | 'pointerup' | 'pointercancel' | 'blur',
+    listener: unknown,
+    options?: unknown
+  ): void;
+  removeEventListener(
+    type: 'pointermove' | 'pointerup' | 'pointercancel' | 'blur',
+    listener: unknown,
+    options?: unknown
+  ): void;
 }
 
 export function bindWindowPointerSession(
@@ -66,21 +74,45 @@ export function bindWindowPointerSession(
   handlers: {
     onMove: (event: PointerEvent) => void;
     onEnd: (event?: unknown) => void;
+    moveOptions?: unknown;
+    endOptions?: unknown;
   }
 ): () => void {
   const moveListener = handlers.onMove;
   const endListener = handlers.onEnd;
+  const addPointerListener = (
+    type: 'pointermove' | 'pointerup' | 'pointercancel' | 'blur',
+    listener: unknown,
+    options: unknown
+  ) => {
+    if (options === undefined) {
+      target.addEventListener(type, listener);
+    } else {
+      target.addEventListener(type, listener, options);
+    }
+  };
+  const removePointerListener = (
+    type: 'pointermove' | 'pointerup' | 'pointercancel' | 'blur',
+    listener: unknown,
+    options: unknown
+  ) => {
+    if (options === undefined) {
+      target.removeEventListener(type, listener);
+    } else {
+      target.removeEventListener(type, listener, options);
+    }
+  };
 
-  target.addEventListener('pointermove', moveListener);
-  target.addEventListener('pointerup', endListener);
-  target.addEventListener('pointercancel', endListener);
-  target.addEventListener('blur', endListener);
+  addPointerListener('pointermove', moveListener, handlers.moveOptions);
+  addPointerListener('pointerup', endListener, handlers.endOptions);
+  addPointerListener('pointercancel', endListener, handlers.endOptions);
+  addPointerListener('blur', endListener, handlers.endOptions);
 
   return () => {
-    target.removeEventListener('pointermove', moveListener);
-    target.removeEventListener('pointerup', endListener);
-    target.removeEventListener('pointercancel', endListener);
-    target.removeEventListener('blur', endListener);
+    removePointerListener('pointermove', moveListener, handlers.moveOptions);
+    removePointerListener('pointerup', endListener, handlers.endOptions);
+    removePointerListener('pointercancel', endListener, handlers.endOptions);
+    removePointerListener('blur', endListener, handlers.endOptions);
   };
 }
 
