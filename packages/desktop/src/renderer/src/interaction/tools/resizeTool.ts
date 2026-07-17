@@ -75,6 +75,21 @@ export interface ResizeToolPreview {
   candidate: Extract<CandidateTransform, { kind: 'resize' }>;
 }
 
+export function createResizeCommitState({
+  startingDimensions,
+  startingPosition
+}: {
+  startingDimensions: PartDimensions;
+  startingPosition: Vec3;
+}): ResizeToolState {
+  return {
+    startingDimensions,
+    startingPosition,
+    latchedRelationId: null,
+    latchedAxis: null
+  };
+}
+
 export function createResizeCommitPreview({
   partId,
   dimensions,

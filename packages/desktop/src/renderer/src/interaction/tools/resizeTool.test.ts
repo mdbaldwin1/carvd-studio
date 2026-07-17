@@ -6,7 +6,7 @@ vi.mock('three', async () => await vi.importActual('three'));
 
 import * as THREE from 'three';
 import type { AppSettings, Part } from '../../types';
-import { createResizeCommitPreview, resizeTool, type ResizeToolInput } from './resizeTool';
+import { createResizeCommitPreview, createResizeCommitState, resizeTool, type ResizeToolInput } from './resizeTool';
 
 function makePart(overrides?: Partial<Part>): Part {
   return {
@@ -184,6 +184,20 @@ describe('resizeTool', () => {
         partId: 'p1',
         dimensions: preview.dimensions,
         position: preview.position
+      });
+    });
+
+    it('createResizeCommitState falls back to resize start dimensions and position', () => {
+      const state = createResizeCommitState({
+        startingDimensions: { length: 10, width: 4, thickness: 1 },
+        startingPosition: { x: 2, y: 0.5, z: -1 }
+      });
+
+      expect(state).toEqual({
+        startingDimensions: { length: 10, width: 4, thickness: 1 },
+        startingPosition: { x: 2, y: 0.5, z: -1 },
+        latchedRelationId: null,
+        latchedAxis: null
       });
     });
 

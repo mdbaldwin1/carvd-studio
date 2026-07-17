@@ -16,7 +16,12 @@ import { isOrbitControls } from './workspaceUtils';
 import { applyConstraints } from '../../interaction/constraints/pipeline';
 import { groundConstraint } from '../../interaction/constraints/groundConstraint';
 import { createGeometryCache } from '../../interaction/geometry/cache';
-import { createResizeCommitPreview, resizeTool, type ResizeToolState } from '../../interaction/tools/resizeTool';
+import {
+  createResizeCommitPreview,
+  createResizeCommitState,
+  resizeTool,
+  type ResizeToolState
+} from '../../interaction/tools/resizeTool';
 import { applyCommitInstructions } from '../../interaction/tools/toolSolver';
 
 /**
@@ -279,12 +284,10 @@ export function usePartResize(
     });
     const commitState =
       resizeToolStateRef.current ??
-      ({
+      createResizeCommitState({
         startingDimensions: { length: partLength, width: partWidth, thickness: partThickness },
-        startingPosition: { x: partPos.x, y: partPos.y, z: partPos.z },
-        latchedRelationId: null,
-        latchedAxis: null
-      } satisfies ResizeToolState);
+        startingPosition: { x: partPos.x, y: partPos.y, z: partPos.z }
+      });
     applyCommitInstructions(resizeTool.commit(commitState, commitPreview), { updatePart });
 
     setIsResizing(false);
