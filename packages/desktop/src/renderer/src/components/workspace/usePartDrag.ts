@@ -21,7 +21,12 @@ import { applyConstraints } from '../../interaction/constraints/pipeline';
 import { groundConstraint } from '../../interaction/constraints/groundConstraint';
 import { collisionConstraint } from '../../interaction/constraints/collisionConstraint';
 import { createGeometryCache } from '../../interaction/geometry/cache';
-import { createMoveCommitPreview, moveTool, type MoveToolState } from '../../interaction/tools/moveTool';
+import {
+  createMoveCommitPreview,
+  createMoveCommitState,
+  moveTool,
+  type MoveToolState
+} from '../../interaction/tools/moveTool';
 import { applyCommitInstructions, type Vec3 } from '../../interaction/tools/toolSolver';
 import { dragDebug } from '../../utils/dragDebug';
 import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
@@ -714,11 +719,9 @@ export function usePartDrag(
         const commitSinglePartMove = (position: Vec3) => {
           const commitState =
             moveToolStateRef.current ??
-            ({
-              initialPrimaryPosition: dragStart.current!.partPos,
-              initialOtherPositions: new Map(),
-              latchedFaceSnap: null
-            } satisfies MoveToolState);
+            createMoveCommitState({
+              primaryPosition: dragStart.current!.partPos
+            });
           const commitPreview = createMoveCommitPreview({ partId: part.id, position, state: commitState });
           applyCommitInstructions(moveTool.commit(commitState, commitPreview), { updatePart });
         };

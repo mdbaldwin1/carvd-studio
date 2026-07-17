@@ -66,6 +66,14 @@ export interface MoveToolPreview {
   candidate: Extract<CandidateTransform, { kind: 'move' }>;
 }
 
+export function createMoveCommitState({ primaryPosition }: { primaryPosition: Vec3 }): MoveToolState {
+  return {
+    initialPrimaryPosition: primaryPosition,
+    initialOtherPositions: new Map(),
+    latchedFaceSnap: null
+  };
+}
+
 function buildPreviewFromSolve(
   input: MoveToolInput,
   state: MoveToolState,

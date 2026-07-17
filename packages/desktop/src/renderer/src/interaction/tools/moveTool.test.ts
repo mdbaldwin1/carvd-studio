@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { AppSettings, Part, SnapGuide } from '../../types';
-import { createMoveCommitPreview, moveTool, type MoveToolInput } from './moveTool';
+import { createMoveCommitPreview, createMoveCommitState, moveTool, type MoveToolInput } from './moveTool';
 
 function makePart(overrides?: Partial<Part>): Part {
   return {
@@ -154,6 +154,14 @@ describe('moveTool', () => {
       expect(preview.delta).toEqual({ x: 3, y: 0, z: -3 });
       expect(preview.positions.get(part.id)).toEqual({ x: 4, y: 0.375, z: -1 });
       expect(preview.candidate).toEqual({ kind: 'move', delta: preview.delta, positions: preview.positions });
+    });
+
+    it('createMoveCommitState falls back to the drag start primary position', () => {
+      const state = createMoveCommitState({ primaryPosition: { x: 2, y: 0.375, z: -3 } });
+
+      expect(state.initialPrimaryPosition).toEqual({ x: 2, y: 0.375, z: -3 });
+      expect(state.initialOtherPositions.size).toBe(0);
+      expect(state.latchedFaceSnap).toBeNull();
     });
 
     it('cancel does not throw and returns nothing', () => {
