@@ -81,6 +81,30 @@ describe('applyCommitInstructions', () => {
     });
   });
 
+  it('updateGroupPositions uses batchUpdateParts when available', () => {
+    const target = {
+      ...makeMockTarget(),
+      batchUpdateParts: vi.fn()
+    };
+    const instructions: CommitInstruction[] = [
+      {
+        kind: 'updateGroupPositions',
+        updates: [
+          { partId: 'a', position: { x: 1, y: 0, z: 0 } },
+          { partId: 'b', position: { x: 2, y: 0, z: 0 } }
+        ]
+      }
+    ];
+
+    applyCommitInstructions(instructions, target);
+
+    expect(target.calls).toHaveLength(0);
+    expect(target.batchUpdateParts).toHaveBeenCalledWith([
+      { id: 'a', changes: { position: { x: 1, y: 0, z: 0 } } },
+      { id: 'b', changes: { position: { x: 2, y: 0, z: 0 } } }
+    ]);
+  });
+
   it('applies a mixed batch in order', () => {
     const target = makeMockTarget();
     const instructions: CommitInstruction[] = [

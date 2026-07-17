@@ -95,6 +95,7 @@ export interface CommitTarget {
       thickness: number;
     }>
   ) => void;
+  batchUpdateParts?: (updates: Array<{ id: string; changes: Partial<{ position: Vec3 }> }>) => void;
   moveSelectedParts?: (delta: Vec3) => void;
 }
 
@@ -116,8 +117,14 @@ export function applyCommitInstructions(instructions: ReadonlyArray<CommitInstru
         });
         break;
       case 'updateGroupPositions':
-        for (const update of ins.updates) {
-          target.updatePart(update.partId, { position: update.position });
+        if (target.batchUpdateParts) {
+          target.batchUpdateParts(
+            ins.updates.map((update) => ({ id: update.partId, changes: { position: update.position } }))
+          );
+        } else {
+          for (const update of ins.updates) {
+            target.updatePart(update.partId, { position: update.position });
+          }
         }
         break;
     }
