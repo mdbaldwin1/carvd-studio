@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import type { GeometryCache } from '../../interaction/geometry/cache';
 import { LightingMode } from '../../types';
 
 // Lighting presets for different viewing conditions
@@ -63,13 +64,17 @@ const _aabbCorners = Array.from({ length: 8 }, () => new THREE.Vector3());
 const _aabbPosition = new THREE.Vector3();
 
 // Helper to calculate axis-aligned bounding box for a part
-export function getPartAABB(part: {
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
-  length: number;
-  width: number;
-  thickness: number;
-}) {
+export function getPartAABB(
+  part: {
+    id?: string;
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number };
+    length: number;
+    width: number;
+    thickness: number;
+  },
+  geometryCache?: GeometryCache
+) {
   _aabbEuler.set(
     (part.rotation.x * Math.PI) / 180,
     (part.rotation.y * Math.PI) / 180,
@@ -78,18 +83,25 @@ export function getPartAABB(part: {
   );
   _aabbQuat.setFromEuler(_aabbEuler);
 
-  const halfLength = part.length / 2;
-  const halfThickness = part.thickness / 2;
-  const halfWidth = part.width / 2;
+  const localAabb =
+    geometryCache && part.id
+      ? geometryCache.get({
+          ...part,
+          id: part.id
+        } as Parameters<GeometryCache['get']>[0]).bounds.localAabb
+      : {
+          min: { x: -part.length / 2, y: -part.thickness / 2, z: -part.width / 2 },
+          max: { x: part.length / 2, y: part.thickness / 2, z: part.width / 2 }
+        };
 
-  _aabbCorners[0].set(-halfLength, -halfThickness, -halfWidth);
-  _aabbCorners[1].set(-halfLength, -halfThickness, halfWidth);
-  _aabbCorners[2].set(-halfLength, halfThickness, -halfWidth);
-  _aabbCorners[3].set(-halfLength, halfThickness, halfWidth);
-  _aabbCorners[4].set(halfLength, -halfThickness, -halfWidth);
-  _aabbCorners[5].set(halfLength, -halfThickness, halfWidth);
-  _aabbCorners[6].set(halfLength, halfThickness, -halfWidth);
-  _aabbCorners[7].set(halfLength, halfThickness, halfWidth);
+  _aabbCorners[0].set(localAabb.min.x, localAabb.min.y, localAabb.min.z);
+  _aabbCorners[1].set(localAabb.min.x, localAabb.min.y, localAabb.max.z);
+  _aabbCorners[2].set(localAabb.min.x, localAabb.max.y, localAabb.min.z);
+  _aabbCorners[3].set(localAabb.min.x, localAabb.max.y, localAabb.max.z);
+  _aabbCorners[4].set(localAabb.max.x, localAabb.min.y, localAabb.min.z);
+  _aabbCorners[5].set(localAabb.max.x, localAabb.min.y, localAabb.max.z);
+  _aabbCorners[6].set(localAabb.max.x, localAabb.max.y, localAabb.min.z);
+  _aabbCorners[7].set(localAabb.max.x, localAabb.max.y, localAabb.max.z);
 
   _aabbPosition.set(part.position.x, part.position.y, part.position.z);
 

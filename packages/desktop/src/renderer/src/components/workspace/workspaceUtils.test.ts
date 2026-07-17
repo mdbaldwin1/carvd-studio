@@ -4,6 +4,8 @@ import { describe, it, expect, vi } from 'vitest';
 vi.unmock('three');
 
 import { LIGHTING_PRESETS, isOrbitControls, getPartAABB } from './workspaceUtils';
+import { createGeometryCache } from '../../interaction/geometry/cache';
+import { createTestPart } from '../../../../../tests/helpers/factories';
 
 // ============================================================
 // Tests
@@ -193,6 +195,24 @@ describe('workspaceUtils', () => {
       expect(aabb.maxY).toBeCloseTo(4);
       expect(aabb.minZ).toBeCloseTo(0);
       expect(aabb.maxZ).toBeCloseTo(4);
+    });
+
+    it('can derive local bounds from the geometry bundle cache', () => {
+      const part = createTestPart({
+        id: 'cached-part',
+        position: { x: 3, y: 4, z: 5 },
+        rotation: { x: 45, y: 30, z: 15 },
+        length: 8,
+        width: 4,
+        thickness: 2
+      });
+      const cache = createGeometryCache();
+
+      const legacyAabb = getPartAABB(part);
+      const cachedAabb = getPartAABB(part, cache);
+
+      expect(cachedAabb).toEqual(legacyAabb);
+      expect(cache.size()).toBe(1);
     });
   });
 });
