@@ -18,7 +18,7 @@ import { isOrbitControls } from './workspaceUtils';
 import type { Part } from '../../types';
 import { dragDebug } from '../../utils/dragDebug';
 import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
-import { solveGroupMoveSnapPreview } from '../../utils/interactionMovePreview';
+import { groupMoveTool, type GroupMoveToolState } from '../../interaction/tools/groupMoveTool';
 import {
   beginMoveInteractionSession,
   clearMoveInteractionPreview,
@@ -62,6 +62,7 @@ export function useGroupDrag(
   const initialBoundsRef = useRef<PartBounds | null>(null);
   const movingPartIdsRef = useRef<Set<string>>(new Set());
   const wasSnappedByPartsRef = useRef<{ x: boolean; y: boolean; z: boolean }>({ x: false, y: false, z: false });
+  const groupMoveToolStateRef = useRef<GroupMoveToolState | null>(null);
   const planeAxesRef = useRef<{ x: boolean; y: boolean; z: boolean }>({ x: true, y: false, z: true });
   const planeBasisURef = useRef(new THREE.Vector3(1, 0, 0));
   const planeBasisVRef = useRef(new THREE.Vector3(0, 0, 1));
@@ -267,25 +268,31 @@ export function useGroupDrag(
               y: newY - anchorPosRef.current.y,
               z: newZ - anchorPosRef.current.z
             };
-            const movingPartIds = [...movingIds];
             const movingParts = parts.filter((part) => movingIds.has(part.id));
-            const preview = solveGroupMoveSnapPreview({
+            const toolInput = {
               initialBounds: initialBoundsRef.current,
               anchorPosition: anchorPosRef.current,
               delta: workingDelta,
               axes,
               referenceParts: parts,
-              movingPartIds,
               movingParts,
               snapGuides,
               settings,
               snapThreshold
-            });
+            };
+            if (!groupMoveToolStateRef.current) {
+              groupMoveToolStateRef.current = groupMoveTool.begin(toolInput);
+            }
+            const toolResult = groupMoveTool.update(toolInput, groupMoveToolStateRef.current);
+            groupMoveToolStateRef.current = toolResult.state;
+            const preview = toolResult.preview;
             newX = anchorPosRef.current.x + preview.delta.x;
             newY = anchorPosRef.current.y + preview.delta.y;
             newZ = anchorPosRef.current.z + preview.delta.z;
             snapLines = preview.snapLines;
             wasSnappedByPartsRef.current = preview.snappedAxes;
+          } else {
+            groupMoveToolStateRef.current = null;
           }
 
           const proposedDelta = {
@@ -484,6 +491,7 @@ export function useGroupDrag(
         initialBoundsRef.current = null;
         movingPartIdsRef.current = new Set();
         wasSnappedByPartsRef.current = { x: false, y: false, z: false };
+        groupMoveToolStateRef.current = null;
         lastDragPosRef.current = null;
         if (rafIdRef.current !== null) {
           window.cancelAnimationFrame(rafIdRef.current);
