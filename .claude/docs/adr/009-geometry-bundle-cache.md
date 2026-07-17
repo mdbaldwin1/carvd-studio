@@ -1,6 +1,6 @@
 # ADR-009: Per-part geometry bundles, versioned cache, derived-from-part
 
-Status: Accepted (Phase §5a — see "Scope" below)
+Status: Accepted (Phase §5 with first consumer migrations — see "Scope" below)
 Date: 2026-05-18
 Phase: §5 Geometry Query Layer
 
@@ -18,7 +18,7 @@ This works for box parts because the geometry IS the box. **Custom cuts will not
 
 The blueprint calls for a `PartGeometryBundle`: one cached, versioned object per part that publishes _every_ geometric view that consumers need. Each subsystem reads the view it cares about — render mesh, hit proxy, snap anchor graph, measure graph, collision proxy, bounds. When part dimensions change, the bundle is invalidated; on next read it rebuilds.
 
-Phase §5a (this commit) lands the types + cache + a derivation that works for the _current_ box parts. Phase §5b/§5c migrate the snap engine and collision engine to read from the bundle. Phase §6 (Part Shape Model) replaces the box-only derivation with one that understands custom cuts. After §6, the same consumer code keeps working — the bundle's interface is stable.
+Phase §5 first landed the types + cache + a derivation that works for the _current_ box parts. This branch now also wires the cache-backed seam into snap/bounds parity helpers, hit-test fallback, measurement AABB, ground constraints, and collision constraints. Phase §6 (Part Shape Model) replaces the box-only derivation with one that understands custom cuts. After §6, the same consumer code keeps working — the bundle's interface is stable.
 
 ## Decision
 

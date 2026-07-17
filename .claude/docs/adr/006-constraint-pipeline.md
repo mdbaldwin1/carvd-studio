@@ -1,6 +1,6 @@
 # ADR-006: Constraints are an ordered, composable pipeline
 
-Status: Accepted (Phase §8a — see "Scope" below)
+Status: Accepted (Phase §8 foundation + initial geometry-backed constraints — see "Scope" below)
 Date: 2026-05-18
 Phase: §8 Constraint Engine
 
@@ -26,7 +26,7 @@ Phase §4 (Tool Solvers) parked this — the `ToolSolver.update` interface produ
 
 ## Decision
 
-**Constraints implement one shared interface and run in a deterministic order from every tool.** Tools compute a raw candidate transform; the pipeline applies constraints; the constrained transform is the preview. Commit re-runs the same chain on the final input (preserving the §4 invariant that preview === commit math).
+**Constraints implement one shared interface and run in a deterministic order from every tool.** Tools compute a raw candidate transform; the pipeline applies constraints; the constrained transform is the preview. Commit re-runs the same chain on the final input (preserving the §4 invariant that preview === commit math). Constraints that need geometric information read through the shared `GeometryCache` from ADR-009 rather than recomputing box assumptions locally.
 
 ```ts
 interface ConstraintContext {
