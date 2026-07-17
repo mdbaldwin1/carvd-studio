@@ -17,8 +17,6 @@ import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
 import { LiveDimensions, snapToGrid } from './partTypes';
 import { isOrbitControls } from './workspaceUtils';
 import { calculateWorldHalfHeight } from '../../utils/mathPool';
-import { applyConstraints } from '../../interaction/constraints/pipeline';
-import { groundConstraint } from '../../interaction/constraints/groundConstraint';
 import { createGeometryCache } from '../../interaction/geometry/cache';
 import {
   createMoveCommitPreview,
@@ -31,6 +29,7 @@ import { dragDebug } from '../../utils/dragDebug';
 import {
   resolveGroupReleaseMove,
   resolveMoveSelection,
+  resolveSinglePartPreviewMove,
   resolveSinglePartReleaseMove
 } from '../../utils/interactionMovement';
 import {
@@ -420,31 +419,16 @@ export function usePartDrag(
             thickness: liveDims.thickness,
             width: liveDims.width
           };
-          const groundResult = applyConstraints(
-            {
-              candidate: {
-                kind: 'move',
-                delta: projectedDelta,
-                positions: new Map([[part.id, { x: newX, y: newY, z: newZ }]])
-              },
-              startingParts: [previewPart],
-              project: {
-                parts: useProjectStore.getState().parts,
-                stocks: [],
-                groupMembers: []
-              },
-              geometryCache: geometryCacheRef.current
-            },
-            [groundConstraint]
-          );
-          if (groundResult.adjusted.kind === 'move') {
-            const adjusted = groundResult.adjusted.positions.get(part.id);
-            if (adjusted) {
-              newX = adjusted.x;
-              newY = adjusted.y;
-              newZ = adjusted.z;
-            }
-          }
+          const groundResult = resolveSinglePartPreviewMove({
+            part: previewPart,
+            projectParts: useProjectStore.getState().parts,
+            proposedDelta: projectedDelta,
+            proposedPosition: { x: newX, y: newY, z: newZ },
+            geometryCache: geometryCacheRef.current
+          });
+          newX = groundResult.position.x;
+          newY = groundResult.position.y;
+          newZ = groundResult.position.z;
 
           // Apply snap-to-parts if enabled (Alt key temporarily bypasses snapping)
           const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled && !evt.altKey;

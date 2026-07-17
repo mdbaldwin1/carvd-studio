@@ -5,6 +5,7 @@ import {
   resolveConstrainedMoveDelta,
   resolveGroupReleaseMove,
   resolveMoveSelection,
+  resolveSinglePartPreviewMove,
   resolveSinglePartReleaseMove
 } from './interactionMovement';
 
@@ -243,5 +244,24 @@ describe('interactionMovement', () => {
 
     expect(result.position).toEqual({ x: 2, y: 0.5, z: 3 });
     expect(result.collisionBlocked).toBe(false);
+  });
+
+  it('resolves a single-part preview position through the ground constraint', () => {
+    const part = {
+      ...parts[0],
+      id: 'moving',
+      thickness: 2,
+      position: { x: 0, y: 1, z: 0 }
+    };
+
+    const result = resolveSinglePartPreviewMove({
+      part,
+      projectParts: [part],
+      proposedDelta: { x: 1, y: -2, z: 0 },
+      proposedPosition: { x: 1, y: -1, z: 0 }
+    });
+
+    expect(result.position.y).toBeGreaterThanOrEqual(1);
+    expect(result.delta).toEqual({ x: 1, y: 0, z: 0 });
   });
 });

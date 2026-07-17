@@ -37,6 +37,11 @@ export interface SinglePartReleaseMoveResult {
   collisionClamped: boolean;
 }
 
+export interface SinglePartPreviewMoveResult {
+  position: TranslationDelta;
+  delta: TranslationDelta;
+}
+
 // `calculatePartWorldHalfHeight` retired in §8b-group — the rotation-aware
 // world half-height math is now inside `groundConstraint` via `getPartAABB`.
 // Pre-allocated three.js objects (`_upVector` etc.) likewise removed.
@@ -266,5 +271,46 @@ export function resolveSinglePartReleaseMove({
     delta: result.adjusted.delta,
     collisionBlocked,
     collisionClamped: result.warnings.some((w) => w.constraintName === 'collision' && w.kind === 'soft-collision')
+  };
+}
+
+export function resolveSinglePartPreviewMove({
+  part,
+  projectParts,
+  proposedDelta,
+  proposedPosition,
+  geometryCache
+}: {
+  part: Part;
+  projectParts: Part[];
+  proposedDelta: TranslationDelta;
+  proposedPosition: TranslationDelta;
+  geometryCache?: GeometryCache;
+}): SinglePartPreviewMoveResult {
+  const result = applyConstraints(
+    {
+      candidate: {
+        kind: 'move',
+        delta: proposedDelta,
+        positions: new Map([[part.id, proposedPosition]])
+      },
+      startingParts: [part],
+      project: {
+        parts: projectParts,
+        stocks: [],
+        groupMembers: []
+      },
+      geometryCache: geometryCache ?? createGeometryCache()
+    },
+    [groundConstraint]
+  );
+
+  if (result.adjusted.kind !== 'move') {
+    return { position: proposedPosition, delta: proposedDelta };
+  }
+
+  return {
+    position: result.adjusted.positions.get(part.id) ?? proposedPosition,
+    delta: result.adjusted.delta
   };
 }
