@@ -14,6 +14,7 @@ import {
   type SessionControllerConfig,
   type SessionModifiers
 } from './sessionController';
+import { bindEventListeners } from './eventBinding';
 
 export interface UseCanvasPointerSessionHandlers {
   onClick?: (action: Extract<SessionAction, { kind: 'click' }>) => void;
@@ -213,22 +214,19 @@ export function useCanvasPointerSession(params: UseCanvasPointerSessionParams): 
       e.preventDefault();
     };
 
-    canvas.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerCancel);
-    window.addEventListener('blur', handleBlur);
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('contextmenu', handleContextMenu);
+    const unbindCanvasListeners = bindEventListeners(canvas, [['pointerdown', handlePointerDown]]);
+    const unbindWindowListeners = bindEventListeners(window, [
+      ['pointermove', handlePointerMove],
+      ['pointerup', handlePointerUp],
+      ['pointercancel', handlePointerCancel],
+      ['blur', handleBlur],
+      ['keydown', handleKeyDown],
+      ['contextmenu', handleContextMenu]
+    ]);
 
     return () => {
-      canvas.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerCancel);
-      window.removeEventListener('blur', handleBlur);
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('contextmenu', handleContextMenu);
+      unbindCanvasListeners();
+      unbindWindowListeners();
       controller.reset();
     };
   }, [canvas, camera, scene, overlayRegistry, disabled]);
