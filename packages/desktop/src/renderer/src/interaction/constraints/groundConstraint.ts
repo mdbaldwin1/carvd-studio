@@ -12,11 +12,13 @@
 
 import { getPartAABB } from '../../components/workspace/workspaceUtils';
 import type { Part } from '../../types';
+import type { GeometryCache } from '../geometry/cache';
 import type { Constraint, ConstraintBlocker, ConstraintResult, ConstraintWarning } from './types';
 
 function clampMovePositions(
   positions: ReadonlyMap<string, { x: number; y: number; z: number }>,
-  startingParts: ReadonlyArray<Part>
+  startingParts: ReadonlyArray<Part>,
+  geometryCache: GeometryCache
 ): {
   positions: Map<string, { x: number; y: number; z: number }>;
   lifted: boolean;
@@ -33,7 +35,7 @@ function clampMovePositions(
       continue;
     }
     // Compute the part's world-space AABB at the candidate position.
-    const aabb = getPartAABB({ ...startingPart, position: pos });
+    const aabb = getPartAABB({ ...startingPart, position: pos }, geometryCache);
     if (aabb.minY < minDipBelowGround) {
       minDipBelowGround = aabb.minY;
       liftedParts.push(partId);
@@ -63,7 +65,11 @@ export const groundConstraint: Constraint = {
     const warnings: ConstraintWarning[] = [];
 
     if (candidate.kind === 'move') {
-      const { positions, lifted, liftedParts } = clampMovePositions(candidate.positions, ctx.startingParts);
+      const { positions, lifted, liftedParts } = clampMovePositions(
+        candidate.positions,
+        ctx.startingParts,
+        ctx.geometryCache
+      );
       // Adjust the delta to reflect the lift: the new delta is the difference
       // between the new primary position and the starting primary position.
       // We don't know the "primary" here — but we can recompute delta from any
@@ -110,7 +116,7 @@ export const groundConstraint: Constraint = {
         width: candidate.dimensions.width,
         thickness: candidate.dimensions.thickness
       };
-      const aabb = getPartAABB(hypothetical);
+      const aabb = getPartAABB(hypothetical, ctx.geometryCache);
       if (aabb.minY < 0) {
         const lift = -aabb.minY;
         const adjusted = {
@@ -140,11 +146,14 @@ export const groundConstraint: Constraint = {
       for (const update of candidate.updates) {
         const starting = ctx.startingParts.find((p) => p.id === update.partId);
         if (!starting) continue;
-        const aabb = getPartAABB({
-          ...starting,
-          position: update.position,
-          rotation: update.rotation
-        });
+        const aabb = getPartAABB(
+          {
+            ...starting,
+            position: update.position,
+            rotation: update.rotation
+          },
+          ctx.geometryCache
+        );
         if (aabb.minY < minDip) {
           minDip = aabb.minY;
           liftedIds.push(update.partId);

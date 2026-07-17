@@ -109,6 +109,16 @@ describe('groundConstraint — move', () => {
     expect(result.warnings[0].constraintName).toBe('ground');
   });
 
+  it('uses the shared geometry cache when checking candidate bounds', () => {
+    const part = makePart({ id: 'a', position: { x: 0, y: 0.375, z: 0 } });
+    const positions = new Map([['a', { x: 0, y: -0.5, z: 0 }]]);
+    const ctx = makeMoveContext([part], positions, { x: 0, y: -0.875, z: 0 });
+
+    groundConstraint.apply(ctx);
+
+    expect(ctx.geometryCache.size()).toBeGreaterThan(0);
+  });
+
   it('lifts a multi-part move by the deepest dip', () => {
     const partA = makePart({ id: 'a', position: { x: 0, y: 0.375, z: 0 } });
     const partB = makePart({ id: 'b', position: { x: 10, y: 0.375, z: 0 }, thickness: 1.5 });
