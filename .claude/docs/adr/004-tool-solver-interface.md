@@ -79,12 +79,12 @@ type CommitInstruction =
 - **Define the interface** in `src/renderer/src/interaction/tools/toolSolver.ts`.
 - **Wrap the three existing pure solvers** (`solvePartMoveSnapPreview`, `solveGroupMoveSnapPreview`, `solveResizePreview`) in `ToolSolver` implementations: `moveTool`, `groupMoveTool`, `resizeTool`. The wrappers preserve current behavior exactly — same math, same snap, same constraints. They expose the shared lifecycle methods on top.
 - **Tests** verify that each wrapper conforms to the interface contract (begin→update→commit chain produces consistent transforms; cancel is a no-op).
-- **Do not refactor `usePartDrag` / `useGroupDrag` / `usePartResize` yet.** The hooks remain unchanged. The wrappers are foundation for the next phase that collapses the hooks.
+- **Hook migration is underway.** `usePartDrag`, `useGroupDrag`, and `usePartResize` now delegate their live preview solver work to `moveTool`, `groupMoveTool`, and `resizeTool`. Resize commit, group-drag release commit, and single-part drag release commit also flow through `ToolSolver.commit` plus `applyCommitInstructions`. The remaining work is deeper pointer-shell collapse, not solver ownership.
 
 ### Phase §4 follow-up (separate commit)
 
-- **Refactor hooks** to delegate solver work to the tools. `usePartDrag` becomes a pointer-event shell that calls `moveTool.update` each frame and `moveTool.commit` at release. Same for `useGroupDrag` → `groupMoveTool`, `usePartResize` → `resizeTool`. Hooks become ~150 LOC each.
-- **Extract rotation tool** from direct rotation call sites. Viewport-projection math stays in `RotationHandle`, while part/world rotation math flows through a pure `rotationTool`.
+- **Finish collapsing hooks** around the tool calls. `usePartDrag`, `useGroupDrag`, and `usePartResize` still own pointer projection, selection orchestration, cleanup refs, and some batch/store semantics. The follow-up target is to shrink those hooks into thinner pointer-event shells now that solver preview and commit paths are tool-owned.
+- **Rotation tool is extracted.** Part-handle rotation, keyboard single-part rotation, and store rotation paths use pure `rotationTool` math. Multi-part keyboard/store rotations still batch position+rotation writes directly because those paths preserve collective-center and single-history-entry semantics.
 - **Wire session controller** to dispatch `dragstart` to the right tool based on the `HitTarget` kind:
   - `part-body` (with selection containing the part) → `moveTool` or `groupMoveTool`
   - `resize-handle` → `resizeTool`
