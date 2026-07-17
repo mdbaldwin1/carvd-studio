@@ -14,7 +14,7 @@ import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { useInteractionStore } from '../../store/interactionStore';
 import { getCombinedBounds, calculateSnapThreshold, type PartBounds } from '../../utils/snapToPartsUtil';
 import { snapToGrid } from './partTypes';
-import { isOrbitControls } from './workspaceUtils';
+import { bindWindowPointerSession, isOrbitControls } from './workspaceUtils';
 import type { Part } from '../../types';
 import { dragDebug } from '../../utils/dragDebug';
 import {
@@ -513,11 +513,17 @@ export function useGroupDrag(
         latestEventRef.current = null;
       };
 
+      // Clean up any previous drag (safety)
+      if (cleanupRef.current) {
+        cleanupRef.current();
+      }
+
+      const unbindPointerSession = bindWindowPointerSession(window, {
+        onMove: handleMove,
+        onEnd: handleUp
+      });
       const cleanup = () => {
-        window.removeEventListener('pointermove', handleMove);
-        window.removeEventListener('pointerup', handleUp);
-        window.removeEventListener('pointercancel', handleUp);
-        window.removeEventListener('blur', handleUp);
+        unbindPointerSession();
         cleanupRef.current = null;
         resetGroupDragRefs();
         clearMoveInteractionPreview({
@@ -527,15 +533,6 @@ export function useGroupDrag(
         if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = true;
       };
 
-      // Clean up any previous drag (safety)
-      if (cleanupRef.current) {
-        cleanupRef.current();
-      }
-
-      window.addEventListener('pointermove', handleMove);
-      window.addEventListener('pointerup', handleUp);
-      window.addEventListener('pointercancel', handleUp);
-      window.addEventListener('blur', handleUp);
       cleanupRef.current = cleanup;
     },
     [camera.position, controls, getWorldPoint, setupDragPlane]

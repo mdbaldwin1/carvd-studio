@@ -56,6 +56,34 @@ export function markPartPointerInteraction() {
   // Reserved hook for part-owned pointer interactions.
 }
 
+export interface WindowPointerSessionTarget {
+  addEventListener(type: 'pointermove' | 'pointerup' | 'pointercancel' | 'blur', listener: unknown): void;
+  removeEventListener(type: 'pointermove' | 'pointerup' | 'pointercancel' | 'blur', listener: unknown): void;
+}
+
+export function bindWindowPointerSession(
+  target: WindowPointerSessionTarget,
+  handlers: {
+    onMove: (event: PointerEvent) => void;
+    onEnd: (event?: unknown) => void;
+  }
+): () => void {
+  const moveListener = handlers.onMove;
+  const endListener = handlers.onEnd;
+
+  target.addEventListener('pointermove', moveListener);
+  target.addEventListener('pointerup', endListener);
+  target.addEventListener('pointercancel', endListener);
+  target.addEventListener('blur', endListener);
+
+  return () => {
+    target.removeEventListener('pointermove', moveListener);
+    target.removeEventListener('pointerup', endListener);
+    target.removeEventListener('pointercancel', endListener);
+    target.removeEventListener('blur', endListener);
+  };
+}
+
 // Module-level reusable objects for getPartAABB calculations.
 // Safe because JS is single-threaded and the return value is a plain object.
 const _aabbEuler = new THREE.Euler();

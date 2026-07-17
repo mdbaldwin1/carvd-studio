@@ -15,7 +15,7 @@ import {
 } from '../../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
 import { LiveDimensions, snapToGrid } from './partTypes';
-import { isOrbitControls } from './workspaceUtils';
+import { bindWindowPointerSession, isOrbitControls } from './workspaceUtils';
 import { calculateWorldHalfHeight } from '../../utils/mathPool';
 import { createGeometryCache } from '../../interaction/geometry/cache';
 import {
@@ -338,17 +338,14 @@ export function usePartDrag(
     };
 
     const removeIntentListeners = () => {
-      window.removeEventListener('pointermove', handleIntentMove);
-      window.removeEventListener('pointerup', handleIntentUp);
-      window.removeEventListener('pointercancel', handleIntentUp);
-      window.removeEventListener('blur', handleIntentUp);
+      unbindIntentListeners();
       intentListenerCleanup.current = null;
     };
 
-    window.addEventListener('pointermove', handleIntentMove);
-    window.addEventListener('pointerup', handleIntentUp);
-    window.addEventListener('pointercancel', handleIntentUp);
-    window.addEventListener('blur', handleIntentUp);
+    const unbindIntentListeners = bindWindowPointerSession(window, {
+      onMove: handleIntentMove,
+      onEnd: handleIntentUp
+    });
     intentListenerCleanup.current = removeIntentListeners;
 
     return removeIntentListeners;
@@ -806,15 +803,12 @@ export function usePartDrag(
       }
     };
 
-    window.addEventListener('pointermove', handleWindowPointerMove);
-    window.addEventListener('pointerup', handleWindowPointerUp);
-    window.addEventListener('pointercancel', handleWindowPointerUp);
-    window.addEventListener('blur', handleWindowPointerUp);
+    const unbindPointerSession = bindWindowPointerSession(window, {
+      onMove: handleWindowPointerMove,
+      onEnd: handleWindowPointerUp
+    });
     return () => {
-      window.removeEventListener('pointermove', handleWindowPointerMove);
-      window.removeEventListener('pointerup', handleWindowPointerUp);
-      window.removeEventListener('pointercancel', handleWindowPointerUp);
-      window.removeEventListener('blur', handleWindowPointerUp);
+      unbindPointerSession();
       if (rafIdRef.current !== null) {
         window.cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;

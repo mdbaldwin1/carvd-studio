@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 // Use real Three.js so rotation math actually works in getPartAABB tests
 vi.unmock('three');
 
-import { LIGHTING_PRESETS, isOrbitControls, getPartAABB } from './workspaceUtils';
+import { LIGHTING_PRESETS, isOrbitControls, getPartAABB, bindWindowPointerSession } from './workspaceUtils';
 import { createGeometryCache } from '../../interaction/geometry/cache';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 
@@ -54,6 +54,38 @@ describe('workspaceUtils', () => {
         dispatchEvent: () => false
       };
       expect(isOrbitControls(controls as never)).toBe(true);
+    });
+  });
+
+  describe('bindWindowPointerSession', () => {
+    it('binds pointer move and terminal listeners and removes them on cleanup', () => {
+      const listeners = new Map<string, unknown>();
+      const target = {
+        addEventListener: vi.fn((type: string, listener: unknown) => {
+          listeners.set(type, listener);
+        }),
+        removeEventListener: vi.fn((type: string, listener: unknown) => {
+          expect(listeners.get(type)).toBe(listener);
+          listeners.delete(type);
+        })
+      };
+      const onMove = vi.fn();
+      const onEnd = vi.fn();
+
+      const cleanup = bindWindowPointerSession(target, { onMove, onEnd });
+
+      expect(target.addEventListener).toHaveBeenCalledWith('pointermove', onMove);
+      expect(target.addEventListener).toHaveBeenCalledWith('pointerup', onEnd);
+      expect(target.addEventListener).toHaveBeenCalledWith('pointercancel', onEnd);
+      expect(target.addEventListener).toHaveBeenCalledWith('blur', onEnd);
+
+      cleanup();
+
+      expect(listeners.size).toBe(0);
+      expect(target.removeEventListener).toHaveBeenCalledWith('pointermove', onMove);
+      expect(target.removeEventListener).toHaveBeenCalledWith('pointerup', onEnd);
+      expect(target.removeEventListener).toHaveBeenCalledWith('pointercancel', onEnd);
+      expect(target.removeEventListener).toHaveBeenCalledWith('blur', onEnd);
     });
   });
 

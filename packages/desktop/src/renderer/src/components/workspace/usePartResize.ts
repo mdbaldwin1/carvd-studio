@@ -12,7 +12,7 @@ import {
   publishResizeInteractionPreview
 } from '../../utils/interactionSession';
 import { LiveDimensions, HandlePosition, snapToGrid } from './partTypes';
-import { isOrbitControls } from './workspaceUtils';
+import { bindWindowPointerSession, isOrbitControls } from './workspaceUtils';
 import {
   createResizeCommitPreview,
   createResizeCommitState,
@@ -317,15 +317,12 @@ export function usePartResize(
       });
     };
 
-    window.addEventListener('pointermove', handleWindowPointerMove);
-    window.addEventListener('pointerup', handleWindowPointerUp);
-    window.addEventListener('pointercancel', handleWindowPointerUp);
-    window.addEventListener('blur', handleWindowPointerUp);
+    const unbindPointerSession = bindWindowPointerSession(window, {
+      onMove: handleWindowPointerMove,
+      onEnd: handleWindowPointerUp
+    });
     return () => {
-      window.removeEventListener('pointermove', handleWindowPointerMove);
-      window.removeEventListener('pointerup', handleWindowPointerUp);
-      window.removeEventListener('pointercancel', handleWindowPointerUp);
-      window.removeEventListener('blur', handleWindowPointerUp);
+      unbindPointerSession();
       if (rafIdRef.current !== null) {
         window.cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
