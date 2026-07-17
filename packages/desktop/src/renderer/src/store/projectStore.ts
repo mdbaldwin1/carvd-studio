@@ -29,6 +29,7 @@ import { useClipboardStore } from './clipboardStore';
 import { useLicenseStore } from './licenseStore';
 import { getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
+import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
 import { rotationTool } from '../interaction/tools/rotationTool';
 import {
   getAllDescendantGroupIds as getAllDescendantGroupIdsFromSelection,
@@ -242,6 +243,23 @@ function maybeShowOverlapClampToast() {
 export const getContainingGroupId = getContainingGroupIdFromSelection;
 export const getAllDescendantPartIds = getAllDescendantPartIdsFromSelection;
 export const getAllDescendantGroupIds = getAllDescendantGroupIdsFromSelection;
+
+const getSceneGraphDescendantPartIds = ({
+  groupId,
+  parts,
+  groups,
+  groupMembers
+}: {
+  groupId: string;
+  parts: Part[];
+  groups: Group[];
+  groupMembers: GroupMember[];
+}): readonly string[] =>
+  buildWorkspaceSceneGraph({
+    parts,
+    groups,
+    groupMembers
+  }).descendantPartIds(groupId);
 
 const getDuplicateOffset = (partsToDuplicate: Part[]): { x: number; y: number; z: number } => {
   if (partsToDuplicate.length === 0) return { x: 2, y: 0, z: 2 };
@@ -785,7 +803,7 @@ export const useProjectStore = create<ProjectState>()(
 
         // Add all parts from duplicated groups
         for (const groupId of groupIdsToDupe) {
-          const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
+          const groupPartIds = getSceneGraphDescendantPartIds({ groupId, parts, groups, groupMembers });
           groupPartIds.forEach((id) => partIdsToDupe.add(id));
         }
 
@@ -1027,7 +1045,7 @@ export const useProjectStore = create<ProjectState>()(
 
         // Add all parts from included groups
         for (const groupId of groupIdsToInclude) {
-          const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
+          const groupPartIds = getSceneGraphDescendantPartIds({ groupId, parts, groups, groupMembers });
           groupPartIds.forEach((id) => partIdsToInclude.add(id));
         }
 
@@ -1508,10 +1526,10 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       deleteGroup: (groupId, mode, targetParentGroupId) => {
-        const { groupMembers } = get();
+        const { parts, groups, groupMembers } = get();
 
         const descendantGroupIds = getAllDescendantGroupIds(groupId, groupMembers);
-        const descendantPartIds = getAllDescendantPartIds(groupId, groupMembers);
+        const descendantPartIds = getSceneGraphDescendantPartIds({ groupId, parts, groups, groupMembers });
 
         if (mode === 'ungroup') {
           // Remove the group, but keep its immediate children
@@ -1649,7 +1667,7 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       mergeGroups: (groupIds, mode) => {
-        const { groups, groupMembers } = get();
+        const { parts, groups, groupMembers } = get();
         const { licenseMode } = useLicenseStore.getState();
         if (groupIds.length < 2) return null;
 
@@ -1683,7 +1701,7 @@ export const useProjectStore = create<ProjectState>()(
           // 'deep' mode - flatten all groups recursively into just parts
           const allPartIds = new Set<string>();
           for (const groupId of groupIds) {
-            const partIds = getAllDescendantPartIds(groupId, groupMembers);
+            const partIds = getSceneGraphDescendantPartIds({ groupId, parts, groups, groupMembers });
             partIds.forEach((id) => allPartIds.add(id));
           }
           newMembers = [...allPartIds].map((id) => ({ id, type: 'part' as const }));
