@@ -65,6 +65,8 @@ export interface ResizeToolPreview {
   dimensions: PartDimensions;
   position: Vec3;
   snapLines: SnapLine[];
+  /** Active resize reference/ruler state for overlay publishing. */
+  referenceState: ResizePreviewResult['referenceState'];
   /** Which dimensions are currently being adjusted by the active handle. */
   resizingDimensions: ResizePreviewResult['resizingDimensions'];
   /** Which dimensions snapped (vs. user-driven). */
@@ -119,6 +121,7 @@ export const resizeTool: ToolSolver<ResizeToolInput, ResizeToolState, ResizeTool
       },
       position: result.position,
       snapLines: result.snapLines,
+      referenceState: result.referenceState,
       resizingDimensions: result.resizingDimensions,
       snappedDimensions: result.snappedDimensions,
       candidate: {

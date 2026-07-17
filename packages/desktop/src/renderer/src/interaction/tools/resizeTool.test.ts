@@ -123,6 +123,29 @@ describe('resizeTool', () => {
       });
     });
 
+    it('update preserves reference state from the shared resize preview solver', () => {
+      const part = makePart({ id: 'p1', length: 10, width: 4, thickness: 1, position: { x: 0, y: 0.5, z: 0 } });
+      const reference = makePart({ id: 'p2', length: 10, width: 4, thickness: 1, position: { x: 15, y: 0.5, z: 0 } });
+      const input = makeInput({
+        part,
+        handlePos: { x: 1, y: 0, z: 0, type: 'edge-y' },
+        localDelta: { x: 2, y: 0, z: 0 },
+        startingDimensions: { length: 10, width: 4, thickness: 1 },
+        referenceParts: [part, reference],
+        referencePartIds: ['p2']
+      });
+      const state = resizeTool.begin(input);
+      const { preview } = resizeTool.update(input, state);
+
+      expect(preview.referenceState?.candidateRelations.some((relation) => relation.editMode === 'resize-size')).toBe(
+        true
+      );
+      expect(preview.referenceState?.candidateRelations.some((relation) => relation.editMode === 'resize-gap')).toBe(
+        true
+      );
+      expect(preview.referenceState?.activeRelationId).toBeTruthy();
+    });
+
     it('commit produces a single updatePartDimensions instruction', () => {
       const part = makePart();
       const input = makeInput({
