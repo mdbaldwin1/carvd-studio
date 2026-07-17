@@ -13,6 +13,7 @@ import { applyConstraints } from '../interaction/constraints/pipeline';
 import { groundConstraint } from '../interaction/constraints/groundConstraint';
 import { createGeometryCache } from '../interaction/geometry/cache';
 import { rotationTool } from '../interaction/tools/rotationTool';
+import { applyCommitInstructions } from '../interaction/tools/toolSolver';
 
 export function useKeyboardShortcuts() {
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
@@ -84,9 +85,7 @@ export function useKeyboardShortcuts() {
           const state = rotationTool.begin(input);
           const { preview } = rotationTool.update(input, state);
 
-          updatePart(part.id, {
-            rotation: preview.rotation
-          });
+          applyCommitInstructions(rotationTool.commit(state, preview), { updatePart });
           return;
         }
 
