@@ -105,6 +105,23 @@ export function usePartDrag(
   const latestEventRef = useRef<PointerEvent | null>(null);
   const dragFrameCounterRef = useRef(0);
 
+  const resetDragRefs = () => {
+    dragStart.current = null;
+    lastDragPosition.current = null;
+    latchedFaceSnapRef.current = null;
+    moveToolStateRef.current = null;
+    wasSnappedByParts.current = { x: false, y: false, z: false };
+  };
+
+  const finishDragState = (didMove: boolean, previewOptions?: Parameters<typeof clearMoveInteractionPreview>[0]) => {
+    setIsDragging(false);
+    resetDragRefs();
+    markJustFinishedDragging(didMove);
+    useSelectionStore.getState().setDraggingPartId(null);
+    clearMoveInteractionPreview(previewOptions);
+    if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = true;
+  };
+
   const getWorldPoint = useCallback(
     (e: PointerEvent | MouseEvent): THREE.Vector3 | null => {
       const rect = gl.domElement.getBoundingClientRect();
@@ -305,18 +322,10 @@ export function usePartDrag(
         // Safety net: drag was started but second useEffect hasn't attached its listeners yet.
         // Do minimal cleanup to prevent stuck drag state.
         removeIntentListeners();
-        setIsDragging(false);
-        dragStart.current = null;
-        lastDragPosition.current = null;
-        latchedFaceSnapRef.current = null;
-        moveToolStateRef.current = null;
-        wasSnappedByParts.current = { x: false, y: false, z: false };
-        useSelectionStore.getState().setDraggingPartId(null);
-        clearMoveInteractionPreview({
+        finishDragState(false, {
           clearSelectionDragDelta: true,
           clearReferenceDistances: false
         });
-        if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = true;
       }
     };
 
@@ -717,16 +726,7 @@ export function usePartDrag(
             // Keep the last previewed drag delta instead of reverting.
             // Final overlap solve can fail near exact-contact due to precision.
             moveSelectedParts(constrainedMultiDelta.delta);
-            clearMoveInteractionPreview();
-            setIsDragging(false);
-            dragStart.current = null;
-            lastDragPosition.current = null;
-            latchedFaceSnapRef.current = null;
-            moveToolStateRef.current = null;
-            wasSnappedByParts.current = { x: false, y: false, z: false };
-            markJustFinishedDragging(dragDistanceSq > 1e-4);
-            useSelectionStore.getState().setDraggingPartId(null);
-            if (isOrbitControls(controls)) controls.enabled = true;
+            finishDragState(dragDistanceSq > 1e-4);
             useSnapStore.getState().updateReferenceDistances();
             return;
           }
@@ -783,16 +783,7 @@ export function usePartDrag(
             updatePart(part.id, {
               position: { x: newX, y: newY, z: newZ }
             });
-            clearMoveInteractionPreview();
-            setIsDragging(false);
-            dragStart.current = null;
-            lastDragPosition.current = null;
-            latchedFaceSnapRef.current = null;
-            moveToolStateRef.current = null;
-            wasSnappedByParts.current = { x: false, y: false, z: false };
-            markJustFinishedDragging(dragDistanceSq > 1e-4);
-            useSelectionStore.getState().setDraggingPartId(null);
-            if (isOrbitControls(controls)) controls.enabled = true;
+            finishDragState(dragDistanceSq > 1e-4);
             useSnapStore.getState().updateReferenceDistances();
             return;
           }
@@ -820,17 +811,8 @@ export function usePartDrag(
           });
         }
 
-        setIsDragging(false);
-        dragStart.current = null;
-        lastDragPosition.current = null;
-        latchedFaceSnapRef.current = null;
-        moveToolStateRef.current = null;
-        wasSnappedByParts.current = { x: false, y: false, z: false };
         // Only suppress the next click if this was a real drag movement.
-        markJustFinishedDragging(dragDistanceSq > 1e-4);
-        useSelectionStore.getState().setDraggingPartId(null);
-        clearMoveInteractionPreview();
-        if (isOrbitControls(controls)) controls.enabled = true;
+        finishDragState(dragDistanceSq > 1e-4);
         useSnapStore.getState().updateReferenceDistances();
       }
     };
