@@ -31,12 +31,7 @@ import { getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
 import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
 import { rotationTool } from '../interaction/tools/rotationTool';
-import {
-  getAncestorGroupIds as getAncestorGroupIdsFromSelection,
-  getContainingGroupId as getContainingGroupIdFromSelection,
-  resolveSelectedGroupIdsWithDescendants,
-  resolveTransformSelectedPartIds
-} from '../utils/interactionSelection';
+import { resolveSelectedGroupIdsWithDescendants, resolveTransformSelectedPartIds } from '../utils/interactionSelection';
 import { dragDebug } from '../utils/dragDebug';
 
 interface ProjectState {
@@ -237,9 +232,6 @@ function maybeShowOverlapClampToast() {
   useUIStore.getState().showToast('Movement limited to avoid overlap', 'info', { duration: 1200 });
 }
 
-/** Find which group a part belongs to, or null if ungrouped. */
-export const getContainingGroupId = getContainingGroupIdFromSelection;
-
 const getSceneGraphDescendantPartIds = ({
   groupId,
   parts,
@@ -299,34 +291,6 @@ const getDuplicateOffset = (partsToDuplicate: Part[]): { x: number; y: number; z
     y: 0,
     z: spanZ + clearance
   };
-};
-
-/** Get all ancestor group IDs for a part, walking up the group hierarchy (for auto-expand). */
-export const getAncestorGroupIds = getAncestorGroupIdsFromSelection;
-
-/** Check if a group is a descendant of another group (to prevent circular references). */
-export const isDescendantOf = (
-  potentialDescendantId: string,
-  potentialAncestorId: string,
-  groupMembers: GroupMember[]
-): boolean => {
-  if (potentialDescendantId === potentialAncestorId) return true;
-
-  // Recursively find all nested group IDs
-  const getDescendantGroupIds = (gId: string): string[] => {
-    const groupIds: string[] = [];
-    const members = groupMembers.filter((gm) => gm.groupId === gId);
-    for (const member of members) {
-      if (member.memberType === 'group') {
-        groupIds.push(member.memberId);
-        groupIds.push(...getDescendantGroupIds(member.memberId));
-      }
-    }
-    return groupIds;
-  };
-
-  const descendantGroupIds = getDescendantGroupIds(potentialAncestorId);
-  return descendantGroupIds.includes(potentialDescendantId);
 };
 
 /** Validate parts for cut list generation, returning any issues found. */

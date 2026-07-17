@@ -2,7 +2,7 @@
  * Shared group-aware click/selection logic used by both InstancedParts and Part components.
  * Extracted to avoid duplicating the ancestor group traversal and editing context logic.
  */
-import { getAncestorGroupIds } from '../../store/projectStore';
+import { getAncestorGroupIds } from '../../utils/interactionSelection';
 import { GroupMember } from '../../types';
 
 export interface PartGroupContext {

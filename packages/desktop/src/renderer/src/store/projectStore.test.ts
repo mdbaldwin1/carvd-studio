@@ -1,11 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  useProjectStore,
-  validatePartsForCutList,
-  getContainingGroupId,
-  getAncestorGroupIds,
-  isDescendantOf
-} from './projectStore';
+import { useProjectStore, validatePartsForCutList } from './projectStore';
 import { useLicenseStore } from './licenseStore';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
 import { useSelectionStore } from './selectionStore';
@@ -15,7 +9,6 @@ import { useUIStore } from './uiStore';
 import {
   createTestPart,
   createTestStock,
-  createTestGroupMember,
   createTestProject,
   createTestAssembly
 } from '../../../../tests/helpers/factories';
@@ -1715,85 +1708,6 @@ describe('projectStore', () => {
 });
 
 // ============================================================
-// Exported utility functions
-// ============================================================
-
-describe('projectStore utility functions', () => {
-  describe('getContainingGroupId', () => {
-    it('returns groupId for a part that belongs to a group', () => {
-      const groupMembers = [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g1', 'p2', 'part')];
-
-      expect(getContainingGroupId('p1', groupMembers)).toBe('g1');
-    });
-
-    it('returns null for an ungrouped part', () => {
-      const groupMembers = [createTestGroupMember('g1', 'p1', 'part')];
-
-      expect(getContainingGroupId('p999', groupMembers)).toBeNull();
-    });
-
-    it('returns null for empty groupMembers', () => {
-      expect(getContainingGroupId('p1', [])).toBeNull();
-    });
-  });
-
-  describe('getAncestorGroupIds', () => {
-    it('returns ancestor chain for a deeply nested part', () => {
-      const groupMembers = [
-        createTestGroupMember('outer', 'inner', 'group'),
-        createTestGroupMember('inner', 'p1', 'part')
-      ];
-
-      const result = getAncestorGroupIds('p1', groupMembers);
-      expect(result).toEqual(['inner', 'outer']);
-    });
-
-    it('returns single group for a directly grouped part', () => {
-      const groupMembers = [createTestGroupMember('g1', 'p1', 'part')];
-
-      const result = getAncestorGroupIds('p1', groupMembers);
-      expect(result).toEqual(['g1']);
-    });
-
-    it('returns empty array for ungrouped part', () => {
-      expect(getAncestorGroupIds('p1', [])).toHaveLength(0);
-    });
-  });
-
-  describe('isDescendantOf', () => {
-    it('returns true for same group', () => {
-      expect(isDescendantOf('g1', 'g1', [])).toBe(true);
-    });
-
-    it('returns true for direct child group', () => {
-      const groupMembers = [createTestGroupMember('parent', 'child', 'group')];
-
-      expect(isDescendantOf('child', 'parent', groupMembers)).toBe(true);
-    });
-
-    it('returns true for deeply nested group', () => {
-      const groupMembers = [
-        createTestGroupMember('outer', 'inner', 'group'),
-        createTestGroupMember('inner', 'deep', 'group')
-      ];
-
-      expect(isDescendantOf('deep', 'outer', groupMembers)).toBe(true);
-    });
-
-    it('returns false for unrelated groups', () => {
-      const groupMembers = [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g2', 'p2', 'part')];
-
-      expect(isDescendantOf('g2', 'g1', groupMembers)).toBe(false);
-    });
-
-    it('returns false for parent checking against child (wrong direction)', () => {
-      const groupMembers = [createTestGroupMember('parent', 'child', 'group')];
-
-      expect(isDescendantOf('parent', 'child', groupMembers)).toBe(false);
-    });
-  });
-});
-
 describe('validatePartsForCutList', () => {
   describe('stock assignment validation', () => {
     it('returns error when part has no stock assigned', () => {

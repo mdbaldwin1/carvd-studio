@@ -3,13 +3,14 @@ import { AlertTriangle, ChevronDown, ChevronRight, Layers } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { useStockLibrary } from '../../hooks/useStockLibrary';
 import { useAssemblyEditingStore } from '../../store/assemblyEditingStore';
-import { getAncestorGroupIds, useProjectStore, validatePartsForCutList } from '../../store/projectStore';
+import { useProjectStore, validatePartsForCutList } from '../../store/projectStore';
 import { useWorkspaceSceneGraph } from '../../interaction/useWorkspaceSceneGraph';
 import type { WorkspaceSceneGraph } from '../../interaction/sceneGraph';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { Group, GroupMember, Part, PartValidationIssue } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { getAncestorGroupIds } from '../../utils/interactionSelection';
 import { IconButton } from '../common/IconButton';
 
 // ── Tree types ──────────────────────────────────────────────────────────

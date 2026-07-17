@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 import * as THREE from 'three';
-import { useProjectStore, getContainingGroupId } from '../store/projectStore';
+import { useProjectStore } from '../store/projectStore';
 import { useWorkspaceSceneGraph } from '../interaction/useWorkspaceSceneGraph';
 import { useClipboardStore } from '../store/clipboardStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useSnapStore } from '../store/snapStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
+import { getContainingGroupId } from '../utils/interactionSelection';
 import { Rotation3D } from '../types';
 import { applyConstraints } from '../interaction/constraints/pipeline';
 import { groundConstraint } from '../interaction/constraints/groundConstraint';

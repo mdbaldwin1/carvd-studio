@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { useProjectStore, isDescendantOf } from './projectStore';
+import { useProjectStore } from './projectStore';
 import { useSnapStore } from './snapStore';
+import { isDescendantOfGroup } from '../utils/interactionSelection';
 
 /** Stores pointer info from InstancedMesh pointerDown so the individual Part can pick up the drag */
 export interface DragIntent {
@@ -125,7 +126,7 @@ export const useSelectionStore = create<SelectionStoreState>((set, get) => ({
       }
 
       // Check if groupId is inside editingGroupId (descendant)
-      if (isDescendantOf(groupId, editingGroupId, groupMembers) && groupId !== editingGroupId) {
+      if (isDescendantOfGroup(groupId, editingGroupId, groupMembers) && groupId !== editingGroupId) {
         newEditingGroupId = editingGroupId; // Stay in the parent group
       }
     }
@@ -145,7 +146,7 @@ export const useSelectionStore = create<SelectionStoreState>((set, get) => ({
         const { groupMembers } = useProjectStore.getState();
         const shouldPreserveEditingContext =
           state.editingGroupId !== null &&
-          (groupId === state.editingGroupId || isDescendantOf(groupId, state.editingGroupId, groupMembers));
+          (groupId === state.editingGroupId || isDescendantOfGroup(groupId, state.editingGroupId, groupMembers));
         // Preserve existing part selection when shift+clicking to add a group
         return {
           selectedGroupIds: [...state.selectedGroupIds, groupId],

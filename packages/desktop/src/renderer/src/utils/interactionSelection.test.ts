@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getAncestorGroupIds,
   getAllDescendantGroupIds,
   getAllDescendantPartIds,
+  getContainingGroupId,
+  isDescendantOfGroup,
   resolveReferenceEntities,
   resolveExplicitSelectedPartIds,
   resolveSelectionEntities,
@@ -33,6 +36,25 @@ describe('interactionSelection', () => {
   it('resolves descendant groups with legacy self-inclusive semantics', () => {
     expect(getAllDescendantGroupIds('g1', groupMembers)).toEqual(['g1', 'g2']);
     expect(getAllDescendantGroupIds('g3', groupMembers)).toEqual(['g3']);
+  });
+
+  it('finds a containing group for grouped parts only', () => {
+    expect(getContainingGroupId('p1', groupMembers)).toBe('g1');
+    expect(getContainingGroupId('missing', groupMembers)).toBeNull();
+    expect(getContainingGroupId('p1', [])).toBeNull();
+  });
+
+  it('resolves ancestor group chains for nested parts', () => {
+    expect(getAncestorGroupIds('p2', groupMembers)).toEqual(['g2', 'g1']);
+    expect(getAncestorGroupIds('p1', groupMembers)).toEqual(['g1']);
+    expect(getAncestorGroupIds('missing', groupMembers)).toEqual([]);
+  });
+
+  it('checks group descendant relationships', () => {
+    expect(isDescendantOfGroup('g1', 'g1', groupMembers)).toBe(true);
+    expect(isDescendantOfGroup('g2', 'g1', groupMembers)).toBe(true);
+    expect(isDescendantOfGroup('g1', 'g2', groupMembers)).toBe(false);
+    expect(isDescendantOfGroup('g3', 'g1', groupMembers)).toBe(false);
   });
 
   it('builds measurement entities from selected groups and standalone parts', () => {

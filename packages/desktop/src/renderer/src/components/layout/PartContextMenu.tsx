@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useProjectStore, getContainingGroupId } from '../../store/projectStore';
+import { useProjectStore } from '../../store/projectStore';
 import { useClipboardStore } from '../../store/clipboardStore';
 import { useLicenseStore } from '../../store/licenseStore';
 import { useSelectionStore } from '../../store/selectionStore';
@@ -7,7 +7,7 @@ import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { getFeatureLimits } from '../../utils/featureLimits';
-import { resolveExplicitSelectedPartIds } from '../../utils/interactionSelection';
+import { getContainingGroupId, resolveExplicitSelectedPartIds } from '../../utils/interactionSelection';
 import { MenuPanel, MenuItemButton, MenuSeparator, MenuLabel, MenuSub } from '../ui/context-menu';
 
 interface PartContextMenuProps {
