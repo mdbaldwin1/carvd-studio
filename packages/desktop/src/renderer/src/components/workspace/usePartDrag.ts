@@ -21,7 +21,8 @@ import { applyConstraints } from '../../interaction/constraints/pipeline';
 import { groundConstraint } from '../../interaction/constraints/groundConstraint';
 import { collisionConstraint } from '../../interaction/constraints/collisionConstraint';
 import { createGeometryCache } from '../../interaction/geometry/cache';
-import { moveTool, type MoveToolState } from '../../interaction/tools/moveTool';
+import { moveTool, type MoveToolPreview, type MoveToolState } from '../../interaction/tools/moveTool';
+import { applyCommitInstructions, type Vec3 } from '../../interaction/tools/toolSolver';
 import { dragDebug } from '../../utils/dragDebug';
 import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
 import {
@@ -710,6 +711,31 @@ export function usePartDrag(
         const hasGroupSelected = currentSelectedGroupIds.length > 0;
         const hasMultiplePartsSelected = effectivePartIds.length > 1;
         const shouldMoveMultiple = hasGroupSelected || hasMultiplePartsSelected;
+        const commitSinglePartMove = (position: Vec3) => {
+          const delta = {
+            x: position.x - dragStart.current!.partPos.x,
+            y: position.y - dragStart.current!.partPos.y,
+            z: position.z - dragStart.current!.partPos.z
+          };
+          const positions = new Map([[part.id, position]]);
+          const commitPreview: MoveToolPreview = {
+            primaryPosition: position,
+            delta,
+            positions,
+            snapLines: [],
+            snappedAxes: { x: false, y: false, z: false },
+            nextLatchedFaceSnap: moveToolStateRef.current?.latchedFaceSnap ?? null,
+            candidate: { kind: 'move', delta, positions }
+          };
+          const commitState =
+            moveToolStateRef.current ??
+            ({
+              initialPrimaryPosition: dragStart.current!.partPos,
+              initialOtherPositions: new Map(),
+              latchedFaceSnap: null
+            } satisfies MoveToolState);
+          applyCommitInstructions(moveTool.commit(commitState, commitPreview), { updatePart });
+        };
 
         if (shouldMoveMultiple && effectivePartIds.length > 0) {
           // Check overlap prevention for multi-part move
@@ -780,9 +806,7 @@ export function usePartDrag(
               fallbackPosition: { x: newX, y: newY, z: newZ }
             });
             // Commit the last validated preview position to avoid jump-back.
-            updatePart(part.id, {
-              position: { x: newX, y: newY, z: newZ }
-            });
+            commitSinglePartMove({ x: newX, y: newY, z: newZ });
             finishDragState(dragDistanceSq > 1e-4);
             useSnapStore.getState().updateReferenceDistances();
             return;
@@ -806,9 +830,7 @@ export function usePartDrag(
           }
 
           dragDebug('partDrag:release:single:commit', { partId: part.id, position: { x: newX, y: newY, z: newZ } });
-          updatePart(part.id, {
-            position: { x: newX, y: newY, z: newZ }
-          });
+          commitSinglePartMove({ x: newX, y: newY, z: newZ });
         }
 
         // Only suppress the next click if this was a real drag movement.
