@@ -29,7 +29,13 @@ import { installDragDebugTools } from '../../utils/dragDebug';
 import { hasInteractiveHitAt as resolveHasInteractiveHitAt } from '../../interaction/hitTest';
 import { useCanvasPointerSession } from '../../interaction/useCanvasPointerSession';
 import { computeOverlayModel } from '../../interaction/overlayModel';
-import { LIGHTING_PRESETS, bindWindowPointerSession, isOrbitControls } from './workspaceUtils';
+import {
+  LIGHTING_PRESETS,
+  bindWindowPointerSession,
+  isOrbitControls,
+  pauseOrbitControls,
+  resumeOrbitControls
+} from './workspaceUtils';
 
 declare global {
   interface Window {
@@ -669,9 +675,7 @@ export function Workspace() {
     setIsBoxSelecting(true);
 
     // Disable orbit controls during selection
-    if (isOrbitControls(controls)) {
-      controls.enabled = false;
-    }
+    pauseOrbitControls(controls);
   };
 
   // Handle pointer move and pointer up for box selection
@@ -697,9 +701,7 @@ export function Workspace() {
       setSelectionBox(null);
 
       // Re-enable orbit controls
-      if (isOrbitControls(controls)) {
-        controls.enabled = true;
-      }
+      resumeOrbitControls(controls);
     };
 
     const handlePointerMove = (e: PointerEvent) => {

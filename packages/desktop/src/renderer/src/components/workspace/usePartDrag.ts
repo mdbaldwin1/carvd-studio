@@ -15,7 +15,12 @@ import {
 } from '../../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
 import { LiveDimensions, snapToGrid } from './partTypes';
-import { bindWindowPointerSession, createPointerRafQueue, isOrbitControls } from './workspaceUtils';
+import {
+  bindWindowPointerSession,
+  createPointerRafQueue,
+  pauseOrbitControls,
+  resumeOrbitControls
+} from './workspaceUtils';
 import { calculateWorldHalfHeight } from '../../utils/mathPool';
 import { createGeometryCache } from '../../interaction/geometry/cache';
 import {
@@ -125,7 +130,7 @@ export function usePartDrag(
     markJustFinishedDragging(didMove);
     useSelectionStore.getState().setDraggingPartId(null);
     clearPreview();
-    if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = true;
+    resumeOrbitControls(controls);
   };
 
   const getWorldPoint = useCallback(
@@ -315,7 +320,7 @@ export function usePartDrag(
         anchorPos: { x: anchorPos.x, y: anchorPos.y, z: anchorPos.z },
         partOriginalPos: { x: part.position.x, y: part.position.y, z: part.position.z }
       });
-      if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = false;
+      pauseOrbitControls(controls);
     };
 
     // Window listener: if pointer released before threshold, it was a click — clean up
@@ -933,7 +938,7 @@ export function usePartDrag(
         anchorPos: { x: anchorPos.x, y: anchorPos.y, z: anchorPos.z },
         partOriginalPos: { x: partOriginalPos.x, y: partOriginalPos.y, z: partOriginalPos.z }
       });
-      if (isOrbitControls(controls)) controls.enabled = false;
+      pauseOrbitControls(controls);
     }
   };
 

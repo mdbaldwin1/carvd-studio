@@ -44,6 +44,18 @@ export function isOrbitControls(controls: THREE.EventDispatcher<object> | null):
   return controls !== null && 'enabled' in controls;
 }
 
+export function pauseOrbitControls(controls: THREE.EventDispatcher<object> | null): void {
+  if (isOrbitControls(controls)) {
+    controls.enabled = false;
+  }
+}
+
+export function resumeOrbitControls(controls: THREE.EventDispatcher<object> | null): void {
+  if (isOrbitControls(controls)) {
+    controls.enabled = true;
+  }
+}
+
 // ADR-002 + ADR-003: the right-click target globals
 // (setRightClickTarget / getRightClickTarget / clearRightClickTarget) that
 // used to live here are gone. The hit-test service resolves right-click

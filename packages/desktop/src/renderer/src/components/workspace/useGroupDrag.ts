@@ -14,7 +14,12 @@ import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { useInteractionStore } from '../../store/interactionStore';
 import { getCombinedBounds, calculateSnapThreshold, type PartBounds } from '../../utils/snapToPartsUtil';
 import { snapToGrid } from './partTypes';
-import { bindWindowPointerSession, createPointerRafQueue, isOrbitControls } from './workspaceUtils';
+import {
+  bindWindowPointerSession,
+  createPointerRafQueue,
+  pauseOrbitControls,
+  resumeOrbitControls
+} from './workspaceUtils';
 import type { Part } from '../../types';
 import { dragDebug } from '../../utils/dragDebug';
 import {
@@ -147,7 +152,7 @@ export function useGroupDrag(
     (worldPoint: THREE.Vector3, screenX: number, screenY: number) => {
       // If a selected group is being dragged, immediately pause orbit controls so
       // camera orbit doesn't steal the gesture before drag threshold is crossed.
-      if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = false;
+      pauseOrbitControls(controls);
 
       // Store start info
       const startPoint = worldPoint.clone();
@@ -518,7 +523,7 @@ export function useGroupDrag(
         cleanupRef.current = null;
         resetGroupDragRefs();
         clearTransformInteractionPreviewKeepingReferenceDistances();
-        if (isOrbitControls(controls)) (controls as { enabled: boolean }).enabled = true;
+        resumeOrbitControls(controls);
       };
 
       cleanupRef.current = cleanup;

@@ -6,6 +6,8 @@ vi.unmock('three');
 import {
   LIGHTING_PRESETS,
   isOrbitControls,
+  pauseOrbitControls,
+  resumeOrbitControls,
   getPartAABB,
   bindWindowPointerSession,
   createPointerRafQueue
@@ -60,6 +62,31 @@ describe('workspaceUtils', () => {
         dispatchEvent: () => false
       };
       expect(isOrbitControls(controls as never)).toBe(true);
+    });
+  });
+
+  describe('orbit control lifecycle helpers', () => {
+    it('pauses and resumes orbit controls when the controls support enabled state', () => {
+      const controls = {
+        enabled: true,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false
+      };
+
+      pauseOrbitControls(controls as never);
+      expect(controls.enabled).toBe(false);
+
+      resumeOrbitControls(controls as never);
+      expect(controls.enabled).toBe(true);
+    });
+
+    it('ignores null and non-orbit controls', () => {
+      const notControls = { addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false };
+
+      expect(() => pauseOrbitControls(null)).not.toThrow();
+      expect(() => resumeOrbitControls(notControls as never)).not.toThrow();
+      expect('enabled' in notControls).toBe(false);
     });
   });
 

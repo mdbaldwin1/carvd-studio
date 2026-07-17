@@ -14,7 +14,7 @@ import {
 } from '../../utils/interactionSession';
 import { LiveDimensions } from './partTypes';
 import { RotationHandle } from './RotationHandle';
-import { isOrbitControls } from './workspaceUtils';
+import { pauseOrbitControls, resumeOrbitControls } from './workspaceUtils';
 
 export function GroupRotationHandles() {
   const { controls } = useThree();
@@ -77,7 +77,7 @@ export function GroupRotationHandles() {
   );
 
   const handleRotateStart = useCallback(() => {
-    if (isOrbitControls(controls)) controls.enabled = false;
+    pauseOrbitControls(controls);
     if (!pivot || selectedIds.length === 0) return;
     beginRotateInteractionSession({
       affectedPartIds: selectedIds,
@@ -87,7 +87,7 @@ export function GroupRotationHandles() {
   }, [controls, pivot, selectedIds]);
 
   const handleRotateEnd = useCallback(() => {
-    if (isOrbitControls(controls)) controls.enabled = true;
+    resumeOrbitControls(controls);
     clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances();
   }, [controls]);
 

@@ -12,7 +12,12 @@ import {
   publishResizeInteractionPreview
 } from '../../utils/interactionSession';
 import { LiveDimensions, HandlePosition, snapToGrid } from './partTypes';
-import { bindWindowPointerSession, createPointerRafQueue, isOrbitControls } from './workspaceUtils';
+import {
+  bindWindowPointerSession,
+  createPointerRafQueue,
+  pauseOrbitControls,
+  resumeOrbitControls
+} from './workspaceUtils';
 import {
   createResizeCommitPreview,
   createResizeCommitState,
@@ -275,7 +280,7 @@ export function usePartResize(
     snappedDimensionsRef.current = { length: false, width: false, thickness: false };
     resizeToolStateRef.current = null;
     resizeStart.current = null;
-    if (isOrbitControls(controls)) controls.enabled = true;
+    resumeOrbitControls(controls);
     document.body.style.cursor = 'auto';
     clearTransformInteractionPreviewKeepingSelectionDelta();
     useSnapStore.getState().updateReferenceDistances();
@@ -352,7 +357,7 @@ export function usePartResize(
             z: part.position.z
           }
         });
-        if (isOrbitControls(controls)) controls.enabled = false;
+        pauseOrbitControls(controls);
       }
     },
     [

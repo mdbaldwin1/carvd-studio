@@ -30,6 +30,7 @@ import { RotationHandle } from './RotationHandle';
 import { useGroupDrag } from './useGroupDrag';
 import { usePartDrag } from './usePartDrag';
 import { usePartResize } from './usePartResize';
+import { pauseOrbitControls, resumeOrbitControls } from './workspaceUtils';
 
 // Decorative edges should never consume pointer hits.
 const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
@@ -290,7 +291,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
   );
 
   const handleRotateStart = useCallback(() => {
-    if (controls) controls.enabled = false;
+    pauseOrbitControls(controls);
     beginRotateInteractionSession({
       affectedPartIds: [part.id],
       primaryPartId: part.id,
@@ -299,7 +300,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
   }, [controls, part.id, part.position.x, part.position.y, part.position.z]);
 
   const handleRotateEnd = useCallback(() => {
-    if (controls) controls.enabled = true;
+    resumeOrbitControls(controls);
     clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances();
   }, [controls]);
 
