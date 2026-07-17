@@ -11,12 +11,12 @@ import {
   clearMoveInteractionPreview,
   publishResizeInteractionPreview
 } from '../../utils/interactionSession';
-import { solveResizePreview } from '../../utils/interactionResizePreview';
 import { LiveDimensions, HandlePosition, snapToGrid } from './partTypes';
 import { isOrbitControls } from './workspaceUtils';
 import { applyConstraints } from '../../interaction/constraints/pipeline';
 import { groundConstraint } from '../../interaction/constraints/groundConstraint';
 import { createGeometryCache } from '../../interaction/geometry/cache';
+import { resizeTool, type ResizeToolState } from '../../interaction/tools/resizeTool';
 
 /**
  * Hook encapsulating all resize logic for a Part component.
@@ -47,6 +47,7 @@ export function usePartResize(
     partWidth: number;
     partThickness: number;
   } | null>(null);
+  const resizeToolStateRef = useRef<ResizeToolState | null>(null);
 
   const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const raycaster = useRef(new THREE.Raycaster());
@@ -134,7 +135,7 @@ export function usePartResize(
 
     const appSettings = useAppSettingsStore.getState().settings;
     const cameraDistance = camera.position.distanceTo(_tempCameraTarget.current.set(partPos.x, partPos.y, partPos.z));
-    const preview = solveResizePreview({
+    const toolInput = {
       part,
       handlePos,
       localDelta: { x: localDelta.x, y: localDelta.y, z: localDelta.z },
@@ -156,7 +157,13 @@ export function usePartResize(
       appSettings,
       units,
       cameraDistance
-    });
+    };
+    if (!resizeToolStateRef.current) {
+      resizeToolStateRef.current = resizeTool.begin(toolInput);
+    }
+    const toolResult = resizeTool.update(toolInput, resizeToolStateRef.current);
+    resizeToolStateRef.current = toolResult.state;
+    const preview = toolResult.preview;
 
     snappedDimensionsRef.current = preview.snappedDimensions;
     useSnapStore.getState().setSnapIndicators(preview.snapLines, []);
@@ -272,6 +279,7 @@ export function usePartResize(
 
     setIsResizing(false);
     snappedDimensionsRef.current = { length: false, width: false, thickness: false };
+    resizeToolStateRef.current = null;
     resizeStart.current = null;
     if (isOrbitControls(controls)) controls.enabled = true;
     document.body.style.cursor = 'auto';
@@ -338,6 +346,7 @@ export function usePartResize(
       const startPoint = getWorldPoint(e.nativeEvent);
       if (startPoint) {
         setIsResizing(true);
+        resizeToolStateRef.current = null;
         resizeStart.current = {
           handlePos,
           startPoint: startPoint.clone(),
