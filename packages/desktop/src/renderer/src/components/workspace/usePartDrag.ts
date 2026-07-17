@@ -19,7 +19,6 @@ import { isOrbitControls } from './workspaceUtils';
 import { calculateWorldHalfHeight } from '../../utils/mathPool';
 import { applyConstraints } from '../../interaction/constraints/pipeline';
 import { groundConstraint } from '../../interaction/constraints/groundConstraint';
-import { collisionConstraint } from '../../interaction/constraints/collisionConstraint';
 import { createGeometryCache } from '../../interaction/geometry/cache';
 import {
   createMoveCommitPreview,
@@ -29,7 +28,11 @@ import {
 } from '../../interaction/tools/moveTool';
 import { applyCommitInstructions, type Vec3 } from '../../interaction/tools/toolSolver';
 import { dragDebug } from '../../utils/dragDebug';
-import { resolveGroupReleaseMove, resolveMoveSelection } from '../../utils/interactionMovement';
+import {
+  resolveGroupReleaseMove,
+  resolveMoveSelection,
+  resolveSinglePartReleaseMove
+} from '../../utils/interactionMovement';
 import {
   beginMoveInteractionSession,
   clearMoveInteractionPreview,
@@ -779,27 +782,15 @@ export function usePartDrag(
             width: liveDims.width
           };
           const stockConstraints = useProjectStore.getState().stockConstraints;
-          const releaseResult = applyConstraints(
-            {
-              candidate: {
-                kind: 'move',
-                delta: { x: newX - part.position.x, y: newY - part.position.y, z: newZ - part.position.z },
-                positions: new Map([[part.id, { x: newX, y: newY, z: newZ }]])
-              },
-              startingParts: [releasePart],
-              project: {
-                parts: allParts,
-                stocks: [],
-                groupMembers: [],
-                preventOverlap: stockConstraints.preventOverlap
-              },
-              geometryCache: geometryCacheRef.current
-            },
-            [groundConstraint, collisionConstraint]
-          );
+          const releaseResult = resolveSinglePartReleaseMove({
+            part: releasePart,
+            projectParts: allParts,
+            proposedPosition: { x: newX, y: newY, z: newZ },
+            preventOverlap: stockConstraints.preventOverlap,
+            geometryCache: geometryCacheRef.current
+          });
 
-          const collisionBlocked = releaseResult.blockers.some((b) => b.constraintName === 'collision');
-          if (collisionBlocked) {
+          if (releaseResult.collisionBlocked) {
             dragDebug('partDrag:release:single:noSafeDelta', {
               partId: part.id,
               fallbackPosition: { x: newX, y: newY, z: newZ }
@@ -811,22 +802,15 @@ export function usePartDrag(
             return;
           }
 
-          if (releaseResult.adjusted.kind === 'move') {
-            const adjusted = releaseResult.adjusted.positions.get(part.id);
-            if (adjusted) {
-              newX = adjusted.x;
-              newY = adjusted.y;
-              newZ = adjusted.z;
-            }
-            dragDebug('partDrag:release:single:pipelineApplied', {
-              partId: part.id,
-              baseDelta,
-              adjustedDelta: releaseResult.adjusted.delta,
-              clamped: releaseResult.warnings.some(
-                (w) => w.constraintName === 'collision' && w.kind === 'soft-collision'
-              )
-            });
-          }
+          newX = releaseResult.position.x;
+          newY = releaseResult.position.y;
+          newZ = releaseResult.position.z;
+          dragDebug('partDrag:release:single:pipelineApplied', {
+            partId: part.id,
+            baseDelta,
+            adjustedDelta: releaseResult.delta,
+            clamped: releaseResult.collisionClamped
+          });
 
           dragDebug('partDrag:release:single:commit', { partId: part.id, position: { x: newX, y: newY, z: newZ } });
           commitSinglePartMove({ x: newX, y: newY, z: newZ });

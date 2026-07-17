@@ -4,7 +4,8 @@ import {
   applyGroundConstraintToDelta,
   resolveConstrainedMoveDelta,
   resolveGroupReleaseMove,
-  resolveMoveSelection
+  resolveMoveSelection,
+  resolveSinglePartReleaseMove
 } from './interactionMovement';
 
 const parts: Part[] = [
@@ -222,5 +223,25 @@ describe('interactionMovement', () => {
 
     expect([...result.affectedPartIds]).toEqual(['p-parent']);
     expect(result.constrained.delta).toEqual({ x: 1, y: 0, z: 0 });
+  });
+
+  it('resolves a single-part release position through the constraint pipeline', () => {
+    const part = {
+      ...parts[0],
+      id: 'moving',
+      length: 4,
+      width: 4,
+      position: { x: 0, y: 0.5, z: 0 }
+    };
+
+    const result = resolveSinglePartReleaseMove({
+      part,
+      projectParts: [part],
+      proposedPosition: { x: 2, y: 0.5, z: 3 },
+      preventOverlap: true
+    });
+
+    expect(result.position).toEqual({ x: 2, y: 0.5, z: 3 });
+    expect(result.collisionBlocked).toBe(false);
   });
 });

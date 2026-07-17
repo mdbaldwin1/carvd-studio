@@ -4,7 +4,7 @@ import { type InteractionSelectionInput, resolveTransformSelectedPartIds } from 
 import { applyConstraints } from '../interaction/constraints/pipeline';
 import { groundConstraint } from '../interaction/constraints/groundConstraint';
 import { collisionConstraint } from '../interaction/constraints/collisionConstraint';
-import { createGeometryCache } from '../interaction/geometry/cache';
+import { createGeometryCache, type GeometryCache } from '../interaction/geometry/cache';
 
 export interface MoveSelectionResolution {
   affectedPartIds: string[];
@@ -28,6 +28,13 @@ export interface ConstrainedMoveDeltaResult {
 export interface GroupReleaseMoveResult {
   affectedPartIds: Set<string>;
   constrained: ConstrainedMoveDeltaResult;
+}
+
+export interface SinglePartReleaseMoveResult {
+  position: TranslationDelta;
+  delta: TranslationDelta;
+  collisionBlocked: boolean;
+  collisionClamped: boolean;
 }
 
 // `calculatePartWorldHalfHeight` retired in §8b-group — the rotation-aware
@@ -203,5 +210,61 @@ export function resolveGroupReleaseMove({
       preventOverlap,
       fallbackDeltaOnOverlap
     })
+  };
+}
+
+export function resolveSinglePartReleaseMove({
+  part,
+  projectParts,
+  proposedPosition,
+  preventOverlap,
+  geometryCache
+}: {
+  part: Part;
+  projectParts: Part[];
+  proposedPosition: TranslationDelta;
+  preventOverlap: boolean;
+  geometryCache?: GeometryCache;
+}): SinglePartReleaseMoveResult {
+  const proposedDelta = {
+    x: proposedPosition.x - part.position.x,
+    y: proposedPosition.y - part.position.y,
+    z: proposedPosition.z - part.position.z
+  };
+  const result = applyConstraints(
+    {
+      candidate: {
+        kind: 'move',
+        delta: proposedDelta,
+        positions: new Map([[part.id, proposedPosition]])
+      },
+      startingParts: [part],
+      project: {
+        parts: projectParts,
+        stocks: [],
+        groupMembers: [],
+        preventOverlap
+      },
+      geometryCache: geometryCache ?? createGeometryCache()
+    },
+    [groundConstraint, collisionConstraint]
+  );
+
+  const collisionBlocked = result.blockers.some((b) => b.constraintName === 'collision');
+  if (result.adjusted.kind !== 'move') {
+    return {
+      position: proposedPosition,
+      delta: proposedDelta,
+      collisionBlocked,
+      collisionClamped: false
+    };
+  }
+
+  const adjustedPosition = result.adjusted.positions.get(part.id) ?? proposedPosition;
+  return {
+    position: adjustedPosition,
+    delta: result.adjusted.delta,
+    collisionBlocked,
+    collisionClamped: result.warnings.some((w) => w.constraintName === 'collision' && w.kind === 'soft-collision')
   };
 }
