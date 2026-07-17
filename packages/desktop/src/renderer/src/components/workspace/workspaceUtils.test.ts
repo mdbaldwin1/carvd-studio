@@ -3,7 +3,13 @@ import { describe, it, expect, vi } from 'vitest';
 // Use real Three.js so rotation math actually works in getPartAABB tests
 vi.unmock('three');
 
-import { LIGHTING_PRESETS, isOrbitControls, getPartAABB, bindWindowPointerSession } from './workspaceUtils';
+import {
+  LIGHTING_PRESETS,
+  isOrbitControls,
+  getPartAABB,
+  bindWindowPointerSession,
+  createPointerRafQueue
+} from './workspaceUtils';
 import { createGeometryCache } from '../../interaction/geometry/cache';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 
@@ -86,6 +92,45 @@ describe('workspaceUtils', () => {
       expect(target.removeEventListener).toHaveBeenCalledWith('pointerup', onEnd);
       expect(target.removeEventListener).toHaveBeenCalledWith('pointercancel', onEnd);
       expect(target.removeEventListener).toHaveBeenCalledWith('blur', onEnd);
+    });
+  });
+
+  describe('createPointerRafQueue', () => {
+    it('coalesces pointer moves to one animation frame and cancels pending work', () => {
+      let nextFrameId = 1;
+      const frames = new Map<number, () => void>();
+      const target = {
+        requestAnimationFrame: vi.fn((callback: () => void) => {
+          const frameId = nextFrameId++;
+          frames.set(frameId, callback);
+          return frameId;
+        }),
+        cancelAnimationFrame: vi.fn((frameId: number) => {
+          frames.delete(frameId);
+        })
+      };
+      const onFrame = vi.fn();
+      const firstEvent = { clientX: 1 } as PointerEvent;
+      const latestEvent = { clientX: 2 } as PointerEvent;
+
+      const queue = createPointerRafQueue(target, onFrame);
+
+      queue.schedule(firstEvent);
+      queue.schedule(latestEvent);
+
+      expect(target.requestAnimationFrame).toHaveBeenCalledTimes(1);
+
+      frames.get(1)?.();
+
+      expect(onFrame).toHaveBeenCalledWith(latestEvent);
+
+      const canceledEvent = { clientX: 3 } as PointerEvent;
+      queue.schedule(canceledEvent);
+      queue.cancel();
+
+      expect(target.cancelAnimationFrame).toHaveBeenCalledWith(2);
+      expect(frames.has(2)).toBe(false);
+      expect(onFrame).not.toHaveBeenCalledWith(canceledEvent);
     });
   });
 

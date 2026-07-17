@@ -14,7 +14,7 @@ import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { useInteractionStore } from '../../store/interactionStore';
 import { getCombinedBounds, calculateSnapThreshold, type PartBounds } from '../../utils/snapToPartsUtil';
 import { snapToGrid } from './partTypes';
-import { bindWindowPointerSession, isOrbitControls } from './workspaceUtils';
+import { bindWindowPointerSession, createPointerRafQueue, isOrbitControls } from './workspaceUtils';
 import type { Part } from '../../types';
 import { dragDebug } from '../../utils/dragDebug';
 import {
@@ -61,10 +61,6 @@ export function useGroupDrag(
 ): {
   startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number) => void;
 } {
-  // RAF gating to coalesce pointer events to animation frame rate
-  const rafIdRef = useRef<number | null>(null);
-  const latestEventRef = useRef<PointerEvent | null>(null);
-
   // Drag state refs (not React state — no re-renders needed during drag)
   const dragActiveRef = useRef(false);
   const startPointRef = useRef<THREE.Vector3 | null>(null);
@@ -156,6 +152,7 @@ export function useGroupDrag(
       // Store start info
       const startPoint = worldPoint.clone();
       let dragStarted = false;
+      let pointerRafQueue: ReturnType<typeof createPointerRafQueue>;
 
       const handleMove = (e: PointerEvent) => {
         if (!dragStarted) {
@@ -230,199 +227,197 @@ export function useGroupDrag(
         }
 
         // Drag active — process move
-        latestEventRef.current = e;
-        if (rafIdRef.current !== null) return;
-        rafIdRef.current = window.requestAnimationFrame(() => {
-          rafIdRef.current = null;
-          const evt = latestEventRef.current;
-          if (!evt || !dragActiveRef.current || !startPointRef.current || !anchorPosRef.current) return;
+        pointerRafQueue.schedule(e);
+      };
 
-          const currentPoint = getWorldPoint(evt);
-          if (!currentPoint) return;
+      pointerRafQueue = createPointerRafQueue(window, (evt) => {
+        if (!dragActiveRef.current || !startPointRef.current || !anchorPosRef.current) return;
 
-          const axes = planeAxesRef.current;
-          const delta = _groupProjected.copy(currentPoint).sub(startPointRef.current);
-          let uAmount = delta.dot(planeBasisURef.current);
-          let vAmount = delta.dot(planeBasisVRef.current);
+        const currentPoint = getWorldPoint(evt);
+        if (!currentPoint) return;
 
-          const settings = useAppSettingsStore.getState().settings;
-          if (settings.liveGridSnap) {
-            // Quantize along virtual group drag basis instead of world axes.
-            uAmount = snapToGrid(uAmount);
-            vAmount = snapToGrid(vAmount);
-          }
+        const axes = planeAxesRef.current;
+        const delta = _groupProjected.copy(currentPoint).sub(startPointRef.current);
+        let uAmount = delta.dot(planeBasisURef.current);
+        let vAmount = delta.dot(planeBasisVRef.current);
 
-          const projectedDelta = _groupProjectedV
-            .copy(planeBasisURef.current)
-            .multiplyScalar(uAmount)
-            .add(_groupProjected.copy(planeBasisVRef.current).multiplyScalar(vAmount));
+        const settings = useAppSettingsStore.getState().settings;
+        if (settings.liveGridSnap) {
+          // Quantize along virtual group drag basis instead of world axes.
+          uAmount = snapToGrid(uAmount);
+          vAmount = snapToGrid(vAmount);
+        }
 
-          let newX = anchorPosRef.current.x + projectedDelta.x;
-          let newY = anchorPosRef.current.y + projectedDelta.y;
-          let newZ = anchorPosRef.current.z + projectedDelta.z;
+        const projectedDelta = _groupProjectedV
+          .copy(planeBasisURef.current)
+          .multiplyScalar(uAmount)
+          .add(_groupProjected.copy(planeBasisVRef.current).multiplyScalar(vAmount));
 
-          // Grid snap
-          const { snapSensitivity } = settings;
-          // Grid snap already applied in virtual basis space above.
+        let newX = anchorPosRef.current.x + projectedDelta.x;
+        let newY = anchorPosRef.current.y + projectedDelta.y;
+        let newZ = anchorPosRef.current.z + projectedDelta.z;
 
-          const { parts, snapGuides } = useProjectStore.getState();
-          const movingIds = movingPartIdsRef.current;
-          const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled && !evt.altKey;
-          let snapLines: import('../../types').SnapLine[] = [];
+        // Grid snap
+        const { snapSensitivity } = settings;
+        // Grid snap already applied in virtual basis space above.
 
-          if (isSnapEnabled && initialBoundsRef.current) {
-            const cameraDistance = camera.position.distanceTo(_intersection.set(newX, newY, newZ));
-            const snapThreshold = calculateSnapThreshold(cameraDistance, snapSensitivity);
-            const workingDelta = {
-              x: newX - anchorPosRef.current.x,
-              y: newY - anchorPosRef.current.y,
-              z: newZ - anchorPosRef.current.z
-            };
-            const movingParts = parts.filter((part) => movingIds.has(part.id));
-            const toolInput = {
-              initialBounds: initialBoundsRef.current,
-              anchorPosition: anchorPosRef.current,
-              delta: workingDelta,
-              axes,
-              referenceParts: parts,
-              movingParts,
-              snapGuides,
-              settings,
-              snapThreshold
-            };
-            if (!groupMoveToolStateRef.current) {
-              groupMoveToolStateRef.current = groupMoveTool.begin(toolInput);
-            }
-            const toolResult = groupMoveTool.update(toolInput, groupMoveToolStateRef.current);
-            groupMoveToolStateRef.current = toolResult.state;
-            const preview = toolResult.preview;
-            newX = anchorPosRef.current.x + preview.delta.x;
-            newY = anchorPosRef.current.y + preview.delta.y;
-            newZ = anchorPosRef.current.z + preview.delta.z;
-            snapLines = preview.snapLines;
-            wasSnappedByPartsRef.current = preview.snappedAxes;
-          } else {
-            groupMoveToolStateRef.current = null;
-          }
+        const { parts, snapGuides } = useProjectStore.getState();
+        const movingIds = movingPartIdsRef.current;
+        const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled && !evt.altKey;
+        let snapLines: import('../../types').SnapLine[] = [];
 
-          const proposedDelta = {
+        if (isSnapEnabled && initialBoundsRef.current) {
+          const cameraDistance = camera.position.distanceTo(_intersection.set(newX, newY, newZ));
+          const snapThreshold = calculateSnapThreshold(cameraDistance, snapSensitivity);
+          const workingDelta = {
             x: newX - anchorPosRef.current.x,
             y: newY - anchorPosRef.current.y,
             z: newZ - anchorPosRef.current.z
           };
+          const movingParts = parts.filter((part) => movingIds.has(part.id));
+          const toolInput = {
+            initialBounds: initialBoundsRef.current,
+            anchorPosition: anchorPosRef.current,
+            delta: workingDelta,
+            axes,
+            referenceParts: parts,
+            movingParts,
+            snapGuides,
+            settings,
+            snapThreshold
+          };
+          if (!groupMoveToolStateRef.current) {
+            groupMoveToolStateRef.current = groupMoveTool.begin(toolInput);
+          }
+          const toolResult = groupMoveTool.update(toolInput, groupMoveToolStateRef.current);
+          groupMoveToolStateRef.current = toolResult.state;
+          const preview = toolResult.preview;
+          newX = anchorPosRef.current.x + preview.delta.x;
+          newY = anchorPosRef.current.y + preview.delta.y;
+          newZ = anchorPosRef.current.z + preview.delta.z;
+          snapLines = preview.snapLines;
+          wasSnappedByPartsRef.current = preview.snappedAxes;
+        } else {
+          groupMoveToolStateRef.current = null;
+        }
 
-          // Ground constraint — ensure no group part goes below ground
-          const { selectedGroupIds, selectedPartIds, editingGroupId } = useSelectionStore.getState();
-          const { groupMembers, parts: allParts, stockConstraints } = useProjectStore.getState();
-          const partIds = new Set(
-            resolveMoveSelection(
-              {
-                selectedPartIds,
-                selectedGroupIds,
-                editingGroupId
-              },
-              allParts,
-              groupMembers
-            ).affectedPartIds
-          );
+        const proposedDelta = {
+          x: newX - anchorPosRef.current.x,
+          y: newY - anchorPosRef.current.y,
+          z: newZ - anchorPosRef.current.z
+        };
 
-          const constrainedPreview = resolveConstrainedMoveDelta(allParts, partIds, proposedDelta, {
-            preventOverlap: stockConstraints.preventOverlap,
-            fallbackDeltaOnOverlap: lastDragPosRef.current ?? { x: 0, y: 0, z: 0 }
+        // Ground constraint — ensure no group part goes below ground
+        const { selectedGroupIds, selectedPartIds, editingGroupId } = useSelectionStore.getState();
+        const { groupMembers, parts: allParts, stockConstraints } = useProjectStore.getState();
+        const partIds = new Set(
+          resolveMoveSelection(
+            {
+              selectedPartIds,
+              selectedGroupIds,
+              editingGroupId
+            },
+            allParts,
+            groupMembers
+          ).affectedPartIds
+        );
+
+        const constrainedPreview = resolveConstrainedMoveDelta(allParts, partIds, proposedDelta, {
+          preventOverlap: stockConstraints.preventOverlap,
+          fallbackDeltaOnOverlap: lastDragPosRef.current ?? { x: 0, y: 0, z: 0 }
+        });
+        proposedDelta.x = constrainedPreview.delta.x;
+        proposedDelta.y = constrainedPreview.delta.y;
+        proposedDelta.z = constrainedPreview.delta.z;
+
+        if (constrainedPreview.overlapBlocked) {
+          dragDebug('groupDrag:move:overlapBlocked', {
+            requestedDelta: proposedDelta,
+            fallbackDelta: constrainedPreview.delta
           });
-          proposedDelta.x = constrainedPreview.delta.x;
-          proposedDelta.y = constrainedPreview.delta.y;
-          proposedDelta.z = constrainedPreview.delta.z;
+        } else if (constrainedPreview.overlapClamped) {
+          dragDebug('groupDrag:move:overlapClamped', {
+            requestedDelta: proposedDelta,
+            safeDelta: constrainedPreview.delta
+          });
+        }
+        if (snapLines.length > 0) {
+          dragDebug('groupDrag:move:snaps', {
+            delta: proposedDelta,
+            snapLineTypes: snapLines.map((l) => l.type),
+            snappedAxes: {
+              x: wasSnappedByPartsRef.current.x,
+              y: wasSnappedByPartsRef.current.y,
+              z: wasSnappedByPartsRef.current.z
+            }
+          });
+        }
 
-          if (constrainedPreview.overlapBlocked) {
-            dragDebug('groupDrag:move:overlapBlocked', {
-              requestedDelta: proposedDelta,
-              fallbackDelta: constrainedPreview.delta
-            });
-          } else if (constrainedPreview.overlapClamped) {
-            dragDebug('groupDrag:move:overlapClamped', {
-              requestedDelta: proposedDelta,
-              safeDelta: constrainedPreview.delta
-            });
-          }
-          if (snapLines.length > 0) {
-            dragDebug('groupDrag:move:snaps', {
+        let referenceDistances: import('../../types').ReferenceDistanceIndicator[] = [];
+        let referenceState:
+          | {
+              selectionEntities?: import('../../utils/interactionSelection').InteractionSelectionEntity[];
+              referenceEntities?: import('../../utils/interactionSelection').InteractionSelectionEntity[];
+              candidateRelations?: import('../../utils/referenceRelations').ReferenceRelation[];
+              activeRelationId?: string | null;
+              latchedAxis?: 'x' | 'y' | 'z' | null;
+            }
+          | undefined;
+
+        const currentReferenceIds = useSnapStore.getState().referencePartIds;
+        const currentActiveReferenceState = useInteractionStore.getState().activeSession?.referenceState ?? null;
+        if (currentReferenceIds.length > 0) {
+          const referenceEntities = resolveReferenceEntities(currentReferenceIds, groupMembers);
+          const selectionEntities = resolveSelectionEntities(
+            {
+              selectedPartIds,
+              selectedGroupIds
+            },
+            groupMembers
+          )
+            .map((entity) => ({
+              ...entity,
+              partIds: entity.partIds.filter((id) => !currentReferenceIds.includes(id))
+            }))
+            .filter((entity) => entity.partIds.length > 0);
+
+          if (selectionEntities.length > 0 && referenceEntities.length > 0) {
+            const relationPreview = solveMoveReferencePreview({
+              selectionEntities,
+              referenceEntities,
+              parts: allParts,
+              movingPartIds: [...partIds],
               delta: proposedDelta,
-              snapLineTypes: snapLines.map((l) => l.type),
-              snappedAxes: {
-                x: wasSnappedByPartsRef.current.x,
-                y: wasSnappedByPartsRef.current.y,
-                z: wasSnappedByPartsRef.current.z
-              }
+              preferredAxis: currentActiveReferenceState?.latchedAxis ?? null,
+              latchedRelationId: currentActiveReferenceState?.activeRelationId ?? null,
+              latchedAxis: currentActiveReferenceState?.latchedAxis ?? null
             });
-          }
 
-          let referenceDistances: import('../../types').ReferenceDistanceIndicator[] = [];
-          let referenceState:
-            | {
-                selectionEntities?: import('../../utils/interactionSelection').InteractionSelectionEntity[];
-                referenceEntities?: import('../../utils/interactionSelection').InteractionSelectionEntity[];
-                candidateRelations?: import('../../utils/referenceRelations').ReferenceRelation[];
-                activeRelationId?: string | null;
-                latchedAxis?: 'x' | 'y' | 'z' | null;
-              }
-            | undefined;
-
-          const currentReferenceIds = useSnapStore.getState().referencePartIds;
-          const currentActiveReferenceState = useInteractionStore.getState().activeSession?.referenceState ?? null;
-          if (currentReferenceIds.length > 0) {
-            const referenceEntities = resolveReferenceEntities(currentReferenceIds, groupMembers);
-            const selectionEntities = resolveSelectionEntities(
-              {
-                selectedPartIds,
-                selectedGroupIds
-              },
-              groupMembers
-            )
-              .map((entity) => ({
-                ...entity,
-                partIds: entity.partIds.filter((id) => !currentReferenceIds.includes(id))
-              }))
-              .filter((entity) => entity.partIds.length > 0);
-
-            if (selectionEntities.length > 0 && referenceEntities.length > 0) {
-              const relationPreview = solveMoveReferencePreview({
+            if (relationPreview.axisAligned && relationPreview.relations.length > 0) {
+              referenceDistances = relationPreview.relations.map(referenceRelationToIndicator);
+              referenceState = {
                 selectionEntities,
                 referenceEntities,
-                parts: allParts,
-                movingPartIds: [...partIds],
-                delta: proposedDelta,
-                preferredAxis: currentActiveReferenceState?.latchedAxis ?? null,
-                latchedRelationId: currentActiveReferenceState?.activeRelationId ?? null,
-                latchedAxis: currentActiveReferenceState?.latchedAxis ?? null
-              });
-
-              if (relationPreview.axisAligned && relationPreview.relations.length > 0) {
-                referenceDistances = relationPreview.relations.map(referenceRelationToIndicator);
-                referenceState = {
-                  selectionEntities,
-                  referenceEntities,
-                  candidateRelations: relationPreview.relations,
-                  activeRelationId: relationPreview.activeRelation?.id ?? null,
-                  latchedAxis: relationPreview.activeRelation?.axis ?? null
-                };
-              }
+                candidateRelations: relationPreview.relations,
+                activeRelationId: relationPreview.activeRelation?.id ?? null,
+                latchedAxis: relationPreview.activeRelation?.axis ?? null
+              };
             }
           }
+        }
 
-          lastDragPosRef.current = proposedDelta;
-          publishMoveInteractionPreview({
-            delta: proposedDelta,
-            snapLines,
-            referenceDistances,
-            referenceState,
-            publishSelectionDragDelta: true
-          });
-          if (snapLines.length === 0) {
-            wasSnappedByPartsRef.current = { x: false, y: false, z: false };
-          }
+        lastDragPosRef.current = proposedDelta;
+        publishMoveInteractionPreview({
+          delta: proposedDelta,
+          snapLines,
+          referenceDistances,
+          referenceState,
+          publishSelectionDragDelta: true
         });
-      };
+        if (snapLines.length === 0) {
+          wasSnappedByPartsRef.current = { x: false, y: false, z: false };
+        }
+      });
 
       const handleUp = () => {
         if (!dragStarted || !lastDragPosRef.current) {
@@ -506,11 +501,7 @@ export function useGroupDrag(
         wasSnappedByPartsRef.current = { x: false, y: false, z: false };
         groupMoveToolStateRef.current = null;
         lastDragPosRef.current = null;
-        if (rafIdRef.current !== null) {
-          window.cancelAnimationFrame(rafIdRef.current);
-          rafIdRef.current = null;
-        }
-        latestEventRef.current = null;
+        pointerRafQueue.cancel();
       };
 
       // Clean up any previous drag (safety)

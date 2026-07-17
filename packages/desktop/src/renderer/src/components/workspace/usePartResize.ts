@@ -12,7 +12,7 @@ import {
   publishResizeInteractionPreview
 } from '../../utils/interactionSession';
 import { LiveDimensions, HandlePosition, snapToGrid } from './partTypes';
-import { bindWindowPointerSession, isOrbitControls } from './workspaceUtils';
+import { bindWindowPointerSession, createPointerRafQueue, isOrbitControls } from './workspaceUtils';
 import {
   createResizeCommitPreview,
   createResizeCommitState,
@@ -69,10 +69,6 @@ export function usePartResize(
   const _tempLocalOffset = useRef(new THREE.Vector3());
   const _tempWorldOffset = useRef(new THREE.Vector3());
   const _tempCameraTarget = useRef(new THREE.Vector3());
-
-  // RAF gating refs for coalescing pointer events to animation frame rate
-  const rafIdRef = useRef<number | null>(null);
-  const latestEventRef = useRef<PointerEvent | null>(null);
 
   // Transform a world-space vector to local space (accounts for part rotation)
   const worldToLocal = (worldDelta: THREE.Vector3): THREE.Vector3 => {
@@ -298,23 +294,20 @@ export function usePartResize(
       }
     };
 
+    const pointerRafQueue = createPointerRafQueue(window, (evt) => {
+      if (!isResizing || !resizeStart.current) return;
+      const currentPoint = getWorldPoint(evt);
+      if (currentPoint) {
+        handleResizeMove(currentPoint);
+      }
+    });
     const handleWindowPointerMove = (e: PointerEvent) => {
       if (e.buttons === 0) {
         handleWindowPointerUp();
         return;
       }
       // Coalesce pointer events to animation frame rate
-      latestEventRef.current = e;
-      if (rafIdRef.current !== null) return;
-      rafIdRef.current = window.requestAnimationFrame(() => {
-        rafIdRef.current = null;
-        const evt = latestEventRef.current;
-        if (!evt || !isResizing || !resizeStart.current) return;
-        const currentPoint = getWorldPoint(evt);
-        if (currentPoint) {
-          handleResizeMove(currentPoint);
-        }
-      });
+      pointerRafQueue.schedule(e);
     };
 
     const unbindPointerSession = bindWindowPointerSession(window, {
@@ -323,10 +316,7 @@ export function usePartResize(
     });
     return () => {
       unbindPointerSession();
-      if (rafIdRef.current !== null) {
-        window.cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
+      pointerRafQueue.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isResizing, liveDims]);

@@ -243,7 +243,10 @@ export function Workspace() {
   // the click-vs-bubble race between the per-mesh part handler and the per-mesh
   // ground handler. The session controller's `onClick` updates this ref via
   // `markSelectionApplied` so the guard still works.
-  // (Those R3F paths migrate to the controller in §4 alongside tool solvers.)
+  // These remaining R3F ground/sky paths still live at the canvas edge because
+  // they depend on empty-space pointer geometry; the session controller owns
+  // click classification and calls `markSelectionApplied` for the shared race
+  // guard.
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
   // Guard against double-processing the same background double-click via bubbling/overlap.
   const lastBackgroundDoubleClickAt = useRef(0);

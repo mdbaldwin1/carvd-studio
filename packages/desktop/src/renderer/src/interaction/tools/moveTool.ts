@@ -7,8 +7,9 @@
 //   commit  produces a single updatePartPosition per moving part
 //   cancel  no-op
 //
-// This wrapper makes no behavior change vs. the existing usePartDrag inline
-// path. Phase §4b will refactor usePartDrag to delegate to this tool.
+// The pointer-event shell keeps viewport/session lifecycle concerns in React,
+// while move preview and commit math flow through this tool and the shared
+// interaction movement helpers.
 
 import type { AppSettings, Part, SnapGuide, SnapLine } from '../../types';
 import { solvePartMoveSnapPreview, type PartMovePreviewResult } from '../../utils/interactionMovePreview';

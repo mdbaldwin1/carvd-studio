@@ -5,10 +5,9 @@
 // solver.begin/update/commit/cancel, and applies the resulting commit
 // instructions to the project store.
 //
-// Phase §4 ships the interface plus three wrappers around existing pure
-// solvers (moveTool, groupMoveTool, resizeTool). Phase §4b collapses the
-// hooks (usePartDrag, useGroupDrag, usePartResize) so they delegate solver
-// work to these tools.
+// The transform hooks keep DOM/R3F lifecycle concerns at the edge. Transform
+// preview and commit work is delegated through these tools and the shared
+// interaction movement helpers so tool math stays reusable and testable.
 
 import type { Rotation3D } from '../../types';
 

@@ -84,6 +84,44 @@ export function bindWindowPointerSession(
   };
 }
 
+export interface PointerRafTarget {
+  requestAnimationFrame(callback: () => void): number;
+  cancelAnimationFrame(frameId: number): void;
+}
+
+export function createPointerRafQueue(
+  target: PointerRafTarget,
+  onFrame: (event: PointerEvent) => void
+): {
+  schedule(event: PointerEvent): void;
+  cancel(): void;
+} {
+  let frameId: number | null = null;
+  let latestEvent: PointerEvent | null = null;
+
+  return {
+    schedule(event) {
+      latestEvent = event;
+      if (frameId !== null) return;
+
+      frameId = target.requestAnimationFrame(() => {
+        frameId = null;
+        const eventForFrame = latestEvent;
+        if (!eventForFrame) return;
+
+        onFrame(eventForFrame);
+      });
+    },
+    cancel() {
+      if (frameId !== null) {
+        target.cancelAnimationFrame(frameId);
+        frameId = null;
+      }
+      latestEvent = null;
+    }
+  };
+}
+
 // Module-level reusable objects for getPartAABB calculations.
 // Safe because JS is single-threaded and the return value is a plain object.
 const _aabbEuler = new THREE.Euler();
