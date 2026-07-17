@@ -496,12 +496,7 @@ export function useGroupDrag(
         cleanup();
       };
 
-      const cleanup = () => {
-        window.removeEventListener('pointermove', handleMove);
-        window.removeEventListener('pointerup', handleUp);
-        window.removeEventListener('pointercancel', handleUp);
-        window.removeEventListener('blur', handleUp);
-        cleanupRef.current = null;
+      const resetGroupDragRefs = () => {
         dragActiveRef.current = false;
         startPointRef.current = null;
         anchorPosRef.current = null;
@@ -515,6 +510,15 @@ export function useGroupDrag(
           rafIdRef.current = null;
         }
         latestEventRef.current = null;
+      };
+
+      const cleanup = () => {
+        window.removeEventListener('pointermove', handleMove);
+        window.removeEventListener('pointerup', handleUp);
+        window.removeEventListener('pointercancel', handleUp);
+        window.removeEventListener('blur', handleUp);
+        cleanupRef.current = null;
+        resetGroupDragRefs();
         clearMoveInteractionPreview({
           clearSelectionDragDelta: true,
           clearReferenceDistances: false
