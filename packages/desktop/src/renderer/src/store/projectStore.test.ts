@@ -3,8 +3,6 @@ import {
   useProjectStore,
   validatePartsForCutList,
   getContainingGroupId,
-  getAllDescendantPartIds,
-  getAllDescendantGroupIds,
   getAncestorGroupIds,
   isDescendantOf
 } from './projectStore';
@@ -1736,53 +1734,6 @@ describe('projectStore utility functions', () => {
 
     it('returns null for empty groupMembers', () => {
       expect(getContainingGroupId('p1', [])).toBeNull();
-    });
-  });
-
-  describe('getAllDescendantPartIds', () => {
-    it('returns direct part members', () => {
-      const groupMembers = [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g1', 'p2', 'part')];
-
-      const result = getAllDescendantPartIds('g1', groupMembers);
-      expect(result).toEqual(expect.arrayContaining(['p1', 'p2']));
-      expect(result).toHaveLength(2);
-    });
-
-    it('returns nested parts from subgroups', () => {
-      const groupMembers = [
-        createTestGroupMember('outer', 'inner', 'group'),
-        createTestGroupMember('inner', 'p1', 'part'),
-        createTestGroupMember('inner', 'p2', 'part')
-      ];
-
-      const result = getAllDescendantPartIds('outer', groupMembers);
-      expect(result).toEqual(expect.arrayContaining(['p1', 'p2']));
-      expect(result).toHaveLength(2);
-    });
-
-    it('returns empty array for a group with no members', () => {
-      expect(getAllDescendantPartIds('g1', [])).toHaveLength(0);
-    });
-  });
-
-  describe('getAllDescendantGroupIds', () => {
-    it('returns the group itself plus nested groups', () => {
-      const groupMembers = [
-        createTestGroupMember('outer', 'inner', 'group'),
-        createTestGroupMember('inner', 'deep', 'group'),
-        createTestGroupMember('deep', 'p1', 'part')
-      ];
-
-      const result = getAllDescendantGroupIds('outer', groupMembers);
-      expect(result).toEqual(expect.arrayContaining(['outer', 'inner', 'deep']));
-      expect(result).toHaveLength(3);
-    });
-
-    it('returns just the group itself when no nested groups', () => {
-      const groupMembers = [createTestGroupMember('g1', 'p1', 'part')];
-
-      const result = getAllDescendantGroupIds('g1', groupMembers);
-      expect(result).toEqual(['g1']);
     });
   });
 

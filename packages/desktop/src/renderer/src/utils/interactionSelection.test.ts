@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getAllDescendantGroupIds,
   getAllDescendantPartIds,
   resolveReferenceEntities,
   resolveExplicitSelectedPartIds,
@@ -21,6 +22,17 @@ describe('interactionSelection', () => {
       resolveExplicitSelectedPartIds({ selectedPartIds: [], selectedGroupIds: ['g1'] }, groupMembers).sort()
     ).toEqual(['p1', 'p2']);
     expect(getAllDescendantPartIds('g1', groupMembers).sort()).toEqual(['p1', 'p2']);
+  });
+
+  it('resolves descendant parts for empty, direct, and nested groups', () => {
+    expect(getAllDescendantPartIds('g1', groupMembers).sort()).toEqual(['p1', 'p2']);
+    expect(getAllDescendantPartIds('g3', groupMembers)).toEqual(['p3']);
+    expect(getAllDescendantPartIds('missing', groupMembers)).toEqual([]);
+  });
+
+  it('resolves descendant groups with legacy self-inclusive semantics', () => {
+    expect(getAllDescendantGroupIds('g1', groupMembers)).toEqual(['g1', 'g2']);
+    expect(getAllDescendantGroupIds('g3', groupMembers)).toEqual(['g3']);
   });
 
   it('builds measurement entities from selected groups and standalone parts', () => {

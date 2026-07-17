@@ -32,8 +32,6 @@ import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../ut
 import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
 import { rotationTool } from '../interaction/tools/rotationTool';
 import {
-  getAllDescendantGroupIds as getAllDescendantGroupIdsFromSelection,
-  getAllDescendantPartIds as getAllDescendantPartIdsFromSelection,
   getAncestorGroupIds as getAncestorGroupIdsFromSelection,
   getContainingGroupId as getContainingGroupIdFromSelection,
   resolveSelectedGroupIdsWithDescendants,
@@ -241,8 +239,6 @@ function maybeShowOverlapClampToast() {
 
 /** Find which group a part belongs to, or null if ungrouped. */
 export const getContainingGroupId = getContainingGroupIdFromSelection;
-export const getAllDescendantPartIds = getAllDescendantPartIdsFromSelection;
-export const getAllDescendantGroupIds = getAllDescendantGroupIdsFromSelection;
 
 const getSceneGraphDescendantPartIds = ({
   groupId,
