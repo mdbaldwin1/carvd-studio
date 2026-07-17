@@ -358,23 +358,34 @@ export const RotationHandle = memo(
       [camera.position, getWorldPointOnRotationPlane, lockAxisFromInitialDrag, onRotateDelta]
     );
 
-    const finishDrag = useCallback(
-      (pointerId?: number) => {
-        if (!draggingRef.current) return;
-        if (activePointerIdRef.current !== null && pointerId !== undefined && pointerId !== activePointerIdRef.current)
-          return;
-
+    const clearRotationDragState = useCallback(
+      ({ cursor, updateDraggingState = true }: { cursor: 'auto' | 'pointer'; updateDraggingState?: boolean }) => {
         draggingRef.current = false;
         axisLockedRef.current = false;
         dragCenterRef.current = null;
         dragStartVectorRef.current = null;
         dragStartWorldPointRef.current = null;
         activePointerIdRef.current = null;
-        setIsDragging(false);
+        if (updateDraggingState) {
+          setIsDragging(false);
+        }
         onRotateEnd();
-        document.body.style.cursor = ringHovered || grabHovered ? 'pointer' : 'auto';
+        document.body.style.cursor = cursor;
       },
-      [grabHovered, onRotateEnd, ringHovered]
+      [onRotateEnd]
+    );
+
+    const finishDrag = useCallback(
+      (pointerId?: number) => {
+        if (!draggingRef.current) return;
+        if (activePointerIdRef.current !== null && pointerId !== undefined && pointerId !== activePointerIdRef.current)
+          return;
+
+        clearRotationDragState({
+          cursor: ringHovered || grabHovered ? 'pointer' : 'auto'
+        });
+      },
+      [clearRotationDragState, grabHovered, ringHovered]
     );
 
     useEffect(() => {
@@ -405,17 +416,13 @@ export const RotationHandle = memo(
     useEffect(() => {
       return () => {
         if (draggingRef.current) {
-          draggingRef.current = false;
-          axisLockedRef.current = false;
-          dragCenterRef.current = null;
-          dragStartVectorRef.current = null;
-          dragStartWorldPointRef.current = null;
-          activePointerIdRef.current = null;
-          onRotateEnd();
-          document.body.style.cursor = 'auto';
+          clearRotationDragState({
+            cursor: 'auto',
+            updateDraggingState: false
+          });
         }
       };
-    }, [onRotateEnd]);
+    }, [clearRotationDragState]);
 
     const handleRingPointerOver = (e: ThreeEvent<PointerEvent>) => {
       e.stopPropagation();
