@@ -35,7 +35,7 @@ export interface UseCanvasPointerSessionParams {
   scene: Object3D | null;
   /** Current project parts (for the rotated-box fallback in hit-testing). */
   parts: ReadonlyArray<Part>;
-  /** Optional overlay registry (Phase §10 will register real overlays). */
+  /** Optional DOM-overlay registry used to prioritize overlays before canvas raycasts. */
   overlayRegistry?: OverlayRegistry;
   /** Handlers — semantic actions only. Stable references not required. */
   handlers: UseCanvasPointerSessionHandlers;

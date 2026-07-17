@@ -5,10 +5,9 @@
 // The "world half-height" was computed inline in legacy code as
 // `worldHalfHeight = part.thickness / 2` for axis-aligned parts. For rotated
 // parts we use the geometry bundle's world-space AABB (derived per part from
-// `bundle.bounds.localObb` rotated into world space). For Phase §8a we lean
-// on the per-part rotation-aware AABB helper that already exists in
-// workspaceUtils (`getPartAABB`), but expressed through the constraint
-// interface so the legacy call sites can be retired in §8b.
+// `bundle.bounds.localObb` rotated into world space). The constraint expresses
+// this through the shared pipeline so callers do not each perform their own
+// ground-clamp math.
 
 import { getPartAABB } from '../../components/workspace/workspaceUtils';
 import type { Part } from '../../types';

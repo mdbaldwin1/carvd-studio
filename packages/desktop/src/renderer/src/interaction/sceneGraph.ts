@@ -2,10 +2,8 @@
 // not a persisted shape. Domain truth lives in `parts / groups / groupMembers`;
 // this module memoizes a hierarchical view for downstream consumers.
 //
-// Phase §1a (this commit): adapter + traversal helpers + tests. No consumer
-// migration. Phase §1b/§1c migrate the ad-hoc `getAllDescendantPartIds` /
-// `getPartGroupContext` / `resolveMoveSelection` / etc. call sites to read
-// from this adapter.
+// Traversal helpers and workspace consumers use this adapter for hierarchy
+// queries that used to be repeated against raw `groupMembers` arrays.
 //
 // World transforms are intentionally out of scope here — they belong to §5
 // (Geometry Query Layer). This module exposes hierarchy + local transform

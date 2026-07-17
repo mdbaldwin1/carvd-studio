@@ -2,9 +2,10 @@
 // `OverlayModel`. Overlay components consume slices via props — they do not
 // read from stores directly.
 //
-// Phase §10a (this commit): the `snap` slot is wired end-to-end. The
-// `references` and `dimensions` slots are stubbed so the model can grow
-// without API churn when §10b migrates the remaining components.
+// The model currently owns snap, reference-distance, and multi-selection
+// dimension overlay inputs. Some reference edit paths still carry legacy
+// indicator/session data through the model until the edit flow is split into
+// its own interaction host.
 
 import type { GroupMember, Part, ReferenceDistanceIndicator, ReferenceRuler, SnapLine } from '../types';
 import type { InteractionSession } from '../store/interactionStore';

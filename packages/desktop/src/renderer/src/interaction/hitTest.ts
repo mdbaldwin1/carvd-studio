@@ -138,11 +138,10 @@ export function setHitTargetDescriptor(object: THREE.Object3D, descriptor: HitTa
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Overlay registry — DOM-space overlays (drei <Html>, native portals) register
-// their bounding rect. The service checks the registry before raycasting so
-// overlays paint on top of the canvas semantically as well as visually.
-//
-// Phase §11 ships the registry empty; Phase §10 wires real overlays in.
+// Overlay registry — DOM-space overlays (drei <Html>, native portals) can
+// register their bounding rect. The service checks the registry before
+// raycasting so overlays paint on top of the canvas semantically as well as
+// visually. Empty registries are valid and simply fall through to raycasting.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface OverlayRegistration {

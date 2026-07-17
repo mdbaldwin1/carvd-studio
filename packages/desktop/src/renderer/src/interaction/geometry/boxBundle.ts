@@ -1,8 +1,8 @@
 // ADR-009: Derive a `PartGeometryBundle` from a box-shaped `Part`.
 //
-// Phase §5a: handles the current part shape (length × width × thickness box).
-// Phase §6 will add a dispatcher that routes parts with fabrication operations
-// to a different deriver while keeping the bundle interface stable.
+// Handles the current part shape (length × width × thickness box). The
+// `PartGeometryBundle` interface stays stable so future non-box fabrication
+// operations can provide a different deriver without changing consumers.
 
 import type { Part } from '../../types';
 import type {
