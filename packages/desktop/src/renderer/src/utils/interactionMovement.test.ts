@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { GroupMember, Part } from '../types';
-import { applyGroundConstraintToDelta, resolveConstrainedMoveDelta, resolveMoveSelection } from './interactionMovement';
+import {
+  applyGroundConstraintToDelta,
+  resolveConstrainedMoveDelta,
+  resolveGroupReleaseMove,
+  resolveMoveSelection
+} from './interactionMovement';
 
 const parts: Part[] = [
   {
@@ -179,5 +184,24 @@ describe('interactionMovement', () => {
     expect(constrained.delta).toEqual({ x: 0, y: 0, z: 0 });
     expect(constrained.overlapBlocked).toBe(true);
     expect(constrained.usedFallbackDelta).toBe(true);
+  });
+
+  it('resolves a group release delta with selected affected part ids', () => {
+    const result = resolveGroupReleaseMove({
+      parts,
+      groupMembers,
+      selection: {
+        selectedPartIds: [],
+        selectedGroupIds: ['g-parent'],
+        editingGroupId: null
+      },
+      proposedDelta: { x: 3, y: 0, z: 2 },
+      fallbackDeltaOnOverlap: { x: 1, y: 0, z: 1 },
+      preventOverlap: false
+    });
+
+    expect([...result.affectedPartIds].sort()).toEqual(['p-a1', 'p-a2', 'p-parent']);
+    expect(result.constrained.delta).toEqual({ x: 3, y: 0, z: 2 });
+    expect(result.constrained.overlapBlocked).toBe(false);
   });
 });

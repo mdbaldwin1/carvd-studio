@@ -17,7 +17,11 @@ import { snapToGrid } from './partTypes';
 import { isOrbitControls } from './workspaceUtils';
 import type { Part } from '../../types';
 import { dragDebug } from '../../utils/dragDebug';
-import { resolveConstrainedMoveDelta, resolveMoveSelection } from '../../utils/interactionMovement';
+import {
+  resolveConstrainedMoveDelta,
+  resolveGroupReleaseMove,
+  resolveMoveSelection
+} from '../../utils/interactionMovement';
 import {
   createGroupMoveCommitPreview,
   createGroupMoveCommitState,
@@ -446,22 +450,20 @@ export function useGroupDrag(
         // Ground constraint on final position
         const { selectedGroupIds, selectedPartIds, editingGroupId } = useSelectionStore.getState();
         const { groupMembers, parts, stockConstraints } = useProjectStore.getState();
-        const partIds = new Set(
-          resolveMoveSelection(
-            {
-              selectedPartIds,
-              selectedGroupIds,
-              editingGroupId
-            },
-            parts,
-            groupMembers
-          ).affectedPartIds
-        );
-
-        const constrainedRelease = resolveConstrainedMoveDelta(parts, partIds, snappedDelta, {
+        const releaseMove = resolveGroupReleaseMove({
+          parts,
+          groupMembers,
+          selection: {
+            selectedPartIds,
+            selectedGroupIds,
+            editingGroupId
+          },
+          proposedDelta: snappedDelta,
           preventOverlap: stockConstraints.preventOverlap,
           fallbackDeltaOnOverlap: finalDelta
         });
+        const partIds = releaseMove.affectedPartIds;
+        const constrainedRelease = releaseMove.constrained;
 
         if (constrainedRelease.overlapBlocked) {
           dragDebug('groupDrag:release:noSafeDelta', {

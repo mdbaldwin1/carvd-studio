@@ -25,6 +25,11 @@ export interface ConstrainedMoveDeltaResult {
   usedFallbackDelta: boolean;
 }
 
+export interface GroupReleaseMoveResult {
+  affectedPartIds: Set<string>;
+  constrained: ConstrainedMoveDeltaResult;
+}
+
 // `calculatePartWorldHalfHeight` retired in §8b-group — the rotation-aware
 // world half-height math is now inside `groundConstraint` via `getPartAABB`.
 // Pre-allocated three.js objects (`_upVector` etc.) likewise removed.
@@ -171,5 +176,30 @@ export function resolveConstrainedMoveDelta(
     overlapBlocked,
     overlapClamped,
     usedFallbackDelta: false
+  };
+}
+
+export function resolveGroupReleaseMove({
+  parts,
+  groupMembers,
+  selection,
+  proposedDelta,
+  fallbackDeltaOnOverlap,
+  preventOverlap
+}: {
+  parts: Part[];
+  groupMembers: GroupMember[];
+  selection: InteractionSelectionInput;
+  proposedDelta: TranslationDelta;
+  fallbackDeltaOnOverlap: TranslationDelta;
+  preventOverlap: boolean;
+}): GroupReleaseMoveResult {
+  const affectedPartIds = new Set(resolveMoveSelection(selection, parts, groupMembers).affectedPartIds);
+  return {
+    affectedPartIds,
+    constrained: resolveConstrainedMoveDelta(parts, affectedPartIds, proposedDelta, {
+      preventOverlap,
+      fallbackDeltaOnOverlap
+    })
   };
 }
