@@ -139,7 +139,7 @@ export function usePartDrag(
   };
 
   const getWorldPoint = useCallback(
-    (e: PointerEvent | MouseEvent): THREE.Vector3 | null => {
+    (e: { clientX: number; clientY: number }): THREE.Vector3 | null => {
       const rect = gl.domElement.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -256,20 +256,8 @@ export function usePartDrag(
     if (!dragIntentForPart || isDragging) return;
     const dragIntent = dragIntentForPart;
 
-    // Keep this part rendered individually, then consume the intent
+    // Keep this part rendered individually while the intent is pending.
     markTransformDraggingPart(part.id);
-
-    // Use the stored world point as the drag start reference
-    let startPoint: THREE.Vector3 | null = null;
-    if (dragIntent.worldPoint) {
-      startPoint = new THREE.Vector3(dragIntent.worldPoint.x, dragIntent.worldPoint.y, dragIntent.worldPoint.z);
-    }
-
-    if (!startPoint) {
-      useSelectionStore.getState().clearDragIntent();
-      clearTransformDraggingPart();
-      return;
-    }
 
     const startScreenX = dragIntent.screenX;
     const startScreenY = dragIntent.screenY;
@@ -303,6 +291,17 @@ export function usePartDrag(
       );
 
       getDragPlaneInfo(anchorPos);
+      const startPoint =
+        getWorldPoint({ clientX: startScreenX, clientY: startScreenY }) ??
+        (dragIntent.worldPoint
+          ? new THREE.Vector3(dragIntent.worldPoint.x, dragIntent.worldPoint.y, dragIntent.worldPoint.z)
+          : null);
+
+      if (!startPoint) {
+        useSelectionStore.getState().clearDragIntent();
+        clearTransformDraggingPart();
+        return;
+      }
 
       setIsDragging(true);
       beginMoveInteractionSession({
@@ -310,7 +309,7 @@ export function usePartDrag(
         primaryPartId: part.id
       });
       dragStart.current = {
-        point: startPoint!.clone(),
+        point: startPoint.clone(),
         partPos: anchorPos,
         partOriginalPos: new THREE.Vector3(part.position.x, part.position.y, part.position.z)
       };
@@ -319,6 +318,7 @@ export function usePartDrag(
       dragDebug('partDrag:intentStart', {
         partId: part.id,
         startImmediately: !!dragIntent.startImmediately,
+        startPointSource: 'drag-plane-ray',
         anchorPos: { x: anchorPos.x, y: anchorPos.y, z: anchorPos.z },
         partOriginalPos: { x: part.position.x, y: part.position.y, z: part.position.z }
       });
@@ -935,7 +935,7 @@ export function usePartDrag(
 
     getDragPlaneInfo(anchorPos);
 
-    const startPoint = e.point ? e.point.clone() : getWorldPoint(e.nativeEvent);
+    const startPoint = getWorldPoint(e.nativeEvent);
     const partOriginalPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
     if (startPoint) {
       setIsDragging(true);
@@ -952,7 +952,7 @@ export function usePartDrag(
       dragFrameCounterRef.current = 0;
       dragDebug('partDrag:start', {
         partId: part.id,
-        startPointSource: e.point ? 'mesh-hit' : 'drag-plane-ray',
+        startPointSource: 'drag-plane-ray',
         anchorPos: { x: anchorPos.x, y: anchorPos.y, z: anchorPos.z },
         partOriginalPos: { x: partOriginalPos.x, y: partOriginalPos.y, z: partOriginalPos.z }
       });
