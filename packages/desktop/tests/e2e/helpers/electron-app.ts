@@ -15,6 +15,7 @@ declare global {
     useSnapStore: { getState: () => any };
     useUIStore: { getState: () => any };
     useInteractionStore: { getState: () => any };
+    useLicenseStore: { getState: () => any };
     __carvdE2E?: {
       getPartScreenPoint: (partId?: string) => { x: number; y: number } | null;
       getResizeHandleScreenPoint: (
@@ -121,7 +122,12 @@ export async function launchElectronApp(): Promise<RunningElectronApp> {
 
 export async function waitForAutomationHooks(window: Page): Promise<void> {
   await window.waitForFunction(
-    () => !!window.useProjectStore && !!window.useSelectionStore && !!window.useUIStore && !!window.useInteractionStore,
+    () =>
+      !!window.useProjectStore &&
+      !!window.useSelectionStore &&
+      !!window.useUIStore &&
+      !!window.useInteractionStore &&
+      !!window.useLicenseStore,
     null,
     { timeout: 30000 }
   );

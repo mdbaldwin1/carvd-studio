@@ -10,6 +10,7 @@ import { useUIStore } from '../store/uiStore';
 import { useInteractionStore } from '../store/interactionStore';
 import { useSnapStore } from '../store/snapStore';
 import { useCameraStore } from '../store/cameraStore';
+import { useLicenseStore } from '../store/licenseStore';
 import { generateSeedProject, generateStockLibraryItems } from '../utils/seedData';
 import { installDragDebugTools } from '../utils/dragDebug';
 
@@ -55,6 +56,7 @@ export function useDevTools() {
       (window as unknown as Record<string, unknown>).useInteractionStore = useInteractionStore;
       (window as unknown as Record<string, unknown>).useSnapStore = useSnapStore;
       (window as unknown as Record<string, unknown>).useCameraStore = useCameraStore;
+      (window as unknown as Record<string, unknown>).useLicenseStore = useLicenseStore;
       window.carvdDev = {
         /**
          * Load the seed project (Simple Writing Desk)
