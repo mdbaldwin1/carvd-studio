@@ -9,6 +9,7 @@ export interface DragIntent {
   screenX: number;
   screenY: number;
   worldPoint: { x: number; y: number; z: number } | null;
+  startImmediately?: boolean;
 }
 
 interface SelectionStoreState {

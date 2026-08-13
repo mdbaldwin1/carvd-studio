@@ -475,7 +475,8 @@ export function Workspace() {
           partId: action.hit.partId,
           screenX: action.downAt.clientX,
           screenY: action.downAt.clientY,
-          worldPoint: action.hit.worldPoint
+          worldPoint: action.hit.worldPoint,
+          startImmediately: true
         });
         pauseOrbitControls(controls);
       },

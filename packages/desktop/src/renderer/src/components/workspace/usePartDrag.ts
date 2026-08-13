@@ -276,14 +276,8 @@ export function usePartDrag(
     const DRAG_THRESHOLD_SQ = 9; // 3px squared
     let dragStarted = false;
 
-    // Window listener: watch for enough mouse movement to distinguish drag from click
-    const handleIntentMove = (e: PointerEvent) => {
-      if (dragStarted) return; // second useEffect has taken over
-      const dx = e.clientX - startScreenX;
-      const dy = e.clientY - startScreenY;
-      if (dx * dx + dy * dy < DRAG_THRESHOLD_SQ) return;
-
-      // Past threshold — start the actual drag
+    const startDrag = () => {
+      if (dragStarted) return;
       dragStarted = true;
 
       // Compute proper anchor (group center for multi-part, part position for single)
@@ -324,10 +318,26 @@ export function usePartDrag(
       dragFrameCounterRef.current = 0;
       dragDebug('partDrag:intentStart', {
         partId: part.id,
+        startImmediately: !!dragIntent.startImmediately,
         anchorPos: { x: anchorPos.x, y: anchorPos.y, z: anchorPos.z },
         partOriginalPos: { x: part.position.x, y: part.position.y, z: part.position.z }
       });
       pauseOrbitControls(controls);
+    };
+
+    if (dragIntent.startImmediately) {
+      startDrag();
+    }
+
+    // Window listener: watch for enough mouse movement to distinguish drag from click
+    const handleIntentMove = (e: PointerEvent) => {
+      if (dragStarted) return; // second useEffect has taken over
+      const dx = e.clientX - startScreenX;
+      const dy = e.clientY - startScreenY;
+      if (dx * dx + dy * dy < DRAG_THRESHOLD_SQ) return;
+
+      // Past threshold — start the actual drag
+      startDrag();
     };
 
     // Window listener: if pointer released before threshold, it was a click — clean up
