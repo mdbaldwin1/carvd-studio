@@ -78,7 +78,11 @@ const DEV_LICENSE_KEY = 'DEV-TEST-LICENSE-KEY';
  * Check if we're in development mode and using the dev test key
  */
 function isDevTestKey(licenseKey: string): boolean {
-  return process.env.NODE_ENV === 'development' && licenseKey === DEV_LICENSE_KEY;
+  return (
+    (process.env.NODE_ENV === 'development' ||
+      (process.env.NODE_ENV === 'test' && process.argv.includes('--test-mode'))) &&
+    licenseKey === DEV_LICENSE_KEY
+  );
 }
 
 /**

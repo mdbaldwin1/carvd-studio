@@ -502,7 +502,7 @@ git commit -m "test: cover properties panel e2e"
 
 - Produces if needed: test-mode mock license activation result IPC/env flag; must not affect production validation.
 
-- [ ] **Step 1: Write failing E2E**
+- [x] **Step 1: Write failing E2E**
 
 Tests:
 
@@ -513,10 +513,10 @@ test("license deactivation returns app to trial/free mode and premium gates appl
 test("upgrade button captures external pricing link without opening a real browser", async () => {});
 ```
 
-- [ ] **Step 2: Run focused spec and verify RED**
-- [ ] **Step 3: Implement minimal test-mode license/external-link seams**
-- [ ] **Step 4: Run focused spec and verify GREEN**
-- [ ] **Step 5: Commit**
+- [x] **Step 2: Run focused spec and verify RED**
+- [x] **Step 3: Implement minimal test-mode license/external-link seams**
+- [x] **Step 4: Run focused spec and verify GREEN**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "test: cover trial license lifecycle e2e"
