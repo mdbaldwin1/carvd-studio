@@ -1,7 +1,7 @@
 # Interaction System Blueprint
 
-Status: Active target architecture  
-Date: 2026-04-13  
+Status: Active target architecture
+Date: 2026-04-13
 Owner intent: establish the long-term interaction architecture for Carvd Studio desktop
 
 See also:

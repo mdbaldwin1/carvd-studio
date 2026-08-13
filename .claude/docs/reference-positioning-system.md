@@ -1,7 +1,7 @@
 # Reference Positioning System
 
-Status: Active implementation spec  
-Date: 2026-04-28  
+Status: Active implementation spec
+Date: 2026-04-28
 Scope: Desktop workspace reference-based move and resize interactions
 
 See also:

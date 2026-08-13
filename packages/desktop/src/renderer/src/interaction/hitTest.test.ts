@@ -408,6 +408,35 @@ describe('bug-class regression: instanced raycast with stale bounding sphere', (
     // The fallback path catches the click.
     expect(result).toMatchObject({ kind: 'part-body', partId: 'A' });
   });
+
+  it('falls back to the part before returning ground when a stale instance raycast misses', () => {
+    const partA = makePart({ id: 'A', position: { x: 0, y: 0.5, z: 0 } });
+    const geometry = new THREE.BoxGeometry(20, 1, 20);
+    const material = new THREE.MeshBasicMaterial();
+    const instanced = new THREE.InstancedMesh(geometry, material, 1);
+    const m = new THREE.Matrix4();
+    m.setPosition(0, 0.5, 0);
+    instanced.setMatrixAt(0, m);
+    instanced.instanceMatrix.needsUpdate = true;
+    instanced.boundingSphere = new THREE.Sphere(new THREE.Vector3(10000, 10000, 10000), 0.0001);
+    setHitTargetDescriptor(instanced, {
+      kind: 'part-body-instanced',
+      nodeId: 'inst',
+      partIdByInstance: ['A']
+    });
+
+    const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshBasicMaterial());
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.position.y = 0;
+    setHitTargetDescriptor(groundMesh, { kind: 'ground' });
+    groundMesh.updateMatrixWorld(true);
+
+    const scene = makeScene([instanced, groundMesh]);
+    const ctx = makeContext(scene, [partA]);
+
+    const result = resolveHitTarget(clientFromWorldXZ(0, 0), ctx);
+    expect(result).toMatchObject({ kind: 'part-body', partId: 'A' });
+  });
 });
 
 describe('bug-class regression: overlay portals must be considered first-class hit targets', () => {

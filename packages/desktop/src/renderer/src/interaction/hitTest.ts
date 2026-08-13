@@ -381,9 +381,10 @@ function pointInsideRect(point: ScreenPoint, rect: OverlayRegistration['rect']):
  *
  * Resolution order (first wins):
  *   1. Registered DOM overlays containing the point.
- *   2. Scene raycast → first intersection with a `hitTarget` descriptor.
+ *   2. Scene raycast → first foreground intersection with a `hitTarget` descriptor.
+ *      Ground/sky hits are kept as background fallbacks, not returned yet.
  *   3. Manual rotated-box fallback over `parts` (returns `part-body`).
- *   4. `null`.
+ *   4. First background hit (`ground` / `sky`) or `null`.
  */
 export function resolveHitTarget(screen: ScreenPoint, context: HitTestContext): HitTarget | null {
   // 1. DOM overlay layer wins (overlays paint on top of the canvas).
@@ -400,9 +401,15 @@ export function resolveHitTarget(screen: ScreenPoint, context: HitTestContext): 
   _raycaster.setFromCamera(ndc, context.camera);
   const intersections = _raycaster.intersectObject(context.scene, true);
 
+  let backgroundTarget: HitTarget | null = null;
   for (const intersection of intersections) {
     const target = classifyIntersection(intersection);
-    if (target) return target;
+    if (!target) continue;
+    if (target.kind === 'ground' || target.kind === 'sky') {
+      backgroundTarget ??= target;
+      continue;
+    }
+    return target;
   }
 
   // 3. Rotated-box fallback over parts. Catches the edge cases where an
@@ -418,7 +425,7 @@ export function resolveHitTarget(screen: ScreenPoint, context: HitTestContext): 
     };
   }
 
-  return null;
+  return backgroundTarget;
 }
 
 /**

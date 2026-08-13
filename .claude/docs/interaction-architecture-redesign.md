@@ -1,7 +1,7 @@
 # Interaction Architecture Redesign
 
-Status: Active architecture review and migration guide  
-Date: 2026-04-13  
+Status: Active architecture review and migration guide
+Date: 2026-04-13
 Scope: Desktop workspace interaction model (`packages/desktop`)
 
 See also:
