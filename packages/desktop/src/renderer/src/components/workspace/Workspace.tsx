@@ -468,6 +468,18 @@ export function Workspace() {
       },
       onDragStart: (action) => {
         if (action.button !== 0 || action.hit?.kind !== 'part-body') return;
+        const activeSession = useInteractionStore.getState().activeSession;
+        const selectionState = useSelectionStore.getState();
+        const isDirectPartDragAlreadyActive =
+          activeSession?.kind === 'move' &&
+          activeSession.primaryPartId === action.hit.partId &&
+          selectionState.selectedPartIds.includes(action.hit.partId);
+        if (isDirectPartDragAlreadyActive) {
+          debugSelection('session:dragstart:part-fallback:skipped-active-direct-drag', {
+            partId: action.hit.partId
+          });
+          return;
+        }
         debugSelection('session:dragstart:part-fallback', { partId: action.hit.partId });
         selectFromPartHit(action.hit.partId, false);
         setSelectedSidebarStockId(null);

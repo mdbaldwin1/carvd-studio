@@ -475,6 +475,7 @@ export function usePartDrag(
             position: { x: newX, y: newY, z: newZ },
             axes: planeInfo.axes,
             worldHalfHeight,
+            alsoMoving: allParts.filter((p) => effectiveDraggingIds.includes(p.id) && p.id !== part.id),
             referenceParts: snapTargetParts.length > 0 && allParts.length > 1 ? snapTargetParts : [],
             movingPartIds: effectiveDraggingIds,
             snapGuides,
