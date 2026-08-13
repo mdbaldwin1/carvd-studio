@@ -68,8 +68,11 @@ export function solvePartMoveSnapPreview(params: {
   let nextLatchedFaceSnap = latchedFaceSnap;
   const snapLines: SnapLine[] = [];
   const winners = createAxisSnapWinners();
+  const snapWouldRestoreDragOrigin = (axis: Axis, nextValue: number) =>
+    Math.abs(position[axis] - part.position[axis]) > 1e-6 && Math.abs(nextValue - part.position[axis]) <= 1e-6;
 
   const applyAxisPosition = (axis: Axis, nextValue: number) => {
+    if (snapWouldRestoreDragOrigin(axis, nextValue)) return false;
     if (axis === 'y' && nextValue < worldHalfHeight) return false;
     nextPosition = { ...nextPosition, [axis]: nextValue };
     return true;
@@ -97,6 +100,7 @@ export function solvePartMoveSnapPreview(params: {
     guideSnaps: initialContext.guideSnaps,
     applyGuideDelta: (axis, delta, guideId) => {
       const candidate = { ...nextPosition, [axis]: nextPosition[axis] + delta };
+      if (snapWouldRestoreDragOrigin(axis, candidate[axis])) return { accepted: false };
       if (axis === 'y' && candidate.y < worldHalfHeight) return { accepted: false };
       nextPosition = candidate;
       const guide = snapGuides.find((entry) => entry.id === guideId);
@@ -109,6 +113,7 @@ export function solvePartMoveSnapPreview(params: {
     originSnaps: initialContext.originSnaps,
     applyOriginDelta: (axis, delta, snapType) => {
       const candidate = { ...nextPosition, [axis]: nextPosition[axis] + delta };
+      if (snapWouldRestoreDragOrigin(axis, candidate[axis])) return { accepted: false };
       if (axis === 'y' && candidate.y < worldHalfHeight) return { accepted: false };
       nextPosition = candidate;
       return {

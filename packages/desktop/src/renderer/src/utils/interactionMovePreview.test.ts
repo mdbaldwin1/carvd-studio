@@ -96,4 +96,40 @@ describe('interactionMovePreview', () => {
     expect(preview.delta.z).toBeCloseTo(4, 5);
     expect(preview.snappedAxes.z).toBe(true);
   });
+
+  it('does not snap a deck board back to end alignment while sliding lengthwise', () => {
+    const movingPart = part({
+      id: 'moving-deck-board',
+      length: 192,
+      width: 6,
+      thickness: 1,
+      position: { x: 0, y: 41, z: 0 },
+      rotation: { x: 0, y: -90, z: 0 }
+    });
+    const adjacentBoard = part({
+      id: 'adjacent-deck-board',
+      length: 192,
+      width: 6,
+      thickness: 1,
+      position: { x: 6.0001, y: 41, z: 0 },
+      rotation: { x: 0, y: -90, z: 0 }
+    });
+
+    const preview = solvePartMoveSnapPreview({
+      part: movingPart,
+      position: { x: 0, y: 41, z: 0.25 },
+      axes: { x: true, y: false, z: true },
+      worldHalfHeight: 0.5,
+      referenceParts: [adjacentBoard],
+      movingPartIds: [movingPart.id],
+      snapGuides: [],
+      settings,
+      snapThreshold: 0.5,
+      latchedFaceSnap: null,
+      resolveFeatureStage: () => 'feature'
+    });
+
+    expect(preview.position.z).toBeCloseTo(0.25, 5);
+    expect(preview.snappedAxes.z).toBe(false);
+  });
 });
