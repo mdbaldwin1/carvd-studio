@@ -1382,6 +1382,33 @@ describe('projectStore', () => {
       expect(part?.grainDirection).toBe('length');
     });
 
+    it('resets selected parts dimensions to match stock', () => {
+      const store = useProjectStore.getState();
+      const stockId = store.addStock({
+        name: 'Plywood Sheet',
+        length: 96,
+        width: 48,
+        thickness: 0.75,
+        color: '#d4a574',
+        grainDirection: 'length'
+      });
+      const partId = store.addPart({
+        name: 'Trimmed Part',
+        stockId,
+        length: 24,
+        width: 6,
+        thickness: 0.5
+      });
+
+      useSelectionStore.getState().selectPart(partId);
+      store.resetSelectedPartsToStock();
+
+      const part = useProjectStore.getState().parts.find((p) => p.id === partId);
+      expect(part?.length).toBe(96);
+      expect(part?.width).toBe(48);
+      expect(part?.thickness).toBe(0.75);
+    });
+
     it('preserves part grain direction when stock has no grain', () => {
       const store = useProjectStore.getState();
       const stockId = store.addStock({
@@ -1466,6 +1493,38 @@ describe('projectStore', () => {
       const part2 = state.parts.find((p) => p.id === partId2);
       expect(part1?.color).toBe('#ff0000');
       expect(part2?.color).toBe('#ff0000');
+    });
+
+    it('resets parts inside selected groups', () => {
+      const store = useProjectStore.getState();
+      const stockId = store.addStock({
+        name: 'Group Stock',
+        length: 60,
+        width: 5,
+        thickness: 1,
+        color: '#ff0000',
+        grainDirection: 'length'
+      });
+      const partId = store.addPart({
+        name: 'Grouped Part',
+        stockId,
+        length: 12,
+        width: 2,
+        thickness: 0.5,
+        color: '#0000ff',
+        grainDirection: 'width'
+      });
+      const groupId = store.createGroup('Reset Group', [{ id: partId, type: 'part' }]);
+
+      useSelectionStore.getState().selectGroup(groupId);
+      store.resetSelectedPartsToStock();
+
+      const part = useProjectStore.getState().parts.find((p) => p.id === partId);
+      expect(part?.length).toBe(60);
+      expect(part?.width).toBe(5);
+      expect(part?.thickness).toBe(1);
+      expect(part?.color).toBe('#ff0000');
+      expect(part?.grainDirection).toBe('length');
     });
   });
 

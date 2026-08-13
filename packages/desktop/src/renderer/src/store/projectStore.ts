@@ -877,13 +877,17 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       resetSelectedPartsToStock: () => {
-        const { stocks } = get();
-        const { selectedPartIds } = useSelectionStore.getState();
-        if (selectedPartIds.length === 0) return;
+        const { stocks, groupMembers } = get();
+        const { selectedPartIds, selectedGroupIds, editingGroupId } = useSelectionStore.getState();
+        const effectiveSelectedPartIds = resolveTransformSelectedPartIds(
+          { selectedPartIds, selectedGroupIds, editingGroupId },
+          groupMembers
+        );
+        if (effectiveSelectedPartIds.length === 0) return;
 
         set((state) => ({
           parts: state.parts.map((p) => {
-            if (!selectedPartIds.includes(p.id)) return p;
+            if (!effectiveSelectedPartIds.includes(p.id)) return p;
             if (!p.stockId) return p; // No stock assigned, skip
 
             const stock = stocks.find((s) => s.id === p.stockId);
@@ -891,6 +895,9 @@ export const useProjectStore = create<ProjectState>()(
 
             return {
               ...p,
+              length: stock.length,
+              width: stock.width,
+              thickness: stock.thickness,
               color: stock.color,
               grainDirection: stock.grainDirection === 'none' ? p.grainDirection : stock.grainDirection
             };
