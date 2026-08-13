@@ -287,6 +287,27 @@ export async function addPartFromSidebar(window: Page): Promise<void> {
   await window.waitForTimeout(500);
 }
 
+type ElectronAPIWithTestDialogs = Window['electronAPI'] & {
+  queueTestSaveDialogPath: (filePath: string | null) => Promise<{ success: boolean; error?: string }>;
+  queueTestOpenDialogPaths: (filePaths: string[] | null) => Promise<{ success: boolean; error?: string }>;
+};
+
+export async function queueSavePath(window: Page, filePath: string | null): Promise<void> {
+  const result = await window.evaluate(async (queuedPath) => {
+    const api = window.electronAPI as ElectronAPIWithTestDialogs;
+    return api.queueTestSaveDialogPath(queuedPath);
+  }, filePath);
+  expect(result).toMatchObject({ success: true });
+}
+
+export async function queueOpenPaths(window: Page, filePaths: string[] | null): Promise<void> {
+  const result = await window.evaluate(async (queuedPaths) => {
+    const api = window.electronAPI as ElectronAPIWithTestDialogs;
+    return api.queueTestOpenDialogPaths(queuedPaths);
+  }, filePaths);
+  expect(result).toMatchObject({ success: true });
+}
+
 export async function getProjectSnapshot(window: Page): Promise<ProjectSnapshot> {
   return window.evaluate(() => {
     const project = window.useProjectStore.getState();
