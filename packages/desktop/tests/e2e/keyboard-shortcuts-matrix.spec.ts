@@ -35,9 +35,24 @@ test.describe('Keyboard shortcut matrix', () => {
     await running.window.keyboard.press(`${mod}+Shift+Z`);
     await expect.poll(async () => (await getProjectSnapshot(running.window)).parts.length).toBe(1);
 
+    await running.window.evaluate(() => {
+      const cameraStore = window.useCameraStore.getState();
+      const originalRequestCenterCameraAtOrigin = cameraStore.requestCenterCameraAtOrigin;
+      (window as unknown as { __homeShortcutRequested?: boolean }).__homeShortcutRequested = false;
+      window.useCameraStore.setState({
+        requestCenterCameraAtOrigin: () => {
+          (window as unknown as { __homeShortcutRequested?: boolean }).__homeShortcutRequested = true;
+          originalRequestCenterCameraAtOrigin();
+        }
+      });
+    });
     await running.window.keyboard.press('Home');
     await expect
-      .poll(async () => running.window.evaluate(() => window.useCameraStore.getState().centerCameraAtOriginRequested))
+      .poll(async () =>
+        running.window.evaluate(
+          () => (window as unknown as { __homeShortcutRequested?: boolean }).__homeShortcutRequested
+        )
+      )
       .toBeTruthy();
   });
 
@@ -65,9 +80,24 @@ test.describe('Keyboard shortcut matrix', () => {
     await running.window.keyboard.press(`${mod}+V`);
     await expect.poll(async () => (await getProjectSnapshot(running.window)).parts.length).toBe(3);
 
+    await running.window.evaluate(() => {
+      const cameraStore = window.useCameraStore.getState();
+      const originalRequestCenterCamera = cameraStore.requestCenterCamera;
+      (window as unknown as { __focusShortcutRequested?: boolean }).__focusShortcutRequested = false;
+      window.useCameraStore.setState({
+        requestCenterCamera: () => {
+          (window as unknown as { __focusShortcutRequested?: boolean }).__focusShortcutRequested = true;
+          originalRequestCenterCamera();
+        }
+      });
+    });
     await running.window.keyboard.press('F');
     await expect
-      .poll(async () => running.window.evaluate(() => window.useCameraStore.getState().centerCameraRequested))
+      .poll(async () =>
+        running.window.evaluate(
+          () => (window as unknown as { __focusShortcutRequested?: boolean }).__focusShortcutRequested
+        )
+      )
       .toBeTruthy();
 
     await running.window.keyboard.press('Escape');
