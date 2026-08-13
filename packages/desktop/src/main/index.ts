@@ -388,6 +388,13 @@ function createWindow(fileToOpen?: string): BrowserWindow {
 
   windows.add(newWindow);
 
+  let didSendInitialOpenProject = false;
+  const sendInitialOpenProject = () => {
+    if (!fileToOpen || didSendInitialOpenProject) return;
+    didSendInitialOpenProject = true;
+    newWindow.webContents.send('open-project', fileToOpen);
+  };
+
   // Show window when ready to avoid flicker
   newWindow.on('ready-to-show', () => {
     const showMainWindow = () => {
@@ -399,9 +406,7 @@ function createWindow(fileToOpen?: string): BrowserWindow {
 
       newWindow.show();
       // If there's a file to open, send it to the renderer
-      if (fileToOpen) {
-        newWindow.webContents.send('open-project', fileToOpen);
-      }
+      sendInitialOpenProject();
     };
 
     // Ensure splash screen is shown for minimum duration
@@ -412,6 +417,12 @@ function createWindow(fileToOpen?: string): BrowserWindow {
       setTimeout(showMainWindow, remaining);
     } else {
       showMainWindow();
+    }
+  });
+
+  newWindow.webContents.once('did-finish-load', () => {
+    if (isTest) {
+      setTimeout(sendInitialOpenProject, 0);
     }
   });
 

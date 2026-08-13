@@ -534,7 +534,7 @@ git commit -m "test: cover trial license lifecycle e2e"
 
 - Consumes Playwright viewport/window APIs and existing Electron helpers.
 
-- [ ] **Step 1: Write failing E2E**
+- [x] **Step 1: Write failing E2E**
 
 Tests:
 
@@ -544,11 +544,11 @@ test("reload preserves saved preferences and recovers app shell without console 
 test("second instance open-file handoff opens project in primary window when feasible", async () => {});
 ```
 
-- [ ] **Step 2: Run focused spec and verify RED**
-- [ ] **Step 3: Implement minimal helpers only if needed**
-- [ ] **Step 4: Run focused spec and verify GREEN**
-- [ ] **Step 5: Run full desktop gates**
-- [ ] **Step 6: Commit**
+- [x] **Step 2: Run focused spec and verify RED**
+- [x] **Step 3: Implement minimal helpers only if needed**
+- [x] **Step 4: Run focused spec and verify GREEN**
+- [x] **Step 5: Run full desktop gates**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit -m "test: cover window app behavior e2e"
