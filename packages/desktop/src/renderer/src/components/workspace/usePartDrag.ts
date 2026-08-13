@@ -921,7 +921,7 @@ export function usePartDrag(
 
     getDragPlaneInfo(anchorPos);
 
-    const startPoint = getWorldPoint(e.nativeEvent);
+    const startPoint = e.point ? e.point.clone() : getWorldPoint(e.nativeEvent);
     const partOriginalPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
     if (startPoint) {
       setIsDragging(true);
@@ -938,6 +938,7 @@ export function usePartDrag(
       dragFrameCounterRef.current = 0;
       dragDebug('partDrag:start', {
         partId: part.id,
+        startPointSource: e.point ? 'mesh-hit' : 'drag-plane-ray',
         anchorPos: { x: anchorPos.x, y: anchorPos.y, z: anchorPos.z },
         partOriginalPos: { x: partOriginalPos.x, y: partOriginalPos.y, z: partOriginalPos.z }
       });
