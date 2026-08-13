@@ -35,6 +35,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // File dialogs
   showSaveDialog: (options: Electron.SaveDialogOptions) => ipcRenderer.invoke('show-save-dialog', options),
   showOpenDialog: (options: Electron.OpenDialogOptions) => ipcRenderer.invoke('show-open-dialog', options),
+  queueTestSaveDialogPath: (filePath: string | null) => ipcRenderer.invoke('queue-test-save-dialog-path', filePath),
+  queueTestOpenDialogPaths: (filePaths: string[] | null) =>
+    ipcRenderer.invoke('queue-test-open-dialog-paths', filePaths),
 
   // File system (for project files only)
   readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath),
@@ -231,6 +234,8 @@ export interface ElectronAPI {
   setPreference: (key: string, value: unknown) => Promise<void>;
   showSaveDialog: (options: Electron.SaveDialogOptions) => Promise<Electron.SaveDialogReturnValue>;
   showOpenDialog: (options: Electron.OpenDialogOptions) => Promise<Electron.OpenDialogReturnValue>;
+  queueTestSaveDialogPath: (filePath: string | null) => Promise<{ success: boolean; error?: string }>;
+  queueTestOpenDialogPaths: (filePaths: string[] | null) => Promise<{ success: boolean; error?: string }>;
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, data: string) => Promise<void>;
   writeBinaryFile: (filePath: string, data: number[]) => Promise<void>;
