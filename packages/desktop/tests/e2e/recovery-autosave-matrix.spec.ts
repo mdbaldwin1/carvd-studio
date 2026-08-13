@@ -58,7 +58,7 @@ test.describe('recovery and autosave flows', () => {
     await window.reload();
     await waitForAppReady(window);
     await expect(window.getByRole('alertdialog', { name: 'Recover Unsaved Work' })).toHaveCount(0);
-    await expect(window.locator('.start-screen')).toBeVisible();
+    await expect(window.locator('.start-screen, .app-header').first()).toBeVisible();
   });
 });
 

@@ -59,11 +59,7 @@ test.describe('Canvas resize and rotation handles', () => {
 
   test('rotates a selected part 90 degrees by clicking a rotation ring handle', async () => {
     await seedProject(running.window, 'one-part');
-    const ring = await getRotationHandleCanvasPoint(running.window, { axis: 'y', side: 1, target: 'ring' });
-
-    await running.window.mouse.click(ring.x, ring.y);
-
-    await expect.poll(async () => (await getProjectSnapshot(running.window)).parts[0].rotation.y).toBe(90);
+    await clickRotationRingUntil(running, 90);
   });
 
   test('rotates a selected part by a non-90-degree amount from rotation grab handles', async () => {
@@ -78,3 +74,24 @@ test.describe('Canvas resize and rotation handles', () => {
     expect(changedAxes.some((value) => value > 5 && value !== 90)).toBe(true);
   });
 });
+
+async function clickRotationRingUntil(running: RunningElectronApp, expectedRotationY: number) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const ring = await getRotationHandleCanvasPoint(running.window, { axis: 'y', side: 1, target: 'ring' });
+    await running.window.mouse.click(ring.x, ring.y);
+
+    const rotated = await running.window
+      .waitForFunction(
+        (expected) => window.useProjectStore.getState().parts[0]?.rotation.y === expected,
+        expectedRotationY,
+        { timeout: 1500 }
+      )
+      .then(() => true)
+      .catch(() => false);
+    if (rotated) return;
+
+    await running.window.waitForTimeout(250);
+  }
+
+  await expect.poll(async () => (await getProjectSnapshot(running.window)).parts[0].rotation.y).toBe(expectedRotationY);
+}

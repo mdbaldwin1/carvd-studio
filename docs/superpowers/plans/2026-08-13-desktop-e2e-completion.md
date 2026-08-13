@@ -334,7 +334,7 @@ git commit -m "test: cover desktop form validation e2e"
 
 - Consumes current assembly editing UI and `useAssemblyEditingStore` if exposed; add test-mode exposure only if necessary.
 
-- [ ] **Step 1: Write failing E2E**
+- [x] **Step 1: Write failing E2E**
 
 Tests:
 
@@ -345,11 +345,11 @@ test("assembly exit dialog supports cancel, discard, and save", async () => {});
 test("app library duplicate and delete assembly actions update persisted library", async () => {});
 ```
 
-- [ ] **Step 2: Run focused spec and verify RED**
-- [ ] **Step 3: Implement minimal test helpers/seams if needed**
-- [ ] **Step 4: Run focused spec and verify GREEN**
-- [ ] **Step 5: Run full desktop gates**
-- [ ] **Step 6: Commit**
+- [x] **Step 2: Run focused spec and verify RED**
+- [x] **Step 3: Implement minimal test helpers/seams if needed**
+- [x] **Step 4: Run focused spec and verify GREEN**
+- [x] **Step 5: Run full desktop gates**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit -m "test: cover assembly editing lifecycle e2e"
