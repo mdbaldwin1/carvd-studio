@@ -1,5 +1,5 @@
 import { Part } from '../types';
-import { getPartOBB, obbsOverlap } from './snapToPartsUtil';
+import { getPartOBB, obbsOverlap, type PartOBB } from './snapToPartsUtil';
 import { dragDebug } from './dragDebug';
 import type { GeometryCache } from '../interaction/geometry/cache';
 
@@ -80,7 +80,7 @@ export function wouldTranslationCauseOverlap(
 
     for (const other of parts) {
       if (movingIds.has(other.id)) continue;
-      if (partsOverlap(p, other, geometryCache) && !translationMovesPartCloserToOther(p, other, delta)) {
+      if (existingOverlapDoesNotWorsen(p, movedPart, other, geometryCache)) {
         continue;
       }
       if (partsOverlap(movedPart, other, geometryCache)) {
@@ -92,17 +92,84 @@ export function wouldTranslationCauseOverlap(
   return false;
 }
 
-function translationMovesPartCloserToOther(part: Part, other: Part, delta: TranslationDelta): boolean {
-  const beforeDx = part.position.x - other.position.x;
-  const beforeDy = part.position.y - other.position.y;
-  const beforeDz = part.position.z - other.position.z;
-  const afterDx = beforeDx + delta.x;
-  const afterDy = beforeDy + delta.y;
-  const afterDz = beforeDz + delta.z;
-  const beforeDistanceSq = beforeDx * beforeDx + beforeDy * beforeDy + beforeDz * beforeDz;
-  const afterDistanceSq = afterDx * afterDx + afterDy * afterDy + afterDz * afterDz;
+function existingOverlapDoesNotWorsen(
+  part: Part,
+  movedPart: Part,
+  other: Part,
+  geometryCache?: GeometryCache
+): boolean {
+  if (!overlapCheckEnabled(part, other)) return true;
+  const beforeDepth = getObbOverlapDepth(
+    getPartOBB(part, part.position, geometryCache),
+    getPartOBB(other, other.position, geometryCache)
+  );
+  if (beforeDepth === null) return false;
 
-  return afterDistanceSq < beforeDistanceSq - OBB_EPSILON;
+  const afterDepth = getObbOverlapDepth(
+    getPartOBB(movedPart, movedPart.position, geometryCache),
+    getPartOBB(other, other.position, geometryCache)
+  );
+  return afterDepth !== null && afterDepth <= beforeDepth + OBB_EPSILON;
+}
+
+function getObbOverlapDepth(a: PartOBB, b: PartOBB): number | null {
+  const dot = (u: { x: number; y: number; z: number }, v: { x: number; y: number; z: number }) =>
+    u.x * v.x + u.y * v.y + u.z * v.z;
+
+  const R = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0]
+  ];
+  const absR = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0]
+  ];
+
+  for (let i = 0; i < 3; i += 1) {
+    for (let j = 0; j < 3; j += 1) {
+      R[i][j] = dot(a.axes[i], b.axes[j]);
+      absR[i][j] = Math.abs(R[i][j]) + OBB_EPSILON;
+    }
+  }
+
+  const tWorld = {
+    x: b.center.x - a.center.x,
+    y: b.center.y - a.center.y,
+    z: b.center.z - a.center.z
+  };
+  const t = [dot(tWorld, a.axes[0]), dot(tWorld, a.axes[1]), dot(tWorld, a.axes[2])];
+  let minDepth = Infinity;
+
+  for (let i = 0; i < 3; i += 1) {
+    const ra = a.halfExtents[i];
+    const rb = b.halfExtents[0] * absR[i][0] + b.halfExtents[1] * absR[i][1] + b.halfExtents[2] * absR[i][2];
+    const depth = ra + rb - Math.abs(t[i]);
+    if (depth <= OBB_SEPARATION_TOLERANCE) return null;
+    minDepth = Math.min(minDepth, depth);
+  }
+
+  for (let j = 0; j < 3; j += 1) {
+    const ra = a.halfExtents[0] * absR[0][j] + a.halfExtents[1] * absR[1][j] + a.halfExtents[2] * absR[2][j];
+    const rb = b.halfExtents[j];
+    const depth = ra + rb - Math.abs(t[0] * R[0][j] + t[1] * R[1][j] + t[2] * R[2][j]);
+    if (depth <= OBB_SEPARATION_TOLERANCE) return null;
+    minDepth = Math.min(minDepth, depth);
+  }
+
+  for (let i = 0; i < 3; i += 1) {
+    for (let j = 0; j < 3; j += 1) {
+      if (Math.abs(R[i][j]) > 1 - OBB_EPSILON) continue;
+      const ra = a.halfExtents[(i + 1) % 3] * absR[(i + 2) % 3][j] + a.halfExtents[(i + 2) % 3] * absR[(i + 1) % 3][j];
+      const rb = b.halfExtents[(j + 1) % 3] * absR[i][(j + 2) % 3] + b.halfExtents[(j + 2) % 3] * absR[i][(j + 1) % 3];
+      const depth = ra + rb - Math.abs(t[(i + 2) % 3] * R[(i + 1) % 3][j] - t[(i + 1) % 3] * R[(i + 2) % 3][j]);
+      if (depth <= OBB_SEPARATION_TOLERANCE) return null;
+      minDepth = Math.min(minDepth, depth);
+    }
+  }
+
+  return minDepth;
 }
 
 export function resolveSafeTranslationDelta(

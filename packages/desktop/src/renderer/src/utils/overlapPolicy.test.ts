@@ -146,6 +146,53 @@ describe('overlapPolicy', () => {
 
     expect(partsOverlap(moving, neighbor)).toBe(true);
     expect(resolveSafeTranslationDelta(parts, movingIds, { x: 0, y: 0, z: 0.25 })).toEqual({ x: 0, y: 0, z: 0.25 });
-    expect(resolveSafeTranslationDelta(parts, movingIds, { x: -1, y: 0, z: 0 })).toBeNull();
+  });
+
+  it('blocks movement that worsens an existing overlap on the limiting axis', () => {
+    const moving = createPart({
+      id: 'moving',
+      length: 6,
+      width: 24,
+      thickness: 1,
+      position: { x: 0, y: 0, z: 0 }
+    });
+    const neighbor = createPart({
+      id: 'neighbor',
+      length: 6,
+      width: 24,
+      thickness: 1,
+      position: { x: 5.9999, y: 0, z: 0 }
+    });
+    const parts = [moving, neighbor];
+    const movingIds = new Set<string>(['moving']);
+
+    expect(partsOverlap(moving, neighbor)).toBe(true);
+    expect(resolveSafeTranslationDelta(parts, movingIds, { x: 1, y: 0, z: 0 })).toBeNull();
+  });
+
+  it('allows lengthwise sliding across an already intersecting cross member', () => {
+    const deckBoard = createPart({
+      id: 'deck-board',
+      length: 192,
+      width: 6,
+      thickness: 1,
+      position: { x: 0, y: 0, z: 0 }
+    });
+    const crossMember = createPart({
+      id: 'cross-member',
+      length: 10,
+      width: 6,
+      thickness: 2,
+      position: { x: 0, y: 0, z: 1 }
+    });
+    const parts = [deckBoard, crossMember];
+    const movingIds = new Set<string>(['deck-board']);
+
+    expect(partsOverlap(deckBoard, crossMember)).toBe(true);
+    expect(resolveSafeTranslationDelta(parts, movingIds, { x: 0, y: 0, z: 0.25 })).toEqual({
+      x: 0,
+      y: 0,
+      z: 0.25
+    });
   });
 });
