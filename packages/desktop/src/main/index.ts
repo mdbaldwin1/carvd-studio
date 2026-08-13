@@ -512,6 +512,10 @@ ipcMain.handle('get-platform', () => {
   return process.platform;
 });
 
+ipcMain.handle('is-test-mode', () => {
+  return process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
+});
+
 ipcMain.handle('open-licenses-file', async () => {
   // In production, the resources folder is in the app bundle
   // In development, it's relative to the project

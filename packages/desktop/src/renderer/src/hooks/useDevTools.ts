@@ -41,8 +41,12 @@ export function useDevTools() {
   const newProject = useProjectStore((s) => s.newProject);
 
   useEffect(() => {
-    // Only expose in development
-    if (import.meta.env.DEV) {
+    let shouldExposeTools = false;
+
+    const exposeTools = async () => {
+      shouldExposeTools = import.meta.env.DEV || (await (window.electronAPI.isTestMode?.() ?? Promise.resolve(false)));
+      if (!shouldExposeTools) return;
+
       installDragDebugTools();
       // Expose stores for console-driven introspection and external automation.
       (window as unknown as Record<string, unknown>).useProjectStore = useProjectStore;
@@ -327,11 +331,19 @@ export function useDevTools() {
       console.log('   carvdDev.clearDragDebugLogs()    - Clear drag/snap debug logs');
       console.log('   carvdDev.getDragDebugLogs()      - Get drag/snap debug logs');
       console.log('   carvdDev.debugInteraction()      - Dump interaction state when something is broken');
-    }
+    };
+
+    void exposeTools();
 
     return () => {
-      if (import.meta.env.DEV) {
+      if (shouldExposeTools) {
         delete window.carvdDev;
+        delete (window as unknown as Record<string, unknown>).useProjectStore;
+        delete (window as unknown as Record<string, unknown>).useSelectionStore;
+        delete (window as unknown as Record<string, unknown>).useUIStore;
+        delete (window as unknown as Record<string, unknown>).useInteractionStore;
+        delete (window as unknown as Record<string, unknown>).useSnapStore;
+        delete (window as unknown as Record<string, unknown>).useCameraStore;
       }
     };
   }, [loadProject, newProject]);

@@ -40,6 +40,9 @@ import {
 declare global {
   interface Window {
     __selectionDebugLogs?: Array<{ ts: string; args: unknown[] }>;
+    __carvdE2E?: {
+      getPartScreenPoint: (partId?: string) => { x: number; y: number } | null;
+    };
   }
 }
 
@@ -161,6 +164,35 @@ export function Workspace() {
   );
 
   const { camera, gl, controls, scene } = useThree();
+
+  useEffect(() => {
+    const isTestMode =
+      typeof window !== 'undefined' &&
+      Boolean((window as unknown as { useProjectStore?: unknown }).useProjectStore) &&
+      Boolean((window as unknown as { useSelectionStore?: unknown }).useSelectionStore);
+    if (!isTestMode) return;
+
+    const projected = new THREE.Vector3();
+    window.__carvdE2E = {
+      getPartScreenPoint: (partId?: string) => {
+        const selection = useSelectionStore.getState();
+        const id = partId ?? selection.selectedPartIds[0];
+        const part = useProjectStore.getState().parts.find((candidate) => candidate.id === id);
+        if (!part) return null;
+
+        const rect = gl.domElement.getBoundingClientRect();
+        projected.set(part.position.x, part.position.y, part.position.z).project(camera);
+        return {
+          x: rect.left + ((projected.x + 1) / 2) * rect.width,
+          y: rect.top + ((1 - projected.y) / 2) * rect.height
+        };
+      }
+    };
+
+    return () => {
+      delete window.__carvdE2E;
+    };
+  }, [camera, gl.domElement]);
 
   // Drag-box selection state
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);

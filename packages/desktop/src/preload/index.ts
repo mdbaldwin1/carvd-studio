@@ -83,6 +83,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // App info
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getPlatform: () => ipcRenderer.invoke('get-platform'),
+  isTestMode: () => ipcRenderer.invoke('is-test-mode'),
   openLicensesFile: () => ipcRenderer.invoke('open-licenses-file'),
 
   // License management
@@ -266,6 +267,7 @@ export interface ElectronAPI {
   onBeforeClose: (callback: () => void) => () => void;
   getAppVersion: () => Promise<string>;
   getPlatform: () => Promise<string>;
+  isTestMode: () => Promise<boolean>;
   openLicensesFile: () => Promise<{ success: boolean; error?: string }>;
   verifyLicense: (licenseKey: string) => Promise<{
     valid: boolean;
