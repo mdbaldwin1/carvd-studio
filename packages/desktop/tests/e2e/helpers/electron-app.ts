@@ -12,10 +12,19 @@ declare global {
   interface Window {
     useProjectStore: { getState: () => any };
     useSelectionStore: { getState: () => any };
+    useSnapStore: { getState: () => any };
     useUIStore: { getState: () => any };
     useInteractionStore: { getState: () => any };
     __carvdE2E?: {
       getPartScreenPoint: (partId?: string) => { x: number; y: number } | null;
+      getResizeHandleScreenPoint: (
+        handle: { x: -1 | 0 | 1; y: -1 | 0 | 1; z: -1 | 0 | 1 },
+        partId?: string
+      ) => { x: number; y: number } | null;
+      getRotationHandleScreenPoint: (
+        handle: { axis: 'x' | 'y' | 'z'; side: -1 | 1; target?: 'ring' | 'grab' },
+        partId?: string
+      ) => { x: number; y: number } | null;
     };
   }
 }
@@ -305,7 +314,15 @@ export async function getProjectSnapshot(window: Page): Promise<ProjectSnapshot>
 
 export async function seedProject(
   window: Page,
-  seed: 'empty' | 'one-part' | 'two-parts' | 'stocked-one-part' = 'one-part'
+  seed:
+    | 'empty'
+    | 'one-part'
+    | 'two-parts'
+    | 'stocked-one-part'
+    | 'one-group'
+    | 'two-groups'
+    | 'mixed-part-and-group'
+    | 'guide' = 'one-part'
 ) {
   await ensureEditorReady(window);
   await window.evaluate((seedKind) => {
@@ -337,15 +354,54 @@ export async function seedProject(
         grainDirection: 'length'
       });
 
-    if (seedKind !== 'empty') {
+    if (seedKind !== 'empty' && seedKind !== 'guide') {
       const firstPartId = addTestPart('E2E Part', { x: 0, y: 1, z: 0 });
       const partIds = firstPartId ? [firstPartId] : [];
-      if (seedKind === 'two-parts') {
+      if (seedKind === 'two-parts' || seedKind === 'one-group' || seedKind === 'mixed-part-and-group') {
         const secondPartId = addTestPart('E2E Part 2', { x: 30, y: 1, z: 0 });
         if (secondPartId) partIds.push(secondPartId);
       }
+      if (seedKind === 'two-groups') {
+        const secondPartId = addTestPart('E2E Part 2', { x: 30, y: 1, z: 0 });
+        const thirdPartId = addTestPart('E2E Part 3', { x: 60, y: 1, z: 0 });
+        if (secondPartId) partIds.push(secondPartId);
+        if (thirdPartId) partIds.push(thirdPartId);
+      }
+
+      if (seedKind === 'one-group' && partIds.length >= 2) {
+        const groupId = project.createGroup(
+          'Group 1',
+          partIds.map((id) => ({ id, type: 'part' as const }))
+        );
+        if (groupId) selection.selectGroup(groupId);
+        return;
+      }
+
+      if (seedKind === 'two-groups' && partIds.length >= 3) {
+        const firstGroupId = project.createGroup('Group 1', [{ id: partIds[0], type: 'part' as const }]);
+        const secondGroupId = project.createGroup('Group 2', [
+          { id: partIds[1], type: 'part' as const },
+          { id: partIds[2], type: 'part' as const }
+        ]);
+        if (firstGroupId && secondGroupId) {
+          window.useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: [firstGroupId, secondGroupId] });
+        }
+        return;
+      }
+
+      if (seedKind === 'mixed-part-and-group' && partIds.length >= 2) {
+        const groupId = project.createGroup('Group 1', [{ id: partIds[0], type: 'part' as const }]);
+        if (groupId) {
+          window.useSelectionStore.setState({ selectedPartIds: [partIds[1]], selectedGroupIds: [groupId] });
+        }
+        return;
+      }
+
       if (partIds.length === 1) selection.selectPart(partIds[0]);
       if (partIds.length > 1) selection.selectParts(partIds);
+    } else if (seedKind === 'guide') {
+      project.addSnapGuide('x', 12);
+      selection.clearSelection();
     } else {
       selection.clearSelection();
     }
@@ -371,6 +427,40 @@ export async function getSelectedPartCanvasPoint(window: Page): Promise<{ x: num
   const point = await window.evaluate(() => window.__carvdE2E?.getPartScreenPoint() ?? null);
   if (!point) {
     throw new Error('No selected part screen point is available');
+  }
+  return point;
+}
+
+export async function getResizeHandleCanvasPoint(
+  window: Page,
+  handle: { x: -1 | 0 | 1; y: -1 | 0 | 1; z: -1 | 0 | 1 }
+): Promise<{ x: number; y: number }> {
+  await window.waitForFunction(() => typeof window.__carvdE2E?.getResizeHandleScreenPoint === 'function', null, {
+    timeout: 10000
+  });
+  const point = await window.evaluate(
+    (targetHandle) => window.__carvdE2E?.getResizeHandleScreenPoint(targetHandle) ?? null,
+    handle
+  );
+  if (!point) {
+    throw new Error('No resize handle screen point is available');
+  }
+  return point;
+}
+
+export async function getRotationHandleCanvasPoint(
+  window: Page,
+  handle: { axis: 'x' | 'y' | 'z'; side: -1 | 1; target?: 'ring' | 'grab' }
+): Promise<{ x: number; y: number }> {
+  await window.waitForFunction(() => typeof window.__carvdE2E?.getRotationHandleScreenPoint === 'function', null, {
+    timeout: 10000
+  });
+  const point = await window.evaluate(
+    (targetHandle) => window.__carvdE2E?.getRotationHandleScreenPoint(targetHandle) ?? null,
+    handle
+  );
+  if (!point) {
+    throw new Error('No rotation handle screen point is available');
   }
   return point;
 }
@@ -401,4 +491,11 @@ export async function clickMenuItem(window: Page, label: string) {
     item?.click();
   }, label);
   await window.waitForTimeout(300);
+}
+
+export async function openSelectionContextMenu(window: Page, point = { x: 500, y: 300 }) {
+  await window.evaluate(({ x, y }) => {
+    window.useUIStore.getState().openContextMenu({ x, y, type: 'part' });
+  }, point);
+  await expect(window.locator('[role="menu"], .context-menu')).toBeVisible({ timeout: 5000 });
 }

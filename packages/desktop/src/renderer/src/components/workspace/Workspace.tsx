@@ -42,6 +42,14 @@ declare global {
     __selectionDebugLogs?: Array<{ ts: string; args: unknown[] }>;
     __carvdE2E?: {
       getPartScreenPoint: (partId?: string) => { x: number; y: number } | null;
+      getResizeHandleScreenPoint: (
+        handle: { x: -1 | 0 | 1; y: -1 | 0 | 1; z: -1 | 0 | 1 },
+        partId?: string
+      ) => { x: number; y: number } | null;
+      getRotationHandleScreenPoint: (
+        handle: { axis: 'x' | 'y' | 'z'; side: -1 | 1; target?: 'ring' | 'grab' },
+        partId?: string
+      ) => { x: number; y: number } | null;
     };
   }
 }
@@ -173,19 +181,82 @@ export function Workspace() {
     if (!isTestMode) return;
 
     const projected = new THREE.Vector3();
+    const euler = new THREE.Euler();
+    const quaternion = new THREE.Quaternion();
+    const local = new THREE.Vector3();
+    const world = new THREE.Vector3();
+    const faceQuaternion = new THREE.Quaternion();
+    const faceNormal = new THREE.Vector3();
+    const grabLocal = new THREE.Vector3();
+    const ringEuler = new THREE.Euler();
+    const ringQuaternion = new THREE.Quaternion();
+    const projectWorld = (point: THREE.Vector3) => {
+      const rect = gl.domElement.getBoundingClientRect();
+      projected.copy(point).project(camera);
+      return {
+        x: rect.left + ((projected.x + 1) / 2) * rect.width,
+        y: rect.top + ((1 - projected.y) / 2) * rect.height
+      };
+    };
+    const resolvePart = (partId?: string) => {
+      const selection = useSelectionStore.getState();
+      const id = partId ?? selection.selectedPartIds[0];
+      return useProjectStore.getState().parts.find((candidate) => candidate.id === id) ?? null;
+    };
+    const partQuaternion = (rotation: { x: number; y: number; z: number }) => {
+      euler.set((rotation.x * Math.PI) / 180, (rotation.y * Math.PI) / 180, (rotation.z * Math.PI) / 180, 'XYZ');
+      return quaternion.setFromEuler(euler);
+    };
+
     window.__carvdE2E = {
       getPartScreenPoint: (partId?: string) => {
-        const selection = useSelectionStore.getState();
-        const id = partId ?? selection.selectedPartIds[0];
-        const part = useProjectStore.getState().parts.find((candidate) => candidate.id === id);
+        const part = resolvePart(partId);
         if (!part) return null;
+        return projectWorld(world.set(part.position.x, part.position.y, part.position.z));
+      },
+      getResizeHandleScreenPoint: (handle, partId?: string) => {
+        const part = resolvePart(partId);
+        if (!part) return null;
+        local.set(
+          handle.x === 0 ? 0 : handle.x * (part.length / 2),
+          handle.y === 0 ? 0 : handle.y * (part.thickness / 2),
+          handle.z === 0 ? 0 : handle.z * (part.width / 2)
+        );
+        local.applyQuaternion(partQuaternion(part.rotation));
+        world.set(part.position.x, part.position.y, part.position.z).add(local);
+        return projectWorld(world);
+      },
+      getRotationHandleScreenPoint: (handle, partId?: string) => {
+        const part = resolvePart(partId);
+        if (!part) return null;
+        const offset = 0.2;
+        if (handle.axis === 'y') {
+          local.set(0, handle.side * (part.thickness / 2 + offset), 0);
+          faceNormal.set(0, handle.side, 0);
+          ringEuler.set(handle.side === 1 ? Math.PI / 2 : -Math.PI / 2, 0, 0);
+        } else if (handle.axis === 'x') {
+          local.set(handle.side * (part.length / 2 + offset), 0, 0);
+          faceNormal.set(handle.side, 0, 0);
+          ringEuler.set(0, handle.side === 1 ? -Math.PI / 2 : Math.PI / 2, 0);
+        } else {
+          local.set(0, 0, handle.side * (part.width / 2 + offset));
+          faceNormal.set(0, 0, handle.side);
+          ringEuler.set(0, handle.side === 1 ? 0 : Math.PI, 0);
+        }
 
-        const rect = gl.domElement.getBoundingClientRect();
-        projected.set(part.position.x, part.position.y, part.position.z).project(camera);
-        return {
-          x: rect.left + ((projected.x + 1) / 2) * rect.width,
-          y: rect.top + ((1 - projected.y) / 2) * rect.height
-        };
+        if (handle.target === 'grab') {
+          faceQuaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), faceNormal);
+          grabLocal.set(0, 0, 1.55);
+          local.add(grabLocal.applyQuaternion(faceQuaternion));
+        } else {
+          ringQuaternion.setFromEuler(ringEuler);
+          grabLocal.set(0.55, 0, 0.02);
+          local.add(grabLocal.applyQuaternion(ringQuaternion));
+        }
+
+        local.applyQuaternion(partQuaternion(part.rotation));
+        world.set(part.position.x, part.position.y, part.position.z).add(local);
+        return projectWorld(world);
       }
     };
 
