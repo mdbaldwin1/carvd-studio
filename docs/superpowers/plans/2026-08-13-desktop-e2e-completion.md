@@ -301,7 +301,7 @@ git commit -m "test: cover cut list exports and validation e2e"
 
 - Consumes existing UI selectors and project/app settings helpers.
 
-- [ ] **Step 1: Write failing E2E**
+- [x] **Step 1: Write failing E2E**
 
 Tests:
 
@@ -313,10 +313,10 @@ test("assembly save/edit forms enforce required name and safe cancel behavior", 
 test("license modal disables submit when empty and reports invalid key errors", async () => {});
 ```
 
-- [ ] **Step 2: Run focused spec and verify RED**
-- [ ] **Step 3: Implement minimal UI/test adjustments only if real accessibility selectors are missing**
-- [ ] **Step 4: Run focused spec and verify GREEN**
-- [ ] **Step 5: Commit**
+- [x] **Step 2: Run focused spec and verify RED**
+- [x] **Step 3: Implement minimal UI/test adjustments only if real accessibility selectors are missing**
+- [x] **Step 4: Run focused spec and verify GREEN**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "test: cover desktop form validation e2e"
