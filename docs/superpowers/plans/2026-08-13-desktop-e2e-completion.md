@@ -367,7 +367,7 @@ git commit -m "test: cover assembly editing lifecycle e2e"
 
 - Consumes existing template screen/editing hooks.
 
-- [ ] **Step 1: Write failing E2E**
+- [x] **Step 1: Write failing E2E**
 
 Tests:
 
@@ -378,10 +378,10 @@ test("duplicates built-in and custom templates into My Templates", async () => {
 test("template import duplicate path keeps existing or replaces based on option when available", async () => {});
 ```
 
-- [ ] **Step 2: Run focused spec and verify RED**
-- [ ] **Step 3: Implement minimal selectors/helpers if needed**
-- [ ] **Step 4: Run focused spec and verify GREEN**
-- [ ] **Step 5: Commit**
+- [x] **Step 2: Run focused spec and verify RED**
+- [x] **Step 3: Implement minimal selectors/helpers if needed**
+- [x] **Step 4: Run focused spec and verify GREEN**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "test: cover template editing lifecycle e2e"
