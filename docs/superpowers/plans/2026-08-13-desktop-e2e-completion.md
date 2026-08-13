@@ -399,7 +399,7 @@ git commit -m "test: cover template editing lifecycle e2e"
 
 - Consumes project file lifecycle helpers from Task 1.
 
-- [ ] **Step 1: Write failing E2E**
+- [x] **Step 1: Write failing E2E**
 
 Tests:
 
@@ -409,10 +409,10 @@ test("opening project with missing assembly prompts to import assembly into app 
 test("skip leaves app library unchanged but project still opens", async () => {});
 ```
 
-- [ ] **Step 2: Run focused spec and verify RED**
-- [ ] **Step 3: Implement helper to create project file with non-library stock/assembly**
-- [ ] **Step 4: Run focused spec and verify GREEN**
-- [ ] **Step 5: Commit**
+- [x] **Step 2: Run focused spec and verify RED**
+- [x] **Step 3: Implement helper to create project file with non-library stock/assembly**
+- [x] **Step 4: Run focused spec and verify GREEN**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "test: cover library import prompts e2e"
