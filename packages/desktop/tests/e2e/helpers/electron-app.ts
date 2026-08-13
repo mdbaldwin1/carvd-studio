@@ -25,6 +25,7 @@ declare global {
         handle: { axis: 'x' | 'y' | 'z'; side: -1 | 1; target?: 'ring' | 'grab' },
         partId?: string
       ) => { x: number; y: number } | null;
+      setCameraView: (view: 'isometric' | 'top' | 'front' | 'right') => void;
     };
   }
 }

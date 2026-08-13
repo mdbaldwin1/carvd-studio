@@ -50,6 +50,7 @@ declare global {
         handle: { axis: 'x' | 'y' | 'z'; side: -1 | 1; target?: 'ring' | 'grab' },
         partId?: string
       ) => { x: number; y: number } | null;
+      setCameraView: (view: 'isometric' | 'top' | 'front' | 'right') => void;
     };
   }
 }
@@ -190,6 +191,13 @@ export function Workspace() {
     const grabLocal = new THREE.Vector3();
     const ringEuler = new THREE.Euler();
     const ringQuaternion = new THREE.Quaternion();
+    const cameraTarget = new THREE.Vector3();
+    const cameraOffsetByView = {
+      isometric: new THREE.Vector3(36, 30, 36),
+      top: new THREE.Vector3(0, 54, 0.01),
+      front: new THREE.Vector3(0, 18, 54),
+      right: new THREE.Vector3(54, 18, 0)
+    } satisfies Record<'isometric' | 'top' | 'front' | 'right', THREE.Vector3>;
     const projectWorld = (point: THREE.Vector3) => {
       const rect = gl.domElement.getBoundingClientRect();
       projected.copy(point).project(camera);
@@ -257,13 +265,27 @@ export function Workspace() {
         local.applyQuaternion(partQuaternion(part.rotation));
         world.set(part.position.x, part.position.y, part.position.z).add(local);
         return projectWorld(world);
+      },
+      setCameraView: (view) => {
+        const part = resolvePart();
+        if (part) {
+          cameraTarget.set(part.position.x, part.position.y, part.position.z);
+        } else {
+          cameraTarget.set(0, 0, 0);
+        }
+        camera.position.copy(cameraTarget).add(cameraOffsetByView[view]);
+        camera.lookAt(cameraTarget);
+        if (isOrbitControls(controls)) {
+          controls.target.copy(cameraTarget);
+          controls.update();
+        }
       }
     };
 
     return () => {
       delete window.__carvdE2E;
     };
-  }, [camera, gl.domElement]);
+  }, [camera, controls, gl.domElement]);
 
   // Drag-box selection state
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);
