@@ -260,7 +260,7 @@ git commit -m "test: cover native menu commands e2e"
 
 - Consumes existing save-dialog queue for PDF/CSV download paths.
 
-- [ ] **Step 1: Write failing E2E**
+- [x] **Step 1: Write failing E2E**
 
 Tests:
 
@@ -271,19 +271,19 @@ test("allows bypassable warnings and blocks non-bypassable errors", async () => 
 test("free mode blocks optimizer and PDF export from the real cut-list modal", async () => {});
 ```
 
-- [ ] **Step 2: Run focused spec and verify RED**
+- [x] **Step 2: Run focused spec and verify RED**
 
 Run focused spec.
 
-- [ ] **Step 3: Implement minimal helper setup**
+- [x] **Step 3: Implement minimal helper setup**
 
 Seed projects for stocked, unassigned, oversize, and grain-mismatch states. Do not bypass UI actions for Generate/Download.
 
-- [ ] **Step 4: Run focused spec and verify GREEN**
+- [x] **Step 4: Run focused spec and verify GREEN**
 
 Run focused spec until PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "test: cover cut list exports and validation e2e"
