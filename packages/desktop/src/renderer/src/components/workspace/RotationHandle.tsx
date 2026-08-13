@@ -3,6 +3,7 @@ import { Html } from '@react-three/drei';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useCameraStore } from '../../store/cameraStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { LiveDimensions, ROTATION_COLORS, ROTATION_HANDLE_SIZE, ROTATION_RING_THICKNESS } from './partTypes';
 import type { HitTargetDescriptor } from '../../interaction/hitTest';
 import {
@@ -38,6 +39,7 @@ export const RotationHandle = memo(
   }) {
     const { gl, size, camera } = useThree();
     const displayMode = useCameraStore((s) => s.displayMode);
+    const setDragIntent = useSelectionStore((s) => s.setDragIntent);
     const groupRef = useRef<THREE.Group>(null);
     const [ringHovered, setRingHovered] = useState(false);
     const [grabHovered, setGrabHovered] = useState(false);
@@ -473,6 +475,17 @@ export const RotationHandle = memo(
             material={ROTATION_HIT_MATERIAL}
             rotation={[0, 0, glyphRollZ]}
             userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}
+            onPointerDown={(e) => {
+              if (e.nativeEvent.button !== 0) return;
+              e.stopPropagation();
+              if (!partId) return;
+              setDragIntent({
+                partId,
+                screenX: e.nativeEvent.clientX,
+                screenY: e.nativeEvent.clientY,
+                worldPoint: null
+              });
+            }}
             onPointerOver={handleRingPointerOver}
             onPointerOut={handleRingPointerOut}
             onClick={(e) => {
