@@ -432,7 +432,7 @@ git commit -m "test: cover library import prompts e2e"
 - Consumes existing `__carvdE2E` part/handle coordinate helpers.
 - Produces if needed: `getPartScreenPoint(partId)` already exists; add group/nested hit helpers only if current helpers cannot target the UI reliably.
 
-- [ ] **Step 1: Write failing E2E**
+- [x] **Step 1: Write failing E2E**
 
 Tests:
 
@@ -445,11 +445,11 @@ test("background context Export as Image and Capture Thumbnail produce observabl
 test("clear all guides works from background and guide context menus", async () => {});
 ```
 
-- [ ] **Step 2: Run focused spec and verify RED**
-- [ ] **Step 3: Add minimal automation hook if targeting is impossible through current helper**
-- [ ] **Step 4: Run focused spec and verify GREEN**
-- [ ] **Step 5: Run full desktop gates**
-- [ ] **Step 6: Commit**
+- [x] **Step 2: Run focused spec and verify RED**
+- [x] **Step 3: Add minimal automation hook if targeting is impossible through current helper**
+- [x] **Step 4: Run focused spec and verify GREEN**
+- [x] **Step 5: Run full desktop gates**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit -m "test: cover canvas selection edge cases e2e"
