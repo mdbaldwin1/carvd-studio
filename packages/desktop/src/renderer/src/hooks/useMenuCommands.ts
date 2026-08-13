@@ -9,6 +9,7 @@ import { useProjectStore } from '../store/projectStore';
 import { useAssemblyEditingStore } from '../store/assemblyEditingStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useUIStore } from '../store/uiStore';
+import { useCameraStore } from '../store/cameraStore';
 import {
   newProject,
   saveProject,
@@ -150,15 +151,19 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
 
         // Edit commands
         case 'undo':
-          useProjectStore.getState().undo();
+          useProjectStore.temporal.getState().undo();
           break;
 
         case 'redo':
-          useProjectStore.getState().redo();
+          useProjectStore.temporal.getState().redo();
           break;
 
         case 'delete': {
           const selectedPartIds = useSelectionStore.getState().selectedPartIds;
+          const selectedGroupIds = useSelectionStore.getState().selectedGroupIds;
+          if (selectedGroupIds.length > 0) {
+            useUIStore.getState().requestDeleteGroups(selectedGroupIds);
+          }
           if (selectedPartIds.length > 0) {
             useUIStore.getState().requestDeleteParts(selectedPartIds);
           }
@@ -166,12 +171,12 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         }
 
         case 'select-all':
-          useProjectStore.getState().selectAllParts();
+          useSelectionStore.getState().selectParts(useProjectStore.getState().parts.map((part) => part.id));
           break;
 
         // View commands
         case 'reset-camera':
-          useProjectStore.getState().resetCamera();
+          useCameraStore.getState().requestCenterCameraAtOrigin();
           break;
 
         // App commands

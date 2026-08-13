@@ -16,6 +16,8 @@ declare global {
     useUIStore: { getState: () => any };
     useInteractionStore: { getState: () => any };
     useLicenseStore: { getState: () => any };
+    useCameraStore: { getState: () => any; setState: (state: Record<string, unknown>) => void };
+    useAssemblyEditingStore: { getState: () => any };
     __carvdE2E?: {
       getPartScreenPoint: (partId?: string) => { x: number; y: number } | null;
       getResizeHandleScreenPoint: (
@@ -127,7 +129,8 @@ export async function waitForAutomationHooks(window: Page): Promise<void> {
       !!window.useSelectionStore &&
       !!window.useUIStore &&
       !!window.useInteractionStore &&
-      !!window.useLicenseStore,
+      !!window.useLicenseStore &&
+      !!window.useAssemblyEditingStore,
     null,
     { timeout: 30000 }
   );
@@ -306,6 +309,24 @@ export async function queueOpenPaths(window: Page, filePaths: string[] | null): 
     return api.queueTestOpenDialogPaths(queuedPaths);
   }, filePaths);
   expect(result).toMatchObject({ success: true });
+}
+
+export async function sendNativeMenuCommand(
+  running: RunningElectronApp,
+  command: string,
+  ...args: unknown[]
+): Promise<void> {
+  await running.electronApp.evaluate(
+    async ({ BrowserWindow }, payload) => {
+      const targetWindow = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+      if (!targetWindow) {
+        throw new Error('No Electron window available for native menu command');
+      }
+      targetWindow.webContents.send('menu-command', payload.command, ...payload.args);
+    },
+    { command, args }
+  );
+  await running.window.waitForTimeout(300);
 }
 
 export async function getProjectSnapshot(window: Page): Promise<ProjectSnapshot> {

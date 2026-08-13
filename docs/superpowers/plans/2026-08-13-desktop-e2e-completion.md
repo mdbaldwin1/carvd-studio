@@ -215,7 +215,7 @@ git commit -m "test: cover recovery autosave e2e"
 - Produces if needed: `window.electronAPI.queueTestExternalOpen(urlPattern)` or a test-mode external-link capture IPC.
 - Produces if needed: `window.electronAPI.dispatchTestMenuCommand(command, ...args)` to avoid OS menu automation flakiness while still using the app’s menu command channel.
 
-- [ ] **Step 1: Write failing E2E**
+- [x] **Step 1: Write failing E2E**
 
 Tests:
 
@@ -225,23 +225,23 @@ test("native File/Edit/View commands dispatch to project actions", async () => {
 test("Help external links and Check for Updates are observable without leaving Electron", async () => {});
 ```
 
-- [ ] **Step 2: Run focused spec and verify RED**
+- [x] **Step 2: Run focused spec and verify RED**
 
 Run native menu focused spec. Expected failure: no deterministic menu/external-link seam.
 
-- [ ] **Step 3: Implement test-mode command/external-link seam**
+- [x] **Step 3: Implement test-mode command/external-link seam**
 
 Keep production `shell.openExternal` and updater behavior unchanged; capture calls only in test mode.
 
-- [ ] **Step 4: Run focused spec and verify GREEN**
+- [x] **Step 4: Run focused spec and verify GREEN**
 
 Run focused spec until PASS.
 
-- [ ] **Step 5: Run full desktop gates**
+- [x] **Step 5: Run full desktop gates**
 
 Run `npm test --workspace=@carvd/desktop`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git commit -m "test: cover native menu commands e2e"
