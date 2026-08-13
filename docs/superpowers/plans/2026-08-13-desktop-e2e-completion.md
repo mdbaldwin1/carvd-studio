@@ -567,7 +567,7 @@ git commit -m "test: cover window app behavior e2e"
 
 - Consumes all prior task deliverables.
 
-- [ ] **Step 1: Run complete desktop quality gates**
+- [x] **Step 1: Run complete desktop quality gates**
 
 ```bash
 npm run lint --workspace=@carvd/desktop
@@ -575,7 +575,7 @@ npm run typecheck --workspace=@carvd/desktop
 npm test --workspace=@carvd/desktop
 ```
 
-- [ ] **Step 2: Run a coverage inventory**
+- [x] **Step 2: Run a coverage inventory**
 
 List all E2E specs and test names:
 
@@ -584,11 +584,18 @@ find packages/desktop/tests/e2e -maxdepth 1 -name '*.spec.ts' -print | sort
 rg -n "test\\(" packages/desktop/tests/e2e -g '*.spec.ts'
 ```
 
-- [ ] **Step 3: Update plan checkboxes and summarize residual non-automated surfaces**
+- [x] **Step 3: Update plan checkboxes and summarize residual non-automated surfaces**
 
 If any surface remains untested because it is not feasible or would require unsafe OS-level automation, document it in this plan with reason and proposed manual verification.
 
-- [ ] **Step 4: Commit final audit**
+Audit result:
+
+- Desktop quality gates pass after Task 12: `npm run lint --workspace=@carvd/desktop`, `npm run typecheck --workspace=@carvd/desktop`, and `npm test --workspace=@carvd/desktop`.
+- E2E inventory: 27 Electron spec files, 94 explicit `test(...)` declarations, and 97 runtime Electron cases after parameterized camera-vantage expansion.
+- The suite now covers project file lifecycle, recovery/autosave, native menus, native import/export, cut-list exports/validation/license gates, form validation, assembly lifecycle, template lifecycle, library import prompts, context menus, keyboard shortcuts, canvas transforms/handles/vantage rotation, toolbar controls, properties panel, free-mode gates, trial/license lifecycle, responsive windows, reload persistence, and OS-style open-file handoff.
+- No residual user-facing desktop app surface from the requested inventory is intentionally left manual-only. Native OS behaviors that are unsafe/flaky to automate directly are exercised through app-owned deterministic seams: queued file dialogs, menu command dispatch, captured external links, test-mode trial/license controls, and emitted open-file events.
+
+- [x] **Step 4: Commit final audit**
 
 ```bash
 git add docs/superpowers/plans/2026-08-13-desktop-e2e-completion.md
