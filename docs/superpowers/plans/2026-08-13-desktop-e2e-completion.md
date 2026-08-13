@@ -164,7 +164,7 @@ git commit -m "test: cover project file lifecycle e2e"
 - Consumes: `window.electronAPI.getRecoveryDir`, `saveRecoveryFile`, `readRecoveryFile`, `deleteRecoveryFile`, `listRecoveryFiles`.
 - Produces: recovery setup helper `seedRecoveryFile(page, fileName, projectJson)` if reusable.
 
-- [ ] **Step 1: Write failing E2E**
+- [x] **Step 1: Write failing E2E**
 
 Create tests for:
 
@@ -174,7 +174,7 @@ test("discards a recovery file and starts clean", async () => {});
 test("ignores malformed recovery files with visible safe fallback", async () => {});
 ```
 
-- [ ] **Step 2: Run focused spec and verify RED**
+- [x] **Step 2: Run focused spec and verify RED**
 
 Run:
 
@@ -184,15 +184,15 @@ npm run test:e2e --workspace=@carvd/desktop -- recovery-autosave-matrix.spec.ts
 
 Expected: FAIL until recovery setup/flow is deterministic.
 
-- [ ] **Step 3: Implement minimal deterministic setup**
+- [x] **Step 3: Implement minimal deterministic setup**
 
 Use existing recovery IPC where possible. Add only test-mode helper if the UI cannot discover seeded recovery files before boot.
 
-- [ ] **Step 4: Run focused spec and verify GREEN**
+- [x] **Step 4: Run focused spec and verify GREEN**
 
 Run focused spec until PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/desktop/tests/e2e/recovery-autosave-matrix.spec.ts packages/desktop/tests/e2e/helpers/electron-app.ts packages/desktop/src/main/index.ts packages/desktop/src/preload/index.ts
