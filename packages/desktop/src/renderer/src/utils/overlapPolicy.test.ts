@@ -123,4 +123,29 @@ describe('overlapPolicy', () => {
     const safe = resolveSafeTranslationDelta(parts, movingIds, proposed);
     expect(safe).toBeNull();
   });
+
+  it('allows movement that does not worsen a pre-existing tiny overlap', () => {
+    const moving = createPart({
+      id: 'moving',
+      length: 192,
+      width: 6,
+      thickness: 1,
+      position: { x: 55.43418603599124, y: 41.198408003138915, z: 7.884627918624318 },
+      rotation: { x: 180, y: -90, z: 0 }
+    });
+    const neighbor = createPart({
+      id: 'neighbor',
+      length: 192,
+      width: 6,
+      thickness: 1,
+      position: { x: 49.43418603599124, y: 41.19842651456869, z: 7.884627918624319 },
+      rotation: { x: 180, y: -90, z: 0 }
+    });
+    const parts = [moving, neighbor];
+    const movingIds = new Set<string>(['moving']);
+
+    expect(partsOverlap(moving, neighbor)).toBe(true);
+    expect(resolveSafeTranslationDelta(parts, movingIds, { x: 0, y: 0, z: 0.25 })).toEqual({ x: 0, y: 0, z: 0.25 });
+    expect(resolveSafeTranslationDelta(parts, movingIds, { x: -1, y: 0, z: 0 })).toBeNull();
+  });
 });

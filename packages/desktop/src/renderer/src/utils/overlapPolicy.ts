@@ -80,6 +80,9 @@ export function wouldTranslationCauseOverlap(
 
     for (const other of parts) {
       if (movingIds.has(other.id)) continue;
+      if (partsOverlap(p, other, geometryCache) && !translationMovesPartCloserToOther(p, other, delta)) {
+        continue;
+      }
       if (partsOverlap(movedPart, other, geometryCache)) {
         return true;
       }
@@ -87,6 +90,19 @@ export function wouldTranslationCauseOverlap(
   }
 
   return false;
+}
+
+function translationMovesPartCloserToOther(part: Part, other: Part, delta: TranslationDelta): boolean {
+  const beforeDx = part.position.x - other.position.x;
+  const beforeDy = part.position.y - other.position.y;
+  const beforeDz = part.position.z - other.position.z;
+  const afterDx = beforeDx + delta.x;
+  const afterDy = beforeDy + delta.y;
+  const afterDz = beforeDz + delta.z;
+  const beforeDistanceSq = beforeDx * beforeDx + beforeDy * beforeDy + beforeDz * beforeDz;
+  const afterDistanceSq = afterDx * afterDx + afterDy * afterDy + afterDz * afterDz;
+
+  return afterDistanceSq < beforeDistanceSq - OBB_EPSILON;
 }
 
 export function resolveSafeTranslationDelta(
