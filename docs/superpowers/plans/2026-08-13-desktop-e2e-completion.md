@@ -467,7 +467,7 @@ git commit -m "test: cover canvas selection edge cases e2e"
 
 - Consumes seeded part/stock helpers.
 
-- [ ] **Step 1: Write failing E2E**
+- [x] **Step 1: Write failing E2E**
 
 Tests:
 
@@ -478,10 +478,10 @@ test("multi-selection properties apply shared editable fields to all selected pa
 test("free mode hides or blocks grain controls", async () => {});
 ```
 
-- [ ] **Step 2: Run focused spec and verify RED**
-- [ ] **Step 3: Implement only necessary selector/test accessibility fixes**
-- [ ] **Step 4: Run focused spec and verify GREEN**
-- [ ] **Step 5: Commit**
+- [x] **Step 2: Run focused spec and verify RED**
+- [x] **Step 3: Implement only necessary selector/test accessibility fixes**
+- [x] **Step 4: Run focused spec and verify GREEN**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -m "test: cover properties panel e2e"
