@@ -101,6 +101,7 @@ export function Workspace() {
   const toggleGroupSelection = useSelectionStore((s) => s.toggleGroupSelection);
   const enterGroup = useSelectionStore((s) => s.enterGroup);
   const selectParts = useSelectionStore((s) => s.selectParts);
+  const setDragIntent = useSelectionStore((s) => s.setDragIntent);
   const openContextMenu = useUIStore((s) => s.openContextMenu);
   const setSelectedSidebarStockId = useUIStore((s) => s.setSelectedSidebarStockId);
   const setSelectionBox = useSelectionStore((s) => s.setSelectionBox);
@@ -389,7 +390,13 @@ export function Workspace() {
     scene,
     parts,
     handlers: {
+      onPointerDownHit: (hit, event) => {
+        if (event.button === 0 && hit.kind === 'part-body') {
+          pauseOrbitControls(controls);
+        }
+      },
       onClick: (action) => {
+        resumeOrbitControls(controls);
         // Mirror the legacy native-mouseup fallback: skip additive (the per-mesh
         // R3F handler already toggled selection; re-toggling would net zero).
         const isAdditive = action.modifiers.shift || action.modifiers.meta || action.modifiers.ctrl;
@@ -458,6 +465,27 @@ export function Workspace() {
         // handle). Open the background context menu so the gesture still does
         // something useful (Add Guide, etc.).
         openContextMenu({ x: action.clientX, y: action.clientY, type: 'background' });
+      },
+      onDragStart: (action) => {
+        if (action.button !== 0 || action.hit?.kind !== 'part-body') return;
+        debugSelection('session:dragstart:part-fallback', { partId: action.hit.partId });
+        selectFromPartHit(action.hit.partId, false);
+        setSelectedSidebarStockId(null);
+        setDragIntent({
+          partId: action.hit.partId,
+          screenX: action.downAt.clientX,
+          screenY: action.downAt.clientY,
+          worldPoint: action.hit.worldPoint
+        });
+        pauseOrbitControls(controls);
+      },
+      onDragCommit: () => {
+        useSelectionStore.getState().clearDragIntent();
+        resumeOrbitControls(controls);
+      },
+      onDragCancel: () => {
+        useSelectionStore.getState().clearDragIntent();
+        resumeOrbitControls(controls);
       }
     }
   });

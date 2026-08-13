@@ -17,6 +17,7 @@ import {
 import { bindEventListeners } from './eventBinding';
 
 export interface UseCanvasPointerSessionHandlers {
+  onPointerDownHit?: (hit: HitTarget, event: PointerEvent) => void;
   onClick?: (action: Extract<SessionAction, { kind: 'click' }>) => void;
   onDoubleClick?: (action: Extract<SessionAction, { kind: 'doubleclick' }>) => void;
   onContextMenu?: (action: Extract<SessionAction, { kind: 'contextmenu' }>) => void;
@@ -138,6 +139,10 @@ export function useCanvasPointerSession(params: UseCanvasPointerSessionParams): 
     const handlePointerDown = (e: PointerEvent) => {
       // Only buttons 0 (left) and 2 (right) participate in click/drag/menu.
       if (e.button !== 0 && e.button !== 2) return;
+      const hit = hitAt(e.clientX, e.clientY);
+      if (hit) {
+        handlersRef.current.onPointerDownHit?.(hit, e);
+      }
       dispatch(
         controller.feed({
           kind: 'pointerdown',
@@ -147,7 +152,7 @@ export function useCanvasPointerSession(params: UseCanvasPointerSessionParams): 
           clientY: e.clientY,
           modifiers: readModifiers(e),
           timestamp: e.timeStamp,
-          hit: hitAt(e.clientX, e.clientY)
+          hit
         })
       );
     };
@@ -214,7 +219,7 @@ export function useCanvasPointerSession(params: UseCanvasPointerSessionParams): 
       e.preventDefault();
     };
 
-    const unbindCanvasListeners = bindEventListeners(canvas, [['pointerdown', handlePointerDown]]);
+    const unbindCanvasListeners = bindEventListeners(canvas, [['pointerdown', handlePointerDown, { capture: true }]]);
     const unbindWindowListeners = bindEventListeners(window, [
       ['pointermove', handlePointerMove],
       ['pointerup', handlePointerUp],

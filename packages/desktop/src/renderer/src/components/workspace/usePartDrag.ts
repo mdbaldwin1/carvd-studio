@@ -39,7 +39,6 @@ import {
 } from '../../utils/interactionMovement';
 import {
   beginMoveInteractionSession,
-  consumeTransformDragIntent,
   clearTransformDraggingPart,
   clearTransformInteractionPreview,
   clearTransformInteractionPreviewKeepingReferenceDistances,
@@ -77,6 +76,7 @@ export function usePartDrag(
   startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number) => void
 ) {
   const [isDragging, setIsDragging] = useState(false);
+  const dragIntentForPart = useSelectionStore((s) => (s.dragIntent?.partId === part.id ? s.dragIntent : null));
   const dragStart = useRef<{ point: THREE.Vector3; partPos: THREE.Vector3; partOriginalPos: THREE.Vector3 } | null>(
     null
   );
@@ -132,6 +132,7 @@ export function usePartDrag(
     setIsDragging(false);
     resetDragRefs();
     markJustFinishedDragging(didMove);
+    useSelectionStore.getState().clearDragIntent();
     clearTransformDraggingPart();
     clearPreview();
     resumeOrbitControls(controls);
@@ -245,13 +246,15 @@ export function usePartDrag(
     }, 0);
   }, []);
 
-  // Drag intent handoff: when this Part mounts because InstancedMesh selected it,
-  // pick up the stored drag intent and watch for drag movement.
+  // Drag intent handoff: when this Part is rendered because InstancedMesh
+  // selected it — or when the native canvas session detects a part drag that
+  // the R3F mesh handler did not claim — pick up the stored drag intent and
+  // watch for drag movement.
   // Uses a threshold to distinguish clicks from drags and attaches window listeners
   // synchronously to avoid race conditions with quick clicks.
   useEffect(() => {
-    const dragIntent = consumeTransformDragIntent(part.id);
-    if (!dragIntent) return;
+    if (!dragIntentForPart || isDragging) return;
+    const dragIntent = dragIntentForPart;
 
     // Keep this part rendered individually, then consume the intent
     markTransformDraggingPart(part.id);
@@ -263,6 +266,7 @@ export function usePartDrag(
     }
 
     if (!startPoint) {
+      useSelectionStore.getState().clearDragIntent();
       clearTransformDraggingPart();
       return;
     }
@@ -331,6 +335,7 @@ export function usePartDrag(
       if (!dragStarted) {
         // Click without drag — clean up drag intent state
         removeIntentListeners();
+        useSelectionStore.getState().clearDragIntent();
         clearTransformDraggingPart();
       } else {
         // Safety net: drag was started but second useEffect hasn't attached its listeners yet.
@@ -352,9 +357,8 @@ export function usePartDrag(
     intentListenerCleanup.current = removeIntentListeners;
 
     return removeIntentListeners;
-    // Only run on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dragIntentForPart, part.id]);
 
   // Attach/detach window listeners when dragging
   useEffect(() => {
