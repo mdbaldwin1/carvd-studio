@@ -138,6 +138,7 @@ export async function waitForAutomationHooks(window: Page): Promise<void> {
 
 export async function closeElectronApp(running: RunningElectronApp | undefined): Promise<void> {
   if (!running) return;
+  const proc = running.electronApp.process();
   try {
     await Promise.race([
       running.electronApp.close(),
@@ -146,12 +147,36 @@ export async function closeElectronApp(running: RunningElectronApp | undefined):
   } catch {
     try {
       const signal = process.platform === 'win32' ? undefined : 'SIGKILL';
-      running.electronApp.process().kill(signal);
+      proc.kill(signal);
     } catch {
       // Process may already be gone.
     }
   }
-  fs.rmSync(running.userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 });
+  // Wait for the process to fully exit before removing the temp profile —
+  // Chromium releases its file locks (e.g. cache journals on Windows, which
+  // otherwise surface as EBUSY) only after exit, not when close() resolves.
+  await new Promise<void>((resolve) => {
+    if (proc.exitCode !== null || proc.signalCode !== null) {
+      resolve();
+      return;
+    }
+    const timer = setTimeout(resolve, 5000);
+    proc.once('exit', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+  try {
+    await fs.promises.rm(running.userDataDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 500
+    });
+  } catch {
+    // Best-effort cleanup: a stray temp profile is harmless and must never
+    // fail a test from teardown.
+  }
 }
 
 export async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {
