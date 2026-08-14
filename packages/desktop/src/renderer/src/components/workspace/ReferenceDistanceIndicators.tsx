@@ -6,58 +6,225 @@
 
 import React, { useState } from 'react';
 import { Line, Html } from '@react-three/drei';
+import { useThree } from '@react-three/fiber';
 import { useProjectStore } from '../../store/projectStore';
-import { useSnapStore } from '../../store/snapStore';
-import { useCameraStore } from '../../store/cameraStore';
 import { formatMeasurementWithUnit, parseInput } from '../../utils/fractions';
-import { ReferenceDistanceIndicator } from '../../types';
+import { getProjectedMeasurementLength, resolveMeasurementOverlayLayout } from '../../utils/measurementOverlayLayout';
+import { getReferenceLabelPosition } from '../../utils/measurementPlacement';
+import { getReferenceDistancePriority } from '../../utils/measurementPriority';
+import { ReferenceRuler } from '../../types';
 import { Input } from '@renderer/components/ui/input';
+import { calculateMoveDeltaForReferenceRelation } from '../../utils/referenceRelations';
+import { resolveResizePositionFromDimensions } from '../../utils/interactionResizePreview';
+import { clearTransformInteractionPreviewKeepingSelectionDelta } from '../../utils/interactionSession';
+import * as THREE from 'three';
+import type { ReferenceOverlayInputs } from '../../interaction/overlayModel';
 
-export function ReferenceDistanceIndicators(): React.ReactElement | null {
-  const activeReferenceDistances = useSnapStore((s) => s.activeReferenceDistances);
-  const units = useProjectStore((s) => s.units);
+interface ReferenceDistanceIndicatorsProps {
+  /** References slot from the OverlayModel. `null` hides the overlay. */
+  data: ReferenceOverlayInputs | null;
+}
+
+// ADR-005: ReferenceDistanceIndicators is a (mostly) pure prop consumer. The
+// slot in OverlayModel carries every piece of state the component reads. The
+// component still reads `moveSelectedParts` / `updatePart` from projectStore
+// because those are imperative action references (stable, do not trigger
+// re-renders) used inside the inline edit submit handler.
+export function ReferenceDistanceIndicators({ data }: ReferenceDistanceIndicatorsProps): React.ReactElement | null {
+  const { camera, size } = useThree();
+  // Stable action references — reading these does not subscribe to state.
   const moveSelectedParts = useProjectStore((s) => s.moveSelectedParts);
-  const displayMode = useCameraStore((s) => s.displayMode);
+  const updatePart = useProjectStore((s) => s.updatePart);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
 
-  if (activeReferenceDistances.length === 0) return null;
+  if (!data) return null;
 
-  const handleStartEdit = (indicator: ReferenceDistanceIndicator) => {
-    setEditingId(indicator.id);
-    setEditValue(formatMeasurementWithUnit(indicator.distance, units));
+  const { rulers, legacyIndicators, activeSession, parts, units, displayMode } = data;
+  const sessionRelationsById = new Map(
+    activeSession?.referenceState.candidateRelations.map((relation) => [relation.id, relation] as const) ?? []
+  );
+  const legacyIndicatorsById = new Map(legacyIndicators.map((indicator) => [indicator.id, indicator] as const));
+  const activeRuler = rulers.find((ruler) => ruler.kind === 'active') ?? rulers[0] ?? null;
+  const hasEditableRuler = rulers.some((ruler) => {
+    if (ruler.editMode === 'move') return true;
+    if (activeSession?.kind !== 'resize' || !ruler.axis) return false;
+    const handleAxisValue =
+      ruler.axis === 'x'
+        ? activeSession.handle?.x
+        : ruler.axis === 'y'
+          ? activeSession.handle?.y
+          : activeSession.handle?.z;
+    return Boolean(handleAxisValue);
+  });
+
+  const viewport = { width: size.width, height: size.height };
+  const labelLayout = resolveMeasurementOverlayLayout(
+    rulers
+      .map((ruler) => {
+        const labelPosition = getReferenceLabelPosition({
+          start: [ruler.start.x, ruler.start.y, ruler.start.z],
+          end: [ruler.end.x, ruler.end.y, ruler.end.z],
+          axis: ruler.axis ?? 'x',
+          cameraUp: [camera.up.x, camera.up.y, camera.up.z],
+          cameraRight: [camera.matrixWorld.elements[0], camera.matrixWorld.elements[1], camera.matrixWorld.elements[2]]
+        });
+
+        const projectedLength = getProjectedMeasurementLength(ruler.start, ruler.end, camera, viewport);
+        if (projectedLength < 36) {
+          return null;
+        }
+
+        return {
+          id: ruler.id,
+          worldPosition: { x: labelPosition[0], y: labelPosition[1], z: labelPosition[2] },
+          priority:
+            getReferenceDistancePriority({
+              type: ruler.type,
+              distance: ruler.distance,
+              isEditing: editingId === ruler.id
+            }) + (ruler.kind === 'active' ? 40 : 0)
+        };
+      })
+      .filter(
+        (item): item is { id: string; worldPosition: { x: number; y: number; z: number }; priority: number } =>
+          item !== null
+      ),
+    camera,
+    viewport,
+    54,
+    3
+  );
+
+  const handleStartEdit = (ruler: ReferenceRuler) => {
+    const canEditResizeRuler =
+      activeSession?.kind === 'resize' &&
+      ruler.axis !== null &&
+      ((ruler.editMode === 'resize-size' &&
+        ((ruler.axis === 'x' && activeSession.handle?.x) ||
+          (ruler.axis === 'y' && activeSession.handle?.y) ||
+          (ruler.axis === 'z' && activeSession.handle?.z))) ||
+        (ruler.editMode === 'resize-gap' &&
+          ((ruler.axis === 'x' && activeSession.handle?.x) ||
+            (ruler.axis === 'y' && activeSession.handle?.y) ||
+            (ruler.axis === 'z' && activeSession.handle?.z))));
+    if (ruler.editMode !== 'move' && !canEditResizeRuler) return;
+    setEditingId(ruler.id);
+    setEditValue(formatMeasurementWithUnit(ruler.distance, units));
   };
 
-  const handleEditSubmit = (indicator: ReferenceDistanceIndicator) => {
+  const handleEditSubmit = (ruler: ReferenceRuler) => {
     const newDist = parseInput(editValue, units);
-    if (newDist !== null && newDist !== indicator.distance) {
-      const delta = newDist - indicator.distance;
-      // Move along the measured vector so editing works for angled indicators too.
-      const vx = indicator.end.x - indicator.start.x;
-      const vy = indicator.end.y - indicator.start.y;
-      const vz = indicator.end.z - indicator.start.z;
-      const len = Math.hypot(vx, vy, vz);
-      if (len < 1e-6) {
+    if (newDist === null || newDist === ruler.distance) {
+      setEditingId(null);
+      return;
+    }
+
+    const sessionRelation = sessionRelationsById.get(ruler.relationId);
+    if (ruler.editMode === 'move') {
+      const movement =
+        sessionRelation && sessionRelation.editMode === 'move'
+          ? calculateMoveDeltaForReferenceRelation(sessionRelation, newDist)
+          : null;
+
+      if (movement) {
+        moveSelectedParts(movement);
+      } else {
+        const delta = newDist - ruler.distance;
+        const vx = ruler.end.x - ruler.start.x;
+        const vy = ruler.end.y - ruler.start.y;
+        const vz = ruler.end.z - ruler.start.z;
+        const len = Math.hypot(vx, vy, vz);
+        if (len < 1e-6) {
+          setEditingId(null);
+          return;
+        }
+
+        moveSelectedParts({
+          x: (-vx / len) * delta,
+          y: (-vy / len) * delta,
+          z: (-vz / len) * delta
+        });
+      }
+      setEditingId(null);
+      return;
+    }
+
+    if (
+      activeSession?.kind !== 'resize' ||
+      !activeSession.primaryPartId ||
+      !activeSession.handle ||
+      !activeSession.dimensions ||
+      !activeSession.position ||
+      !ruler.axis
+    ) {
+      setEditingId(null);
+      return;
+    }
+
+    const part = parts.find((entry) => entry.id === activeSession.primaryPartId);
+    if (!part) {
+      setEditingId(null);
+      return;
+    }
+
+    const rotationQuaternion = new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(
+        (part.rotation.x * Math.PI) / 180,
+        (part.rotation.y * Math.PI) / 180,
+        (part.rotation.z * Math.PI) / 180,
+        'XYZ'
+      )
+    );
+    const nextDimensions = { ...activeSession.dimensions };
+    const axisToDimensionKey = ruler.axis === 'x' ? 'length' : ruler.axis === 'y' ? 'thickness' : 'width';
+    const handleAxisValue =
+      ruler.axis === 'x'
+        ? activeSession.handle.x
+        : ruler.axis === 'y'
+          ? activeSession.handle.y
+          : activeSession.handle.z;
+
+    if (ruler.editMode === 'resize-size') {
+      nextDimensions[axisToDimensionKey] =
+        axisToDimensionKey === 'thickness' ? Math.max(0.25, newDist) : Math.max(0.5, newDist);
+    } else if (ruler.editMode === 'resize-gap' && sessionRelation && handleAxisValue !== 0) {
+      const movement = calculateMoveDeltaForReferenceRelation(sessionRelation, newDist);
+      if (!movement) {
         setEditingId(null);
         return;
       }
-
-      // start is selected side; to increase distance, move start away from end.
-      const movement = {
-        x: (-vx / len) * delta,
-        y: (-vy / len) * delta,
-        z: (-vz / len) * delta
-      };
-
-      moveSelectedParts(movement);
+      const faceMovement = ruler.axis === 'x' ? movement.x : ruler.axis === 'y' ? movement.y : movement.z;
+      const nextDimensionValue = activeSession.dimensions[axisToDimensionKey] + handleAxisValue * faceMovement;
+      nextDimensions[axisToDimensionKey] =
+        axisToDimensionKey === 'thickness' ? Math.max(0.25, nextDimensionValue) : Math.max(0.5, nextDimensionValue);
+    } else {
+      setEditingId(null);
+      return;
     }
+
+    const nextPosition = resolveResizePositionFromDimensions({
+      basePosition: activeSession.position,
+      baseDimensions: activeSession.dimensions,
+      nextDimensions,
+      handlePos: activeSession.handle,
+      rotationQuaternion
+    });
+
+    updatePart(part.id, {
+      length: nextDimensions.length,
+      width: nextDimensions.width,
+      thickness: nextDimensions.thickness,
+      position: nextPosition
+    });
+    clearTransformInteractionPreviewKeepingSelectionDelta();
     setEditingId(null);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, indicator: ReferenceDistanceIndicator) => {
+  const handleKeyDown = (e: React.KeyboardEvent, ruler: ReferenceRuler) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleEditSubmit(indicator);
+      handleEditSubmit(ruler);
     } else if (e.key === 'Escape') {
       setEditingId(null);
     }
@@ -65,43 +232,79 @@ export function ReferenceDistanceIndicators(): React.ReactElement | null {
 
   return (
     <group>
-      {activeReferenceDistances.map((indicator) => {
-        // Cyan for edge-to-edge gaps, yellow for edge alignment offsets
-        const color = indicator.type === 'edge-to-edge' ? '#00d9ff' : '#ffcc00';
-        const isEditing = editingId === indicator.id;
+      {activeSession && activeRuler && hasEditableRuler ? (
+        <Html
+          position={[activeRuler.labelPosition.x, activeRuler.labelPosition.y + 0.9, activeRuler.labelPosition.z]}
+          center
+          occlude={displayMode === 'solid'}
+          style={{ pointerEvents: 'none' }}
+        >
+          <div className="rounded-[6px] border border-white/18 bg-[rgba(15,20,30,0.85)] px-2.5 py-1 text-[11px] font-medium text-white/92 shadow-[0_4px_14px_rgba(0,0,0,0.25)] whitespace-nowrap">
+            {activeSession.kind === 'resize'
+              ? 'Click a ruler to type exact size or gap'
+              : 'Click the active ruler to type an exact distance'}
+          </div>
+        </Html>
+      ) : null}
+      {rulers.map((ruler) => {
+        const legacyIndicator = legacyIndicatorsById.get(ruler.id);
+        const color =
+          ruler.kind === 'active'
+            ? ruler.type === 'edge-to-edge'
+              ? '#00f0ff'
+              : '#ffd84d'
+            : ruler.type === 'edge-to-edge'
+              ? '#00d9ff'
+              : '#ffcc00';
+        const isEditing = editingId === ruler.id;
+        const labelPosition = getReferenceLabelPosition({
+          start: [ruler.start.x, ruler.start.y, ruler.start.z],
+          end: [ruler.end.x, ruler.end.y, ruler.end.z],
+          axis: ruler.axis ?? 'x',
+          cameraUp: [camera.up.x, camera.up.y, camera.up.z],
+          cameraRight: [camera.matrixWorld.elements[0], camera.matrixWorld.elements[1], camera.matrixWorld.elements[2]],
+          offsetDistance: 0.95 + (labelLayout.get(ruler.id)?.lane ?? 0) * 0.7
+        });
+        const isEditable =
+          ruler.editMode === 'move' ||
+          (activeSession?.kind === 'resize' &&
+            ruler.axis !== null &&
+            ((ruler.editMode === 'resize-size' &&
+              ((ruler.axis === 'x' && activeSession.handle?.x) ||
+                (ruler.axis === 'y' && activeSession.handle?.y) ||
+                (ruler.axis === 'z' && activeSession.handle?.z))) ||
+              (ruler.editMode === 'resize-gap' &&
+                ((ruler.axis === 'x' && activeSession.handle?.x) ||
+                  (ruler.axis === 'y' && activeSession.handle?.y) ||
+                  (ruler.axis === 'z' && activeSession.handle?.z)))));
 
         return (
-          <group key={indicator.id}>
+          <group key={ruler.id}>
             {/* Distance line */}
             <Line
               points={[
-                [indicator.start.x, indicator.start.y, indicator.start.z],
-                [indicator.end.x, indicator.end.y, indicator.end.z]
+                [ruler.start.x, ruler.start.y, ruler.start.z],
+                [ruler.end.x, ruler.end.y, ruler.end.z]
               ]}
               color={color}
-              lineWidth={1.5}
+              lineWidth={ruler.kind === 'active' ? 2.25 : 1.5}
               depthTest={displayMode === 'solid'}
-              dashed={indicator.type === 'edge-offset'}
+              dashed={ruler.type === 'edge-offset'}
               dashSize={0.2}
               gapSize={0.1}
             />
 
             {/* Distance label */}
-            <Html
-              position={[indicator.labelPosition.x, indicator.labelPosition.y, indicator.labelPosition.z]}
-              center
-              occlude={displayMode === 'solid' ? 'blending' : false}
-              style={{ pointerEvents: 'auto' }}
-            >
-              {isEditing ? (
+            <Html position={labelPosition} center occlude={displayMode === 'solid'} style={{ pointerEvents: 'auto' }}>
+              {!labelLayout.get(ruler.id)?.visible ? null : isEditing ? (
                 <Input
                   type="text"
-                  className="w-[70px] py-0.5 px-1.5 text-[11px] font-medium rounded-[3px] border-2 border-accent bg-surface text-text text-center outline-none focus:shadow-[0_0_0_2px_rgba(0,127,255,0.3)]"
+                  className="w-[84px] py-1 px-2 text-[12px] font-semibold rounded-[4px] border-2 border-accent bg-surface text-text text-center outline-none focus:shadow-[0_0_0_2px_rgba(0,127,255,0.3)]"
                   autoFocus
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={() => handleEditSubmit(indicator)}
-                  onKeyDown={(e) => handleKeyDown(e, indicator)}
+                  onBlur={() => handleEditSubmit(ruler)}
+                  onKeyDown={(e) => handleKeyDown(e, ruler)}
                   onClick={(e) => e.stopPropagation()}
                   onPointerDown={(e) => {
                     e.stopPropagation();
@@ -114,10 +317,10 @@ export function ReferenceDistanceIndicators(): React.ReactElement | null {
                 />
               ) : (
                 <div
-                  className={`py-0.5 px-1.5 text-[11px] font-medium rounded-[3px] cursor-pointer whitespace-nowrap select-none transition-all duration-100 hover:scale-105 ${indicator.type === 'edge-to-edge' ? 'bg-[rgba(0,217,255,0.9)] text-black' : 'bg-[rgba(255,204,0,0.9)] text-black'}`}
+                  className={`py-1 px-2 text-[12px] font-semibold rounded-[4px] whitespace-nowrap select-none transition-all duration-100 ${isEditable ? 'cursor-pointer hover:scale-105' : 'cursor-default'} ${ruler.kind === 'active' ? 'ring-2 ring-white/70' : ''} ${ruler.type === 'edge-to-edge' ? 'bg-[rgba(0,217,255,0.92)] text-black' : 'bg-[rgba(255,204,0,0.92)] text-black'}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleStartEdit(indicator);
+                    handleStartEdit(ruler);
                   }}
                   onPointerDown={(e) => {
                     e.stopPropagation();
@@ -127,9 +330,19 @@ export function ReferenceDistanceIndicators(): React.ReactElement | null {
                     e.stopPropagation();
                     e.nativeEvent.stopImmediatePropagation();
                   }}
-                  title="Click to edit distance"
+                  title={
+                    isEditable
+                      ? ruler.editMode === 'resize-size'
+                        ? 'Click to edit size'
+                        : ruler.editMode === 'resize-gap'
+                          ? 'Click to edit gap'
+                          : 'Click to edit distance'
+                      : legacyIndicator
+                        ? undefined
+                        : 'Reference ruler'
+                  }
                 >
-                  {formatMeasurementWithUnit(indicator.distance, units)}
+                  {formatMeasurementWithUnit(ruler.distance, units)}
                 </div>
               )}
             </Html>

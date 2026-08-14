@@ -5,6 +5,7 @@ import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { Part, Stock } from '@renderer/types';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
+import { KeyboardEvent, useEffect, useState } from 'react';
 
 interface SinglePartBasicsCardProps {
   selectedPart: Part;
@@ -49,6 +50,57 @@ export function SinglePartBasicsCard({
   snapIncrement,
   onSnapIncrementChange
 }: SinglePartBasicsCardProps) {
+  const [rotationDrafts, setRotationDrafts] = useState({
+    x: String(selectedPart.rotation.x),
+    y: String(selectedPart.rotation.y),
+    z: String(selectedPart.rotation.z)
+  });
+  const [editingRotationAxis, setEditingRotationAxis] = useState<'x' | 'y' | 'z' | null>(null);
+
+  useEffect(() => {
+    setRotationDrafts((current) => ({
+      x: editingRotationAxis === 'x' ? current.x : String(selectedPart.rotation.x),
+      y: editingRotationAxis === 'y' ? current.y : String(selectedPart.rotation.y),
+      z: editingRotationAxis === 'z' ? current.z : String(selectedPart.rotation.z)
+    }));
+  }, [editingRotationAxis, selectedPart.id, selectedPart.rotation.x, selectedPart.rotation.y, selectedPart.rotation.z]);
+
+  const commitRotationDraft = (axis: 'x' | 'y' | 'z') => {
+    const draftValue = rotationDrafts[axis].trim();
+    const parsed = Number(draftValue);
+
+    setEditingRotationAxis((current) => (current === axis ? null : current));
+
+    if (draftValue === '' || !Number.isFinite(parsed)) {
+      setRotationDrafts((current) => ({
+        ...current,
+        [axis]: String(selectedPart.rotation[axis])
+      }));
+      return;
+    }
+
+    if (axis === 'x') {
+      onRotationXChange(parsed);
+    } else if (axis === 'y') {
+      onRotationYChange(parsed);
+    } else {
+      onRotationZChange(parsed);
+    }
+  };
+
+  const handleRotationKeyDown = (axis: 'x' | 'y' | 'z') => (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    } else if (e.key === 'Escape') {
+      setRotationDrafts((current) => ({
+        ...current,
+        [axis]: String(selectedPart.rotation[axis])
+      }));
+      setEditingRotationAxis(null);
+      e.currentTarget.blur();
+    }
+  };
+
   return (
     <div className="properties-card">
       <div className="property-group">
@@ -138,27 +190,36 @@ export function SinglePartBasicsCard({
               <Input
                 type="number"
                 step={snapEnabled ? snapIncrement : 0.1}
-                value={selectedPart.rotation.x}
+                value={rotationDrafts.x}
                 className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                onChange={(e) => onRotationXChange(Number(e.target.value))}
+                onFocus={() => setEditingRotationAxis('x')}
+                onChange={(e) => setRotationDrafts((current) => ({ ...current, x: e.target.value }))}
+                onBlur={() => commitRotationDraft('x')}
+                onKeyDown={handleRotationKeyDown('x')}
                 aria-label="Rotation X"
               />
               <span>,</span>
               <Input
                 type="number"
                 step={snapEnabled ? snapIncrement : 0.1}
-                value={selectedPart.rotation.y}
+                value={rotationDrafts.y}
                 className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                onChange={(e) => onRotationYChange(Number(e.target.value))}
+                onFocus={() => setEditingRotationAxis('y')}
+                onChange={(e) => setRotationDrafts((current) => ({ ...current, y: e.target.value }))}
+                onBlur={() => commitRotationDraft('y')}
+                onKeyDown={handleRotationKeyDown('y')}
                 aria-label="Rotation Y"
               />
               <span>,</span>
               <Input
                 type="number"
                 step={snapEnabled ? snapIncrement : 0.1}
-                value={selectedPart.rotation.z}
+                value={rotationDrafts.z}
                 className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                onChange={(e) => onRotationZChange(Number(e.target.value))}
+                onFocus={() => setEditingRotationAxis('z')}
+                onChange={(e) => setRotationDrafts((current) => ({ ...current, z: e.target.value }))}
+                onBlur={() => commitRotationDraft('z')}
+                onKeyDown={handleRotationKeyDown('z')}
                 aria-label="Rotation Z"
               />
             </div>

@@ -19,6 +19,17 @@ const DEFAULT_SETTINGS: AppSettings = {
   snapSensitivity: 'normal',
   snapToOrigin: true, // Snap to origin planes by default
   dimensionSnapSameTypeOnly: false, // Allow matching any dimension by default
+  advancedSnapPreset: 'precision',
+  enableSurfaceAnchors: true,
+  enableFractionalAnchors: true,
+  enableGoldenRatioAnchors: false,
+  enableFeatureAnchors: true,
+  enableLayoutSnaps: true,
+  enableEqualSpacingSnap: true,
+  enableDistributionSnap: true,
+  enablePatternSnap: true,
+  enableAxisLegacySnaps: true,
+  showSnapCandidates: false,
   // Display settings
   lightingMode: 'default', // Default lighting preset
   brightnessMultiplier: 1.0, // Default brightness (1.0 = 100%)
@@ -64,6 +75,17 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
           'snapSensitivity',
           'snapToOrigin',
           'dimensionSnapSameTypeOnly',
+          'advancedSnapPreset',
+          'enableSurfaceAnchors',
+          'enableFractionalAnchors',
+          'enableGoldenRatioAnchors',
+          'enableFeatureAnchors',
+          'enableLayoutSnaps',
+          'enableEqualSpacingSnap',
+          'enableDistributionSnap',
+          'enablePatternSnap',
+          'enableAxisLegacySnaps',
+          'showSnapCandidates',
           'lightingMode',
           'brightnessMultiplier',
           'autoSave'
@@ -105,6 +127,17 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
           snapSensitivity,
           snapToOrigin,
           dimensionSnapSameTypeOnly,
+          advancedSnapPreset,
+          enableSurfaceAnchors,
+          enableFractionalAnchors,
+          enableGoldenRatioAnchors,
+          enableFeatureAnchors,
+          enableLayoutSnaps,
+          enableEqualSpacingSnap,
+          enableDistributionSnap,
+          enablePatternSnap,
+          enableAxisLegacySnaps,
+          showSnapCandidates,
           lightingMode,
           brightnessMultiplier,
           autoSave
@@ -119,6 +152,17 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
           window.electronAPI.getPreference('snapSensitivity'),
           window.electronAPI.getPreference('snapToOrigin'),
           window.electronAPI.getPreference('dimensionSnapSameTypeOnly'),
+          window.electronAPI.getPreference('advancedSnapPreset'),
+          window.electronAPI.getPreference('enableSurfaceAnchors'),
+          window.electronAPI.getPreference('enableFractionalAnchors'),
+          window.electronAPI.getPreference('enableGoldenRatioAnchors'),
+          window.electronAPI.getPreference('enableFeatureAnchors'),
+          window.electronAPI.getPreference('enableLayoutSnaps'),
+          window.electronAPI.getPreference('enableEqualSpacingSnap'),
+          window.electronAPI.getPreference('enableDistributionSnap'),
+          window.electronAPI.getPreference('enablePatternSnap'),
+          window.electronAPI.getPreference('enableAxisLegacySnaps'),
+          window.electronAPI.getPreference('showSnapCandidates'),
           window.electronAPI.getPreference('lightingMode'),
           window.electronAPI.getPreference('brightnessMultiplier'),
           window.electronAPI.getPreference('autoSave')
@@ -140,6 +184,42 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
             dimensionSnapSameTypeOnly !== undefined
               ? (dimensionSnapSameTypeOnly as boolean)
               : DEFAULT_SETTINGS.dimensionSnapSameTypeOnly,
+          advancedSnapPreset:
+            (advancedSnapPreset as AppSettings['advancedSnapPreset']) || DEFAULT_SETTINGS.advancedSnapPreset,
+          enableSurfaceAnchors:
+            enableSurfaceAnchors !== undefined
+              ? (enableSurfaceAnchors as boolean)
+              : DEFAULT_SETTINGS.enableSurfaceAnchors,
+          enableFractionalAnchors:
+            enableFractionalAnchors !== undefined
+              ? (enableFractionalAnchors as boolean)
+              : DEFAULT_SETTINGS.enableFractionalAnchors,
+          enableGoldenRatioAnchors:
+            enableGoldenRatioAnchors !== undefined
+              ? (enableGoldenRatioAnchors as boolean)
+              : DEFAULT_SETTINGS.enableGoldenRatioAnchors,
+          enableFeatureAnchors:
+            enableFeatureAnchors !== undefined
+              ? (enableFeatureAnchors as boolean)
+              : DEFAULT_SETTINGS.enableFeatureAnchors,
+          enableLayoutSnaps:
+            enableLayoutSnaps !== undefined ? (enableLayoutSnaps as boolean) : DEFAULT_SETTINGS.enableLayoutSnaps,
+          enableEqualSpacingSnap:
+            enableEqualSpacingSnap !== undefined
+              ? (enableEqualSpacingSnap as boolean)
+              : DEFAULT_SETTINGS.enableEqualSpacingSnap,
+          enableDistributionSnap:
+            enableDistributionSnap !== undefined
+              ? (enableDistributionSnap as boolean)
+              : DEFAULT_SETTINGS.enableDistributionSnap,
+          enablePatternSnap:
+            enablePatternSnap !== undefined ? (enablePatternSnap as boolean) : DEFAULT_SETTINGS.enablePatternSnap,
+          enableAxisLegacySnaps:
+            enableAxisLegacySnaps !== undefined
+              ? (enableAxisLegacySnaps as boolean)
+              : DEFAULT_SETTINGS.enableAxisLegacySnaps,
+          showSnapCandidates:
+            showSnapCandidates !== undefined ? (showSnapCandidates as boolean) : DEFAULT_SETTINGS.showSnapCandidates,
           lightingMode: (lightingMode as AppSettings['lightingMode']) || DEFAULT_SETTINGS.lightingMode,
           brightnessMultiplier: (brightnessMultiplier as number) || DEFAULT_SETTINGS.brightnessMultiplier,
           autoSave: autoSave !== undefined ? (autoSave as boolean) : DEFAULT_SETTINGS.autoSave
@@ -185,6 +265,17 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
         window.electronAPI.setPreference('snapSensitivity', newSettings.snapSensitivity ?? 'normal'),
         window.electronAPI.setPreference('snapToOrigin', newSettings.snapToOrigin ?? true),
         window.electronAPI.setPreference('dimensionSnapSameTypeOnly', newSettings.dimensionSnapSameTypeOnly ?? false),
+        window.electronAPI.setPreference('advancedSnapPreset', newSettings.advancedSnapPreset ?? 'precision'),
+        window.electronAPI.setPreference('enableSurfaceAnchors', newSettings.enableSurfaceAnchors ?? true),
+        window.electronAPI.setPreference('enableFractionalAnchors', newSettings.enableFractionalAnchors ?? true),
+        window.electronAPI.setPreference('enableGoldenRatioAnchors', newSettings.enableGoldenRatioAnchors ?? false),
+        window.electronAPI.setPreference('enableFeatureAnchors', newSettings.enableFeatureAnchors ?? true),
+        window.electronAPI.setPreference('enableLayoutSnaps', newSettings.enableLayoutSnaps ?? true),
+        window.electronAPI.setPreference('enableEqualSpacingSnap', newSettings.enableEqualSpacingSnap ?? true),
+        window.electronAPI.setPreference('enableDistributionSnap', newSettings.enableDistributionSnap ?? true),
+        window.electronAPI.setPreference('enablePatternSnap', newSettings.enablePatternSnap ?? true),
+        window.electronAPI.setPreference('enableAxisLegacySnaps', newSettings.enableAxisLegacySnaps ?? true),
+        window.electronAPI.setPreference('showSnapCandidates', newSettings.showSnapCandidates ?? false),
         window.electronAPI.setPreference('lightingMode', newSettings.lightingMode ?? 'default'),
         window.electronAPI.setPreference('brightnessMultiplier', newSettings.brightnessMultiplier ?? 1.0),
         window.electronAPI.setPreference('autoSave', newSettings.autoSave ?? false)

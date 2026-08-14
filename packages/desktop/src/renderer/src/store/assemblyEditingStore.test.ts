@@ -9,6 +9,7 @@ import { useAssemblyEditingStore } from './assemblyEditingStore';
 import { useProjectStore } from './projectStore';
 import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
+import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
 
 const resetStores = () => {
@@ -44,6 +45,7 @@ const resetStores = () => {
     referencePartIds: [],
     activeReferenceDistances: []
   });
+  useInteractionStore.getState().endSession();
 };
 
 describe('assemblyEditingStore', () => {

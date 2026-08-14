@@ -1,23 +1,57 @@
 import { Html, Line } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useProjectStore } from '../../store/projectStore';
-import { useSnapStore } from '../../store/snapStore';
-import { useCameraStore } from '../../store/cameraStore';
 import { SnapLine } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
+import type { SnapOverlayData } from '../../interaction/overlayModel';
 
-// Component that renders snap alignment lines during drag operations
-export function SnapAlignmentLines() {
+interface SnapAlignmentLinesProps {
+  /** Snap slice from the OverlayModel. `null` hides the overlay entirely. */
+  data: SnapOverlayData | null;
+  units: 'imperial' | 'metric';
+  displayMode: 'solid' | 'translucent' | 'wireframe';
+}
+
+// ADR-005: SnapAlignmentLines is a pure prop consumer. Workspace computes the
+// overlay model and passes the snap slice + units + displayMode down. The
+// component does not read from stores.
+export function SnapAlignmentLines({ data, units, displayMode }: SnapAlignmentLinesProps) {
   const { camera } = useThree();
-  const activeSnapLines = useSnapStore((s) => s.activeSnapLines);
-  const units = useProjectStore((s) => s.units);
-  const displayMode = useCameraStore((s) => s.displayMode);
 
-  if (activeSnapLines.length === 0) return null;
+  if (!data) return null;
+
+  const { lines: activeSnapLines, pulseAt: snapPulseAt, labelPosition: snapLabelPosition } = data;
+
+  const now = performance.now();
+  const pulseAge = now - snapPulseAt;
+  const pulseActive = pulseAge >= 0 && pulseAge <= 320;
+  const pulseScale = pulseActive ? 0.35 + 0.65 * Math.sin((Math.PI * pulseAge) / 320) ** 2 : 0;
+
+  const axisAccent = (axis: 'x' | 'y' | 'z') => (axis === 'x' ? '#ff6b6b' : axis === 'y' ? '#69db7c' : '#4dabf7');
 
   // Colors for different snap types
   const getLineColor = (line: SnapLine) => {
+    switch (line.family) {
+      case 'guide':
+        return '#00d9ff';
+      case 'origin':
+        return '#ffffff';
+      case 'face':
+        return '#00d9ff';
+      case 'surface-anchor':
+        if (line.subtype?.includes('quarter')) return '#ff922b';
+        if (line.subtype?.includes('midline')) return '#ff922b';
+        return '#69db7c';
+      case 'surface-fraction':
+        if (line.subtype === 'corner-anchor') return '#69db7c';
+        if (line.subtype?.includes('fraction-50')) return '#69db7c';
+        return '#ff922b';
+      case 'feature':
+        return '#ffffff';
+      default:
+        break;
+    }
+
     if (line.type === 'dimension-match') {
       // Different colors for standard vs part-matched dimensions
       if (line.dimensionMatchInfo?.isStandard) {
@@ -25,9 +59,7 @@ export function SnapAlignmentLines() {
       }
       return '#ffa94d'; // Orange for part-matched dimensions
     }
-    if (line.type === 'equal-spacing') {
-      return '#da77f2'; // Magenta/purple for equal spacing
-    }
+    if (line.type === 'equal-spacing') return '#da77f2';
     if (line.type === 'center') {
       return '#ffd43b'; // Yellow for center alignment
     }
@@ -98,8 +130,70 @@ export function SnapAlignmentLines() {
     ];
   };
 
+  const getSnapToken = (line: SnapLine) => {
+    if (line.family === 'face') return 'FACE';
+    if (line.family === 'surface-anchor') {
+      if (line.subtype === 'center-2d') return 'Center-2D';
+      if (line.subtype === 'center-1d') return `CENTER-${line.axis.toUpperCase()}`;
+      if (line.subtype === 'edge-midline') return 'MIDLINE';
+      if (line.subtype === 'edge-quarterline') return 'QUARTER';
+    }
+    if (line.family === 'surface-fraction') {
+      if (line.subtype === 'fraction-25') return `25%-${line.axis.toUpperCase()}`;
+      if (line.subtype === 'fraction-50') return '50%';
+      if (line.subtype === 'fraction-75') return `75%-${line.axis.toUpperCase()}`;
+      if (line.subtype === 'fraction-0') return '0%';
+      if (line.subtype === 'fraction-100') return '100%';
+      if (line.subtype === 'corner-anchor') return 'CORNER';
+      return 'FRACTION';
+    }
+    if (line.family === 'feature') {
+      if (line.subtype === 'vertex-face') return 'VTX->FACE';
+      if (line.subtype === 'vertex-vertex') return 'VTX->VTX';
+      if (line.subtype === 'vertex-edge') return 'VTX->EDGE';
+      if (line.subtype === 'midpoint-midpoint') return 'MID->MID';
+      if (line.subtype === 'edge-extension') return 'EXT-LINE';
+      return 'EDGE';
+    }
+    if (line.type === 'equal-spacing') {
+      if (line.subtype === 'distribution') return 'DISTR';
+      if (line.subtype === 'pattern') return 'PATTERN';
+      return 'EQUAL';
+    }
+    if (line.type === 'dimension-match') return 'MATCH';
+    return null;
+  };
+
   return (
     <group>
+      {activeSnapLines.some((line) => line.state === 'latched') && (
+        <Html
+          position={
+            snapLabelPosition
+              ? [snapLabelPosition.x, snapLabelPosition.y + 0.5, snapLabelPosition.z]
+              : [camera.position.x * 0.1, camera.position.y * 0.1, camera.position.z * 0.1]
+          }
+          center
+        >
+          <div
+            style={{
+              color: '#00d9ff',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              fontFamily: 'monospace',
+              backgroundColor: 'rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              border: '1px solid #00d9ff',
+              textShadow: '0 0 3px rgba(0,0,0,0.85)'
+            }}
+          >
+            SNAP LOCK
+          </div>
+        </Html>
+      )}
       {activeSnapLines.map((line, index) => (
         <group key={`snap-group-${index}`}>
           {/* Main snap alignment line */}
@@ -109,12 +203,68 @@ export function SnapAlignmentLines() {
               [line.end.x, line.end.y, line.end.z]
             ]}
             color={getLineColor(line)}
-            lineWidth={2}
+            lineWidth={
+              (line.family === 'feature' ? 1.1 : line.state === 'winner' || !line.state ? 2 : 1) +
+              (line.state === 'winner' || !line.state ? pulseScale : 0)
+            }
             depthTest={displayMode === 'solid'}
-            dashed
-            dashSize={0.5}
-            gapSize={0.25}
+            transparent={line.state === 'candidate'}
+            opacity={line.state === 'candidate' ? 0.3 : 1}
+            dashed={
+              line.subtype?.includes('quarter') === true ||
+              line.subtype?.includes('fraction-25') === true ||
+              line.subtype?.includes('fraction-75') === true
+            }
+            dashSize={line.state === 'winner' || !line.state ? 0.5 : 0.3}
+            gapSize={line.state === 'winner' || !line.state ? 0.25 : 0.2}
           />
+
+          {(line.state === 'winner' || !line.state) && (
+            <>
+              <mesh position={[line.start.x, line.start.y, line.start.z]}>
+                <sphereGeometry args={[0.055, 10, 10]} />
+                <meshBasicMaterial color={axisAccent(line.axis)} />
+              </mesh>
+              <mesh position={[line.end.x, line.end.y, line.end.z]}>
+                <sphereGeometry args={[0.055, 10, 10]} />
+                <meshBasicMaterial color={axisAccent(line.axis)} />
+              </mesh>
+            </>
+          )}
+
+          {getSnapToken(line) && (
+            <Html
+              position={
+                snapLabelPosition
+                  ? [snapLabelPosition.x, snapLabelPosition.y + 0.2 + index * 0.12, snapLabelPosition.z]
+                  : [(line.start.x + line.end.x) / 2, (line.start.y + line.end.y) / 2, (line.start.z + line.end.z) / 2]
+              }
+              center
+              occlude={displayMode === 'solid'}
+              zIndexRange={[0, 40]}
+              style={{ pointerEvents: 'none' }}
+            >
+              <div
+                style={{
+                  color: getLineColor(line),
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  fontFamily: 'monospace',
+                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                  backdropFilter: 'blur(4px)',
+                  WebkitBackdropFilter: 'blur(4px)',
+                  padding: '1px 5px',
+                  borderRadius: '3px',
+                  whiteSpace: 'nowrap',
+                  userSelect: 'none',
+                  border: `1px solid ${getLineColor(line)}`,
+                  textShadow: '0 0 3px rgba(0,0,0,0.85)'
+                }}
+              >
+                {getSnapToken(line)}
+              </div>
+            </Html>
+          )}
 
           {/* Connector line to matched part (for dimension-match only) */}
           {line.connectorLine && (
@@ -166,7 +316,7 @@ export function SnapAlignmentLines() {
                 <Html
                   position={[indicator.labelPosition.x, indicator.labelPosition.y, indicator.labelPosition.z]}
                   center
-                  occlude={displayMode === 'solid' ? 'blending' : false}
+                  occlude={displayMode === 'solid'}
                   zIndexRange={[0, 50]}
                   style={{ pointerEvents: 'none' }}
                 >
@@ -176,12 +326,15 @@ export function SnapAlignmentLines() {
                       fontSize: '11px',
                       fontWeight: 'bold',
                       fontFamily: 'monospace',
-                      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                      backdropFilter: 'blur(4px)',
+                      WebkitBackdropFilter: 'blur(4px)',
                       padding: isDimensionMatch ? '3px 8px' : '2px 5px',
                       borderRadius: '3px',
                       whiteSpace: 'nowrap',
                       userSelect: 'none',
                       border: `1px solid ${labelColor}`,
+                      textShadow: '0 0 3px rgba(0,0,0,0.85)',
                       boxShadow: isDimensionMatch ? '0 2px 4px rgba(0,0,0,0.3)' : 'none'
                     }}
                   >

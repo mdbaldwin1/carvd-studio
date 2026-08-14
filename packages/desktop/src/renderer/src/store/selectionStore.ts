@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { useProjectStore, isDescendantOf } from './projectStore';
+import { useProjectStore } from './projectStore';
 import { useSnapStore } from './snapStore';
+import { isDescendantOfGroup } from '../utils/interactionSelection';
 
 /** Stores pointer info from InstancedMesh pointerDown so the individual Part can pick up the drag */
 export interface DragIntent {
@@ -8,13 +9,14 @@ export interface DragIntent {
   screenX: number;
   screenY: number;
   worldPoint: { x: number; y: number; z: number } | null;
+  startImmediately?: boolean;
 }
 
 interface SelectionStoreState {
   // Part selection
   selectedPartIds: string[];
   hoveredPartId: string | null;
-  transformMode: 'translate' | 'scale';
+  transformMode: 'translate' | 'rotate' | 'scale';
   activeDragDelta: { x: number; y: number; z: number } | null;
   selectionBox: {
     start: { x: number; y: number };
@@ -39,7 +41,7 @@ interface SelectionStoreState {
 
   // Actions - Hover/UI
   setHoveredPart: (id: string | null) => void;
-  setTransformMode: (mode: 'translate' | 'scale') => void;
+  setTransformMode: (mode: 'translate' | 'rotate' | 'scale') => void;
   setActiveDragDelta: (delta: { x: number; y: number; z: number } | null) => void;
   setSelectionBox: (box: { start: { x: number; y: number }; end: { x: number; y: number } } | null) => void;
   setDragIntent: (intent: DragIntent) => void;
@@ -125,7 +127,7 @@ export const useSelectionStore = create<SelectionStoreState>((set, get) => ({
       }
 
       // Check if groupId is inside editingGroupId (descendant)
-      if (isDescendantOf(groupId, editingGroupId, groupMembers) && groupId !== editingGroupId) {
+      if (isDescendantOfGroup(groupId, editingGroupId, groupMembers) && groupId !== editingGroupId) {
         newEditingGroupId = editingGroupId; // Stay in the parent group
       }
     }
@@ -145,7 +147,7 @@ export const useSelectionStore = create<SelectionStoreState>((set, get) => ({
         const { groupMembers } = useProjectStore.getState();
         const shouldPreserveEditingContext =
           state.editingGroupId !== null &&
-          (groupId === state.editingGroupId || isDescendantOf(groupId, state.editingGroupId, groupMembers));
+          (groupId === state.editingGroupId || isDescendantOfGroup(groupId, state.editingGroupId, groupMembers));
         // Preserve existing part selection when shift+clicking to add a group
         return {
           selectedGroupIds: [...state.selectedGroupIds, groupId],

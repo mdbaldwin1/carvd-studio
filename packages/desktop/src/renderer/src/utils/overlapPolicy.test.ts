@@ -53,6 +53,21 @@ describe('overlapPolicy', () => {
     expect(wouldTransformedPartsOverlap([a, b], transformed)).toBe(true);
   });
 
+  it('ignores unrelated existing overlaps when evaluating a transformed part', () => {
+    const blockerA = createPart({ id: 'a', length: 10, position: { x: 0, y: 0.5, z: 0 } });
+    const blockerB = createPart({ id: 'b', length: 10, position: { x: 5, y: 0.5, z: 0 } });
+    const movable = createPart({ id: 'c', length: 4, width: 4, position: { x: 30, y: 0.5, z: 0 } });
+    const parts = [blockerA, blockerB, movable];
+
+    expect(partsOverlap(blockerA, blockerB)).toBe(true);
+    expect(partsOverlap(movable, blockerA)).toBe(false);
+    expect(partsOverlap(movable, blockerB)).toBe(false);
+
+    const transformed = new Map<string, Part>([['c', { ...movable, rotation: { x: 0, y: 0, z: 45 } }]]);
+
+    expect(wouldTransformedPartsOverlap(parts, transformed)).toBe(false);
+  });
+
   it('resolves a safe translation delta before collision', () => {
     const moving = createPart({ id: 'moving', length: 4, position: { x: 0, y: 0.5, z: 0 } });
     const target = createPart({ id: 'target', length: 4, position: { x: 12, y: 0.5, z: 0 } });
@@ -69,7 +84,25 @@ describe('overlapPolicy', () => {
     expect(wouldTranslationCauseOverlap(parts, movingIds, safe!)).toBe(false);
   });
 
-  it('preserves tangential slide while clamping penetrating axis', () => {
+  it('preserves movement direction when a substantial safe fraction exists', () => {
+    const moving = createPart({ id: 'moving', length: 4, width: 4, position: { x: 0, y: 0.5, z: 0 } });
+    const target = createPart({ id: 'target', length: 4, width: 4, position: { x: 12, y: 0.5, z: 0 } });
+    const parts = [moving, target];
+    const movingIds = new Set<string>(['moving']);
+
+    const proposed = { x: 12, y: 0, z: 3 };
+    expect(wouldTranslationCauseOverlap(parts, movingIds, proposed)).toBe(true);
+
+    const safe = resolveSafeTranslationDelta(parts, movingIds, proposed);
+    expect(safe).not.toBeNull();
+    expect(safe!.x).toBeGreaterThan(0);
+    expect(safe!.z).toBeGreaterThan(0);
+    // Direction-preserving solve should keep x:z close to the proposed ratio (12:3).
+    expect(safe!.z / safe!.x).toBeCloseTo(3 / 12, 2);
+    expect(wouldTranslationCauseOverlap(parts, movingIds, safe!)).toBe(false);
+  });
+
+  it('returns null instead of redirecting to another axis when blocked', () => {
     const target = createPart({
       id: 'target',
       length: 8,
@@ -91,10 +124,83 @@ describe('overlapPolicy', () => {
     expect(wouldTranslationCauseOverlap(parts, movingIds, proposed)).toBe(true);
 
     const safe = resolveSafeTranslationDelta(parts, movingIds, proposed);
-    expect(safe).not.toBeNull();
-    expect(safe!.x).toBeGreaterThan(2.5);
-    expect(safe!.y).toBeGreaterThan(-0.3);
-    expect(wouldTranslationCauseOverlap(parts, movingIds, safe!)).toBe(false);
+    expect(safe).toBeNull();
+  });
+
+  it('allows movement that does not worsen a pre-existing tiny overlap', () => {
+    const moving = createPart({
+      id: 'moving',
+      length: 192,
+      width: 6,
+      thickness: 1,
+      position: { x: 55.43418603599124, y: 41.198408003138915, z: 7.884627918624318 },
+      rotation: { x: 180, y: -90, z: 0 }
+    });
+    const neighbor = createPart({
+      id: 'neighbor',
+      length: 192,
+      width: 6,
+      thickness: 1,
+      position: { x: 49.43418603599124, y: 41.19842651456869, z: 7.884627918624319 },
+      rotation: { x: 180, y: -90, z: 0 }
+    });
+    const parts = [moving, neighbor];
+    const movingIds = new Set<string>(['moving']);
+
+    // Exact face-axis SAT treats the zero-volume X touch as non-overlapping,
+    // so the move away is trivially allowed. The shipped guarantee is the
+    // second assertion: dragging away from a pre-existing micro-overlap must
+    // not be blocked.
+    expect(partsOverlap(moving, neighbor)).toBe(false);
+    expect(resolveSafeTranslationDelta(parts, movingIds, { x: 0, y: 0, z: 0.25 })).toEqual({ x: 0, y: 0, z: 0.25 });
+  });
+
+  it('blocks movement that worsens an existing overlap on the limiting axis', () => {
+    const moving = createPart({
+      id: 'moving',
+      length: 6,
+      width: 24,
+      thickness: 1,
+      position: { x: 0, y: 0, z: 0 }
+    });
+    const neighbor = createPart({
+      id: 'neighbor',
+      length: 6,
+      width: 24,
+      thickness: 1,
+      position: { x: 5.9999, y: 0, z: 0 }
+    });
+    const parts = [moving, neighbor];
+    const movingIds = new Set<string>(['moving']);
+
+    expect(partsOverlap(moving, neighbor)).toBe(true);
+    expect(resolveSafeTranslationDelta(parts, movingIds, { x: 1, y: 0, z: 0 })).toBeNull();
+  });
+
+  it('allows lengthwise sliding across an already intersecting cross member', () => {
+    const deckBoard = createPart({
+      id: 'deck-board',
+      length: 192,
+      width: 6,
+      thickness: 1,
+      position: { x: 0, y: 0, z: 0 }
+    });
+    const crossMember = createPart({
+      id: 'cross-member',
+      length: 10,
+      width: 6,
+      thickness: 2,
+      position: { x: 0, y: 0, z: 1 }
+    });
+    const parts = [deckBoard, crossMember];
+    const movingIds = new Set<string>(['deck-board']);
+
+    expect(partsOverlap(deckBoard, crossMember)).toBe(true);
+    expect(resolveSafeTranslationDelta(parts, movingIds, { x: 0, y: 0, z: 0.25 })).toEqual({
+      x: 0,
+      y: 0,
+      z: 0.25
+    });
   });
 
   it('allows beveled face to approach flush against another part (no ghost corner)', () => {
@@ -200,10 +306,10 @@ describe('overlapPolicy', () => {
 
     // With exemption for the target, overlap is ignored for that pair
     const exempt = new Set(['target']);
-    expect(wouldTranslationCauseOverlap(parts, movingIds, proposed, exempt)).toBe(false);
+    expect(wouldTranslationCauseOverlap(parts, movingIds, proposed, undefined, exempt)).toBe(false);
 
     // resolveSafeTranslationDelta also allows the full delta with exemption
-    const safe = resolveSafeTranslationDelta(parts, movingIds, proposed, exempt);
+    const safe = resolveSafeTranslationDelta(parts, movingIds, proposed, undefined, exempt);
     expect(safe).not.toBeNull();
     expect(safe!.x).toBeCloseTo(6);
   });

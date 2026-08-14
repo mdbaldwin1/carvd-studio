@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GRID_SIZE } from '../../constants';
 import { useProjectStore } from '../../store/projectStore';
+import { useSnapStore } from '../../store/snapStore';
+import { useInteractionStore } from '../../store/interactionStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
@@ -24,17 +26,33 @@ import { SceneBackground } from './SceneBackground';
 import { SnapAlignmentLines } from './SnapAlignmentLines';
 import { SnapGuides } from './SnapGuides';
 import { ThumbnailCaptureHandler } from './ThumbnailCaptureHandler';
+import { installDragDebugTools } from '../../utils/dragDebug';
+import { hasInteractiveHitAt as resolveHasInteractiveHitAt } from '../../interaction/hitTest';
+import { useCanvasPointerSession } from '../../interaction/useCanvasPointerSession';
+import { computeOverlayModel } from '../../interaction/overlayModel';
 import {
   LIGHTING_PRESETS,
+  bindWindowPointerSession,
   isOrbitControls,
-  setRightClickTarget,
-  getRightClickTarget,
-  clearRightClickTarget
+  pauseOrbitControls,
+  resumeOrbitControls
 } from './workspaceUtils';
 
 declare global {
   interface Window {
     __selectionDebugLogs?: Array<{ ts: string; args: unknown[] }>;
+    __carvdE2E?: {
+      getPartScreenPoint: (partId?: string) => { x: number; y: number } | null;
+      getResizeHandleScreenPoint: (
+        handle: { x: -1 | 0 | 1; y: -1 | 0 | 1; z: -1 | 0 | 1 },
+        partId?: string
+      ) => { x: number; y: number } | null;
+      getRotationHandleScreenPoint: (
+        handle: { axis: 'x' | 'y' | 'z'; side: -1 | 1; target?: 'ring' | 'grab' },
+        partId?: string
+      ) => { x: number; y: number } | null;
+      setCameraView: (view: 'isometric' | 'top' | 'front' | 'right') => void;
+    };
   }
 }
 
@@ -58,6 +76,10 @@ function useEffectiveTheme(): 'light' | 'dark' {
 }
 
 export function Workspace() {
+  useEffect(() => {
+    installDragDebugTools();
+  }, []);
+
   const debugSelection = (...args: unknown[]) => {
     if (import.meta.env.DEV) {
       const entry = { ts: new Date().toISOString(), args };
@@ -72,6 +94,19 @@ export function Workspace() {
   };
 
   const parts = useProjectStore((s) => s.parts);
+  const units = useProjectStore((s) => s.units);
+  const groupMembers = useProjectStore((s) => s.groupMembers);
+  // ADR-005: overlay model derivation reads snap state here once instead of
+  // each overlay component re-subscribing independently.
+  const snapActiveLines = useSnapStore((s) => s.activeSnapLines);
+  const snapPulseAt = useSnapStore((s) => s.snapPulseAt);
+  const snapLabelPosition = useSnapStore((s) => s.snapLabelPosition);
+  const activeReferenceRulers = useSnapStore((s) => s.activeReferenceRulers);
+  const activeReferenceDistances = useSnapStore((s) => s.activeReferenceDistances);
+  const displayMode = useCameraStore((s) => s.displayMode);
+  const selectedPartIdsForOverlay = useSelectionStore((s) => s.selectedPartIds);
+  const selectedGroupIdsForOverlay = useSelectionStore((s) => s.selectedGroupIds);
+  const activeSessionForOverlay = useInteractionStore((s) => s.activeSession);
   const clearSelection = useSelectionStore((s) => s.clearSelection);
   const selectPart = useSelectionStore((s) => s.selectPart);
   const selectGroup = useSelectionStore((s) => s.selectGroup);
@@ -79,6 +114,7 @@ export function Workspace() {
   const toggleGroupSelection = useSelectionStore((s) => s.toggleGroupSelection);
   const enterGroup = useSelectionStore((s) => s.enterGroup);
   const selectParts = useSelectionStore((s) => s.selectParts);
+  const setDragIntent = useSelectionStore((s) => s.setDragIntent);
   const openContextMenu = useUIStore((s) => s.openContextMenu);
   const setSelectedSidebarStockId = useUIStore((s) => s.setSelectedSidebarStockId);
   const setSelectionBox = useSelectionStore((s) => s.setSelectionBox);
@@ -94,9 +130,163 @@ export function Workspace() {
   const lightingPreset = LIGHTING_PRESETS[lightingMode];
   const effectiveTheme = useEffectiveTheme();
 
+  // ADR-005: single derivation point for every overlay's display data.
+  // Memoize so child overlay components only re-render when their slice
+  // identity changes.
+  const overlayModel = useMemo(
+    () =>
+      computeOverlayModel({
+        activeSession: activeSessionForOverlay,
+        snap: {
+          activeSnapLines: snapActiveLines,
+          snapPulseAt,
+          snapLabelPosition
+        },
+        selection: {
+          selectedPartIds: selectedPartIdsForOverlay,
+          selectedGroupIds: selectedGroupIdsForOverlay
+        },
+        project: {
+          parts,
+          groupMembers,
+          units
+        },
+        references: {
+          activeReferenceRulers,
+          activeReferenceDistances
+        },
+        displayMode
+      }),
+    [
+      activeSessionForOverlay,
+      snapActiveLines,
+      snapPulseAt,
+      snapLabelPosition,
+      selectedPartIdsForOverlay,
+      selectedGroupIdsForOverlay,
+      parts,
+      groupMembers,
+      units,
+      activeReferenceRulers,
+      activeReferenceDistances,
+      displayMode
+    ]
+  );
+
   const { camera, gl, controls, scene } = useThree();
-  const raycasterRef = useRef(new THREE.Raycaster());
-  const pointerNdcRef = useRef(new THREE.Vector2());
+
+  useEffect(() => {
+    const isTestMode =
+      typeof window !== 'undefined' &&
+      Boolean((window as unknown as { useProjectStore?: unknown }).useProjectStore) &&
+      Boolean((window as unknown as { useSelectionStore?: unknown }).useSelectionStore);
+    if (!isTestMode) return;
+
+    const projected = new THREE.Vector3();
+    const euler = new THREE.Euler();
+    const quaternion = new THREE.Quaternion();
+    const local = new THREE.Vector3();
+    const world = new THREE.Vector3();
+    const faceQuaternion = new THREE.Quaternion();
+    const faceNormal = new THREE.Vector3();
+    const grabLocal = new THREE.Vector3();
+    const ringEuler = new THREE.Euler();
+    const ringQuaternion = new THREE.Quaternion();
+    const cameraTarget = new THREE.Vector3();
+    const cameraOffsetByView = {
+      isometric: new THREE.Vector3(36, 30, 36),
+      top: new THREE.Vector3(0, 54, 0.01),
+      front: new THREE.Vector3(0, 18, 54),
+      right: new THREE.Vector3(54, 18, 0)
+    } satisfies Record<'isometric' | 'top' | 'front' | 'right', THREE.Vector3>;
+    const projectWorld = (point: THREE.Vector3) => {
+      const rect = gl.domElement.getBoundingClientRect();
+      projected.copy(point).project(camera);
+      return {
+        x: rect.left + ((projected.x + 1) / 2) * rect.width,
+        y: rect.top + ((1 - projected.y) / 2) * rect.height
+      };
+    };
+    const resolvePart = (partId?: string) => {
+      const selection = useSelectionStore.getState();
+      const id = partId ?? selection.selectedPartIds[0];
+      return useProjectStore.getState().parts.find((candidate) => candidate.id === id) ?? null;
+    };
+    const partQuaternion = (rotation: { x: number; y: number; z: number }) => {
+      euler.set((rotation.x * Math.PI) / 180, (rotation.y * Math.PI) / 180, (rotation.z * Math.PI) / 180, 'XYZ');
+      return quaternion.setFromEuler(euler);
+    };
+
+    window.__carvdE2E = {
+      getPartScreenPoint: (partId?: string) => {
+        const part = resolvePart(partId);
+        if (!part) return null;
+        return projectWorld(world.set(part.position.x, part.position.y, part.position.z));
+      },
+      getResizeHandleScreenPoint: (handle, partId?: string) => {
+        const part = resolvePart(partId);
+        if (!part) return null;
+        local.set(
+          handle.x === 0 ? 0 : handle.x * (part.length / 2),
+          handle.y === 0 ? 0 : handle.y * (part.thickness / 2),
+          handle.z === 0 ? 0 : handle.z * (part.width / 2)
+        );
+        local.applyQuaternion(partQuaternion(part.rotation));
+        world.set(part.position.x, part.position.y, part.position.z).add(local);
+        return projectWorld(world);
+      },
+      getRotationHandleScreenPoint: (handle, partId?: string) => {
+        const part = resolvePart(partId);
+        if (!part) return null;
+        const offset = 0.2;
+        if (handle.axis === 'y') {
+          local.set(0, handle.side * (part.thickness / 2 + offset), 0);
+          faceNormal.set(0, handle.side, 0);
+          ringEuler.set(handle.side === 1 ? Math.PI / 2 : -Math.PI / 2, 0, 0);
+        } else if (handle.axis === 'x') {
+          local.set(handle.side * (part.length / 2 + offset), 0, 0);
+          faceNormal.set(handle.side, 0, 0);
+          ringEuler.set(0, handle.side === 1 ? -Math.PI / 2 : Math.PI / 2, 0);
+        } else {
+          local.set(0, 0, handle.side * (part.width / 2 + offset));
+          faceNormal.set(0, 0, handle.side);
+          ringEuler.set(0, handle.side === 1 ? 0 : Math.PI, 0);
+        }
+
+        if (handle.target === 'grab') {
+          faceQuaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), faceNormal);
+          grabLocal.set(0, 0, 1.55);
+          local.add(grabLocal.applyQuaternion(faceQuaternion));
+        } else {
+          ringQuaternion.setFromEuler(ringEuler);
+          grabLocal.set(0.55, 0, 0.02);
+          local.add(grabLocal.applyQuaternion(ringQuaternion));
+        }
+
+        local.applyQuaternion(partQuaternion(part.rotation));
+        world.set(part.position.x, part.position.y, part.position.z).add(local);
+        return projectWorld(world);
+      },
+      setCameraView: (view) => {
+        const part = resolvePart();
+        if (part) {
+          cameraTarget.set(part.position.x, part.position.y, part.position.z);
+        } else {
+          cameraTarget.set(0, 0, 0);
+        }
+        camera.position.copy(cameraTarget).add(cameraOffsetByView[view]);
+        camera.lookAt(cameraTarget);
+        if (isOrbitControls(controls)) {
+          controls.target.copy(cameraTarget);
+          controls.update();
+        }
+      }
+    };
+
+    return () => {
+      delete window.__carvdE2E;
+    };
+  }, [camera, controls, gl.domElement]);
 
   // Drag-box selection state
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);
@@ -173,13 +363,26 @@ export function Workspace() {
     };
   }, [controls, camera, setCameraState]);
 
-  // Track mouse position to distinguish click vs drag (for camera orbit)
+  // ADR-003: pointer state lives inside the session controller in
+  // `useCanvasPointerSession` below. The legacy cross-handler refs
+  // (`leftClickDownPos`, `rightClickDownPos`, `previousSelectionKeyRef`) are
+  // gone — the state machine is the single source of truth for click vs drag
+  // classification and double-click timing.
+  //
+  // `pointerDownPos` is kept because R3F per-mesh ground/sky handlers below
+  // still use it to distinguish a deliberate empty-click from an orbit drag.
+  // `lastSelectionApplyAtRef` is kept for the same reason — it suppresses
+  // empty-click deselect for 250ms after a selection was applied, protecting
+  // the click-vs-bubble race between the per-mesh part handler and the per-mesh
+  // ground handler. The session controller's `onClick` updates this ref via
+  // `markSelectionApplied` so the guard still works.
+  // These remaining R3F ground/sky paths still live at the canvas edge because
+  // they depend on empty-space pointer geometry; the session controller owns
+  // click classification and calls `markSelectionApplied` for the shared race
+  // guard.
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
   // Guard against double-processing the same background double-click via bubbling/overlap.
   const lastBackgroundDoubleClickAt = useRef(0);
-  // Track right-click position and time to distinguish right-click vs right-drag (for pan)
-  const rightClickDownPos = useRef<{ x: number; y: number; time: number } | null>(null);
-  const leftClickDownPos = useRef<{ x: number; y: number; time: number } | null>(null);
   const lastSelectionApplyAtRef = useRef(0);
   const lastPartDrillAtRef = useRef(0);
 
@@ -187,85 +390,11 @@ export function Workspace() {
     lastSelectionApplyAtRef.current = performance.now();
   };
 
-  const getHitPartId = useCallback(
-    (clientX: number, clientY: number): string | null => {
-      const rect = gl.domElement.getBoundingClientRect();
-      const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
-      const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
-      pointerNdcRef.current.set(ndcX, ndcY);
-      raycasterRef.current.setFromCamera(pointerNdcRef.current, camera);
-      const hits = raycasterRef.current.intersectObjects(scene.children, true);
-
-      for (const hit of hits) {
-        const partId = (hit.object.userData?.partId as string | undefined) ?? null;
-        if (partId) return partId;
-
-        const partIdByInstance = hit.object.userData?.partIdByInstance as string[] | undefined;
-        if (hit.instanceId !== undefined && partIdByInstance?.[hit.instanceId]) {
-          return partIdByInstance[hit.instanceId];
-        }
-      }
-
-      // Fallback: screen-space hit test from project parts.
-      // This path does not depend on mesh/instance raycast internals.
-      const pointerScreenX = clientX;
-      const pointerScreenY = clientY;
-      let bestPartId: string | null = null;
-      let bestDepth = Infinity;
-      const marginPx = 2;
-
-      const corners = Array.from({ length: 8 }, () => new THREE.Vector3());
-      const center = new THREE.Vector3();
-      const euler = new THREE.Euler();
-      const quat = new THREE.Quaternion();
-
-      for (const part of parts) {
-        euler.set(
-          (part.rotation.x * Math.PI) / 180,
-          (part.rotation.y * Math.PI) / 180,
-          (part.rotation.z * Math.PI) / 180,
-          'XYZ'
-        );
-        quat.setFromEuler(euler);
-        center.set(part.position.x, part.position.y, part.position.z);
-        const localCorners = getPartLocalCorners(part);
-
-        let minX = Infinity;
-        let maxX = -Infinity;
-        let minY = Infinity;
-        let maxY = -Infinity;
-
-        for (let i = 0; i < localCorners.length; i += 1) {
-          const c = corners[i].copy(localCorners[i]);
-          c.applyQuaternion(quat).add(center).project(camera);
-          const sx = ((c.x + 1) / 2) * rect.width + rect.left;
-          const sy = ((-c.y + 1) / 2) * rect.height + rect.top;
-          minX = Math.min(minX, sx);
-          maxX = Math.max(maxX, sx);
-          minY = Math.min(minY, sy);
-          maxY = Math.max(maxY, sy);
-        }
-
-        const contains =
-          pointerScreenX >= minX - marginPx &&
-          pointerScreenX <= maxX + marginPx &&
-          pointerScreenY >= minY - marginPx &&
-          pointerScreenY <= maxY + marginPx;
-        if (!contains) continue;
-
-        const depth = center.clone().project(camera).z;
-        if (depth < bestDepth) {
-          bestDepth = depth;
-          bestPartId = part.id;
-        }
-      }
-
-      if (bestPartId) return bestPartId;
-
-      return null;
-    },
-    [camera, gl, scene, parts]
-  );
+  // ADR-003: `getHitPartId` is no longer needed at the Workspace level — the
+  // session controller's hit-test runs inside `useCanvasPointerSession` and
+  // delivers typed `HitTarget` results to the click/contextmenu handlers.
+  // `selectFromPartHit` / `drillFromPartHit` are still called from those
+  // handlers, but they now receive `partId` from the session action directly.
 
   const selectFromPartHit = useCallback(
     (partId: string, additive: boolean) => {
@@ -372,167 +501,158 @@ export function Workspace() {
     [enterGroup, selectGroup, selectPart, setSelectedSidebarStockId]
   );
 
-  // Prevent native context menu on canvas - we'll show our own on mouseup
-  useEffect(() => {
-    const canvas = gl.domElement;
-    const preventContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-    };
-    canvas.addEventListener('contextmenu', preventContextMenu);
-    return () => canvas.removeEventListener('contextmenu', preventContextMenu);
-  }, [gl]);
-
-  // Track right-click for our custom context menu (fires on mouseup, not mousedown)
-  useEffect(() => {
-    const canvas = gl.domElement;
-
-    const handleMouseDown = (e: MouseEvent) => {
-      if (e.button === 0) {
-        leftClickDownPos.current = { x: e.clientX, y: e.clientY, time: Date.now() };
-      }
-      if (e.button === 2) {
-        rightClickDownPos.current = { x: e.clientX, y: e.clientY, time: Date.now() };
-        const hitPartId = getHitPartId(e.clientX, e.clientY);
-        debugSelection('native:mousedown:right', {
-          x: e.clientX,
-          y: e.clientY,
-          hitPartId
+  // ADR-003: pointer events are routed through the session controller. Hook
+  // owns all native canvas + window listeners (pointerdown/up/move/cancel,
+  // blur, escape, contextmenu) and emits typed semantic actions back to us.
+  //
+  // Per-mesh R3F handlers in Part.tsx / InstancedParts.tsx still apply
+  // selection eagerly on pointerdown — the controller's `onClick` is the
+  // fallback for clicks that R3F's per-mesh path didn't already handle (e.g.
+  // when orbit/drag detection ate the R3F click). The controller is
+  // authoritative for double-click, context menu, and empty-space clicks.
+  useCanvasPointerSession({
+    canvas: gl.domElement,
+    camera,
+    scene,
+    parts,
+    handlers: {
+      onPointerDownHit: (hit, event) => {
+        if (event.button === 0 && hit.kind === 'part-body') {
+          pauseOrbitControls(controls);
+        }
+      },
+      onClick: (action) => {
+        resumeOrbitControls(controls);
+        // Mirror the legacy native-mouseup fallback: skip additive (the per-mesh
+        // R3F handler already toggled selection; re-toggling would net zero).
+        const isAdditive = action.modifiers.shift || action.modifiers.meta || action.modifiers.ctrl;
+        if (isAdditive) {
+          debugSelection('session:click:additive-skipped');
+          return;
+        }
+        if (action.hit?.kind === 'part-body') {
+          debugSelection('session:click:part-fallback', { partId: action.hit.partId });
+          selectFromPartHit(action.hit.partId, false);
+        }
+        // ground / sky / null are handled by the R3F per-mesh
+        // handleBackgroundClick / handleSkyClick paths (which run via the R3F
+        // event system) — we don't duplicate the deselect logic here.
+      },
+      onDoubleClick: (action) => {
+        if (action.hit?.kind === 'part-body') {
+          debugSelection('session:dblclick:part', { partId: action.hit.partId });
+          drillFromPartHit(action.hit.partId);
+        }
+      },
+      onContextMenu: (action) => {
+        debugSelection('session:contextmenu', {
+          x: action.clientX,
+          y: action.clientY,
+          hit: action.hit?.kind ?? null
         });
-        if (hitPartId) {
-          const selectionState = useSelectionStore.getState();
+        if (action.hit?.kind === 'snap-guide') {
+          openContextMenu({
+            x: action.clientX,
+            y: action.clientY,
+            type: 'guide',
+            guideId: action.hit.guideId
+          });
+          return;
+        }
+        if (action.hit?.kind === 'part-body') {
+          // Ensure the part is selected (matching the legacy fallback) so the
+          // part context menu acts on the right target.
+          const selection = useSelectionStore.getState();
           const projectState = useProjectStore.getState();
-          const hitContext = getPartGroupContext(hitPartId, projectState.groupMembers, selectionState.editingGroupId);
+          const hitContext = getPartGroupContext(
+            action.hit.partId,
+            projectState.groupMembers,
+            selection.editingGroupId
+          );
           const isAlreadySelected =
-            selectionState.selectedPartIds.includes(hitPartId) ||
-            hitContext.ancestorGroupIds.some((groupId) => selectionState.selectedGroupIds.includes(groupId));
-
+            selection.selectedPartIds.includes(action.hit.partId) ||
+            hitContext.ancestorGroupIds.some((groupId) => selection.selectedGroupIds.includes(groupId));
           if (!isAlreadySelected) {
-            selectFromPartHit(hitPartId, false);
+            selectFromPartHit(action.hit.partId, false);
           }
-          setRightClickTarget({ type: 'part' });
-          debugSelection('native:mousedown:right:setTarget', {
-            targetType: 'part',
-            hitPartId,
-            isAlreadySelected
-          });
+          openContextMenu({ x: action.clientX, y: action.clientY, type: 'part' });
+          return;
         }
-      }
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      if (e.button === 0 && leftClickDownPos.current) {
-        const dx = e.clientX - leftClickDownPos.current.x;
-        const dy = e.clientY - leftClickDownPos.current.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const elapsed = Date.now() - leftClickDownPos.current.time;
-
-        // Native selection fallback for simple clicks.
-        if (distance <= 5 && elapsed <= 500) {
-          const hitPartId = getHitPartId(e.clientX, e.clientY);
-          debugSelection('native:mouseup:left', {
-            x: e.clientX,
-            y: e.clientY,
-            distance,
-            elapsed,
-            hitPartId
+        if (action.hit?.kind === 'ground' || action.hit?.kind === 'sky') {
+          openContextMenu({
+            x: action.clientX,
+            y: action.clientY,
+            type: 'background',
+            worldPosition: action.hit.worldPoint
           });
-          if (hitPartId) {
-            const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
-            const isModKey = isMac ? e.metaKey : e.ctrlKey;
-            selectFromPartHit(hitPartId, e.shiftKey || isModKey);
-          } else {
-            debugSelection('native:mouseup:left:no-part-hit');
-          }
+          return;
         }
-        leftClickDownPos.current = null;
-      }
-
-      if (e.button === 2 && rightClickDownPos.current) {
-        const dx = e.clientX - rightClickDownPos.current.x;
-        const dy = e.clientY - rightClickDownPos.current.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const elapsed = Date.now() - rightClickDownPos.current.time;
-
-        // Only show context menu if it was a quick click (not a pan)
-        if (distance <= 5 && elapsed <= 500) {
-          // Show context menu based on what was targeted on mousedown
-          const target = getRightClickTarget();
-          debugSelection('native:mouseup:right', {
-            x: e.clientX,
-            y: e.clientY,
-            distance,
-            elapsed,
-            target
+        // Click landed on empty space or a non-context-menu target (e.g. a
+        // handle). Open the background context menu so the gesture still does
+        // something useful (Add Guide, etc.).
+        openContextMenu({ x: action.clientX, y: action.clientY, type: 'background' });
+      },
+      onDragStart: (action) => {
+        if (action.button !== 0 || action.hit?.kind !== 'part-body') return;
+        const activeSession = useInteractionStore.getState().activeSession;
+        const selectionState = useSelectionStore.getState();
+        const isDirectPartDragAlreadyActive =
+          activeSession?.kind === 'move' &&
+          activeSession.primaryPartId === action.hit.partId &&
+          selectionState.selectedPartIds.includes(action.hit.partId);
+        if (isDirectPartDragAlreadyActive) {
+          debugSelection('session:dragstart:part-fallback:skipped-active-direct-drag', {
+            partId: action.hit.partId
           });
-          if (target) {
-            if (target.type === 'guide' && target.guideId) {
-              openContextMenu({
-                x: e.clientX,
-                y: e.clientY,
-                type: 'guide',
-                guideId: target.guideId
-              });
-            } else if (target.type === 'part') {
-              openContextMenu({ x: e.clientX, y: e.clientY, type: 'part' });
-            } else {
-              openContextMenu({
-                x: e.clientX,
-                y: e.clientY,
-                type: 'background',
-                worldPosition: target.worldPosition
-              });
-            }
-          } else {
-            debugSelection('native:mouseup:right:no-target');
-          }
+          return;
         }
-        rightClickDownPos.current = null;
-        clearRightClickTarget();
+        debugSelection('session:dragstart:part-fallback', { partId: action.hit.partId });
+        selectFromPartHit(action.hit.partId, false);
+        setSelectedSidebarStockId(null);
+        setDragIntent({
+          partId: action.hit.partId,
+          screenX: action.downAt.clientX,
+          screenY: action.downAt.clientY,
+          worldPoint: action.hit.worldPoint,
+          startImmediately: true
+        });
+        pauseOrbitControls(controls);
+      },
+      onDragCommit: () => {
+        useSelectionStore.getState().clearDragIntent();
+        resumeOrbitControls(controls);
+      },
+      onDragCancel: () => {
+        useSelectionStore.getState().clearDragIntent();
+        resumeOrbitControls(controls);
       }
-    };
+    }
+  });
 
-    const handleDoubleClick = (e: MouseEvent) => {
-      if (e.button !== 0) return;
-      if ((e as MouseEvent & { __carvdPartDblClickHandled?: boolean }).__carvdPartDblClickHandled) {
-        debugSelection('native:dblclick:left:skipped-already-handled');
-        return;
-      }
-      const hitPartId = getHitPartId(e.clientX, e.clientY);
-      debugSelection('native:dblclick:left', { x: e.clientX, y: e.clientY, hitPartId });
-      if (hitPartId) {
-        drillFromPartHit(hitPartId);
-      }
-    };
+  // The legacy contextmenu + mousedown/mouseup/dblclick/blur useEffect blocks
+  // that lived here are deleted: the hook above owns all of those paths.
+  // Cross-handler refs (leftClickDownPos, rightClickDownPos,
+  // lastSelectionApplyAtRef, previousSelectionKeyRef, lastPartDrillAtRef) and
+  // their bookkeeping useEffect are likewise gone — the state machine inside
+  // the controller is now the single source of truth for click vs drag and
+  // double-click timing.
 
-    canvas.addEventListener('mousedown', handleMouseDown);
-    canvas.addEventListener('mouseup', handleMouseUp);
-    canvas.addEventListener('dblclick', handleDoubleClick);
-    return () => {
-      canvas.removeEventListener('mousedown', handleMouseDown);
-      canvas.removeEventListener('mouseup', handleMouseUp);
-      canvas.removeEventListener('dblclick', handleDoubleClick);
-    };
-  }, [gl, openContextMenu, getHitPartId, selectFromPartHit, drillFromPartHit]);
-
+  // ADR-002: delegates to the hit-test service. Used by background-click and
+  // empty-space-click paths to decide whether to clear the selection.
   const hasInteractiveHitAt = useCallback(
     (clientX: number, clientY: number): boolean => {
       const rect = gl.domElement.getBoundingClientRect();
-      const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
-      const ndcY = -((clientY - rect.top) / rect.height) * 2 + 1;
-      pointerNdcRef.current.set(ndcX, ndcY);
-      raycasterRef.current.setFromCamera(pointerNdcRef.current, camera);
-      const hits = raycasterRef.current.intersectObjects(scene.children, true);
-      return hits.some((hit) => {
-        const partId = hit.object.userData?.partId as string | undefined;
-        if (partId) return true;
-
-        const partIdByInstance = hit.object.userData?.partIdByInstance as string[] | undefined;
-        if (hit.instanceId !== undefined && partIdByInstance?.[hit.instanceId]) return true;
-
-        return false;
-      });
+      return resolveHasInteractiveHitAt(
+        { clientX, clientY },
+        {
+          camera,
+          scene,
+          canvasRect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+          parts
+        }
+      );
     },
-    [camera, gl, scene]
+    [camera, gl, parts, scene]
   );
 
   // Click on empty space to deselect (only if not box selecting and not after drag)
@@ -543,6 +663,26 @@ export function Workspace() {
     // This prevents clearing selection when dragging a part and releasing over the ground
     if (!pointerDownPos.current) {
       debugSelection('background:click:ignored-no-pointerdown');
+      return;
+    }
+
+    // Additive (shift / cmd) click on empty space should preserve the existing
+    // selection. Without this, missing a part while shift+clicking would wipe
+    // out everything the user just multi-selected.
+    const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+    const isModKey = isMac ? e.nativeEvent.metaKey : e.nativeEvent.ctrlKey;
+    if (e.nativeEvent.shiftKey || isModKey) {
+      pointerDownPos.current = null;
+      debugSelection('background:click:additive-preserve-selection');
+      return;
+    }
+
+    // Suppress deselect while a context menu is open. Trackpad right-click can
+    // emit a paired left button event, and clearing selection here would unmount
+    // the just-opened part menu (which depends on selectedPartIds).
+    if (useUIStore.getState().contextMenu) {
+      pointerDownPos.current = null;
+      debugSelection('background:click:suppressed-context-menu-open');
       return;
     }
 
@@ -580,21 +720,12 @@ export function Workspace() {
     debugSelection('background:click:cleared-selection');
   };
 
-  // Track what was right-clicked on pointer down (for context menu on mouseup)
-  const handleGroundRightClick = (e: ThreeEvent<PointerEvent>) => {
-    if (e.nativeEvent.button === 2) {
-      e.stopPropagation();
-      const worldPosition = e.point ? { x: e.point.x, y: 0, z: e.point.z } : { x: 0, y: 0, z: 0 };
-      setRightClickTarget({ type: 'background', worldPosition });
-    }
-  };
-
-  const handleSkyRightClick = (e: ThreeEvent<PointerEvent>) => {
-    if (e.nativeEvent.button === 2) {
-      const worldPosition = e.point ? { x: e.point.x, y: e.point.y, z: e.point.z } : { x: 0, y: 0, z: 0 };
-      setRightClickTarget({ type: 'background', worldPosition });
-    }
-  };
+  // ADR-002 + ADR-003: right-click target resolution is handled by the
+  // hit-test service via the session controller's onContextMenu. The
+  // workspaceUtils right-click-target globals are gone; the per-mesh
+  // ground/sky right-click handlers below are now no-ops kept only so the
+  // pointerdown plumbing remains symmetrical until §4b consolidates these
+  // paths into the controller too.
 
   // Click on sky to deselect (similar to ground click)
   const handleSkyClick = (e: ThreeEvent<MouseEvent>) => {
@@ -602,6 +733,22 @@ export function Workspace() {
 
     // Only clear selection if we tracked a pointer-down on the sky
     if (!pointerDownPos.current) {
+      return;
+    }
+
+    // Preserve selection on additive (shift / cmd) click — same reason as ground.
+    const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+    const isModKey = isMac ? e.nativeEvent.metaKey : e.nativeEvent.ctrlKey;
+    if (e.nativeEvent.shiftKey || isModKey) {
+      pointerDownPos.current = null;
+      debugSelection('sky:click:additive-preserve-selection');
+      return;
+    }
+
+    // Suppress deselect while a context menu is open (see handleBackgroundClick).
+    if (useUIStore.getState().contextMenu) {
+      pointerDownPos.current = null;
+      debugSelection('sky:click:suppressed-context-menu-open');
       return;
     }
 
@@ -671,9 +818,11 @@ export function Workspace() {
     // Always track pointer position for click detection
     handleBackgroundPointerDownForClick(e);
 
-    // Track right-click target for context menu
+    // Right-click on ground: the session controller's onContextMenu resolves
+    // this via the hit-test service and opens the background menu with the
+    // world position. Nothing to do here at the per-mesh level.
     if (e.nativeEvent.button === 2) {
-      handleGroundRightClick(e);
+      e.stopPropagation();
       return;
     }
 
@@ -693,9 +842,7 @@ export function Workspace() {
     setIsBoxSelecting(true);
 
     // Disable orbit controls during selection
-    if (isOrbitControls(controls)) {
-      controls.enabled = false;
-    }
+    pauseOrbitControls(controls);
   };
 
   // Handle pointer move and pointer up for box selection
@@ -721,9 +868,7 @@ export function Workspace() {
       setSelectionBox(null);
 
       // Re-enable orbit controls
-      if (isOrbitControls(controls)) {
-        controls.enabled = true;
-      }
+      resumeOrbitControls(controls);
     };
 
     const handlePointerMove = (e: PointerEvent) => {
@@ -738,16 +883,13 @@ export function Workspace() {
       finishBoxSelection();
     };
 
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
-    window.addEventListener('blur', handlePointerUp);
+    const unbindPointerSession = bindWindowPointerSession(window, {
+      onMove: handlePointerMove,
+      onEnd: handlePointerUp
+    });
 
     return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerUp);
-      window.removeEventListener('blur', handlePointerUp);
+      unbindPointerSession();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isBoxSelecting, controls, selectParts, clearSelection, setSelectionBox, setSelectedSidebarStockId]);
@@ -836,7 +978,8 @@ export function Workspace() {
         onClick={handleBackgroundClick}
         onDoubleClick={handleBackgroundDoubleClick}
         onPointerDown={handleBackgroundPointerDown}
-        userData={{ isGround: true }}
+        // ADR-002: hitTarget descriptor for the hit-test service.
+        userData={{ isGround: true, hitTarget: { kind: 'ground' } }}
       >
         <planeGeometry args={[200, 200]} />
         <meshBasicMaterial visible={false} />
@@ -844,15 +987,11 @@ export function Workspace() {
 
       {/* Sky sphere (catches clicks that miss everything else) */}
       <mesh
-        onPointerDown={(e) => {
-          handleBackgroundPointerDownForClick(e);
-          if (e.nativeEvent.button === 2) {
-            handleSkyRightClick(e);
-          }
-        }}
+        onPointerDown={handleBackgroundPointerDownForClick}
         onClick={handleSkyClick}
         onDoubleClick={handleBackgroundDoubleClick}
-        userData={{ isSky: true }}
+        // ADR-002: hitTarget descriptor for the hit-test service.
+        userData={{ isSky: true, hitTarget: { kind: 'sky' } }}
         renderOrder={-1}
       >
         <sphereGeometry args={[500, 8, 6]} />
@@ -912,14 +1051,15 @@ export function Workspace() {
       {/* Group-wide rotation handles */}
       <GroupRotationHandles />
 
-      {/* Multi-selection bounding box dimensions */}
-      <MultiSelectionDimensions />
+      {/* Multi-selection bounding box dimensions — OverlayModel dimensions slot (ADR-005) */}
+      <MultiSelectionDimensions data={overlayModel.dimensions} />
 
-      {/* Snap alignment lines */}
-      <SnapAlignmentLines />
+      {/* Snap alignment lines — consumes the snap slot of OverlayModel (ADR-005) */}
+      <SnapAlignmentLines data={overlayModel.snap} units={units} displayMode={displayMode} />
 
       {/* Reference distance indicators */}
-      <ReferenceDistanceIndicators />
+      {/* Reference rulers — OverlayModel references slot (ADR-005) */}
+      <ReferenceDistanceIndicators data={overlayModel.references} />
 
       {/* Persistent snap guides */}
       <SnapGuides />

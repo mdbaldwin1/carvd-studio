@@ -204,7 +204,9 @@ describe('ContextMenu', () => {
           partId: 'part-1'
         },
         closeContextMenu: vi.fn(),
-        openSaveAssemblyModal: vi.fn()
+        openSaveAssemblyModal: vi.fn(),
+        requestDeleteParts: vi.fn(),
+        requestDeleteGroups: vi.fn()
       });
       useCameraStore.setState({
         requestCenterCamera: vi.fn()
@@ -241,11 +243,11 @@ describe('ContextMenu', () => {
       expect(useClipboardStore.getState().copySelectedParts).toHaveBeenCalled();
     });
 
-    it('calls deleteSelectedParts on Delete', () => {
+    it('calls requestDeleteParts on Delete', () => {
       render(<ContextMenu />);
       fireEvent.click(screen.getByText('Delete'));
 
-      expect(useProjectStore.getState().deleteSelectedParts).toHaveBeenCalled();
+      expect(useUIStore.getState().requestDeleteParts).toHaveBeenCalledWith(['part-1', 'part-2']);
     });
 
     it('calls requestCenterCamera on Center View', () => {

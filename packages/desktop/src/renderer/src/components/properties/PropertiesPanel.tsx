@@ -14,9 +14,11 @@ import { useAssemblyEditingStore } from '@renderer/store/assemblyEditingStore';
 import { useCameraStore } from '@renderer/store/cameraStore';
 import { useLicenseStore } from '@renderer/store/licenseStore';
 import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
-import { getAllDescendantPartIds, getContainingGroupId, useProjectStore } from '@renderer/store/projectStore';
+import { useProjectStore } from '@renderer/store/projectStore';
+import { useWorkspaceSceneGraph } from '@renderer/interaction/useWorkspaceSceneGraph';
 import { useSelectionStore } from '@renderer/store/selectionStore';
 import { useSnapStore } from '@renderer/store/snapStore';
+import { getContainingGroupId } from '@renderer/utils/interactionSelection';
 import { useUIStore } from '@renderer/store/uiStore';
 import { Stock } from '@renderer/types';
 import { getDocsUrl } from '@renderer/utils/docsLinks';
@@ -45,6 +47,7 @@ export function PropertiesPanel() {
   const openSaveAssemblyModal = useUIStore((s) => s.openSaveAssemblyModal);
   const showToast = useUIStore((s) => s.showToast);
   const deleteGroup = useProjectStore((s) => s.deleteGroup);
+  const requestDeleteGroups = useUIStore((s) => s.requestDeleteGroups);
   const createGroup = useProjectStore((s) => s.createGroup);
   const addToGroup = useProjectStore((s) => s.addToGroup);
   const removeFromGroup = useProjectStore((s) => s.removeFromGroup);
@@ -52,6 +55,8 @@ export function PropertiesPanel() {
   const duplicateSelectedParts = useProjectStore((s) => s.duplicateSelectedParts);
   const assignStockToSelectedParts = useProjectStore((s) => s.assignStockToSelectedParts);
   const groupMembers = useProjectStore((s) => s.groupMembers);
+  // ADR-008: scene graph adapter for descendantPartIds lookups.
+  const sceneGraph = useWorkspaceSceneGraph();
   const editingGroupId = useSelectionStore((s) => s.editingGroupId);
   const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
   const toggleReference = useSnapStore((s) => s.toggleReference);
@@ -131,11 +136,11 @@ export function PropertiesPanel() {
   const effectiveSelectedPartIds = useMemo(() => {
     const partIds = new Set(selectedPartIds);
     for (const groupId of selectedGroupIds) {
-      const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
+      const groupPartIds = sceneGraph.descendantPartIds(groupId);
       groupPartIds.forEach((id) => partIds.add(id));
     }
     return [...partIds];
-  }, [groupMembers, selectedGroupIds, selectedPartIds]);
+  }, [sceneGraph, selectedGroupIds, selectedPartIds]);
 
   const ungroupedPartIds = selectedPartIds.filter((id) => getContainingGroupId(id, groupMembers) === null);
   const partsInGroups = selectedPartIds.filter((id) => getContainingGroupId(id, groupMembers) !== null);
@@ -155,8 +160,8 @@ export function PropertiesPanel() {
   };
 
   const handleDeleteSelection = () => {
-    for (const groupId of selectedGroupIds) {
-      deleteGroup(groupId, 'recursive');
+    if (selectedGroupIds.length > 0) {
+      requestDeleteGroups(selectedGroupIds);
     }
     if (selectedPartIds.length > 0) {
       requestDeleteParts(selectedPartIds);
@@ -194,14 +199,14 @@ export function PropertiesPanel() {
           onCenterView={requestCenterCamera}
           onSaveAsAssembly={openSaveAssemblyModal}
           onToggleReference={() => {
-            const groupPartIds = getAllDescendantPartIds(selectedGroup.id, groupMembers);
+            const groupPartIds = sceneGraph.descendantPartIds(selectedGroup.id);
             if (groupPartIds.length > 0) {
-              toggleReference(groupPartIds);
+              toggleReference([...groupPartIds]);
             }
           }}
           onRemoveFromParent={(groupId) => removeFromGroup([groupId], 'group')}
           onUngroup={(groupId) => deleteGroup(groupId, 'ungroup', editingGroupId ?? null)}
-          onDeleteGroup={(groupId) => deleteGroup(groupId, 'recursive', null)}
+          onDeleteGroup={(groupId) => requestDeleteGroups([groupId])}
         />
       );
     }

@@ -17,6 +17,7 @@ export interface ElectronAPI {
   setWindowTitle: (title: string) => Promise<void>;
   getAppVersion: () => Promise<string>;
   getPlatform: () => Promise<string>;
+  isTestMode: () => Promise<boolean>;
   verifyLicense: (licenseKey: string) => Promise<{
     valid: boolean;
     data?: {

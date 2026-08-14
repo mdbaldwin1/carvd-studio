@@ -5,16 +5,14 @@ import { AlertTriangle, ChevronDown, ChevronRight, Layers } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { useStockLibrary } from '../../hooks/useStockLibrary';
 import { useAssemblyEditingStore } from '../../store/assemblyEditingStore';
-import {
-  getAllDescendantPartIds,
-  getAncestorGroupIds,
-  useProjectStore,
-  validatePartsForCutList
-} from '../../store/projectStore';
+import { useProjectStore, validatePartsForCutList } from '../../store/projectStore';
+import { useWorkspaceSceneGraph } from '../../interaction/useWorkspaceSceneGraph';
+import type { WorkspaceSceneGraph } from '../../interaction/sceneGraph';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { Group, GroupMember, Part, PartValidationIssue } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { getAncestorGroupIds } from '../../utils/interactionSelection';
 import { IconButton } from '../common/IconButton';
 
 // ── Tree types ──────────────────────────────────────────────────────────
@@ -176,7 +174,7 @@ function flattenTree(
   selectedGroupIdSet: Set<string>,
   editingGroupId: string | null,
   validationByPart: Map<string, PartValidationIssue[]>,
-  groupMembers: GroupMember[],
+  sceneGraph: WorkspaceSceneGraph,
   forceExpandGroups: boolean,
   level = 0,
   parentGroupId: string | null = null
@@ -191,13 +189,13 @@ function flattenTree(
       const isExpanded = forceExpandGroups || expandedGroupIdSet.has(group.id);
       const isSelected = selectedGroupIdSet.has(group.id);
       const isEditing = editingGroupId === group.id;
-      const childCount = getAllDescendantPartIds(group.id, groupMembers).length;
+      const childCount = sceneGraph.descendantPartIds(group.id).length;
 
       // Compute descendant issues only for collapsed groups
       let hasChildError = false;
       let hasChildWarning = false;
       if (!isExpanded) {
-        const descendantPartIds = getAllDescendantPartIds(group.id, groupMembers);
+        const descendantPartIds = sceneGraph.descendantPartIds(group.id);
         for (const partId of descendantPartIds) {
           const issues = validationByPart.get(partId);
           if (issues && issues.length > 0) {
@@ -231,7 +229,7 @@ function flattenTree(
             selectedGroupIdSet,
             editingGroupId,
             validationByPart,
-            groupMembers,
+            sceneGraph,
             forceExpandGroups,
             level + 1,
             group.id
@@ -422,6 +420,8 @@ export function HierarchicalPartsList({
   const parts = useProjectStore((s) => s.parts);
   const groups = useProjectStore((s) => s.groups);
   const groupMembers = useProjectStore((s) => s.groupMembers);
+  // ADR-008: scene graph adapter for descendantPartIds lookups.
+  const sceneGraph = useWorkspaceSceneGraph();
   const projectStocks = useProjectStore((s) => s.stocks);
   const units = useProjectStore((s) => s.units);
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
@@ -522,7 +522,7 @@ export function HierarchicalPartsList({
         selectedGroupIdSet,
         editingGroupId,
         validationByPart,
-        groupMembers,
+        sceneGraph,
         hasActiveSearch
       ),
     [
@@ -531,7 +531,7 @@ export function HierarchicalPartsList({
       selectedGroupIdSet,
       editingGroupId,
       validationByPart,
-      groupMembers,
+      sceneGraph,
       hasActiveSearch
     ]
   );

@@ -8,11 +8,14 @@ import {
   getPartWorldAABB
 } from './partFeatureGeometry';
 import { getRectCutDepth, getResolvedRectCutFeature, isTopTarget } from './rectCutUtils';
+import type { GeometryCache } from '../interaction/geometry/cache';
 
 // Module-level reusable objects for getPartBounds calculations.
 // Safe because JS is single-threaded and callers only see the returned plain PartBounds object.
 const _boundsEuler = new THREE.Euler();
 const _boundsQuat = new THREE.Quaternion();
+const _boundsCorners = Array.from({ length: 8 }, () => new THREE.Vector3());
+const _boundsPosition = new THREE.Vector3();
 
 // Part bounding box in world space
 export interface PartBounds {
@@ -72,9 +75,96 @@ export interface SnapResult {
   closestDistance?: number;
 }
 
-// Calculate axis-aligned bounding box for a part in world space
-export function getPartBounds(part: Part): PartBounds {
-  const { minX, maxX, minY, maxY, minZ, maxZ } = getPartWorldAABB(part);
+function withSnapFamily(lines: SnapLine[], family: NonNullable<SnapLine['family']>, subtype?: string): SnapLine[] {
+  return lines.map((line) => ({
+    ...line,
+    family,
+    subtype: line.subtype ?? subtype,
+    state: line.state ?? 'winner'
+  }));
+}
+
+// Calculate axis-aligned bounding box for a part in world space.
+//
+// Feature-bearing parts (custom cuts) get their exact world AABB from the
+// feature geometry. Otherwise, ADR-009 applies: when a `geometryCache` is
+// provided, the part's 8 local-space corners come from
+// `bundle.snapGraph.corners`; for box parts the corners are identical to the
+// inline derivation, and the overload is opt-in so every existing caller
+// keeps working unchanged.
+export function getPartBounds(part: Part, geometryCache?: GeometryCache): PartBounds {
+  if (part.features && part.features.length > 0) {
+    const { minX, maxX, minY, maxY, minZ, maxZ } = getPartWorldAABB(part);
+    return {
+      id: part.id,
+      minX,
+      maxX,
+      minY,
+      maxY,
+      minZ,
+      maxZ,
+      centerX: (minX + maxX) / 2,
+      centerY: (minY + maxY) / 2,
+      centerZ: (minZ + maxZ) / 2
+    };
+  }
+
+  _boundsEuler.set(
+    (part.rotation.x * Math.PI) / 180,
+    (part.rotation.y * Math.PI) / 180,
+    (part.rotation.z * Math.PI) / 180,
+    'XYZ'
+  );
+  _boundsQuat.setFromEuler(_boundsEuler);
+
+  if (geometryCache) {
+    const bundle = geometryCache.get(part);
+    // Bundle corners are local-space; write each into the pre-allocated
+    // working buffer.
+    const cornerCount = bundle.snapGraph.corners.length;
+    if (cornerCount !== 8) {
+      // Box parts have exactly 8 corners; if a custom-cut bundle introduces
+      // a different count later, fall back to inline math to preserve box
+      // semantics until the snap engine learns about non-box geometry.
+      return getPartBoundsInline(part);
+    }
+    for (let i = 0; i < 8; i++) {
+      const local = bundle.snapGraph.corners[i].point;
+      _boundsCorners[i].set(local.x, local.y, local.z);
+    }
+  } else {
+    const halfLength = part.length / 2;
+    const halfThickness = part.thickness / 2;
+    const halfWidth = part.width / 2;
+    _boundsCorners[0].set(-halfLength, -halfThickness, -halfWidth);
+    _boundsCorners[1].set(-halfLength, -halfThickness, halfWidth);
+    _boundsCorners[2].set(-halfLength, halfThickness, -halfWidth);
+    _boundsCorners[3].set(-halfLength, halfThickness, halfWidth);
+    _boundsCorners[4].set(halfLength, -halfThickness, -halfWidth);
+    _boundsCorners[5].set(halfLength, -halfThickness, halfWidth);
+    _boundsCorners[6].set(halfLength, halfThickness, -halfWidth);
+    _boundsCorners[7].set(halfLength, halfThickness, halfWidth);
+  }
+
+  _boundsPosition.set(part.position.x, part.position.y, part.position.z);
+
+  let minX = Infinity,
+    maxX = -Infinity;
+  let minY = Infinity,
+    maxY = -Infinity;
+  let minZ = Infinity,
+    maxZ = -Infinity;
+
+  for (const corner of _boundsCorners) {
+    corner.applyQuaternion(_boundsQuat);
+    corner.add(_boundsPosition);
+    minX = Math.min(minX, corner.x);
+    maxX = Math.max(maxX, corner.x);
+    minY = Math.min(minY, corner.y);
+    maxY = Math.max(maxY, corner.y);
+    minZ = Math.min(minZ, corner.z);
+    maxZ = Math.max(maxZ, corner.z);
+  }
 
   return {
     id: part.id,
@@ -90,10 +180,10 @@ export function getPartBounds(part: Part): PartBounds {
   };
 }
 
-// Calculate bounds for a part at a hypothetical position (for live drag)
-export function getPartBoundsAtPosition(part: Part, position: { x: number; y: number; z: number }): PartBounds {
-  const tempPart = { ...part, position };
-  return getPartBounds(tempPart);
+// Inline-only path. Used by getPartBounds when a bundle is unexpectedly
+// non-box (defensive fallback).
+function getPartBoundsInline(part: Part): PartBounds {
+  return getPartBounds(part);
 }
 
 /** Compute rotation matrix columns from Euler XYZ angles (degrees). */
@@ -131,21 +221,54 @@ function eulerToAxes(rotation: { x: number; y: number; z: number }): {
   };
 }
 
-export function getPartOBB(part: Part, position: { x: number; y: number; z: number } = part.position): PartOBB {
+// Calculate bounds for a part at a hypothetical position (for live drag)
+export function getPartBoundsAtPosition(
+  part: Part,
+  position: { x: number; y: number; z: number },
+  geometryCache?: GeometryCache
+): PartBounds {
+  const tempPart = { ...part, position };
+  return getPartBounds(tempPart, geometryCache);
+}
+
+export function getPartOBB(
+  part: Part,
+  position: { x: number; y: number; z: number } = part.position,
+  geometryCache?: GeometryCache
+): PartOBB {
   const { ax0, ax1, ax2, ay0, ay1, ay2, az0, az1, az2 } = eulerToAxes(part.rotation);
 
-  // Use feature-aware local bounding box so end cuts, bevels, and
-  // through-cut notches shrink the OBB instead of leaving ghost volume.
-  const localBox = getPartLocalBoundingBox(part);
-  const halfX = (localBox.max.x - localBox.min.x) / 2;
-  const halfY = (localBox.max.y - localBox.min.y) / 2;
-  const halfZ = (localBox.max.z - localBox.min.z) / 2;
-
+  // Feature-bearing parts use the feature-aware local bounding box so end
+  // cuts, bevels, and through-cut notches shrink the OBB instead of leaving
+  // ghost volume. Otherwise, ADR-009: half-extents come from the bundle when
+  // a cache is provided (identical to the inline derivation for box parts).
+  const hasFeatures = !!part.features && part.features.length > 0;
+  let halfX: number;
+  let halfY: number;
+  let halfZ: number;
   // Local center offset (non-zero when features make the box asymmetric,
   // e.g. a bevel on only one end shifts the box center toward the other end)
-  const lcx = (localBox.min.x + localBox.max.x) / 2;
-  const lcy = (localBox.min.y + localBox.max.y) / 2;
-  const lcz = (localBox.min.z + localBox.max.z) / 2;
+  let lcx = 0;
+  let lcy = 0;
+  let lcz = 0;
+  if (hasFeatures) {
+    const localBox = getPartLocalBoundingBox(part);
+    halfX = (localBox.max.x - localBox.min.x) / 2;
+    halfY = (localBox.max.y - localBox.min.y) / 2;
+    halfZ = (localBox.max.z - localBox.min.z) / 2;
+    lcx = (localBox.min.x + localBox.max.x) / 2;
+    lcy = (localBox.min.y + localBox.max.y) / 2;
+    lcz = (localBox.min.z + localBox.max.z) / 2;
+  } else if (geometryCache) {
+    const bundle = geometryCache.get(part);
+    halfX = bundle.bounds.localObb.halfExtents.x;
+    halfY = bundle.bounds.localObb.halfExtents.y;
+    halfZ = bundle.bounds.localObb.halfExtents.z;
+  } else {
+    halfX = part.length / 2;
+    halfY = part.thickness / 2;
+    halfZ = part.width / 2;
+  }
 
   return {
     center: {
@@ -520,8 +643,9 @@ function convexEdgeDirections(vertices: Vec3[]): Vec3[] {
   return dirs;
 }
 
-// Calculate combined bounding box for multiple parts
-export function getCombinedBounds(parts: Part[]): PartBounds {
+// Calculate combined bounding box for multiple parts.
+// ADR-009: opt-in bundle path threaded through `getPartBounds`.
+export function getCombinedBounds(parts: Part[], geometryCache?: GeometryCache): PartBounds {
   if (parts.length === 0) {
     return {
       id: 'empty',
@@ -545,7 +669,7 @@ export function getCombinedBounds(parts: Part[]): PartBounds {
     maxZ = -Infinity;
 
   for (const part of parts) {
-    const bounds = getPartBounds(part);
+    const bounds = getPartBounds(part, geometryCache);
     minX = Math.min(minX, bounds.minX);
     maxX = Math.max(maxX, bounds.maxX);
     minY = Math.min(minY, bounds.minY);
@@ -569,7 +693,11 @@ export function getCombinedBounds(parts: Part[]): PartBounds {
 }
 
 // Calculate combined bounding box for parts at adjusted positions
-export function getCombinedBoundsAtPosition(parts: Part[], delta: { x: number; y: number; z: number }): PartBounds {
+export function getCombinedBoundsAtPosition(
+  parts: Part[],
+  delta: { x: number; y: number; z: number },
+  geometryCache?: GeometryCache
+): PartBounds {
   if (parts.length === 0) {
     return {
       id: 'empty',
@@ -601,7 +729,7 @@ export function getCombinedBoundsAtPosition(parts: Part[], delta: { x: number; y
         z: part.position.z + delta.z
       }
     };
-    const bounds = getPartBounds(adjustedPart);
+    const bounds = getPartBounds(adjustedPart, geometryCache);
     minX = Math.min(minX, bounds.minX);
     maxX = Math.max(maxX, bounds.maxX);
     minY = Math.min(minY, bounds.minY);
@@ -885,7 +1013,8 @@ export function getNearestParts(
   draggingBounds: PartBounds,
   allParts: Part[],
   draggingPartIds: string[],
-  maxParts: number = 10
+  maxParts: number = 10,
+  geometryCache?: GeometryCache
 ): Part[] {
   // Filter out the parts being dragged
   const otherParts = allParts.filter((p) => !draggingPartIds.includes(p.id));
@@ -893,7 +1022,7 @@ export function getNearestParts(
   // Calculate distances and sort.
   // Prefer true box-to-box gap over center distance so large pieces with nearby faces are not missed.
   const partsWithDistance = otherParts.map((part) => {
-    const bounds = getPartBounds(part);
+    const bounds = getPartBounds(part, geometryCache);
     const gapX =
       draggingBounds.maxX < bounds.minX
         ? bounds.minX - draggingBounds.maxX
@@ -1240,6 +1369,8 @@ function createSnapLine(
       return {
         axis: 'x',
         type,
+        family: 'axis',
+        state: 'winner',
         start: { x: snapValue, y: avgY, z: minZ },
         end: { x: snapValue, y: avgY, z: maxZ },
         snapValue,
@@ -1254,6 +1385,8 @@ function createSnapLine(
       return {
         axis: 'y',
         type,
+        family: 'axis',
+        state: 'winner',
         start: { x: minX, y: snapValue, z: avgZ },
         end: { x: maxX, y: snapValue, z: avgZ },
         snapValue,
@@ -1268,6 +1401,8 @@ function createSnapLine(
       return {
         axis: 'z',
         type,
+        family: 'axis',
+        state: 'winner',
         start: { x: minX, y: avgY, z: snapValue },
         end: { x: maxX, y: avgY, z: snapValue },
         snapValue,
@@ -1333,6 +1468,8 @@ function createEqualSpacingSnapLines(
       snapLines.push({
         axis: 'x',
         type: 'equal-spacing',
+        family: 'equal-spacing',
+        state: 'winner',
         start: { x: draggingBounds.centerX, y, z: minZ },
         end: { x: draggingBounds.centerX, y, z: maxZ },
         snapValue: draggingBounds.centerX,
@@ -1366,6 +1503,8 @@ function createEqualSpacingSnapLines(
       snapLines.push({
         axis: 'y',
         type: 'equal-spacing',
+        family: 'equal-spacing',
+        state: 'winner',
         start: { x: minX, y: draggingBounds.centerY, z },
         end: { x: maxX, y: draggingBounds.centerY, z },
         snapValue: draggingBounds.centerY,
@@ -1399,6 +1538,8 @@ function createEqualSpacingSnapLines(
       snapLines.push({
         axis: 'z',
         type: 'equal-spacing',
+        family: 'equal-spacing',
+        state: 'winner',
         start: { x: minX, y, z: draggingBounds.centerZ },
         end: { x: maxX, y, z: draggingBounds.centerZ },
         snapValue: draggingBounds.centerZ,
@@ -1417,16 +1558,17 @@ export function detectSnaps(
   currentPosition: { x: number; y: number; z: number },
   allParts: Part[],
   draggingPartIds: string[],
-  snapThreshold: number = 0.5 // Default threshold in inches
+  snapThreshold: number = 0.5, // Default threshold in inches
+  geometryCache?: GeometryCache
 ): SnapResult {
   // Get bounds of dragging part at current position
-  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
+  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition, geometryCache);
 
   // Find nearest parts to check for snaps
-  const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
+  const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds, 10, geometryCache);
 
   // Get bounds for all target parts
-  const targetBounds = nearestParts.map((p) => getPartBounds(p));
+  const targetBounds = nearestParts.map((p) => getPartBounds(p, geometryCache));
 
   // Check for snaps on each axis
   const xSnap = checkAxisSnaps(
@@ -2049,6 +2191,8 @@ export function createGuideSnapLine(guide: SnapGuide, draggingBounds: PartBounds
       return {
         axis: 'x',
         type: 'face',
+        family: 'guide',
+        state: 'winner',
         start: { x: position, y: avgY, z: minZ },
         end: { x: position, y: avgY, z: maxZ },
         snapValue: position
@@ -2062,6 +2206,8 @@ export function createGuideSnapLine(guide: SnapGuide, draggingBounds: PartBounds
       return {
         axis: 'y',
         type: 'face',
+        family: 'guide',
+        state: 'winner',
         start: { x: minX, y: position, z: avgZ },
         end: { x: maxX, y: position, z: avgZ },
         snapValue: position
@@ -2076,6 +2222,8 @@ export function createGuideSnapLine(guide: SnapGuide, draggingBounds: PartBounds
       return {
         axis: 'z',
         type: 'face',
+        family: 'guide',
+        state: 'winner',
         start: { x: minX, y: avgY, z: position },
         end: { x: maxX, y: avgY, z: position },
         snapValue: position
@@ -2166,6 +2314,8 @@ export function createOriginSnapLine(
       return {
         axis: 'x',
         type: snapType === 'center' ? 'center' : 'edge',
+        family: 'origin',
+        state: 'winner',
         start: { x: 0, y, z: minZ },
         end: { x: 0, y, z: maxZ },
         snapValue: 0
@@ -2179,6 +2329,8 @@ export function createOriginSnapLine(
       return {
         axis: 'y',
         type: snapType === 'center' ? 'center' : 'edge',
+        family: 'origin',
+        state: 'winner',
         start: { x: minX, y: 0, z },
         end: { x: maxX, y: 0, z },
         snapValue: 0
@@ -2193,6 +2345,8 @@ export function createOriginSnapLine(
       return {
         axis: 'z',
         type: snapType === 'center' ? 'center' : 'edge',
+        family: 'origin',
+        state: 'winner',
         start: { x: minX, y, z: 0 },
         end: { x: maxX, y, z: 0 },
         snapValue: 0
@@ -2310,7 +2464,7 @@ export function detectFaceSnaps(
     snappedX,
     snappedY,
     snappedZ,
-    snapLines: [createFaceSnapLine(dominantAxis, position, adjustedBounds, best.targetBounds)],
+    snapLines: withSnapFamily([createFaceSnapLine(dominantAxis, position, adjustedBounds, best.targetBounds)], 'face'),
     closestDistance: bestDistance
   };
 }
@@ -2683,6 +2837,7 @@ export function detectFeatureSnaps(
   draggingPartIds: string[],
   snapThreshold: number
 ): SnapResult {
+  const MIN_VERTEX_FACE_DISTANCE = Math.max(1e-4, snapThreshold * 0.002);
   const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
   const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
   const dragEdges = getPartEdges(draggingPart, currentPosition);
@@ -2694,6 +2849,7 @@ export function detectFeatureSnaps(
         lineStart: Vec3;
         lineEnd: Vec3;
         distance: number;
+        subtype: string;
       }
     | undefined;
   let bestDistance = snapThreshold;
@@ -2713,8 +2869,6 @@ export function detectFeatureSnaps(
         const along = dotVec(closestDiff, e1.dir);
         const perpOffset = subVec(closestDiff, mulVec(e1.dir, along));
         const distance = lenVec(perpOffset);
-        if (distance <= 1e-5) continue;
-        if (distance >= bestDistance) continue;
 
         const p1a = dotVec(e1.a, e1.dir);
         const p1b = dotVec(e1.b, e1.dir);
@@ -2727,12 +2881,44 @@ export function detectFeatureSnaps(
         const overlap = Math.min(max1, max2) - Math.max(min1, min2);
         if (overlap < -Math.max(0.01, snapThreshold * 0.5)) continue;
 
+        if (distance <= 1e-5) {
+          // Coplanar/collinear edges: snap by endpoint alignment along the edge direction.
+          // This enables edge snapping while sliding on an already surface-snapped face.
+          const edge1MinPoint = p1a <= p1b ? e1.a : e1.b;
+          const edge1MaxPoint = p1a <= p1b ? e1.b : e1.a;
+          const edge2MinPoint = p2a <= p2b ? e2.a : e2.b;
+          const edge2MaxPoint = p2a <= p2b ? e2.b : e2.a;
+          const alongCandidates = [
+            { delta: min2 - min1, lineStart: edge1MinPoint, lineEnd: edge2MinPoint },
+            { delta: max2 - max1, lineStart: edge1MaxPoint, lineEnd: edge2MaxPoint },
+            { delta: min2 - max1, lineStart: edge1MaxPoint, lineEnd: edge2MinPoint },
+            { delta: max2 - min1, lineStart: edge1MinPoint, lineEnd: edge2MaxPoint }
+          ];
+
+          for (const candidate of alongCandidates) {
+            const candidateDistance = Math.abs(candidate.delta);
+            if (candidateDistance <= 1e-5 || candidateDistance >= bestDistance) continue;
+            bestDistance = candidateDistance;
+            best = {
+              delta: mulVec(e1.dir, candidate.delta),
+              lineStart: candidate.lineStart,
+              lineEnd: candidate.lineEnd,
+              distance: candidateDistance,
+              subtype: 'edge-extension'
+            };
+          }
+          continue;
+        }
+
+        if (distance >= bestDistance) continue;
+
         bestDistance = distance;
         best = {
           delta: perpOffset,
           lineStart: c1,
           lineEnd: c2,
-          distance
+          distance,
+          subtype: 'edge-edge'
         };
       }
     }
@@ -2743,11 +2929,9 @@ export function detectFeatureSnaps(
         const offset = subVec(vertex, face.center);
         const planeDistance = dotVec(offset, face.normal);
         const absDistance = Math.abs(planeDistance);
-        // Skip near-coincident projections — the vertex is already on this
-        // face (e.g. after a face snap). Allowing near-zero distances here
-        // would poison bestDistance and block useful edge-edge snaps on
-        // tangential axes.
-        if (absDistance <= 1e-3) continue;
+        // Ignore already-coplanar candidates; they should not suppress
+        // meaningful edge-alignment snaps on the same surface.
+        if (absDistance <= MIN_VERTEX_FACE_DISTANCE) continue;
         if (absDistance >= bestDistance) continue;
 
         const projected = subVec(vertex, mulVec(face.normal, planeDistance));
@@ -2761,7 +2945,8 @@ export function detectFeatureSnaps(
           delta: mulVec(face.normal, -planeDistance),
           lineStart: vertex,
           lineEnd: projected,
-          distance: absDistance
+          distance: absDistance,
+          subtype: 'vertex-face'
         };
       }
     }
@@ -2804,15 +2989,316 @@ export function detectFeatureSnaps(
     snappedX,
     snappedY,
     snappedZ,
-    snapLines: [
-      {
-        axis,
-        type: 'edge',
-        start: { x: best.lineStart.x, y: best.lineStart.y, z: best.lineStart.z },
-        end: { x: best.lineEnd.x, y: best.lineEnd.y, z: best.lineEnd.z },
-        snapValue: axis === 'x' ? best.lineEnd.x : axis === 'y' ? best.lineEnd.y : best.lineEnd.z
+    snapLines: withSnapFamily(
+      [
+        {
+          axis,
+          type: 'edge',
+          start: { x: best.lineStart.x, y: best.lineStart.y, z: best.lineStart.z },
+          end: { x: best.lineEnd.x, y: best.lineEnd.y, z: best.lineEnd.z },
+          snapValue: axis === 'x' ? best.lineEnd.x : axis === 'y' ? best.lineEnd.y : best.lineEnd.z
+        }
+      ],
+      'feature',
+      best.subtype
+    ),
+    closestDistance: best.distance
+  };
+}
+
+export function detectSurfaceAnchorSnaps(
+  draggingPart: Part,
+  currentPosition: { x: number; y: number; z: number },
+  allParts: Part[],
+  draggingPartIds: string[],
+  snapThreshold: number
+): SnapResult {
+  const dragFaces = getPartFaces(draggingPart, currentPosition);
+  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
+  const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
+  const FACE_SNAP_CLEARANCE = 1e-4;
+  let best:
+    | {
+        delta: Vec3;
+        lineStart: Vec3;
+        lineEnd: Vec3;
+        distance: number;
+        subtype: string;
       }
-    ],
+    | undefined;
+  let bestDistance = snapThreshold;
+
+  for (const targetPart of nearestParts) {
+    const targetFaces = getPartFaces(targetPart, targetPart.position);
+    for (const dragFace of dragFaces) {
+      for (const targetFace of targetFaces) {
+        if (!areFacesSnapCompatible(dragFace, targetFace, snapThreshold)) continue;
+
+        const centerDelta = subVec(targetFace.center, dragFace.center);
+        const planeDistance = dotVec(centerDelta, targetFace.normal);
+        const absPlaneDistance = Math.abs(planeDistance);
+        if (absPlaneDistance > snapThreshold) continue;
+
+        const clearance = Math.min(FACE_SNAP_CLEARANCE, absPlaneDistance * 0.5);
+        const correctedPlaneDistance = planeDistance - Math.sign(planeDistance || 1) * clearance;
+
+        const dragOnTargetPlane = addScaledVec(dragFace.center, targetFace.normal, correctedPlaneDistance);
+        const planarOffset = subVec(dragOnTargetPlane, targetFace.center);
+        const u = dotVec(planarOffset, targetFace.tangent1);
+        const v = dotVec(planarOffset, targetFace.tangent2);
+
+        const anchors: Array<{ u: number; v: number; subtype: string }> = [
+          { u: 0, v: 0, subtype: 'center-2d' },
+          { u: 0, v, subtype: 'center-1d' },
+          { u, v: 0, subtype: 'center-1d' },
+          { u: targetFace.half1 * 0.5, v, subtype: 'edge-quarterline' },
+          { u: -targetFace.half1 * 0.5, v, subtype: 'edge-quarterline' },
+          { u, v: targetFace.half2 * 0.5, subtype: 'edge-quarterline' },
+          { u, v: -targetFace.half2 * 0.5, subtype: 'edge-quarterline' },
+          { u: targetFace.half1, v: 0, subtype: 'edge-midline' },
+          { u: -targetFace.half1, v: 0, subtype: 'edge-midline' },
+          { u: 0, v: targetFace.half2, subtype: 'edge-midline' },
+          { u: 0, v: -targetFace.half2, subtype: 'edge-midline' }
+        ];
+
+        for (const anchor of anchors) {
+          if (Math.abs(anchor.u) > targetFace.half1 + 1e-4 || Math.abs(anchor.v) > targetFace.half2 + 1e-4) continue;
+          const du = anchor.u - u;
+          const dv = anchor.v - v;
+          const candidateDistance = Math.hypot(absPlaneDistance, du, dv);
+          if (candidateDistance >= bestDistance) continue;
+
+          const tangentialDelta = addVec(mulVec(targetFace.tangent1, du), mulVec(targetFace.tangent2, dv));
+          const normalDelta = mulVec(targetFace.normal, correctedPlaneDistance);
+          const delta = addVec(normalDelta, tangentialDelta);
+          const lineEnd = addVec(
+            targetFace.center,
+            addVec(mulVec(targetFace.tangent1, anchor.u), mulVec(targetFace.tangent2, anchor.v))
+          );
+          bestDistance = candidateDistance;
+          best = {
+            delta,
+            lineStart: dragFace.center,
+            lineEnd,
+            distance: candidateDistance,
+            subtype: anchor.subtype
+          };
+        }
+      }
+    }
+  }
+
+  if (!best) {
+    return {
+      adjustedPosition: currentPosition,
+      snappedX: false,
+      snappedY: false,
+      snappedZ: false,
+      snapLines: [],
+      closestDistance: undefined
+    };
+  }
+
+  const adjustedPosition = {
+    x: currentPosition.x + best.delta.x,
+    y: currentPosition.y + best.delta.y,
+    z: currentPosition.z + best.delta.z
+  };
+  const snappedX = Math.abs(best.delta.x) > 1e-5;
+  const snappedY = Math.abs(best.delta.y) > 1e-5;
+  const snappedZ = Math.abs(best.delta.z) > 1e-5;
+  const axis = dominantAxisFromDelta(best.delta);
+
+  return {
+    adjustedPosition,
+    snappedX,
+    snappedY,
+    snappedZ,
+    snapLines: withSnapFamily(
+      [
+        {
+          axis,
+          type: 'center',
+          start: best.lineStart,
+          end: best.lineEnd,
+          snapValue: axis === 'x' ? best.lineEnd.x : axis === 'y' ? best.lineEnd.y : best.lineEnd.z
+        }
+      ],
+      'surface-anchor',
+      best.subtype
+    ),
+    closestDistance: best.distance
+  };
+}
+
+export function detectFractionalFaceSnaps(
+  draggingPart: Part,
+  currentPosition: { x: number; y: number; z: number },
+  allParts: Part[],
+  draggingPartIds: string[],
+  snapThreshold: number,
+  includeGoldenRatioAnchors = false
+): SnapResult {
+  const dragFaces = getPartFaces(draggingPart, currentPosition);
+  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
+  const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
+  const FACE_SNAP_CLEARANCE = 1e-4;
+  const fractionAnchors = [
+    { f: 0, subtype: 'fraction-0' },
+    { f: 0.25, subtype: 'fraction-25' },
+    { f: 0.5, subtype: 'fraction-50' },
+    { f: 0.75, subtype: 'fraction-75' },
+    { f: 1, subtype: 'fraction-100' }
+  ];
+  const goldenAnchors = includeGoldenRatioAnchors
+    ? [
+        { f: 0.382, subtype: 'golden-38' },
+        { f: 0.618, subtype: 'golden-62' }
+      ]
+    : [];
+  const anchors = [...fractionAnchors, ...goldenAnchors];
+
+  let best:
+    | {
+        delta: Vec3;
+        lineStart: Vec3;
+        lineEnd: Vec3;
+        distance: number;
+        subtype: string;
+      }
+    | undefined;
+  let bestDistance = snapThreshold;
+
+  for (const targetPart of nearestParts) {
+    const targetFaces = getPartFaces(targetPart, targetPart.position);
+    for (const dragFace of dragFaces) {
+      for (const targetFace of targetFaces) {
+        if (!areFacesSnapCompatible(dragFace, targetFace, snapThreshold)) continue;
+
+        const centerDelta = subVec(targetFace.center, dragFace.center);
+        const planeDistance = dotVec(centerDelta, targetFace.normal);
+        const absPlaneDistance = Math.abs(planeDistance);
+        if (absPlaneDistance > snapThreshold) continue;
+
+        const clearance = Math.min(FACE_SNAP_CLEARANCE, absPlaneDistance * 0.5);
+        const correctedPlaneDistance = planeDistance - Math.sign(planeDistance || 1) * clearance;
+        const dragOnTargetPlane = addScaledVec(dragFace.center, targetFace.normal, correctedPlaneDistance);
+        const planarOffset = subVec(dragOnTargetPlane, targetFace.center);
+        const u = dotVec(planarOffset, targetFace.tangent1);
+        const v = dotVec(planarOffset, targetFace.tangent2);
+
+        for (const anchor of anchors) {
+          const uTarget = (anchor.f - 0.5) * 2 * targetFace.half1;
+          const du = uTarget - u;
+          const candidateDistanceU = Math.hypot(absPlaneDistance, du);
+          if (candidateDistanceU < bestDistance) {
+            const tangentialDelta = mulVec(targetFace.tangent1, du);
+            const normalDelta = mulVec(targetFace.normal, correctedPlaneDistance);
+            const delta = addVec(normalDelta, tangentialDelta);
+            const lineEnd = addVec(
+              targetFace.center,
+              addVec(mulVec(targetFace.tangent1, uTarget), mulVec(targetFace.tangent2, v))
+            );
+            bestDistance = candidateDistanceU;
+            best = {
+              delta,
+              lineStart: dragFace.center,
+              lineEnd,
+              distance: candidateDistanceU,
+              subtype: anchor.subtype
+            };
+          }
+
+          const vTarget = (anchor.f - 0.5) * 2 * targetFace.half2;
+          const dv = vTarget - v;
+          const candidateDistanceV = Math.hypot(absPlaneDistance, dv);
+          if (candidateDistanceV < bestDistance) {
+            const tangentialDelta = mulVec(targetFace.tangent2, dv);
+            const normalDelta = mulVec(targetFace.normal, correctedPlaneDistance);
+            const delta = addVec(normalDelta, tangentialDelta);
+            const lineEnd = addVec(
+              targetFace.center,
+              addVec(mulVec(targetFace.tangent1, u), mulVec(targetFace.tangent2, vTarget))
+            );
+            bestDistance = candidateDistanceV;
+            best = {
+              delta,
+              lineStart: dragFace.center,
+              lineEnd,
+              distance: candidateDistanceV,
+              subtype: anchor.subtype
+            };
+          }
+        }
+
+        for (const cornerU of [0, 1] as const) {
+          for (const cornerV of [0, 1] as const) {
+            const uTarget = (cornerU - 0.5) * 2 * targetFace.half1;
+            const vTarget = (cornerV - 0.5) * 2 * targetFace.half2;
+            const du = uTarget - u;
+            const dv = vTarget - v;
+            const candidateDistance = Math.hypot(absPlaneDistance, du, dv);
+            if (candidateDistance >= bestDistance) continue;
+            const tangentialDelta = addVec(mulVec(targetFace.tangent1, du), mulVec(targetFace.tangent2, dv));
+            const normalDelta = mulVec(targetFace.normal, correctedPlaneDistance);
+            const delta = addVec(normalDelta, tangentialDelta);
+            const lineEnd = addVec(
+              targetFace.center,
+              addVec(mulVec(targetFace.tangent1, uTarget), mulVec(targetFace.tangent2, vTarget))
+            );
+            bestDistance = candidateDistance;
+            best = {
+              delta,
+              lineStart: dragFace.center,
+              lineEnd,
+              distance: candidateDistance,
+              subtype: 'corner-anchor'
+            };
+          }
+        }
+      }
+    }
+  }
+
+  if (!best) {
+    return {
+      adjustedPosition: currentPosition,
+      snappedX: false,
+      snappedY: false,
+      snappedZ: false,
+      snapLines: [],
+      closestDistance: undefined
+    };
+  }
+
+  const adjustedPosition = {
+    x: currentPosition.x + best.delta.x,
+    y: currentPosition.y + best.delta.y,
+    z: currentPosition.z + best.delta.z
+  };
+  const snappedX = Math.abs(best.delta.x) > 1e-5;
+  const snappedY = Math.abs(best.delta.y) > 1e-5;
+  const snappedZ = Math.abs(best.delta.z) > 1e-5;
+  const axis = dominantAxisFromDelta(best.delta);
+
+  return {
+    adjustedPosition,
+    snappedX,
+    snappedY,
+    snappedZ,
+    snapLines: withSnapFamily(
+      [
+        {
+          axis,
+          type: 'center',
+          start: best.lineStart,
+          end: best.lineEnd,
+          snapValue: axis === 'x' ? best.lineEnd.x : axis === 'y' ? best.lineEnd.y : best.lineEnd.z
+        }
+      ],
+      'surface-fraction',
+      best.subtype
+    ),
     closestDistance: best.distance
   };
 }
@@ -2835,6 +3321,8 @@ function createFaceSnapLine(
       return {
         axis: 'x',
         type: 'face',
+        family: 'face',
+        state: 'winner',
         start: { x: position, y: minY, z: avgZ },
         end: { x: position, y: maxY, z: avgZ },
         snapValue: position
@@ -2848,6 +3336,8 @@ function createFaceSnapLine(
       return {
         axis: 'y',
         type: 'face',
+        family: 'face',
+        state: 'winner',
         start: { x: minX, y: position, z: avgZ },
         end: { x: maxX, y: position, z: avgZ },
         snapValue: position
@@ -2862,6 +3352,8 @@ function createFaceSnapLine(
       return {
         axis: 'z',
         type: 'face',
+        family: 'face',
+        state: 'winner',
         start: { x: minX, y: avgY, z: position },
         end: { x: maxX, y: avgY, z: position },
         snapValue: position

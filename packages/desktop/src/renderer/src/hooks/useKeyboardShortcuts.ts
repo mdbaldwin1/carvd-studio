@@ -1,20 +1,24 @@
 import { useEffect } from 'react';
 import * as THREE from 'three';
-import { useProjectStore, getContainingGroupId, getAllDescendantPartIds } from '../store/projectStore';
+import { useProjectStore } from '../store/projectStore';
+import { useWorkspaceSceneGraph } from '../interaction/useWorkspaceSceneGraph';
 import { useClipboardStore } from '../store/clipboardStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useSnapStore } from '../store/snapStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
+import { getContainingGroupId } from '../utils/interactionSelection';
 import { Rotation3D } from '../types';
-import { calculateWorldHalfHeightFromDegrees } from '../utils/mathPool';
-import { rotateAroundWorldAxis } from '../utils/rotation';
+import { rotationTool } from '../interaction/tools/rotationTool';
+import { applyCommitInstructions } from '../interaction/tools/toolSolver';
+import { resolveRotateBatchGrounding } from '../utils/interactionMovement';
 
 export function useKeyboardShortcuts() {
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const parts = useProjectStore((s) => s.parts);
   const gridSize = useProjectStore((s) => s.gridSize);
   const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
+  const requestDeleteGroups = useUIStore((s) => s.requestDeleteGroups);
   const duplicateSelectedParts = useProjectStore((s) => s.duplicateSelectedParts);
   const updatePart = useProjectStore((s) => s.updatePart);
   const batchUpdateParts = useProjectStore((s) => s.batchUpdateParts);
@@ -30,6 +34,8 @@ export function useKeyboardShortcuts() {
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
   const groupMembers = useProjectStore((s) => s.groupMembers);
   const groups = useProjectStore((s) => s.groups);
+  // ADR-008: read group descendants from the scene graph adapter.
+  const sceneGraph = useWorkspaceSceneGraph();
   const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const editingGroupId = useSelectionStore((s) => s.editingGroupId);
   const createGroup = useProjectStore((s) => s.createGroup);
@@ -47,7 +53,7 @@ export function useKeyboardShortcuts() {
       // Calculate effective selected parts (directly selected + parts from selected groups)
       const effectivePartIds = new Set(selectedPartIds);
       for (const groupId of selectedGroupIds) {
-        const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
+        const groupPartIds = sceneGraph.descendantPartIds(groupId);
         groupPartIds.forEach((id) => effectivePartIds.add(id));
       }
 
@@ -73,11 +79,11 @@ export function useKeyboardShortcuts() {
         // For single part selection, just rotate in place (around its own center)
         if (selectedParts.length === 1) {
           const part = selectedParts[0];
-          const newRotation = rotateAroundWorldAxis(part.rotation, axis, 90);
+          const input = { part, axis, degrees: 90, space: 'world' as const };
+          const state = rotationTool.begin(input);
+          const { preview } = rotationTool.update(input, state);
 
-          updatePart(part.id, {
-            rotation: newRotation
-          });
+          applyCommitInstructions(rotationTool.commit(state, preview), { updatePart });
           return;
         }
 
@@ -114,7 +120,9 @@ export function useKeyboardShortcuts() {
           const newPosition = center.clone().add(offset);
 
           // 2. Rotate the part's own orientation around world axis
-          const newRotation = rotateAroundWorldAxis(part.rotation, axis, 90);
+          const input = { part, axis, degrees: 90, space: 'world' as const };
+          const state = rotationTool.begin(input);
+          const { preview } = rotationTool.update(input, state);
 
           updates.push({
             id: part.id,
@@ -124,34 +132,30 @@ export function useKeyboardShortcuts() {
                 y: newPosition.y,
                 z: newPosition.z
               },
-              rotation: newRotation
+              rotation: preview.rotation
             }
           });
         }
 
-        // Ground constraint: ensure no part goes below ground after rotation
-        // Find the minimum Y position considering part dimensions and rotation
-        let minY = Infinity;
-        for (let i = 0; i < selectedParts.length; i++) {
-          const part = selectedParts[i];
-          const update = updates[i];
-          const effectiveHalfHeight = calculateWorldHalfHeightFromDegrees(
-            update.changes.rotation,
-            part.length,
-            part.thickness,
-            part.width,
-            part.features
-          );
+        // ADR-006: ground clamp runs through the constraint pipeline. For
+        // the 'rotate' candidate kind, `groundConstraint.apply` lifts every
+        // part uniformly by the deepest dip — same semantics as the legacy
+        // inline loop, now shared with every other transform path.
+        const grounded = resolveRotateBatchGrounding({
+          startingParts: selectedParts,
+          projectParts: parts,
+          groupMembers,
+          updates: updates.map((u) => ({
+            partId: u.id,
+            position: u.changes.position,
+            rotation: u.changes.rotation
+          }))
+        });
 
-          const bottomY = update.changes.position.y - effectiveHalfHeight;
-          minY = Math.min(minY, bottomY);
-        }
-
-        // If any part is below ground, shift all parts up
-        if (minY < 0) {
-          const shiftUp = -minY;
-          for (const update of updates) {
-            update.changes.position.y += shiftUp;
+        for (let i = 0; i < updates.length; i++) {
+          const adjusted = grounded.updates.find((u) => u.partId === updates[i].id);
+          if (adjusted) {
+            updates[i].changes.position = adjusted.position;
           }
         }
 
@@ -235,9 +239,12 @@ export function useKeyboardShortcuts() {
           break;
 
         case 'r':
-          // R = Toggle reference parts for snapping
-          if (hasSelection) {
-            toggleReference(selectedPartIds);
+          // R = Toggle reference parts for snapping. Uses `effectivePartIds`
+          // (which expands selected groups to their descendant parts) so that
+          // clicking a part inside a group — which auto-selects the group,
+          // not the part — still toggles every part in the group on `r`.
+          if (hasSelection && effectivePartIds.size > 0) {
+            toggleReference([...effectivePartIds]);
           }
           break;
 
@@ -281,11 +288,10 @@ export function useKeyboardShortcuts() {
           // Delete selected parts and groups
           if (hasSelection) {
             e.preventDefault();
-            // Delete selected groups first (recursive mode deletes group and all contents)
-            for (const groupId of selectedGroupIds) {
-              deleteGroup(groupId, 'recursive');
+            if (selectedGroupIds.length > 0) {
+              requestDeleteGroups(selectedGroupIds);
             }
-            // Then delete any directly selected parts (that weren't in deleted groups)
+            // Then request delete any directly selected parts (that weren't in deleted groups)
             if (selectedPartIds.length > 0) {
               requestDeleteParts(selectedPartIds);
             }
@@ -365,6 +371,7 @@ export function useKeyboardShortcuts() {
     parts,
     gridSize,
     requestDeleteParts,
+    requestDeleteGroups,
     duplicateSelectedParts,
     updatePart,
     batchUpdateParts,
@@ -380,6 +387,7 @@ export function useKeyboardShortcuts() {
     referencePartIds,
     groupMembers,
     groups,
+    sceneGraph,
     selectedGroupIds,
     editingGroupId,
     createGroup,

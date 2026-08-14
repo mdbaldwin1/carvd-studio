@@ -4,6 +4,7 @@ import { useProjectStore } from '../store/projectStore';
 import { useAssemblyEditingStore } from '../store/assemblyEditingStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useUIStore } from '../store/uiStore';
+import { useCameraStore } from '../store/cameraStore';
 
 // Mock file operations
 vi.mock('../utils/fileOperations', () => ({
@@ -75,7 +76,7 @@ beforeEach(() => {
     assemblies: []
   });
   useAssemblyEditingStore.setState({ isEditingAssembly: false });
-  useSelectionStore.setState({ selectedPartIds: [] });
+  useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: [] });
   useUIStore.setState({ toast: null });
 });
 
@@ -86,8 +87,7 @@ beforeEach(() => {
 describe('useMenuCommands', () => {
   describe('edit commands', () => {
     it('handles undo command', async () => {
-      const undo = vi.fn();
-      useProjectStore.setState({ undo });
+      const undo = vi.spyOn(useProjectStore.temporal.getState(), 'undo').mockImplementation(() => {});
 
       renderHook(() => useMenuCommands());
       await menuCommandHandler('undo');
@@ -96,8 +96,7 @@ describe('useMenuCommands', () => {
     });
 
     it('handles redo command', async () => {
-      const redo = vi.fn();
-      useProjectStore.setState({ redo });
+      const redo = vi.spyOn(useProjectStore.temporal.getState(), 'redo').mockImplementation(() => {});
 
       renderHook(() => useMenuCommands());
       await menuCommandHandler('redo');
@@ -128,25 +127,37 @@ describe('useMenuCommands', () => {
     });
 
     it('handles select-all command', async () => {
-      const selectAllParts = vi.fn();
-      useProjectStore.setState({ selectAllParts });
+      const selectParts = vi.fn();
+      useProjectStore.setState({
+        parts: [
+          {
+            id: 'p1',
+            name: 'Part 1'
+          },
+          {
+            id: 'p2',
+            name: 'Part 2'
+          }
+        ]
+      });
+      useSelectionStore.setState({ selectParts });
 
       renderHook(() => useMenuCommands());
       await menuCommandHandler('select-all');
 
-      expect(selectAllParts).toHaveBeenCalled();
+      expect(selectParts).toHaveBeenCalledWith(['p1', 'p2']);
     });
   });
 
   describe('view commands', () => {
     it('handles reset-camera command', async () => {
-      const resetCamera = vi.fn();
-      useProjectStore.setState({ resetCamera });
+      const requestCenterCameraAtOrigin = vi.fn();
+      useCameraStore.setState({ requestCenterCameraAtOrigin });
 
       renderHook(() => useMenuCommands());
       await menuCommandHandler('reset-camera');
 
-      expect(resetCamera).toHaveBeenCalled();
+      expect(requestCenterCameraAtOrigin).toHaveBeenCalled();
     });
   });
 

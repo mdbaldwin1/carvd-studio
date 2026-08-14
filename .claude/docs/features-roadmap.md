@@ -137,6 +137,6 @@ None currently.
 ## Known Limitations (By Design)
 
 1. **Boxes only** - No curves, all parts are rectangular
-2. **90° rotation** - Axis-aligned only
+2. **Arbitrary rotation** - Supported; angled drag/snap UX is actively being refined
 3. **Guillotine cuts** - Table saw workflow
 4. **Offline-only** - No cloud, no accounts

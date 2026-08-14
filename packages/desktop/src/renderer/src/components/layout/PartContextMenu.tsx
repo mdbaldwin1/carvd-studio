@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useProjectStore, getContainingGroupId, getAllDescendantPartIds } from '../../store/projectStore';
+import { useProjectStore } from '../../store/projectStore';
 import { useClipboardStore } from '../../store/clipboardStore';
 import { useLicenseStore } from '../../store/licenseStore';
 import { useSelectionStore } from '../../store/selectionStore';
@@ -8,6 +8,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { usePartCutsEditingStore } from '../../store/partCutsEditingStore';
 import { getFeatureLimits } from '../../utils/featureLimits';
+import { getContainingGroupId, resolveExplicitSelectedPartIds } from '../../utils/interactionSelection';
 import { MenuPanel, MenuItemButton, MenuSeparator, MenuLabel, MenuSub } from '../ui/context-menu';
 
 interface PartContextMenuProps {
@@ -21,7 +22,8 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const parts = useProjectStore((s) => s.parts);
   const copySelectedParts = useClipboardStore((s) => s.copySelectedParts);
-  const deleteSelectedParts = useProjectStore((s) => s.deleteSelectedParts);
+  const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
+  const requestDeleteGroups = useUIStore((s) => s.requestDeleteGroups);
   const resetSelectedPartsToStock = useProjectStore((s) => s.resetSelectedPartsToStock);
   const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
@@ -33,7 +35,6 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const editingGroupId = useSelectionStore((s) => s.editingGroupId);
   const createGroup = useProjectStore((s) => s.createGroup);
   const removeFromGroup = useProjectStore((s) => s.removeFromGroup);
-  const deleteGroup = useProjectStore((s) => s.deleteGroup);
   const addToGroup = useProjectStore((s) => s.addToGroup);
   const mergeGroups = useProjectStore((s) => s.mergeGroups);
   const openSaveAssemblyModal = useUIStore((s) => s.openSaveAssemblyModal);
@@ -47,12 +48,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
 
   // Calculate effective selected part IDs (includes parts from selected groups)
   const effectiveSelectedPartIds = useMemo(() => {
-    const partIds = new Set(selectedPartIds);
-    for (const groupId of selectedGroupIds) {
-      const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
-      groupPartIds.forEach((id) => partIds.add(id));
-    }
-    return [...partIds];
+    return resolveExplicitSelectedPartIds({ selectedPartIds, selectedGroupIds }, groupMembers);
   }, [selectedPartIds, selectedGroupIds, groupMembers]);
 
   const hasGroupSelection = selectedGroupIds.length > 0;
@@ -102,13 +98,12 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   };
 
   const handleDelete = () => {
-    // Delete selected groups first (recursive mode deletes group and all contents)
-    for (const groupId of selectedGroupIds) {
-      deleteGroup(groupId, 'recursive');
+    if (selectedGroupIds.length > 0) {
+      requestDeleteGroups(selectedGroupIds);
     }
-    // Then delete any directly selected parts (that weren't in deleted groups)
+    // Then request delete any directly selected parts (that weren't in deleted groups)
     if (selectedPartIds.length > 0) {
-      deleteSelectedParts();
+      requestDeleteParts(selectedPartIds);
     }
     onClose();
   };
@@ -150,7 +145,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const handleUngroup = () => {
     if (groupToUngroup) {
       // If we're in edit mode, pass the parent group so children move to parent instead of top-level
-      deleteGroup(groupToUngroup, 'ungroup', isInEditMode ? editingGroupId : null);
+      useProjectStore.getState().deleteGroup(groupToUngroup, 'ungroup', isInEditMode ? editingGroupId : null);
     }
     onClose();
   };

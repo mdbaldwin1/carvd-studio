@@ -1,10 +1,11 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { useProjectStore, getAllDescendantPartIds } from '../../store/projectStore';
+import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { getPartBounds } from '../../utils/snapToPartsUtil';
+import { resolveExplicitSelectedPartIds } from '../../utils/interactionSelection';
 import { isOrbitControls } from './workspaceUtils';
 
 // Component that handles camera centering and view vector tracking
@@ -100,14 +101,7 @@ export function CameraController() {
 
   // Handle center on selection
   useEffect(() => {
-    // Get all part IDs to center on (directly selected parts + parts within selected groups)
-    const allPartIds = new Set(selectedPartIds);
-    for (const groupId of selectedGroupIds) {
-      const descendantPartIds = getAllDescendantPartIds(groupId, groupMembers);
-      for (const partId of descendantPartIds) {
-        allPartIds.add(partId);
-      }
-    }
+    const allPartIds = new Set(resolveExplicitSelectedPartIds({ selectedPartIds, selectedGroupIds }, groupMembers));
 
     if (!centerCameraRequested || allPartIds.size === 0) return;
 

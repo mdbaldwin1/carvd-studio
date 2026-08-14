@@ -3,7 +3,9 @@ import { Html } from '@react-three/drei';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useCameraStore } from '../../store/cameraStore';
+import { useSelectionStore } from '../../store/selectionStore';
 import { LiveDimensions, ROTATION_COLORS, ROTATION_HANDLE_SIZE, ROTATION_RING_THICKNESS } from './partTypes';
+import type { HitTargetDescriptor } from '../../interaction/hitTest';
 import {
   ROTATION_HIT_GEOMETRY,
   ROTATION_HIT_MATERIAL,
@@ -12,9 +14,12 @@ import {
   ROTATION_RING_ARC_START,
   ROTATION_RING_ARC_LENGTH
 } from './partGeometry';
+import { chooseBestRotationAxisCandidate } from './rotationAxisSelection';
+import { bindWindowPointerSession, resetWorkspaceCursor, setWorkspaceCursor } from './workspaceUtils';
 
 export const RotationHandle = memo(
   function RotationHandle({
+    partId,
     liveDims,
     axis,
     side,
@@ -23,6 +28,7 @@ export const RotationHandle = memo(
     onRotateStart,
     onRotateEnd
   }: {
+    partId: string | null;
     liveDims: LiveDimensions;
     axis: 'x' | 'y' | 'z';
     side: 1 | -1; // Which side of the axis (+1 or -1)
@@ -33,6 +39,7 @@ export const RotationHandle = memo(
   }) {
     const { gl, size, camera } = useThree();
     const displayMode = useCameraStore((s) => s.displayMode);
+    const setDragIntent = useSelectionStore((s) => s.setDragIntent);
     const groupRef = useRef<THREE.Group>(null);
     const [ringHovered, setRingHovered] = useState(false);
     const [grabHovered, setGrabHovered] = useState(false);
@@ -48,6 +55,7 @@ export const RotationHandle = memo(
     const axisLockedRef = useRef(false);
     const axisCandidatesRef = useRef<['x' | 'y' | 'z', 'x' | 'y' | 'z']>(['x', 'y']);
     const dragStartClientRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const dragStartWorldPointRef = useRef<THREE.Vector3 | null>(null);
     const dragStartVectorRef = useRef<THREE.Vector3 | null>(null);
     const rotationCenterWorldRef = useRef(new THREE.Vector3());
     const rotationAxisWorldRef = useRef(new THREE.Vector3(0, 1, 0));
@@ -160,6 +168,10 @@ export const RotationHandle = memo(
       return Math.atan2(clientY - center.y, clientX - center.x);
     };
 
+    const stopWorkspaceSelection = (e: ThreeEvent<MouseEvent | PointerEvent>) => {
+      e.stopPropagation();
+    };
+
     const getProjectedScreenPoint = useCallback(
       (world: THREE.Vector3): { x: number; y: number } => {
         _projected.current.copy(world).project(camera);
@@ -201,23 +213,31 @@ export const RotationHandle = memo(
         const dragDirY = dy / mag;
 
         const [candidateA, candidateB] = axisCandidatesRef.current;
+        const viewDirToCenter = _tmpVecB.current.copy(rotationCenterWorldRef.current).sub(camera.position).normalize();
         const evaluateCandidate = (candidate: 'x' | 'y' | 'z') => {
           setRotationAxisFromLocalAxis(candidate);
-          const startWorldPoint = getWorldPointOnRotationPlane(
-            dragStartClientRef.current.x,
-            dragStartClientRef.current.y
-          );
-          if (!startWorldPoint) return null;
-
-          const startVector = _tmpVecB.current.copy(startWorldPoint).sub(rotationCenterWorldRef.current);
+          // Prefer the actual pointer-down world point projected onto the candidate rotation plane.
+          const planeNormal = rotationAxisWorldRef.current;
+          let startVector: THREE.Vector3;
+          if (dragStartWorldPointRef.current) {
+            const offset = _tmpVecB.current.copy(dragStartWorldPointRef.current).sub(rotationCenterWorldRef.current);
+            const normalComp = offset.dot(planeNormal);
+            startVector = offset.addScaledVector(planeNormal, -normalComp);
+          } else {
+            const startWorldPoint = getWorldPointOnRotationPlane(
+              dragStartClientRef.current.x,
+              dragStartClientRef.current.y
+            );
+            if (!startWorldPoint) return null;
+            startVector = _tmpVecB.current.copy(startWorldPoint).sub(rotationCenterWorldRef.current);
+          }
           if (startVector.lengthSq() < 1e-8) return null;
           startVector.normalize();
 
           const tangentWorld = _tmpVecC.current.copy(rotationAxisWorldRef.current).cross(startVector).normalize();
-          const p0 = getProjectedScreenPoint(startWorldPoint);
-          const p1 = getProjectedScreenPoint(
-            _tmpVecA.current.copy(startWorldPoint).addScaledVector(tangentWorld, 0.25)
-          );
+          const p0World = _tmpVecA.current.copy(rotationCenterWorldRef.current).add(startVector);
+          const p0 = getProjectedScreenPoint(p0World);
+          const p1 = getProjectedScreenPoint(_tmpVecA.current.copy(p0World).addScaledVector(tangentWorld, 0.25));
           const tx = p1.x - p0.x;
           const ty = p1.y - p0.y;
           const tmag = Math.hypot(tx, ty);
@@ -226,22 +246,21 @@ export const RotationHandle = memo(
           const tangentDirX = tx / tmag;
           const tangentDirY = ty / tmag;
           const dot = tangentDirX * dragDirX + tangentDirY * dragDirY;
+          const tangentStrength = THREE.MathUtils.clamp(tmag / 24, 0, 1);
+          const axisPerpendicularity = 1 - Math.abs(rotationAxisWorldRef.current.dot(viewDirToCenter));
+          const alignment = Math.abs(dot);
           return {
             candidate,
-            alignment: Math.abs(dot),
+            alignment,
+            tangentStrength,
+            axisPerpendicularity,
             startVector: startVector.clone()
           };
         };
 
         const resultA = evaluateCandidate(candidateA);
         const resultB = evaluateCandidate(candidateB);
-        const best = !resultA
-          ? resultB
-          : !resultB
-            ? resultA
-            : resultA.alignment >= resultB.alignment
-              ? resultA
-              : resultB;
+        const best = chooseBestRotationAxisCandidate(resultA, resultB);
         if (!best) return false;
 
         setRotationAxisFromLocalAxis(best.candidate);
@@ -250,15 +269,12 @@ export const RotationHandle = memo(
         axisLockedRef.current = true;
         return true;
       },
-      [getProjectedScreenPoint, getWorldPointOnRotationPlane, setRotationAxisFromLocalAxis]
+      [camera.position, getProjectedScreenPoint, getWorldPointOnRotationPlane, setRotationAxisFromLocalAxis]
     );
 
     const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
       if (e.nativeEvent.button !== 0) return;
       e.stopPropagation();
-      if (typeof e.nativeEvent.stopImmediatePropagation === 'function') {
-        e.nativeEvent.stopImmediatePropagation();
-      }
       if (typeof e.target.setPointerCapture === 'function') {
         e.target.setPointerCapture(e.pointerId);
       }
@@ -278,6 +294,7 @@ export const RotationHandle = memo(
 
       activePointerIdRef.current = e.pointerId;
       dragStartClientRef.current = { x: e.clientX, y: e.clientY };
+      dragStartWorldPointRef.current = e.point ? e.point.clone() : null;
       const center = getProjectedScreenCenter(e.clientX, e.clientY);
       dragCenterRef.current = center;
       dragStartAngleRef.current = getScreenAngle(e.clientX, e.clientY, center);
@@ -288,7 +305,7 @@ export const RotationHandle = memo(
       setDisplayAngle(0);
       setIsDragging(true);
       onRotateStart();
-      document.body.style.cursor = 'grabbing';
+      setWorkspaceCursor('grabbing');
     };
 
     const handleWindowPointerMove = useCallback(
@@ -343,22 +360,34 @@ export const RotationHandle = memo(
       [camera.position, getWorldPointOnRotationPlane, lockAxisFromInitialDrag, onRotateDelta]
     );
 
+    const clearRotationDragState = useCallback(
+      ({ cursor, updateDraggingState = true }: { cursor: 'auto' | 'pointer'; updateDraggingState?: boolean }) => {
+        draggingRef.current = false;
+        axisLockedRef.current = false;
+        dragCenterRef.current = null;
+        dragStartVectorRef.current = null;
+        dragStartWorldPointRef.current = null;
+        activePointerIdRef.current = null;
+        if (updateDraggingState) {
+          setIsDragging(false);
+        }
+        onRotateEnd();
+        setWorkspaceCursor(cursor);
+      },
+      [onRotateEnd]
+    );
+
     const finishDrag = useCallback(
       (pointerId?: number) => {
         if (!draggingRef.current) return;
         if (activePointerIdRef.current !== null && pointerId !== undefined && pointerId !== activePointerIdRef.current)
           return;
 
-        draggingRef.current = false;
-        axisLockedRef.current = false;
-        dragCenterRef.current = null;
-        dragStartVectorRef.current = null;
-        activePointerIdRef.current = null;
-        setIsDragging(false);
-        onRotateEnd();
-        document.body.style.cursor = ringHovered || grabHovered ? 'pointer' : 'auto';
+        clearRotationDragState({
+          cursor: ringHovered || grabHovered ? 'pointer' : 'auto'
+        });
       },
-      [grabHovered, onRotateEnd, ringHovered]
+      [clearRotationDragState, grabHovered, ringHovered]
     );
 
     useEffect(() => {
@@ -367,47 +396,48 @@ export const RotationHandle = memo(
       const handleWindowPointerUp = (e: PointerEvent) => {
         finishDrag(e.pointerId);
       };
-      const handleWindowPointerCancel = (e: PointerEvent) => {
-        finishDrag(e.pointerId);
-      };
 
-      window.addEventListener('pointermove', handleWindowPointerMove, { passive: false });
-      window.addEventListener('pointerup', handleWindowPointerUp, { passive: true });
-      window.addEventListener('pointercancel', handleWindowPointerCancel, { passive: true });
+      const unbindPointerSession = bindWindowPointerSession(window, {
+        onMove: handleWindowPointerMove,
+        onEnd: (event) => {
+          if (event && typeof event === 'object' && 'pointerId' in event) {
+            handleWindowPointerUp(event as PointerEvent);
+            return;
+          }
+          finishDrag();
+        },
+        moveOptions: { passive: false },
+        endOptions: { passive: true }
+      });
 
       return () => {
-        window.removeEventListener('pointermove', handleWindowPointerMove);
-        window.removeEventListener('pointerup', handleWindowPointerUp);
-        window.removeEventListener('pointercancel', handleWindowPointerCancel);
+        unbindPointerSession();
       };
     }, [finishDrag, handleWindowPointerMove, isDragging]);
 
     useEffect(() => {
       return () => {
         if (draggingRef.current) {
-          draggingRef.current = false;
-          axisLockedRef.current = false;
-          dragCenterRef.current = null;
-          dragStartVectorRef.current = null;
-          activePointerIdRef.current = null;
-          onRotateEnd();
-          document.body.style.cursor = 'auto';
+          clearRotationDragState({
+            cursor: 'auto',
+            updateDraggingState: false
+          });
         }
       };
-    }, [onRotateEnd]);
+    }, [clearRotationDragState]);
 
     const handleRingPointerOver = (e: ThreeEvent<PointerEvent>) => {
       e.stopPropagation();
       setRingHovered(true);
       if (!isDragging && !grabHovered) {
-        document.body.style.cursor = 'pointer';
+        setWorkspaceCursor('pointer');
       }
     };
 
     const handleRingPointerOut = () => {
       setRingHovered(false);
       if (!isDragging && !grabHovered) {
-        document.body.style.cursor = 'auto';
+        resetWorkspaceCursor();
       }
     };
 
@@ -415,15 +445,25 @@ export const RotationHandle = memo(
       e.stopPropagation();
       setGrabHovered(true);
       if (!isDragging) {
-        document.body.style.cursor = 'pointer';
+        setWorkspaceCursor('pointer');
       }
     };
 
     const handleGrabPointerOut = () => {
       setGrabHovered(false);
       if (!isDragging && !ringHovered) {
-        document.body.style.cursor = 'auto';
+        resetWorkspaceCursor();
       }
+    };
+
+    // ADR-002: descriptor for the hit-test service. Same shape across the
+    // four meshes that own this handle's pointer events.
+    const hitDescriptor: HitTargetDescriptor = {
+      kind: 'rotation-handle',
+      nodeId: partId ?? `rotation-${axis}-${side}`,
+      partId,
+      axis,
+      side
     };
 
     return (
@@ -434,10 +474,22 @@ export const RotationHandle = memo(
             geometry={ROTATION_HIT_GEOMETRY}
             material={ROTATION_HIT_MATERIAL}
             rotation={[0, 0, glyphRollZ]}
+            userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}
+            onPointerDown={(e) => {
+              if (e.nativeEvent.button !== 0) return;
+              e.stopPropagation();
+              if (!partId) return;
+              setDragIntent({
+                partId,
+                screenX: e.nativeEvent.clientX,
+                screenY: e.nativeEvent.clientY,
+                worldPoint: null
+              });
+            }}
             onPointerOver={handleRingPointerOver}
             onPointerOut={handleRingPointerOut}
             onClick={(e) => {
-              e.stopPropagation();
+              stopWorkspaceSelection(e);
               onRotate(axis);
             }}
           />
@@ -470,14 +522,24 @@ export const RotationHandle = memo(
 
         <group quaternion={faceQuaternion}>
           {/* Connector from ring to external grab handle */}
-          <line geometry={connectorGeometry}>
+          <line
+            geometry={connectorGeometry}
+            userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}
+            onPointerDown={stopWorkspaceSelection}
+            onClick={stopWorkspaceSelection}
+          >
             <lineBasicMaterial color={grabColor} transparent opacity={0.85} />
           </line>
 
           {/* External grab handle for drag rotation */}
           <group position={grabPosition}>
             <mesh
-              onPointerDown={handlePointerDown}
+              userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}
+              onPointerDown={(e) => {
+                stopWorkspaceSelection(e);
+                handlePointerDown(e);
+              }}
+              onClick={stopWorkspaceSelection}
               onPointerOver={handleGrabPointerOver}
               onPointerOut={handleGrabPointerOut}
               renderOrder={1000}
@@ -486,7 +548,12 @@ export const RotationHandle = memo(
               <meshBasicMaterial transparent opacity={0.001} depthTest={false} depthWrite={false} />
             </mesh>
             <mesh
-              onPointerDown={handlePointerDown}
+              userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}
+              onPointerDown={(e) => {
+                stopWorkspaceSelection(e);
+                handlePointerDown(e);
+              }}
+              onClick={stopWorkspaceSelection}
               onPointerOver={handleGrabPointerOver}
               onPointerOut={handleGrabPointerOut}
               renderOrder={1001}

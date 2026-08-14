@@ -98,4 +98,88 @@ describe('SnappingSection', () => {
     expect(screen.getByText('Normal')).toBeInTheDocument();
     expect(screen.getByText('Loose (easier)')).toBeInTheDocument();
   });
+
+  it('renders advanced preset control with precision default', () => {
+    render(<SnappingSection formData={defaultFormData} onSettingChange={vi.fn()} />);
+    const select = getSettingControl('Advanced Snap Preset') as HTMLInputElement;
+    expect(select.value).toBe('precision');
+  });
+
+  it('calls onSettingChange when advanced preset changes', () => {
+    const onChange = vi.fn();
+    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
+    fireEvent.change(getSettingControl('Advanced Snap Preset'), { target: { value: 'layout' } });
+    expect(onChange).toHaveBeenCalledWith('advancedSnapPreset', 'layout');
+    expect(onChange).toHaveBeenCalledWith('enableGoldenRatioAnchors', true);
+  });
+
+  it('calls onSettingChange when surface anchors toggled', () => {
+    const onChange = vi.fn();
+    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
+    fireEvent.click(getSettingControl('Surface Anchors'));
+    expect(onChange).toHaveBeenCalledWith('enableSurfaceAnchors', false);
+  });
+
+  it('calls onSettingChange when fractional anchors toggled', () => {
+    const onChange = vi.fn();
+    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
+    fireEvent.click(getSettingControl('Fractional Face Anchors'));
+    expect(onChange).toHaveBeenCalledWith('enableFractionalAnchors', false);
+  });
+
+  it('calls onSettingChange when candidate indicators toggled', () => {
+    const onChange = vi.fn();
+    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
+    fireEvent.click(getSettingControl('Show Candidate Indicators'));
+    expect(onChange).toHaveBeenCalledWith('showSnapCandidates', true);
+  });
+
+  it('calls onSettingChange when golden ratio anchors toggled', () => {
+    const onChange = vi.fn();
+    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
+    fireEvent.click(getSettingControl('Golden Ratio Anchors'));
+    expect(onChange).toHaveBeenCalledWith('enableGoldenRatioAnchors', true);
+  });
+
+  it('calls onSettingChange when feature anchors toggled', () => {
+    const onChange = vi.fn();
+    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
+    fireEvent.click(getSettingControl('Feature Anchors'));
+    expect(onChange).toHaveBeenCalledWith('enableFeatureAnchors', false);
+  });
+
+  it('calls onSettingChange when layout snaps toggled', () => {
+    const onChange = vi.fn();
+    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
+    fireEvent.click(getSettingControl('Layout Snaps'));
+    expect(onChange).toHaveBeenCalledWith('enableLayoutSnaps', false);
+  });
+
+  it('calls onSettingChange when equal spacing snaps toggled', () => {
+    const onChange = vi.fn();
+    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
+    fireEvent.click(getSettingControl('Equal Spacing Snaps'));
+    expect(onChange).toHaveBeenCalledWith('enableEqualSpacingSnap', false);
+  });
+
+  it('calls onSettingChange when distribution snaps toggled', () => {
+    const onChange = vi.fn();
+    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
+    fireEvent.click(getSettingControl('Distribution Snaps'));
+    expect(onChange).toHaveBeenCalledWith('enableDistributionSnap', false);
+  });
+
+  it('calls onSettingChange when pattern snaps toggled', () => {
+    const onChange = vi.fn();
+    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
+    fireEvent.click(getSettingControl('Pattern Snaps'));
+    expect(onChange).toHaveBeenCalledWith('enablePatternSnap', false);
+  });
+
+  it('calls onSettingChange when axis edge/center snaps toggled', () => {
+    const onChange = vi.fn();
+    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
+    fireEvent.click(getSettingControl('Axis Edge/Center Snaps'));
+    expect(onChange).toHaveBeenCalledWith('enableAxisLegacySnaps', false);
+  });
 });

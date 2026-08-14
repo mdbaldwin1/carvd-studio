@@ -2,11 +2,13 @@ import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { Clipboard } from '../types';
 import { canAddPart, getBlockedMessage } from '../utils/featureLimits';
-import { useProjectStore, generateCopyName, getAllDescendantPartIds } from './projectStore';
+import { useProjectStore, generateCopyName } from './projectStore';
 import { useLicenseStore } from './licenseStore';
 import { useSelectionStore } from './selectionStore';
 import { useUIStore } from './uiStore';
 import { clonePartFeatures, normalizePart } from '../utils/partFeatures';
+import { resolveSelectedGroupIdsWithDescendants } from '../utils/interactionSelection';
+import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
 
 interface ClipboardStoreState {
   clipboard: Clipboard;
@@ -25,27 +27,21 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
     const { parts, groups, groupMembers } = useProjectStore.getState();
     const { selectedPartIds, selectedGroupIds } = useSelectionStore.getState();
 
+    // ADR-008: build a one-shot scene graph from current project state. This
+    // is the "non-React" pattern for sceneGraph use — Zustand actions don't
+    // have access to React hooks, so we construct the adapter inline. The
+    // build is cheap and only happens on copy (an infrequent user action).
+    const sceneGraph = buildWorkspaceSceneGraph({ parts, groups, groupMembers });
+
     // Collect all parts to copy (directly selected + parts from selected groups)
     const partIdsToCopy = new Set(selectedPartIds);
 
-    // Helper to collect all descendant groups recursively
-    const collectDescendantGroupIds = (groupId: string, collected: Set<string>) => {
-      collected.add(groupId);
-      const childGroups = groupMembers.filter((gm) => gm.groupId === groupId && gm.memberType === 'group');
-      for (const child of childGroups) {
-        collectDescendantGroupIds(child.memberId, collected);
-      }
-    };
-
     // Collect all groups to copy (selected groups + their descendants)
-    const groupIdsToCopy = new Set<string>();
-    for (const groupId of selectedGroupIds) {
-      collectDescendantGroupIds(groupId, groupIdsToCopy);
-    }
+    const groupIdsToCopy = new Set(resolveSelectedGroupIdsWithDescendants(selectedGroupIds, groupMembers));
 
     // Add all parts from copied groups
     for (const groupId of groupIdsToCopy) {
-      const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
+      const groupPartIds = sceneGraph.descendantPartIds(groupId);
       groupPartIds.forEach((id) => partIdsToCopy.add(id));
     }
 

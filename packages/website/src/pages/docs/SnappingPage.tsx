@@ -71,8 +71,25 @@ export default function SnappingPage() {
             <div>
               <p className="font-bold mb-xs">Center Snapping</p>
               <p className="text-muted">
-                Parts snap to the center of other parts for easy alignment.
-                Green guide lines show alignment points.
+                Parts can snap center-to-center in one axis or two axes while
+                staying face-latched, so you can slide across a surface and
+                still get deterministic alignment.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Surface Anchors</p>
+              <p className="text-muted">
+                Surface anchor snaps include centerline, midline, and
+                quarterline alignment on compatible faces. This is ideal for
+                quickly finding centered or 25%/75% placements on larger panels.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Fractional Face Anchors</p>
+              <p className="text-muted">
+                Fractional anchors evaluate 0/25/50/75/100 face positions and
+                support both one-axis and two-axis combinations for precise
+                layout work.
               </p>
             </div>
             <div>
@@ -111,6 +128,15 @@ export default function SnappingPage() {
                 For rotated parts, drag movement now follows the most
                 camera-facing local plane, which keeps movement and snapping
                 more predictable from different viewing angles.
+              </p>
+            </div>
+            <div>
+              <p className="font-bold mb-xs">Snap Presets</p>
+              <p className="text-muted">
+                App Settings include snapping presets:
+                <strong> Simple</strong>, <strong>Precision</strong>, and
+                <strong> Layout</strong>, plus toggles for surface anchors,
+                fractional anchors, and candidate indicators.
               </p>
             </div>
             <div>

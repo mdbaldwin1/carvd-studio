@@ -288,12 +288,12 @@ describe('useKeyboardShortcuts', () => {
 
     it('deletes selected groups recursively', () => {
       useSelectionStore.setState({ selectedGroupIds: ['g1'] });
-      const deleteGroup = vi.fn();
-      useProjectStore.setState({ deleteGroup });
+      const requestDeleteGroups = vi.fn();
+      useUIStore.setState({ requestDeleteGroups });
       renderHook(() => useKeyboardShortcuts());
 
       fireKey('Backspace');
-      expect(deleteGroup).toHaveBeenCalledWith('g1', 'recursive');
+      expect(requestDeleteGroups).toHaveBeenCalledWith(['g1']);
     });
 
     it('does nothing when nothing is selected', () => {

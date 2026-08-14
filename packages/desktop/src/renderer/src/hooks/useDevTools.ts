@@ -6,7 +6,14 @@
 import { useEffect } from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useSelectionStore } from '../store/selectionStore';
+import { useUIStore } from '../store/uiStore';
+import { useInteractionStore } from '../store/interactionStore';
+import { useSnapStore } from '../store/snapStore';
+import { useCameraStore } from '../store/cameraStore';
+import { useLicenseStore } from '../store/licenseStore';
+import { useAssemblyEditingStore } from '../store/assemblyEditingStore';
 import { generateSeedProject, generateStockLibraryItems } from '../utils/seedData';
+import { installDragDebugTools } from '../utils/dragDebug';
 
 // Colors for randomized test parts
 const TEST_PART_COLORS = ['#c4a574', '#f5deb3', '#8B4513', '#DEB887', '#D2691E', '#CD853F'];
@@ -22,6 +29,11 @@ declare global {
       createParts: (count: number) => void;
       measureUndoSnapshot: () => void;
       perfBaseline: () => void;
+      enableDragDebug: () => void;
+      disableDragDebug: () => void;
+      clearDragDebugLogs: () => void;
+      getDragDebugLogs: () => unknown[];
+      debugInteraction: () => void;
     };
   }
 }
@@ -31,8 +43,22 @@ export function useDevTools() {
   const newProject = useProjectStore((s) => s.newProject);
 
   useEffect(() => {
-    // Only expose in development
-    if (import.meta.env.DEV) {
+    let shouldExposeTools = false;
+
+    const exposeTools = async () => {
+      shouldExposeTools = import.meta.env.DEV || (await (window.electronAPI.isTestMode?.() ?? Promise.resolve(false)));
+      if (!shouldExposeTools) return;
+
+      installDragDebugTools();
+      // Expose stores for console-driven introspection and external automation.
+      (window as unknown as Record<string, unknown>).useProjectStore = useProjectStore;
+      (window as unknown as Record<string, unknown>).useSelectionStore = useSelectionStore;
+      (window as unknown as Record<string, unknown>).useUIStore = useUIStore;
+      (window as unknown as Record<string, unknown>).useInteractionStore = useInteractionStore;
+      (window as unknown as Record<string, unknown>).useSnapStore = useSnapStore;
+      (window as unknown as Record<string, unknown>).useCameraStore = useCameraStore;
+      (window as unknown as Record<string, unknown>).useLicenseStore = useLicenseStore;
+      (window as unknown as Record<string, unknown>).useAssemblyEditingStore = useAssemblyEditingStore;
       window.carvdDev = {
         /**
          * Load the seed project (Simple Writing Desk)
@@ -215,6 +241,84 @@ export function useDevTools() {
           console.log('   (logged every 5s by PerfMonitor)');
 
           console.log('\n=============================');
+        },
+
+        /**
+         * Enable deep drag/snap debug logging
+         * Call from console: carvdDev.enableDragDebug()
+         */
+        enableDragDebug: () => {
+          window.enableDragDebug?.();
+        },
+
+        /**
+         * Disable deep drag/snap debug logging
+         * Call from console: carvdDev.disableDragDebug()
+         */
+        disableDragDebug: () => {
+          window.disableDragDebug?.();
+        },
+
+        /**
+         * Clear drag/snap debug log buffer
+         * Call from console: carvdDev.clearDragDebugLogs()
+         */
+        clearDragDebugLogs: () => {
+          window.clearDragDebugLogs?.();
+        },
+
+        /**
+         * Get drag/snap debug logs as JSON-serializable array
+         * Call from console: carvdDev.getDragDebugLogs()
+         */
+        getDragDebugLogs: () => {
+          return window.dumpDragDebugLogs?.() ?? [];
+        },
+
+        /**
+         * Dump interaction-related state — run when right-click / selection / context menu
+         * is misbehaving. Prints stores + module-level globals + canvas listener health.
+         * Call from console: carvdDev.debugInteraction()
+         */
+        debugInteraction: () => {
+          const selection = useSelectionStore.getState();
+          const ui = useUIStore.getState();
+          const interaction = useInteractionStore.getState();
+          const snap = useSnapStore.getState();
+          const project = useProjectStore.getState();
+          const canvas = document.querySelector('canvas');
+
+          console.group('=== Interaction State Snapshot ===');
+          console.log('selection', {
+            selectedPartIds: selection.selectedPartIds,
+            selectedGroupIds: selection.selectedGroupIds,
+            hoveredPartId: selection.hoveredPartId,
+            editingGroupId: selection.editingGroupId,
+            draggingPartId: selection.draggingPartId,
+            dragIntent: selection.dragIntent,
+            activeDragDelta: selection.activeDragDelta
+          });
+          console.log('ui', {
+            contextMenu: ui.contextMenu,
+            selectedSidebarStockId: ui.selectedSidebarStockId
+          });
+          console.log('interaction', { activeSession: interaction.activeSession });
+          console.log('snap', {
+            referencePartIds: snap.referencePartIds,
+            activeSnapLines: snap.activeSnapLines.length,
+            activeReferenceDistances: snap.activeReferenceDistances.length,
+            snapToPartsEnabled: snap.snapToPartsEnabled
+          });
+          console.log('project', {
+            partCount: project.parts.length,
+            snapGuideCount: project.snapGuides.length
+          });
+          console.log('canvas', canvas ? { exists: true, tagName: canvas.tagName } : { exists: false });
+          console.log(
+            '__selectionDebugLogs (last 20)',
+            (window as unknown as { __selectionDebugLogs?: unknown[] }).__selectionDebugLogs?.slice(-20)
+          );
+          console.groupEnd();
         }
       };
 
@@ -226,11 +330,24 @@ export function useDevTools() {
       console.log('   carvdDev.createParts(100)        - Create N test parts');
       console.log('   carvdDev.measureUndoSnapshot()   - Measure undo snapshot sizes');
       console.log('   carvdDev.perfBaseline()          - Print performance baseline');
-    }
+      console.log('   carvdDev.enableDragDebug()       - Enable drag/snap deep logging');
+      console.log('   carvdDev.disableDragDebug()      - Disable drag/snap deep logging');
+      console.log('   carvdDev.clearDragDebugLogs()    - Clear drag/snap debug logs');
+      console.log('   carvdDev.getDragDebugLogs()      - Get drag/snap debug logs');
+      console.log('   carvdDev.debugInteraction()      - Dump interaction state when something is broken');
+    };
+
+    void exposeTools();
 
     return () => {
-      if (import.meta.env.DEV) {
+      if (shouldExposeTools) {
         delete window.carvdDev;
+        delete (window as unknown as Record<string, unknown>).useProjectStore;
+        delete (window as unknown as Record<string, unknown>).useSelectionStore;
+        delete (window as unknown as Record<string, unknown>).useUIStore;
+        delete (window as unknown as Record<string, unknown>).useInteractionStore;
+        delete (window as unknown as Record<string, unknown>).useSnapStore;
+        delete (window as unknown as Record<string, unknown>).useCameraStore;
       }
     };
   }, [loadProject, newProject]);
