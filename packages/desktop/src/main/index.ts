@@ -1156,7 +1156,7 @@ ipcMain.handle('set-window-title', (event, title: string) => {
 // Update title bar overlay colors (Windows/Linux only)
 ipcMain.handle('set-title-bar-overlay', (event, options: { color: string; symbolColor: string }) => {
   const win = BrowserWindow.fromWebContents(event.sender);
-  if (win && process.platform !== 'darwin') {
+  if (win && process.platform !== 'darwin' && !isTestMode) {
     win.setTitleBarOverlay({
       color: options.color,
       symbolColor: options.symbolColor,
