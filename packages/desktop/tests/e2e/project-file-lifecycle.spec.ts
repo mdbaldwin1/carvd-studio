@@ -108,7 +108,9 @@ test.describe('project file lifecycle', () => {
     await window.getByRole('tab', { name: 'Favorites' }).click();
     await expect(window.getByText('favorite-project')).toBeVisible();
 
-    await window.getByLabel('Remove favorite-project from favorites').click();
+    const removeFavoriteButton = window.getByLabel('Remove favorite-project from favorites');
+    await expect(removeFavoriteButton).toBeVisible();
+    await removeFavoriteButton.evaluate((button) => (button as HTMLButtonElement).click());
     await expect
       .poll(async () => window.evaluate(() => window.electronAPI.getFavoriteProjects()))
       .not.toContain(projectPath);
