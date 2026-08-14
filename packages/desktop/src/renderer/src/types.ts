@@ -544,7 +544,12 @@ export interface CustomShoppingItem {
 // ============================================================
 
 // Current file format version - increment when making breaking changes
-export const CARVD_FILE_VERSION = 1;
+// Version 2 introduces part features (custom cuts). Files are written at the
+// lowest version that can represent them so plain projects stay openable in
+// older builds, while featured projects make old builds warn instead of
+// silently showing uncut boxes.
+export const CARVD_FILE_VERSION = 2;
+export const CARVD_FILE_VERSION_BASE = 1;
 
 // The .carvd file format - plain JSON structure
 export interface CarvdFile {

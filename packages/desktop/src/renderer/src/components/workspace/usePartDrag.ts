@@ -21,7 +21,7 @@ import {
   pauseOrbitControls,
   resumeOrbitControls
 } from './workspaceUtils';
-import { calculateWorldHalfHeight } from '../../utils/mathPool';
+import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 import { createGeometryCache } from '../../interaction/geometry/cache';
 import {
   createMoveCommitPreview,
@@ -423,12 +423,15 @@ export function usePartDrag(
 
         // The snap solver below still needs `worldHalfHeight` as a scalar
         // for its in-snap ground rejection. Compute it here so both the
-        // constraint pipeline and the snap solver see the same value.
-        const worldHalfHeight = calculateWorldHalfHeight(
-          rotationQuaternion,
+        // constraint pipeline and the snap solver see the same value —
+        // feature-aware, so a beveled/mitred part doesn't hover at box
+        // height while a snap is active.
+        const worldHalfHeight = calculateWorldHalfHeightFromDegrees(
+          part.rotation,
           liveDims.length,
           liveDims.thickness,
-          liveDims.width
+          liveDims.width,
+          part.features
         );
 
         // ADR-006: ground clamp through the constraint pipeline. Uses the

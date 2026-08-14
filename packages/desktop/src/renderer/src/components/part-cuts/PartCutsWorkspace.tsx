@@ -16,6 +16,8 @@ import {
   FACE_TARGETS,
   FeatureDraft,
   getFeatureDraftTarget,
+  getPresetHint as getOperationPresetHint,
+  getPresetLabel as getOperationPresetLabel,
   normalizeRectCutDraft,
   OperationPreset
 } from '@renderer/components/part-features/partFeatureEditorState';
@@ -54,7 +56,7 @@ import {
   DropdownMenuTrigger
 } from '@renderer/components/ui/dropdown-menu';
 import { MoreHorizontal } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface PartCutsWorkspaceProps {
   part: Part;
@@ -97,56 +99,6 @@ function getSelectedTargetLabel(draft: FeatureDraft | null): string | null {
   if (draft.cutType === 'edge_notch') return EDGE_NOTCH_SIDE_LABELS[edgeTargetToSide(draft.edgeTarget)];
   if (draft.cutType === 'rabbet') return EDGE_LABELS[draft.edgeTarget];
   return FACE_LABELS[draft.faceTarget];
-}
-
-function getOperationPresetLabel(preset: OperationPreset): string {
-  switch (preset) {
-    case 'end_cut':
-      return 'End Cut';
-    case 'corner_notch':
-      return 'Corner Notch';
-    case 'edge_notch':
-      return 'Edge Notch';
-    case 'cutout':
-      return 'Cutout';
-    case 'dado':
-      return 'Dado';
-    case 'stopped_dado':
-      return 'Stopped Dado';
-    case 'rabbet':
-      return 'Rabbet';
-    case 'groove':
-      return 'Groove';
-    case 'stopped_groove':
-      return 'Stopped Groove';
-    case 'mortise':
-      return 'Mortise';
-  }
-}
-
-function getOperationPresetHint(preset: OperationPreset): string {
-  switch (preset) {
-    case 'end_cut':
-      return 'Mitres, bevels, and compound cuts on either end.';
-    case 'corner_notch':
-      return 'Remove a rectangular chunk from one exact corner.';
-    case 'edge_notch':
-      return 'Notch into a specific edge while keeping the blank rectangular.';
-    case 'cutout':
-      return 'Place a rectangular pocket or opening on one face.';
-    case 'dado':
-      return 'Cut a full-width channel across the top or bottom face.';
-    case 'stopped_dado':
-      return 'Cut a blind channel across the board width with a limited run along the blank.';
-    case 'rabbet':
-      return 'Cut a full-run edge recess along one supported edge.';
-    case 'groove':
-      return 'Cut a full-length face groove with blind depth.';
-    case 'stopped_groove':
-      return 'Cut a blind face groove with a limited run and explicit placement.';
-    case 'mortise':
-      return 'Cut a blind face pocket for joinery layout.';
-  }
 }
 
 function getDraftStepTitle(draft: FeatureDraft): string {
@@ -216,6 +168,13 @@ export function PartCutsWorkspace({
 }: PartCutsWorkspaceProps) {
   const [draft, setDraft] = useState<FeatureDraft | null>(null);
   const [panelMode, setPanelMode] = useState<CutsPanelMode>('list');
+  const workspaceRootRef = useRef<HTMLDivElement | null>(null);
+
+  // The workspace replaces the whole editor surface; move focus into it so
+  // keyboard users land in the new mode instead of a removed element.
+  useEffect(() => {
+    workspaceRootRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     setDraft(null);
@@ -443,7 +402,13 @@ export function PartCutsWorkspace({
       : null;
 
   return (
-    <div className="app-main flex min-h-0 flex-1 bg-bg">
+    <div
+      ref={workspaceRootRef}
+      tabIndex={-1}
+      role="region"
+      aria-label={`Part cuts for ${part.name}`}
+      className="app-main flex min-h-0 flex-1 bg-bg outline-none"
+    >
       <div className="flex min-h-0 flex-1 gap-4 p-4">
         <Card className="flex min-h-0 flex-1 flex-col">
           <CardHeader className="pb-4">
@@ -541,7 +506,7 @@ export function PartCutsWorkspace({
                       <span className="font-medium text-text">{enabledOperationCount}</span> enabled
                     </span>
                     <span className={`font-medium ${hasUnsavedChanges ? 'text-accent' : 'text-text'}`}>
-                      {hasUnsavedChanges ? 'Unsaved part changes' : 'Saved to part draft'}
+                      {hasUnsavedChanges ? 'Unsaved part changes' : 'No unsaved changes'}
                     </span>
                   </div>
                 </div>
@@ -1044,6 +1009,11 @@ export function PartCutsWorkspace({
                               min={0.125}
                               disabled={inspectorDraft.cutType === 'groove'}
                             />
+                            {inspectorDraft.cutType === 'groove' && (
+                              <p className="mt-1 text-[11px] text-text-muted">
+                                Grooves always run the full board length, so the run matches the blank.
+                              </p>
+                            )}
                           </div>
                           <div>
                             <Label>
@@ -1150,6 +1120,11 @@ export function PartCutsWorkspace({
                                   min={0}
                                   disabled={inspectorDraft.cutType === 'stopped_dado'}
                                 />
+                                {inspectorDraft.cutType === 'stopped_dado' && (
+                                  <p className="mt-1 text-[11px] text-text-muted">
+                                    Stopped dados span the full board width, so this offset stays fixed.
+                                  </p>
+                                )}
                               </div>
                             </div>
                           )}

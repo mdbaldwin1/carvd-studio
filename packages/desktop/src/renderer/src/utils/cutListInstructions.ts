@@ -1,4 +1,5 @@
 import { CutInstruction, PartFeature } from '../types';
+import { getReferenceMode } from './endCutUtils';
 import { getFeatureSummary } from './partFeatureSummary';
 
 export interface GroupedCutInstruction {
@@ -23,7 +24,9 @@ function getFeatureGroupingKey(feature: PartFeature): string {
       target: feature.target,
       reference: feature.reference,
       cutType: feature.cutType,
-      lengthMode: feature.lengthMode,
+      // Resolve through the canonical reference-mode helper so features that
+      // differ only in legacy lengthMode vs stored reference group together.
+      lengthMode: getReferenceMode(feature),
       parameters: feature.parameters
     });
   }

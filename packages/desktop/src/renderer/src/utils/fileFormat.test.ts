@@ -11,7 +11,7 @@ import {
   CARVD_FILE_EXTENSION,
   CARVD_FILE_FILTER
 } from './fileFormat';
-import { CARVD_FILE_VERSION, GroupMember } from '../types';
+import { CARVD_FILE_VERSION, CARVD_FILE_VERSION_BASE, GroupMember } from '../types';
 import {
   createTestPart,
   createTestStock,
@@ -60,12 +60,35 @@ describe('fileFormat', () => {
     it('creates valid CarvdFile structure', () => {
       const file = createValidCarvdFile();
 
-      expect(file.version).toBe(CARVD_FILE_VERSION);
+      // Plain projects serialize at the base version so older builds can
+      // still open them; only featured projects require the newer reader.
+      expect(file.version).toBe(CARVD_FILE_VERSION_BASE);
       expect(file.project).toBeDefined();
       expect(file.parts).toEqual([]);
       expect(file.stocks).toEqual([]);
       expect(file.groups).toEqual([]);
       expect(file.groupMembers).toEqual([]);
+    });
+
+    it('stamps the current version when any part carries cut features', () => {
+      const featured = createTestPart({
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 45 }
+          }
+        ]
+      });
+      const file = createValidCarvdFile({ parts: [featured] });
+
+      expect(file.version).toBe(CARVD_FILE_VERSION);
     });
 
     it('includes project metadata', () => {
@@ -231,7 +254,7 @@ describe('fileFormat', () => {
 
       expect(project.name).toBe('Test Project');
       expect(project.units).toBe('imperial');
-      expect(project.version).toBe(String(CARVD_FILE_VERSION));
+      expect(project.version).toBe(String(CARVD_FILE_VERSION_BASE));
     });
 
     it('preserves all project data', () => {

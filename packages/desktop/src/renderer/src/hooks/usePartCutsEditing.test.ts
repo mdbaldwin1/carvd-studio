@@ -7,6 +7,12 @@ import { useProjectStore } from '../store/projectStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useUIStore } from '../store/uiStore';
 
+const openPartOne = () => {
+  const part = useProjectStore.getState().parts.find((p) => p.id === 'part-1')!;
+  usePartCutsEditingStore.getState().startEditingPartCuts(part.id, part.name, part.features);
+  useSelectionStore.getState().selectPart(part.id);
+};
+
 describe('usePartCutsEditing', () => {
   beforeEach(() => {
     usePartCutsEditingStore.getState().finishEditing();
@@ -30,7 +36,7 @@ describe('usePartCutsEditing', () => {
           ]
         })
       ],
-      updatePart: vi.fn()
+      updatePart: vi.fn(() => true)
     });
     useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: [] });
     useUIStore.setState({ showToast: vi.fn() });
@@ -40,7 +46,7 @@ describe('usePartCutsEditing', () => {
     const { result } = renderHook(() => usePartCutsEditing());
 
     act(() => {
-      result.current.openForPart('part-1');
+      openPartOne();
     });
 
     expect(result.current.isEditingPartCuts).toBe(true);
@@ -48,13 +54,34 @@ describe('usePartCutsEditing', () => {
     expect(useSelectionStore.getState().selectedPartIds).toEqual(['part-1']);
   });
 
+  it('keeps editing and shows an error when the store rejects the save', () => {
+    const updatePart = vi.fn(() => false);
+    const showToast = vi.fn();
+    useProjectStore.setState({ updatePart });
+    useUIStore.setState({ showToast });
+    const { result } = renderHook(() => usePartCutsEditing());
+
+    act(() => {
+      openPartOne();
+    });
+
+    let saved = true;
+    act(() => {
+      saved = result.current.saveAndExit();
+    });
+
+    expect(saved).toBe(false);
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('overlap'), 'error');
+    expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
+  });
+
   it('saves draft features back to the project store', () => {
-    const updatePart = vi.fn();
+    const updatePart = vi.fn(() => true);
     useProjectStore.setState({ updatePart });
     const { result } = renderHook(() => usePartCutsEditing());
 
     act(() => {
-      result.current.openForPart('part-1');
+      openPartOne();
     });
 
     act(() => {
@@ -92,14 +119,14 @@ describe('usePartCutsEditing', () => {
   });
 
   it('blocks save when the draft contains duplicate enabled end cuts on the same end', () => {
-    const updatePart = vi.fn();
+    const updatePart = vi.fn(() => true);
     const showToast = vi.fn();
     useProjectStore.setState({ updatePart });
     useUIStore.setState({ showToast });
     const { result } = renderHook(() => usePartCutsEditing());
 
     act(() => {
-      result.current.openForPart('part-1');
+      openPartOne();
     });
 
     act(() => {
@@ -142,7 +169,7 @@ describe('usePartCutsEditing', () => {
     const { result } = renderHook(() => usePartCutsEditing());
 
     act(() => {
-      result.current.openForPart('part-1');
+      openPartOne();
     });
 
     act(() => {
@@ -157,7 +184,7 @@ describe('usePartCutsEditing', () => {
     const { result } = renderHook(() => usePartCutsEditing());
 
     act(() => {
-      result.current.openForPart('part-1');
+      openPartOne();
     });
 
     act(() => {

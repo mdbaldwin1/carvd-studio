@@ -22,9 +22,7 @@ export function usePartCutsEditing() {
   const hoveredTarget = usePartCutsEditingStore((s) => s.hoveredTarget);
   const pendingTarget = usePartCutsEditingStore((s) => s.pendingTarget);
   const showExitDialog = usePartCutsEditingStore((s) => s.showExitDialog);
-  const startEditingPartCuts = usePartCutsEditingStore((s) => s.startEditingPartCuts);
   const setDraftFeatures = usePartCutsEditingStore((s) => s.setDraftFeatures);
-  const resetDraftFeatures = usePartCutsEditingStore((s) => s.resetDraftFeatures);
   const selectFeature = usePartCutsEditingStore((s) => s.selectFeature);
   const setHoveredTarget = usePartCutsEditingStore((s) => s.setHoveredTarget);
   const setPendingTarget = usePartCutsEditingStore((s) => s.setPendingTarget);
@@ -38,21 +36,6 @@ export function usePartCutsEditing() {
     [parts, sourcePartId]
   );
   const sourceFeatures = useMemo(() => sourcePart?.features ?? [], [sourcePart]);
-
-  const openForPart = useCallback(
-    (partId: string) => {
-      const part = useProjectStore.getState().parts.find((entry) => entry.id === partId);
-      if (!part) {
-        showToast('Part not found', 'error');
-        return false;
-      }
-
-      startEditingPartCuts(part.id, part.name, part.features);
-      selectPart(part.id);
-      return true;
-    },
-    [selectPart, showToast, startEditingPartCuts]
-  );
 
   const saveAndExit = useCallback(() => {
     const currentPart = sourcePartId ? useProjectStore.getState().parts.find((part) => part.id === sourcePartId) : null;
@@ -80,7 +63,11 @@ export function usePartCutsEditing() {
       return false;
     }
 
-    updatePart(sourcePartId, { features: clonePartFeatures(draftFeatures) });
+    const didUpdate = updatePart(sourcePartId, { features: clonePartFeatures(draftFeatures) });
+    if (!didUpdate) {
+      showToast('Couldn\u2019t save cuts \u2014 the updated part would overlap another part', 'error');
+      return false;
+    }
     finishEditing();
     selectPart(sourcePartId);
     showToast(`Saved cuts for "${currentPart.name}"`, 'success');
@@ -98,10 +85,6 @@ export function usePartCutsEditing() {
     requestStoreExit(sourceFeatures);
   }, [requestStoreExit, sourceFeatures]);
 
-  const restoreDraftFromSource = useCallback(() => {
-    resetDraftFeatures(sourceFeatures);
-  }, [resetDraftFeatures, sourceFeatures]);
-
   return {
     isEditingPartCuts,
     sourcePartId,
@@ -112,12 +95,10 @@ export function usePartCutsEditing() {
     hoveredTarget,
     pendingTarget,
     showExitDialog,
-    openForPart,
     saveAndExit,
     discardAndExit,
     requestExit,
     cancelExit,
-    restoreDraftFromSource,
     setDraftFeatures,
     selectFeature,
     setHoveredTarget,

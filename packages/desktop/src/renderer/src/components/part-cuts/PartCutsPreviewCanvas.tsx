@@ -721,24 +721,6 @@ function PartCutsPreviewScene({
             {handleOverlay.mode === 'rect' && handleOverlay.depthInfo && (
               <DepthIndicator depthInfo={handleOverlay.depthInfo} groupRef={groupRef} />
             )}
-            {handleOverlay.mode === 'end' && handleOverlay.guidePosition && handleOverlay.guideSize && (
-              <mesh position={handleOverlay.guidePosition} renderOrder={6}>
-                <boxGeometry args={handleOverlay.guideSize} />
-                <meshBasicMaterial color={AREA_COLOR} transparent opacity={0.22} depthWrite={false} />
-              </mesh>
-            )}
-            {handleOverlay.mode === 'end' && handleOverlay.referenceHandle && (
-              <mesh
-                position={handleOverlay.referenceHandle}
-                renderOrder={7}
-                onPointerDown={(event) => beginDrag('reference', event)}
-                onPointerMove={updateDrag}
-                onPointerUp={endDrag}
-              >
-                <sphereGeometry args={[HANDLE_SIZE * 0.6, 18, 18]} />
-                <meshBasicMaterial color={HANDLE_COLOR} />
-              </mesh>
-            )}
           </>
         )}
 

@@ -7,6 +7,7 @@ import {
   Assembly,
   CameraState,
   CARVD_FILE_VERSION,
+  CARVD_FILE_VERSION_BASE,
   CarvdFile,
   CutList,
   CustomShoppingItem,
@@ -54,8 +55,16 @@ export function serializeProject(state: {
   thumbnail?: ProjectThumbnail | null;
   cameraState?: CameraState | null;
 }): CarvdFile {
+  const partHasFeatures = (part: Part) => (part.features?.length ?? 0) > 0;
+  const usesPartFeatures =
+    state.parts.some(partHasFeatures) ||
+    state.assemblies.some((assembly) => assembly.parts.some((part) => (part.features?.length ?? 0) > 0));
+
   return {
-    version: CARVD_FILE_VERSION,
+    // Featured projects need version 2 so older builds warn instead of
+    // silently dropping cuts; plain projects stay at the base version for
+    // maximum backward compatibility.
+    version: usesPartFeatures ? CARVD_FILE_VERSION : CARVD_FILE_VERSION_BASE,
     project: {
       name: state.projectName,
       createdAt: state.createdAt,
@@ -227,6 +236,10 @@ function validateReferentialIntegrity(file: CarvdFile): { errors: string[]; warn
  */
 function migrateFile(file: CarvdFile): CarvdFile {
   let migrated = { ...file };
+
+  // Version 1 -> 2: part features (custom cuts) were introduced. V1 files
+  // simply have no features; `normalizePart` on load seeds the field, so no
+  // structural rewrite is required.
 
   // Version 0 -> 1 migration (hypothetical, for future use)
   // if (migrated.version < 1) {

@@ -33,22 +33,8 @@ function getVerticalFlip(feature: EndCutFeature): boolean {
   return feature.parameters.verticalFlip ?? false;
 }
 
-function getReferenceMode(feature: EndCutFeature): EndCutFeature['lengthMode'] {
+export function getReferenceMode(feature: EndCutFeature): EndCutFeature['lengthMode'] {
   return feature.parameters.reference?.mode ?? feature.lengthMode;
-}
-
-export function getEndCutReferenceValue(
-  feature: EndCutFeature,
-  part: Pick<{ length: number; width: number; thickness: number }, 'length' | 'width' | 'thickness'>
-): number {
-  const measurements = getDerivedLengthMeasurements({
-    length: part.length,
-    width: part.width,
-    thickness: part.thickness,
-    features: [feature]
-  });
-  const mode = getReferenceMode(feature);
-  return getLengthReferenceValue(measurements, mode);
 }
 
 function getEnabledEndCuts(features?: PartFeature[]): EndCutFeature[] {

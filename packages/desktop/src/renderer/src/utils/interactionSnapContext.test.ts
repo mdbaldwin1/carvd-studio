@@ -14,7 +14,8 @@ function part(overrides: Partial<Part> = {}): Part {
     stockId: overrides.stockId ?? null,
     grainSensitive: overrides.grainSensitive ?? false,
     grainDirection: overrides.grainDirection ?? 'length',
-    color: overrides.color ?? '#fff'
+    color: overrides.color ?? '#fff',
+    features: overrides.features
   };
 }
 
@@ -78,5 +79,51 @@ describe('interactionSnapContext', () => {
     expect(context.facePosition).toEqual({ x: 7, y: 0, z: 3 });
     expect(context.originBounds.centerX).toBe(7);
     expect(typeof context.advancedDetectors.surface).toBe('function');
+  });
+  it('exposes a mate detector that snaps a part into a matching socket', () => {
+    const hostPart = part({
+      id: 'host',
+      length: 24,
+      width: 12,
+      thickness: 1.5,
+      position: { x: 0, y: 0.75, z: 0 },
+      features: [
+        {
+          id: 'cutout-1',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'cutout',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min' },
+          parameters: { size: { length: 6, width: 4 }, depthMode: 'blind', depth: 0.5 },
+          placement: { x: 3, z: 4 }
+        }
+      ]
+    });
+    const dragPart = part({
+      id: 'drag',
+      length: 6,
+      width: 4,
+      thickness: 2,
+      position: { x: 0, y: 0, z: 0 }
+    });
+
+    const context = createPartSnapContext({
+      part: dragPart,
+      position: { x: -6, y: 2.5, z: 0 },
+      referenceParts: [hostPart, dragPart],
+      movingPartIds: ['drag'],
+      snapGuides: [],
+      snapThreshold: 0.5,
+      snapToOrigin: false,
+      enableGoldenRatioAnchors: false,
+      enableAxisLegacySnaps: false
+    });
+
+    const mateResult = context.advancedDetectors.mate();
+    expect(mateResult.snappedY).toBe(true);
+    expect(mateResult.adjustedPosition.y).toBeCloseTo(2.0);
+    expect(mateResult.snapLines.length).toBeGreaterThan(0);
   });
 });

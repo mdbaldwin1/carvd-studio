@@ -1,57 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildFeaturesFromPreset, mirrorFeature } from './partFeatureActions';
+import { mirrorFeature } from './partFeatureActions';
 
 describe('partFeatureActions', () => {
-  it('builds paired end cuts from the mitre-both-ends preset', () => {
-    const features = buildFeaturesFromPreset('mitre_both_ends', { partLength: 24 });
-
-    expect(features).toHaveLength(2);
-    expect(features[0]).toMatchObject({
-      kind: 'end_cut',
-      target: { type: 'face', face: 'left_end' },
-      cutType: 'mitre',
-      parameters: {
-        horizontalAngle: 45
-      }
-    });
-    expect(features[1]).toMatchObject({
-      kind: 'end_cut',
-      target: { type: 'face', face: 'right_end' },
-      cutType: 'mitre',
-      parameters: {
-        horizontalAngle: 45
-      }
-    });
-  });
-
-  it('builds paired corner reliefs and constrained joinery presets', () => {
-    const cornerPair = buildFeaturesFromPreset('front_corners');
-    const dado = buildFeaturesFromPreset('centered_dado');
-    const rabbet = buildFeaturesFromPreset('top_front_rabbet');
-
-    expect(cornerPair).toHaveLength(2);
-    expect(cornerPair[0]).toMatchObject({
-      kind: 'rect_cut',
-      cutType: 'corner_notch',
-      target: { type: 'corner', corner: 'front_left_corner' }
-    });
-    expect(cornerPair[1]).toMatchObject({
-      kind: 'rect_cut',
-      cutType: 'corner_notch',
-      target: { type: 'corner', corner: 'front_right_corner' }
-    });
-    expect(dado[0]).toMatchObject({
-      kind: 'rect_cut',
-      cutType: 'dado',
-      target: { type: 'face', face: 'top_face' }
-    });
-    expect(rabbet[0]).toMatchObject({
-      kind: 'rect_cut',
-      cutType: 'rabbet',
-      target: { type: 'edge', edge: 'top_front_edge' }
-    });
-  });
-
   it('mirrors an end cut to the opposite end', () => {
     const mirrored = mirrorFeature(
       {

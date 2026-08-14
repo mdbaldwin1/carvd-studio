@@ -878,7 +878,9 @@ function App() {
               </div>
               <div className="header-actions">
                 <div className="header-actions-group">
-                  <UndoRedoButtons />
+                  {/* Project undo/redo would silently edit the project behind
+                      the cuts workspace; the cut draft has its own save/discard. */}
+                  {!isEditingPartCuts && <UndoRedoButtons />}
                   {(isEditingTemplate || isEditingAssembly || isEditingPartCuts) && (
                     <Button
                       variant={

@@ -5,6 +5,7 @@ import { useWorkspaceSceneGraph } from '../interaction/useWorkspaceSceneGraph';
 import { useClipboardStore } from '../store/clipboardStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useSnapStore } from '../store/snapStore';
+import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
 import { getContainingGroupId } from '../utils/interactionSelection';
@@ -14,6 +15,7 @@ import { applyCommitInstructions } from '../interaction/tools/toolSolver';
 import { resolveRotateBatchGrounding } from '../utils/interactionMovement';
 
 export function useKeyboardShortcuts() {
+  const isEditingPartCuts = usePartCutsEditingStore((s) => s.isEditingPartCuts);
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const parts = useProjectStore((s) => s.parts);
   const gridSize = useProjectStore((s) => s.gridSize);
@@ -45,6 +47,11 @@ export function useKeyboardShortcuts() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Part Cuts mode owns its own editing surface. The source part stays
+      // selected behind the workspace, so project-level shortcuts (undo,
+      // rotate, duplicate, delete, copy/paste) would silently edit it.
+      if (isEditingPartCuts) return;
+
       // Ignore if typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return;
@@ -367,6 +374,7 @@ export function useKeyboardShortcuts() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
+    isEditingPartCuts,
     selectedPartIds,
     parts,
     gridSize,

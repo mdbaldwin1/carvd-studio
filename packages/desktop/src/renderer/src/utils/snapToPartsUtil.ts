@@ -5,7 +5,8 @@ import {
   getPartContourSubBoxes,
   getPartLocalBoundingBox,
   getPartLocalConvexVertices,
-  getPartWorldAABB
+  getPartWorldAABB,
+  hasRenderablePartFeatures
 } from './partFeatureGeometry';
 import { getRectCutDepth, getResolvedRectCutFeature, isTopTarget } from './rectCutUtils';
 import type { GeometryCache } from '../interaction/geometry/cache';
@@ -2774,7 +2775,29 @@ function dominantAxisFromDelta(delta: Vec3): 'x' | 'y' | 'z' {
   return ax >= ay && ax >= az ? 'x' : ay >= az ? 'y' : 'z';
 }
 
+function transformLocalVertexToWorld(
+  local: { x: number; y: number; z: number },
+  rotation: { x: number; y: number; z: number },
+  position: { x: number; y: number; z: number }
+): Vec3 {
+  const { ax0, ax1, ax2, ay0, ay1, ay2, az0, az1, az2 } = eulerToAxes(rotation);
+  return {
+    x: position.x + ax0 * local.x + ay0 * local.y + az0 * local.z,
+    y: position.y + ax1 * local.x + ay1 * local.y + az1 * local.z,
+    z: position.z + ax2 * local.x + ay2 * local.y + az2 * local.z
+  };
+}
+
 function getPartVertices(part: Part, position: { x: number; y: number; z: number }): Vec3[] {
+  // Feature-bearing parts snap by their true hull vertices so cut-away
+  // corners (mitres, notches) stop offering ghost snap targets.
+  if (hasRenderablePartFeatures(part)) {
+    return getPartLocalConvexVertices(part).map((local) => transformLocalVertexToWorld(local, part.rotation, position));
+  }
+  return getPartObbVertices(part, position);
+}
+
+function getPartObbVertices(part: Part, position: { x: number; y: number; z: number }): Vec3[] {
   const obb = getPartOBB(part, position);
   const center = obb.center;
   const [ax, ay, az] = obb.axes;
@@ -2796,7 +2819,35 @@ function getPartVertices(part: Part, position: { x: number; y: number; z: number
 }
 
 function getPartEdges(part: Part, position: { x: number; y: number; z: number }): PartEdge[] {
-  const v = getPartVertices(part, position);
+  // Feature-bearing flat-contour parts get true contour edges; parts with
+  // vertical end-cut insets (bevels/compounds) keep the tightened-OBB edge
+  // approximation because the deduped hull loses the bottom/top pairing.
+  if (hasRenderablePartFeatures(part)) {
+    const profiles = getPartEndCutProfiles(part);
+    const hasVertical = profiles.left.verticalInset > 0 || profiles.right.verticalInset > 0;
+    if (!hasVertical) {
+      const world = getPartLocalConvexVertices(part).map((local) =>
+        transformLocalVertexToWorld(local, part.rotation, position)
+      );
+      const contourPointCount = world.length / 2;
+      const edges: PartEdge[] = [];
+      const pushEdge = (a: Vec3, b: Vec3) => {
+        const ab = subVec(b, a);
+        const length = lenVec(ab);
+        if (length <= 1e-6) return;
+        edges.push({ a, b, dir: normalizeVec(ab), length });
+      };
+      for (let i = 0; i < contourPointCount; i += 1) {
+        const j = (i + 1) % contourPointCount;
+        pushEdge(world[2 * i], world[2 * j]); // bottom contour loop
+        pushEdge(world[2 * i + 1], world[2 * j + 1]); // top contour loop
+        pushEdge(world[2 * i], world[2 * i + 1]); // vertical connector
+      }
+      return edges;
+    }
+  }
+
+  const v = getPartObbVertices(part, position);
   const edgeIndices: Array<[number, number]> = [
     [0, 1],
     [0, 2],
