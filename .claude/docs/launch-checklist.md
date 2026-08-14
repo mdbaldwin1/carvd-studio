@@ -269,6 +269,34 @@ node scripts/version-bump.cjs patch  # or minor, major
 - [ ] All keyboard shortcuts work
 - [ ] Auto-update notification appears (if applicable)
 
+### Part Cuts Release Checklist
+
+Feature gate decisions (must be made before the feature ships):
+
+- [ ] Licensing tier decided — Part Cuts is currently available to all tiers,
+      including free mode (`featureLimits.ts` has no `canUsePartCuts` gate)
+- [ ] Promotion scope decided — ship all ten operations at once, or stage
+      per `part-cuts-production-review.md` (end cuts + simple rect cuts first)
+- [ ] Website/docs copy planned — the site was deliberately scrubbed of
+      joinery claims pre-1.0; Part Cuts reinstates them and needs new copy
+      and screenshots (cuts workspace, mitred/dado'd parts, fabrication list)
+
+Functional testing:
+
+- [ ] Open Part Cuts from Properties panel and right-click menu
+- [ ] Add/edit/mirror/reorder/disable/delete each operation type
+- [ ] Preview handles move/resize face pockets and stopped channels
+- [ ] Direct target picking on faces/edges/corners
+- [ ] Conflict detection blocks invalid stacks (duplicate end cuts,
+      opposing-face blind intersections) with numbered messages
+- [ ] Save/discard prompt on exit; Save Part persists cuts
+- [ ] Project shortcuts (undo/delete/rotate/duplicate) do nothing while
+      the cuts workspace is open
+- [ ] Cut list/CSV/PDF show blank dims + numbered fabrication instructions
+- [ ] Featured project saves as file format v2; opening it in an older
+      build shows the "please update" message (not silent cut loss)
+- [ ] Socket mating snap: matching part snaps into a dado/groove/mortise
+
 ### Website Testing
 
 - [ ] All pages load without errors

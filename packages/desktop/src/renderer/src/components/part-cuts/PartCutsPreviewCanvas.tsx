@@ -114,11 +114,11 @@ function shouldUseFallbackPreview(): boolean {
   );
 }
 
-function clamp(value: number, min: number, max: number): number {
+export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function supportsPreviewHandles(draft: FeatureDraft | null): boolean {
+export function supportsPreviewHandles(draft: FeatureDraft | null): boolean {
   if (!draft) return false;
   if (draft.mode === 'end_cut') return false;
   return (
@@ -131,7 +131,7 @@ function supportsPreviewHandles(draft: FeatureDraft | null): boolean {
  * Works for ALL rect_cut types (face-targeted and edge-targeted).
  * Returns null for end cuts or features without a resolved rect position.
  */
-function buildRectDimensionOverlay(
+export function buildRectDimensionOverlay(
   part: Part,
   draft: FeatureDraft
 ): {
@@ -240,7 +240,7 @@ function buildRectDimensionOverlay(
   return { lines, depthData, x0, x1, cz0, cz1, y };
 }
 
-function buildEndCutDimensionLines(
+export function buildEndCutDimensionLines(
   part: Part,
   draft: FeatureDraft,
   allFeatures?: PartFeature[]
@@ -380,7 +380,7 @@ function buildEndCutDimensionLines(
   return { lines, arcs };
 }
 
-function getEditableHandleOverlay(
+export function getEditableHandleOverlay(
   part: Part,
   draft: FeatureDraft | null,
   allFeatures?: PartFeature[]
@@ -422,7 +422,7 @@ function getEditableHandleOverlay(
   };
 }
 
-function applyHandleDelta(
+export function applyHandleDelta(
   part: Part,
   startDraft: FeatureDraft,
   kind: HandleKind,
@@ -454,7 +454,7 @@ function applyHandleDelta(
   return nextDraft;
 }
 
-function nudgeDraft(part: Part, draft: FeatureDraft, kind: HandleKind, direction: 1 | -1): FeatureDraft {
+export function nudgeDraft(part: Part, draft: FeatureDraft, kind: HandleKind, direction: 1 | -1): FeatureDraft {
   const step = 0.25 * direction;
   return applyHandleDelta(
     part,

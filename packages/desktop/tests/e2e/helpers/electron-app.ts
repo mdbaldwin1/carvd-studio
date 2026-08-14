@@ -16,6 +16,7 @@ declare global {
     useUIStore: { getState: () => any };
     useInteractionStore: { getState: () => any };
     useLicenseStore: { getState: () => any };
+    usePartCutsEditingStore: { getState: () => any };
     useCameraStore: { getState: () => any; setState: (state: Record<string, unknown>) => void };
     useAssemblyEditingStore: { getState: () => any };
     __carvdE2E?: {
