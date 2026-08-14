@@ -48,20 +48,20 @@ test.describe('Data management and license flows', () => {
     const settings = window.getByRole('dialog', { name: 'App Settings' });
     await settings.getByRole('tab', { name: 'Data & License' }).click();
     await settings.getByRole('button', { name: 'Enter License Key' }).click();
-    if (
-      !(await window
-        .getByText('Activate Carvd Studio')
-        .last()
-        .isVisible({ timeout: 3000 })
-        .catch(() => false))
-    ) {
+    // The activation modal is lazy-loaded, so its first open can outlast a short
+    // visibility probe on cold CI runners. Wait on the dialog itself, and only
+    // re-navigate if it truly never opened — a premature re-click on App Settings
+    // deadlocks against the late-arriving modal overlay.
+    const licenseDialog = window.getByRole('dialog').filter({ hasText: 'Activate Carvd Studio' });
+    try {
+      await licenseDialog.waitFor({ state: 'visible', timeout: 15000 });
+    } catch {
       await window.getByTitle('App Settings').click();
       const reopenedSettings = window.getByRole('dialog', { name: 'App Settings' });
       await reopenedSettings.getByRole('tab', { name: 'Data & License' }).click();
       await reopenedSettings.getByRole('button', { name: 'Enter License Key' }).click();
     }
 
-    const licenseDialog = window.getByRole('dialog').filter({ hasText: 'Activate Carvd Studio' });
     await expect(licenseDialog).toBeVisible();
     await expect(licenseDialog.getByRole('button', { name: 'Activate License' })).toBeDisabled();
 
