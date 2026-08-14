@@ -73,7 +73,12 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose?.()}>
-      <DialogContent className="w-[620px] max-w-[92vw] max-h-[86vh] bg-surface" onClose={() => onClose?.()}>
+      <DialogContent
+        className="w-[620px] max-w-[92vw] max-h-[86vh] bg-surface"
+        onClose={() => onClose?.()}
+        aria-label="Activate Carvd Studio"
+      >
+        <DialogTitle className="sr-only">License activation dialog</DialogTitle>
         {/* Close button */}
         {onClose && (
           <Button
@@ -94,9 +99,9 @@ export function LicenseActivationModal({ isOpen, onActivate, onClose }: LicenseA
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary mb-4 text-text">
               <Key size={28} />
             </div>
-            <DialogTitle id="license-modal-title" className="m-0 text-2xl text-text">
+            <h2 id="license-modal-title" className="m-0 text-2xl font-semibold text-text">
               Activate Carvd Studio
-            </DialogTitle>
+            </h2>
             <p className="mt-2 mb-0 text-text-secondary text-sm">Enter your license key to unlock all features</p>
           </div>
 

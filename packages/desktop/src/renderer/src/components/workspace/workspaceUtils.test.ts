@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Use real Three.js so rotation math actually works in getPartAABB tests
 vi.unmock('three');
@@ -6,11 +6,16 @@ vi.unmock('three');
 import {
   LIGHTING_PRESETS,
   isOrbitControls,
-  setRightClickTarget,
-  getRightClickTarget,
-  clearRightClickTarget,
-  getPartAABB
+  pauseOrbitControls,
+  resumeOrbitControls,
+  resetWorkspaceCursor,
+  setWorkspaceCursor,
+  getPartAABB,
+  bindWindowPointerSession,
+  createPointerRafQueue
 } from './workspaceUtils';
+import { createGeometryCache } from '../../interaction/geometry/cache';
+import { createTestPart } from '../../../../../tests/helpers/factories';
 
 // ============================================================
 // Tests
@@ -62,51 +67,138 @@ describe('workspaceUtils', () => {
     });
   });
 
-  describe('right-click target management', () => {
-    beforeEach(() => {
-      clearRightClickTarget();
+  describe('orbit control lifecycle helpers', () => {
+    it('pauses and resumes orbit controls when the controls support enabled state', () => {
+      const controls = {
+        enabled: true,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false
+      };
+
+      pauseOrbitControls(controls as never);
+      expect(controls.enabled).toBe(false);
+
+      resumeOrbitControls(controls as never);
+      expect(controls.enabled).toBe(true);
     });
 
-    it('starts with null target', () => {
-      expect(getRightClickTarget()).toBeNull();
-    });
+    it('ignores null and non-orbit controls', () => {
+      const notControls = { addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false };
 
-    it('sets and gets a background target', () => {
-      setRightClickTarget({ type: 'background' });
-      expect(getRightClickTarget()).toEqual({ type: 'background' });
-    });
-
-    it('sets and gets a part target', () => {
-      setRightClickTarget({ type: 'part' });
-      expect(getRightClickTarget()).toEqual({ type: 'part' });
-    });
-
-    it('sets and gets a guide target with position', () => {
-      setRightClickTarget({
-        type: 'guide',
-        worldPosition: { x: 1, y: 2, z: 3 },
-        guideId: 'guide-1'
-      });
-      const target = getRightClickTarget();
-      expect(target).toEqual({
-        type: 'guide',
-        worldPosition: { x: 1, y: 2, z: 3 },
-        guideId: 'guide-1'
-      });
-    });
-
-    it('clears the target', () => {
-      setRightClickTarget({ type: 'part' });
-      clearRightClickTarget();
-      expect(getRightClickTarget()).toBeNull();
-    });
-
-    it('overwrites previous target', () => {
-      setRightClickTarget({ type: 'part' });
-      setRightClickTarget({ type: 'background' });
-      expect(getRightClickTarget()!.type).toBe('background');
+      expect(() => pauseOrbitControls(null)).not.toThrow();
+      expect(() => resumeOrbitControls(notControls as never)).not.toThrow();
+      expect('enabled' in notControls).toBe(false);
     });
   });
+
+  describe('workspace cursor helpers', () => {
+    it('sets and resets the body cursor on the provided target', () => {
+      const target = { body: { style: { cursor: 'auto' } } };
+
+      setWorkspaceCursor('grabbing', target);
+      expect(target.body.style.cursor).toBe('grabbing');
+
+      resetWorkspaceCursor(target);
+      expect(target.body.style.cursor).toBe('auto');
+    });
+  });
+
+  describe('bindWindowPointerSession', () => {
+    it('binds pointer move and terminal listeners and removes them on cleanup', () => {
+      const listeners = new Map<string, unknown>();
+      const target = {
+        addEventListener: vi.fn((type: string, listener: unknown) => {
+          listeners.set(type, listener);
+        }),
+        removeEventListener: vi.fn((type: string, listener: unknown) => {
+          expect(listeners.get(type)).toBe(listener);
+          listeners.delete(type);
+        })
+      };
+      const onMove = vi.fn();
+      const onEnd = vi.fn();
+
+      const cleanup = bindWindowPointerSession(target, { onMove, onEnd });
+
+      expect(target.addEventListener).toHaveBeenCalledWith('pointermove', onMove);
+      expect(target.addEventListener).toHaveBeenCalledWith('pointerup', onEnd);
+      expect(target.addEventListener).toHaveBeenCalledWith('pointercancel', onEnd);
+      expect(target.addEventListener).toHaveBeenCalledWith('blur', onEnd);
+
+      cleanup();
+
+      expect(listeners.size).toBe(0);
+      expect(target.removeEventListener).toHaveBeenCalledWith('pointermove', onMove);
+      expect(target.removeEventListener).toHaveBeenCalledWith('pointerup', onEnd);
+      expect(target.removeEventListener).toHaveBeenCalledWith('pointercancel', onEnd);
+      expect(target.removeEventListener).toHaveBeenCalledWith('blur', onEnd);
+    });
+
+    it('passes listener options when provided', () => {
+      const target = {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn()
+      };
+      const onMove = vi.fn();
+      const onEnd = vi.fn();
+
+      bindWindowPointerSession(target, {
+        onMove,
+        onEnd,
+        moveOptions: { passive: false },
+        endOptions: { passive: true }
+      });
+
+      expect(target.addEventListener).toHaveBeenCalledWith('pointermove', onMove, { passive: false });
+      expect(target.addEventListener).toHaveBeenCalledWith('pointerup', onEnd, { passive: true });
+      expect(target.addEventListener).toHaveBeenCalledWith('pointercancel', onEnd, { passive: true });
+      expect(target.addEventListener).toHaveBeenCalledWith('blur', onEnd, { passive: true });
+    });
+  });
+
+  describe('createPointerRafQueue', () => {
+    it('coalesces pointer moves to one animation frame and cancels pending work', () => {
+      let nextFrameId = 1;
+      const frames = new Map<number, () => void>();
+      const target = {
+        requestAnimationFrame: vi.fn((callback: () => void) => {
+          const frameId = nextFrameId++;
+          frames.set(frameId, callback);
+          return frameId;
+        }),
+        cancelAnimationFrame: vi.fn((frameId: number) => {
+          frames.delete(frameId);
+        })
+      };
+      const onFrame = vi.fn();
+      const firstEvent = { clientX: 1 } as PointerEvent;
+      const latestEvent = { clientX: 2 } as PointerEvent;
+
+      const queue = createPointerRafQueue(target, onFrame);
+
+      queue.schedule(firstEvent);
+      queue.schedule(latestEvent);
+
+      expect(target.requestAnimationFrame).toHaveBeenCalledTimes(1);
+
+      frames.get(1)?.();
+
+      expect(onFrame).toHaveBeenCalledWith(latestEvent);
+
+      const canceledEvent = { clientX: 3 } as PointerEvent;
+      queue.schedule(canceledEvent);
+      queue.cancel();
+
+      expect(target.cancelAnimationFrame).toHaveBeenCalledWith(2);
+      expect(frames.has(2)).toBe(false);
+      expect(onFrame).not.toHaveBeenCalledWith(canceledEvent);
+    });
+  });
+
+  // Right-click target globals were removed in Phase 3b cleanup — context
+  // menu routing now flows through the session controller and hit-test
+  // service. See ADR-002 + ADR-003.
 
   describe('getPartAABB', () => {
     it('calculates AABB for un-rotated part at origin', () => {
@@ -242,6 +334,24 @@ describe('workspaceUtils', () => {
       expect(aabb.maxY).toBeCloseTo(4);
       expect(aabb.minZ).toBeCloseTo(0);
       expect(aabb.maxZ).toBeCloseTo(4);
+    });
+
+    it('can derive local bounds from the geometry bundle cache', () => {
+      const part = createTestPart({
+        id: 'cached-part',
+        position: { x: 3, y: 4, z: 5 },
+        rotation: { x: 45, y: 30, z: 15 },
+        length: 8,
+        width: 4,
+        thickness: 2
+      });
+      const cache = createGeometryCache();
+
+      const legacyAabb = getPartAABB(part);
+      const cachedAabb = getPartAABB(part, cache);
+
+      expect(cachedAabb).toEqual(legacyAabb);
+      expect(cache.size()).toBe(1);
     });
   });
 });

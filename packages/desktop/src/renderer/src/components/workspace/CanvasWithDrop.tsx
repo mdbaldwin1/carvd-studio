@@ -5,11 +5,13 @@ import { useAppSettings } from '@renderer/hooks/useAppSettings';
 import { useAssemblyLibrary } from '@renderer/hooks/useAssemblyLibrary';
 import { useStockLibrary } from '@renderer/hooks/useStockLibrary';
 import { useProjectStore } from '@renderer/store/projectStore';
+import { useUIStore } from '@renderer/store/uiStore';
 import { useState } from 'react';
 import { Workspace } from './Workspace';
 
 export function CanvasWithDrop() {
   const partsCount = useProjectStore((s) => s.parts.length);
+  const setSelectedSidebarStockId = useUIStore((s) => s.setSelectedSidebarStockId);
   const [isDragOver, setIsDragOver] = useState(false);
   const [dropType, setDropType] = useState<'stock' | 'assembly' | null>(null);
   const { settings: appSettings } = useAppSettings();
@@ -76,6 +78,7 @@ export function CanvasWithDrop() {
         grainDirection: stock.grainDirection === 'none' ? 'length' : stock.grainDirection,
         grainSensitive: stock.grainDirection !== 'none'
       });
+      setSelectedSidebarStockId(null);
       return;
     }
 

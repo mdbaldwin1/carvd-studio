@@ -12,6 +12,12 @@ import log from 'electron-log';
 export const TRIAL_DAYS = 14;
 export const BANNER_START_DAY = 7; // Show banner after this many days
 
+function canUseTrialTestControls(): boolean {
+  return (
+    process.env.NODE_ENV === 'development' || (process.env.NODE_ENV === 'test' && process.argv.includes('--test-mode'))
+  );
+}
+
 export interface TrialStatus {
   /** Whether the trial period is still active */
   isTrialActive: boolean;
@@ -92,8 +98,8 @@ export function resetTrialAcknowledgement(): void {
  * Reset trial for development/testing only
  */
 export function resetTrial(): void {
-  if (process.env.NODE_ENV !== 'development') {
-    log.warn('[Trial] Attempted to reset trial in production - ignored');
+  if (!canUseTrialTestControls()) {
+    log.warn('[Trial] Attempted to reset trial outside development/test mode - ignored');
     return;
   }
   log.info('[Trial] Resetting trial (dev mode)');
@@ -106,8 +112,8 @@ export function resetTrial(): void {
  * @param daysRemaining Days to simulate (e.g., 3 for "3 days left")
  */
 export function simulateTrialDaysRemaining(daysRemaining: number): TrialStatus {
-  if (process.env.NODE_ENV !== 'development') {
-    log.warn('[Trial] Attempted to simulate trial in production - ignored');
+  if (!canUseTrialTestControls()) {
+    log.warn('[Trial] Attempted to simulate trial outside development/test mode - ignored');
     return getTrialStatus();
   }
 
@@ -126,8 +132,8 @@ export function simulateTrialDaysRemaining(daysRemaining: number): TrialStatus {
  * Simulate expired trial (dev only)
  */
 export function simulateTrialExpired(): TrialStatus {
-  if (process.env.NODE_ENV !== 'development') {
-    log.warn('[Trial] Attempted to simulate expired trial in production - ignored');
+  if (!canUseTrialTestControls()) {
+    log.warn('[Trial] Attempted to simulate expired trial outside development/test mode - ignored');
     return getTrialStatus();
   }
 

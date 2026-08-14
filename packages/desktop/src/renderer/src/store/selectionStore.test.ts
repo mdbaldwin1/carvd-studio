@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useSelectionStore } from './selectionStore';
 import { useProjectStore } from './projectStore';
 import { useSnapStore } from './snapStore';
+import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
 
 // Helper to reset store state before each test
@@ -31,6 +32,7 @@ const resetStores = () => {
     referencePartIds: [],
     activeReferenceDistances: []
   });
+  useInteractionStore.getState().endSession();
 };
 
 describe('selectionStore', () => {

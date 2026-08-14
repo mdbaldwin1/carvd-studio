@@ -6,10 +6,21 @@ import { useShallow } from 'zustand/shallow';
 import { useCameraStore } from '../../store/cameraStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
+import { useInteractionStore } from '../../store/interactionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { Part as PartType } from '../../types';
 import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
-import { rotateAroundLocalAxis } from '../../utils/rotation';
+import {
+  beginRotateInteractionSession,
+  clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances,
+  publishRotateInteractionPreview
+} from '../../utils/interactionSession';
+import { resolvePartInteractionPreview, shouldHideMeasurementOverlays } from '../../utils/interactionOverlay';
+import { getProjectedMeasurementLength, resolveMeasurementOverlayLayout } from '../../utils/measurementOverlayLayout';
+import { getPartDimensionPlacements } from '../../utils/measurementPlacement';
+import { getPartDimensionPriority } from '../../utils/measurementPriority';
+import { rotationTool } from '../../interaction/tools/rotationTool';
+import { applyCommitInstructions } from '../../interaction/tools/toolSolver';
 import { DimensionLabel } from './DimensionLabel';
 import { GrainDirectionArrow } from './GrainDirectionArrow';
 import { getPartGroupContext } from './partClickHandler';
@@ -19,6 +30,7 @@ import { RotationHandle } from './RotationHandle';
 import { useGroupDrag } from './useGroupDrag';
 import { usePartDrag } from './usePartDrag';
 import { usePartResize } from './usePartResize';
+import { pauseOrbitControls, resetWorkspaceCursor, resumeOrbitControls, setWorkspaceCursor } from './workspaceUtils';
 
 // Decorative edges should never consume pointer hits.
 const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
@@ -29,7 +41,7 @@ interface PartProps {
 }
 
 export const Part = memo(function Part({ part, isStockHighlighted = false }: PartProps) {
-  const { camera, gl, controls } = useThree();
+  const { camera, gl, controls, size } = useThree();
 
   // Project state selector - only re-renders when these specific values change
   const { units, groupMembers } = useProjectStore(
@@ -41,15 +53,15 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
 
   // Selection state selector
-  const { selectedPartIds, hoveredPartId, activeDragDelta, selectedGroupIds, editingGroupId } = useSelectionStore(
+  const { selectedPartIds, hoveredPartId, selectedGroupIds, editingGroupId } = useSelectionStore(
     useShallow((s) => ({
       selectedPartIds: s.selectedPartIds,
       hoveredPartId: s.hoveredPartId,
-      activeDragDelta: s.activeDragDelta,
       selectedGroupIds: s.selectedGroupIds,
       editingGroupId: s.editingGroupId
     }))
   );
+  const activeSession = useInteractionStore((s) => s.activeSession);
 
   // Camera store state
   const showGrainDirection = useCameraStore((s) => s.showGrainDirection);
@@ -185,12 +197,18 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
       return;
     }
 
-    if (!e.nativeEvent.shiftKey) {
-      if (groupToSelectOnClick) {
-        selectGroup(groupToSelectOnClick);
-      } else {
-        selectPart(part.id);
-      }
+    const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+    const isModKey = isMac ? e.nativeEvent.metaKey : e.nativeEvent.ctrlKey;
+    const isAdditiveSelection = e.nativeEvent.shiftKey || isModKey;
+
+    if (isAdditiveSelection) {
+      return;
+    }
+
+    if (groupToSelectOnClick) {
+      selectGroup(groupToSelectOnClick);
+    } else {
+      selectPart(part.id);
     }
   };
 
@@ -225,14 +243,14 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
     e.stopPropagation();
     setHoveredPart(part.id);
     if (!isDragging && !isResizing) {
-      document.body.style.cursor = 'move';
+      setWorkspaceCursor('move');
     }
   };
 
   const handlePointerOut = () => {
     setHoveredPart(null);
     if (!isDragging && !isResizing) {
-      document.body.style.cursor = 'auto';
+      resetWorkspaceCursor();
     }
   };
 
@@ -241,29 +259,49 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
     (axis: 'x' | 'y' | 'z', degrees: number) => {
       const latestPart = useProjectStore.getState().parts.find((p) => p.id === part.id);
       if (!latestPart) return;
-      const newRotation = rotateAroundLocalAxis(latestPart.rotation, axis, degrees);
-      updatePart(part.id, {
-        rotation: newRotation
-      });
+      const input = { part: latestPart, axis, degrees, space: 'local' as const };
+      const state = rotationTool.begin(input);
+      const { preview } = rotationTool.update(input, state);
+      applyCommitInstructions(rotationTool.commit(state, preview), { updatePart });
     },
     [part.id, updatePart]
   );
 
-  const handleRotate = useCallback((axis: 'x' | 'y' | 'z') => applyLocalRotation(axis, 90), [applyLocalRotation]);
+  const handleRotate = useCallback(
+    (axis: 'x' | 'y' | 'z') => {
+      beginRotateInteractionSession({
+        affectedPartIds: [part.id],
+        primaryPartId: part.id,
+        pivot: { x: part.position.x, y: part.position.y, z: part.position.z },
+        axis,
+        initialDegrees: 90
+      });
+      applyLocalRotation(axis, 90);
+      clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances();
+    },
+    [applyLocalRotation, part.id, part.position.x, part.position.y, part.position.z]
+  );
   const handleRotateDelta = useCallback(
     (axis: 'x' | 'y' | 'z', degrees: number) => {
       if (Math.abs(degrees) < 0.01) return;
       applyLocalRotation(axis, degrees);
+      publishRotateInteractionPreview({ axis, degreesDelta: degrees });
     },
     [applyLocalRotation]
   );
 
   const handleRotateStart = useCallback(() => {
-    if (controls) controls.enabled = false;
-  }, [controls]);
+    pauseOrbitControls(controls);
+    beginRotateInteractionSession({
+      affectedPartIds: [part.id],
+      primaryPartId: part.id,
+      pivot: { x: part.position.x, y: part.position.y, z: part.position.z }
+    });
+  }, [controls, part.id, part.position.x, part.position.y, part.position.z]);
 
   const handleRotateEnd = useCallback(() => {
-    if (controls) controls.enabled = true;
+    resumeOrbitControls(controls);
+    clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances();
   }, [controls]);
 
   // Use live dimensions for rendering
@@ -274,11 +312,116 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
   let renderY = liveDims.y;
   let renderZ = liveDims.z;
 
-  if (!isDragging && isSelected && activeDragDelta) {
-    renderX = part.position.x + activeDragDelta.x;
-    renderY = part.position.y + activeDragDelta.y;
-    renderZ = part.position.z + activeDragDelta.z;
+  const interactionPreview = resolvePartInteractionPreview(part, activeSession);
+  const isAffectedByActiveInteraction = interactionPreview.affected;
+
+  if (!isDragging && !isResizing && isAffectedByActiveInteraction) {
+    renderX = interactionPreview.position.x;
+    renderY = interactionPreview.position.y;
+    renderZ = interactionPreview.position.z;
   }
+
+  const partDimensionPlacements = useMemo(() => {
+    const cameraLocal = new THREE.Vector3(
+      camera.position.x - renderX,
+      camera.position.y - renderY,
+      camera.position.z - renderZ
+    ).applyQuaternion(inverseRotationQuaternion);
+
+    return getPartDimensionPlacements({
+      length: liveDims.length,
+      width: liveDims.width,
+      thickness: liveDims.thickness,
+      cameraLocal: [cameraLocal.x, cameraLocal.y, cameraLocal.z]
+    });
+  }, [
+    camera.position.x,
+    camera.position.y,
+    camera.position.z,
+    inverseRotationQuaternion,
+    liveDims.length,
+    liveDims.thickness,
+    liveDims.width,
+    renderX,
+    renderY,
+    renderZ
+  ]);
+
+  const partDimensionLayout = useMemo(() => {
+    const viewport = { width: size.width, height: size.height };
+    const candidates = [
+      {
+        id: 'length' as const,
+        placement: partDimensionPlacements.length,
+        start: partDimensionPlacements.length.start,
+        end: partDimensionPlacements.length.end,
+        priority: getPartDimensionPriority('length')
+      },
+      {
+        id: 'width' as const,
+        placement: partDimensionPlacements.width,
+        start: partDimensionPlacements.width.start,
+        end: partDimensionPlacements.width.end,
+        priority: getPartDimensionPriority('width')
+      },
+      {
+        id: 'thickness' as const,
+        placement: partDimensionPlacements.thickness,
+        start: partDimensionPlacements.thickness.start,
+        end: partDimensionPlacements.thickness.end,
+        priority: getPartDimensionPriority('thickness')
+      }
+    ];
+
+    const visibleByLength = candidates.filter((candidate) => {
+      const start = new THREE.Vector3(...candidate.start)
+        .applyQuaternion(rotationQuaternion)
+        .add(new THREE.Vector3(renderX, renderY, renderZ));
+      const end = new THREE.Vector3(...candidate.end)
+        .applyQuaternion(rotationQuaternion)
+        .add(new THREE.Vector3(renderX, renderY, renderZ));
+
+      return (
+        getProjectedMeasurementLength(
+          { x: start.x, y: start.y, z: start.z },
+          { x: end.x, y: end.y, z: end.z },
+          camera,
+          viewport
+        ) >= (candidate.id === 'thickness' ? 44 : 56)
+      );
+    });
+
+    return resolveMeasurementOverlayLayout(
+      visibleByLength.map((candidate) => {
+        const labelLocal = new THREE.Vector3(
+          (candidate.start[0] + candidate.end[0]) / 2 + candidate.placement.offsetDir[0] * candidate.placement.offset,
+          (candidate.start[1] + candidate.end[1]) / 2 + candidate.placement.offsetDir[1] * candidate.placement.offset,
+          (candidate.start[2] + candidate.end[2]) / 2 + candidate.placement.offsetDir[2] * candidate.placement.offset
+        );
+        labelLocal.applyQuaternion(rotationQuaternion).add(new THREE.Vector3(renderX, renderY, renderZ));
+
+        return {
+          id: candidate.id,
+          worldPosition: { x: labelLocal.x, y: labelLocal.y, z: labelLocal.z },
+          priority: candidate.priority
+        };
+      }),
+      camera,
+      viewport,
+      42,
+      2
+    );
+  }, [camera, partDimensionPlacements, renderX, renderY, renderZ, rotationQuaternion, size.height, size.width]);
+
+  // Rotation handles stay visible the whole time a single part is selected — they're
+  // the primary affordance for rotating, including the 90° click and drag-rotate.
+  const showSinglePartRotationHandles = isOnlySelected;
+  // Resize handles only appear on hover / during an active resize gesture. Always-on
+  // resize handles clutter the part with small dots that read as opaque rectangles
+  // sitting on top of the part body, especially during drag.
+  const showSinglePartResizeHandles =
+    isOnlySelected &&
+    (isHovered || isResizing || (activeSession?.primaryPartId === part.id && activeSession.kind === 'resize'));
 
   return (
     <group position={[renderX, renderY, renderZ]}>
@@ -289,7 +432,11 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
           onPointerDown={handlePointerDown}
           onPointerOver={handlePointerOver}
           onPointerOut={handlePointerOut}
-          userData={{ partId: part.id }}
+          // ADR-002: descriptor schema so the hit-test service can resolve this mesh.
+          userData={{
+            partId: part.id,
+            hitTarget: { kind: 'part-body', nodeId: part.id, partId: part.id }
+          }}
         >
           <boxGeometry args={dims} />
           {displayMode === 'solid' && <meshStandardMaterial color={part.color} />}
@@ -335,11 +482,12 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             <GrainDirectionArrow liveDims={liveDims} grainDirection={part.grainDirection} />
           )}
 
-        {/* Resize handles - only show when single part selected */}
-        {isOnlySelected &&
+        {/* Resize handles - only show when single part selected and hovered/resizing */}
+        {showSinglePartResizeHandles &&
           HANDLE_POSITIONS.map((handlePos, idx) => (
             <ResizeHandle
               key={idx}
+              partId={part.id}
               liveDims={liveDims}
               handlePos={handlePos}
               onResizeStart={handleResizeStart}
@@ -347,10 +495,11 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             />
           ))}
 
-        {/* Rotation handles on all 6 faces - only show when single part selected */}
-        {isOnlySelected && (
+        {/* Rotation handles on all 6 faces - always visible while a single part is selected */}
+        {showSinglePartRotationHandles && (
           <>
             <RotationHandle
+              partId={part.id}
               liveDims={liveDims}
               axis="y"
               side={1}
@@ -360,6 +509,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               onRotateEnd={handleRotateEnd}
             />
             <RotationHandle
+              partId={part.id}
               liveDims={liveDims}
               axis="y"
               side={-1}
@@ -369,6 +519,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               onRotateEnd={handleRotateEnd}
             />
             <RotationHandle
+              partId={part.id}
               liveDims={liveDims}
               axis="x"
               side={1}
@@ -378,6 +529,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               onRotateEnd={handleRotateEnd}
             />
             <RotationHandle
+              partId={part.id}
               liveDims={liveDims}
               axis="x"
               side={-1}
@@ -387,6 +539,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               onRotateEnd={handleRotateEnd}
             />
             <RotationHandle
+              partId={part.id}
               liveDims={liveDims}
               axis="z"
               side={1}
@@ -396,6 +549,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               onRotateEnd={handleRotateEnd}
             />
             <RotationHandle
+              partId={part.id}
               liveDims={liveDims}
               axis="z"
               side={-1}
@@ -408,34 +562,42 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
         )}
 
         {/* Blueprint-style dimension labels - show for directly selected parts only */}
-        {isDirectlySelected && !isDragging && !activeDragDelta && (
+        {isDirectlySelected && !isDragging && !isResizing && !shouldHideMeasurementOverlays(activeSession) && (
           <>
             <DimensionLabel
-              start={[-liveDims.length / 2, -liveDims.thickness / 2, -liveDims.width / 2]}
-              end={[liveDims.length / 2, -liveDims.thickness / 2, -liveDims.width / 2]}
+              hidden={!partDimensionLayout.get('length')?.visible}
+              start={partDimensionPlacements.length.start}
+              end={partDimensionPlacements.length.end}
               value={liveDims.length}
-              offsetDir={[0, 0, -1]}
-              offset={1.5}
+              offsetDir={partDimensionPlacements.length.offsetDir}
+              offset={partDimensionPlacements.length.offset + (partDimensionLayout.get('length')?.lane ?? 0) * 0.7}
               color="#e74c3c"
               units={units}
+              fontSize={0.44}
             />
             <DimensionLabel
-              start={[liveDims.length / 2, -liveDims.thickness / 2, -liveDims.width / 2]}
-              end={[liveDims.length / 2, -liveDims.thickness / 2, liveDims.width / 2]}
+              hidden={!partDimensionLayout.get('width')?.visible}
+              start={partDimensionPlacements.width.start}
+              end={partDimensionPlacements.width.end}
               value={liveDims.width}
-              offsetDir={[1, 0, 0]}
-              offset={1.5}
+              offsetDir={partDimensionPlacements.width.offsetDir}
+              offset={partDimensionPlacements.width.offset + (partDimensionLayout.get('width')?.lane ?? 0) * 0.7}
               color="#3498db"
               units={units}
+              fontSize={0.44}
             />
             <DimensionLabel
-              start={[liveDims.length / 2, -liveDims.thickness / 2, -liveDims.width / 2]}
-              end={[liveDims.length / 2, liveDims.thickness / 2, -liveDims.width / 2]}
+              hidden={!partDimensionLayout.get('thickness')?.visible}
+              start={partDimensionPlacements.thickness.start}
+              end={partDimensionPlacements.thickness.end}
               value={liveDims.thickness}
-              offsetDir={[1, 0, -1]}
-              offset={1.5}
+              offsetDir={partDimensionPlacements.thickness.offsetDir}
+              offset={
+                partDimensionPlacements.thickness.offset + (partDimensionLayout.get('thickness')?.lane ?? 0) * 0.65
+              }
               color="#2ecc71"
               units={units}
+              fontSize={0.4}
             />
           </>
         )}
