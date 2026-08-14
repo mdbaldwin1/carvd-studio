@@ -71,7 +71,7 @@ interface ProjectState {
 
   // Actions - Parts
   addPart: (part?: Partial<Part>) => string | null;
-  updatePart: (id: string, updates: Partial<Part>) => void;
+  updatePart: (id: string, updates: Partial<Part>) => boolean;
   updateParts: (ids: string[], updates: Partial<Part>) => void;
   batchUpdateParts: (updates: Array<{ id: string; changes: Partial<Part> }>) => void;
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
@@ -468,7 +468,12 @@ export const useProjectStore = create<ProjectState>()(
 
           let nextPart = { ...existingPart, ...updates };
           const affectsOverlap =
-            updates.position !== undefined || updates.rotation !== undefined || updates.ignoreOverlap !== undefined;
+            updates.position !== undefined ||
+            updates.rotation !== undefined ||
+            updates.ignoreOverlap !== undefined ||
+            updates.length !== undefined ||
+            updates.width !== undefined ||
+            updates.thickness !== undefined;
 
           if (state.stockConstraints.preventOverlap && affectsOverlap) {
             const transformed = new Map<string, Part>([[id, nextPart]]);
@@ -523,7 +528,7 @@ export const useProjectStore = create<ProjectState>()(
           };
         });
 
-        if (!didUpdate) return;
+        if (!didUpdate) return false;
 
         get().markCutListStale();
         if (
@@ -535,6 +540,8 @@ export const useProjectStore = create<ProjectState>()(
         ) {
           useSnapStore.getState().updateReferenceDistances();
         }
+
+        return true;
       },
 
       updateParts: (ids, updates) => {
@@ -562,7 +569,10 @@ export const useProjectStore = create<ProjectState>()(
             if (
               changes.position !== undefined ||
               changes.rotation !== undefined ||
-              changes.ignoreOverlap !== undefined
+              changes.ignoreOverlap !== undefined ||
+              changes.length !== undefined ||
+              changes.width !== undefined ||
+              changes.thickness !== undefined
             ) {
               affectsOverlap = true;
             }

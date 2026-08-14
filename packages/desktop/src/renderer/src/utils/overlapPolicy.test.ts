@@ -102,6 +102,50 @@ describe('overlapPolicy', () => {
     expect(wouldTranslationCauseOverlap(parts, movingIds, safe!)).toBe(false);
   });
 
+  it('allows translating a rotated leg under a seat (Dining Bench regression)', () => {
+    const seat = createPart({
+      id: 'seat',
+      name: 'Bench Seat',
+      length: 40,
+      width: 11,
+      thickness: 2,
+      position: { x: 1.5625, y: 18.375, z: -16.4375 },
+      rotation: { x: 0, y: 0, z: 0 }
+    });
+
+    const legStart = createPart({
+      id: 'leg',
+      name: 'Leg 2 (copy)',
+      length: 14.625,
+      width: 1,
+      thickness: 1,
+      position: { x: -14.27589554684791, y: 10.0625, z: -30.61843547323637 },
+      rotation: { x: 270, y: 90, z: 0 }
+    });
+
+    // Place the leg footprint under the seat corner (keeping its original Y).
+    const seatMinX = seat.position.x - seat.length / 2;
+    const seatMinZ = seat.position.z - seat.width / 2;
+    const legTarget = createPart({
+      ...legStart,
+      position: { x: seatMinX + 0.5, y: legStart.position.y, z: seatMinZ + 0.5 }
+    });
+
+    expect(partsOverlap(legTarget, seat)).toBe(false);
+
+    const parts = [seat, legStart];
+    const proposed = {
+      x: legTarget.position.x - legStart.position.x,
+      y: legTarget.position.y - legStart.position.y,
+      z: legTarget.position.z - legStart.position.z
+    };
+    const safe = resolveSafeTranslationDelta(parts, new Set(['leg']), proposed);
+    expect(safe).not.toBeNull();
+    expect(safe!.x).toBeCloseTo(proposed.x, 6);
+    expect(safe!.y).toBeCloseTo(proposed.y, 6);
+    expect(safe!.z).toBeCloseTo(proposed.z, 6);
+  });
+
   it('returns null instead of redirecting to another axis when blocked', () => {
     const target = createPart({
       id: 'target',

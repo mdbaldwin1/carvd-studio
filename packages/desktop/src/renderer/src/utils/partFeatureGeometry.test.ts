@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
+import type { PartFeature } from '../types';
 import {
   clearPartGeometryCache,
   getPartRenderGeometry,
@@ -1090,7 +1091,7 @@ describe('partFeatureGeometry', () => {
             length: 6,
             width: 4,
             thickness: 0.75,
-            features: [config.feature as any]
+            features: [config.feature as unknown as PartFeature]
           })
         );
         geometry.computeBoundingBox();

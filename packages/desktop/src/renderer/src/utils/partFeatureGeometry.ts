@@ -221,10 +221,25 @@ function shapeFromContour(contour: Point2[], holes: Point2[][]): THREE.Shape {
 function getRectCutHole(feature: RectCutFeature, part: Part): Point2[] | null {
   const halfLength = part.length / 2;
   const halfWidth = part.width / 2;
-  const startX = clamp(-halfLength + feature.placement.x, -halfLength + 0.001, halfLength - 0.001);
-  const startZ = clamp(-halfWidth + feature.placement.z, -halfWidth + 0.001, halfWidth - 0.001);
-  const endX = clamp(startX + feature.parameters.size.length, startX + 0.001, halfLength - 0.001);
-  const endZ = clamp(startZ + feature.parameters.size.width, startZ + 0.001, halfWidth - 0.001);
+  const margin = 0.001;
+
+  const rawSX = -halfLength + feature.placement.x;
+  const rawSZ = -halfWidth + feature.placement.z;
+  const rawEX = rawSX + feature.parameters.size.length;
+  const rawEZ = rawSZ + feature.parameters.size.width;
+
+  // When an edge of the cut is flush with the part boundary, extend it to
+  // the boundary instead of clamping inward — this eliminates the thin
+  // sliver of material that would otherwise remain.
+  const flushL = rawSX <= -halfLength + margin;
+  const flushR = rawEX >= halfLength - margin;
+  const flushF = rawSZ <= -halfWidth + margin;
+  const flushB = rawEZ >= halfWidth - margin;
+
+  const startX = flushL ? -halfLength : clamp(rawSX, -halfLength + margin, halfLength - margin);
+  const startZ = flushF ? -halfWidth : clamp(rawSZ, -halfWidth + margin, halfWidth - margin);
+  const endX = flushR ? halfLength : clamp(rawEX, startX + margin, halfLength - margin);
+  const endZ = flushB ? halfWidth : clamp(rawEZ, startZ + margin, halfWidth - margin);
 
   if (endX <= startX || endZ <= startZ) return null;
 
@@ -258,9 +273,45 @@ function applyCutoutToContour(contour: Point2[], feature: RectCutFeature, part: 
 
   if (!fl && !fr && !ff && !fb) return null; // fully interior → use hole
 
-  // Opposite-edge or 3+ edge flush creates disconnected regions — keep as hole
   const flushCount = [fl, fr, ff, fb].filter(Boolean).length;
-  if (flushCount >= 3) return null;
+
+  // 3-edge flush (e.g. dado at one end spanning full width): clip the contour
+  // by clamping points inside the cut zone to the cut boundary. The remaining
+  // material is a single connected region.
+  if (flushCount >= 3) {
+    const sx = Math.max(-halfLength, rawSX);
+    const sz = Math.max(-halfWidth, rawSZ);
+    const ex = Math.min(halfLength, rawEX);
+    const ez = Math.min(halfWidth, rawEZ);
+
+    // Only clamp along axes where the cut is flush on ONE side (not both).
+    // When flush on both sides of an axis, the cut spans the full dimension
+    // and there's nothing to clip along that axis.
+    const clampX = fl !== fr; // exactly one of left/right is flush
+    const clampZ = ff !== fb; // exactly one of front/back is flush
+
+    const clipped = contour.map((p) => ({
+      x: clampX ? (fl ? Math.max(p.x, ex) : Math.min(p.x, sx)) : p.x,
+      z: clampZ ? (ff ? Math.max(p.z, ez) : Math.min(p.z, sz)) : p.z
+    }));
+
+    // Remove consecutive duplicate points
+    const deduped = clipped.filter(
+      (p, i) => i === 0 || Math.abs(p.x - clipped[i - 1].x) > 1e-6 || Math.abs(p.z - clipped[i - 1].z) > 1e-6
+    );
+    // Also check wrap-around duplicate
+    if (
+      deduped.length > 1 &&
+      Math.abs(deduped[0].x - deduped[deduped.length - 1].x) < 1e-6 &&
+      Math.abs(deduped[0].z - deduped[deduped.length - 1].z) < 1e-6
+    ) {
+      deduped.pop();
+    }
+
+    return deduped.length >= 3 ? deduped : null;
+  }
+
+  // Opposite-edge flush without a third creates disconnected regions — keep as hole
   if (flushCount === 2 && ((fl && fr) || (ff && fb))) return null;
 
   const sx = Math.max(-halfLength, rawSX);
@@ -456,14 +507,13 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
         continue;
       }
 
-      // Through-depth cutouts flush with an edge become contour modifications
-      // so the extruded sidewall correctly shows the opening.
-      if (feature.parameters.depthMode === 'through') {
-        const flushed = applyCutoutToContour(layerContour, feature, part);
-        if (flushed) {
-          layerContour = flushed;
-          continue;
-        }
+      // Cutouts flush with an edge become contour modifications so the
+      // extruded sidewall correctly shows the opening (no sliver of material).
+      // This applies to both through and blind cuts in their active layers.
+      const flushed = applyCutoutToContour(layerContour, feature, part);
+      if (flushed) {
+        layerContour = flushed;
+        continue;
       }
 
       const hole = getRectCutHole(feature, part);

@@ -49,7 +49,9 @@ function clamp(value: number, min: number, max: number): number {
 
 export function getRectCutDepth(feature: RectCutFeature, thickness: number): number {
   if (feature.parameters.depthMode === 'through') return thickness;
-  return clamp(feature.parameters.depth ?? 0, 0, Math.max(0, thickness - 0.001));
+  const depth = clamp(feature.parameters.depth ?? 0, 0, thickness);
+  // Treat as full thickness when within tolerance to avoid a paper-thin residual layer
+  return thickness - depth < 0.001 ? thickness : depth;
 }
 
 export function isTopOrBottomFace(face: FaceTarget): boolean {

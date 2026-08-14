@@ -71,7 +71,7 @@ export function usePartDrag(
   togglePartSelection: (id: string) => void,
   selectGroup: (id: string) => void,
   toggleGroupSelection: (id: string) => void,
-  updatePart: (id: string, updates: Partial<PartType>) => void,
+  updatePart: (id: string, updates: Partial<PartType>) => boolean,
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void,
   startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number) => void
 ) {
@@ -160,7 +160,22 @@ export function usePartDrag(
   };
 
   const getDragPlaneInfo = useCallback(
-    (partPosition: THREE.Vector3): DragPlaneInfo => {
+    (partPosition: THREE.Vector3, mode: 'ground' | 'face' = 'ground'): DragPlaneInfo => {
+      // Default: keep parts moving on the ground plane (XZ) so Y doesn't drift
+      // during drag. Holding Shift enables camera-aware face-plane dragging.
+      if (mode === 'ground') {
+        _tempNormal.current.set(0, 1, 0);
+        _tempBasisU.current.set(1, 0, 0);
+        _tempBasisV.current.set(0, 0, 1);
+        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current, partPosition);
+        return {
+          normal: _tempNormal.current,
+          basisU: _tempBasisU.current,
+          basisV: _tempBasisV.current,
+          axes: { x: true, y: false, z: true }
+        };
+      }
+
       _tempForward.current.set(0, 0, -1).applyQuaternion(camera.quaternion);
       _tempNormal.current.copy(_tempForward.current).normalize();
       planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current, partPosition);
@@ -386,7 +401,7 @@ export function usePartDrag(
       if (currentPoint) {
         const delta = _tempDelta.current.copy(currentPoint).sub(dragStart.current.point);
         dragFrameCounterRef.current += 1;
-        const planeInfo = getDragPlaneInfo(dragStart.current.partPos);
+        const planeInfo = getDragPlaneInfo(dragStart.current.partPos, evt.shiftKey ? 'face' : 'ground');
 
         let uAmount = delta.dot(planeInfo.basisU);
         let vAmount = delta.dot(planeInfo.basisV);
@@ -679,9 +694,14 @@ export function usePartDrag(
           (lastDragPosition.current.x - dragStart.current.partOriginalPos.x) ** 2 +
           (lastDragPosition.current.y - dragStart.current.partOriginalPos.y) ** 2 +
           (lastDragPosition.current.z - dragStart.current.partOriginalPos.z) ** 2;
-        let newX = lastDragPosition.current.x;
-        let newY = lastDragPosition.current.y;
-        let newZ = lastDragPosition.current.z;
+        const { liveGridSnap } = useAppSettingsStore.getState().settings;
+        const rawX = lastDragPosition.current.x;
+        const rawY = lastDragPosition.current.y;
+        const rawZ = lastDragPosition.current.z;
+
+        let newX = wasSnappedByParts.current.x || !liveGridSnap ? rawX : snapToGrid(rawX);
+        let newY = wasSnappedByParts.current.y || !liveGridSnap ? rawY : snapToGrid(rawY);
+        let newZ = wasSnappedByParts.current.z || !liveGridSnap ? rawZ : snapToGrid(rawZ);
 
         const currentSelectedIds = useSelectionStore.getState().selectedPartIds;
         const currentSelectedGroupIds = useSelectionStore.getState().selectedGroupIds;
@@ -934,7 +954,7 @@ export function usePartDrag(
       moveSelection.anchorPosition.z
     );
 
-    getDragPlaneInfo(anchorPos);
+    getDragPlaneInfo(anchorPos, 'ground');
 
     const startPoint = getWorldPoint(e.nativeEvent);
     const partOriginalPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);

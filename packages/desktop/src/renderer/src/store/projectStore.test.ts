@@ -151,6 +151,31 @@ describe('projectStore', () => {
         const part2 = state.parts.find((p) => p.id === part2Id);
         expect(part2?.name).toBe('Part 2');
       });
+
+      it('prevents dimension updates that would overlap another part when preventOverlap is enabled', () => {
+        const store = useProjectStore.getState();
+
+        const partAId = store.addPart({
+          name: 'A',
+          position: { x: 0, y: 0.5, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        });
+        store.addPart({
+          name: 'B',
+          position: { x: 12, y: 0.5, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        });
+
+        store.updatePart(partAId, { length: 30 });
+
+        const state = useProjectStore.getState();
+        const partA = state.parts.find((p) => p.id === partAId);
+        expect(partA?.length).toBe(10);
+      });
     });
 
     describe('updateParts', () => {
@@ -170,8 +195,22 @@ describe('projectStore', () => {
     describe('batchUpdateParts', () => {
       it('updates multiple parts with different changes each', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1', color: '#ffffff' });
-        const part2Id = store.addPart({ name: 'Part 2', color: '#ffffff' });
+        const part1Id = store.addPart({
+          name: 'Part 1',
+          color: '#ffffff',
+          position: { x: 0, y: 0.75, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        });
+        const part2Id = store.addPart({
+          name: 'Part 2',
+          color: '#ffffff',
+          position: { x: 20, y: 0.75, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        });
 
         store.batchUpdateParts([
           { id: part1Id, changes: { color: '#ff0000', length: 30 } },
@@ -209,6 +248,31 @@ describe('projectStore', () => {
         const state = useProjectStore.getState();
         expect(state.parts).toHaveLength(1);
         expect(state.parts[0].name).toBe('Updated');
+      });
+
+      it('prevents batched dimension updates that would cause overlap when preventOverlap is enabled', () => {
+        const store = useProjectStore.getState();
+
+        const partAId = store.addPart({
+          name: 'A',
+          position: { x: 0, y: 0.5, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        });
+        store.addPart({
+          name: 'B',
+          position: { x: 12, y: 0.5, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        });
+
+        store.batchUpdateParts([{ id: partAId, changes: { length: 30 } }]);
+
+        const state = useProjectStore.getState();
+        const partA = state.parts.find((p) => p.id === partAId);
+        expect(partA?.length).toBe(10);
       });
     });
 

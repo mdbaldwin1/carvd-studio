@@ -19,6 +19,7 @@ import { getPartRenderGeometry } from '@renderer/utils/partFeatureGeometry';
 import { getRectCutDepth, getResolvedRectCutFeature } from '@renderer/utils/rectCutUtils';
 import { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 interface PartCutsPreviewCanvasProps {
   part: Part;
@@ -571,7 +572,7 @@ function PartCutsPreviewScene({
     [draft, previewPart]
   );
   const groupRef = useRef<THREE.Group>(null);
-  const controlsRef = useRef<{ enabled: boolean } | null>(null);
+  const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const activeDragRef = useRef<ActiveDragState | null>(null);
   const [isDraggingHandle, setIsDraggingHandle] = useState(false);
 
@@ -778,7 +779,7 @@ function PartCutsPreviewScene({
       </group>
 
       <OrbitControls
-        ref={controlsRef as any}
+        ref={controlsRef}
         enablePan={false}
         minDistance={maxDimension * 0.8}
         maxDistance={maxDimension * 6}

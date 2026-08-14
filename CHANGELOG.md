@@ -42,6 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Prevent Overlap during resize** — Prevent Overlap now blocks dimension-only edits (including resize commits) that would make a part overlap another part.
+- **Part context menu right-click** — Restored right-click-on-part context menu behavior on macOS trackpads (`ctrl`+click).
+- **Background clicks selecting parts** — Fixed background clicks sometimes selecting a part due to an over-eager screen-space hit-test fallback.
+- **Drag plane Y drift** — Dragging parts now defaults to the ground plane (XZ) to avoid unintended vertical drift; hold `Shift` while dragging to enable face-plane dragging.
+- **Drag/drop jumpiness with Prevent Overlap** — Drag commits now respect the grid snap setting and immediately revert the live preview if a drop is rejected, preventing “sticks until deselect then snaps back”.
 - **Compound end-cut bevel direction in Part Cuts (POC)** — End-cut editors now expose explicit `High Point On` control for bevel and compound cuts, and the renderer applies that vertical direction so compound cuts no longer appear to ignore their bevel component.
 
 ## [1.0.5] - 2026-08-13
