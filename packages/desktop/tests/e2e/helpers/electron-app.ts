@@ -151,7 +151,7 @@ export async function closeElectronApp(running: RunningElectronApp | undefined):
       // Process may already be gone.
     }
   }
-  fs.rmSync(running.userDataDir, { recursive: true, force: true });
+  fs.rmSync(running.userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 });
 }
 
 export async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {

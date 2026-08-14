@@ -144,8 +144,9 @@ async function clickTabDownloadItem(cutListDialog: ReturnType<Page['locator']>, 
 }
 
 async function expectSavedFile(filePath: string) {
-  await expect.poll(() => fs.existsSync(filePath), { timeout: 5000 }).toBe(true);
-  expect(fs.statSync(filePath).size).toBeGreaterThan(0);
+  await expect
+    .poll(() => (fs.existsSync(filePath) ? fs.statSync(filePath).size : 0), { timeout: 5000 })
+    .toBeGreaterThan(0);
 }
 
 async function setLicenseMode(window: Page, mode: 'trial' | 'licensed' | 'free') {

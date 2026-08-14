@@ -108,7 +108,7 @@ test.describe('project file lifecycle', () => {
     await window.getByRole('tab', { name: 'Favorites' }).click();
     await expect(window.getByText('favorite-project')).toBeVisible();
 
-    const removeFavoriteButton = window.getByLabel('Remove favorite-project from favorites');
+    const removeFavoriteButton = window.getByLabel(/Remove .*favorite-project from favorites/);
     await expect(removeFavoriteButton).toBeVisible();
     await removeFavoriteButton.evaluate((button) => (button as HTMLButtonElement).click());
     await expect
