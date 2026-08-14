@@ -1,222 +1,80 @@
-import { Line, Text } from '@react-three/drei';
-import { Suspense, memo, useMemo } from 'react';
+import { useThree } from '@react-three/fiber';
+import { useMemo } from 'react';
 import * as THREE from 'three';
-import { useProjectStore, getAllDescendantPartIds } from '../../store/projectStore';
-import { useSelectionStore } from '../../store/selectionStore';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { resolveMeasurementSelectionEntities } from '../../utils/interactionSelection';
+import { getProjectedMeasurementLength, resolveMeasurementOverlayLayout } from '../../utils/measurementOverlayLayout';
+import { getBoundingBoxDimensionPlacements } from '../../utils/measurementPlacement';
+import { getBoundingMeasurementPriority } from '../../utils/measurementPriority';
+import { DimensionLabel } from './DimensionLabel';
 import { getPartAABB } from './workspaceUtils';
-import labelFontUrl from '../../assets/fonts/NotoSans-Variable.ttf?url';
+import type { DimensionOverlayInputs } from '../../interaction/overlayModel';
 
 const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
 
-// Blueprint-style dimension label for multi-selection bounding box
-const BoundingBoxDimensionLabel = memo(
-  function BoundingBoxDimensionLabel({
-    start,
-    end,
-    value,
-    offsetDir,
-    offset = 2,
-    color = '#ffffff',
-    units
-  }: {
-    start: [number, number, number];
-    end: [number, number, number];
-    value: number;
-    offsetDir: [number, number, number];
-    offset?: number;
-    color?: string;
-    units: 'imperial' | 'metric';
-  }) {
-    const midX = (start[0] + end[0]) / 2;
-    const midY = (start[1] + end[1]) / 2;
-    const midZ = (start[2] + end[2]) / 2;
+interface MultiSelectionDimensionsProps {
+  /** Dimensions slot from the OverlayModel. `null` hides the overlay. */
+  data: DimensionOverlayInputs | null;
+}
 
-    const dirLen = Math.sqrt(offsetDir[0] ** 2 + offsetDir[1] ** 2 + offsetDir[2] ** 2);
-    const offsetVec: [number, number, number] = [
-      (offsetDir[0] / dirLen) * offset,
-      (offsetDir[1] / dirLen) * offset,
-      (offsetDir[2] / dirLen) * offset
-    ];
+// Stable empty defaults so hooks can run unconditionally when `data` is null.
+const EMPTY_PARTS: DimensionOverlayInputs['parts'] = [];
+const EMPTY_STRINGS: ReadonlyArray<string> = [];
+const EMPTY_GROUP_MEMBERS: DimensionOverlayInputs['groupMembers'] = [];
 
-    const offsetStart: [number, number, number] = [
-      start[0] + offsetVec[0],
-      start[1] + offsetVec[1],
-      start[2] + offsetVec[2]
-    ];
-    const offsetEnd: [number, number, number] = [end[0] + offsetVec[0], end[1] + offsetVec[1], end[2] + offsetVec[2]];
-    const labelPos: [number, number, number] = [midX + offsetVec[0], midY + offsetVec[1], midZ + offsetVec[2]];
-    const labelText = formatMeasurementWithUnit(value, units);
-    const lineLength = Math.sqrt(
-      (offsetEnd[0] - offsetStart[0]) ** 2 + (offsetEnd[1] - offsetStart[1]) ** 2 + (offsetEnd[2] - offsetStart[2]) ** 2
-    );
-    const lineDir: [number, number, number] = [
-      (offsetEnd[0] - offsetStart[0]) / Math.max(lineLength, 1e-6),
-      (offsetEnd[1] - offsetStart[1]) / Math.max(lineLength, 1e-6),
-      (offsetEnd[2] - offsetStart[2]) / Math.max(lineLength, 1e-6)
-    ];
-    const labelGap = Math.max(0.56, Math.min(0.94, 0.38 + labelText.length * 0.05));
-    const halfGap = Math.min(labelGap * 0.5, lineLength * 0.45);
-    const lineLeftEnd: [number, number, number] = [
-      labelPos[0] - lineDir[0] * halfGap,
-      labelPos[1] - lineDir[1] * halfGap,
-      labelPos[2] - lineDir[2] * halfGap
-    ];
-    const lineRightStart: [number, number, number] = [
-      labelPos[0] + lineDir[0] * halfGap,
-      labelPos[1] + lineDir[1] * halfGap,
-      labelPos[2] + lineDir[2] * halfGap
-    ];
-    const textQuaternion = new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0, 0, 1),
-      new THREE.Vector3(offsetVec[0], offsetVec[1], offsetVec[2]).normalize()
-    );
+// ADR-005: MultiSelectionDimensions is a pure prop consumer. The slot in
+// OverlayModel gates rendering on `activeSession === null && hasSelection`;
+// the heavy AABB / gap computation memoized below stays in the component.
+export function MultiSelectionDimensions({ data }: MultiSelectionDimensionsProps) {
+  const { camera, size } = useThree();
 
-    // Calculate tick direction
-    const dimDir: [number, number, number] = [end[0] - start[0], end[1] - start[1], end[2] - start[2]];
-    const tickDir: [number, number, number] = [
-      dimDir[1] * offsetVec[2] - dimDir[2] * offsetVec[1],
-      dimDir[2] * offsetVec[0] - dimDir[0] * offsetVec[2],
-      dimDir[0] * offsetVec[1] - dimDir[1] * offsetVec[0]
-    ];
-    const tickLen = Math.sqrt(tickDir[0] ** 2 + tickDir[1] ** 2 + tickDir[2] ** 2);
-    const tickLength = 0.4;
-    const normalizedTick: [number, number, number] =
-      tickLen > 0
-        ? [
-            ((tickDir[0] / tickLen) * tickLength) / 2,
-            ((tickDir[1] / tickLen) * tickLength) / 2,
-            ((tickDir[2] / tickLen) * tickLength) / 2
-          ]
-        : [0, tickLength / 2, 0];
+  // Rules of Hooks: hooks must run unconditionally. Read inputs through
+  // stable empty defaults so the hook signatures stay constant when `data`
+  // is null; we early-return after the hook prelude.
+  const parts = data?.parts ?? EMPTY_PARTS;
+  const selectedPartIds = data?.selectedPartIds ?? EMPTY_STRINGS;
+  const selectedGroupIds = data?.selectedGroupIds ?? EMPTY_STRINGS;
+  const groupMembers = data?.groupMembers ?? EMPTY_GROUP_MEMBERS;
+  const units = data?.units ?? 'imperial';
 
-    return (
-      <group>
-        {/* Main dimension line with centered gap at the label */}
-        <Line points={[offsetStart, lineLeftEnd]} color={color} lineWidth={2} raycast={NOOP_RAYCAST} />
-        <Line points={[lineRightStart, offsetEnd]} color={color} lineWidth={2} raycast={NOOP_RAYCAST} />
-
-        {/* Start extension line */}
-        <Line
-          raycast={NOOP_RAYCAST}
-          points={[
-            [start[0] + offsetVec[0] * 0.2, start[1] + offsetVec[1] * 0.2, start[2] + offsetVec[2] * 0.2],
-            [
-              offsetStart[0] + offsetVec[0] * 0.15,
-              offsetStart[1] + offsetVec[1] * 0.15,
-              offsetStart[2] + offsetVec[2] * 0.15
-            ]
-          ]}
-          color={color}
-          lineWidth={1}
-        />
-
-        {/* End extension line */}
-        <Line
-          raycast={NOOP_RAYCAST}
-          points={[
-            [end[0] + offsetVec[0] * 0.2, end[1] + offsetVec[1] * 0.2, end[2] + offsetVec[2] * 0.2],
-            [offsetEnd[0] + offsetVec[0] * 0.15, offsetEnd[1] + offsetVec[1] * 0.15, offsetEnd[2] + offsetVec[2] * 0.15]
-          ]}
-          color={color}
-          lineWidth={1}
-        />
-
-        {/* Start tick mark */}
-        <Line
-          raycast={NOOP_RAYCAST}
-          points={[
-            [
-              offsetStart[0] - normalizedTick[0],
-              offsetStart[1] - normalizedTick[1],
-              offsetStart[2] - normalizedTick[2]
-            ],
-            [offsetStart[0] + normalizedTick[0], offsetStart[1] + normalizedTick[1], offsetStart[2] + normalizedTick[2]]
-          ]}
-          color={color}
-          lineWidth={2}
-        />
-
-        {/* End tick mark */}
-        <Line
-          raycast={NOOP_RAYCAST}
-          points={[
-            [offsetEnd[0] - normalizedTick[0], offsetEnd[1] - normalizedTick[1], offsetEnd[2] - normalizedTick[2]],
-            [offsetEnd[0] + normalizedTick[0], offsetEnd[1] + normalizedTick[1], offsetEnd[2] + normalizedTick[2]]
-          ]}
-          color={color}
-          lineWidth={2}
-        />
-
-        {/* Dimension text (3D mesh so depth/occlusion is consistent with scene geometry) */}
-        <Suspense fallback={null}>
-          <Text
-            raycast={NOOP_RAYCAST}
-            position={labelPos}
-            quaternion={textQuaternion}
-            font={labelFontUrl}
-            fontSize={0.38}
-            color={color}
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.02}
-            outlineColor="#000000"
-          >
-            {labelText}
-          </Text>
-        </Suspense>
-      </group>
-    );
-  },
-  (prev, next) =>
-    prev.value === next.value &&
-    prev.offset === next.offset &&
-    prev.color === next.color &&
-    prev.units === next.units &&
-    prev.start[0] === next.start[0] &&
-    prev.start[1] === next.start[1] &&
-    prev.start[2] === next.start[2] &&
-    prev.end[0] === next.end[0] &&
-    prev.end[1] === next.end[1] &&
-    prev.end[2] === next.end[2] &&
-    prev.offsetDir[0] === next.offsetDir[0] &&
-    prev.offsetDir[1] === next.offsetDir[1] &&
-    prev.offsetDir[2] === next.offsetDir[2]
-);
-
-// Component that shows overall bounding box dimensions when multiple parts are selected
-export function MultiSelectionDimensions() {
-  const parts = useProjectStore((s) => s.parts);
-  const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
-  const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
-  const groupMembers = useProjectStore((s) => s.groupMembers);
-  const activeDragDelta = useSelectionStore((s) => s.activeDragDelta);
-  const units = useProjectStore((s) => s.units);
-
-  // Calculate effective selected part IDs (includes parts from selected groups)
-  const effectiveSelectedPartIds = useMemo(() => {
-    const partIds = new Set(selectedPartIds);
-    for (const groupId of selectedGroupIds) {
-      const groupPartIds = getAllDescendantPartIds(groupId, groupMembers);
-      groupPartIds.forEach((id) => partIds.add(id));
-    }
-    return [...partIds];
+  const measurementEntities = useMemo(() => {
+    return resolveMeasurementSelectionEntities({ selectedPartIds, selectedGroupIds }, groupMembers);
   }, [selectedPartIds, selectedGroupIds, groupMembers]);
 
   // Memoize the heavy AABB + gap calculations
   const boundsData = useMemo(() => {
     // Show bounding box for 2+ selected parts, or for group selections (even single-part groups)
     const hasGroupSelection = selectedGroupIds.length > 0;
-    const minParts = hasGroupSelection ? 1 : 2;
-    if (effectiveSelectedPartIds.length < minParts) return null;
+    const minEntities = hasGroupSelection ? 1 : 2;
+    if (measurementEntities.length < minEntities) return null;
 
-    const selectedParts = parts.filter((p) => effectiveSelectedPartIds.includes(p.id));
-    if (selectedParts.length < minParts) return null;
+    const entityAABBs = measurementEntities
+      .map((entity) => {
+        const entityParts = parts.filter((part) => entity.partIds.includes(part.id));
+        if (entityParts.length === 0) return null;
 
-    const partAABBs = selectedParts.map((part) => ({
-      part,
-      aabb: getPartAABB(part)
-    }));
+        const partAABBs = entityParts.map((part) => getPartAABB(part));
+        return {
+          entity,
+          aabb: {
+            minX: Math.min(...partAABBs.map((aabb) => aabb.minX)),
+            maxX: Math.max(...partAABBs.map((aabb) => aabb.maxX)),
+            minY: Math.min(...partAABBs.map((aabb) => aabb.minY)),
+            maxY: Math.max(...partAABBs.map((aabb) => aabb.maxY)),
+            minZ: Math.min(...partAABBs.map((aabb) => aabb.minZ)),
+            maxZ: Math.max(...partAABBs.map((aabb) => aabb.maxZ))
+          }
+        };
+      })
+      .filter(
+        (
+          entry
+        ): entry is {
+          entity: (typeof measurementEntities)[number];
+          aabb: ReturnType<typeof getPartAABB>;
+        } => entry !== null
+      );
+
+    if (entityAABBs.length < minEntities) return null;
 
     let minX = Infinity,
       maxX = -Infinity;
@@ -225,7 +83,7 @@ export function MultiSelectionDimensions() {
     let minZ = Infinity,
       maxZ = -Infinity;
 
-    for (const { aabb } of partAABBs) {
+    for (const { aabb } of entityAABBs) {
       minX = Math.min(minX, aabb.minX);
       maxX = Math.max(maxX, aabb.maxX);
       minY = Math.min(minY, aabb.minY);
@@ -242,7 +100,7 @@ export function MultiSelectionDimensions() {
       distance: number;
     }[] = [];
 
-    const sortedByX = [...partAABBs].sort((a, b) => a.aabb.minX - b.aabb.minX);
+    const sortedByX = [...entityAABBs].sort((a, b) => a.aabb.minX - b.aabb.minX);
     for (let i = 0; i < sortedByX.length - 1; i++) {
       const current = sortedByX[i];
       const next = sortedByX[i + 1];
@@ -259,7 +117,7 @@ export function MultiSelectionDimensions() {
       }
     }
 
-    const sortedByZ = [...partAABBs].sort((a, b) => a.aabb.minZ - b.aabb.minZ);
+    const sortedByZ = [...entityAABBs].sort((a, b) => a.aabb.minZ - b.aabb.minZ);
     for (let i = 0; i < sortedByZ.length - 1; i++) {
       const current = sortedByZ[i];
       const next = sortedByZ[i + 1];
@@ -276,7 +134,7 @@ export function MultiSelectionDimensions() {
       }
     }
 
-    const sortedByY = [...partAABBs].sort((a, b) => a.aabb.minY - b.aabb.minY);
+    const sortedByY = [...entityAABBs].sort((a, b) => a.aabb.minY - b.aabb.minY);
     for (let i = 0; i < sortedByY.length - 1; i++) {
       const current = sortedByY[i];
       const next = sortedByY[i + 1];
@@ -294,54 +152,166 @@ export function MultiSelectionDimensions() {
     }
 
     return { minX, maxX, minY, maxY, minZ, maxZ, gaps };
-  }, [effectiveSelectedPartIds, parts, selectedGroupIds]);
+  }, [measurementEntities, parts, selectedGroupIds]);
 
+  const dimensionLayout = useMemo(() => {
+    if (!boundsData) {
+      return new Set<string>();
+    }
+
+    const { minX, maxX, minY, maxY, minZ, maxZ, gaps } = boundsData;
+    const sizeX = maxX - minX;
+    const sizeY = maxY - minY;
+    const sizeZ = maxZ - minZ;
+    const placements = getBoundingBoxDimensionPlacements({
+      minX,
+      maxX,
+      minY,
+      maxY,
+      minZ,
+      maxZ,
+      cameraWorld: [camera.position.x, camera.position.y, camera.position.z]
+    });
+    const viewport = { width: size.width, height: size.height };
+    const candidates = [
+      {
+        id: 'bound-x',
+        start: placements.x.start,
+        end: placements.x.end,
+        labelPosition: {
+          x: (placements.x.start[0] + placements.x.end[0]) / 2 + placements.x.offsetDir[0] * placements.x.offset,
+          y: (placements.x.start[1] + placements.x.end[1]) / 2 + placements.x.offsetDir[1] * placements.x.offset,
+          z: (placements.x.start[2] + placements.x.end[2]) / 2 + placements.x.offsetDir[2] * placements.x.offset
+        },
+        priority: getBoundingMeasurementPriority('overall', 'x', sizeX)
+      },
+      {
+        id: 'bound-z',
+        start: placements.z.start,
+        end: placements.z.end,
+        labelPosition: {
+          x: (placements.z.start[0] + placements.z.end[0]) / 2 + placements.z.offsetDir[0] * placements.z.offset,
+          y: (placements.z.start[1] + placements.z.end[1]) / 2 + placements.z.offsetDir[1] * placements.z.offset,
+          z: (placements.z.start[2] + placements.z.end[2]) / 2 + placements.z.offsetDir[2] * placements.z.offset
+        },
+        priority: getBoundingMeasurementPriority('overall', 'z', sizeZ)
+      },
+      {
+        id: 'bound-y',
+        start: placements.y.start,
+        end: placements.y.end,
+        labelPosition: {
+          x: (placements.y.start[0] + placements.y.end[0]) / 2 + placements.y.offsetDir[0] * placements.y.offset,
+          y: (placements.y.start[1] + placements.y.end[1]) / 2 + placements.y.offsetDir[1] * placements.y.offset,
+          z: (placements.y.start[2] + placements.y.end[2]) / 2 + placements.y.offsetDir[2] * placements.y.offset
+        },
+        priority: getBoundingMeasurementPriority('overall', 'y', sizeY)
+      },
+      ...gaps.map((gap, index) => {
+        const gapOffsetDir: [number, number, number] =
+          gap.axis === 'x' ? [0, 1, 0] : gap.axis === 'z' ? [0, 1, 0] : [1, 0, 0];
+        return {
+          id: `gap-${index}`,
+          start: gap.start,
+          end: gap.end,
+          labelPosition: {
+            x: (gap.start[0] + gap.end[0]) / 2 + gapOffsetDir[0] * 1.5,
+            y: (gap.start[1] + gap.end[1]) / 2 + gapOffsetDir[1] * 1.5,
+            z: (gap.start[2] + gap.end[2]) / 2 + gapOffsetDir[2] * 1.5
+          },
+          priority: getBoundingMeasurementPriority('gap', gap.axis, gap.distance)
+        };
+      })
+    ].filter((candidate) => {
+      const length = getProjectedMeasurementLength(
+        { x: candidate.start[0], y: candidate.start[1], z: candidate.start[2] },
+        { x: candidate.end[0], y: candidate.end[1], z: candidate.end[2] },
+        camera,
+        viewport
+      );
+
+      return length >= (candidate.id.startsWith('gap-') ? 42 : 56);
+    });
+
+    return resolveMeasurementOverlayLayout(
+      candidates.map((candidate) => ({
+        id: candidate.id,
+        worldPosition: candidate.labelPosition,
+        priority: candidate.priority
+      })),
+      camera,
+      viewport,
+      44,
+      3
+    );
+  }, [boundsData, camera, size.height, size.width]);
+
+  // ADR-005: the OverlayModel slot already gates on `activeSession === null`
+  // and "has selection." All we need at the component level is "the bounds
+  // computation produced a result" (i.e. ≥ minEntities for the selection
+  // shape).
+  if (!data) return null;
   if (!boundsData) return null;
-  if (activeDragDelta) return null; // Hide dimension labels while dragging
 
   const { minX, maxX, minY, maxY, minZ, maxZ, gaps } = boundsData;
   const sizeX = maxX - minX;
   const sizeY = maxY - minY;
   const sizeZ = maxZ - minZ;
-
-  const bottomFrontLeft: [number, number, number] = [minX, minY, minZ];
-  const bottomFrontRight: [number, number, number] = [maxX, minY, minZ];
-  const bottomBackRight: [number, number, number] = [maxX, minY, maxZ];
-  const topFrontRight: [number, number, number] = [maxX, maxY, minZ];
+  const placements = getBoundingBoxDimensionPlacements({
+    minX,
+    maxX,
+    minY,
+    maxY,
+    minZ,
+    maxZ,
+    cameraWorld: [camera.position.x, camera.position.y, camera.position.z]
+  });
 
   return (
     <group>
       {/* X dimension (width) - along front edge at bottom, offset toward -Z */}
-      <BoundingBoxDimensionLabel
-        start={bottomFrontLeft}
-        end={bottomFrontRight}
+      <DimensionLabel
+        hidden={!dimensionLayout.get('bound-x')?.visible}
+        start={placements.x.start}
+        end={placements.x.end}
         value={sizeX}
-        offsetDir={[0, 0, -1]}
-        offset={3}
+        offsetDir={placements.x.offsetDir}
+        offset={placements.x.offset + (dimensionLayout.get('bound-x')?.lane ?? 0) * 0.85}
         color="#ff6b6b"
         units={units}
+        fontSize={0.5}
+        lineWidth={2}
+        tickLength={0.46}
       />
 
       {/* Z dimension (depth) - along right edge at bottom, offset toward +X */}
-      <BoundingBoxDimensionLabel
-        start={bottomFrontRight}
-        end={bottomBackRight}
+      <DimensionLabel
+        hidden={!dimensionLayout.get('bound-z')?.visible}
+        start={placements.z.start}
+        end={placements.z.end}
         value={sizeZ}
-        offsetDir={[1, 0, 0]}
-        offset={3}
+        offsetDir={placements.z.offsetDir}
+        offset={placements.z.offset + (dimensionLayout.get('bound-z')?.lane ?? 0) * 0.85}
         color="#4dabf7"
         units={units}
+        fontSize={0.5}
+        lineWidth={2}
+        tickLength={0.46}
       />
 
       {/* Y dimension (height) - along front-right vertical edge, offset diagonally */}
-      <BoundingBoxDimensionLabel
-        start={bottomFrontRight}
-        end={topFrontRight}
+      <DimensionLabel
+        hidden={!dimensionLayout.get('bound-y')?.visible}
+        start={placements.y.start}
+        end={placements.y.end}
         value={sizeY}
-        offsetDir={[1, 0, -1]}
-        offset={3}
+        offsetDir={placements.y.offsetDir}
+        offset={placements.y.offset + (dimensionLayout.get('bound-y')?.lane ?? 0) * 0.85}
         color="#69db7c"
         units={units}
+        fontSize={0.5}
+        lineWidth={2}
+        tickLength={0.46}
       />
 
       {/* Gap/spacing dimensions between parts */}
@@ -349,15 +319,18 @@ export function MultiSelectionDimensions() {
         const offsetDir: [number, number, number] =
           gap.axis === 'x' ? [0, 1, 0] : gap.axis === 'z' ? [0, 1, 0] : [1, 0, 0];
         return (
-          <BoundingBoxDimensionLabel
+          <DimensionLabel
             key={`gap-${index}`}
+            hidden={!dimensionLayout.get(`gap-${index}`)?.visible}
             start={gap.start}
             end={gap.end}
             value={gap.distance}
             offsetDir={offsetDir}
-            offset={1.5}
+            offset={1.5 + (dimensionLayout.get(`gap-${index}`)?.lane ?? 0) * 0.7}
             color="#ffd43b"
             units={units}
+            fontSize={0.42}
+            lineWidth={1.5}
           />
         );
       })}

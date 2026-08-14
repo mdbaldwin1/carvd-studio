@@ -3,6 +3,7 @@ import { useClipboardStore } from './clipboardStore';
 import { useProjectStore } from './projectStore';
 import { useSelectionStore } from './selectionStore';
 import { useLicenseStore } from './licenseStore';
+import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
 
 // Helper to reset store state before each test
@@ -21,6 +22,7 @@ const resetStores = () => {
   useClipboardStore.setState({
     clipboard: { parts: [], groups: [], groupMembers: [] }
   });
+  useInteractionStore.getState().endSession();
   useLicenseStore.setState({ licenseMode: 'trial' });
   useUIStore.setState({ toast: null });
 };

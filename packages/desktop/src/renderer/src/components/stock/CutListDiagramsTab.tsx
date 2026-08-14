@@ -4,9 +4,10 @@ import type { WheelEvent } from 'react';
 import { UNTITLED_PROJECT_NAME } from '@renderer/constants/appDefaults';
 import { Button } from '@renderer/components/ui/button';
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from '@renderer/components/ui/dialog';
-import { getAncestorGroupIds, useProjectStore } from '../../store/projectStore';
+import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import { getBlockedMessage } from '../../utils/featureLimits';
+import { getAncestorGroupIds } from '../../utils/interactionSelection';
 // pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { showSavedFileToast } from '../../utils/fileToast';
 import { logger } from '../../utils/logger';

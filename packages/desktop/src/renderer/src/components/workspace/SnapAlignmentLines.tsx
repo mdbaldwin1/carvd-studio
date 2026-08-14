@@ -1,22 +1,26 @@
 import { Html, Line } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useProjectStore } from '../../store/projectStore';
-import { useSnapStore } from '../../store/snapStore';
-import { useCameraStore } from '../../store/cameraStore';
 import { SnapLine } from '../../types';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
+import type { SnapOverlayData } from '../../interaction/overlayModel';
 
-// Component that renders snap alignment lines during drag operations
-export function SnapAlignmentLines() {
+interface SnapAlignmentLinesProps {
+  /** Snap slice from the OverlayModel. `null` hides the overlay entirely. */
+  data: SnapOverlayData | null;
+  units: 'imperial' | 'metric';
+  displayMode: 'solid' | 'translucent' | 'wireframe';
+}
+
+// ADR-005: SnapAlignmentLines is a pure prop consumer. Workspace computes the
+// overlay model and passes the snap slice + units + displayMode down. The
+// component does not read from stores.
+export function SnapAlignmentLines({ data, units, displayMode }: SnapAlignmentLinesProps) {
   const { camera } = useThree();
-  const activeSnapLines = useSnapStore((s) => s.activeSnapLines);
-  const snapPulseAt = useSnapStore((s) => s.snapPulseAt);
-  const snapLabelPosition = useSnapStore((s) => s.snapLabelPosition);
-  const units = useProjectStore((s) => s.units);
-  const displayMode = useCameraStore((s) => s.displayMode);
 
-  if (activeSnapLines.length === 0) return null;
+  if (!data) return null;
+
+  const { lines: activeSnapLines, pulseAt: snapPulseAt, labelPosition: snapLabelPosition } = data;
 
   const now = performance.now();
   const pulseAge = now - snapPulseAt;
@@ -177,10 +181,13 @@ export function SnapAlignmentLines() {
               fontSize: '10px',
               fontWeight: 'bold',
               fontFamily: 'monospace',
-              backgroundColor: 'rgba(0,0,0,0.78)',
+              backgroundColor: 'rgba(0,0,0,0.45)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
               padding: '2px 6px',
               borderRadius: '4px',
-              border: '1px solid #00d9ff'
+              border: '1px solid #00d9ff',
+              textShadow: '0 0 3px rgba(0,0,0,0.85)'
             }}
           >
             SNAP LOCK
@@ -233,7 +240,7 @@ export function SnapAlignmentLines() {
                   : [(line.start.x + line.end.x) / 2, (line.start.y + line.end.y) / 2, (line.start.z + line.end.z) / 2]
               }
               center
-              occlude={displayMode === 'solid' ? 'blending' : false}
+              occlude={displayMode === 'solid'}
               zIndexRange={[0, 40]}
               style={{ pointerEvents: 'none' }}
             >
@@ -243,12 +250,15 @@ export function SnapAlignmentLines() {
                   fontSize: '10px',
                   fontWeight: 'bold',
                   fontFamily: 'monospace',
-                  backgroundColor: 'rgba(0, 0, 0, 0.82)',
+                  backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                  backdropFilter: 'blur(4px)',
+                  WebkitBackdropFilter: 'blur(4px)',
                   padding: '1px 5px',
                   borderRadius: '3px',
                   whiteSpace: 'nowrap',
                   userSelect: 'none',
-                  border: `1px solid ${getLineColor(line)}`
+                  border: `1px solid ${getLineColor(line)}`,
+                  textShadow: '0 0 3px rgba(0,0,0,0.85)'
                 }}
               >
                 {getSnapToken(line)}
@@ -306,7 +316,7 @@ export function SnapAlignmentLines() {
                 <Html
                   position={[indicator.labelPosition.x, indicator.labelPosition.y, indicator.labelPosition.z]}
                   center
-                  occlude={displayMode === 'solid' ? 'blending' : false}
+                  occlude={displayMode === 'solid'}
                   zIndexRange={[0, 50]}
                   style={{ pointerEvents: 'none' }}
                 >
@@ -316,12 +326,15 @@ export function SnapAlignmentLines() {
                       fontSize: '11px',
                       fontWeight: 'bold',
                       fontFamily: 'monospace',
-                      backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+                      backdropFilter: 'blur(4px)',
+                      WebkitBackdropFilter: 'blur(4px)',
                       padding: isDimensionMatch ? '3px 8px' : '2px 5px',
                       borderRadius: '3px',
                       whiteSpace: 'nowrap',
                       userSelect: 'none',
                       border: `1px solid ${labelColor}`,
+                      textShadow: '0 0 3px rgba(0,0,0,0.85)',
                       boxShadow: isDimensionMatch ? '0 2px 4px rgba(0,0,0,0.3)' : 'none'
                     }}
                   >

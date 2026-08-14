@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-08-13
+
+### Added
+
+- **Comprehensive desktop E2E coverage** — Expanded Electron click-through testing across project file lifecycle, recovery/autosave, native menus/import/export, context menus, keyboard shortcuts, canvas drag/resize/rotate handles, toolbar controls, properties editing, cut-list exports/validation, free-mode gates, license/trial lifecycle, assembly/template lifecycle, library import prompts, responsive windows, reload persistence, and OS-style open-file handoff.
+
+### Changed
+
+- **Live move-reference rulers now follow the active transform session** — Moving a part or group relative to reference parts/groups now publishes session-aware reference relations during drag, highlights the strongest active ruler in-canvas, and keeps typed ruler edits aligned to the relation axis instead of relying only on passive overlay geometry.
+- **Resize rulers now support direct size and gap editing** — Active resize sessions now publish editable size rulers and reference-gap rulers from the shared preview solver, so resizing against a reference can be driven by typed values in-canvas instead of only by handle dragging and dimension-match snaps.
+- **Reference target selection is now more stable during transforms** — Move and resize relation solving now latches near-equal active rulers instead of bouncing between candidates frame-to-frame, grouped references get a stronger preference when they compete with otherwise similar loose-part targets, and active ruler sessions now show a lightweight in-canvas hint so typed distance/size/gap editing is easier to discover.
+- **Measurement overlay placement hardening** — Part dimensions, multi-selection bounds, and editable reference-distance labels now choose camera-visible outer edges more intelligently and billboard their text toward the viewer, reducing odd label placement in dense cabinet/furniture assemblies.
+- **Measurement overlay decluttering** — Dimension and reference labels now suppress tiny-on-screen spans and low-priority overlapping labels in dense scenes, reducing visual pileups around tight assemblies and small gaps.
+- **Measurement label readability** — Measurement labels now use larger text, wider line breaks around the label text, and multi-lane outward stacking before suppression, making dimensions and editable position markers easier to read in crowded views.
+- **Selection-relative spacing semantics** — Multi-selection spacing markers now measure between the actual selected entities (selected groups as units plus standalone selected parts) instead of between every descendant part, so relative distances are more meaningful when multiple parts or groups are selected together.
+
+### Fixed
+
+- **OS-style project file handoff reliability** — Initial `.carvd` files opened by the operating system are now dispatched to the renderer after either window readiness or load completion, preventing missed open-file handoffs in visible/test-mode windows.
+- **Multi-part drag preview now follows the cursor in real time** — When dragging a multi-selection, every selected part now translates with the cursor during the drag instead of only the clicked part moving while the rest jumped on release. The window-listener `useEffect` in `usePartDrag` was depending on the entire `liveDims` object, so every drag frame's `setLiveDims` invalidated the effect, ran cleanup (which calls `clearMoveInteractionPreview`), and tore down the move session — leaving `activeSession.delta` stuck at zero for non-primary parts.
+- **InstancedMesh raycast now reliably hits non-selected parts** — Clicks on parts rendered via the bulk `InstancedMesh` (i.e. anything not currently selected/hovered/referenced) were silently passing through to the ground because the bounding sphere was being assigned to `geometry.boundingSphere` (a local-space slot) populated with a world-space union, which corrupted three.js's per-instance `Mesh.raycast` depth-rejection. Switched to writing the InstancedMesh's own `boundingSphere` via `mesh.computeBoundingSphere()` and consolidated matrix + bounding-sphere updates into a single effect so they can never drift.
+- **Right-click context menu now opens reliably on canvas overlays** — The `contextmenu` listener was attached to the canvas DOM element, but drei `<Html>` overlay labels (snap tokens, distance labels, reference rulers) render via portal in `document.body` outside the canvas's bubble path; right-clicks landing on those labels never reached the workspace handler. Listener moved to `window` and gated by canvas bounding rect so non-workspace UI keeps its own right-click behavior.
+- **Black rectangle artifacts during drag eliminated on macOS Metal/ANGLE** — Workspace `<Html>` overlays were using `occlude='blending'`, which renders an invisible shader plane for depth-based occlusion. The shader leaks black fragments visibly on Apple Metal/ANGLE drivers (Electron 41+ on M-series macOS). Switched to raycast-based `occlude={true}`, which hides occluded labels via CSS visibility instead of the shader plane.
+- **Right-click target no longer leaks across gestures** — `globalRightClickTarget` is now reset on every `pointerdown` (capture phase) and consumed eagerly inside the contextmenu handler, so a stale target from a previous gesture can't open the wrong menu (e.g. opening a part menu after clicking on background).
+- **Rotation handles + 90° rotate icons stay visible while a single part is selected** — Previously gated on `isHovered` so they vanished the instant the cursor moved off the part body — including onto the handle itself, since R3F dispatches `pointerout` on the part when entering a handle mesh. Resize handles still appear on hover only (so they don't clutter the part during drag).
+- **Shift / Cmd+click multi-select no longer double-toggles** — The R3F per-mesh `pointerdown` handler toggles selection, and the native canvas `mouseup` fallback was calling `selectFromPartHit(..., additive=true)` which toggled it back. The native fallback now skips additive selections; R3F's handler is authoritative for shift/cmd toggle.
+- **Shift / Cmd+click on empty workspace area preserves the existing selection** — Previously cleared the multi-selection when a click missed a part, so a single mis-aimed shift+click while building up a multi-selection wiped the work.
+- **Snap and distance labels less visually intrusive** — Snap-token, distance, and "SNAP LOCK" labels in `SnapAlignmentLines` had `rgba(0,0,0,0.78–0.85)` backgrounds that read as opaque black rectangles wherever the alignment-line midpoint landed. Reduced background opacity to ~0.4 and added `backdrop-filter: blur(4px)` plus a text shadow to keep readability without blocking the workspace.
+
+## [1.0.4] - 2026-04-06
+
+### Changed
+
+- **Transitive dependency security refresh** — Refreshed the npm lockfile and applied targeted override resolutions for vulnerable transitive chains (`dompurify`, `lodash`, `lodash-es`, `undici`, `tar`, `@xmldom/xmldom`, and `minimatch`) so the current Dependabot alert set is cleared on `develop`.
+
+## [1.0.3] - 2026-04-06
+
+### Fixed
+
+- **Unrelated project overlaps no longer freeze valid rotations** — Overlap-prevention checks for store-driven transforms now only evaluate collision pairs involving the part(s) being changed, so pre-existing overlaps elsewhere in a project no longer block rotation handles, 90° face rotates, or rotation input edits on unrelated parts.
+- **Rotation handles no longer steal nearby part clicks** — Rotation rings, connector stems, and drag knobs now block the workspace’s native part-selection fallback so clicking near or on those controls no longer re-selects the underlying part by accident.
+- **Part selection no longer uses loose screen boxes** — The workspace’s native click fallback now uses a precise ray-vs-rotated-box test instead of projected screen-space bounding boxes, so clicks near a part no longer count as selecting it.
+
+## [1.0.2] - 2026-04-02
+
 ### Added
 
 - **Advanced surface snapping framework (POC)** — Added surface-anchor snaps (center-1D, center-2D, edge-to-midline, edge-to-quarterline), fractional face anchors (0/25/50/75/100), and extended per-axis snap arbitration stages (`surface`, `fraction`) for more predictable placement on face-latched drags.
@@ -14,6 +59,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Precise part rotation controls (POC)** — Added single-part `Rotation (X, Y, Z)` controls in the Properties panel with direct degree entry, angle snap toggle, adjustable snap step, one-click reset, and drag-to-rotate ring handles with live angle feedback.
 - **Feature-level part snapping for angled assemblies (POC)** — Added true feature snap candidates during drag: edge-to-edge (parallel edge alignment) and vertex-to-face projection, layered on top of oriented face snapping for non-axis-aligned parts.
 - **Group-wide rotation drag handles (POC)** — Added shared rotation handles for multi-part/group selections so selected sets can be rotated together around a common pivot using the same drag interaction as single-part rotation.
+
+### Changed
+
+- **Snapping settings expanded with presets and anchor toggles** — App Settings now expose advanced snap controls (`Simple`/`Precision`/`Layout` preset, surface-anchor toggle, fractional-anchor toggle, candidate-indicator toggle), and drag pipelines respect those preferences in both single-part and group drag flows.
+- **Ghost display mode readability** — Increased Ghost/translucent part opacity and added outline rendering so part silhouettes are easier to read while staying semi-transparent.
+- **Rotation model generalized beyond 90° increments** — Internal rotation typing and transformation utilities now support arbitrary angles while preserving fast `X/Y/Z` keyboard rotations for intuitive quick-turn workflows.
+- **Rotated-part snapping and overlap hardening** — Face-to-face snapping now validates oriented face compatibility (opposing normals plus in-plane overlap) and solves oriented snap deltas, overlap prevention during drag/properties edits now uses OBB-vs-OBB tests instead of broad AABB-only checks, and drag overlap resolution now applies swept/binary-search fallback so parts can approach contact smoothly without hard blocking.
+- **Unified overlap policy enforcement** — Centralized overlap checks now apply symmetric `ignoreOverlap` behavior (if either part opts out, overlap is allowed) and consistent OBB-based prevention across drag, group drag, keyboard/reference moves, store-driven transforms, and properties overlap warnings.
+- **Canvas interaction hardening for angled parts** — Drag/resize interaction planes are now chosen from camera-facing local part planes for more intuitive movement on arbitrarily rotated parts, group drag overlap checks now use OBB tests with swept fallback (matching single-part behavior), and legacy axis-only snap candidates are automatically disabled for non-axis-aligned contexts to avoid conflicting snap pulls.
+
+### Fixed
+
+- **Angled movement + rotation axis UX hardening** — Non-90° part drag now uses orthonormalized virtual axes, group drag now mirrors angled virtual-axis behavior from the grabbed part context, and rotation-handle axis locking now uses pointer-down world-point projection for more reliable camera-angle axis selection.
+- **Angled group drag snap/movement regressions** — Group dragging now uses the same camera-projected drag plane model as single-part drag (removing camera-axis lock jumps), axis-legacy group snaps are automatically skipped in non-axis-aligned contexts, and final placement now preserves snapped axes instead of always re-quantizing to grid on drop.
+- **Layout snap commit flags for axis snaps** — `detectSnaps` now marks distribution/pattern layout snaps as snapped axes, so those snaps are consistently applied by drag handlers and no longer show visual snap lines without committing the matching axis move.
+- **Overlap-prevention blocking during movement** — Live drag overlap checks are now always enforced (including face-latched drag states), and overlap-safe translation solving now performs swept path checks to prevent high-speed “tunneling” through blockers while still preserving tangential slide where possible.
+- **Side-view face-snap drift while blocked** — Axis-aligned face-latched drags now stay on the standard drag plane (instead of tangent-plane remapping), preventing the “moves away from camera while pushing into a blocker” behavior on vertical/horizontal part contact.
+- **Odd-angle blocked face-latch drift** — Face-latched overlap prevention now supports a no-axis-redirection solve mode during part drag, so blocked push-through attempts on angled contacts remain on the user’s drag vector instead of “sliding away” on a secondary axis.
+
+## [1.0.1] - 2026-02-25
+
+### Changed
+
+- **Maintenance PR auto-merge automation** — Added a dedicated workflow that auto-enables merge for `sync main back to develop` PRs using merge commits and auto-enables merge for version-bump PRs using squash, reducing manual release-ops steps while preserving main/develop ancestry on syncs.
+
+### Fixed
+
+- **Maintenance auto-merge workflow execution context** — Added an explicit repository checkout before running `gh pr merge` in the maintenance auto-merge workflow to prevent `fatal: not a git repository` failures on `pull_request_target` runs.
+- **Release packaging builder stability in CI** — Pinned release packaging to `electron-builder@26.7.0` in CI (instead of transient `npx` latest), avoiding the `26.8.x` app-entry corruption regression where `out/main/index.js` is missing from `app.asar`.
+- **Ubuntu E2E dependency install CI hang** — Hardened desktop Linux E2E setup by wrapping `playwright install-deps` with timeout/retry guards so `Test` workflows no longer block indefinitely on runner apt lock/deps stalls.
+
+## [1.0.0] - 2026-02-25
+
+### Added
+
 - **Expanded source branding asset pack** — Added new `assets/` source logos in PNG/SVG variants for icon, horizontal, horizontal-words, vertical, and white-header use cases to support consistent marketing and in-app branding exports.
 - **Website SEO automation + docs-search schema** — Added build-time sitemap generation (`npm run generate:sitemap` via website `prebuild`), introduced `WebSite` JSON-LD `SearchAction` targeting `/docs?search={search_term_string}`, and documented SEO operations/manual search engine submission steps in `packages/website/SEO.md`.
 - **Start screen Settings & Library buttons** — Added icon buttons in the start screen header for quick access to App Settings and Stock/Assembly Library without needing to open a project first
@@ -25,14 +105,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Transitive dependency security refresh** — Refreshed the npm lockfile and applied targeted override resolutions for vulnerable transitive chains (`dompurify`, `lodash`, `lodash-es`, `undici`, `tar`, `@xmldom/xmldom`, and `minimatch`) so the current Dependabot alert set is cleared on `develop`.
-- **Snapping settings expanded with presets and anchor toggles** — App Settings now expose advanced snap controls (`Simple`/`Precision`/`Layout` preset, surface-anchor toggle, fractional-anchor toggle, candidate-indicator toggle), and drag pipelines respect those preferences in both single-part and group drag flows.
-- **Ghost display mode readability** — Increased Ghost/translucent part opacity and added outline rendering so part silhouettes are easier to read while staying semi-transparent.
-- **Rotation model generalized beyond 90° increments** — Internal rotation typing and transformation utilities now support arbitrary angles while preserving fast `X/Y/Z` keyboard rotations for intuitive quick-turn workflows.
-- **Rotated-part snapping and overlap hardening** — Face-to-face snapping now validates oriented face compatibility (opposing normals plus in-plane overlap) and solves oriented snap deltas, overlap prevention during drag/properties edits now uses OBB-vs-OBB tests instead of broad AABB-only checks, and drag overlap resolution now applies swept/binary-search fallback so parts can approach contact smoothly without hard blocking.
-- **Unified overlap policy enforcement** — Centralized overlap checks now apply symmetric `ignoreOverlap` behavior (if either part opts out, overlap is allowed) and consistent OBB-based prevention across drag, group drag, keyboard/reference moves, store-driven transforms, and properties overlap warnings.
-- **Canvas interaction hardening for angled parts** — Drag/resize interaction planes are now chosen from camera-facing local part planes for more intuitive movement on arbitrarily rotated parts, group drag overlap checks now use OBB tests with swept fallback (matching single-part behavior), and legacy axis-only snap candidates are automatically disabled for non-axis-aligned contexts to avoid conflicting snap pulls.
-- **Maintenance PR auto-merge automation** — Added a dedicated workflow that auto-enables merge for `sync main back to develop` PRs using merge commits and auto-enables merge for version-bump PRs using squash, reducing manual release-ops steps while preserving main/develop ancestry on syncs.
 - **Desktop checkout/support/legal link centralization** — Consolidated upgrade checkout URLs into a single renderer link config (with optional `VITE_LEMON_SQUEEZY_CHECKOUT_URL` override), switched in-app support actions to the website support page, and added a `Help -> Support` menu item so purchase/help/legal flows consistently route through the website.
 - **Trial license activation access in App Settings** — Trial users can now open `Enter License Key` directly from `App Settings -> Data & License` (in addition to purchasing), instead of waiting for late-trial/expired prompts.
 - **Sync workflow sequencing hardening** — `sync-develop` now runs after the `Release` workflow completes (instead of directly on `main` push), uses workflow-level concurrency, reuses an existing open sync PR branch when present, and auto-closes redundant zero-diff sync PRs to reduce release-race churn.
@@ -74,18 +146,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Unrelated project overlaps no longer freeze valid rotations** — Overlap-prevention checks for store-driven transforms now only evaluate collision pairs involving the part(s) being changed, so pre-existing overlaps elsewhere in a project no longer block rotation handles, 90° face rotates, or rotation input edits on unrelated parts.
-- **Rotation handles no longer steal nearby part clicks** — Rotation rings, connector stems, and drag knobs now block the workspace’s native part-selection fallback so clicking near or on those controls no longer re-selects the underlying part by accident.
-- **Part selection no longer uses loose screen boxes** — The workspace’s native click fallback now uses a precise ray-vs-rotated-box test instead of projected screen-space bounding boxes, so clicks near a part no longer count as selecting it.
-- **Angled movement + rotation axis UX hardening** — Non-90° part drag now uses orthonormalized virtual axes, group drag now mirrors angled virtual-axis behavior from the grabbed part context, and rotation-handle axis locking now uses pointer-down world-point projection for more reliable camera-angle axis selection.
-- **Angled group drag snap/movement regressions** — Group dragging now uses the same camera-projected drag plane model as single-part drag (removing camera-axis lock jumps), axis-legacy group snaps are automatically skipped in non-axis-aligned contexts, and final placement now preserves snapped axes instead of always re-quantizing to grid on drop.
-- **Layout snap commit flags for axis snaps** — `detectSnaps` now marks distribution/pattern layout snaps as snapped axes, so those snaps are consistently applied by drag handlers and no longer show visual snap lines without committing the matching axis move.
-- **Overlap-prevention blocking during movement** — Live drag overlap checks are now always enforced (including face-latched drag states), and overlap-safe translation solving now performs swept path checks to prevent high-speed “tunneling” through blockers while still preserving tangential slide where possible.
-- **Side-view face-snap drift while blocked** — Axis-aligned face-latched drags now stay on the standard drag plane (instead of tangent-plane remapping), preventing the “moves away from camera while pushing into a blocker” behavior on vertical/horizontal part contact.
-- **Odd-angle blocked face-latch drift** — Face-latched overlap prevention now supports a no-axis-redirection solve mode during part drag, so blocked push-through attempts on angled contacts remain on the user’s drag vector instead of “sliding away” on a secondary axis.
-- **Maintenance auto-merge workflow execution context** — Added an explicit repository checkout before running `gh pr merge` in the maintenance auto-merge workflow to prevent `fatal: not a git repository` failures on `pull_request_target` runs.
-- **Release packaging builder stability in CI** — Pinned release packaging to `electron-builder@26.7.0` in CI (instead of transient `npx` latest), avoiding the `26.8.x` app-entry corruption regression where `out/main/index.js` is missing from `app.asar`.
-- **Ubuntu E2E dependency install CI hang** — Hardened desktop Linux E2E setup by wrapping `playwright install-deps` with timeout/retry guards so `Test` workflows no longer block indefinitely on runner apt lock/deps stalls.
 - **Lemon Squeezy activation `instance_id` error** — Activation now follows Lemon Squeezy’s instance lifecycle (activate with `instance_name`, then persist and reuse the returned `instance.id` for validate/deactivate), including stale-instance recovery when `instance_id` no longer exists.
 - **Updater restart crash in packaged app** — Hardened desktop packaging so runtime deps are always installed in `packages/desktop/node_modules` before `electron-builder` runs (local scripts and release CI), resolving `ERR_MODULE_NOT_FOUND` for `electron-log` after auto-update restart.
 - **Crawler handling for website API redirects** — Added `X-Robots-Tag: noindex, nofollow, noarchive` and `Disallow: /api/` policy for website API endpoints to reduce accidental indexing of non-content URLs.
@@ -143,6 +203,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Desktop dev startup self-healing** — `npm run dev` in `packages/desktop` now preflights missing native `rolldown` bindings and missing Electron runtime assets, automatically repairing the common optional-dependency/worktree install failures that previously broke local startup.
 - **Release Version Comparison** — Replaced fragile `HEAD~1` version comparisons with durable artifact checks (GitHub Releases for desktop, `website-v*` git tags for website) to prevent skipped releases on squash merges
 - **Website Deployment Gate** — Website version tagging now waits for Vercel deployment to succeed before creating the `website-v*` tag
 - **Vercel Deployment Failure** — Fixed `ignoreCommand` exceeding Vercel's 256-character schema limit, which caused all deployments to fail
@@ -222,9 +283,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-Platform** - macOS and Windows desktop application
 - **Marketing Website** - Product website with features, pricing, documentation, and download pages
 
-[Unreleased]: https://github.com/mdbaldwin1/carvd-studio/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/mdbaldwin1/carvd-studio/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/mdbaldwin1/carvd-studio/compare/v1.0.4...v1.0.5
+[1.0.4]: https://github.com/mdbaldwin1/carvd-studio/compare/v1.0.3...v1.0.4
+[1.0.3]: https://github.com/mdbaldwin1/carvd-studio/compare/v1.0.2...v1.0.3
+[1.0.2]: https://github.com/mdbaldwin1/carvd-studio/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/mdbaldwin1/carvd-studio/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/mdbaldwin1/carvd-studio/compare/v0.1.11...v1.0.0
+[0.1.11]: https://github.com/mdbaldwin1/carvd-studio/compare/v0.1.10...v0.1.11
+[0.1.10]: https://github.com/mdbaldwin1/carvd-studio/compare/v0.1.8...v0.1.10
 [0.1.8]: https://github.com/mdbaldwin1/carvd-studio/compare/v0.1.6...v0.1.8
 [0.1.6]: https://github.com/mdbaldwin1/carvd-studio/compare/v0.1.4...v0.1.6
 [0.1.4]: https://github.com/mdbaldwin1/carvd-studio/compare/v0.1.1...v0.1.4
-[0.1.1]: https://github.com/mdbaldwin1/carvd-studio/releases/tag/v0.1.1
+[0.1.1]: https://github.com/mdbaldwin1/carvd-studio/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mdbaldwin1/carvd-studio/releases/tag/v0.1.0

@@ -1,5 +1,14 @@
 import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { join, normalize, isAbsolute, dirname } from 'path';
+
+// Enable CDP for automation when explicitly opted in via env. Off in normal dev,
+// so it doesn't keep a debugging port open by default. Set CARVD_REMOTE_DEBUG=1
+// before `npm run dev` to expose renderer CDP at port 9333 (used by tests/scripts/*.mjs).
+// Note: 9229 is reserved for the Node inspector electron-vite enables on the main
+// process, so we use a separate port for the renderer.
+if (process.env.CARVD_REMOTE_DEBUG === '1') {
+  app.commandLine.appendSwitch('remote-debugging-port', '9333');
+}
 import { existsSync } from 'fs';
 import { readFile, writeFile, unlink, access, readdir, mkdir, stat } from 'fs/promises';
 import { pathToFileURL } from 'url';
@@ -72,6 +81,59 @@ import {
   simulateTrialExpired
 } from './trial';
 
+const isTestMode = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
+const queuedTestSaveDialogPaths: string[] = [];
+const queuedTestOpenDialogPaths: string[][] = [];
+
+function getQueuedTestSaveDialogResult(): Electron.SaveDialogReturnValue | null {
+  if (!isTestMode || queuedTestSaveDialogPaths.length === 0) {
+    return null;
+  }
+
+  const filePath = queuedTestSaveDialogPaths.shift();
+  if (!filePath) {
+    return { canceled: true, filePath: undefined };
+  }
+
+  return { canceled: false, filePath };
+}
+
+function getQueuedTestOpenDialogResult(): Electron.OpenDialogReturnValue | null {
+  if (!isTestMode || queuedTestOpenDialogPaths.length === 0) {
+    return null;
+  }
+
+  const filePaths = queuedTestOpenDialogPaths.shift() ?? [];
+  return {
+    canceled: filePaths.length === 0,
+    filePaths
+  };
+}
+
+async function showSaveDialog(
+  win: BrowserWindow,
+  options: Electron.SaveDialogOptions
+): Promise<Electron.SaveDialogReturnValue> {
+  const queuedResult = getQueuedTestSaveDialogResult();
+  if (queuedResult) {
+    return queuedResult;
+  }
+
+  return dialog.showSaveDialog(win, options);
+}
+
+async function showOpenDialog(
+  win: BrowserWindow,
+  options: Electron.OpenDialogOptions
+): Promise<Electron.OpenDialogReturnValue> {
+  const queuedResult = getQueuedTestOpenDialogResult();
+  if (queuedResult) {
+    return queuedResult;
+  }
+
+  return dialog.showOpenDialog(win, options);
+}
+
 // =============================================================================
 // GPU Acceleration — ensure hardware-accelerated rendering in production
 // =============================================================================
@@ -92,7 +154,6 @@ process.on('uncaughtException', (error) => {
   // Show error dialog in production only (not dev or test mode).
   // dialog.showErrorBox() is synchronous and blocks the main thread,
   // which would hang E2E tests and prevent BrowserWindow creation.
-  const isTestMode = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
   if (process.env.NODE_ENV !== 'development' && !isTestMode) {
     dialog.showErrorBox(
       'Unexpected Error',
@@ -327,6 +388,13 @@ function createWindow(fileToOpen?: string): BrowserWindow {
 
   windows.add(newWindow);
 
+  let didSendInitialOpenProject = false;
+  const sendInitialOpenProject = () => {
+    if (!fileToOpen || didSendInitialOpenProject) return;
+    didSendInitialOpenProject = true;
+    newWindow.webContents.send('open-project', fileToOpen);
+  };
+
   // Show window when ready to avoid flicker
   newWindow.on('ready-to-show', () => {
     const showMainWindow = () => {
@@ -338,9 +406,7 @@ function createWindow(fileToOpen?: string): BrowserWindow {
 
       newWindow.show();
       // If there's a file to open, send it to the renderer
-      if (fileToOpen) {
-        newWindow.webContents.send('open-project', fileToOpen);
-      }
+      sendInitialOpenProject();
     };
 
     // Ensure splash screen is shown for minimum duration
@@ -351,6 +417,12 @@ function createWindow(fileToOpen?: string): BrowserWindow {
       setTimeout(showMainWindow, remaining);
     } else {
       showMainWindow();
+    }
+  });
+
+  newWindow.webContents.once('did-finish-load', () => {
+    if (isTest) {
+      setTimeout(sendInitialOpenProject, 0);
     }
   });
 
@@ -433,11 +505,35 @@ ipcMain.handle('set-preference', (_event, key: string, value: unknown) => {
 });
 
 ipcMain.handle('show-save-dialog', async (_event, options) => {
+  const queuedResult = getQueuedTestSaveDialogResult();
+  if (queuedResult) {
+    return queuedResult;
+  }
   return dialog.showSaveDialog(options);
 });
 
 ipcMain.handle('show-open-dialog', async (_event, options) => {
+  const queuedResult = getQueuedTestOpenDialogResult();
+  if (queuedResult) {
+    return queuedResult;
+  }
   return dialog.showOpenDialog(options);
+});
+
+ipcMain.handle('queue-test-save-dialog-path', (_event, filePath: string | null) => {
+  if (!isTestMode) {
+    return { success: false, error: 'Only available in test mode' };
+  }
+  queuedTestSaveDialogPaths.push(filePath ?? '');
+  return { success: true };
+});
+
+ipcMain.handle('queue-test-open-dialog-paths', (_event, filePaths: string[] | null) => {
+  if (!isTestMode) {
+    return { success: false, error: 'Only available in test mode' };
+  }
+  queuedTestOpenDialogPaths.push(filePaths ?? []);
+  return { success: true };
 });
 
 ipcMain.handle('read-file', async (_event, filePath: string) => {
@@ -501,6 +597,10 @@ ipcMain.handle('get-app-version', () => {
 
 ipcMain.handle('get-platform', () => {
   return process.platform;
+});
+
+ipcMain.handle('is-test-mode', () => {
+  return process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
 });
 
 ipcMain.handle('open-licenses-file', async () => {
@@ -646,7 +746,7 @@ ipcMain.handle('export-app-state', async (event) => {
   if (!win) return { success: false, error: 'No window available' };
 
   try {
-    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    const { canceled, filePath } = await showSaveDialog(win, {
       title: 'Export App State',
       defaultPath: `carvd-backup-${new Date().toISOString().split('T')[0]}.carvd-backup`,
       filters: [{ name: 'Carvd Backup', extensions: ['carvd-backup'] }]
@@ -671,7 +771,7 @@ ipcMain.handle('preview-import-app-state', async (event) => {
   if (!win) return { success: false, error: 'No window available' };
 
   try {
-    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    const { canceled, filePaths } = await showOpenDialog(win, {
       title: 'Import App State',
       filters: [{ name: 'Carvd Backup', extensions: ['carvd-backup'] }],
       properties: ['openFile']
@@ -744,7 +844,7 @@ ipcMain.handle('export-template', async (event, templateId: string) => {
       return { success: false, error: 'Template not found' };
     }
 
-    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    const { canceled, filePath } = await showSaveDialog(win, {
       title: 'Export Template',
       defaultPath: `${exportData.data.name.replace(/[^a-zA-Z0-9-_ ]/g, '')}.carvd-template`,
       filters: [{ name: 'Carvd Template', extensions: ['carvd-template'] }]
@@ -772,7 +872,7 @@ ipcMain.handle('export-assembly', async (event, assemblyId: string) => {
       return { success: false, error: 'Assembly not found' };
     }
 
-    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    const { canceled, filePath } = await showSaveDialog(win, {
       title: 'Export Assembly',
       defaultPath: `${exportData.data.name.replace(/[^a-zA-Z0-9-_ ]/g, '')}.carvd-assembly`,
       filters: [{ name: 'Carvd Assembly', extensions: ['carvd-assembly'] }]
@@ -801,7 +901,7 @@ ipcMain.handle('export-stocks', async (event, stockIds: string[]) => {
     }
 
     const defaultName = stockIds.length === 1 ? exportData.data[0].name : `stocks-${stockIds.length}`;
-    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    const { canceled, filePath } = await showSaveDialog(win, {
       title: 'Export Stocks',
       defaultPath: `${defaultName.replace(/[^a-zA-Z0-9-_ ]/g, '')}.carvd-stocks`,
       filters: [{ name: 'Carvd Stocks', extensions: ['carvd-stocks'] }]
@@ -824,7 +924,7 @@ ipcMain.handle('import-template', async (event, options?: { replaceIfExists?: bo
   if (!win) return { success: false, error: 'No window available' };
 
   try {
-    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    const { canceled, filePaths } = await showOpenDialog(win, {
       title: 'Import Template',
       filters: [{ name: 'Carvd Template', extensions: ['carvd-template'] }],
       properties: ['openFile']
@@ -862,7 +962,7 @@ ipcMain.handle('import-assembly', async (event, options?: { replaceIfExists?: bo
   if (!win) return { success: false, error: 'No window available' };
 
   try {
-    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    const { canceled, filePaths } = await showOpenDialog(win, {
       title: 'Import Assembly',
       filters: [{ name: 'Carvd Assembly', extensions: ['carvd-assembly'] }],
       properties: ['openFile']
@@ -901,7 +1001,7 @@ ipcMain.handle('import-stocks', async (event, options?: { replaceIfExists?: bool
   if (!win) return { success: false, error: 'No window available' };
 
   try {
-    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    const { canceled, filePaths } = await showOpenDialog(win, {
       title: 'Import Stocks',
       filters: [{ name: 'Carvd Stocks', extensions: ['carvd-stocks'] }],
       properties: ['openFile']
@@ -1056,7 +1156,7 @@ ipcMain.handle('set-window-title', (event, title: string) => {
 // Update title bar overlay colors (Windows/Linux only)
 ipcMain.handle('set-title-bar-overlay', (event, options: { color: string; symbolColor: string }) => {
   const win = BrowserWindow.fromWebContents(event.sender);
-  if (win && process.platform !== 'darwin') {
+  if (win && process.platform !== 'darwin' && !isTestMode) {
     win.setTitleBarOverlay({
       color: options.color,
       symbolColor: options.symbolColor,

@@ -1,22 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  useProjectStore,
-  validatePartsForCutList,
-  getContainingGroupId,
-  getAllDescendantPartIds,
-  getAllDescendantGroupIds,
-  getAncestorGroupIds,
-  isDescendantOf
-} from './projectStore';
+import { useProjectStore, validatePartsForCutList } from './projectStore';
 import { useLicenseStore } from './licenseStore';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
 import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
+import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
 import {
   createTestPart,
   createTestStock,
-  createTestGroupMember,
   createTestProject,
   createTestAssembly
 } from '../../../../tests/helpers/factories';
@@ -50,6 +42,7 @@ const resetStore = () => {
     referencePartIds: [],
     activeReferenceDistances: []
   });
+  useInteractionStore.getState().endSession();
   useAssemblyEditingStore.setState({
     isEditingAssembly: false,
     editingAssemblyId: null,
@@ -1389,6 +1382,33 @@ describe('projectStore', () => {
       expect(part?.grainDirection).toBe('length');
     });
 
+    it('resets selected parts dimensions to match stock', () => {
+      const store = useProjectStore.getState();
+      const stockId = store.addStock({
+        name: 'Plywood Sheet',
+        length: 96,
+        width: 48,
+        thickness: 0.75,
+        color: '#d4a574',
+        grainDirection: 'length'
+      });
+      const partId = store.addPart({
+        name: 'Trimmed Part',
+        stockId,
+        length: 24,
+        width: 6,
+        thickness: 0.5
+      });
+
+      useSelectionStore.getState().selectPart(partId);
+      store.resetSelectedPartsToStock();
+
+      const part = useProjectStore.getState().parts.find((p) => p.id === partId);
+      expect(part?.length).toBe(96);
+      expect(part?.width).toBe(48);
+      expect(part?.thickness).toBe(0.75);
+    });
+
     it('preserves part grain direction when stock has no grain', () => {
       const store = useProjectStore.getState();
       const stockId = store.addStock({
@@ -1473,6 +1493,38 @@ describe('projectStore', () => {
       const part2 = state.parts.find((p) => p.id === partId2);
       expect(part1?.color).toBe('#ff0000');
       expect(part2?.color).toBe('#ff0000');
+    });
+
+    it('resets parts inside selected groups', () => {
+      const store = useProjectStore.getState();
+      const stockId = store.addStock({
+        name: 'Group Stock',
+        length: 60,
+        width: 5,
+        thickness: 1,
+        color: '#ff0000',
+        grainDirection: 'length'
+      });
+      const partId = store.addPart({
+        name: 'Grouped Part',
+        stockId,
+        length: 12,
+        width: 2,
+        thickness: 0.5,
+        color: '#0000ff',
+        grainDirection: 'width'
+      });
+      const groupId = store.createGroup('Reset Group', [{ id: partId, type: 'part' }]);
+
+      useSelectionStore.getState().selectGroup(groupId);
+      store.resetSelectedPartsToStock();
+
+      const part = useProjectStore.getState().parts.find((p) => p.id === partId);
+      expect(part?.length).toBe(60);
+      expect(part?.width).toBe(5);
+      expect(part?.thickness).toBe(1);
+      expect(part?.color).toBe('#ff0000');
+      expect(part?.grainDirection).toBe('length');
     });
   });
 
@@ -1715,132 +1767,6 @@ describe('projectStore', () => {
 });
 
 // ============================================================
-// Exported utility functions
-// ============================================================
-
-describe('projectStore utility functions', () => {
-  describe('getContainingGroupId', () => {
-    it('returns groupId for a part that belongs to a group', () => {
-      const groupMembers = [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g1', 'p2', 'part')];
-
-      expect(getContainingGroupId('p1', groupMembers)).toBe('g1');
-    });
-
-    it('returns null for an ungrouped part', () => {
-      const groupMembers = [createTestGroupMember('g1', 'p1', 'part')];
-
-      expect(getContainingGroupId('p999', groupMembers)).toBeNull();
-    });
-
-    it('returns null for empty groupMembers', () => {
-      expect(getContainingGroupId('p1', [])).toBeNull();
-    });
-  });
-
-  describe('getAllDescendantPartIds', () => {
-    it('returns direct part members', () => {
-      const groupMembers = [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g1', 'p2', 'part')];
-
-      const result = getAllDescendantPartIds('g1', groupMembers);
-      expect(result).toEqual(expect.arrayContaining(['p1', 'p2']));
-      expect(result).toHaveLength(2);
-    });
-
-    it('returns nested parts from subgroups', () => {
-      const groupMembers = [
-        createTestGroupMember('outer', 'inner', 'group'),
-        createTestGroupMember('inner', 'p1', 'part'),
-        createTestGroupMember('inner', 'p2', 'part')
-      ];
-
-      const result = getAllDescendantPartIds('outer', groupMembers);
-      expect(result).toEqual(expect.arrayContaining(['p1', 'p2']));
-      expect(result).toHaveLength(2);
-    });
-
-    it('returns empty array for a group with no members', () => {
-      expect(getAllDescendantPartIds('g1', [])).toHaveLength(0);
-    });
-  });
-
-  describe('getAllDescendantGroupIds', () => {
-    it('returns the group itself plus nested groups', () => {
-      const groupMembers = [
-        createTestGroupMember('outer', 'inner', 'group'),
-        createTestGroupMember('inner', 'deep', 'group'),
-        createTestGroupMember('deep', 'p1', 'part')
-      ];
-
-      const result = getAllDescendantGroupIds('outer', groupMembers);
-      expect(result).toEqual(expect.arrayContaining(['outer', 'inner', 'deep']));
-      expect(result).toHaveLength(3);
-    });
-
-    it('returns just the group itself when no nested groups', () => {
-      const groupMembers = [createTestGroupMember('g1', 'p1', 'part')];
-
-      const result = getAllDescendantGroupIds('g1', groupMembers);
-      expect(result).toEqual(['g1']);
-    });
-  });
-
-  describe('getAncestorGroupIds', () => {
-    it('returns ancestor chain for a deeply nested part', () => {
-      const groupMembers = [
-        createTestGroupMember('outer', 'inner', 'group'),
-        createTestGroupMember('inner', 'p1', 'part')
-      ];
-
-      const result = getAncestorGroupIds('p1', groupMembers);
-      expect(result).toEqual(['inner', 'outer']);
-    });
-
-    it('returns single group for a directly grouped part', () => {
-      const groupMembers = [createTestGroupMember('g1', 'p1', 'part')];
-
-      const result = getAncestorGroupIds('p1', groupMembers);
-      expect(result).toEqual(['g1']);
-    });
-
-    it('returns empty array for ungrouped part', () => {
-      expect(getAncestorGroupIds('p1', [])).toHaveLength(0);
-    });
-  });
-
-  describe('isDescendantOf', () => {
-    it('returns true for same group', () => {
-      expect(isDescendantOf('g1', 'g1', [])).toBe(true);
-    });
-
-    it('returns true for direct child group', () => {
-      const groupMembers = [createTestGroupMember('parent', 'child', 'group')];
-
-      expect(isDescendantOf('child', 'parent', groupMembers)).toBe(true);
-    });
-
-    it('returns true for deeply nested group', () => {
-      const groupMembers = [
-        createTestGroupMember('outer', 'inner', 'group'),
-        createTestGroupMember('inner', 'deep', 'group')
-      ];
-
-      expect(isDescendantOf('deep', 'outer', groupMembers)).toBe(true);
-    });
-
-    it('returns false for unrelated groups', () => {
-      const groupMembers = [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g2', 'p2', 'part')];
-
-      expect(isDescendantOf('g2', 'g1', groupMembers)).toBe(false);
-    });
-
-    it('returns false for parent checking against child (wrong direction)', () => {
-      const groupMembers = [createTestGroupMember('parent', 'child', 'group')];
-
-      expect(isDescendantOf('parent', 'child', groupMembers)).toBe(false);
-    });
-  });
-});
-
 describe('validatePartsForCutList', () => {
   describe('stock assignment validation', () => {
     it('returns error when part has no stock assigned', () => {

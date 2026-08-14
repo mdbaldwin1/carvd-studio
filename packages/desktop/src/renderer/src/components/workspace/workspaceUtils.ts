@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import type { GeometryCache } from '../../interaction/geometry/cache';
 import { LightingMode } from '../../types';
 
 // Lighting presets for different viewing conditions
@@ -43,33 +44,136 @@ export function isOrbitControls(controls: THREE.EventDispatcher<object> | null):
   return controls !== null && 'enabled' in controls;
 }
 
-// Module-level tracking for right-click context menu
-// Shared between Workspace, SnapGuides, and Part
-let globalRightClickTarget: {
-  type: 'background' | 'part' | 'guide';
-  worldPosition?: { x: number; y: number; z: number };
-  guideId?: string;
-} | null = null;
-let lastPartPointerInteractionAt = 0;
-
-export function setRightClickTarget(target: typeof globalRightClickTarget) {
-  globalRightClickTarget = target;
+export function pauseOrbitControls(controls: THREE.EventDispatcher<object> | null): void {
+  if (isOrbitControls(controls)) {
+    controls.enabled = false;
+  }
 }
 
-export function getRightClickTarget() {
-  return globalRightClickTarget;
+export function resumeOrbitControls(controls: THREE.EventDispatcher<object> | null): void {
+  if (isOrbitControls(controls)) {
+    controls.enabled = true;
+  }
 }
 
-export function clearRightClickTarget() {
-  globalRightClickTarget = null;
+type CursorTarget = { body: { style: { cursor: string } } };
+
+export function setWorkspaceCursor(cursor: string, target: CursorTarget = document): void {
+  target.body.style.cursor = cursor;
 }
+
+export function resetWorkspaceCursor(target: CursorTarget = document): void {
+  setWorkspaceCursor('auto', target);
+}
+
+// ADR-002 + ADR-003: the right-click target globals
+// (setRightClickTarget / getRightClickTarget / clearRightClickTarget) that
+// used to live here are gone. The hit-test service resolves right-click
+// targets via userData.hitTarget descriptors, and the session controller's
+// onContextMenu handler reads them directly. The globals were the bridge
+// between per-mesh R3F handlers and the workspace contextmenu listener;
+// neither side needs the bridge anymore.
 
 export function markPartPointerInteraction() {
-  lastPartPointerInteractionAt = performance.now();
+  // Reserved hook for part-owned pointer interactions.
 }
 
-export function hadRecentPartPointerInteraction(windowMs = 140): boolean {
-  return performance.now() - lastPartPointerInteractionAt <= windowMs;
+export interface WindowPointerSessionTarget {
+  addEventListener(
+    type: 'pointermove' | 'pointerup' | 'pointercancel' | 'blur',
+    listener: unknown,
+    options?: unknown
+  ): void;
+  removeEventListener(
+    type: 'pointermove' | 'pointerup' | 'pointercancel' | 'blur',
+    listener: unknown,
+    options?: unknown
+  ): void;
+}
+
+export function bindWindowPointerSession(
+  target: WindowPointerSessionTarget,
+  handlers: {
+    onMove: (event: PointerEvent) => void;
+    onEnd: (event?: unknown) => void;
+    moveOptions?: unknown;
+    endOptions?: unknown;
+  }
+): () => void {
+  const moveListener = handlers.onMove;
+  const endListener = handlers.onEnd;
+  const addPointerListener = (
+    type: 'pointermove' | 'pointerup' | 'pointercancel' | 'blur',
+    listener: unknown,
+    options: unknown
+  ) => {
+    if (options === undefined) {
+      target.addEventListener(type, listener);
+    } else {
+      target.addEventListener(type, listener, options);
+    }
+  };
+  const removePointerListener = (
+    type: 'pointermove' | 'pointerup' | 'pointercancel' | 'blur',
+    listener: unknown,
+    options: unknown
+  ) => {
+    if (options === undefined) {
+      target.removeEventListener(type, listener);
+    } else {
+      target.removeEventListener(type, listener, options);
+    }
+  };
+
+  addPointerListener('pointermove', moveListener, handlers.moveOptions);
+  addPointerListener('pointerup', endListener, handlers.endOptions);
+  addPointerListener('pointercancel', endListener, handlers.endOptions);
+  addPointerListener('blur', endListener, handlers.endOptions);
+
+  return () => {
+    removePointerListener('pointermove', moveListener, handlers.moveOptions);
+    removePointerListener('pointerup', endListener, handlers.endOptions);
+    removePointerListener('pointercancel', endListener, handlers.endOptions);
+    removePointerListener('blur', endListener, handlers.endOptions);
+  };
+}
+
+export interface PointerRafTarget {
+  requestAnimationFrame(callback: () => void): number;
+  cancelAnimationFrame(frameId: number): void;
+}
+
+export function createPointerRafQueue(
+  target: PointerRafTarget,
+  onFrame: (event: PointerEvent) => void
+): {
+  schedule(event: PointerEvent): void;
+  cancel(): void;
+} {
+  let frameId: number | null = null;
+  let latestEvent: PointerEvent | null = null;
+
+  return {
+    schedule(event) {
+      latestEvent = event;
+      if (frameId !== null) return;
+
+      frameId = target.requestAnimationFrame(() => {
+        frameId = null;
+        const eventForFrame = latestEvent;
+        if (!eventForFrame) return;
+
+        onFrame(eventForFrame);
+      });
+    },
+    cancel() {
+      if (frameId !== null) {
+        target.cancelAnimationFrame(frameId);
+        frameId = null;
+      }
+      latestEvent = null;
+    }
+  };
 }
 
 // Module-level reusable objects for getPartAABB calculations.
@@ -80,13 +184,17 @@ const _aabbCorners = Array.from({ length: 8 }, () => new THREE.Vector3());
 const _aabbPosition = new THREE.Vector3();
 
 // Helper to calculate axis-aligned bounding box for a part
-export function getPartAABB(part: {
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
-  length: number;
-  width: number;
-  thickness: number;
-}) {
+export function getPartAABB(
+  part: {
+    id?: string;
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number };
+    length: number;
+    width: number;
+    thickness: number;
+  },
+  geometryCache?: GeometryCache
+) {
   _aabbEuler.set(
     (part.rotation.x * Math.PI) / 180,
     (part.rotation.y * Math.PI) / 180,
@@ -95,18 +203,25 @@ export function getPartAABB(part: {
   );
   _aabbQuat.setFromEuler(_aabbEuler);
 
-  const halfLength = part.length / 2;
-  const halfThickness = part.thickness / 2;
-  const halfWidth = part.width / 2;
+  const localAabb =
+    geometryCache && part.id
+      ? geometryCache.get({
+          ...part,
+          id: part.id
+        } as Parameters<GeometryCache['get']>[0]).bounds.localAabb
+      : {
+          min: { x: -part.length / 2, y: -part.thickness / 2, z: -part.width / 2 },
+          max: { x: part.length / 2, y: part.thickness / 2, z: part.width / 2 }
+        };
 
-  _aabbCorners[0].set(-halfLength, -halfThickness, -halfWidth);
-  _aabbCorners[1].set(-halfLength, -halfThickness, halfWidth);
-  _aabbCorners[2].set(-halfLength, halfThickness, -halfWidth);
-  _aabbCorners[3].set(-halfLength, halfThickness, halfWidth);
-  _aabbCorners[4].set(halfLength, -halfThickness, -halfWidth);
-  _aabbCorners[5].set(halfLength, -halfThickness, halfWidth);
-  _aabbCorners[6].set(halfLength, halfThickness, -halfWidth);
-  _aabbCorners[7].set(halfLength, halfThickness, halfWidth);
+  _aabbCorners[0].set(localAabb.min.x, localAabb.min.y, localAabb.min.z);
+  _aabbCorners[1].set(localAabb.min.x, localAabb.min.y, localAabb.max.z);
+  _aabbCorners[2].set(localAabb.min.x, localAabb.max.y, localAabb.min.z);
+  _aabbCorners[3].set(localAabb.min.x, localAabb.max.y, localAabb.max.z);
+  _aabbCorners[4].set(localAabb.max.x, localAabb.min.y, localAabb.min.z);
+  _aabbCorners[5].set(localAabb.max.x, localAabb.min.y, localAabb.max.z);
+  _aabbCorners[6].set(localAabb.max.x, localAabb.max.y, localAabb.min.z);
+  _aabbCorners[7].set(localAabb.max.x, localAabb.max.y, localAabb.max.z);
 
   _aabbPosition.set(part.position.x, part.position.y, part.position.z);
 

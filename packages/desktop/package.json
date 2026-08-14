@@ -1,6 +1,6 @@
 {
   "name": "@carvd/desktop",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "An offline-only desktop app for designing and planning custom furniture and cabinetry.",
   "private": true,
   "type": "module",
@@ -12,6 +12,7 @@
   "license": "ISC",
   "author": "Michael Baldwin",
   "scripts": {
+    "predev": "node scripts/ensure-dev-runtime.cjs",
     "dev": "unset ELECTRON_RUN_AS_NODE && electron-vite dev",
     "dev:debug": "unset ELECTRON_RUN_AS_NODE && electron-vite dev --inspect",
     "build": "electron-vite build",
@@ -33,15 +34,15 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run && vitest run --config vitest.main.config.ts && playwright test",
+    "test": "vitest run && vitest run --config vitest.main.config.ts && npm run build && playwright test",
     "test:unit": "vitest run && vitest run --config vitest.main.config.ts",
     "test:main": "vitest run --config vitest.main.config.ts",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:debug": "playwright test --debug",
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:headed": "npm run build && playwright test --headed",
+    "test:e2e:debug": "npm run build && playwright test --debug",
     "analyze": "ANALYZE=true electron-vite build"
   },
   "dependencies": {

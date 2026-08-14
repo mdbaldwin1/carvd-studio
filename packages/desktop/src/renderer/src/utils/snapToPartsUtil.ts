@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Part, SnapLine, SnapDistanceIndicator, SnapGuide, ReferenceDistanceIndicator } from '../types';
+import type { GeometryCache } from '../interaction/geometry/cache';
 
 // Module-level reusable objects for getPartBounds calculations.
 // Safe because JS is single-threaded and callers only see the returned plain PartBounds object.
@@ -73,8 +74,14 @@ function withSnapFamily(lines: SnapLine[], family: NonNullable<SnapLine['family'
   }));
 }
 
-// Calculate axis-aligned bounding box for a part in world space
-export function getPartBounds(part: Part): PartBounds {
+// Calculate axis-aligned bounding box for a part in world space.
+//
+// ADR-009: when a `geometryCache` is provided, the part's 8 local-space
+// corners come from `bundle.snapGraph.corners` (which is the seam custom-cuts
+// will use to ship non-cuboid corner sets). For box parts the corners are
+// identical to the inline derivation; this overload is opt-in to keep every
+// existing caller working unchanged.
+export function getPartBounds(part: Part, geometryCache?: GeometryCache): PartBounds {
   _boundsEuler.set(
     (part.rotation.x * Math.PI) / 180,
     (part.rotation.y * Math.PI) / 180,
@@ -83,19 +90,34 @@ export function getPartBounds(part: Part): PartBounds {
   );
   _boundsQuat.setFromEuler(_boundsEuler);
 
-  const halfLength = part.length / 2;
-  const halfThickness = part.thickness / 2;
-  const halfWidth = part.width / 2;
-
-  // Set corner values in-place (no new allocations)
-  _boundsCorners[0].set(-halfLength, -halfThickness, -halfWidth);
-  _boundsCorners[1].set(-halfLength, -halfThickness, halfWidth);
-  _boundsCorners[2].set(-halfLength, halfThickness, -halfWidth);
-  _boundsCorners[3].set(-halfLength, halfThickness, halfWidth);
-  _boundsCorners[4].set(halfLength, -halfThickness, -halfWidth);
-  _boundsCorners[5].set(halfLength, -halfThickness, halfWidth);
-  _boundsCorners[6].set(halfLength, halfThickness, -halfWidth);
-  _boundsCorners[7].set(halfLength, halfThickness, halfWidth);
+  if (geometryCache) {
+    const bundle = geometryCache.get(part);
+    // Bundle corners are local-space; write each into the pre-allocated
+    // working buffer.
+    const cornerCount = bundle.snapGraph.corners.length;
+    if (cornerCount !== 8) {
+      // Box parts have exactly 8 corners; if a custom-cut bundle introduces
+      // a different count later, fall back to inline math to preserve box
+      // semantics until the snap engine learns about non-box geometry.
+      return getPartBoundsInline(part);
+    }
+    for (let i = 0; i < 8; i++) {
+      const local = bundle.snapGraph.corners[i].point;
+      _boundsCorners[i].set(local.x, local.y, local.z);
+    }
+  } else {
+    const halfLength = part.length / 2;
+    const halfThickness = part.thickness / 2;
+    const halfWidth = part.width / 2;
+    _boundsCorners[0].set(-halfLength, -halfThickness, -halfWidth);
+    _boundsCorners[1].set(-halfLength, -halfThickness, halfWidth);
+    _boundsCorners[2].set(-halfLength, halfThickness, -halfWidth);
+    _boundsCorners[3].set(-halfLength, halfThickness, halfWidth);
+    _boundsCorners[4].set(halfLength, -halfThickness, -halfWidth);
+    _boundsCorners[5].set(halfLength, -halfThickness, halfWidth);
+    _boundsCorners[6].set(halfLength, halfThickness, -halfWidth);
+    _boundsCorners[7].set(halfLength, halfThickness, halfWidth);
+  }
 
   _boundsPosition.set(part.position.x, part.position.y, part.position.z);
 
@@ -131,13 +153,27 @@ export function getPartBounds(part: Part): PartBounds {
   };
 }
 
-// Calculate bounds for a part at a hypothetical position (for live drag)
-export function getPartBoundsAtPosition(part: Part, position: { x: number; y: number; z: number }): PartBounds {
-  const tempPart = { ...part, position };
-  return getPartBounds(tempPart);
+// Inline-only path. Used by getPartBounds when a bundle is unexpectedly
+// non-box (defensive fallback).
+function getPartBoundsInline(part: Part): PartBounds {
+  return getPartBounds(part);
 }
 
-export function getPartOBB(part: Part, position: { x: number; y: number; z: number } = part.position): PartOBB {
+// Calculate bounds for a part at a hypothetical position (for live drag)
+export function getPartBoundsAtPosition(
+  part: Part,
+  position: { x: number; y: number; z: number },
+  geometryCache?: GeometryCache
+): PartBounds {
+  const tempPart = { ...part, position };
+  return getPartBounds(tempPart, geometryCache);
+}
+
+export function getPartOBB(
+  part: Part,
+  position: { x: number; y: number; z: number } = part.position,
+  geometryCache?: GeometryCache
+): PartOBB {
   _boundsEuler.set(
     (part.rotation.x * Math.PI) / 180,
     (part.rotation.y * Math.PI) / 180,
@@ -160,6 +196,24 @@ export function getPartOBB(part: Part, position: { x: number; y: number; z: numb
   const wy = qw * qy;
   const wz = qw * qz;
 
+  // ADR-009: half-extents come from the bundle when a cache is provided.
+  // For box parts the result is identical to the inline derivation; the seam
+  // is in place for §6 custom-cut bundles to ship different extents (e.g. a
+  // beveled end whose OBB shrinks along one axis).
+  let halfL: number;
+  let halfT: number;
+  let halfW: number;
+  if (geometryCache) {
+    const bundle = geometryCache.get(part);
+    halfL = bundle.bounds.localObb.halfExtents.x;
+    halfT = bundle.bounds.localObb.halfExtents.y;
+    halfW = bundle.bounds.localObb.halfExtents.z;
+  } else {
+    halfL = part.length / 2;
+    halfT = part.thickness / 2;
+    halfW = part.width / 2;
+  }
+
   return {
     center: { x: position.x, y: position.y, z: position.z },
     axes: [
@@ -167,7 +221,7 @@ export function getPartOBB(part: Part, position: { x: number; y: number; z: numb
       { x: 2 * (xy - wz), y: 1 - 2 * (xx + zz), z: 2 * (yz + wx) },
       { x: 2 * (xz + wy), y: 2 * (yz - wx), z: 1 - 2 * (xx + yy) }
     ],
-    halfExtents: [part.length / 2, part.thickness / 2, part.width / 2]
+    halfExtents: [halfL, halfT, halfW]
   };
 }
 
@@ -247,8 +301,9 @@ export function obbsOverlap(
   return true;
 }
 
-// Calculate combined bounding box for multiple parts
-export function getCombinedBounds(parts: Part[]): PartBounds {
+// Calculate combined bounding box for multiple parts.
+// ADR-009: opt-in bundle path threaded through `getPartBounds`.
+export function getCombinedBounds(parts: Part[], geometryCache?: GeometryCache): PartBounds {
   if (parts.length === 0) {
     return {
       id: 'empty',
@@ -272,7 +327,7 @@ export function getCombinedBounds(parts: Part[]): PartBounds {
     maxZ = -Infinity;
 
   for (const part of parts) {
-    const bounds = getPartBounds(part);
+    const bounds = getPartBounds(part, geometryCache);
     minX = Math.min(minX, bounds.minX);
     maxX = Math.max(maxX, bounds.maxX);
     minY = Math.min(minY, bounds.minY);
@@ -296,7 +351,11 @@ export function getCombinedBounds(parts: Part[]): PartBounds {
 }
 
 // Calculate combined bounding box for parts at adjusted positions
-export function getCombinedBoundsAtPosition(parts: Part[], delta: { x: number; y: number; z: number }): PartBounds {
+export function getCombinedBoundsAtPosition(
+  parts: Part[],
+  delta: { x: number; y: number; z: number },
+  geometryCache?: GeometryCache
+): PartBounds {
   if (parts.length === 0) {
     return {
       id: 'empty',
@@ -328,7 +387,7 @@ export function getCombinedBoundsAtPosition(parts: Part[], delta: { x: number; y
         z: part.position.z + delta.z
       }
     };
-    const bounds = getPartBounds(adjustedPart);
+    const bounds = getPartBounds(adjustedPart, geometryCache);
     minX = Math.min(minX, bounds.minX);
     maxX = Math.max(maxX, bounds.maxX);
     minY = Math.min(minY, bounds.minY);
@@ -612,7 +671,8 @@ export function getNearestParts(
   draggingBounds: PartBounds,
   allParts: Part[],
   draggingPartIds: string[],
-  maxParts: number = 10
+  maxParts: number = 10,
+  geometryCache?: GeometryCache
 ): Part[] {
   // Filter out the parts being dragged
   const otherParts = allParts.filter((p) => !draggingPartIds.includes(p.id));
@@ -620,7 +680,7 @@ export function getNearestParts(
   // Calculate distances and sort.
   // Prefer true box-to-box gap over center distance so large pieces with nearby faces are not missed.
   const partsWithDistance = otherParts.map((part) => {
-    const bounds = getPartBounds(part);
+    const bounds = getPartBounds(part, geometryCache);
     const gapX =
       draggingBounds.maxX < bounds.minX
         ? bounds.minX - draggingBounds.maxX
@@ -1156,16 +1216,17 @@ export function detectSnaps(
   currentPosition: { x: number; y: number; z: number },
   allParts: Part[],
   draggingPartIds: string[],
-  snapThreshold: number = 0.5 // Default threshold in inches
+  snapThreshold: number = 0.5, // Default threshold in inches
+  geometryCache?: GeometryCache
 ): SnapResult {
   // Get bounds of dragging part at current position
-  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
+  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition, geometryCache);
 
   // Find nearest parts to check for snaps
-  const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
+  const nearestParts = getNearestParts(draggingBounds, allParts, draggingPartIds, 10, geometryCache);
 
   // Get bounds for all target parts
-  const targetBounds = nearestParts.map((p) => getPartBounds(p));
+  const targetBounds = nearestParts.map((p) => getPartBounds(p, geometryCache));
 
   // Check for snaps on each axis
   const xSnap = checkAxisSnaps(
