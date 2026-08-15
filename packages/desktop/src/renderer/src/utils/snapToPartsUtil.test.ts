@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Part, SnapGuide } from '../types';
 import {
+  calculateGroupReferenceDistances,
+  calculateReferenceDistances,
   calculateSnapThreshold,
+  calculateVectorReferenceDistance,
   createDimensionMatchSnapLine,
   createEnhancedDimensionSnapLine,
   createGuideSnapLine,
@@ -2018,6 +2021,200 @@ describe('snapToPartsUtil', () => {
 
       const result = detectFeatureMateSnaps(dragPart, currentPos, [hostPart, dragPart], ['drag'], 0.5);
       expect(result.mateHostPartId).toBeUndefined();
+    });
+  });
+  describe('reference distance indicators', () => {
+    it('calculates axis-aligned edge distances between a dragged part and a reference', () => {
+      const dragging = createTestPart({
+        id: 'drag',
+        length: 4,
+        width: 4,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 }
+      });
+      const reference = createTestPart({
+        id: 'ref',
+        length: 4,
+        width: 4,
+        thickness: 1,
+        position: { x: 10, y: 0.5, z: 0 }
+      });
+
+      const indicators = calculateReferenceDistances(dragging, dragging.position, [reference]);
+
+      expect(indicators.length).toBeGreaterThan(0);
+      const xIndicator = indicators.find((i) => i.axis === 'x');
+      expect(xIndicator).toBeDefined();
+      // Gap between facing edges: ref minX (8) - drag maxX (2) = 6
+      expect(xIndicator!.distance).toBeCloseTo(6);
+      expect(xIndicator!.fromPartId).toBe('drag');
+      expect(xIndicator!.toPartId).toBe('ref');
+    });
+
+    it('treats a multi-part drag as one combined unit with the applied delta', () => {
+      const a = createTestPart({ id: 'a', length: 4, width: 4, thickness: 1, position: { x: 0, y: 0.5, z: 0 } });
+      const b = createTestPart({ id: 'b', length: 4, width: 4, thickness: 1, position: { x: 6, y: 0.5, z: 0 } });
+      const reference = createTestPart({
+        id: 'ref',
+        length: 4,
+        width: 4,
+        thickness: 1,
+        position: { x: 20, y: 0.5, z: 0 }
+      });
+
+      const indicators = calculateGroupReferenceDistances([a, b], { x: 2, y: 0, z: 0 }, [reference]);
+
+      expect(indicators.length).toBeGreaterThan(0);
+      const xIndicator = indicators.find((i) => i.axis === 'x');
+      // Combined maxX after delta = 8 + 2 + 2 = 10... facing gap = ref minX (18) - 10 = 8
+      expect(xIndicator!.distance).toBeCloseTo(8);
+      expect(xIndicator!.fromPartId).toBe('selected-group');
+      expect(calculateGroupReferenceDistances([], { x: 0, y: 0, z: 0 }, [reference])).toEqual([]);
+    });
+
+    it('produces a single dominant-axis vector distance for rotated contexts', () => {
+      const selected = createTestPart({
+        id: 'sel',
+        length: 4,
+        width: 4,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 }
+      });
+      const reference = createTestPart({
+        id: 'ref',
+        length: 4,
+        width: 4,
+        thickness: 1,
+        position: { x: 9, y: 0.5, z: 3 }
+      });
+
+      const result = calculateVectorReferenceDistance([selected], [reference], 'sel', 'ref');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].axis).toBe('x');
+      expect(result[0].distance).toBeCloseTo(Math.sqrt(9 * 9 + 3 * 3));
+      expect(result[0].id).toBe('vector-sel-ref');
+
+      expect(calculateVectorReferenceDistance([], [reference], 'sel', 'ref')).toEqual([]);
+      expect(calculateVectorReferenceDistance([selected], [selected], 'sel', 'sel')).toEqual([]);
+    });
+  });
+
+  describe('feature-aware snap geometry (ghost corners)', () => {
+    const cornerNotchTarget = () =>
+      createTestPart({
+        id: 'notched',
+        length: 24,
+        width: 12,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [
+          {
+            id: 'notch-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'corner_notch',
+            target: { type: 'corner', corner: 'front_left_corner' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 6, width: 6 }, depthMode: 'through' },
+            placement: { x: 0, z: 0 }
+          }
+        ]
+      });
+
+    it('snaps to the true contour edge of a notched part', () => {
+      const target = cornerNotchTarget();
+      // Drag part approaching the notch inset edge at x = -6 (after 6" notch from minX -12)
+      const drag = createTestPart({
+        id: 'drag',
+        length: 4,
+        width: 4,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 }
+      });
+      const currentPos = { x: -3.7, y: 0.375, z: -7 }; // drag minX = -5.7, near inset edge -6
+
+      const result = detectFeatureSnaps(drag, currentPos, [target, drag], ['drag'], 0.5);
+
+      expect(result.snappedX || result.snappedY || result.snappedZ).toBe(true);
+      expect(result.snapLines.length).toBeGreaterThan(0);
+    });
+
+    it('offers no snap at the cut-away corner of a notched part', () => {
+      const target = cornerNotchTarget();
+      // The original box corner at (-12, y, -6) was removed by the notch.
+      // Nearest true geometry is >= 5.5 away on the relevant axes.
+      const drag = createTestPart({
+        id: 'drag',
+        length: 4,
+        width: 4,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 }
+      });
+      const currentPos = { x: -14.3, y: 0.375, z: -8.3 }; // drag corner 0.3 from the ghost corner
+
+      const result = detectFeatureSnaps(drag, currentPos, [target, drag], ['drag'], 0.5);
+
+      const snappedToGhost =
+        (result.snappedX && Math.abs(result.adjustedPosition.x - -14.0) < 1e-6) ||
+        (result.snappedZ && Math.abs(result.adjustedPosition.z - -8.0) < 1e-6);
+      expect(snappedToGhost).toBe(false);
+    });
+  });
+  describe('feature socket edge cases', () => {
+    it('exposes sockets for bottom-face pockets and skips zero-depth cuts', () => {
+      const part = createTestPart({
+        length: 24,
+        width: 12,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [
+          {
+            id: 'bottom-pocket',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'mortise',
+            target: { type: 'face', face: 'bottom_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 4, width: 3 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 4, z: 4 }
+          },
+          {
+            id: 'zero-depth',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'mortise',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 4, width: 3 }, depthMode: 'blind', depth: 0 },
+            placement: { x: 12, z: 4 }
+          }
+        ]
+      });
+
+      const sockets = getPartFeatureSockets(part);
+      expect(sockets).toHaveLength(1);
+      expect(sockets[0].featureId).toBe('bottom-pocket');
+    });
+  });
+
+  describe('getPartBounds bundle fallback', () => {
+    it('falls back to inline bounds when a bundle reports a non-box corner set', () => {
+      const part = createTestPart({ length: 8, width: 4, thickness: 2, position: { x: 1, y: 1, z: 1 } });
+      const fakeCache = {
+        get: () => ({
+          snapGraph: { corners: [{ point: { x: 0, y: 0, z: 0 } }] }
+        })
+      } as never;
+
+      const bounds = getPartBounds(part, fakeCache);
+      expect(bounds.minX).toBeCloseTo(-3);
+      expect(bounds.maxX).toBeCloseTo(5);
+      expect(bounds.minY).toBeCloseTo(0);
+      expect(bounds.maxY).toBeCloseTo(2);
     });
   });
 });

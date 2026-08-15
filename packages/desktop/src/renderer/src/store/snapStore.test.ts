@@ -411,4 +411,87 @@ describe('snapStore', () => {
       expect(useSnapStore.getState().referencePartIds).toHaveLength(0);
     });
   });
+  describe('snap perf sampling', () => {
+    it('accumulates average, max, and over-budget counts', () => {
+      const store = useSnapStore.getState();
+      store.resetSnapPerf();
+      const budget = useSnapStore.getState().snapPerf.budgetMs;
+
+      store.recordSnapPerfSample(budget / 2);
+      store.recordSnapPerfSample(budget * 2);
+
+      const perf = useSnapStore.getState().snapPerf;
+      expect(perf.sampleCount).toBe(2);
+      expect(perf.lastMs).toBeCloseTo(budget * 2);
+      expect(perf.maxMs).toBeCloseTo(budget * 2);
+      expect(perf.avgMs).toBeCloseTo((budget / 2 + budget * 2) / 2);
+      expect(perf.overBudgetCount).toBe(1);
+
+      store.resetSnapPerf();
+      expect(useSnapStore.getState().snapPerf.sampleCount).toBe(0);
+    });
+  });
+
+  describe('indicator setters', () => {
+    it('setSnapIndicatorsWithRulers keeps explicit rulers and pulses on winner change', () => {
+      const store = useSnapStore.getState();
+      const line = {
+        id: 'line-1',
+        axis: 'x' as const,
+        type: 'edge' as const,
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 0, y: 0, z: 4 }
+      };
+      const ruler = {
+        id: 'ruler-1',
+        axis: 'x' as const,
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 4, y: 0, z: 0 },
+        distance: 4,
+        labelPosition: { x: 2, y: 0.5, z: 0 },
+        fromPartId: 'a',
+        toPartId: 'b'
+      };
+
+      store.setSnapIndicatorsWithRulers([line] as never, [] as never, [ruler] as never);
+
+      const state = useSnapStore.getState();
+      expect(state.activeSnapLines).toHaveLength(1);
+      expect(state.activeReferenceRulers).toHaveLength(1);
+      expect(state.snapPulseAt).toBeGreaterThan(0);
+    });
+
+    it('setFaceLatchActive and setSnapLabelPosition update transient state', () => {
+      const store = useSnapStore.getState();
+      store.setFaceLatchActive(true);
+      store.setSnapLabelPosition({ x: 1, y: 2, z: 3 });
+      expect(useSnapStore.getState().faceLatchActive).toBe(true);
+      expect(useSnapStore.getState().snapLabelPosition).toEqual({ x: 1, y: 2, z: 3 });
+    });
+  });
+
+  describe('updateReferenceDistances early exits', () => {
+    it('clears indicators when references or selection are empty', () => {
+      useSnapStore.setState({
+        referencePartIds: [],
+        activeReferenceDistances: [{ distance: 1 }] as never,
+        activeReferenceRulers: [{ id: 'stale' }] as never
+      });
+      useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: [] });
+
+      useSnapStore.getState().updateReferenceDistances();
+
+      expect(useSnapStore.getState().activeReferenceDistances).toEqual([]);
+      expect(useSnapStore.getState().activeReferenceRulers).toEqual([]);
+    });
+
+    it('clears indicators when reference ids resolve to nothing', () => {
+      useSnapStore.setState({ referencePartIds: ['ghost-part'] });
+      useSelectionStore.setState({ selectedPartIds: ['also-ghost'], selectedGroupIds: [] });
+
+      useSnapStore.getState().updateReferenceDistances();
+
+      expect(useSnapStore.getState().activeReferenceDistances).toEqual([]);
+    });
+  });
 });

@@ -305,4 +305,147 @@ describe('getPartFeatureConflicts', () => {
     expect(conflicts[0]?.message).toContain('Operation 3');
     expect(conflicts[0]?.message).toContain('Operation 2');
   });
+  const rectCut = (
+    id: string,
+    cutType: 'cutout' | 'corner_notch' | 'edge_notch' | 'dado' | 'mortise',
+    target: { type: 'face'; face: string } | { type: 'corner'; corner: string } | { type: 'edge'; edge: string },
+    parameters: Record<string, unknown>,
+    placement: { x: number; z: number } = { x: 0, z: 0 }
+  ) =>
+    ({
+      id,
+      kind: 'rect_cut',
+      version: 1,
+      enabled: true,
+      cutType,
+      target,
+      reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+      parameters,
+      placement
+    }) as never;
+
+  it('detects overlap between corner notches on right/back corners', () => {
+    const part = createTestPart({ length: 24, width: 12, thickness: 1 });
+    const conflicts = getPartFeatureConflicts(
+      [
+        rectCut(
+          'n1',
+          'corner_notch',
+          { type: 'corner', corner: 'back_right_corner' },
+          {
+            size: { length: 6, width: 6 },
+            depthMode: 'through'
+          }
+        ),
+        rectCut(
+          'n2',
+          'corner_notch',
+          { type: 'corner', corner: 'back_right_corner' },
+          {
+            size: { length: 4, width: 4 },
+            depthMode: 'through'
+          }
+        )
+      ],
+      part
+    );
+    expect(conflicts.some((c) => c.code !== 'none')).toBe(true);
+    expect(conflicts[0].message).toMatch(/Operation 2/);
+  });
+
+  it('detects overlap between front and back edge notches sharing footprint', () => {
+    const part = createTestPart({ length: 24, width: 6, thickness: 1 });
+    const conflicts = getPartFeatureConflicts(
+      [
+        rectCut(
+          'e1',
+          'edge_notch',
+          { type: 'edge', edge: 'top_back_edge' },
+          { size: { length: 8, width: 4 }, depthMode: 'through' },
+          { x: 4, z: 0 }
+        ),
+        rectCut(
+          'e2',
+          'edge_notch',
+          { type: 'edge', edge: 'top_front_edge' },
+          { size: { length: 8, width: 4 }, depthMode: 'through' },
+          { x: 6, z: 0 }
+        )
+      ],
+      part
+    );
+    expect(conflicts.length).toBeGreaterThan(0);
+  });
+
+  it('detects overlap between left and right edge notches meeting mid-board', () => {
+    const part = createTestPart({ length: 10, width: 12, thickness: 1 });
+    const conflicts = getPartFeatureConflicts(
+      [
+        rectCut(
+          'e1',
+          'edge_notch',
+          { type: 'edge', edge: 'top_left_edge' },
+          { size: { length: 7, width: 5 }, depthMode: 'through' },
+          { x: 0, z: 3 }
+        ),
+        rectCut(
+          'e2',
+          'edge_notch',
+          { type: 'edge', edge: 'top_right_edge' },
+          { size: { length: 7, width: 5 }, depthMode: 'through' },
+          { x: 0, z: 4 }
+        )
+      ],
+      part
+    );
+    expect(conflicts.length).toBeGreaterThan(0);
+  });
+
+  it('treats a through cutout as reaching both faces for opposing-blind analysis', () => {
+    const part = createTestPart({ length: 24, width: 12, thickness: 1 });
+    const conflicts = getPartFeatureConflicts(
+      [
+        rectCut(
+          'through-cutout',
+          'cutout',
+          { type: 'face', face: 'top_face' },
+          { size: { length: 6, width: 4 }, depthMode: 'through' },
+          { x: 4, z: 4 }
+        ),
+        rectCut(
+          'bottom-mortise',
+          'mortise',
+          { type: 'face', face: 'bottom_face' },
+          { size: { length: 4, width: 3 }, depthMode: 'blind', depth: 0.4 },
+          { x: 5, z: 4.5 }
+        )
+      ],
+      part
+    );
+    expect(conflicts.length).toBeGreaterThan(0);
+  });
+
+  it('does not flag blind cuts on opposite faces whose depths do not meet', () => {
+    const part = createTestPart({ length: 24, width: 12, thickness: 2 });
+    const conflicts = getPartFeatureConflicts(
+      [
+        rectCut(
+          'top-pocket',
+          'mortise',
+          { type: 'face', face: 'top_face' },
+          { size: { length: 4, width: 3 }, depthMode: 'blind', depth: 0.5 },
+          { x: 4, z: 4 }
+        ),
+        rectCut(
+          'bottom-pocket',
+          'mortise',
+          { type: 'face', face: 'bottom_face' },
+          { size: { length: 4, width: 3 }, depthMode: 'blind', depth: 0.5 },
+          { x: 4, z: 4 }
+        )
+      ],
+      part
+    );
+    expect(conflicts.every((c) => c.code !== 'rect_depth_intersection')).toBe(true);
+  });
 });

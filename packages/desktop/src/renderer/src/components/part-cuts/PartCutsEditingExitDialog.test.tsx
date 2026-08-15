@@ -32,4 +32,19 @@ describe('PartCutsEditingExitDialog', () => {
     expect(onDiscard).toHaveBeenCalled();
     expect(onCancel).toHaveBeenCalled();
   });
+
+  it('renders nothing while closed', () => {
+    render(<PartCutsEditingExitDialog {...defaultProps} isOpen={false} />);
+
+    expect(screen.queryByText('Save Part Cuts?')).not.toBeInTheDocument();
+  });
+
+  it('treats dismissing the dialog as cancel', () => {
+    const onCancel = vi.fn();
+    render(<PartCutsEditingExitDialog {...defaultProps} onCancel={onCancel} />);
+
+    fireEvent.keyDown(screen.getByRole('alertdialog'), { key: 'Escape' });
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
 });

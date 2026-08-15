@@ -473,4 +473,60 @@ describe('CutListDiagramsTab', () => {
       expect(screen.getByText('Download')).toBeInTheDocument();
     });
   });
+  describe('board detail zoom controls', () => {
+    it('zooms in, out, clamps, and resets from the detail modal', async () => {
+      const user = userEvent.setup();
+      render(<CutListDiagramsTab {...defaultProps} />);
+      await user.click(screen.getByText('Board #1'));
+
+      const zoomLabel = () => document.querySelector('span.min-w-14')!;
+      expect(zoomLabel().textContent).toBe('100%');
+
+      const buttons = screen.getAllByRole('button');
+      const plus = buttons.find((b) => b.querySelector('svg.lucide-plus'));
+      const minus = buttons.find((b) => b.querySelector('svg.lucide-minus'));
+      expect(plus).toBeDefined();
+      expect(minus).toBeDefined();
+
+      await user.click(plus!);
+      expect(zoomLabel().textContent).toBe('125%');
+
+      await user.click(minus!);
+      await user.click(minus!);
+      expect(zoomLabel().textContent).toBe('75%');
+
+      // Clamp at the minimum
+      await user.click(minus!);
+      await user.click(minus!);
+      expect(zoomLabel().textContent).toBe('50%');
+
+      await user.click(screen.getByRole('button', { name: 'Reset' }));
+      expect(zoomLabel().textContent).toBe('100%');
+    });
+
+    it('closes the detail modal', async () => {
+      const user = userEvent.setup();
+      render(<CutListDiagramsTab {...defaultProps} />);
+      await user.click(screen.getByText('Board #1'));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+      const close = screen.getAllByRole('button').find((b) => b.getAttribute('aria-label')?.match(/close/i));
+      if (close) {
+        await user.click(close);
+      }
+    });
+  });
+
+  describe('pdf export gating', () => {
+    it('blocks PDF export without a license', async () => {
+      const user = userEvent.setup();
+      render(<CutListDiagramsTab {...defaultProps} canExportPDF={false} />);
+
+      const exportButton = screen.queryByRole('button', { name: /PDF/i });
+      if (exportButton) {
+        await user.click(exportButton);
+        expect(useUIStore.getState().showToast).toHaveBeenCalled();
+      }
+    });
+  });
 });

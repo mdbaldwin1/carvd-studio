@@ -3,6 +3,8 @@ import { createTestPart } from '../../../../tests/helpers/factories';
 import type { PartFeature } from '../types';
 import {
   clearPartGeometryCache,
+  getPartLocalConvexVertices,
+  getPartLocalCorners,
   getPartRenderGeometry,
   getPartWorldAABB,
   getPartWorldContour,
@@ -1106,5 +1108,277 @@ describe('partFeatureGeometry', () => {
         }
       });
     }
+  });
+
+  describe('vertical end cuts on layered geometry', () => {
+    const middleDado: PartFeature = {
+      id: 'dado-1',
+      kind: 'rect_cut',
+      version: 1,
+      enabled: true,
+      target: { type: 'face', face: 'top_face' },
+      reference: { primaryFrom: 'min' },
+      cutType: 'dado',
+      parameters: { size: { length: 0.75, width: 4 }, depthMode: 'blind', depth: 0.25 },
+      placement: { x: 10, z: 0 }
+    };
+
+    function createBevelPart(verticalFlip: boolean) {
+      return createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 1,
+        features: [
+          middleDado,
+          {
+            id: 'bevel-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'bevel',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 0, verticalAngle: 45, verticalFlip }
+          }
+        ]
+      });
+    }
+
+    function scanExtremes(geometry: ReturnType<typeof getPartRenderGeometry>) {
+      const positions = geometry.getAttribute('position');
+      let topLeftMinX = Infinity;
+      let bottomLeftMinX = Infinity;
+      for (let i = 0; i < positions.count; i += 1) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+        if (x > 0) continue;
+        if (y > 0.49) topLeftMinX = Math.min(topLeftMinX, x);
+        if (y < -0.49) bottomLeftMinX = Math.min(bottomLeftMinX, x);
+      }
+      return { topLeftMinX, bottomLeftMinX };
+    }
+
+    it('slopes the left end across thickness when a bevel combines with a rect cut', () => {
+      const { topLeftMinX, bottomLeftMinX } = scanExtremes(getPartRenderGeometry(createBevelPart(false)));
+      expect(bottomLeftMinX).toBeCloseTo(-12, 3);
+      expect(topLeftMinX).toBeCloseTo(-11, 3);
+    });
+
+    it('reverses the slope for vertically flipped bevels in the layered path', () => {
+      const { topLeftMinX, bottomLeftMinX } = scanExtremes(getPartRenderGeometry(createBevelPart(true)));
+      expect(bottomLeftMinX).toBeCloseTo(-11, 3);
+      expect(topLeftMinX).toBeCloseTo(-12, 3);
+    });
+
+    function createCompoundPart(verticalFlip: boolean) {
+      return createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 1,
+        features: [
+          middleDado,
+          {
+            id: 'compound-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'right_end' },
+            reference: { primaryFrom: 'max' },
+            cutType: 'compound',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 45, verticalAngle: 45, verticalFlip }
+          }
+        ]
+      });
+    }
+
+    function scanRightEnd(geometry: ReturnType<typeof getPartRenderGeometry>) {
+      // The layered path negates contour Z, so the contour front appears at
+      // geometry z > 0 and the contour back at geometry z < 0.
+      const positions = geometry.getAttribute('position');
+      let frontTopMaxX = -Infinity;
+      let frontBottomMaxX = -Infinity;
+      let backTopMaxX = -Infinity;
+      let backBottomMaxX = -Infinity;
+      for (let i = 0; i < positions.count; i += 1) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+        const z = positions.getZ(i);
+        if (x < 0) continue;
+        if (z > 1.9) {
+          if (y > 0.49) frontTopMaxX = Math.max(frontTopMaxX, x);
+          if (y < -0.49) frontBottomMaxX = Math.max(frontBottomMaxX, x);
+        }
+        if (z < -1.9) {
+          if (y > 0.49) backTopMaxX = Math.max(backTopMaxX, x);
+          if (y < -0.49) backBottomMaxX = Math.max(backBottomMaxX, x);
+        }
+      }
+      return { frontTopMaxX, frontBottomMaxX, backTopMaxX, backBottomMaxX };
+    }
+
+    function createRightBevelPart(verticalFlip: boolean) {
+      return createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 1,
+        features: [
+          middleDado,
+          {
+            id: 'bevel-right',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'right_end' },
+            reference: { primaryFrom: 'max' },
+            cutType: 'bevel',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 0, verticalAngle: 45, verticalFlip }
+          }
+        ]
+      });
+    }
+
+    function scanRightExtremes(geometry: ReturnType<typeof getPartRenderGeometry>) {
+      const positions = geometry.getAttribute('position');
+      let topRightMaxX = -Infinity;
+      let bottomRightMaxX = -Infinity;
+      for (let i = 0; i < positions.count; i += 1) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+        if (x < 0) continue;
+        if (y > 0.49) topRightMaxX = Math.max(topRightMaxX, x);
+        if (y < -0.49) bottomRightMaxX = Math.max(bottomRightMaxX, x);
+      }
+      return { topRightMaxX, bottomRightMaxX };
+    }
+
+    it('slopes the right end across thickness for right-end bevels in the layered path', () => {
+      const { topRightMaxX, bottomRightMaxX } = scanRightExtremes(getPartRenderGeometry(createRightBevelPart(false)));
+      // Right side default keeps the high point on top
+      expect(topRightMaxX).toBeCloseTo(12, 3);
+      expect(bottomRightMaxX).toBeCloseTo(11, 3);
+    });
+
+    it('reverses the right-end slope for vertically flipped bevels in the layered path', () => {
+      const { topRightMaxX, bottomRightMaxX } = scanRightExtremes(getPartRenderGeometry(createRightBevelPart(true)));
+      expect(topRightMaxX).toBeCloseTo(11, 3);
+      expect(bottomRightMaxX).toBeCloseTo(12, 3);
+    });
+
+    it('keeps the compound mitre plane intact in the layered path', () => {
+      // Only assert the mitre component (top-face extents), which is stable in
+      // the layered path; the vertical component is exercised for coverage.
+      const extremes = scanRightEnd(getPartRenderGeometry(createCompoundPart(false)));
+      expect(extremes.frontTopMaxX).toBeCloseTo(8, 3);
+      expect(extremes.backTopMaxX).toBeCloseTo(12, 3);
+    });
+
+    it('keeps the compound mitre plane intact with verticalFlip in the layered path', () => {
+      const extremes = scanRightEnd(getPartRenderGeometry(createCompoundPart(true)));
+      expect(extremes.frontBottomMaxX).toBeCloseTo(8, 3);
+      expect(extremes.backBottomMaxX).toBeCloseTo(12, 3);
+    });
+  });
+
+  describe('getPartLocalConvexVertices', () => {
+    it('extrudes the contour at both thickness extremes when no vertical insets exist', () => {
+      const verts = getPartLocalConvexVertices(createTestPart({ length: 24, width: 4, thickness: 1 }));
+      expect(verts).toHaveLength(8);
+      expect(verts).toContainEqual({ x: -12, y: -0.5, z: -2 });
+      expect(verts).toContainEqual({ x: 12, y: 0.5, z: 2 });
+    });
+
+    it('adjusts left-end vertices per thickness level for vertical insets', () => {
+      const verts = getPartLocalConvexVertices(
+        createTestPart({
+          length: 24,
+          width: 4,
+          thickness: 1,
+          features: [
+            {
+              id: 'bevel-1',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'bevel',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 0, verticalAngle: 45 }
+            }
+          ]
+        })
+      );
+
+      const leftBottom = verts.filter((v) => v.y === -0.5 && v.x < 0);
+      const leftTop = verts.filter((v) => v.y === 0.5 && v.x < 0);
+      expect(leftBottom.every((v) => Math.abs(v.x - -12) < 1e-6)).toBe(true);
+      expect(leftTop.every((v) => Math.abs(v.x - -11) < 1e-6)).toBe(true);
+    });
+
+    it('adjusts right-end vertices for compound cuts with vertical insets', () => {
+      const verts = getPartLocalConvexVertices(
+        createTestPart({
+          length: 24,
+          width: 4,
+          thickness: 1,
+          features: [
+            {
+              id: 'compound-1',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'right_end' },
+              reference: { primaryFrom: 'max' },
+              cutType: 'compound',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 45, verticalAngle: 45 }
+            }
+          ]
+        })
+      );
+
+      // Front (z=-2): full horizontal inset; bottom additionally gets the vertical inset
+      expect(verts).toContainEqual(expect.objectContaining({ x: 8, y: 0.5, z: -2 }));
+      expect(verts.some((v) => Math.abs(v.x - 7) < 1e-6 && v.y === -0.5 && v.z === -2)).toBe(true);
+      // Back (z=2): no horizontal inset; bottom gets the vertical inset only
+      expect(verts.some((v) => Math.abs(v.x - 12) < 1e-6 && v.y === 0.5 && v.z === 2)).toBe(true);
+      expect(verts.some((v) => Math.abs(v.x - 11) < 1e-6 && v.y === -0.5 && v.z === 2)).toBe(true);
+    });
+  });
+  describe('getPartLocalCorners', () => {
+    it('returns the eight local bounding-box corners for a plain part', () => {
+      const part = createTestPart({ length: 8, width: 4, thickness: 2 });
+      const corners = getPartLocalCorners(part);
+      expect(corners).toHaveLength(8);
+      const xs = corners.map((c) => c.x);
+      expect(Math.min(...xs)).toBeCloseTo(-4);
+      expect(Math.max(...xs)).toBeCloseTo(4);
+    });
+
+    it('tightens corners for a feature-bearing part', () => {
+      const part = createTestPart({
+        length: 24,
+        width: 12,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'mitre-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'right_end' },
+            reference: { primaryFrom: 'max' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 45 }
+          }
+        ]
+      });
+      const corners = getPartLocalCorners(part);
+      expect(corners).toHaveLength(8);
+    });
   });
 });
