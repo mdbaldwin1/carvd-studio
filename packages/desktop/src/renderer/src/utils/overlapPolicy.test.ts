@@ -1017,4 +1017,41 @@ describe('overlapPolicy', () => {
       expect(partsOverlap(partA, finalB)).toBe(false);
     }
   });
+  it('does not report overlap in the wedge removed by a long-edge bevel', () => {
+    const beveled = createPart({
+      id: 'beveled',
+      length: 10,
+      width: 4,
+      thickness: 1,
+      position: { x: 0, y: 0.5, z: 0 },
+      features: [
+        {
+          id: 'eb-1',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'front_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'bevel',
+          lengthMode: 'long_point',
+          parameters: { horizontalAngle: 0, verticalAngle: 45 }
+        }
+      ]
+    });
+    // A slat sitting inside the removed top-front wedge: y 0.7..1.0 (upper
+    // third of the beveled part), z -1.9..-1.4 (inside the wedge at that height)
+    const slat = createPart({
+      id: 'slat',
+      length: 10,
+      width: 0.5,
+      thickness: 0.3,
+      position: { x: 0, y: 0.85, z: -1.65 }
+    });
+
+    expect(partsOverlap(beveled, slat)).toBe(false);
+
+    // Same slat against the unbeveled version of the part must overlap.
+    const plain = { ...beveled, features: [] };
+    expect(partsOverlap(plain, slat)).toBe(true);
+  });
 });

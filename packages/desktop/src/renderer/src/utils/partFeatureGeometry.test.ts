@@ -3,6 +3,7 @@ import { createTestPart } from '../../../../tests/helpers/factories';
 import type { PartFeature } from '../types';
 import {
   clearPartGeometryCache,
+  getPartLocalBoundingBox,
   getPartLocalConvexVertices,
   getPartLocalCorners,
   getPartRenderGeometry,
@@ -1379,6 +1380,58 @@ describe('partFeatureGeometry', () => {
       });
       const corners = getPartLocalCorners(part);
       expect(corners).toHaveLength(8);
+    });
+  });
+  describe('edge bevels', () => {
+    const frontBevelPart = () =>
+      createTestPart({
+        length: 10,
+        width: 4,
+        thickness: 1,
+        features: [
+          {
+            id: 'eb-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'front_face' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'bevel',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 0, verticalAngle: 45 }
+          }
+        ]
+      });
+
+    it('displaces top-front hull vertices inward while the bottom keeps full width', () => {
+      const verts = getPartLocalConvexVertices(frontBevelPart());
+
+      const bottomFront = verts.filter((v) => v.y === -0.5 && Math.abs(v.z + 2) < 1e-6);
+      expect(bottomFront.length).toBeGreaterThan(0);
+
+      // No top vertex may remain at the original front face plane
+      const topAtOriginalFront = verts.filter((v) => v.y === 0.5 && Math.abs(v.z + 2) < 1e-6);
+      expect(topAtOriginalFront).toHaveLength(0);
+
+      // Displaced top-front vertices land at z = -2 + 1 = -1
+      const topFront = verts.filter((v) => v.y === 0.5 && Math.abs(v.z + 1) < 1e-6);
+      expect(topFront.length).toBeGreaterThan(0);
+    });
+
+    it('renders geometry with no top vertices on the original front plane', () => {
+      const geometry = getPartRenderGeometry(frontBevelPart());
+      const positions = geometry.getAttribute('position');
+      let offendingVertices = 0;
+      for (let i = 0; i < positions.count; i += 1) {
+        if (positions.getY(i) > 0.49 && positions.getZ(i) < -1.99) offendingVertices += 1;
+      }
+      expect(offendingVertices).toBe(0);
+    });
+
+    it('keeps the local bounding box at full width (long point)', () => {
+      const box = getPartLocalBoundingBox(frontBevelPart());
+      expect(box.min.z).toBeCloseTo(-2);
+      expect(box.max.z).toBeCloseTo(2);
     });
   });
 });

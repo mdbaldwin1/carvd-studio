@@ -22,6 +22,9 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const parts = useProjectStore((s) => s.parts);
   const copySelectedParts = useClipboardStore((s) => s.copySelectedParts);
+  const copyPartCuts = useClipboardStore((s) => s.copyPartCuts);
+  const pastePartCutsToParts = useClipboardStore((s) => s.pastePartCutsToParts);
+  const cutsClipboard = useClipboardStore((s) => s.cutsClipboard);
   const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
   const requestDeleteGroups = useUIStore((s) => s.requestDeleteGroups);
   const resetSelectedPartsToStock = useProjectStore((s) => s.resetSelectedPartsToStock);
@@ -94,6 +97,27 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
 
   const handleCopy = () => {
     copySelectedParts();
+    onClose();
+  };
+
+  const handleCopyCuts = () => {
+    if (!singleSelectedPart) return;
+    const copied = copyPartCuts(singleSelectedPart.id);
+    showToast(
+      copied
+        ? `Copied ${singleSelectedPart.features!.length} cut${singleSelectedPart.features!.length === 1 ? '' : 's'} from "${singleSelectedPart.name}"`
+        : 'This part has no cuts to copy',
+      copied ? 'success' : 'warning'
+    );
+    onClose();
+  };
+
+  const handlePasteCuts = () => {
+    const applied = pastePartCutsToParts(effectiveSelectedPartIds);
+    showToast(
+      applied > 0 ? `Applied cuts to ${applied} part${applied === 1 ? '' : 's'}` : 'No parts selected to receive cuts',
+      applied > 0 ? 'success' : 'warning'
+    );
     onClose();
   };
 
@@ -218,6 +242,14 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
       <MenuItemButton onClick={handleCenter}>Center View</MenuItemButton>
       <MenuItemButton onClick={handleCopy}>Copy</MenuItemButton>
       {singleSelectedPart && <MenuItemButton onClick={handleEditCuts}>Edit Part Cuts...</MenuItemButton>}
+      {singleSelectedPart && (singleSelectedPart.features?.length ?? 0) > 0 && (
+        <MenuItemButton onClick={handleCopyCuts}>Copy Cuts</MenuItemButton>
+      )}
+      {cutsClipboard && cutsClipboard.length > 0 && effectiveSelectedPartIds.length > 0 && (
+        <MenuItemButton onClick={handlePasteCuts}>
+          Paste Cuts ({effectiveSelectedPartIds.length} part{effectiveSelectedPartIds.length === 1 ? '' : 's'})
+        </MenuItemButton>
+      )}
       <MenuItemButton
         onClick={handleSaveAsAssembly}
         disabled={!canUseAssemblies}

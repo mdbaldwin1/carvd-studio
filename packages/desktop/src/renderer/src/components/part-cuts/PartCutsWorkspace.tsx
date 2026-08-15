@@ -1,5 +1,6 @@
 import { FractionInput } from '@renderer/components/common/FractionInput';
 import { PartCutsPreviewCanvas } from '@renderer/components/part-cuts/PartCutsPreviewCanvas';
+import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import {
   applyTargetToFeatureDraft,
   buildDraftFromFeature,
@@ -18,6 +19,8 @@ import {
   getFeatureDraftTarget,
   getPresetHint as getOperationPresetHint,
   getPresetLabel as getOperationPresetLabel,
+  isEdgeBevelTarget,
+  normalizeEndCutDraft,
   normalizeRectCutDraft,
   OperationPreset
 } from '@renderer/components/part-features/partFeatureEditorState';
@@ -30,7 +33,7 @@ import { Label } from '@renderer/components/ui/label';
 import { ScrollArea } from '@renderer/components/ui/scroll-area';
 import { Select } from '@renderer/components/ui/select';
 import { EndCutFeature, Part, PartFeature, PartFeatureTarget, RectCutFeature } from '@renderer/types';
-import { getDerivedLengthMeasurements } from '@renderer/utils/endCutUtils';
+import { getDerivedLengthMeasurements, getDerivedWidthMeasurements } from '@renderer/utils/endCutUtils';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import { getPickableTargetLabel, isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
 import { getAvailableMirrorActions, getMirrorActionLabel, mirrorFeature } from '@renderer/utils/partFeatureActions';
@@ -102,7 +105,10 @@ function getSelectedTargetLabel(draft: FeatureDraft | null): string | null {
 }
 
 function getDraftStepTitle(draft: FeatureDraft): string {
-  if (draft.mode === 'end_cut') return 'Step 2: Pick the end and set the angle';
+  if (draft.mode === 'end_cut')
+    return isEdgeBevelTarget(draft.targetFace)
+      ? 'Step 2: Pick the edge and set the bevel angle'
+      : 'Step 2: Pick the end and set the angle';
 
   switch (draft.cutType) {
     case 'corner_notch':
@@ -176,6 +182,34 @@ export function PartCutsWorkspace({
     workspaceRootRef.current?.focus();
   }, []);
 
+  const undoDraft = usePartCutsEditingStore((state) => state.undoDraft);
+  const redoDraft = usePartCutsEditingStore((state) => state.redoDraft);
+  const canUndoDraft = usePartCutsEditingStore((state) => state.draftHistory.length > 0);
+  const canRedoDraft = usePartCutsEditingStore((state) => state.draftFuture.length > 0);
+
+  // Draft-level undo/redo: the global project shortcuts are gated off in this
+  // mode, so Cmd+Z here steps the cut draft, not the project.
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      const isMod = event.metaKey || event.ctrlKey;
+      if (!isMod) return;
+      const key = event.key.toLowerCase();
+      if (key === 'z' && event.shiftKey) {
+        event.preventDefault();
+        redoDraft();
+      } else if (key === 'z') {
+        event.preventDefault();
+        undoDraft();
+      } else if (key === 'y') {
+        event.preventDefault();
+        redoDraft();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [redoDraft, undoDraft]);
+
   useEffect(() => {
     setDraft(null);
     setPanelMode('list');
@@ -214,6 +248,7 @@ export function PartCutsWorkspace({
 
   const endCutPreviewMeasurements = useMemo(() => {
     if (!draftPreviewFeature || draftPreviewFeature.kind !== 'end_cut') return null;
+    if (isEdgeBevelTarget(draftPreviewFeature.target.face)) return null;
 
     const nextFeatures = draft.featureId
       ? draftFeatures.map((feature) => (feature.id === draft.featureId ? draftPreviewFeature : feature))
@@ -229,11 +264,30 @@ export function PartCutsWorkspace({
     return measurements;
   }, [draft, draftFeatures, draftPreviewFeature, part.length, part.thickness, part.width]);
 
-  const isEndCutHighPointOnTop = (targetFace: 'left_end' | 'right_end', verticalFlip: boolean): boolean =>
-    targetFace === 'right_end' ? !verticalFlip : verticalFlip;
+  const edgeBevelPreviewMeasurements = useMemo(() => {
+    if (!draftPreviewFeature || draftPreviewFeature.kind !== 'end_cut') return null;
+    if (!isEdgeBevelTarget(draftPreviewFeature.target.face)) return null;
 
-  const getVerticalFlipFromHighPoint = (targetFace: 'left_end' | 'right_end', highPoint: 'top' | 'bottom'): boolean =>
-    targetFace === 'right_end' ? highPoint !== 'top' : highPoint === 'top';
+    const nextFeatures = draft.featureId
+      ? draftFeatures.map((feature) => (feature.id === draft.featureId ? draftPreviewFeature : feature))
+      : [...draftFeatures, draftPreviewFeature];
+
+    return getDerivedWidthMeasurements({
+      width: part.width,
+      thickness: part.thickness,
+      features: nextFeatures
+    });
+  }, [draft, draftFeatures, draftPreviewFeature, part.thickness, part.width]);
+
+  const isEndCutHighPointOnTop = (
+    targetFace: 'left_end' | 'right_end' | 'front_face' | 'back_face',
+    verticalFlip: boolean
+  ): boolean => (targetFace === 'right_end' ? !verticalFlip : verticalFlip);
+
+  const getVerticalFlipFromHighPoint = (
+    targetFace: 'left_end' | 'right_end' | 'front_face' | 'back_face',
+    highPoint: 'top' | 'bottom'
+  ): boolean => (targetFace === 'right_end' ? highPoint !== 'top' : highPoint === 'top');
 
   const featureConflicts = useMemo(() => getPartFeatureConflicts(draftFeatures, part), [draftFeatures, part]);
   const hasBlockingFeatureConflicts = featureConflicts.some((conflict) => conflict.severity === 'error');
@@ -273,7 +327,7 @@ export function PartCutsWorkspace({
     if (!draft) return;
     if (draft.mode === 'rect_cut' && draftValidationMessage) return;
 
-    const nextFeature = buildFeatureFromDraft(draft);
+    const nextFeature = buildFeatureFromDraft(draft.mode === 'end_cut' ? normalizeEndCutDraft(draft) : draft);
     const nextFeatures = draft.featureId
       ? draftFeatures.map((feature) => (feature.id === draft.featureId ? nextFeature : feature))
       : [...draftFeatures, nextFeature];
@@ -489,7 +543,29 @@ export function PartCutsWorkspace({
                 </CardDescription>
               </div>
               {panelMode === 'list' ? (
-                <Button onClick={handleBeginAdd}>+ Add Cut</Button>
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={undoDraft}
+                    disabled={!canUndoDraft}
+                    aria-label="Undo cut change"
+                    title="Undo cut change (Cmd+Z)"
+                  >
+                    Undo
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={redoDraft}
+                    disabled={!canRedoDraft}
+                    aria-label="Redo cut change"
+                    title="Redo cut change (Cmd+Shift+Z)"
+                  >
+                    Redo
+                  </Button>
+                  <Button onClick={handleBeginAdd}>+ Add Cut</Button>
+                </div>
               ) : (
                 <Button variant="ghost" onClick={handleCancelEditor}>
                   Back to Cuts
@@ -639,30 +715,36 @@ export function PartCutsWorkspace({
                     Pick the cut type first. The next step will walk through the right target and measurements.
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-4">
                   {(
                     [
-                      'end_cut',
-                      'corner_notch',
-                      'edge_notch',
-                      'cutout',
-                      'dado',
-                      'stopped_dado',
-                      'rabbet',
-                      'groove',
-                      'stopped_groove',
-                      'mortise'
-                    ] as OperationPreset[]
-                  ).map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      className="rounded-md border border-border bg-bg px-3 py-3 text-left transition-colors hover:border-accent hover:bg-accent/5"
-                      onClick={() => handleStartPreset(preset)}
-                    >
-                      <div className="text-sm font-semibold text-text">{getOperationPresetLabel(preset)}</div>
-                      <div className="mt-1 text-[11px] text-text-muted">{getOperationPresetHint(preset)}</div>
-                    </button>
+                      { group: 'Ends & Edges', presets: ['end_cut', 'edge_bevel'] },
+                      {
+                        group: 'Channels & Laps',
+                        presets: ['dado', 'stopped_dado', 'groove', 'stopped_groove', 'half_lap']
+                      },
+                      { group: 'Edges & Corners', presets: ['rabbet', 'edge_notch', 'corner_notch'] },
+                      { group: 'Pockets & Openings', presets: ['mortise', 'cutout'] }
+                    ] as Array<{ group: string; presets: OperationPreset[] }>
+                  ).map(({ group, presets }) => (
+                    <div key={group}>
+                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                        {group}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {presets.map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            className="rounded-md border border-border bg-bg px-3 py-3 text-left transition-colors hover:border-accent hover:bg-accent/5"
+                            onClick={() => handleStartPreset(preset)}
+                          >
+                            <div className="text-sm font-semibold text-text">{getOperationPresetLabel(preset)}</div>
+                            <div className="mt-1 text-[11px] text-text-muted">{getOperationPresetHint(preset)}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -681,18 +763,24 @@ export function PartCutsWorkspace({
 
                   {inspectorDraft.mode === 'end_cut' && (
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {END_TARGETS.map((target) => (
-                        <Button
-                          key={target}
-                          type="button"
-                          size="xs"
-                          variant="outline"
-                          active={inspectorDraft.targetFace === target}
-                          onClick={() => setDraft({ ...inspectorDraft, targetFace: target })}
-                        >
-                          {FACE_LABELS[target]}
-                        </Button>
-                      ))}
+                      {([...END_TARGETS, 'front_face', 'back_face'] as (typeof inspectorDraft.targetFace)[]).map(
+                        (target) => (
+                          <Button
+                            key={target}
+                            type="button"
+                            size="xs"
+                            variant="outline"
+                            active={inspectorDraft.targetFace === target}
+                            onClick={() => setDraft(normalizeEndCutDraft({ ...inspectorDraft, targetFace: target }))}
+                          >
+                            {target === 'front_face'
+                              ? 'Front Edge'
+                              : target === 'back_face'
+                                ? 'Back Edge'
+                                : FACE_LABELS[target]}
+                          </Button>
+                        )
+                      )}
                     </div>
                   )}
 
@@ -780,23 +868,30 @@ export function PartCutsWorkspace({
 
                     {inspectorDraft.mode === 'end_cut' && (
                       <>
-                        <div>
-                          <Label htmlFor="end-cut-type">Cut Style</Label>
-                          <Select
-                            id="end-cut-type"
-                            value={inspectorDraft.cutType}
-                            onChange={(e) =>
-                              setDraft({
-                                ...inspectorDraft,
-                                cutType: e.target.value as EndCutFeature['cutType']
-                              })
-                            }
-                          >
-                            <option value="mitre">Mitre</option>
-                            <option value="bevel">Bevel</option>
-                            <option value="compound">Compound</option>
-                          </Select>
-                        </div>
+                        {isEdgeBevelTarget(inspectorDraft.targetFace) ? (
+                          <p className="text-[11px] text-text-muted">
+                            Edge bevels tilt the whole long face across the thickness, so the cut style is always a
+                            bevel. The board width stays locked to the long point.
+                          </p>
+                        ) : (
+                          <div>
+                            <Label htmlFor="end-cut-type">Cut Style</Label>
+                            <Select
+                              id="end-cut-type"
+                              value={inspectorDraft.cutType}
+                              onChange={(e) =>
+                                setDraft({
+                                  ...inspectorDraft,
+                                  cutType: e.target.value as EndCutFeature['cutType']
+                                })
+                              }
+                            >
+                              <option value="mitre">Mitre</option>
+                              <option value="bevel">Bevel</option>
+                              <option value="compound">Compound</option>
+                            </Select>
+                          </div>
+                        )}
 
                         {(inspectorDraft.cutType === 'mitre' || inspectorDraft.cutType === 'compound') && (
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -876,6 +971,24 @@ export function PartCutsWorkspace({
                                 <option value="top">Top</option>
                                 <option value="bottom">Bottom</option>
                               </Select>
+                            </div>
+                          </div>
+                        )}
+
+                        {edgeBevelPreviewMeasurements && (
+                          <div className="rounded-md border border-border bg-bg p-3">
+                            <p className="text-[12px] font-medium text-text">Resulting Widths</p>
+                            <p className="mt-1 text-[11px] text-text-muted">
+                              Long point stays locked to the board width. The bevel only tilts the shaped edge.
+                            </p>
+                            <div className="mt-2 grid grid-cols-1 gap-1 text-[11px] text-text-muted sm:grid-cols-3">
+                              <span>Blank {formatMeasurementWithUnit(part.width, units)}</span>
+                              <span>
+                                Long Point {formatMeasurementWithUnit(edgeBevelPreviewMeasurements.longPoint, units)}
+                              </span>
+                              <span>
+                                Short Point {formatMeasurementWithUnit(edgeBevelPreviewMeasurements.shortPoint, units)}
+                              </span>
                             </div>
                           </div>
                         )}

@@ -71,6 +71,8 @@ export function edgeTargetToSide(edge: EdgeTarget): EdgeNotchSide {
 
 export type OperationPreset =
   | 'end_cut'
+  | 'edge_bevel'
+  | 'half_lap'
   | 'corner_notch'
   | 'edge_notch'
   | 'cutout'
@@ -319,6 +321,44 @@ export function buildDraftFromPreset(preset: OperationPreset, defaults?: DraftPa
     };
   }
 
+  if (preset === 'edge_bevel') {
+    // Long-edge (rip) bevel: tilts a long face across the thickness. Only the
+    // vertical angle applies; the part width stays authoritative (long point).
+    return {
+      mode: 'end_cut',
+      featureId: null,
+      label: '',
+      enabled: true,
+      targetFace: 'front_face',
+      cutType: 'bevel',
+      lengthMode: 'long_point',
+      referenceMode: null,
+      referenceValue: null,
+      horizontalAngle: 0,
+      horizontalFlip: false,
+      verticalAngle: 45,
+      verticalFlip: false
+    };
+  }
+
+  if (preset === 'half_lap') {
+    // A half lap is a blind dado at half the board thickness. Default to an
+    // end lap (channel at the left end); the maker adjusts run and position
+    // for cross laps.
+    const thickness = defaults?.partThickness ?? 0.75;
+    return normalizeRectCutDraft(
+      {
+        ...getDefaultRectDraft('dado'),
+        label: 'Half Lap',
+        depthMode: 'blind',
+        depth: Math.max(0.125, thickness / 2),
+        sizeLength: Math.min(defaults?.partWidth ?? 3, defaults?.partLength ?? 3),
+        placementX: 0
+      },
+      defaults
+    );
+  }
+
   return normalizeRectCutDraft(getDefaultRectDraft(preset), defaults);
 }
 
@@ -363,6 +403,28 @@ export function buildDraftFromFeature(
     },
     _part ? { partLength: _part.length, partWidth: _part.width, partThickness: _part.thickness } : undefined
   );
+}
+
+export function isEdgeBevelTarget(face: 'left_end' | 'right_end' | 'front_face' | 'back_face'): boolean {
+  return face === 'front_face' || face === 'back_face';
+}
+
+export function normalizeEndCutDraft(
+  draft: Extract<FeatureDraft, { mode: 'end_cut' }>
+): Extract<FeatureDraft, { mode: 'end_cut' }> {
+  if (!isEdgeBevelTarget(draft.targetFace)) return draft;
+  // Long-edge bevels only tilt across the thickness; force the bevel cut type
+  // and zero any horizontal component from a previous end-target draft.
+  return {
+    ...draft,
+    cutType: 'bevel',
+    horizontalAngle: 0,
+    horizontalFlip: false,
+    lengthMode: 'long_point',
+    referenceMode: null,
+    referenceValue: null,
+    verticalAngle: draft.verticalAngle === 0 ? 45 : draft.verticalAngle
+  };
 }
 
 export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
@@ -476,6 +538,10 @@ export function getPresetLabel(preset: OperationPreset): string {
   switch (preset) {
     case 'end_cut':
       return 'End Cut';
+    case 'edge_bevel':
+      return 'Edge Bevel';
+    case 'half_lap':
+      return 'Half Lap';
     case 'corner_notch':
       return 'Corner Notch';
     case 'edge_notch':
@@ -501,6 +567,10 @@ export function getPresetHint(preset: OperationPreset): string {
   switch (preset) {
     case 'end_cut':
       return 'Mitres, bevels, and compound cuts on either end.';
+    case 'edge_bevel':
+      return 'Rip bevel along the front or back edge \u2014 mitred boxes and waterfall edges.';
+    case 'half_lap':
+      return 'Blind channel at half thickness for lap joints \u2014 starts as an end lap.';
     case 'corner_notch':
       return 'Remove a rectangular chunk from one exact corner.';
     case 'edge_notch':

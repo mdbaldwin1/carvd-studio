@@ -79,6 +79,13 @@ function getEndCutHighPointLabel(feature: Extract<PartFeature, { kind: 'end_cut'
 }
 
 export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'metric'): string {
+  if (feature.kind === 'end_cut' && (feature.target.face === 'front_face' || feature.target.face === 'back_face')) {
+    const angle = feature.parameters.verticalAngle ?? 0;
+    const edgeLabel = feature.target.face === 'front_face' ? 'Front Edge' : 'Back Edge';
+    const highPoint = feature.parameters.verticalFlip ? 'Top' : 'Bottom';
+    return `Edge Bevel ${angle}\u00b0 on ${edgeLabel} \u00b7 High point on ${highPoint}`;
+  }
+
   if (feature.kind === 'end_cut') {
     const angleBits = [];
     if (feature.cutType === 'mitre' || feature.cutType === 'compound') {

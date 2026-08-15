@@ -3,6 +3,7 @@ import type { EndCutFeature, PartFeature, RectCutFeature } from '@renderer/types
 import {
   applyTargetToFeatureDraft,
   buildDraftFromFeature,
+  normalizeEndCutDraft,
   buildDraftFromPreset,
   buildFeatureFromDraft,
   duplicateFeature,
@@ -550,6 +551,44 @@ describe('partFeatureEditorState', () => {
       }
       expect(getPresetLabel('stopped_dado')).toBe('Stopped Dado');
       expect(getPresetHint('mortise')).toContain('blind face pocket');
+    });
+  });
+  describe('half lap preset', () => {
+    it('seeds a blind dado at half the part thickness at the board end', () => {
+      const draft = buildDraftFromPreset('half_lap', { partLength: 24, partWidth: 4, partThickness: 1.5 });
+
+      expect(draft.mode).toBe('rect_cut');
+      if (draft.mode !== 'rect_cut') return;
+      expect(draft.cutType).toBe('dado');
+      expect(draft.depthMode).toBe('blind');
+      expect(draft.depth).toBeCloseTo(0.75);
+      expect(draft.placementX).toBe(0);
+      expect(draft.label).toBe('Half Lap');
+    });
+  });
+  describe('edge bevel drafts', () => {
+    it('builds an edge bevel preset draft targeting the front edge', () => {
+      const draft = buildDraftFromPreset('edge_bevel');
+      expect(draft.mode).toBe('end_cut');
+      if (draft.mode !== 'end_cut') return;
+      expect(draft.targetFace).toBe('front_face');
+      expect(draft.cutType).toBe('bevel');
+      expect(draft.verticalAngle).toBe(45);
+    });
+
+    it('normalizes end drafts retargeted onto an edge to bevel-only settings', () => {
+      const endDraft = buildDraftFromPreset('end_cut');
+      if (endDraft.mode !== 'end_cut') return;
+      const retargeted = normalizeEndCutDraft({ ...endDraft, targetFace: 'back_face' });
+
+      expect(retargeted.cutType).toBe('bevel');
+      expect(retargeted.horizontalAngle).toBe(0);
+      expect(retargeted.lengthMode).toBe('long_point');
+      expect(retargeted.verticalAngle).toBe(45);
+
+      // End targets pass through untouched
+      const untouched = normalizeEndCutDraft(endDraft);
+      expect(untouched).toEqual(endDraft);
     });
   });
 });

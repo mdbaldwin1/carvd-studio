@@ -1,5 +1,5 @@
 import { Part } from '../types';
-import { getPartEndCutProfiles } from './endCutUtils';
+import { getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
 import {
   getPartWorldContour,
   hasRenderablePartFeatures,
@@ -26,7 +26,11 @@ type TranslationDelta = { x: number; y: number; z: number };
 
 function hasVerticalEndCuts(part: Part): boolean {
   const profiles = getPartEndCutProfiles(part);
-  return profiles.left.verticalInset > 0 || profiles.right.verticalInset > 0;
+  if (profiles.left.verticalInset > 0 || profiles.right.verticalInset > 0) return true;
+  // Long-edge bevels also remove material along Y, so they need the same
+  // convex-shape treatment to avoid ghost corners at the beveled face.
+  const edgeProfiles = getPartEdgeBevelProfiles(part);
+  return edgeProfiles.front.inset > 0 || edgeProfiles.back.inset > 0;
 }
 
 function hasNonRectangularContour(part: Part): boolean {

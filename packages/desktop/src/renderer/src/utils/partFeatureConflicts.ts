@@ -188,7 +188,7 @@ export function getPartFeatureConflicts(
       const face = feature.target.face;
       const prior = endCutsByFace.get(face);
       if (prior) {
-        const message = `Operation ${index + 1} and Operation ${prior.featureIndex + 1} both use ${getFeatureTargetLabel(feature)}. Only one enabled end cut per end is currently supported.`;
+        const message = `Operation ${index + 1} and Operation ${prior.featureIndex + 1} both use ${getFeatureTargetLabel(feature)}. Only one enabled cut per end or edge is currently supported.`;
         conflicts.push({
           featureId: feature.id,
           featureIndex: index,

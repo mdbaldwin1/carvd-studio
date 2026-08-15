@@ -4,6 +4,9 @@ import {
   getDerivedLengthMeasurements,
   getEndCutInsetAt,
   getLengthReferenceValue,
+  getDerivedWidthMeasurements,
+  getEdgeBevelInsetAt,
+  getPartEdgeBevelProfiles,
   getPartEndCutProfiles,
   getReferenceMode
 } from './endCutUtils';
@@ -315,6 +318,61 @@ describe('endCutUtils', () => {
 
     it('defaults to the long point for unknown modes', () => {
       expect(getLengthReferenceValue(measurements, undefined as unknown as 'long_point')).toBe(24);
+    });
+  });
+  describe('edge bevel profiles', () => {
+    const frontBevel = (angle: number, flip = false) =>
+      ({
+        id: 'eb-1',
+        kind: 'end_cut',
+        version: 1,
+        enabled: true,
+        target: { type: 'face', face: 'front_face' },
+        reference: { primaryFrom: 'min' },
+        cutType: 'bevel',
+        lengthMode: 'long_point',
+        parameters: { horizontalAngle: 0, verticalAngle: angle, verticalFlip: flip }
+      }) as never;
+
+    it('computes the Z inset from the vertical angle and thickness', () => {
+      const profiles = getPartEdgeBevelProfiles({ width: 6, thickness: 1, features: [frontBevel(45)] });
+      expect(profiles.front.inset).toBeCloseTo(1);
+      expect(profiles.back.inset).toBe(0);
+    });
+
+    it('interpolates the inset across the thickness with flip support', () => {
+      const profiles = getPartEdgeBevelProfiles({ width: 6, thickness: 1, features: [frontBevel(45)] });
+      // Default: long point at the bottom face (zero inset at y = -halfT)
+      expect(getEdgeBevelInsetAt('front', profiles, { thickness: 1 }, { y: -0.5 })).toBeCloseTo(0);
+      expect(getEdgeBevelInsetAt('front', profiles, { thickness: 1 }, { y: 0 })).toBeCloseTo(0.5);
+      expect(getEdgeBevelInsetAt('front', profiles, { thickness: 1 }, { y: 0.5 })).toBeCloseTo(1);
+
+      const flipped = getPartEdgeBevelProfiles({ width: 6, thickness: 1, features: [frontBevel(45, true)] });
+      expect(getEdgeBevelInsetAt('front', flipped, { thickness: 1 }, { y: 0.5 })).toBeCloseTo(0);
+      expect(getEdgeBevelInsetAt('front', flipped, { thickness: 1 }, { y: -0.5 })).toBeCloseTo(1);
+    });
+
+    it('clamps opposing bevels so they cannot consume the full width', () => {
+      const back = {
+        ...(frontBevel(80) as { target: { type: string; face: string } }),
+        id: 'eb-2',
+        target: { type: 'face', face: 'back_face' }
+      } as never;
+      const profiles = getPartEdgeBevelProfiles({ width: 2, thickness: 1, features: [frontBevel(80), back] });
+      expect(profiles.front.inset + profiles.back.inset).toBeLessThanOrEqual(1.99);
+    });
+
+    it('derives long/short point widths', () => {
+      const widths = getDerivedWidthMeasurements({ width: 6, thickness: 1, features: [frontBevel(45)] });
+      expect(widths.longPoint).toBeCloseTo(6);
+      expect(widths.shortPoint).toBeCloseTo(5);
+      expect(widths.centerline).toBeCloseTo(5.5);
+    });
+
+    it('keeps end-cut length profiles independent of edge bevels', () => {
+      const profiles = getPartEndCutProfiles({ length: 24, width: 6, thickness: 1, features: [frontBevel(45)] });
+      expect(profiles.left.maxInset).toBe(0);
+      expect(profiles.right.maxInset).toBe(0);
     });
   });
 });

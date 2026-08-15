@@ -164,4 +164,50 @@ describe('partCutsEditingStore', () => {
     expect(usePartCutsEditingStore.getState().draftFeatures).toEqual([]);
     expect(usePartCutsEditingStore.getState().selectedFeatureId).toBeNull();
   });
+  describe('draft undo/redo', () => {
+    const feature = (id: string) =>
+      ({
+        id,
+        kind: 'rect_cut',
+        version: 1,
+        enabled: true,
+        cutType: 'dado',
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        parameters: { size: { length: 0.75, width: 4 }, depthMode: 'blind', depth: 0.375 },
+        placement: { x: 2, z: 0 }
+      }) as never;
+
+    it('steps draft changes backward and forward within the session', () => {
+      const store = usePartCutsEditingStore.getState();
+      store.startEditingPartCuts('p1', 'Part 1', []);
+
+      store.setDraftFeatures([feature('a')]);
+      store.setDraftFeatures([feature('a'), feature('b')]);
+
+      expect(usePartCutsEditingStore.getState().canUndoDraft()).toBe(true);
+      usePartCutsEditingStore.getState().undoDraft();
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['a']);
+
+      usePartCutsEditingStore.getState().redoDraft();
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['a', 'b']);
+
+      // A new change clears the redo stack
+      usePartCutsEditingStore.getState().undoDraft();
+      usePartCutsEditingStore.getState().setDraftFeatures([feature('c')]);
+      expect(usePartCutsEditingStore.getState().canRedoDraft()).toBe(false);
+    });
+
+    it('ignores no-op draft updates and resets history on session start', () => {
+      const store = usePartCutsEditingStore.getState();
+      store.startEditingPartCuts('p1', 'Part 1', []);
+      store.setDraftFeatures([feature('a')]);
+      store.setDraftFeatures([feature('a')]); // identical — no history entry
+
+      expect(usePartCutsEditingStore.getState().draftHistory).toHaveLength(1);
+
+      store.startEditingPartCuts('p2', 'Part 2', []);
+      expect(usePartCutsEditingStore.getState().canUndoDraft()).toBe(false);
+    });
+  });
 });

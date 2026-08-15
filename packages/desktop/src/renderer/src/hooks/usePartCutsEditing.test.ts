@@ -161,7 +161,7 @@ describe('usePartCutsEditing', () => {
     });
 
     expect(updatePart).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Only one enabled end cut per end'), 'error');
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Only one enabled cut per end or edge'), 'error');
     expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
   });
 

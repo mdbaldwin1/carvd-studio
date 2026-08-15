@@ -312,4 +312,21 @@ describe('partFeatureSummary', () => {
       );
     });
   });
+  it('summarizes long-edge bevels with edge and high point', () => {
+    const summary = getFeatureSummary(
+      {
+        id: 'eb-1',
+        kind: 'end_cut',
+        version: 1,
+        enabled: true,
+        target: { type: 'face', face: 'front_face' },
+        reference: { primaryFrom: 'min' },
+        cutType: 'bevel',
+        lengthMode: 'long_point',
+        parameters: { horizontalAngle: 0, verticalAngle: 45, verticalFlip: true }
+      },
+      'imperial'
+    );
+    expect(summary).toBe('Edge Bevel 45\u00b0 on Front Edge \u00b7 High point on Top');
+  });
 });

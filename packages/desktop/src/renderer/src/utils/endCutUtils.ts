@@ -77,6 +77,7 @@ export function getPartEndCutProfiles(input: {
   };
 
   for (const feature of getEnabledEndCuts(input.features)) {
+    if (feature.target.face !== 'left_end' && feature.target.face !== 'right_end') continue;
     const profile = feature.target.face === 'left_end' ? left : right;
     profile.horizontalInset = getFeatureHorizontalInset(feature, input.width);
     profile.verticalInset = getFeatureVerticalInset(feature, input.thickness);
@@ -170,4 +171,76 @@ export function getLengthReferenceValue(
     default:
       return measurements.longPoint;
   }
+}
+
+export interface EdgeBevelProfile {
+  /** Z inset removed at the short-point face, in inches. */
+  inset: number;
+  /** false = long point at the bottom face (default); true = long point on top. */
+  flip: boolean;
+}
+
+export interface PartEdgeBevelProfiles {
+  front: EdgeBevelProfile;
+  back: EdgeBevelProfile;
+}
+
+/**
+ * Long-edge (rip) bevels: an end_cut feature targeting front_face/back_face
+ * tilts that long face across the thickness. Only the vertical angle applies.
+ */
+export function getPartEdgeBevelProfiles(input: {
+  width: number;
+  thickness: number;
+  features?: PartFeature[];
+}): PartEdgeBevelProfiles {
+  const front: EdgeBevelProfile = { inset: 0, flip: false };
+  const back: EdgeBevelProfile = { inset: 0, flip: false };
+
+  for (const feature of getEnabledEndCuts(input.features)) {
+    if (feature.target.face !== 'front_face' && feature.target.face !== 'back_face') continue;
+    const profile = feature.target.face === 'front_face' ? front : back;
+    const angle = Math.abs(feature.parameters.verticalAngle || 0);
+    profile.inset = input.thickness > 0 ? Math.max(0, Math.tan((angle * Math.PI) / 180) * input.thickness) : 0;
+    profile.flip = feature.parameters.verticalFlip ?? false;
+  }
+
+  // Keep at least a sliver of width so opposing bevels can't invert the part.
+  const allowedMaxInset = Math.max(0, input.width - 0.01);
+  const total = front.inset + back.inset;
+  if (total > allowedMaxInset && total > 0) {
+    const scale = allowedMaxInset / total;
+    front.inset *= scale;
+    back.inset *= scale;
+  }
+
+  return { front, back };
+}
+
+export function getEdgeBevelInsetAt(
+  side: 'front' | 'back',
+  profiles: PartEdgeBevelProfiles,
+  dimensions: { thickness: number },
+  point: { y: number }
+): number {
+  const profile = side === 'front' ? profiles.front : profiles.back;
+  if (profile.inset <= 0) return 0;
+
+  const halfThickness = dimensions.thickness / 2;
+  const defaultRatio =
+    dimensions.thickness <= 0 ? 0 : Math.min(1, Math.max(0, (point.y + halfThickness) / dimensions.thickness));
+  const ratio = profile.flip ? 1 - defaultRatio : defaultRatio;
+  return profile.inset * ratio;
+}
+
+/** Derived width measurements for parts with long-edge bevels. */
+export function getDerivedWidthMeasurements(input: { width: number; thickness: number; features?: PartFeature[] }): {
+  longPoint: number;
+  shortPoint: number;
+  centerline: number;
+} {
+  const profiles = getPartEdgeBevelProfiles(input);
+  const longPoint = Math.max(0, input.width);
+  const shortPoint = Math.max(0, longPoint - profiles.front.inset - profiles.back.inset);
+  return { longPoint, shortPoint, centerline: (longPoint + shortPoint) / 2 };
 }

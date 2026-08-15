@@ -2324,7 +2324,7 @@ describe('validatePartsForCutList', () => {
       const featureIssues = issues.filter((issue) => issue.type === 'feature_validation' && issue.severity === 'error');
 
       expect(featureIssues).toHaveLength(1);
-      expect(featureIssues[0]?.message).toContain('Only one enabled end cut per end');
+      expect(featureIssues[0]?.message).toContain('Only one enabled cut per end or edge');
     });
   });
 

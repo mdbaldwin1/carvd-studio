@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { createTestPart } from '../../../../tests/helpers/factories';
 import { useClipboardStore } from './clipboardStore';
 import { useLicenseStore } from './licenseStore';
 import { useProjectStore } from './projectStore';
@@ -617,6 +618,51 @@ describe('clipboardStore', () => {
       useProjectStore.getState().newProject();
 
       expect(useClipboardStore.getState().clipboard.parts).toHaveLength(0);
+    });
+  });
+  describe('cuts clipboard', () => {
+    const dado = {
+      id: 'dado-1',
+      kind: 'rect_cut' as const,
+      version: 1,
+      enabled: true,
+      cutType: 'dado' as const,
+      target: { type: 'face' as const, face: 'top_face' as const },
+      reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+      parameters: { size: { length: 0.75, width: 4 }, depthMode: 'blind' as const, depth: 0.375 },
+      placement: { x: 6, z: 0 }
+    };
+
+    it('copies cuts from a part and applies fresh instances to targets', () => {
+      const source = createTestPart({ id: 'src', features: [dado] });
+      const t1 = createTestPart({ id: 't1' });
+      const t2 = createTestPart({ id: 't2' });
+      useProjectStore.setState({ parts: [source, t1, t2] });
+
+      const copied = useClipboardStore.getState().copyPartCuts('src');
+      expect(copied).toBe(true);
+
+      const applied = useClipboardStore.getState().pastePartCutsToParts(['t1', 't2']);
+      expect(applied).toBe(2);
+
+      const parts = useProjectStore.getState().parts;
+      const t1Features = parts.find((p) => p.id === 't1')!.features!;
+      const t2Features = parts.find((p) => p.id === 't2')!.features!;
+      expect(t1Features).toHaveLength(1);
+      expect(t2Features).toHaveLength(1);
+      expect(t1Features[0].cutType).toBe('dado');
+      // Fresh ids per target, independent of the source and each other
+      expect(t1Features[0].id).not.toBe('dado-1');
+      expect(t1Features[0].id).not.toBe(t2Features[0].id);
+    });
+
+    it('refuses to copy from parts without cuts and paste without a clipboard', () => {
+      const bare = createTestPart({ id: 'bare' });
+      useProjectStore.setState({ parts: [bare] });
+      useClipboardStore.setState({ cutsClipboard: null });
+
+      expect(useClipboardStore.getState().copyPartCuts('bare')).toBe(false);
+      expect(useClipboardStore.getState().pastePartCutsToParts(['bare'])).toBe(0);
     });
   });
 });

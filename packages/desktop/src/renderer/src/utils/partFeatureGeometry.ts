@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Part, PartFeature, RectCutFeature } from '../types';
-import { getEndCutInsetAt, getPartEndCutProfiles } from './endCutUtils';
+import { getEdgeBevelInsetAt, getEndCutInsetAt, getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
 import {
   getRectCutDepth,
   getRectCutPreviewSupport,
@@ -388,49 +388,53 @@ function addQuad(vertices: number[], a: Point3, b: Point3, c: Point3, d: Point3)
 
 function createEndCutOnlyGeometry(part: Part): THREE.BufferGeometry {
   const profiles = getPartEndCutProfiles(part);
+  const edgeProfiles = getPartEdgeBevelProfiles(part);
   const halfLength = part.length / 2;
   const halfWidth = part.width / 2;
   const halfThickness = part.thickness / 2;
+  // Long-edge bevels tilt the front/back faces across the thickness.
+  const frontZAt = (y: number) => -halfWidth + getEdgeBevelInsetAt('front', edgeProfiles, part, { y });
+  const backZAt = (y: number) => halfWidth - getEdgeBevelInsetAt('back', edgeProfiles, part, { y });
 
   const lfb = {
     x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z: -halfWidth }),
     y: -halfThickness,
-    z: -halfWidth
+    z: frontZAt(-halfThickness)
   };
   const lbb = {
     x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z: halfWidth }),
     y: -halfThickness,
-    z: halfWidth
+    z: backZAt(-halfThickness)
   };
   const lbt = {
     x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: halfThickness, z: halfWidth }),
     y: halfThickness,
-    z: halfWidth
+    z: backZAt(halfThickness)
   };
   const lft = {
     x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: halfThickness, z: -halfWidth }),
     y: halfThickness,
-    z: -halfWidth
+    z: frontZAt(halfThickness)
   };
   const rfb = {
     x: halfLength - getEndCutInsetAt('right', profiles, part, { y: -halfThickness, z: -halfWidth }),
     y: -halfThickness,
-    z: -halfWidth
+    z: frontZAt(-halfThickness)
   };
   const rbb = {
     x: halfLength - getEndCutInsetAt('right', profiles, part, { y: -halfThickness, z: halfWidth }),
     y: -halfThickness,
-    z: halfWidth
+    z: backZAt(-halfThickness)
   };
   const rbt = {
     x: halfLength - getEndCutInsetAt('right', profiles, part, { y: halfThickness, z: halfWidth }),
     y: halfThickness,
-    z: halfWidth
+    z: backZAt(halfThickness)
   };
   const rft = {
     x: halfLength - getEndCutInsetAt('right', profiles, part, { y: halfThickness, z: -halfWidth }),
     y: halfThickness,
-    z: -halfWidth
+    z: frontZAt(halfThickness)
   };
 
   const vertices: number[] = [];
@@ -529,6 +533,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
       : (mergeGeometries(layerGeometries, false) ?? getLayerGeometry(contour, [], part.thickness, -part.thickness / 2));
 
   applyVerticalEndCuts(geometry, part);
+  applyEdgeBevels(geometry, part);
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
@@ -567,6 +572,32 @@ function applyVerticalEndCuts(geometry: THREE.BufferGeometry, part: Part): void 
       if (Math.abs(x - rightBaseBoundaryX) < epsilon) {
         positions.setX(i, halfLength - rightInset);
       }
+    }
+  }
+
+  positions.needsUpdate = true;
+}
+
+function applyEdgeBevels(geometry: THREE.BufferGeometry, part: Part): void {
+  const profiles = getPartEdgeBevelProfiles(part);
+  if (profiles.front.inset <= 0 && profiles.back.inset <= 0) return;
+
+  const positions = geometry.getAttribute('position');
+  const halfWidth = part.width / 2;
+  const epsilon = 1e-4;
+
+  for (let i = 0; i < positions.count; i += 1) {
+    const y = positions.getY(i);
+    const z = positions.getZ(i);
+
+    // Front face sits at z = -halfWidth; the bevel pushes it inward (+Z).
+    if (profiles.front.inset > 0 && Math.abs(z + halfWidth) < epsilon) {
+      positions.setZ(i, -halfWidth + getEdgeBevelInsetAt('front', profiles, part, { y }));
+    }
+
+    // Back face sits at z = +halfWidth; the bevel pushes it inward (-Z).
+    if (profiles.back.inset > 0 && Math.abs(z - halfWidth) < epsilon) {
+      positions.setZ(i, halfWidth - getEdgeBevelInsetAt('back', profiles, part, { y }));
     }
   }
 
@@ -621,9 +652,23 @@ export function getPartLocalConvexVertices(part: Part): Array<{ x: number; y: nu
   const halfThickness = part.thickness / 2;
 
   const profiles = getPartEndCutProfiles(part);
+  const edgeProfiles = getPartEdgeBevelProfiles(part);
   const hasVertical = profiles.left.verticalInset > 0 || profiles.right.verticalInset > 0;
+  const hasEdgeBevels = edgeProfiles.front.inset > 0 || edgeProfiles.back.inset > 0;
+  const halfWidthForBevels = part.width / 2;
 
-  if (!hasVertical) {
+  const applyEdgeBevelToVertex = (z: number, y: number): number => {
+    if (!hasEdgeBevels) return z;
+    if (edgeProfiles.front.inset > 0 && Math.abs(z + halfWidthForBevels) < 1e-6) {
+      return -halfWidthForBevels + getEdgeBevelInsetAt('front', edgeProfiles, part, { y });
+    }
+    if (edgeProfiles.back.inset > 0 && Math.abs(z - halfWidthForBevels) < 1e-6) {
+      return halfWidthForBevels - getEdgeBevelInsetAt('back', edgeProfiles, part, { y });
+    }
+    return z;
+  };
+
+  if (!hasVertical && !hasEdgeBevels) {
     // Fast path: just extrude the 2D contour at ±halfThickness
     const verts: Array<{ x: number; y: number; z: number }> = [];
     for (const p of contour) {
@@ -671,10 +716,11 @@ export function getPartLocalConvexVertices(part: Part): Array<{ x: number; y: nu
         }
       }
 
-      const key = `${x.toFixed(8)},${y.toFixed(8)},${p.z.toFixed(8)}`;
+      const z = applyEdgeBevelToVertex(p.z, y);
+      const key = `${x.toFixed(8)},${y.toFixed(8)},${z.toFixed(8)}`;
       if (!seen.has(key)) {
         seen.add(key);
-        verts.push({ x, y, z: p.z });
+        verts.push({ x, y, z });
       }
     }
   }

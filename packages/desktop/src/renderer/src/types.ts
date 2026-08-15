@@ -140,7 +140,9 @@ export interface PartFeatureBase {
 
 export interface EndCutFeature extends PartFeatureBase {
   kind: 'end_cut';
-  target: { type: 'face'; face: 'left_end' | 'right_end' };
+  // left/right ends take mitre/bevel/compound cuts; front/back faces take
+  // long-edge (rip) bevels, which only use the vertical angle.
+  target: { type: 'face'; face: 'left_end' | 'right_end' | 'front_face' | 'back_face' };
   cutType: 'mitre' | 'bevel' | 'compound';
   lengthMode: 'long_point' | 'short_point' | 'centerline';
   parameters: {

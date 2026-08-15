@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Long-edge bevels (Edge Bevel)** — Rip bevels along a board's front or back edge, unlocking mitred boxes and waterfall edges. Edge bevels render as true tilted faces, snap and overlap by their real shape, keep the board width locked to the long point with derived long/short-point width readouts, and appear in summaries and fabrication instructions.
+- **Half Lap preset** — The cut picker now includes a Half Lap starter that seeds a blind channel at half the board thickness positioned as an end lap, ready to adjust for cross laps.
+- **Copy and paste cuts between parts** — Right-click a part with cuts to `Copy Cuts`, then select any number of parts and `Paste Cuts` to apply the same joinery to all of them in one undo step, each part receiving independent cut instances.
+- **Undo/redo inside the cuts workspace** — Cut draft changes now step backward and forward with Cmd+Z / Cmd+Shift+Z (and header buttons) without touching project history.
+- **Grouped cut picker** — The "What kind of cut?" step now organizes operations into Ends & Edges, Channels & Laps, Edges & Corners, and Pockets & Openings.
 - **Part Cuts workspace** — A dedicated editing mode for shaping individual boards, opened from the part's Properties panel (`Edit Part Cuts`) or right-click menu (`Edit Cuts`). A guided `What kind of cut?` flow adds cuts, a focused single-cut editor handles changes, and exiting prompts to save or discard unsaved cut changes.
 - **Ten woodworking cut operations** — End cuts (mitres, bevels, and compound cuts on either end), dados, stopped dados, grooves, stopped grooves, rabbets, mortises, face cutouts, edge notches, and corner notches — each with constrained, validated parameters and true 3D preview geometry. Ordinary rectangular parts stay on the high-performance instanced render path.
 - **Direct manipulation in the cuts preview** — Face pockets and stopped channels can be moved and resized with drag handles directly in the 3D preview, and cut targets can be retargeted by hovering and clicking faces, edges, and corners on the part itself, with the editor panel as the exact-entry fallback.

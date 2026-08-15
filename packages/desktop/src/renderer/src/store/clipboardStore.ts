@@ -1,27 +1,62 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
-import { Clipboard } from '../types';
+import { Clipboard, PartFeature } from '../types';
 import { canAddPart, getBlockedMessage } from '../utils/featureLimits';
 import { useProjectStore, generateCopyName } from './projectStore';
 import { useLicenseStore } from './licenseStore';
 import { useSelectionStore } from './selectionStore';
 import { useUIStore } from './uiStore';
-import { clonePartFeatures, normalizePart } from '../utils/partFeatures';
+import { clonePartFeature, clonePartFeatures, normalizePart } from '../utils/partFeatures';
 import { resolveSelectedGroupIdsWithDescendants } from '../utils/interactionSelection';
 import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
 
 interface ClipboardStoreState {
   clipboard: Clipboard;
+  cutsClipboard: PartFeature[] | null;
 
   // Actions
   copySelectedParts: () => void;
   pasteClipboard: () => string[];
   pasteAtPosition: (position: { x: number; y: number; z: number }) => string[];
   clearClipboard: () => void;
+  copyPartCuts: (partId: string) => boolean;
+  pastePartCutsToParts: (partIds: string[]) => number;
 }
 
 export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
   clipboard: { parts: [], groups: [], groupMembers: [] },
+  cutsClipboard: null,
+
+  copyPartCuts: (partId) => {
+    const part = useProjectStore.getState().parts.find((p) => p.id === partId);
+    if (!part || !part.features || part.features.length === 0) return false;
+    set({ cutsClipboard: clonePartFeatures(part.features) });
+    return true;
+  },
+
+  pastePartCutsToParts: (partIds) => {
+    const { cutsClipboard } = get();
+    if (!cutsClipboard || cutsClipboard.length === 0 || partIds.length === 0) return 0;
+    const { parts, batchUpdateParts } = useProjectStore.getState();
+    const targets = parts.filter((p) => partIds.includes(p.id));
+    if (targets.length === 0) return 0;
+
+    // Each target gets its own feature instances so later edits stay
+    // independent; conflict analysis re-runs per part on its own dimensions.
+    batchUpdateParts(
+      targets.map((target) => ({
+        id: target.id,
+        changes: {
+          features: cutsClipboard.map((feature) => {
+            const cloned = clonePartFeature(feature);
+            cloned.id = uuidv4();
+            return cloned;
+          })
+        }
+      }))
+    );
+    return targets.length;
+  },
 
   copySelectedParts: () => {
     const { parts, groups, groupMembers } = useProjectStore.getState();
