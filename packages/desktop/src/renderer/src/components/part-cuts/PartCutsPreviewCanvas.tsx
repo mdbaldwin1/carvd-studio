@@ -399,6 +399,12 @@ export function getEditableHandleOverlay(
     };
   }
 
+  // Side-face pockets recess along Z; the top-down overlay math doesn't
+  // apply, so fall back to inspector-only editing for them.
+  if (draft.mode === 'rect_cut' && (draft.faceTarget === 'front_face' || draft.faceTarget === 'back_face')) {
+    return null;
+  }
+
   const dims = buildRectDimensionOverlay(part, draft);
   if (!dims) return null;
 

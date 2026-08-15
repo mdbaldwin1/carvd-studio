@@ -184,6 +184,12 @@ export function getResolvedRectCutFeature(
   return cloneRectCutFeature(feature);
 }
 
+export function isSideFaceTarget(feature: RectCutFeature): boolean {
+  return (
+    feature.target.type === 'face' && (feature.target.face === 'front_face' || feature.target.face === 'back_face')
+  );
+}
+
 export function isTopTarget(feature: RectCutFeature): boolean {
   if (feature.target.type === 'face') return feature.target.face === 'top_face';
   if (feature.target.type === 'edge') return feature.target.edge.startsWith('top_');
@@ -205,6 +211,13 @@ export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPrevie
     feature.cutType === 'stopped_groove' ||
     feature.cutType === 'mortise'
   ) {
+    const isSideFacePocket =
+      (feature.cutType === 'mortise' || feature.cutType === 'cutout') &&
+      feature.target.type === 'face' &&
+      (feature.target.face === 'front_face' || feature.target.face === 'back_face');
+    if (isSideFacePocket) {
+      return { supported: true };
+    }
     if (feature.target.type !== 'face' || !isTopOrBottomFace(feature.target.face)) {
       return {
         supported: false,
@@ -266,7 +279,12 @@ export function validateRectCutFeature(
   if (resolvedFeature.parameters.depthMode === 'blind') {
     const depth = resolvedFeature.parameters.depth ?? 0;
     if (!Number.isFinite(depth) || depth <= 0) return 'Blind depth must be greater than zero.';
-    if (depth >= part.thickness) return 'Blind depth must stay less than part thickness.';
+    if (isSideFaceTarget(resolvedFeature)) {
+      // Side-face pockets recess into the board width instead of thickness.
+      if (depth >= part.width) return 'Blind depth must stay less than part width.';
+    } else if (depth >= part.thickness) {
+      return 'Blind depth must stay less than part thickness.';
+    }
   }
 
   if (resolvedFeature.cutType === 'dado') {
@@ -309,8 +327,11 @@ export function validateRectCutFeature(
   }
 
   if (resolvedFeature.cutType === 'mortise') {
-    if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
-      return 'Mortise must target the top or bottom face.';
+    if (
+      resolvedFeature.target.type !== 'face' ||
+      (!isTopOrBottomFace(resolvedFeature.target.face) && !isSideFaceTarget(resolvedFeature))
+    ) {
+      return 'Mortise must target the top, bottom, front, or back face.';
     }
     if (resolvedFeature.parameters.depthMode !== 'blind') return 'Mortise currently uses blind depth only.';
   }
@@ -322,7 +343,16 @@ export function validateRectCutFeature(
   ) {
     if (resolvedFeature.placement.x < 0 || resolvedFeature.placement.z < 0) return 'Cutout offsets cannot be negative.';
     if (resolvedFeature.placement.x + sizeLength > part.length) return 'Cutout length runs past the blank.';
-    if (resolvedFeature.placement.z + sizeWidth > part.width) return 'Cutout width runs past the blank.';
+    if (isSideFaceTarget(resolvedFeature)) {
+      // On front/back faces, the cross measurement and offset run across the
+      // board thickness rather than its width.
+      if (resolvedFeature.parameters.depthMode !== 'blind') return 'Side-face pockets use blind depth only.';
+      if (resolvedFeature.placement.z + sizeWidth > part.thickness) {
+        return 'Pocket height runs past the board thickness.';
+      }
+    } else if (resolvedFeature.placement.z + sizeWidth > part.width) {
+      return 'Cutout width runs past the blank.';
+    }
   }
 
   if (resolvedFeature.cutType === 'rabbet') {

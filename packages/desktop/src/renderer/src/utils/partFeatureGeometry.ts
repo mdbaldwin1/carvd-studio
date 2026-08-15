@@ -7,6 +7,7 @@ import {
   getRectCutPreviewSupport,
   getResolvedRectCutFeature,
   isBottomTarget,
+  isSideFaceTarget,
   isTopTarget
 } from './rectCutUtils';
 
@@ -393,48 +394,51 @@ function createEndCutOnlyGeometry(part: Part): THREE.BufferGeometry {
   const halfWidth = part.width / 2;
   const halfThickness = part.thickness / 2;
   // Long-edge bevels tilt the front/back faces across the thickness.
-  const frontZAt = (y: number) => -halfWidth + getEdgeBevelInsetAt('front', edgeProfiles, part, { y });
-  const backZAt = (y: number) => halfWidth - getEdgeBevelInsetAt('back', edgeProfiles, part, { y });
+  // World convention (see partCutPicking): the +Z face is the FRONT and the
+  // -Z face is the BACK, so the -Z corners take the back profile and vice
+  // versa. Corner ordering (and thus quad winding) is unchanged.
+  const minusZAt = (y: number) => -halfWidth + getEdgeBevelInsetAt('back', edgeProfiles, part, { y });
+  const plusZAt = (y: number) => halfWidth - getEdgeBevelInsetAt('front', edgeProfiles, part, { y });
 
   const lfb = {
     x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z: -halfWidth }),
     y: -halfThickness,
-    z: frontZAt(-halfThickness)
+    z: minusZAt(-halfThickness)
   };
   const lbb = {
     x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z: halfWidth }),
     y: -halfThickness,
-    z: backZAt(-halfThickness)
+    z: plusZAt(-halfThickness)
   };
   const lbt = {
     x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: halfThickness, z: halfWidth }),
     y: halfThickness,
-    z: backZAt(halfThickness)
+    z: plusZAt(halfThickness)
   };
   const lft = {
     x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: halfThickness, z: -halfWidth }),
     y: halfThickness,
-    z: frontZAt(halfThickness)
+    z: minusZAt(halfThickness)
   };
   const rfb = {
     x: halfLength - getEndCutInsetAt('right', profiles, part, { y: -halfThickness, z: -halfWidth }),
     y: -halfThickness,
-    z: frontZAt(-halfThickness)
+    z: minusZAt(-halfThickness)
   };
   const rbb = {
     x: halfLength - getEndCutInsetAt('right', profiles, part, { y: -halfThickness, z: halfWidth }),
     y: -halfThickness,
-    z: backZAt(-halfThickness)
+    z: plusZAt(-halfThickness)
   };
   const rbt = {
     x: halfLength - getEndCutInsetAt('right', profiles, part, { y: halfThickness, z: halfWidth }),
     y: halfThickness,
-    z: backZAt(halfThickness)
+    z: plusZAt(halfThickness)
   };
   const rft = {
     x: halfLength - getEndCutInsetAt('right', profiles, part, { y: halfThickness, z: -halfWidth }),
     y: halfThickness,
-    z: frontZAt(halfThickness)
+    z: minusZAt(halfThickness)
   };
 
   const vertices: number[] = [];
@@ -469,6 +473,17 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
 
   for (const feature of supportedRectCuts) {
     if (feature.parameters.depthMode !== 'blind') continue;
+    if (isSideFaceTarget(feature)) {
+      // Side-face pockets occupy a band across the thickness: slice at the
+      // band edges so only those layers get the front/back recess.
+      const bandLow = Math.max(-part.thickness / 2, -part.thickness / 2 + feature.placement.z);
+      const bandHigh = Math.min(part.thickness / 2, bandLow + feature.parameters.size.width);
+      if (bandHigh - bandLow > 1e-6) {
+        sliceY.add(bandLow);
+        sliceY.add(bandHigh);
+      }
+      continue;
+    }
     const depth = getRectCutDepth(feature, part.thickness);
     if (depth <= 0) continue;
     if (isTopTarget(feature)) {
@@ -492,6 +507,32 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     const layerHoles: Point2[][] = [];
 
     for (const feature of supportedRectCuts) {
+      if (isSideFaceTarget(feature)) {
+        const pocketDepth = Math.min(feature.parameters.depth ?? 0, part.width);
+        const bandLow = -part.thickness / 2 + feature.placement.z;
+        const bandHigh = bandLow + feature.parameters.size.width;
+        if (pocketDepth <= 0 || yMid < bandLow || yMid > bandHigh) continue;
+        // Within its band a side-face pocket is a front/back recess: reuse the
+        // edge-notch contour math with the pocket depth as the notch width.
+        const pseudoNotch: RectCutFeature = {
+          ...feature,
+          cutType: 'edge_notch',
+          target: {
+            type: 'edge',
+            edge:
+              feature.target.type === 'face' && feature.target.face === 'back_face' ? 'top_back_edge' : 'top_front_edge'
+          },
+          parameters: {
+            ...feature.parameters,
+            size: { length: feature.parameters.size.length, width: pocketDepth },
+            depthMode: 'through'
+          },
+          placement: { x: feature.placement.x, z: 0 }
+        };
+        layerContour = applyEdgeNotch(layerContour, pseudoNotch);
+        continue;
+      }
+
       const depth = getRectCutDepth(feature, part.thickness);
       const active =
         feature.parameters.depthMode === 'through' ||
@@ -590,14 +631,14 @@ function applyEdgeBevels(geometry: THREE.BufferGeometry, part: Part): void {
     const y = positions.getY(i);
     const z = positions.getZ(i);
 
-    // Front face sits at z = -halfWidth; the bevel pushes it inward (+Z).
-    if (profiles.front.inset > 0 && Math.abs(z + halfWidth) < epsilon) {
-      positions.setZ(i, -halfWidth + getEdgeBevelInsetAt('front', profiles, part, { y }));
+    // World-space convention (matching partCutPicking): the FRONT face
+    // renders at +Z and the BACK face at -Z.
+    if (profiles.front.inset > 0 && Math.abs(z - halfWidth) < epsilon) {
+      positions.setZ(i, halfWidth - getEdgeBevelInsetAt('front', profiles, part, { y }));
     }
 
-    // Back face sits at z = +halfWidth; the bevel pushes it inward (-Z).
-    if (profiles.back.inset > 0 && Math.abs(z - halfWidth) < epsilon) {
-      positions.setZ(i, halfWidth - getEdgeBevelInsetAt('back', profiles, part, { y }));
+    if (profiles.back.inset > 0 && Math.abs(z + halfWidth) < epsilon) {
+      positions.setZ(i, -halfWidth + getEdgeBevelInsetAt('back', profiles, part, { y }));
     }
   }
 

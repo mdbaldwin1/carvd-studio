@@ -448,4 +448,25 @@ describe('getPartFeatureConflicts', () => {
     );
     expect(conflicts.every((c) => c.code !== 'rect_depth_intersection')).toBe(true);
   });
+  it('flags opposing side-face pockets whose depths meet', () => {
+    const part = createTestPart({ length: 20, width: 2, thickness: 2 });
+    const pocket = (id: string, face: 'front_face' | 'back_face', depth: number) =>
+      rectCut(
+        id,
+        'mortise',
+        { type: 'face', face },
+        {
+          size: { length: 3, width: 1 },
+          depthMode: 'blind',
+          depth
+        },
+        { x: 4, z: 0.5 }
+      );
+
+    const meeting = getPartFeatureConflicts([pocket('f', 'front_face', 1.2), pocket('b', 'back_face', 1.2)], part);
+    expect(meeting.some((c) => c.code === 'rect_depth_intersection' && c.severity === 'error')).toBe(true);
+
+    const clearing = getPartFeatureConflicts([pocket('f', 'front_face', 0.5), pocket('b', 'back_face', 0.5)], part);
+    expect(clearing.every((c) => c.code !== 'rect_depth_intersection')).toBe(true);
+  });
 });

@@ -146,10 +146,17 @@ describe('partFeatureEditorState', () => {
       expect(normalized.placementZ).toBe(0);
     });
 
-    it('coerces face targets to top/bottom for face-based cut types', () => {
-      for (const cutType of ['cutout', 'dado', 'stopped_dado', 'groove', 'stopped_groove', 'mortise'] as const) {
+    it('coerces face targets per cut type, keeping side faces for pockets', () => {
+      // Channels stay on top/bottom where run semantics are defined.
+      for (const cutType of ['dado', 'stopped_dado', 'groove', 'stopped_groove'] as const) {
         const normalized = normalizeRectCutDraft(createRectDraft({ cutType, faceTarget: 'front_face' }), PART_DEFAULTS);
         expect(normalized.faceTarget).toBe('top_face');
+      }
+      // Pockets may sink into side faces and become blind there.
+      for (const cutType of ['cutout', 'mortise'] as const) {
+        const normalized = normalizeRectCutDraft(createRectDraft({ cutType, faceTarget: 'front_face' }), PART_DEFAULTS);
+        expect(normalized.faceTarget).toBe('front_face');
+        expect(normalized.depthMode).toBe('blind');
       }
       const bottom = normalizeRectCutDraft(createRectDraft({ faceTarget: 'bottom_face' }), PART_DEFAULTS);
       expect(bottom.faceTarget).toBe('bottom_face');

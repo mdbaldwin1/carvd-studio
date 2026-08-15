@@ -210,13 +210,25 @@ export function normalizeRectCutDraft(
   normalized.placementX = Math.max(0, sanitizeFinite(normalized.placementX, 0));
   normalized.placementZ = Math.max(0, sanitizeFinite(normalized.placementZ, 0));
 
-  if (
-    normalized.cutType === 'cutout' ||
+  if (normalized.cutType === 'cutout' || normalized.cutType === 'mortise') {
+    // Pockets may target top/bottom or the front/back side faces (side-face
+    // pockets recess into the board width and are always blind).
+    if (
+      normalized.faceTarget !== 'top_face' &&
+      normalized.faceTarget !== 'bottom_face' &&
+      normalized.faceTarget !== 'front_face' &&
+      normalized.faceTarget !== 'back_face'
+    ) {
+      normalized.faceTarget = 'top_face';
+    }
+    if (normalized.faceTarget === 'front_face' || normalized.faceTarget === 'back_face') {
+      normalized.depthMode = 'blind';
+    }
+  } else if (
     normalized.cutType === 'dado' ||
     normalized.cutType === 'stopped_dado' ||
     normalized.cutType === 'groove' ||
-    normalized.cutType === 'stopped_groove' ||
-    normalized.cutType === 'mortise'
+    normalized.cutType === 'stopped_groove'
   ) {
     if (normalized.faceTarget !== 'top_face' && normalized.faceTarget !== 'bottom_face') {
       normalized.faceTarget = 'top_face';

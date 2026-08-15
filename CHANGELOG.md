@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Side-face mortises and pockets** — Mortises and cutouts can now target the front or back face of a board, recessing into its width — the layout needed for leg-and-apron mortise-and-tenon joinery. Side-face pockets are always blind, render as true recesses within their height band, respect opposing-pocket depth conflicts, and are edited through the inspector with thickness-aware field labels.
 - **Long-edge bevels (Edge Bevel)** — Rip bevels along a board's front or back edge, unlocking mitred boxes and waterfall edges. Edge bevels render as true tilted faces, snap and overlap by their real shape, keep the board width locked to the long point with derived long/short-point width readouts, and appear in summaries and fabrication instructions.
 - **Half Lap preset** — The cut picker now includes a Half Lap starter that seeds a blind channel at half the board thickness positioned as an end lap, ready to adjust for cross laps.
 - **Copy and paste cuts between parts** — Right-click a part with cuts to `Copy Cuts`, then select any number of parts and `Paste Cuts` to apply the same joinery to all of them in one undo step, each part receiving independent cut instances.

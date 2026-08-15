@@ -118,16 +118,16 @@ describe('rectCutUtils', () => {
         reference: { primaryFrom: 'min' },
         cutType: 'mortise',
         parameters: {
-          size: { length: 2, width: 0.75 },
+          size: { length: 2, width: 0.5 },
           depthMode: 'blind',
           depth: 0.25
         },
-        placement: { x: 2, z: 1 }
+        placement: { x: 2, z: 0 }
       },
       { length: 24, width: 8, thickness: 0.75 }
     );
 
-    expect(mortiseIssue).toContain('top or bottom face');
+    expect(mortiseIssue).toContain('top, bottom, front, or back face');
   });
 
   it('normalizes stopped dado and stopped groove while preserving partial runs', () => {
@@ -401,6 +401,11 @@ describe('rectCutUtils', () => {
         const support = getRectCutPreviewSupport(
           createRectCut({ cutType, target: { type: 'face', face: 'front_face' } })
         );
+        if (cutType === 'mortise' || cutType === 'cutout') {
+          // Side-face pockets are now first-class (leg mortises).
+          expect(support.supported).toBe(true);
+          continue;
+        }
         expect(support.supported).toBe(false);
         if (!support.supported) {
           expect(support.reason).toContain(reasonPrefix);

@@ -1418,12 +1418,13 @@ describe('partFeatureGeometry', () => {
       expect(topFront.length).toBeGreaterThan(0);
     });
 
-    it('renders geometry with no top vertices on the original front plane', () => {
+    it('renders geometry with no top vertices on the original front plane (world +Z)', () => {
       const geometry = getPartRenderGeometry(frontBevelPart());
       const positions = geometry.getAttribute('position');
       let offendingVertices = 0;
       for (let i = 0; i < positions.count; i += 1) {
-        if (positions.getY(i) > 0.49 && positions.getZ(i) < -1.99) offendingVertices += 1;
+        // World convention: the front face renders at +Z (see partCutPicking).
+        if (positions.getY(i) > 0.49 && positions.getZ(i) > 1.99) offendingVertices += 1;
       }
       expect(offendingVertices).toBe(0);
     });
@@ -1432,6 +1433,63 @@ describe('partFeatureGeometry', () => {
       const box = getPartLocalBoundingBox(frontBevelPart());
       expect(box.min.z).toBeCloseTo(-2);
       expect(box.max.z).toBeCloseTo(2);
+    });
+  });
+  describe('side-face pockets', () => {
+    const frontMortisePart = () =>
+      createTestPart({
+        length: 20,
+        width: 2,
+        thickness: 2,
+        features: [
+          {
+            id: 'sm-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'mortise',
+            target: { type: 'face', face: 'front_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            // Opening: 3" run starting 4" from the left, 1" tall starting
+            // 0.5" up from the bottom, sunk 0.75" into the front face.
+            parameters: { size: { length: 3, width: 1 }, depthMode: 'blind', depth: 0.75 },
+            placement: { x: 4, z: 0.5 }
+          }
+        ]
+      });
+
+    it('recesses the front face only within the pocket band', () => {
+      const geometry = getPartRenderGeometry(frontMortisePart());
+      const positions = geometry.getAttribute('position');
+
+      let recessedInBand = 0;
+      let recessedOutsideBand = 0;
+      for (let i = 0; i < positions.count; i += 1) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+        const z = positions.getZ(i);
+        // World convention: the front face renders at +Z, so the pocket floor
+        // sits at z = 1 - 0.75 = 0.25 within the run.
+        const inRun = x > -6.01 && x < -2.99;
+        if (Math.abs(z - 0.25) < 1e-3 && inRun) {
+          // Band: y from -0.5 (0.5" up from bottom of 2" board) to +0.5
+          if (y >= -0.51 && y <= 0.51) recessedInBand += 1;
+          else recessedOutsideBand += 1;
+        }
+      }
+      expect(recessedInBand).toBeGreaterThan(0);
+      expect(recessedOutsideBand).toBe(0);
+    });
+
+    it('keeps the full-width contour outside the pocket band', () => {
+      const geometry = getPartRenderGeometry(frontMortisePart());
+      const positions = geometry.getAttribute('position');
+      // Above the band (y near top face) the front face must remain at z = +1.
+      let fullWidthAtTop = 0;
+      for (let i = 0; i < positions.count; i += 1) {
+        if (positions.getY(i) > 0.9 && Math.abs(positions.getZ(i) - 1) < 1e-3) fullWidthAtTop += 1;
+      }
+      expect(fullWidthAtTop).toBeGreaterThan(0);
     });
   });
 });

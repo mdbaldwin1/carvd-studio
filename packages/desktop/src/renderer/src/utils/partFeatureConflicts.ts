@@ -1,6 +1,6 @@
 import { Part, PartFeature, RectCutFeature } from '@renderer/types';
 import { getFeatureTargetLabel } from '@renderer/utils/partFeatureSummary';
-import { getResolvedRectCutFeature, isBottomTarget, isTopTarget } from '@renderer/utils/rectCutUtils';
+import { getResolvedRectCutFeature, isBottomTarget, isSideFaceTarget, isTopTarget } from '@renderer/utils/rectCutUtils';
 
 export interface PartFeatureConflict {
   featureId: string;
@@ -19,7 +19,7 @@ interface RectBounds {
   maxZ: number;
 }
 
-type ReachableSurface = 'top' | 'bottom';
+type ReachableSurface = 'top' | 'bottom' | 'front' | 'back';
 type DepthInterval = { min: number; max: number };
 
 function overlaps(a: RectBounds, b: RectBounds): boolean {
@@ -53,6 +53,18 @@ function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length'
       maxX: resolvedFeature.placement.x + sizeLength,
       minZ: resolvedFeature.placement.z,
       maxZ: resolvedFeature.placement.z + sizeWidth
+    };
+  }
+
+  if (isSideFaceTarget(resolvedFeature)) {
+    const depth = Math.min(resolvedFeature.parameters.depth ?? 0, part.width);
+    if (depth <= 0) return null;
+    const front = resolvedFeature.target.type === 'face' && resolvedFeature.target.face === 'front_face';
+    return {
+      minX: resolvedFeature.placement.x,
+      maxX: resolvedFeature.placement.x + sizeLength,
+      minZ: front ? 0 : part.width - depth,
+      maxZ: front ? depth : part.width
     };
   }
 
@@ -96,6 +108,12 @@ function getReachableSurfaces(feature: RectCutFeature, resolvedFeature: RectCutF
 
   if (isTopTarget(resolvedFeature)) return new Set<ReachableSurface>(['top']);
   if (isBottomTarget(resolvedFeature)) return new Set<ReachableSurface>(['bottom']);
+  if (resolvedFeature.target.type === 'face' && resolvedFeature.target.face === 'front_face') {
+    return new Set<ReachableSurface>(['front']);
+  }
+  if (resolvedFeature.target.type === 'face' && resolvedFeature.target.face === 'back_face') {
+    return new Set<ReachableSurface>(['back']);
+  }
 
   if (feature.target.type === 'face') {
     if (feature.target.face === 'top_face') return new Set<ReachableSurface>(['top']);
@@ -144,6 +162,15 @@ function getDepthInterval(feature: RectCutFeature, part: Pick<Part, 'thickness'>
   return { min: 0, max: part.thickness };
 }
 
+function getSideDepthInterval(
+  feature: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): DepthInterval {
+  const depth = Math.max(0, Math.min(part.width, feature.parameters.depth ?? 0));
+  const front = feature.target.type === 'face' && feature.target.face === 'front_face';
+  return front ? { min: 0, max: depth } : { min: part.width - depth, max: part.width };
+}
+
 function intervalsOverlap(a: DepthInterval, b: DepthInterval): boolean {
   return a.min < b.max && a.max > b.min;
 }
@@ -160,10 +187,17 @@ function isOpposingBlindIntersection(
   const priorSurfaces = getReachableSurfaces(priorFeature, priorResolved);
   const currentSurfaces = getReachableSurfaces(currentFeature, currentResolved);
 
-  const isOpposed =
+  const isVerticallyOpposed =
     (priorSurfaces.has('top') && currentSurfaces.has('bottom')) ||
     (priorSurfaces.has('bottom') && currentSurfaces.has('top'));
-  if (!isOpposed) return false;
+  const isSideOpposed =
+    (priorSurfaces.has('front') && currentSurfaces.has('back')) ||
+    (priorSurfaces.has('back') && currentSurfaces.has('front'));
+  if (!isVerticallyOpposed && !isSideOpposed) return false;
+
+  if (isSideOpposed) {
+    return intervalsOverlap(getSideDepthInterval(priorResolved, part), getSideDepthInterval(currentResolved, part));
+  }
 
   return intervalsOverlap(getDepthInterval(priorResolved, part), getDepthInterval(currentResolved, part));
 }

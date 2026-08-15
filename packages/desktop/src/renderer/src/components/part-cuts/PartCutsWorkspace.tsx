@@ -238,6 +238,11 @@ export function PartCutsWorkspace({
     ) {
       return FACE_TARGETS;
     }
+    // Pockets can also sink into the front/back side faces (leg mortises);
+    // channels stay on top/bottom where their run semantics are defined.
+    if (draft.cutType === 'mortise' || draft.cutType === 'cutout') {
+      return [...TOP_BOTTOM_FACE_TARGETS, 'front_face', 'back_face'] as typeof TOP_BOTTOM_FACE_TARGETS;
+    }
     return TOP_BOTTOM_FACE_TARGETS;
   }, [draft]);
 
@@ -1226,7 +1231,12 @@ export function PartCutsWorkspace({
                                 />
                               </div>
                               <div>
-                                <Label>Offset Across Width</Label>
+                                <Label>
+                                  {inspectorDraft.faceTarget === 'front_face' ||
+                                  inspectorDraft.faceTarget === 'back_face'
+                                    ? 'Offset Up From Bottom'
+                                    : 'Offset Across Width'}
+                                </Label>
                                 <FractionInput
                                   value={inspectorDraft.placementZ}
                                   onChange={(value) => updateRectDraft({ placementZ: value })}
