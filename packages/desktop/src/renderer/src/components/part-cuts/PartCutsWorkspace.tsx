@@ -453,7 +453,10 @@ export function PartCutsWorkspace({
   const inspectorHidesDepthSelector =
     inspectorUsesBlindOnlyDepth ||
     (inspectorDraft?.mode === 'rect_cut' &&
-      (inspectorDraft.cutType === 'corner_notch' || inspectorDraft.cutType === 'edge_notch'));
+      (inspectorDraft.cutType === 'corner_notch' ||
+        inspectorDraft.cutType === 'edge_notch' ||
+        // A tenon is sized by its tongue, not by a through/blind choice.
+        inspectorDraft.cutType === 'tenon'));
   const inspectorUsesDerivedCrossWidth =
     inspectorDraft?.mode === 'rect_cut' && ['dado', 'stopped_dado', 'rabbet'].includes(inspectorDraft.cutType);
   const preservedEndCutReferenceNote =
@@ -1164,15 +1167,18 @@ export function PartCutsWorkspace({
                             <Label>
                               {inspectorDraft.cutType === 'tenon'
                                 ? 'Tenon Width'
-                                : inspectorDraft.cutType === 'dado'
-                                  ? 'Across Board Width'
-                                  : inspectorDraft.cutType === 'stopped_dado'
+                                : inspectorDraft.faceTarget === 'front_face' ||
+                                    inspectorDraft.faceTarget === 'back_face'
+                                  ? 'Height Across Thickness'
+                                  : inspectorDraft.cutType === 'dado'
                                     ? 'Across Board Width'
-                                    : inspectorDraft.cutType === 'rabbet'
-                                      ? 'Full Edge Run'
-                                      : inspectorDraft.cutType === 'groove'
-                                        ? 'Groove Width'
-                                        : 'Cross-Cut Width'}
+                                    : inspectorDraft.cutType === 'stopped_dado'
+                                      ? 'Across Board Width'
+                                      : inspectorDraft.cutType === 'rabbet'
+                                        ? 'Full Edge Run'
+                                        : inspectorDraft.cutType === 'groove'
+                                          ? 'Groove Width'
+                                          : 'Cross-Cut Width'}
                             </Label>
                             {inspectorUsesDerivedCrossWidth ? (
                               <div className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text">
@@ -1208,7 +1214,14 @@ export function PartCutsWorkspace({
 
                         {inspectorDraft.depthMode === 'blind' && (
                           <div>
-                            <Label>{inspectorDraft.cutType === 'tenon' ? 'Tenon Thickness' : 'Blind Depth'}</Label>
+                            <Label>
+                              {inspectorDraft.cutType === 'tenon'
+                                ? 'Tenon Thickness'
+                                : inspectorDraft.faceTarget === 'front_face' ||
+                                    inspectorDraft.faceTarget === 'back_face'
+                                  ? 'Depth Into Width'
+                                  : 'Blind Depth'}
+                            </Label>
                             <FractionInput
                               value={inspectorDraft.depth}
                               onChange={(value) => updateRectDraft({ depth: value })}
@@ -1251,20 +1264,24 @@ export function PartCutsWorkspace({
                           inspectorDraft.cutType !== 'rabbet' &&
                           inspectorDraft.cutType !== 'groove' && (
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                              <div>
-                                <Label>Offset Along Length</Label>
-                                <FractionInput
-                                  value={inspectorDraft.placementX}
-                                  onChange={(value) => updateRectDraft({ placementX: value })}
-                                  min={0}
-                                />
-                              </div>
+                              {inspectorDraft.cutType !== 'tenon' && (
+                                <div>
+                                  <Label>Offset Along Length</Label>
+                                  <FractionInput
+                                    value={inspectorDraft.placementX}
+                                    onChange={(value) => updateRectDraft({ placementX: value })}
+                                    min={0}
+                                  />
+                                </div>
+                              )}
                               <div>
                                 <Label>
-                                  {inspectorDraft.faceTarget === 'front_face' ||
-                                  inspectorDraft.faceTarget === 'back_face'
-                                    ? 'Offset Up From Bottom'
-                                    : 'Offset Across Width'}
+                                  {inspectorDraft.cutType === 'tenon'
+                                    ? 'Shoulder Offset Across Width'
+                                    : inspectorDraft.faceTarget === 'front_face' ||
+                                        inspectorDraft.faceTarget === 'back_face'
+                                      ? 'Offset Up From Bottom'
+                                      : 'Offset Across Width'}
                                 </Label>
                                 <FractionInput
                                   value={inspectorDraft.placementZ}
@@ -1290,7 +1307,9 @@ export function PartCutsWorkspace({
                             inspectorDraft.cutType === 'stopped_groove' ||
                             inspectorDraft.cutType === 'mortise') && (
                             <p className="text-[11px] text-text-muted">
-                              Blind previews use top or bottom targets so the recess direction stays clear.
+                              {inspectorDraft.faceTarget === 'front_face' || inspectorDraft.faceTarget === 'back_face'
+                                ? 'Side-face pockets recess into the board width from the face you picked.'
+                                : 'Blind previews use top or bottom targets so the recess direction stays clear.'}
                             </p>
                           )}
 
