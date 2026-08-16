@@ -167,6 +167,32 @@ export function getResolvedRectCutFeature(
     };
   }
 
+  if (feature.cutType === 'tenon') {
+    const targetFace =
+      feature.target.type === 'face' && (feature.target.face === 'left_end' || feature.target.face === 'right_end')
+        ? feature.target.face
+        : 'right_end';
+    const tenonLength = Math.max(0, Math.min(feature.parameters.size.length, part.length));
+    const tongueWidth = Math.max(0, Math.min(feature.parameters.size.width, part.width));
+    const tongueThickness = Math.max(0, Math.min(feature.parameters.depth ?? 0, part.thickness));
+    // Keep the tongue inside the blank across the width.
+    const maxOffset = Math.max(0, part.width - tongueWidth);
+    return {
+      ...cloneRectCutFeature(feature),
+      target: { type: 'face', face: targetFace },
+      parameters: {
+        ...feature.parameters,
+        size: { length: tenonLength, width: tongueWidth },
+        depthMode: 'blind',
+        depth: tongueThickness
+      },
+      placement: {
+        x: 0,
+        z: Math.max(0, Math.min(feature.placement.z, maxOffset))
+      }
+    };
+  }
+
   if (feature.cutType === 'mortise') {
     const target =
       feature.target.type === 'face' ? { type: 'face' as const, face: feature.target.face } : feature.target;
@@ -203,6 +229,13 @@ export function isBottomTarget(feature: RectCutFeature): boolean {
 }
 
 export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPreviewSupport {
+  if (feature.cutType === 'tenon') {
+    if (feature.target.type !== 'face' || (feature.target.face !== 'left_end' && feature.target.face !== 'right_end')) {
+      return { supported: false, reason: 'Tenons must be cut on the left or right end.' };
+    }
+    return { supported: true };
+  }
+
   if (
     feature.cutType === 'cutout' ||
     feature.cutType === 'dado' ||
@@ -324,6 +357,25 @@ export function validateRectCutFeature(
     }
     if (resolvedFeature.placement.x + sizeLength > part.length) return 'Stopped groove run extends past the blank.';
     if (resolvedFeature.placement.z + sizeWidth > part.width) return 'Stopped groove width runs past the blank.';
+  }
+
+  if (resolvedFeature.cutType === 'tenon') {
+    if (
+      resolvedFeature.target.type !== 'face' ||
+      (resolvedFeature.target.face !== 'left_end' && resolvedFeature.target.face !== 'right_end')
+    ) {
+      return 'Tenon must be cut on the left or right end.';
+    }
+    const tongueThickness = resolvedFeature.parameters.depth ?? 0;
+    if (tongueThickness <= 0) return 'Tenon thickness must be greater than zero.';
+    if (tongueThickness >= part.thickness) return 'Tenon thickness must stay less than part thickness.';
+    if (sizeLength <= 0) return 'Tenon length must be greater than zero.';
+    if (sizeLength >= part.length) return 'Tenon length must stay less than part length.';
+    if (sizeWidth <= 0) return 'Tenon width must be greater than zero.';
+    if (sizeWidth > part.width) return 'Tenon width runs past the blank.';
+    if (resolvedFeature.placement.z < 0) return 'Tenon offset cannot be negative.';
+    if (resolvedFeature.placement.z + sizeWidth > part.width) return 'Tenon offset pushes the tongue past the blank.';
+    return null;
   }
 
   if (resolvedFeature.cutType === 'mortise') {

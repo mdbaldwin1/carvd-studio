@@ -598,4 +598,26 @@ describe('partFeatureEditorState', () => {
       expect(untouched).toEqual(endDraft);
     });
   });
+  describe('tenon drafts', () => {
+    it('seeds a tenon preset on an end with a blind tongue', () => {
+      const draft = buildDraftFromPreset('tenon', { partLength: 24, partWidth: 4, partThickness: 1.5 });
+      expect(draft.mode).toBe('rect_cut');
+      if (draft.mode !== 'rect_cut') return;
+      expect(draft.cutType).toBe('tenon');
+      expect(draft.faceTarget).toBe('right_end');
+      expect(draft.depthMode).toBe('blind');
+      expect(draft.depth).toBeLessThan(1.5);
+      expect(draft.sizeWidth).toBeLessThanOrEqual(4);
+    });
+
+    it('coerces a tenon retargeted onto a face back to an end', () => {
+      const draft = normalizeRectCutDraft(createRectDraft({ cutType: 'tenon', faceTarget: 'top_face' }), {
+        partLength: 24,
+        partWidth: 4,
+        partThickness: 1.5
+      });
+      expect(draft.faceTarget).toBe('right_end');
+      expect(draft.placementX).toBe(0);
+    });
+  });
 });

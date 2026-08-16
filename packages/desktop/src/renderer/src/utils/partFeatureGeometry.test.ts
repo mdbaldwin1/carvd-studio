@@ -1495,4 +1495,129 @@ describe('partFeatureGeometry', () => {
       expect(fullWidthAtTop).toBeGreaterThan(0);
     });
   });
+  describe('tenons', () => {
+    // 24" rail, 4" wide, 1.5" thick. Tenon on the right end: 1.5" long,
+    // 2" wide tongue centred across the width (offset 1"), 0.5" thick.
+    const tenonPart = (overrides: Record<string, unknown> = {}) =>
+      createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 1.5,
+        features: [
+          {
+            id: 'tenon-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'tenon',
+            target: { type: 'face', face: 'right_end' },
+            reference: { primaryFrom: 'max', secondaryFrom: 'min' },
+            parameters: { size: { length: 1.5, width: 2 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 0, z: 1 },
+            ...overrides
+          }
+        ]
+      });
+
+    const scanEnd = (geometry: ReturnType<typeof getPartRenderGeometry>) => {
+      const positions = geometry.getAttribute('position');
+      let maxXInTongueBand = -Infinity;
+      let maxXOutsideBand = -Infinity;
+      const tongueEndZ: number[] = [];
+      for (let i = 0; i < positions.count; i += 1) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+        const z = positions.getZ(i);
+        if (Math.abs(y) <= 0.25 + 1e-6) maxXInTongueBand = Math.max(maxXInTongueBand, x);
+        if (Math.abs(y) > 0.25 + 1e-6) maxXOutsideBand = Math.max(maxXOutsideBand, x);
+        if (Math.abs(x - 12) < 1e-6) tongueEndZ.push(z);
+      }
+      return { maxXInTongueBand, maxXOutsideBand, tongueEndZ };
+    };
+
+    it('leaves a tongue at full length and cuts the cheeks back to the shoulder', () => {
+      const { maxXInTongueBand, maxXOutsideBand } = scanEnd(getPartRenderGeometry(tenonPart()));
+
+      // The tongue runs to the end of the blank...
+      expect(maxXInTongueBand).toBeCloseTo(12, 5);
+      // ...while the cheeks stop at the shoulder, 1.5" back.
+      expect(maxXOutsideBand).toBeCloseTo(10.5, 5);
+    });
+
+    it('narrows the tongue to the tenon width between the shoulders', () => {
+      const { tongueEndZ } = scanEnd(getPartRenderGeometry(tenonPart()));
+
+      // Only the tongue reaches x = 12, spanning z -1..1 (2" wide, centred).
+      expect(tongueEndZ.length).toBeGreaterThan(0);
+      expect(Math.min(...tongueEndZ)).toBeCloseTo(-1, 5);
+      expect(Math.max(...tongueEndZ)).toBeCloseTo(1, 5);
+    });
+
+    it('supports a full-width (bare-faced) tenon with no side shoulders', () => {
+      const part = tenonPart({
+        parameters: { size: { length: 1.5, width: 4 }, depthMode: 'blind', depth: 0.5 },
+        placement: { x: 0, z: 0 }
+      });
+      const { tongueEndZ, maxXOutsideBand } = scanEnd(getPartRenderGeometry(part));
+
+      expect(Math.min(...tongueEndZ)).toBeCloseTo(-2, 5);
+      expect(Math.max(...tongueEndZ)).toBeCloseTo(2, 5);
+      expect(maxXOutsideBand).toBeCloseTo(10.5, 5);
+    });
+
+    it('cuts tenons on both ends of a rail independently', () => {
+      const rail = createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 1.5,
+        features: [
+          {
+            id: 't-left',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'tenon',
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 1, width: 2 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 0, z: 1 }
+          },
+          {
+            id: 't-right',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'tenon',
+            target: { type: 'face', face: 'right_end' },
+            reference: { primaryFrom: 'max', secondaryFrom: 'min' },
+            parameters: { size: { length: 1.5, width: 2 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 0, z: 1 }
+          }
+        ]
+      });
+
+      const positions = getPartRenderGeometry(rail).getAttribute('position');
+      let minXOutsideBand = Infinity;
+      let maxXOutsideBand = -Infinity;
+      let minXInBand = Infinity;
+      let maxXInBand = -Infinity;
+      for (let i = 0; i < positions.count; i += 1) {
+        const x = positions.getX(i);
+        const y = positions.getY(i);
+        if (Math.abs(y) > 0.25 + 1e-6) {
+          minXOutsideBand = Math.min(minXOutsideBand, x);
+          maxXOutsideBand = Math.max(maxXOutsideBand, x);
+        } else {
+          minXInBand = Math.min(minXInBand, x);
+          maxXInBand = Math.max(maxXInBand, x);
+        }
+      }
+
+      // Both tongues reach their ends; both sets of cheeks stop at their own shoulder.
+      expect(minXInBand).toBeCloseTo(-12, 5);
+      expect(maxXInBand).toBeCloseTo(12, 5);
+      expect(minXOutsideBand).toBeCloseTo(-11, 5);
+      expect(maxXOutsideBand).toBeCloseTo(10.5, 5);
+    });
+  });
 });

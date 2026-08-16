@@ -72,6 +72,7 @@ export function edgeTargetToSide(edge: EdgeTarget): EdgeNotchSide {
 export type OperationPreset =
   | 'end_cut'
   | 'edge_bevel'
+  | 'tenon'
   | 'half_lap'
   | 'corner_notch'
   | 'edge_notch'
@@ -144,23 +145,27 @@ function getDefaultRectDraft(cutType: RectCutFeature['cutType']): Extract<Featur
     edgeTarget: 'top_front_edge',
     cornerTarget: 'front_left_corner',
     sizeLength:
-      cutType === 'dado'
-        ? 0.75
-        : cutType === 'stopped_dado'
-          ? 3
-          : cutType === 'rabbet'
-            ? 0.5
-            : cutType === 'mortise'
-              ? 2
-              : cutType === 'stopped_groove'
-                ? 4
-                : 0.75,
+      cutType === 'tenon'
+        ? 1.5
+        : cutType === 'dado'
+          ? 0.75
+          : cutType === 'stopped_dado'
+            ? 3
+            : cutType === 'rabbet'
+              ? 0.5
+              : cutType === 'mortise'
+                ? 2
+                : cutType === 'stopped_groove'
+                  ? 4
+                  : 0.75,
     sizeWidth:
-      cutType === 'rabbet' || cutType === 'groove' || cutType === 'stopped_groove'
-        ? 0.5
-        : cutType === 'stopped_dado'
-          ? 0
-          : 0.75,
+      cutType === 'tenon'
+        ? 2
+        : cutType === 'rabbet' || cutType === 'groove' || cutType === 'stopped_groove'
+          ? 0.5
+          : cutType === 'stopped_dado'
+            ? 0
+            : 0.75,
     depthMode: BLIND_ONLY_RECT_CUT_TYPES.includes(cutType) ? 'blind' : 'through',
     depth: 0.25,
     placementX: 0,
@@ -209,6 +214,23 @@ export function normalizeRectCutDraft(
   );
   normalized.placementX = Math.max(0, sanitizeFinite(normalized.placementX, 0));
   normalized.placementZ = Math.max(0, sanitizeFinite(normalized.placementZ, 0));
+
+  if (normalized.cutType === 'tenon') {
+    // Tenons live on an end face and are described by tongue dimensions.
+    if (normalized.faceTarget !== 'left_end' && normalized.faceTarget !== 'right_end') {
+      normalized.faceTarget = 'right_end';
+    }
+    normalized.depthMode = 'blind';
+    normalized.placementX = 0;
+    if (defaults?.partThickness && normalized.depth >= defaults.partThickness) {
+      normalized.depth = Math.max(0.0625, defaults.partThickness / 3);
+    }
+    if (defaults?.partWidth) {
+      normalized.sizeWidth = Math.min(normalized.sizeWidth, defaults.partWidth);
+      normalized.placementZ = Math.max(0, Math.min(normalized.placementZ, defaults.partWidth - normalized.sizeWidth));
+    }
+    return normalized;
+  }
 
   if (normalized.cutType === 'cutout' || normalized.cutType === 'mortise') {
     // Pockets may target top/bottom or the front/back side faces (side-face
@@ -552,6 +574,8 @@ export function getPresetLabel(preset: OperationPreset): string {
       return 'End Cut';
     case 'edge_bevel':
       return 'Edge Bevel';
+    case 'tenon':
+      return 'Tenon';
     case 'half_lap':
       return 'Half Lap';
     case 'corner_notch':
@@ -581,6 +605,8 @@ export function getPresetHint(preset: OperationPreset): string {
       return 'Mitres, bevels, and compound cuts on either end.';
     case 'edge_bevel':
       return 'Rip bevel along the front or back edge \u2014 mitred boxes and waterfall edges.';
+    case 'tenon':
+      return 'Tongue on an end, sized to fit a mortise \u2014 the other half of the joint.';
     case 'half_lap':
       return 'Blind channel at half thickness for lap joints \u2014 starts as an end lap.';
     case 'corner_notch':

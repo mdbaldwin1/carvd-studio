@@ -686,4 +686,65 @@ describe('rectCutUtils', () => {
       expect(issue).toContain('Blind notch previews');
     });
   });
+  describe('tenon', () => {
+    const tenon = (overrides: Record<string, unknown> = {}) =>
+      ({
+        id: 'tenon-1',
+        kind: 'rect_cut',
+        version: 1,
+        enabled: true,
+        cutType: 'tenon',
+        target: { type: 'face', face: 'right_end' },
+        reference: { primaryFrom: 'max', secondaryFrom: 'min' },
+        parameters: { size: { length: 1.5, width: 2 }, depthMode: 'blind', depth: 0.5 },
+        placement: { x: 0, z: 1 },
+        ...overrides
+      }) as never;
+
+    const part = { length: 24, width: 4, thickness: 1.5 };
+
+    it('accepts a well-formed tenon and clamps the tongue inside the blank', () => {
+      expect(validateRectCutFeature(tenon(), part)).toBeNull();
+
+      const resolved = getResolvedRectCutFeature(tenon({ placement: { x: 3, z: 9 } }), part);
+      // Offset clamps so the tongue stays on the board; placement.x is unused.
+      expect(resolved.placement.x).toBe(0);
+      expect(resolved.placement.z).toBe(2);
+      expect(resolved.parameters.depthMode).toBe('blind');
+    });
+
+    it('coerces a non-end target back onto an end', () => {
+      const resolved = getResolvedRectCutFeature(tenon({ target: { type: 'face', face: 'top_face' } }), part);
+      expect(resolved.target).toEqual({ type: 'face', face: 'right_end' });
+    });
+
+    it('rejects tenons that are not physically cuttable', () => {
+      expect(
+        validateRectCutFeature(
+          tenon({ parameters: { size: { length: 1.5, width: 2 }, depthMode: 'blind', depth: 1.5 } }),
+          part
+        )
+      ).toContain('less than part thickness');
+      expect(
+        validateRectCutFeature(
+          tenon({ parameters: { size: { length: 30, width: 2 }, depthMode: 'blind', depth: 0.5 } }),
+          part
+        )
+      ).toContain('less than part length');
+    });
+
+    it('clamps an oversized tongue to the blank instead of failing', () => {
+      const oversized = tenon({ parameters: { size: { length: 1.5, width: 9 }, depthMode: 'blind', depth: 0.5 } });
+      // Width is a resolver-clamped dimension: typing too wide gives a
+      // full-width (bare-faced) tenon rather than a validation error.
+      expect(validateRectCutFeature(oversized, part)).toBeNull();
+      expect(getResolvedRectCutFeature(oversized, part).parameters.size.width).toBe(4);
+    });
+
+    it('supports preview only on end targets', () => {
+      expect(getRectCutPreviewSupport(getResolvedRectCutFeature(tenon(), part)).supported).toBe(true);
+      const onFace = getRectCutPreviewSupport(tenon({ target: { type: 'face', face: 'top_face' } }));
+      expect(onFace.supported).toBe(false);
+    });
+  });
 });

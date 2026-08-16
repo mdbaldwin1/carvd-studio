@@ -168,7 +168,8 @@ export interface RectCutFeature extends PartFeatureBase {
     | 'rabbet'
     | 'groove'
     | 'stopped_groove'
-    | 'mortise';
+    | 'mortise'
+    | 'tenon';
   parameters: {
     size: {
       length: number;

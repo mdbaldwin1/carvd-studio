@@ -56,6 +56,18 @@ function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length'
     };
   }
 
+  if (resolvedFeature.cutType === 'tenon') {
+    // A tenon occupies the whole end region across the blank's width.
+    const isLeft = resolvedFeature.target.type === 'face' && resolvedFeature.target.face === 'left_end';
+    const runLength = Math.min(resolvedFeature.parameters.size.length, part.length);
+    return {
+      minX: isLeft ? 0 : part.length - runLength,
+      maxX: isLeft ? runLength : part.length,
+      minZ: 0,
+      maxZ: part.width
+    };
+  }
+
   if (isSideFaceTarget(resolvedFeature)) {
     const depth = Math.min(resolvedFeature.parameters.depth ?? 0, part.width);
     if (depth <= 0) return null;

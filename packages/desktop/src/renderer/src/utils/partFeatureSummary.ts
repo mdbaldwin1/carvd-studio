@@ -110,6 +110,11 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
     return `${toTitleCase(feature.cutType)}${angleText} on ${getFeatureTargetLabel(feature)}${directionText}`;
   }
 
+  if (feature.cutType === 'tenon') {
+    const tongueThickness = feature.parameters.depth ?? 0;
+    return `Tenon on ${getFeatureTargetLabel(feature)} \u00b7 ${formatMeasurementWithUnit(feature.parameters.size.length, units)} long \u00d7 ${formatMeasurementWithUnit(feature.parameters.size.width, units)} wide \u00d7 ${formatMeasurementWithUnit(tongueThickness, units)} thick`;
+  }
+
   if (feature.cutType === 'dado') {
     return `Dado on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} wide × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
   }

@@ -479,6 +479,14 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
   const sliceY = new Set<number>([-part.thickness / 2, part.thickness / 2]);
 
   for (const feature of supportedRectCuts) {
+    if (feature.cutType === 'tenon') {
+      const tongueThickness = feature.parameters.depth ?? 0;
+      if (tongueThickness > 0 && tongueThickness < part.thickness) {
+        sliceY.add(-tongueThickness / 2);
+        sliceY.add(tongueThickness / 2);
+      }
+      continue;
+    }
     if (feature.parameters.depthMode !== 'blind') continue;
     if (isSideFaceTarget(feature)) {
       // Side-face pockets occupy a band across the thickness: slice at the
@@ -510,10 +518,12 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     if (layerDepth <= 1e-6) continue;
     const yMid = yMin + layerDepth / 2;
 
-    let layerContour = contour.map(clonePoint);
+    const tenons = supportedRectCuts.filter((feature) => feature.cutType === 'tenon');
+    let layerContour = tenons.length > 0 ? buildTenonLayerContour(part, tenons, yMid) : contour.map(clonePoint);
     const layerHoles: Point2[][] = [];
 
     for (const feature of supportedRectCuts) {
+      if (feature.cutType === 'tenon') continue;
       if (isSideFaceTarget(feature)) {
         const pocketDepth = Math.min(feature.parameters.depth ?? 0, part.width);
         const bandLow = -part.thickness / 2 + feature.placement.z;
@@ -650,6 +660,72 @@ function applyEdgeBevels(geometry: THREE.BufferGeometry, part: Part): void {
   }
 
   positions.needsUpdate = true;
+}
+
+/**
+ * Contour for a layer of a tenoned part.
+ *
+ * A tenon leaves a projecting tongue at one end: layers inside the tongue's
+ * thickness band keep the full length (narrowed to the tongue width by the
+ * shoulders), while layers outside the band stop at the shoulder line. Both
+ * ends are handled in one pass so a rail can carry a tenon at each end.
+ */
+function buildTenonLayerContour(part: Part, tenons: RectCutFeature[], yMid: number): Point2[] {
+  const halfLength = part.length / 2;
+  const halfWidth = part.width / 2;
+
+  const sideOf = (feature: RectCutFeature): 'left' | 'right' =>
+    feature.target.type === 'face' && feature.target.face === 'left_end' ? 'left' : 'right';
+
+  const describe = (feature: RectCutFeature | undefined) => {
+    if (!feature) return null;
+    const tongueThickness = feature.parameters.depth ?? 0;
+    const tenonLength = feature.parameters.size.length;
+    if (tongueThickness <= 0 || tenonLength <= 0) return null;
+    // The tongue is centred in the blank's thickness.
+    const inBand = Math.abs(yMid) <= tongueThickness / 2;
+    const zMin = -halfWidth + feature.placement.z;
+    return { tenonLength, inBand, zMin, zMax: zMin + feature.parameters.size.width };
+  };
+
+  const left = describe(tenons.find((feature) => sideOf(feature) === 'left'));
+  const right = describe(tenons.find((feature) => sideOf(feature) === 'right'));
+
+  const xLeftBody = left ? -halfLength + left.tenonLength : -halfLength;
+  const xRightBody = right ? halfLength - right.tenonLength : halfLength;
+
+  const points: Point2[] = [];
+  points.push({ x: xLeftBody, z: -halfWidth });
+  points.push({ x: xRightBody, z: -halfWidth });
+
+  if (right?.inBand) {
+    points.push({ x: xRightBody, z: right.zMin });
+    points.push({ x: halfLength, z: right.zMin });
+    points.push({ x: halfLength, z: right.zMax });
+    points.push({ x: xRightBody, z: right.zMax });
+  }
+  points.push({ x: xRightBody, z: halfWidth });
+  points.push({ x: xLeftBody, z: halfWidth });
+
+  if (left?.inBand) {
+    points.push({ x: xLeftBody, z: left.zMax });
+    points.push({ x: -halfLength, z: left.zMax });
+    points.push({ x: -halfLength, z: left.zMin });
+    points.push({ x: xLeftBody, z: left.zMin });
+  }
+
+  // Drop points a degenerate tongue (flush to an edge, or full width) leaves
+  // duplicated, so the extruded wall has no zero-length segments.
+  const deduped: Point2[] = [];
+  for (const point of points) {
+    const previous = deduped[deduped.length - 1];
+    if (previous && Math.abs(previous.x - point.x) < 1e-9 && Math.abs(previous.z - point.z) < 1e-9) continue;
+    deduped.push(point);
+  }
+  const first = deduped[0];
+  const last = deduped[deduped.length - 1];
+  if (deduped.length > 1 && Math.abs(first.x - last.x) < 1e-9 && Math.abs(first.z - last.z) < 1e-9) deduped.pop();
+  return deduped;
 }
 
 function getFeatureContour(part: Part): Point2[] {

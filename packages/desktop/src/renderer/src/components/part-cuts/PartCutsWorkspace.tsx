@@ -111,6 +111,8 @@ function getDraftStepTitle(draft: FeatureDraft): string {
       : 'Step 2: Pick the end and set the angle';
 
   switch (draft.cutType) {
+    case 'tenon':
+      return 'Step 2: Pick the end and size the tongue';
     case 'corner_notch':
       return 'Step 2: Pick the corner and size the notch';
     case 'edge_notch':
@@ -723,7 +725,7 @@ export function PartCutsWorkspace({
                 <div className="flex flex-col gap-4">
                   {(
                     [
-                      { group: 'Ends & Edges', presets: ['end_cut', 'edge_bevel'] },
+                      { group: 'Ends & Edges', presets: ['end_cut', 'edge_bevel', 'tenon'] },
                       {
                         group: 'Channels & Laps',
                         presets: ['dado', 'stopped_dado', 'groove', 'stopped_groove', 'half_lap']
@@ -786,6 +788,23 @@ export function PartCutsWorkspace({
                           </Button>
                         )
                       )}
+                    </div>
+                  )}
+
+                  {inspectorDraft.mode === 'rect_cut' && inspectorDraft.cutType === 'tenon' && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {END_TARGETS.map((target) => (
+                        <Button
+                          key={target}
+                          type="button"
+                          size="xs"
+                          variant="outline"
+                          active={inspectorDraft.faceTarget === target}
+                          onClick={() => updateRectDraft({ faceTarget: target })}
+                        >
+                          {FACE_LABELS[target]}
+                        </Button>
+                      ))}
                     </div>
                   )}
 
@@ -1087,17 +1106,25 @@ export function PartCutsWorkspace({
                             Mortise is a blind face pocket. Set pocket size, placement, and blind depth.
                           </p>
                         )}
+                        {inspectorDraft.cutType === 'tenon' && (
+                          <p className="text-[11px] text-text-muted">
+                            Tenon leaves a tongue on the end, centred in the board thickness. Size it to the mortise it
+                            fits — the board length already includes the tenon, so no extra allowance is needed.
+                          </p>
+                        )}
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           <div>
                             <Label>
-                              {inspectorDraft.cutType === 'rabbet'
-                                ? 'Shoulder Width'
-                                : inspectorDraft.cutType === 'stopped_dado'
-                                  ? 'Run Along Blank'
-                                  : inspectorDraft.cutType === 'groove'
-                                    ? 'Full Board Run'
-                                    : 'Run Along Blank'}
+                              {inspectorDraft.cutType === 'tenon'
+                                ? 'Tenon Length'
+                                : inspectorDraft.cutType === 'rabbet'
+                                  ? 'Shoulder Width'
+                                  : inspectorDraft.cutType === 'stopped_dado'
+                                    ? 'Run Along Blank'
+                                    : inspectorDraft.cutType === 'groove'
+                                      ? 'Full Board Run'
+                                      : 'Run Along Blank'}
                             </Label>
                             <FractionInput
                               value={
@@ -1135,15 +1162,17 @@ export function PartCutsWorkspace({
                           </div>
                           <div>
                             <Label>
-                              {inspectorDraft.cutType === 'dado'
-                                ? 'Across Board Width'
-                                : inspectorDraft.cutType === 'stopped_dado'
+                              {inspectorDraft.cutType === 'tenon'
+                                ? 'Tenon Width'
+                                : inspectorDraft.cutType === 'dado'
                                   ? 'Across Board Width'
-                                  : inspectorDraft.cutType === 'rabbet'
-                                    ? 'Full Edge Run'
-                                    : inspectorDraft.cutType === 'groove'
-                                      ? 'Groove Width'
-                                      : 'Cross-Cut Width'}
+                                  : inspectorDraft.cutType === 'stopped_dado'
+                                    ? 'Across Board Width'
+                                    : inspectorDraft.cutType === 'rabbet'
+                                      ? 'Full Edge Run'
+                                      : inspectorDraft.cutType === 'groove'
+                                        ? 'Groove Width'
+                                        : 'Cross-Cut Width'}
                             </Label>
                             {inspectorUsesDerivedCrossWidth ? (
                               <div className="rounded-md border border-border bg-bg px-3 py-2 text-sm text-text">
@@ -1179,7 +1208,7 @@ export function PartCutsWorkspace({
 
                         {inspectorDraft.depthMode === 'blind' && (
                           <div>
-                            <Label>Blind Depth</Label>
+                            <Label>{inspectorDraft.cutType === 'tenon' ? 'Tenon Thickness' : 'Blind Depth'}</Label>
                             <FractionInput
                               value={inspectorDraft.depth}
                               onChange={(value) => updateRectDraft({ depth: value })}
