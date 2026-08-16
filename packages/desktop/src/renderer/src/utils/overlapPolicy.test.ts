@@ -1038,14 +1038,14 @@ describe('overlapPolicy', () => {
         }
       ]
     });
-    // A slat sitting inside the removed top-front wedge: y 0.7..1.0 (upper
-    // third of the beveled part), z -1.9..-1.4 (inside the wedge at that height)
+    // A slat sitting inside the removed top-front wedge. The front face
+    // renders at +Z, so the wedge is on the +Z side at z 1.4..1.9.
     const slat = createPart({
       id: 'slat',
       length: 10,
       width: 0.5,
       thickness: 0.3,
-      position: { x: 0, y: 0.85, z: -1.65 }
+      position: { x: 0, y: 0.85, z: 1.65 }
     });
 
     expect(partsOverlap(beveled, slat)).toBe(false);

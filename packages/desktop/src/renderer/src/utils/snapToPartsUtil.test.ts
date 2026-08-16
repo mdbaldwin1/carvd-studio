@@ -21,6 +21,7 @@ import {
   getPartBoundsAtPosition,
   getPartFeatureSockets,
   getPartOBB,
+  getPartVertices,
   obbsOverlap,
   STANDARD_DIMENSIONS_IMPERIAL,
   STANDARD_DIMENSIONS_METRIC,
@@ -2123,45 +2124,35 @@ describe('snapToPartsUtil', () => {
         ]
       });
 
-    it('snaps to the true contour edge of a notched part', () => {
-      const target = cornerNotchTarget();
-      // Drag part approaching the notch inset edge at x = -6 (after 6" notch from minX -12)
-      const drag = createTestPart({
-        id: 'drag',
-        length: 4,
-        width: 4,
-        thickness: 0.75,
-        position: { x: 0, y: 0.375, z: 0 }
-      });
-      const currentPos = { x: -3.7, y: 0.375, z: -7 }; // drag minX = -5.7, near inset edge -6
+    it('offers the notch inner corners but not the corner the notch removed', () => {
+      // The notch removes x -12..-6, z 0..6 in world space (the front face
+      // renders at +Z). Snap geometry must follow the material that is left.
+      const vertices = getPartVertices(cornerNotchTarget(), { x: 0, y: 0.375, z: 0 });
+      const hasCorner = (x: number, z: number) =>
+        vertices.some((v) => Math.abs(v.x - x) < 1e-6 && Math.abs(v.z - z) < 1e-6);
 
-      const result = detectFeatureSnaps(drag, currentPos, [target, drag], ['drag'], 0.5);
+      // Inner corners created by the notch are real material and must snap.
+      expect(hasCorner(-6, 0)).toBe(true);
+      expect(hasCorner(-6, 6)).toBe(true);
+      expect(hasCorner(-12, 0)).toBe(true);
 
-      expect(result.snappedX || result.snappedY || result.snappedZ).toBe(true);
-      expect(result.snapLines.length).toBeGreaterThan(0);
+      // The original box corner was cut away — offering it would let users
+      // snap to empty space.
+      expect(hasCorner(-12, 6)).toBe(false);
+
+      // Untouched corners still snap.
+      expect(hasCorner(-12, -6)).toBe(true);
+      expect(hasCorner(12, 6)).toBe(true);
     });
 
-    it('offers no snap at the cut-away corner of a notched part', () => {
-      const target = cornerNotchTarget();
-      // The original box corner at (-12, y, -6) was removed by the notch.
-      // Nearest true geometry is >= 5.5 away on the relevant axes.
-      const drag = createTestPart({
-        id: 'drag',
-        length: 4,
-        width: 4,
-        thickness: 0.75,
-        position: { x: 0, y: 0.375, z: 0 }
-      });
-      const currentPos = { x: -14.3, y: 0.375, z: -8.3 }; // drag corner 0.3 from the ghost corner
-
-      const result = detectFeatureSnaps(drag, currentPos, [target, drag], ['drag'], 0.5);
-
-      const snappedToGhost =
-        (result.snappedX && Math.abs(result.adjustedPosition.x - -14.0) < 1e-6) ||
-        (result.snappedZ && Math.abs(result.adjustedPosition.z - -8.0) < 1e-6);
-      expect(snappedToGhost).toBe(false);
+    it('keeps a plain part on the full box corner set', () => {
+      const plain = createTestPart({ id: 'plain', length: 24, width: 12, thickness: 0.75 });
+      const vertices = getPartVertices(plain, { x: 0, y: 0.375, z: 0 });
+      const corners = new Set(vertices.map((v) => `${v.x.toFixed(3)},${v.z.toFixed(3)}`));
+      expect(corners.size).toBe(4);
     });
   });
+
   describe('feature socket edge cases', () => {
     it('exposes sockets for bottom-face pockets and skips zero-depth cuts', () => {
       const part = createTestPart({

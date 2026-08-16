@@ -209,16 +209,17 @@ describe('partFeatureGeometry', () => {
       const x = defaultPositions.getX(i);
       const z = defaultPositions.getZ(i);
       if (x > 0) continue;
-      if (z < -1.9) defaultFrontX = Math.min(defaultFrontX, x);
-      if (z > 1.9) defaultBackX = Math.min(defaultBackX, x);
+      // The front face renders at +Z (matching the Front View camera).
+      if (z > 1.9) defaultFrontX = Math.min(defaultFrontX, x);
+      if (z < -1.9) defaultBackX = Math.min(defaultBackX, x);
     }
 
     for (let i = 0; i < flippedPositions.count; i += 1) {
       const x = flippedPositions.getX(i);
       const z = flippedPositions.getZ(i);
       if (x > 0) continue;
-      if (z < -1.9) flippedFrontX = Math.min(flippedFrontX, x);
-      if (z > 1.9) flippedBackX = Math.min(flippedBackX, x);
+      if (z > 1.9) flippedFrontX = Math.min(flippedFrontX, x);
+      if (z < -1.9) flippedBackX = Math.min(flippedBackX, x);
     }
 
     expect(defaultFrontX).toBeCloseTo(-12, 3);
@@ -1341,12 +1342,13 @@ describe('partFeatureGeometry', () => {
         })
       );
 
-      // Front (z=-2): full horizontal inset; bottom additionally gets the vertical inset
-      expect(verts).toContainEqual(expect.objectContaining({ x: 8, y: 0.5, z: -2 }));
-      expect(verts.some((v) => Math.abs(v.x - 7) < 1e-6 && v.y === -0.5 && v.z === -2)).toBe(true);
-      // Back (z=2): no horizontal inset; bottom gets the vertical inset only
-      expect(verts.some((v) => Math.abs(v.x - 12) < 1e-6 && v.y === 0.5 && v.z === 2)).toBe(true);
-      expect(verts.some((v) => Math.abs(v.x - 11) < 1e-6 && v.y === -0.5 && v.z === 2)).toBe(true);
+      // The hull is world space: the front face is at +Z, the back at -Z.
+      // Front (z=2): full horizontal inset; bottom additionally gets the vertical inset
+      expect(verts).toContainEqual(expect.objectContaining({ x: 8, y: 0.5, z: 2 }));
+      expect(verts.some((v) => Math.abs(v.x - 7) < 1e-6 && v.y === -0.5 && v.z === 2)).toBe(true);
+      // Back (z=-2): no horizontal inset; bottom gets the vertical inset only
+      expect(verts.some((v) => Math.abs(v.x - 12) < 1e-6 && v.y === 0.5 && v.z === -2)).toBe(true);
+      expect(verts.some((v) => Math.abs(v.x - 11) < 1e-6 && v.y === -0.5 && v.z === -2)).toBe(true);
     });
   });
   describe('getPartLocalCorners', () => {
@@ -1406,15 +1408,16 @@ describe('partFeatureGeometry', () => {
     it('displaces top-front hull vertices inward while the bottom keeps full width', () => {
       const verts = getPartLocalConvexVertices(frontBevelPart());
 
-      const bottomFront = verts.filter((v) => v.y === -0.5 && Math.abs(v.z + 2) < 1e-6);
+      // The hull is expressed in world space, where the front face is at +Z.
+      const bottomFront = verts.filter((v) => v.y === -0.5 && Math.abs(v.z - 2) < 1e-6);
       expect(bottomFront.length).toBeGreaterThan(0);
 
       // No top vertex may remain at the original front face plane
-      const topAtOriginalFront = verts.filter((v) => v.y === 0.5 && Math.abs(v.z + 2) < 1e-6);
+      const topAtOriginalFront = verts.filter((v) => v.y === 0.5 && Math.abs(v.z - 2) < 1e-6);
       expect(topAtOriginalFront).toHaveLength(0);
 
-      // Displaced top-front vertices land at z = -2 + 1 = -1
-      const topFront = verts.filter((v) => v.y === 0.5 && Math.abs(v.z + 1) < 1e-6);
+      // Displaced top-front vertices land at z = 2 - 1 = 1
+      const topFront = verts.filter((v) => v.y === 0.5 && Math.abs(v.z - 1) < 1e-6);
       expect(topFront.length).toBeGreaterThan(0);
     });
 

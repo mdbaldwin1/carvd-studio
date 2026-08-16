@@ -393,61 +393,68 @@ function createEndCutOnlyGeometry(part: Part): THREE.BufferGeometry {
   const halfLength = part.length / 2;
   const halfWidth = part.width / 2;
   const halfThickness = part.thickness / 2;
-  // Long-edge bevels tilt the front/back faces across the thickness.
-  // World convention (see partCutPicking): the +Z face is the FRONT and the
-  // -Z face is the BACK, so the -Z corners take the back profile and vice
-  // versa. Corner ordering (and thus quad winding) is unchanged.
-  const minusZAt = (y: number) => -halfWidth + getEdgeBevelInsetAt('back', edgeProfiles, part, { y });
-  const plusZAt = (y: number) => halfWidth - getEdgeBevelInsetAt('front', edgeProfiles, part, { y });
+  // Corners are built in CONTOUR space (front at -halfWidth, back at
+  // +halfWidth) and mirrored into world space on emit, exactly as the layered
+  // extrusion path does via rotateX(-π/2). Keeping both paths on one
+  // convention is what stops asymmetric cuts from rendering on opposite sides
+  // depending on whether a part also carries a rect cut.
+  const frontZAt = (y: number) => -halfWidth + getEdgeBevelInsetAt('front', edgeProfiles, part, { y });
+  const backZAt = (y: number) => halfWidth - getEdgeBevelInsetAt('back', edgeProfiles, part, { y });
 
   const lfb = {
     x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z: -halfWidth }),
     y: -halfThickness,
-    z: minusZAt(-halfThickness)
+    z: frontZAt(-halfThickness)
   };
   const lbb = {
     x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z: halfWidth }),
     y: -halfThickness,
-    z: plusZAt(-halfThickness)
+    z: backZAt(-halfThickness)
   };
   const lbt = {
     x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: halfThickness, z: halfWidth }),
     y: halfThickness,
-    z: plusZAt(halfThickness)
+    z: backZAt(halfThickness)
   };
   const lft = {
     x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: halfThickness, z: -halfWidth }),
     y: halfThickness,
-    z: minusZAt(halfThickness)
+    z: frontZAt(halfThickness)
   };
   const rfb = {
     x: halfLength - getEndCutInsetAt('right', profiles, part, { y: -halfThickness, z: -halfWidth }),
     y: -halfThickness,
-    z: minusZAt(-halfThickness)
+    z: frontZAt(-halfThickness)
   };
   const rbb = {
     x: halfLength - getEndCutInsetAt('right', profiles, part, { y: -halfThickness, z: halfWidth }),
     y: -halfThickness,
-    z: plusZAt(-halfThickness)
+    z: backZAt(-halfThickness)
   };
   const rbt = {
     x: halfLength - getEndCutInsetAt('right', profiles, part, { y: halfThickness, z: halfWidth }),
     y: halfThickness,
-    z: plusZAt(halfThickness)
+    z: backZAt(halfThickness)
   };
   const rft = {
     x: halfLength - getEndCutInsetAt('right', profiles, part, { y: halfThickness, z: -halfWidth }),
     y: halfThickness,
-    z: minusZAt(halfThickness)
+    z: frontZAt(halfThickness)
   };
 
   const vertices: number[] = [];
-  addQuad(vertices, lfb, lft, rft, rfb);
-  addQuad(vertices, lbb, rbb, rbt, lbt);
-  addQuad(vertices, lfb, rfb, rbb, lbb);
-  addQuad(vertices, lft, lbt, rbt, rft);
-  addQuad(vertices, lfb, lbb, lbt, lft);
-  addQuad(vertices, rfb, rft, rbt, rbb);
+  // Mirroring Z reverses triangle orientation, so each quad is emitted in
+  // reverse vertex order to keep its normal facing outward.
+  const mirrorZ = (p: Point3): Point3 => ({ x: p.x, y: p.y, z: -p.z });
+  const addMirroredQuad = (a: Point3, b: Point3, c: Point3, d: Point3) =>
+    addQuad(vertices, mirrorZ(d), mirrorZ(c), mirrorZ(b), mirrorZ(a));
+
+  addMirroredQuad(lfb, lft, rft, rfb);
+  addMirroredQuad(lbb, rbb, rbt, lbt);
+  addMirroredQuad(lfb, rfb, rbb, lbb);
+  addMirroredQuad(lft, lbt, rbt, rft);
+  addMirroredQuad(lfb, lbb, lbt, lft);
+  addMirroredQuad(rfb, rft, rbt, rbb);
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
@@ -698,23 +705,27 @@ export function getPartLocalConvexVertices(part: Part): Array<{ x: number; y: nu
   const hasEdgeBevels = edgeProfiles.front.inset > 0 || edgeProfiles.back.inset > 0;
   const halfWidthForBevels = part.width / 2;
 
+  // Operates in world space (post Z-mirror), matching applyEdgeBevels: the
+  // front face is at +Z and the back face at -Z.
   const applyEdgeBevelToVertex = (z: number, y: number): number => {
     if (!hasEdgeBevels) return z;
-    if (edgeProfiles.front.inset > 0 && Math.abs(z + halfWidthForBevels) < 1e-6) {
-      return -halfWidthForBevels + getEdgeBevelInsetAt('front', edgeProfiles, part, { y });
+    if (edgeProfiles.front.inset > 0 && Math.abs(z - halfWidthForBevels) < 1e-6) {
+      return halfWidthForBevels - getEdgeBevelInsetAt('front', edgeProfiles, part, { y });
     }
-    if (edgeProfiles.back.inset > 0 && Math.abs(z - halfWidthForBevels) < 1e-6) {
-      return halfWidthForBevels - getEdgeBevelInsetAt('back', edgeProfiles, part, { y });
+    if (edgeProfiles.back.inset > 0 && Math.abs(z + halfWidthForBevels) < 1e-6) {
+      return -halfWidthForBevels + getEdgeBevelInsetAt('back', edgeProfiles, part, { y });
     }
     return z;
   };
 
   if (!hasVertical && !hasEdgeBevels) {
-    // Fast path: just extrude the 2D contour at ±halfThickness
+    // Fast path: just extrude the 2D contour at ±halfThickness.
+    // Contour Z is negated because the render pipeline mirrors it (see
+    // getLayerGeometry); the hull must sit where the mesh is drawn.
     const verts: Array<{ x: number; y: number; z: number }> = [];
     for (const p of contour) {
-      verts.push({ x: p.x, y: -halfThickness, z: p.z });
-      verts.push({ x: p.x, y: halfThickness, z: p.z });
+      verts.push({ x: p.x, y: -halfThickness, z: -p.z });
+      verts.push({ x: p.x, y: halfThickness, z: -p.z });
     }
     return verts;
   }
@@ -757,7 +768,9 @@ export function getPartLocalConvexVertices(part: Part): Array<{ x: number; y: nu
         }
       }
 
-      const z = applyEdgeBevelToVertex(p.z, y);
+      // Negate contour Z to match the mirrored render geometry, then apply
+      // the edge bevel in that same world space.
+      const z = applyEdgeBevelToVertex(-p.z, y);
       const key = `${x.toFixed(8)},${y.toFixed(8)},${z.toFixed(8)}`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -783,9 +796,11 @@ export function getPartLocalBoundingBox(part: Part): { min: THREE.Vector3; max: 
     maxZ = Math.max(maxZ, point.z);
   }
 
+  // Contour Z is mirrored by the render pipeline, so the world-space Z range
+  // is [-maxZ, -minZ].
   return {
-    min: new THREE.Vector3(minX, -part.thickness / 2, minZ),
-    max: new THREE.Vector3(maxX, part.thickness / 2, maxZ)
+    min: new THREE.Vector3(minX, -part.thickness / 2, -maxZ),
+    max: new THREE.Vector3(maxX, part.thickness / 2, -minZ)
   };
 }
 

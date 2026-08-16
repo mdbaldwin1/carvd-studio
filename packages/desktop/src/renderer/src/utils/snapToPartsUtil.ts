@@ -2788,7 +2788,12 @@ function transformLocalVertexToWorld(
   };
 }
 
-function getPartVertices(part: Part, position: { x: number; y: number; z: number }): Vec3[] {
+/**
+ * World-space snap vertices for a part. Feature-bearing parts return their
+ * true hull (so cut-away corners are not offered as snap targets); plain
+ * parts return the eight box corners.
+ */
+export function getPartVertices(part: Part, position: { x: number; y: number; z: number }): Vec3[] {
   // Feature-bearing parts snap by their true hull vertices so cut-away
   // corners (mitres, notches) stop offering ghost snap targets.
   if (hasRenderablePartFeatures(part)) {
