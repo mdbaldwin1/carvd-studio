@@ -557,7 +557,7 @@ describe('partFeatureEditorState', () => {
         expect(getPresetHint(preset)).toBeTruthy();
       }
       expect(getPresetLabel('stopped_dado')).toBe('Stopped Dado');
-      expect(getPresetHint('mortise')).toContain('blind face pocket');
+      expect(getPresetHint('mortise')).toContain('Blind pocket');
     });
   });
   describe('half lap preset', () => {

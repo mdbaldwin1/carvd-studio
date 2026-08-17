@@ -14,6 +14,7 @@ import {
   buildPreviewPart,
   buildRectDimensionOverlay,
   clamp,
+  computePreviewCameraFit,
   getEditableHandleOverlay,
   nudgeDraft,
   PartCutsPreviewCanvas,
@@ -463,10 +464,10 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
     const { container } = renderCanvas(draft, { pendingTarget: { type: 'face', face: 'top_face' } });
 
     expect(screen.getByTestId('r3f-canvas')).toBeInTheDocument();
-    expect(screen.getByText('Preview Selection')).toBeInTheDocument();
+    // One merged overlay card: what the cut is, where it sits, and what to do.
     expect(screen.getByText('Mortise on Top Face')).toBeInTheDocument();
-    expect(screen.getByText(/drag the preview handles/i)).toBeInTheDocument();
-    expect(screen.getByText(/Active target:/i)).toBeInTheDocument();
+    expect(screen.getByText('On Top Face')).toBeInTheDocument();
+    expect(screen.getByText(/drag the handles to size it/i)).toBeInTheDocument();
     // Base part mesh plus move/length/width handles and the area overlay
     expect(container.querySelectorAll('mesh').length).toBeGreaterThanOrEqual(5);
   });
@@ -476,7 +477,7 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
 
     const { container, onHoverTarget, onActivateTarget } = renderCanvas(draft);
 
-    expect(screen.getByText(/Hover or click a highlighted target/i)).toBeInTheDocument();
+    expect(screen.getByText(/Click a highlighted face, edge, or corner/i)).toBeInTheDocument();
     expect(screen.getByText('45°')).toBeInTheDocument();
 
     const meshes = Array.from(container.querySelectorAll('mesh'));
@@ -508,5 +509,56 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
     const meshCountWithoutWidth = withoutWidth.container.querySelectorAll('mesh').length;
 
     expect(meshCountWithoutWidth).toBeLessThan(meshCountWithWidth);
+  });
+  it('offers to move the cut when a different target is hovered', () => {
+    const draft = createRectDraft('mortise', { placementX: 4, placementZ: 3 });
+
+    // Committed target is the top face; the pointer is over the bottom face.
+    renderCanvas(draft, { hoveredTarget: { type: 'face', face: 'bottom_face' } });
+
+    expect(screen.getByText(/Click to move this cut to the Bottom Face/i)).toBeInTheDocument();
+    // The generic instruction is replaced while a move is on offer.
+    expect(screen.queryByText(/drag the handles to size it/i)).not.toBeInTheDocument();
+  });
+  describe('computePreviewCameraFit', () => {
+    const viewport = { fov: 38, aspect: 16 / 9 };
+
+    it('pulls the camera back far enough to frame the whole blank', () => {
+      const rail = computePreviewCameraFit({ length: 24, width: 4, thickness: 1.5 }, viewport);
+
+      // Half the diagonal of the blank must fit inside the vertical frustum.
+      const radius = Math.hypot(12, 0.75, 2);
+      const halfFovTan = Math.tan((38 * Math.PI) / 360);
+      expect(rail.distance).toBeGreaterThan(radius / halfFovTan);
+      // ...but not wastefully far: the old fixed placement sat at ~87 units.
+      expect(rail.distance).toBeLessThan(50);
+    });
+
+    it('scales with the part, so a small block is not framed like a long rail', () => {
+      const rail = computePreviewCameraFit({ length: 24, width: 4, thickness: 1.5 }, viewport);
+      const block = computePreviewCameraFit({ length: 4, width: 4, thickness: 4 }, viewport);
+
+      expect(block.distance).toBeLessThan(rail.distance);
+      // Both keep the same three-quarter viewing direction.
+      const direction = (fit: typeof rail) => fit.position.map((v) => v / fit.distance);
+      expect(direction(block)[0]).toBeCloseTo(direction(rail)[0], 6);
+      expect(direction(block)[1]).toBeCloseTo(direction(rail)[1], 6);
+    });
+
+    it('pulls back further for a tall, narrow viewport', () => {
+      const wide = computePreviewCameraFit({ length: 24, width: 4, thickness: 1.5 }, { fov: 38, aspect: 2 });
+      const narrow = computePreviewCameraFit({ length: 24, width: 4, thickness: 1.5 }, { fov: 38, aspect: 0.5 });
+
+      expect(narrow.distance).toBeGreaterThan(wide.distance);
+    });
+
+    it('stays finite for degenerate blanks and viewports', () => {
+      const fit = computePreviewCameraFit({ length: 0, width: 0, thickness: 0 }, { fov: 0, aspect: 0 });
+
+      expect(Number.isFinite(fit.distance)).toBe(true);
+      expect(fit.distance).toBeGreaterThan(0);
+      expect(fit.near).toBeGreaterThan(0);
+      expect(fit.far).toBeGreaterThan(fit.near);
+    });
   });
 });

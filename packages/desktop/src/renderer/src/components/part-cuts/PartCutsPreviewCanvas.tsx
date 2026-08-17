@@ -17,7 +17,7 @@ import {
 } from '@renderer/utils/partCutPicking';
 import { getPartRenderGeometry } from '@renderer/utils/partFeatureGeometry';
 import { getRectCutDepth, getResolvedRectCutFeature } from '@renderer/utils/rectCutUtils';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
@@ -766,14 +766,94 @@ function PartCutsPreviewScene({
         })}
       </group>
 
+      <FrameCameraToPart part={previewPart} controlsRef={controlsRef} />
       <OrbitControls
         ref={controlsRef}
         enablePan={false}
-        minDistance={maxDimension * 0.8}
+        minDistance={maxDimension * 0.25}
         maxDistance={maxDimension * 6}
       />
     </>
   );
+}
+
+/**
+ * Camera placement that frames a blank of the given size.
+ *
+ * Uses the part's bounding-sphere radius so the fit holds from any orbit
+ * angle, and takes whichever of the vertical/horizontal frustum limits is
+ * tighter for the viewport's aspect ratio.
+ */
+export function computePreviewCameraFit(
+  blank: { length: number; width: number; thickness: number },
+  viewport: { fov: number; aspect: number }
+): { distance: number; position: [number, number, number]; near: number; far: number } {
+  const radius = Math.max(0.5, Math.hypot(blank.length / 2, blank.thickness / 2, blank.width / 2));
+  const fov = viewport.fov > 0 ? viewport.fov : 38;
+  const aspect = viewport.aspect > 0 ? viewport.aspect : 1;
+  const halfFov = (fov * Math.PI) / 360;
+  const verticalDistance = radius / Math.tan(halfFov);
+  const horizontalDistance = verticalDistance / aspect;
+  const distance = Math.max(verticalDistance, horizontalDistance) * 1.12;
+
+  // Keep the established three-quarter viewing angle.
+  const direction = [0.61, 0.44, 0.66];
+  const magnitude = Math.hypot(...direction);
+  return {
+    distance,
+    position: [
+      (direction[0] / magnitude) * distance,
+      (direction[1] / magnitude) * distance,
+      (direction[2] / magnitude) * distance
+    ],
+    near: Math.max(0.01, distance / 200),
+    far: distance * 12
+  };
+}
+
+/**
+ * Frames the camera so the blank fills the viewport. The previous fixed
+ * placement scaled off the longest dimension, which pushed the camera roughly
+ * twice as far as needed for long, thin parts (a 24" rail read as a sliver).
+ * Re-frames only when the blank's dimensions change, so a user's orbit is not
+ * reset while they edit a cut.
+ */
+function FrameCameraToPart({
+  part,
+  controlsRef
+}: {
+  part: Part;
+  controlsRef: React.RefObject<OrbitControlsImpl | null>;
+}): null {
+  const { camera, size } = useThree();
+  const dimensionKey = `${part.length}x${part.width}x${part.thickness}`;
+
+  useEffect(() => {
+    const perspective = camera as THREE.PerspectiveCamera;
+    if (!perspective.isPerspectiveCamera) return;
+
+    const fit = computePreviewCameraFit(part, {
+      fov: perspective.fov,
+      aspect: size.width > 0 && size.height > 0 ? size.width / size.height : 1
+    });
+
+    perspective.position.set(...fit.position);
+    perspective.near = fit.near;
+    perspective.far = fit.far;
+    perspective.updateProjectionMatrix();
+    perspective.lookAt(0, 0, 0);
+
+    const controls = controlsRef.current;
+    if (controls) {
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }
+    // Size is read for the fit but intentionally not a dependency: re-framing
+    // on every panel resize would fight the user's orbit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dimensionKey, camera, controlsRef]);
+
+  return null;
 }
 
 export function PartCutsPreviewCanvas({
@@ -911,29 +991,21 @@ export function PartCutsPreviewCanvas({
         />
       </Canvas>
 
-      <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-2">
-        {selectedFeatureSummary && (
-          <div className="rounded-md border border-accent/30 bg-bg/90 px-3 py-2 text-left text-sm text-text shadow-sm backdrop-blur">
-            <div className="font-medium">Preview Selection</div>
-            <div className="mt-1">{selectedFeatureSummary}</div>
-            {selectedFeatureTargetLabel && (
-              <div className="mt-1 text-xs text-text-muted">Target: {selectedFeatureTargetLabel}</div>
-            )}
-          </div>
-        )}
-
-        {draft && (
-          <div className="rounded-md border border-border/80 bg-bg/90 px-3 py-2 text-left text-xs text-text-muted shadow-sm backdrop-blur">
-            {supportsHandles
-              ? 'Click a highlighted target first, then drag the preview handles to adjust this operation.'
-              : 'Hover or click a highlighted target to resolve a canonical face, edge, or corner for this operation.'}
-          </div>
-        )}
-      </div>
-
-      {activeTargetLabel && (
-        <div className="pointer-events-none absolute bottom-3 left-3 rounded-md border border-border/80 bg-bg/90 px-3 py-2 text-sm text-text shadow-sm backdrop-blur">
-          Active target: <span className="font-medium">{activeTargetLabel}</span>
+      {(selectedFeatureSummary || draft) && (
+        <div className="pointer-events-none absolute left-3 top-3 max-w-[min(88%,26rem)] rounded-md border border-accent/30 bg-bg/90 px-3 py-2 text-left text-sm text-text shadow-sm backdrop-blur">
+          {selectedFeatureSummary && <div>{selectedFeatureSummary}</div>}
+          {selectedFeatureTargetLabel && (
+            <div className="mt-1 text-xs text-text-muted">On {selectedFeatureTargetLabel}</div>
+          )}
+          {draft && (
+            <div className="mt-1.5 text-xs text-text-muted">
+              {activeTargetLabel && activeTargetLabel !== selectedFeatureTargetLabel
+                ? `Click to move this cut to the ${activeTargetLabel}.`
+                : supportsHandles
+                  ? 'Click a highlighted face on the part to place this cut, then drag the handles to size it.'
+                  : 'Click a highlighted face, edge, or corner on the part to move this cut there.'}
+            </div>
+          )}
         </div>
       )}
     </div>

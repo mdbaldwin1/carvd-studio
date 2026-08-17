@@ -1620,4 +1620,132 @@ describe('partFeatureGeometry', () => {
       expect(maxXOutsideBand).toBeCloseTo(10.5, 5);
     });
   });
+  describe('edge bevels in the layered render path', () => {
+    // A part carrying any rect cut goes through the layered extrusion instead
+    // of the end-cut-only hull, so the bevel is applied by a separate code
+    // path. Both paths must agree (see the render-path Z convention tests).
+    const bevelPlusCutout = (face: 'front_face' | 'back_face') =>
+      createTestPart({
+        length: 10,
+        width: 4,
+        thickness: 1,
+        features: [
+          {
+            id: 'bevel',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face },
+            reference: { primaryFrom: 'min' },
+            cutType: 'bevel',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 0, verticalAngle: 45 }
+          },
+          {
+            id: 'hole',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'cutout',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 1, width: 1 }, depthMode: 'through' },
+            placement: { x: 4.5, z: 1.5 }
+          }
+        ]
+      });
+
+    it('tilts the front face in the layered path too', () => {
+      const positions = getPartRenderGeometry(bevelPlusCutout('front_face')).getAttribute('position');
+      let topOnOriginalFront = 0;
+      let topOnBevelledPlane = 0;
+      for (let i = 0; i < positions.count; i += 1) {
+        if (positions.getY(i) < 0.49) continue;
+        if (positions.getZ(i) > 1.99) topOnOriginalFront += 1;
+        if (Math.abs(positions.getZ(i) - 1) < 1e-3) topOnBevelledPlane += 1;
+      }
+      // Front face renders at +Z: its top edge moves inward to z = 2 - 1 = 1.
+      expect(topOnOriginalFront).toBe(0);
+      expect(topOnBevelledPlane).toBeGreaterThan(0);
+    });
+
+    it('tilts the back face on the opposite side', () => {
+      const positions = getPartRenderGeometry(bevelPlusCutout('back_face')).getAttribute('position');
+      let topOnOriginalBack = 0;
+      let topOnBevelledPlane = 0;
+      for (let i = 0; i < positions.count; i += 1) {
+        if (positions.getY(i) < 0.49) continue;
+        if (positions.getZ(i) < -1.99) topOnOriginalBack += 1;
+        if (Math.abs(positions.getZ(i) + 1) < 1e-3) topOnBevelledPlane += 1;
+      }
+      expect(topOnOriginalBack).toBe(0);
+      expect(topOnBevelledPlane).toBeGreaterThan(0);
+    });
+  });
+
+  describe('notch families used by side-face pockets and edge notches', () => {
+    it('recesses a back-face pocket on the far side of the board', () => {
+      const part = createTestPart({
+        length: 20,
+        width: 2,
+        thickness: 2,
+        features: [
+          {
+            id: 'back-pocket',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'mortise',
+            target: { type: 'face', face: 'back_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 3, width: 1 }, depthMode: 'blind', depth: 0.75 },
+            placement: { x: 4, z: 0.5 }
+          }
+        ]
+      });
+
+      const positions = getPartRenderGeometry(part).getAttribute('position');
+      let recessed = 0;
+      for (let i = 0; i < positions.count; i += 1) {
+        const x = positions.getX(i);
+        const inRun = x > -6.01 && x < -2.99;
+        // Back face renders at -Z, so the floor sits at -1 + 0.75 = -0.25.
+        if (inRun && Math.abs(positions.getZ(i) + 0.25) < 1e-3) recessed += 1;
+      }
+      expect(recessed).toBeGreaterThan(0);
+    });
+
+    it('notches a right-side edge without disturbing the opposite end', () => {
+      const part = createTestPart({
+        length: 20,
+        width: 6,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'right-notch',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'edge_notch',
+            target: { type: 'edge', edge: 'top_right_edge' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 2, width: 2 }, depthMode: 'through' },
+            placement: { x: 0, z: 2 }
+          }
+        ]
+      });
+
+      const positions = getPartRenderGeometry(part).getAttribute('position');
+      let minX = Infinity;
+      let maxX = -Infinity;
+      for (let i = 0; i < positions.count; i += 1) {
+        minX = Math.min(minX, positions.getX(i));
+        maxX = Math.max(maxX, positions.getX(i));
+      }
+      // The left end is untouched; the right end still reaches the blank edge
+      // outside the notched z band.
+      expect(minX).toBeCloseTo(-10, 5);
+      expect(maxX).toBeCloseTo(10, 5);
+    });
+  });
 });

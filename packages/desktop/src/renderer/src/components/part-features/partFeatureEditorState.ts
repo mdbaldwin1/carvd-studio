@@ -604,28 +604,28 @@ export function getPresetHint(preset: OperationPreset): string {
     case 'end_cut':
       return 'Mitres, bevels, and compound cuts on either end.';
     case 'edge_bevel':
-      return 'Rip bevel along the front or back edge \u2014 mitred boxes and waterfall edges.';
+      return 'Rip bevel along a long edge, for mitred boxes.';
     case 'tenon':
-      return 'Tongue on an end, sized to fit a mortise \u2014 the other half of the joint.';
+      return 'Tongue on an end that fits a mortise.';
     case 'half_lap':
-      return 'Blind channel at half thickness for lap joints \u2014 starts as an end lap.';
+      return 'Half-thickness channel for lap joints.';
     case 'corner_notch':
-      return 'Remove a rectangular chunk from one exact corner.';
+      return 'Remove a rectangle from one corner.';
     case 'edge_notch':
-      return 'Notch into a specific edge while keeping the blank rectangular.';
+      return 'Notch into one edge of the blank.';
     case 'cutout':
-      return 'Place a rectangular pocket or opening on one face.';
+      return 'Rectangular pocket or opening on a face.';
     case 'dado':
-      return 'Cut a full-width channel across the top or bottom face.';
+      return 'Full-width channel across the face.';
     case 'stopped_dado':
-      return 'Cut a blind channel across the board width with a limited run along the blank.';
+      return 'Blind channel across the width, stopping short.';
     case 'rabbet':
-      return 'Cut a full-run edge recess along one supported edge.';
+      return 'Recess along one full edge.';
     case 'groove':
-      return 'Cut a full-length face groove with blind depth.';
+      return 'Full-length groove along the face.';
     case 'stopped_groove':
-      return 'Cut a blind face groove with a limited run and explicit placement.';
+      return 'Blind groove along the length, stopping short.';
     case 'mortise':
-      return 'Cut a blind face pocket for loose-tenon or joinery layout.';
+      return 'Blind pocket for a tenon to seat into.';
   }
 }

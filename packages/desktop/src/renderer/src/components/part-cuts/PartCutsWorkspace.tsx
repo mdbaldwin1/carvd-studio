@@ -28,6 +28,7 @@ import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { Checkbox } from '@renderer/components/ui/checkbox';
+import { cn } from '@renderer/lib/utils';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { ScrollArea } from '@renderer/components/ui/scroll-area';
@@ -35,7 +36,7 @@ import { Select } from '@renderer/components/ui/select';
 import { EndCutFeature, Part, PartFeature, PartFeatureTarget, RectCutFeature } from '@renderer/types';
 import { getDerivedLengthMeasurements, getDerivedWidthMeasurements } from '@renderer/utils/endCutUtils';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
-import { getPickableTargetLabel, isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
+import { isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
 import { getAvailableMirrorActions, getMirrorActionLabel, mirrorFeature } from '@renderer/utils/partFeatureActions';
 import { getPartFeatureConflicts } from '@renderer/utils/partFeatureConflicts';
 import {
@@ -93,15 +94,6 @@ function reorderFeatures(features: PartFeature[], fromIndex: number, toIndex: nu
   const [moved] = next.splice(fromIndex, 1);
   next.splice(toIndex, 0, moved);
   return next;
-}
-
-function getSelectedTargetLabel(draft: FeatureDraft | null): string | null {
-  if (!draft) return null;
-  if (draft.mode === 'end_cut') return FACE_LABELS[draft.targetFace];
-  if (draft.cutType === 'corner_notch') return CORNER_LABELS[draft.cornerTarget];
-  if (draft.cutType === 'edge_notch') return EDGE_NOTCH_SIDE_LABELS[edgeTargetToSide(draft.edgeTarget)];
-  if (draft.cutType === 'rabbet') return EDGE_LABELS[draft.edgeTarget];
-  return FACE_LABELS[draft.faceTarget];
 }
 
 function getDraftStepTitle(draft: FeatureDraft): string {
@@ -431,8 +423,6 @@ export function PartCutsWorkspace({
     onPendingTargetChange(null);
   };
 
-  const selectedTargetLabel = getSelectedTargetLabel(inspectorDraft);
-  const activeTargetLabel = getPickableTargetLabel(hoveredTarget) ?? getPickableTargetLabel(pendingTarget);
   const selectedFeatureSummary = inspectorDraft
     ? getFeatureSummary(buildFeatureFromDraft(inspectorDraft), units)
     : null;
@@ -506,21 +496,6 @@ export function PartCutsWorkspace({
                 }
               />
 
-              {(selectedTargetLabel || activeTargetLabel || selectedFeatureSummary) && (
-                <div className="rounded-md border border-border bg-bg px-3 py-3 text-left text-sm text-text-secondary">
-                  {selectedFeatureSummary && <div className="font-medium text-text">{selectedFeatureSummary}</div>}
-                  {selectedTargetLabel && (
-                    <div className="mt-1">
-                      Target: <span className="font-medium text-text">{selectedTargetLabel}</span>
-                    </div>
-                  )}
-                  {activeTargetLabel && (
-                    <div className="mt-1">
-                      Preview pick: <span className="font-medium text-text">{activeTargetLabel}</span>
-                    </div>
-                  )}
-                </div>
-              )}
               {featureConflicts.length > 0 && (
                 <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-left">
                   <div className="text-xs font-semibold uppercase tracking-wide text-warning">Cut Conflicts</div>
@@ -725,7 +700,7 @@ export function PartCutsWorkspace({
                     Pick the cut type first. The next step will walk through the right target and measurements.
                   </p>
                 </div>
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-3">
                   {(
                     [
                       { group: 'Ends & Edges', presets: ['end_cut', 'edge_bevel', 'tenon'] },
@@ -738,19 +713,26 @@ export function PartCutsWorkspace({
                     ] as Array<{ group: string; presets: OperationPreset[] }>
                   ).map(({ group, presets }) => (
                     <div key={group}>
-                      <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                      <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
                         {group}
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        {presets.map((preset) => (
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {presets.map((preset, presetIndex) => (
                           <button
                             key={preset}
                             type="button"
-                            className="rounded-md border border-border bg-bg px-3 py-3 text-left transition-colors hover:border-accent hover:bg-accent/5"
+                            className={cn(
+                              'rounded-md border border-border bg-bg px-3 py-2 text-left transition-colors hover:border-accent hover:bg-accent/5',
+                              // Let an odd trailing tile fill the row instead of
+                              // leaving a hole beside it.
+                              presets.length % 2 === 1 && presetIndex === presets.length - 1 && 'col-span-2'
+                            )}
                             onClick={() => handleStartPreset(preset)}
                           >
                             <div className="text-sm font-semibold text-text">{getOperationPresetLabel(preset)}</div>
-                            <div className="mt-1 text-[11px] text-text-muted">{getOperationPresetHint(preset)}</div>
+                            <div className="mt-0.5 text-[11px] leading-snug text-text-muted">
+                              {getOperationPresetHint(preset)}
+                            </div>
                           </button>
                         ))}
                       </div>
@@ -1277,7 +1259,7 @@ export function PartCutsWorkspace({
                               <div>
                                 <Label>
                                   {inspectorDraft.cutType === 'tenon'
-                                    ? 'Shoulder Offset Across Width'
+                                    ? 'Shoulder Offset'
                                     : inspectorDraft.faceTarget === 'front_face' ||
                                         inspectorDraft.faceTarget === 'back_face'
                                       ? 'Offset Up From Bottom'

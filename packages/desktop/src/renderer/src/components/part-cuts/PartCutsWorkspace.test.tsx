@@ -4,6 +4,7 @@ import { ComponentProps } from 'react';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 import type { EndCutFeature, RectCutFeature } from '@renderer/types';
+import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
 
 type WorkspaceProps = ComponentProps<typeof PartCutsWorkspace>;
@@ -814,10 +815,12 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getAllByText(/Target:/i)[0]).toHaveTextContent('Bottom Face');
   });
 
-  it('shows the hovered preview pick label', () => {
+  it('forwards the hovered target to the preview', () => {
+    // The workspace no longer restates the hovered pick itself — the preview
+    // overlay owns that feedback, so assert the target reaches the preview.
     renderWorkspace({ hoveredTarget: { type: 'face', face: 'top_face' } });
 
-    expect(screen.getByText(/Preview pick:/i)).toHaveTextContent('Top Face');
+    expect(screen.getByText(/Active target:/i)).toHaveTextContent('Top Face');
   });
 
   it('wires the footer actions to exit and save', () => {
@@ -838,5 +841,100 @@ describe('PartCutsWorkspace', () => {
     renderWorkspace({ draftFeatures: conflictingFeatures, hasUnsavedChanges: true });
 
     expect(screen.getByRole('button', { name: 'Save Part' })).toBeDisabled();
+  });
+  describe('draft keyboard shortcuts', () => {
+    const seedDraftHistory = () => {
+      const store = usePartCutsEditingStore.getState();
+      store.startEditingPartCuts('p1', 'Panel', []);
+      store.setDraftFeatures([createMortiseFeature({ id: 'first' })]);
+      store.setDraftFeatures([createMortiseFeature({ id: 'first' }), createMortiseFeature({ id: 'second' })]);
+    };
+
+    it('steps the cut draft back and forward with the platform shortcuts', () => {
+      seedDraftHistory();
+      renderWorkspace();
+
+      fireEvent.keyDown(window, { key: 'z', metaKey: true });
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first']);
+
+      fireEvent.keyDown(window, { key: 'z', metaKey: true, shiftKey: true });
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first', 'second']);
+
+      fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first']);
+
+      fireEvent.keyDown(window, { key: 'y', ctrlKey: true });
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first', 'second']);
+    });
+
+    it('ignores unmodified keys and keystrokes aimed at text fields', () => {
+      seedDraftHistory();
+      renderWorkspace();
+      const before = usePartCutsEditingStore.getState().draftFeatures.length;
+
+      // No modifier: plain "z" must not undo.
+      fireEvent.keyDown(window, { key: 'z' });
+      expect(usePartCutsEditingStore.getState().draftFeatures).toHaveLength(before);
+
+      // Typing the same shortcut inside a text field must not undo either.
+      startCut('Mortise');
+      const label = screen.getByPlaceholderText('Face-frame left stile');
+      fireEvent.keyDown(label, { key: 'z', metaKey: true });
+      expect(usePartCutsEditingStore.getState().draftFeatures).toHaveLength(before);
+    });
+
+    it('drives undo and redo from the header buttons', () => {
+      seedDraftHistory();
+      renderWorkspace();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Undo cut change' }));
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first']);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Redo cut change' }));
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first', 'second']);
+    });
+  });
+
+  describe('target-aware field labels', () => {
+    it('labels tenon fields by tongue dimensions and hides the controls it forces', () => {
+      renderWorkspace();
+      startCut('Tenon');
+
+      expect(screen.getByText('Tenon Length')).toBeInTheDocument();
+      expect(screen.getByText('Tenon Width')).toBeInTheDocument();
+      expect(screen.getByText('Tenon Thickness')).toBeInTheDocument();
+      expect(screen.getByText('Shoulder Offset')).toBeInTheDocument();
+      // A tenon has no through/blind choice and no along-length offset.
+      expect(screen.queryByText('Depth')).not.toBeInTheDocument();
+      expect(screen.queryByText('Offset Along Length')).not.toBeInTheDocument();
+    });
+
+    it('labels side-face pockets across the thickness', () => {
+      renderWorkspace();
+      startCut('Mortise');
+
+      expect(screen.getByText('Cross-Cut Width')).toBeInTheDocument();
+      expect(screen.getByText('Blind Depth')).toBeInTheDocument();
+
+      clickInspectorTarget('Front Face');
+
+      expect(screen.getByText('Height Across Thickness')).toBeInTheDocument();
+      expect(screen.getByText('Depth Into Width')).toBeInTheDocument();
+      expect(screen.getByText('Offset Up From Bottom')).toBeInTheDocument();
+      expect(screen.getByText(/recess into the board width/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('cut picker layout', () => {
+    it('lets an odd trailing tile fill its row so groups have no gap', () => {
+      renderWorkspace();
+      fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+
+      // Ends & Edges holds three tiles, so Tenon is the odd one out.
+      const tenon = screen.getByRole('button', { name: /^Tenon/ });
+      expect(tenon.className).toContain('col-span-2');
+      // Pockets & Openings holds two, so neither spans.
+      expect(screen.getByRole('button', { name: /^Mortise/ }).className).not.toContain('col-span-2');
+    });
   });
 });

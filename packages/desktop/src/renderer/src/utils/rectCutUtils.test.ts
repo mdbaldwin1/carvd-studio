@@ -747,4 +747,78 @@ describe('rectCutUtils', () => {
       expect(onFace.supported).toBe(false);
     });
   });
+  describe('placement validation per cut type', () => {
+    const part = { length: 24, width: 8, thickness: 1.5 };
+    const rect = (cutType: string, overrides: Record<string, unknown>) =>
+      ({
+        id: 'v-1',
+        kind: 'rect_cut',
+        version: 1,
+        enabled: true,
+        cutType,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        parameters: { size: { length: 2, width: 2 }, depthMode: 'blind', depth: 0.25 },
+        placement: { x: 0, z: 0 },
+        ...overrides
+      }) as never;
+
+    const cases: Array<[string, never, RegExp]> = [
+      ['dado pushed off the left end', rect('dado', { placement: { x: -1, z: 0 } }), /offset cannot be negative/i],
+      [
+        'dado running past the blank',
+        rect('dado', {
+          parameters: { size: { length: 4, width: 2 }, depthMode: 'blind', depth: 0.25 },
+          placement: { x: 23, z: 0 }
+        }),
+        /past the blank/i
+      ],
+      [
+        'stopped dado pushed off the left end',
+        rect('stopped_dado', { placement: { x: -2, z: 0 } }),
+        /offset cannot be negative/i
+      ],
+      [
+        'stopped dado running past the blank',
+        rect('stopped_dado', {
+          parameters: { size: { length: 6, width: 2 }, depthMode: 'blind', depth: 0.25 },
+          placement: { x: 22, z: 0 }
+        }),
+        /extends past the blank/i
+      ],
+      [
+        'groove pushed off the front edge',
+        rect('groove', { placement: { x: 0, z: -1 } }),
+        /offset cannot be negative/i
+      ],
+      [
+        'groove running past the width',
+        rect('groove', {
+          parameters: { size: { length: 2, width: 3 }, depthMode: 'blind', depth: 0.25 },
+          placement: { x: 0, z: 7 }
+        }),
+        /runs past the blank/i
+      ],
+      [
+        'side-face pocket deeper than the board is wide',
+        rect('mortise', {
+          target: { type: 'face', face: 'front_face' },
+          parameters: { size: { length: 2, width: 1 }, depthMode: 'blind', depth: 9 }
+        }),
+        /less than part width/i
+      ]
+    ];
+
+    for (const [name, feature, expected] of cases) {
+      it(`rejects a ${name}`, () => {
+        expect(validateRectCutFeature(feature, part)).toMatch(expected);
+      });
+    }
+
+    it('accepts the same cuts once they sit inside the blank', () => {
+      expect(validateRectCutFeature(rect('dado', { placement: { x: 4, z: 0 } }), part)).toBeNull();
+      expect(validateRectCutFeature(rect('stopped_dado', { placement: { x: 4, z: 0 } }), part)).toBeNull();
+      expect(validateRectCutFeature(rect('groove', { placement: { x: 0, z: 2 } }), part)).toBeNull();
+    });
+  });
 });
