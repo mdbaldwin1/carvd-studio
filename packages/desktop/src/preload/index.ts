@@ -1,7 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { AnalyticsConsent, DesktopAnalyticsEvent } from '../shared/analytics';
 
-const analyticsTestBridgeEnabled = process.argv.includes('--analytics-e2e-control');
+const analyticsTestBridgeEnabled =
+  import.meta.env.PRELOAD_VITE_ANALYTICS_E2E === '1' && process.argv.includes('--analytics-e2e-control');
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object

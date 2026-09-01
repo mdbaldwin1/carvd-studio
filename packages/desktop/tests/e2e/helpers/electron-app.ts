@@ -148,7 +148,6 @@ export async function closeElectronApp(
 ): Promise<void> {
   if (!running) return;
   const proc = running.electronApp.process();
-  if (options.removeUserData === false) return;
   try {
     await Promise.race([
       running.electronApp.close(),
@@ -176,6 +175,7 @@ export async function closeElectronApp(
       resolve();
     });
   });
+  if (options.removeUserData === false) return;
   try {
     await fs.promises.rm(running.userDataDir, {
       recursive: true,

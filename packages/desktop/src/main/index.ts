@@ -1309,7 +1309,10 @@ registerAnalyticsIpcHandlers(ipcMain, {
 });
 
 const analyticsTestControlsEnabled =
-  process.argv.includes('--test-mode') && process.argv.includes('--analytics-e2e-control') && !app.isPackaged;
+  import.meta.env.MAIN_VITE_ANALYTICS_E2E === '1' &&
+  process.argv.includes('--test-mode') &&
+  process.argv.includes('--analytics-e2e-control') &&
+  !app.isPackaged;
 registerAnalyticsTestControl(ipcMain, analyticsTestControlsEnabled, flushAnalytics);
 
 registerAnalyticsLifecycle(app, {

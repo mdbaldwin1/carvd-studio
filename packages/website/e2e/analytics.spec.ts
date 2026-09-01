@@ -6,16 +6,30 @@ test.use({
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36",
 });
 
-function decodedPayloads(payloads: Buffer[]): string {
-  return payloads
-    .map((payload) => {
-      if (payload[0] === 0x1f && payload[1] === 0x8b)
-        return gunzipSync(payload).toString("utf8");
-      const body = payload.toString("utf8");
-      const encoded = new URLSearchParams(body).get("data");
-      return encoded ? Buffer.from(encoded, "base64").toString("utf8") : body;
-    })
-    .join("\n");
+type CapturedEvent = { event: string; properties: Record<string, unknown> };
+
+function capturedEvents(payloads: Buffer[]): CapturedEvent[] {
+  return payloads.flatMap((payload) => {
+    if (payload[0] === 0x1f && payload[1] === 0x8b)
+      payload = gunzipSync(payload);
+    const body = payload.toString("utf8");
+    const encoded = new URLSearchParams(body).get("data");
+    const decoded = encoded
+      ? Buffer.from(encoded, "base64").toString("utf8")
+      : body;
+    try {
+      const parsed = JSON.parse(decoded) as
+        | CapturedEvent
+        | { batch?: CapturedEvent[] };
+      return "batch" in parsed && Array.isArray(parsed.batch)
+        ? parsed.batch
+        : "event" in parsed
+          ? [parsed]
+          : [];
+    } catch {
+      return [];
+    }
+  });
 }
 
 test.describe("explicit website analytics", () => {
@@ -81,13 +95,27 @@ test.describe("explicit website analytics", () => {
       .click();
     await expect(page).toHaveURL("/features");
     await expect
-      .poll(() => decodedPayloads(payloads), { timeout: 15_000 })
-      .toContain("$pageview");
+      .poll(
+        () =>
+          capturedEvents(payloads).some(
+            ({ event, properties }) =>
+              event === "$pageview" &&
+              String(properties.$current_url).endsWith("/features"),
+          ),
+        { timeout: 15_000 },
+      )
+      .toBe(true);
     await page.goto("/");
     await page.locator("#download a").filter({ hasText: "macOS" }).click();
     await expect
-      .poll(() => decodedPayloads(payloads), { timeout: 15_000 })
-      .toContain("download_clicked");
+      .poll(
+        () =>
+          capturedEvents(payloads).some(
+            ({ event }) => event === "download_clicked",
+          ),
+        { timeout: 15_000 },
+      )
+      .toBe(true);
     await page.goto("/pricing");
     const popupPromise = page.waitForEvent("popup");
     await page
@@ -98,15 +126,34 @@ test.describe("explicit website analytics", () => {
     await expect(popup).toHaveURL(/store\.example\.test/);
 
     await expect
-      .poll(() => decodedPayloads(payloads), { timeout: 15_000 })
-      .toContain("checkout_started");
-    const payload = decodedPayloads(payloads);
-    expect(payload).toContain("download_clicked");
-    expect(payload).toContain("macos");
-    expect(payload).toContain("home");
-    expect(payload).toContain("checkout_started");
-    expect(payload).toContain("desktop_license");
-    expect(payload).toContain("pricing-card");
+      .poll(
+        () =>
+          capturedEvents(payloads).some(
+            ({ event }) => event === "checkout_started",
+          ),
+        { timeout: 15_000 },
+      )
+      .toBe(true);
+    const events = capturedEvents(payloads);
+    const pageview = events.find(
+      ({ event, properties }) =>
+        event === "$pageview" &&
+        String(properties.$current_url).endsWith("/features"),
+    );
+    expect(pageview).toBeDefined();
+    expect(new URL(String(pageview?.properties.$current_url)).pathname).toBe(
+      "/features",
+    );
+    const download = events.find(({ event }) => event === "download_clicked");
+    expect({
+      platform: download?.properties.platform,
+      location: download?.properties.location,
+    }).toEqual({ platform: "macos", location: "home-hero-card" });
+    const checkout = events.find(({ event }) => event === "checkout_started");
+    expect({
+      product: checkout?.properties.product,
+      location: checkout?.properties.location,
+    }).toEqual({ product: "desktop_license", location: "pricing-card" });
   });
 
   test("aborted analytics delivery never blocks normal navigation", async ({
