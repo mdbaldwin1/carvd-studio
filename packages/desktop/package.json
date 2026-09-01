@@ -41,8 +41,9 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "MAIN_VITE_ANALYTICS_E2E=1 PRELOAD_VITE_ANALYTICS_E2E=1 npm run build && playwright test",
-    "test:e2e:headed": "npm run build && playwright test --headed",
-    "test:e2e:debug": "npm run build && playwright test --debug",
+    "test:e2e:headed": "MAIN_VITE_ANALYTICS_E2E=1 PRELOAD_VITE_ANALYTICS_E2E=1 npm run build && playwright test --headed",
+    "test:e2e:debug": "MAIN_VITE_ANALYTICS_E2E=1 PRELOAD_VITE_ANALYTICS_E2E=1 npm run build && playwright test --debug",
+    "verify:production-analytics-boundary": "npm run build && node scripts/assert-no-analytics-e2e-controls.cjs",
     "analyze": "ANALYZE=true electron-vite build"
   },
   "dependencies": {

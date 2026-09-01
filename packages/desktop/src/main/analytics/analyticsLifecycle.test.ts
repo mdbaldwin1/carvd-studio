@@ -57,4 +57,21 @@ describe('registerAnalyticsLifecycle', () => {
 
     expect(shutdown).toHaveBeenCalledTimes(1);
   });
+
+  it('waits for asynchronous initialization before capturing app_opened', async () => {
+    const initialized = createDeferred();
+    const capture = vi.fn();
+
+    registerAnalyticsLifecycle(
+      { whenReady: () => Promise.resolve(), on: vi.fn() },
+      { initialize: () => initialized.promise, capture, shutdown: vi.fn().mockResolvedValue(undefined) }
+    );
+
+    await Promise.resolve();
+    expect(capture).not.toHaveBeenCalled();
+    initialized.resolve();
+    await initialized.promise;
+    await Promise.resolve();
+    expect(capture).toHaveBeenCalledWith({ name: 'app_opened', properties: {} });
+  });
 });

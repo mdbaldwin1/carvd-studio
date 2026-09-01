@@ -90,7 +90,6 @@ import {
 } from './analytics/analyticsService';
 import { registerAnalyticsIpcHandlers } from './analytics/analyticsIpc';
 import { registerAnalyticsLifecycle } from './analytics/analyticsLifecycle';
-import { analyticsTestTransport, registerAnalyticsTestControl } from './analytics/analyticsTestControl';
 
 const isTestMode = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
 const queuedTestSaveDialogPaths: string[] = [];
@@ -1313,11 +1312,18 @@ const analyticsTestControlsEnabled =
   process.argv.includes('--test-mode') &&
   process.argv.includes('--analytics-e2e-control') &&
   !app.isPackaged;
-registerAnalyticsTestControl(ipcMain, analyticsTestControlsEnabled, flushAnalytics);
+const analyticsTestControlsReady = analyticsTestControlsEnabled
+  ? import('./analytics/analyticsTestControl').then((controls) => {
+      controls.registerAnalyticsTestControl(ipcMain, true, flushAnalytics);
+      return controls.analyticsTestTransport;
+    })
+  : Promise.resolve(null);
 
 registerAnalyticsLifecycle(app, {
-  initialize: () =>
-    initializeAnalytics(analyticsTestControlsEnabled ? { transport: analyticsTestTransport } : undefined),
+  initialize: async () => {
+    const transport = await analyticsTestControlsReady;
+    initializeAnalytics(transport ? { transport } : undefined);
+  },
   capture: captureAnalytics,
   shutdown: shutdownAnalytics
 });
@@ -1354,7 +1360,9 @@ store.onDidAnyChange((newValue, oldValue) => {
   }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // In E2E builds, register test-only IPC before exposing the renderer bridge.
+  await analyticsTestControlsReady;
   const isTest = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
   if (isTest) {
     log.info('[Main] Test mode detected — skipping splash screen and auto-updater');

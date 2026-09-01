@@ -6,7 +6,7 @@ export interface ElectronAnalyticsLifecycle {
 }
 
 export interface AnalyticsLifecycleDependencies {
-  initialize(): void;
+  initialize(): void | Promise<void>;
   capture(event: DesktopAnalyticsEvent<'app_opened'>): void;
   shutdown(): Promise<void>;
 }
@@ -17,8 +17,8 @@ export function registerAnalyticsLifecycle(
 ): void {
   void app
     .whenReady()
-    .then(() => {
-      analytics.initialize();
+    .then(async () => {
+      await analytics.initialize();
       analytics.capture({ name: 'app_opened', properties: {} });
     })
     .catch(() => undefined);
