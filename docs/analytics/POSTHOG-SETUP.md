@@ -91,11 +91,11 @@ Display conversion formulas alongside cards:
 
 Use desktop events only, rolling 30 days:
 
-1. Ordered funnel with a 14-day window: `app_opened` → `onboarding_completed` → `project_created` → `project_saved` → `cut_list_generated` where `success=true` → `export_completed` where `success=true` → `license_activated`.
+1. Ordered funnel with a 14-day window: `app_opened` → `onboarding_completed` → `project_created` → `project_saved` → `cut_list_generated` where `success=true` → `license_activated`.
 2. Project creation mix: unique persons and event totals for `project_created`, breakdown by `source` and `units`.
 3. Save activation: unique persons performing `project_saved`, breakdown by `save_kind` and `part_count_bucket`.
 4. Optimizer success: event totals for `cut_list_generated`, formula success events / all cut-list events; breakdown by part and stock buckets.
-5. Export success: event totals for `export_completed`, formula success events / all export events; breakdown by `export_type`.
+5. **Separate insight, not a required funnel step — Export success:** event totals for `export_completed`, formula success events / all export events; breakdown by `export_type`.
 6. License intent and activation: unique persons for `checkout_opened` and `license_activated`, separately; breakdown checkout by `surface` and `license_mode`.
 7. Duplicate the funnel with breakdowns by trusted `$os`, `app_version`, and first-seen week (cohort installations by the week of their first `app_opened`). Do not use PostHog browser OS for desktop reporting.
 
