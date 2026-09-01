@@ -15,6 +15,7 @@ const SHUTDOWN_TIMEOUT_MS = 1_000;
 
 export interface AnalyticsServiceOptions {
   transport?: AnalyticsTransport | null;
+  createTransport?: () => AnalyticsTransport | null;
   queue?: AnalyticsQueue;
   clock?: () => number;
   createInstallationId?: () => string;
@@ -36,14 +37,23 @@ interface AnalyticsLifecycle {
 let lifecycle: AnalyticsLifecycle | null = null;
 let nextGeneration = 0;
 let createInstallationId = randomUUID;
+let restartOptions: AnalyticsServiceOptions | null = null;
 
 export function initializeAnalytics(options: AnalyticsServiceOptions = {}): void {
+  restartOptions = options;
+  initializeLifecycle(options);
+}
+
+function initializeLifecycle(options: AnalyticsServiceOptions): boolean {
   if (lifecycle) invalidateLifecycle(lifecycle);
+
+  const transportResult = resolveTransport(options);
+  if (!transportResult.success) return false;
 
   const nextLifecycle: AnalyticsLifecycle = {
     generation: ++nextGeneration,
     queue: options.queue ?? createAnalyticsQueue(analyticsStorage, options.clock ?? Date.now),
-    transport: resolveTransport(options),
+    transport: transportResult.transport,
     active: true,
     flushInterval: null,
     flushPromise: null
@@ -62,6 +72,8 @@ export function initializeAnalytics(options: AnalyticsServiceOptions = {}): void
       void flushLifecycle(nextLifecycle).catch(() => undefined);
     }, FLUSH_INTERVAL_MS);
   }
+
+  return transportResult.success;
 }
 
 export function getAnalyticsConsent(): AnalyticsConsent {
@@ -76,7 +88,12 @@ export function setAnalyticsConsent(consent: AnalyticsConsent): AnalyticsConsent
   if (consent !== 'granted' && lifecycle) invalidateLifecycle(lifecycle);
 
   try {
-    return { success: setAnalyticsConsentPreference(consent) };
+    const persisted = setAnalyticsConsentPreference(consent);
+    if (!persisted) return { success: false };
+    if (consent === 'granted' && !lifecycle && restartOptions && !initializeLifecycle(restartOptions)) {
+      return { success: false };
+    }
+    return { success: true };
   } catch {
     return { success: false };
   }
@@ -115,11 +132,16 @@ export async function shutdownAnalytics(): Promise<void> {
   await waitAtMost(finalFlush, SHUTDOWN_TIMEOUT_MS);
 }
 
-function resolveTransport(options: AnalyticsServiceOptions): AnalyticsTransport | null {
+function resolveTransport(options: AnalyticsServiceOptions): {
+  transport: AnalyticsTransport | null;
+  success: boolean;
+} {
   try {
-    return Object.hasOwn(options, 'transport') ? (options.transport ?? null) : createPostHogTransport();
+    if (Object.hasOwn(options, 'transport')) return { transport: options.transport ?? null, success: true };
+    if (options.createTransport) return { transport: options.createTransport(), success: true };
+    return { transport: createPostHogTransport(), success: true };
   } catch {
-    return null;
+    return { transport: null, success: false };
   }
 }
 

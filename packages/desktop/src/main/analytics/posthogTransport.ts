@@ -1,4 +1,5 @@
 import { PostHog, type EventMessage } from 'posthog-node';
+import type { PostHogFetchOptions, PostHogFetchResponse } from '@posthog/core';
 import type { QueuedAnalyticsEvent } from './analyticsQueue';
 
 export interface AnalyticsTransport {
@@ -22,7 +23,19 @@ export interface PostHogClient {
   shutdown(timeoutMs?: number): Promise<void>;
 }
 
-export type PostHogClientFactory = (apiKey: string, options: { host: string }) => PostHogClient;
+export type AnalyticsFetch = (url: string, options: RequestInit) => Promise<Response>;
+
+export type PostHogClientFactory = (
+  apiKey: string,
+  options: { host: string; fetchRetryCount: number; fetch: PostHogFetch }
+) => PostHogClient;
+
+export interface PostHogTransportOptions {
+  createClient?: PostHogClientFactory;
+  fetch?: AnalyticsFetch;
+}
+
+type PostHogFetch = (url: string, options: PostHogFetchOptions) => Promise<PostHogFetchResponse>;
 
 export function getPostHogConfig(environment: PostHogEnvironment = import.meta.env): PostHogConfig | null {
   const apiKey = environment.MAIN_VITE_POSTHOG_KEY?.trim();
@@ -33,11 +46,16 @@ export function getPostHogConfig(environment: PostHogEnvironment = import.meta.e
 
 export function createPostHogTransport(
   config: PostHogConfig | null = getPostHogConfig(),
-  createClient: PostHogClientFactory = (apiKey, options) => new PostHog(apiKey, options)
+  options: PostHogTransportOptions = {}
 ): AnalyticsTransport | null {
   if (!config) return null;
 
-  const client = createClient(config.apiKey, { host: config.host });
+  const controller = new AbortController();
+  const fetchImplementation = options.fetch ?? globalThis.fetch;
+  const fetch: PostHogFetch = (url, request) =>
+    fetchImplementation(url, { ...request, signal: controller.signal }) as Promise<PostHogFetchResponse>;
+  const createClient = options.createClient ?? ((apiKey, clientOptions) => new PostHog(apiKey, clientOptions));
+  const client = createClient(config.apiKey, { host: config.host, fetchRetryCount: 0, fetch });
 
   return {
     async send(events): Promise<void> {
@@ -54,6 +72,7 @@ export function createPostHogTransport(
     },
 
     async shutdown(): Promise<void> {
+      controller.abort();
       await client.shutdown(1_000);
     }
   };

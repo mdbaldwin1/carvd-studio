@@ -195,6 +195,7 @@ describe('analytics service', () => {
 
   it('contains initialization prune failures and interval flush failures', async () => {
     await shutdownAnalytics();
+    vi.useFakeTimers();
     const originalGet = store.get.bind(store);
     const getSpy = vi.spyOn(store, 'get').mockImplementation((key, defaultValue) => {
       if (key === 'analyticsQueue') throw new Error('queue read failed');
@@ -205,7 +206,6 @@ describe('analytics service', () => {
     try {
       expect(() => initializeAnalytics({ transport: intervalTransport })).not.toThrow();
       setAnalyticsConsent('granted');
-      vi.useFakeTimers();
       await vi.advanceTimersByTimeAsync(60_000);
     } finally {
       getSpy.mockRestore();
@@ -273,6 +273,59 @@ describe('analytics service', () => {
 
     expect(newTransport.sentBatches).toHaveLength(1);
     expect(getAnalyticsQueue()).toEqual([]);
+  });
+
+  it('does not let a stale successful send acknowledge the reinitialized queue', async () => {
+    await shutdownAnalytics();
+    const oldTransport = new DeferredTransport();
+    initializeAnalytics({ transport: oldTransport, createInstallationId: () => 'old-installation' });
+    setAnalyticsConsent('granted');
+    captureAnalytics({ name: 'app_opened', properties: {} });
+    const oldFlush = flushAnalytics();
+
+    const newTransport = new FakeTransport();
+    initializeAnalytics({ transport: newTransport });
+    oldTransport.sendDeferred.resolve();
+    await oldFlush;
+    await flushAnalytics();
+
+    expect(newTransport.sentBatches).toHaveLength(1);
+    expect(getAnalyticsQueue()).toEqual([]);
+  });
+
+  it('reactivates a fresh lifecycle when consent changes from denied to granted', () => {
+    const createdTransports: FakeTransport[] = [];
+    initializeAnalytics({
+      createTransport: () => {
+        const nextTransport = new FakeTransport();
+        createdTransports.push(nextTransport);
+        return nextTransport;
+      },
+      createInstallationId: () => 'reactivated-installation'
+    });
+
+    expect(setAnalyticsConsent('denied')).toEqual({ success: true });
+    expect(setAnalyticsConsent('granted')).toEqual({ success: true });
+    captureAnalytics({ name: 'app_opened', properties: {} });
+
+    expect(createdTransports).toHaveLength(2);
+    expect(getAnalyticsInstallationId()).toBe('reactivated-installation');
+    expect(getAnalyticsQueue()).toHaveLength(1);
+  });
+
+  it('reports failed reactivation when the transport factory throws', () => {
+    initializeAnalytics({
+      createTransport: () => {
+        throw new Error('transport factory failed');
+      }
+    });
+    setAnalyticsConsent('denied');
+
+    let result: ReturnType<typeof setAnalyticsConsent> | undefined;
+    expect(() => {
+      result = setAnalyticsConsent('granted');
+    }).not.toThrow();
+    expect(result).toEqual({ success: false });
   });
 
   it('is a no-op when PostHog configuration is absent', async () => {
