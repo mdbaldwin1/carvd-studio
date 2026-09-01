@@ -34,6 +34,10 @@ npm run build --workspace=@carvd/website
 
 ## Deployment
 
+## Analytics configuration
+
+`VITE_POSTHOG_KEY` and `VITE_POSTHOG_HOST` enable optional public website analytics; blank keys are no-ops. Use separate development and production projects. Website event ownership is `src/analytics`; desktop catalog ownership is `packages/desktop/src/shared/analytics.ts`. Server webhook variables are `LEMON_SQUEEZY_WEBHOOK_SECRET`, `POSTHOG_PROJECT_KEY`, `POSTHOG_HOST`, and `ANALYTICS_ID_SALT`; subscribe only to `order_created`. Clear `VITE_POSTHOG_KEY` in Vercel to stop website delivery. Desktop consent defaults off; revoking it deletes queued analytics and its anonymous identifier.
+
 This website can be deployed to:
 
 - **Vercel** (recommended)

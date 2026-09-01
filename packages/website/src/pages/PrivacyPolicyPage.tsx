@@ -35,19 +35,18 @@ export default function PrivacyPolicyPage() {
                   Our Commitment to Your Privacy
                 </h2>
                 <p className="mb-4 text-text-muted">
-                  Carvd Studio is designed with privacy as a core principle.
-                  Unlike most modern software, we don't collect your data, track
-                  your usage, or require an internet connection to function.
-                  Your designs, your data, and your privacy belong to you.
+                  Project files and designs remain local unless you explicitly
+                  export or share them. Carvd Studio offers optional anonymous
+                  product analytics.
                 </p>
                 <div
                   className="rounded-lg border p-8 max-sm:p-6"
                   style={highlightBoxStyle}
                 >
                   <p className="font-semibold">
-                    TL;DR: We don't collect your data. Carvd Studio runs
-                    entirely on your computer. We can't see your designs, and we
-                    don't want to.
+                    Analytics never includes project names, filenames, paths,
+                    notes, dimensions, design content, email addresses, or
+                    license keys.
                   </p>
                 </div>
               </section>
@@ -63,7 +62,10 @@ export default function PrivacyPolicyPage() {
                 </p>
                 <ul className="grid gap-2 text-text-muted">
                   <li>- Your furniture designs or project files</li>
-                  <li>- Usage analytics or telemetry data</li>
+                  <li>
+                    - Project names, filenames, paths, notes, dimensions, and
+                    design content
+                  </li>
                   <li>
                     - Personal information beyond what you provide at purchase
                   </li>
@@ -179,9 +181,9 @@ export default function PrivacyPolicyPage() {
                   </li>
                 </ul>
                 <p className="mt-4 text-text-muted">
-                  We do not use analytics services, advertising networks, or any
-                  other third-party tracking within the Carvd Studio
-                  application.
+                  You can change this choice at any time in App Settings → Data
+                  & License. When disabled, queued analytics and the anonymous
+                  installation identifier are deleted.
                 </p>
               </section>
 

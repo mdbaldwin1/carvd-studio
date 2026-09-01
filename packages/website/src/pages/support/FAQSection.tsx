@@ -60,8 +60,9 @@ export default function FAQSection() {
             </AccordionTrigger>
             <AccordionContent className="leading-relaxed text-text-muted max-sm:text-sm">
               No! Carvd Studio is designed to work completely offline. Your
-              projects are saved locally on your computer. Internet is only
-              needed for license activation and checking for updates.
+              project files are saved locally on your computer. Optional
+              anonymous analytics never includes design content; internet is
+              otherwise only needed for license activation and updates.
             </AccordionContent>
           </AccordionItem>
 

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Consent-gated desktop analytics delivery** — Added durable local consent preferences, anonymous installation identifiers, bounded offline delivery with retry backoff, and optional PostHog transport configuration. Analytics stays disabled until explicitly granted and clears local analytics data immediately on revocation.
 - **Analytics privacy controls** — Added a first-run optional analytics choice after onboarding and a permanent App Settings → Data & License control with a clear disclosure of anonymous usage data and prohibited project data.
+- **Privacy disclosure** — Clarified that analytics remains optional, anonymous, and disabled until configured/consented; project design content remains local and revocation deletes queued analytics and the anonymous identifier.
 
 ## [1.0.5] - 2026-08-13
 

@@ -237,9 +237,9 @@ export default function HomePage() {
                 Your Designs Stay Yours
               </h3>
               <p className="leading-relaxed text-text-muted">
-                No cloud. No subscriptions. No data mining. Everything stays on
-                your computer where it belongs. Work in your shop, at job sites,
-                or anywhere—even without internet. Complete privacy guaranteed.
+                Project files stay local on your computer. Optional anonymous
+                analytics never includes design content, so you can work offline
+                with your designs kept private.
               </p>
             </Card>
             <Card className="feature-card p-8 max-md:p-6">
