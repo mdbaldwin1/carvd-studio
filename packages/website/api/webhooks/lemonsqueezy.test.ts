@@ -61,6 +61,48 @@ describe("Lemon Squeezy webhook", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("rejects non-POST requests before reading or delivering their bodies", async () => {
+    const response = await handler(
+      new Request("https://carvd-studio.com/api/webhooks/lemonsqueezy", {
+        method: "GET",
+      }),
+    );
+
+    expect(response.status).toBe(405);
+    expect(response.headers.get("Allow")).toBe("POST");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["signed malformed JSON", "{"],
+    [
+      "empty order id",
+      JSON.stringify({
+        meta: { event_name: "order_created", test_mode: false },
+        data: { id: "", attributes: { currency: "USD", total: 1 } },
+      }),
+    ],
+    [
+      "blank currency",
+      JSON.stringify({
+        meta: { event_name: "order_created", test_mode: false },
+        data: { id: 1, attributes: { currency: " ", total: 1 } },
+      }),
+    ],
+    [
+      "negative total",
+      JSON.stringify({
+        meta: { event_name: "order_created", test_mode: false },
+        data: { id: 1, attributes: { currency: "USD", total: -1 } },
+      }),
+    ],
+  ])("returns 400 for %s", async (_name, body) => {
+    const response = await handler(signedRequest(body));
+
+    expect(response.status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("acknowledges unsupported verified events without delivery", async () => {
     const unsupported = JSON.stringify({
       meta: { event_name: "subscription_created" },
@@ -80,10 +122,21 @@ describe("Lemon Squeezy webhook", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     const [, request] = vi.mocked(fetch).mock.calls[0];
     const event = JSON.parse((request as RequestInit).body as string);
+    expect(fetch).toHaveBeenCalledWith("https://us.i.posthog.com/capture/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: expect.any(String),
+    });
+    expect(Object.keys(event).sort()).toEqual([
+      "api_key",
+      "distinct_id",
+      "event",
+      "properties",
+      "uuid",
+    ]);
     expect(event).toMatchObject({
+      api_key: "posthog-project-key",
       event: "purchase_completed",
-      distinct_id: expect.any(String),
-      uuid: expect.any(String),
       properties: {
         product: "desktop_license",
         currency: "USD",
@@ -97,6 +150,12 @@ describe("Lemon Squeezy webhook", () => {
       "test_mode",
       "value_cents",
     ]);
+    expect(event.uuid).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(event.distinct_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
     expect(JSON.stringify(event)).not.toMatch(
       /private@example|secret-license|customer-456|order-123|Private/,
     );
