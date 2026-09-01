@@ -416,7 +416,7 @@ export default function FeaturesPage() {
                 <Button size="lg" asChild>
                   <a href="/download">Download Free Trial</a>
                 </Button>
-                <BuyButton />
+                <BuyButton location="features-cta" />
               </div>
               <p className="text-sm text-text-muted">
                 ✓ 30-day money-back guarantee &nbsp;•&nbsp; ✓ No subscription

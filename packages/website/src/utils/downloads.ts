@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { websiteAnalytics } from "../analytics/analytics";
 
 const GITHUB_REPO = "mdbaldwin1/carvd-studio";
 const FALLBACK_VERSION = "0.1.0";
@@ -79,6 +80,17 @@ export function getDownloadHref(
   }
 
   return getTrackedDownloadUrl(download.platform, source);
+}
+
+export function captureDownloadClick(
+  platform: DownloadInfo["platform"],
+  location: string,
+): void {
+  try {
+    websiteAnalytics.capture("download_clicked", { platform, location });
+  } catch {
+    // Analytics failures must not interrupt the browser's normal navigation.
+  }
 }
 
 /**

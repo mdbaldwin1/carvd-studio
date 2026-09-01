@@ -1,4 +1,8 @@
-import { getDownloadHref, useDownloadInfo } from "../utils/downloads";
+import {
+  captureDownloadClick,
+  getDownloadHref,
+  useDownloadInfo,
+} from "../utils/downloads";
 import { AppleIcon, WindowsIcon } from "../components/BrandIcons";
 import SEO from "../components/SEO";
 import Header from "../components/Header";
@@ -61,6 +65,12 @@ export default function DownloadPage() {
             <div className="flex flex-wrap justify-center gap-8 max-sm:flex-col max-sm:items-center">
               <a
                 href={getDownloadHref(macDownload, "download-hero-card")}
+                onClick={() =>
+                  captureDownloadClick(
+                    macDownload.platform,
+                    "download-hero-card",
+                  )
+                }
                 className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
                 <span>
@@ -76,6 +86,12 @@ export default function DownloadPage() {
               </a>
               <a
                 href={getDownloadHref(windowsDownload, "download-hero-card")}
+                onClick={() =>
+                  captureDownloadClick(
+                    windowsDownload.platform,
+                    "download-hero-card",
+                  )
+                }
                 className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
                 <span>
@@ -434,13 +450,27 @@ export default function DownloadPage() {
             </p>
             <div className="mb-6 flex justify-center gap-4 max-sm:flex-col max-sm:items-center">
               <Button size="lg" asChild>
-                <a href={getDownloadHref(macDownload, "download-cta-footer")}>
+                <a
+                  href={getDownloadHref(macDownload, "download-cta-footer")}
+                  onClick={() =>
+                    captureDownloadClick(
+                      macDownload.platform,
+                      "download-cta-footer",
+                    )
+                  }
+                >
                   Download for macOS
                 </a>
               </Button>
               <Button size="lg" variant="outline" asChild>
                 <a
                   href={getDownloadHref(windowsDownload, "download-cta-footer")}
+                  onClick={() =>
+                    captureDownloadClick(
+                      windowsDownload.platform,
+                      "download-cta-footer",
+                    )
+                  }
                 >
                   Download for Windows
                 </a>
