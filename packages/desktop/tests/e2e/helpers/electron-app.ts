@@ -141,7 +141,11 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
   } catch (error) {
     await closeElectronProcess(electronApp);
     if (isNewProfile) {
-      await fs.promises.rm(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+      try {
+        await fs.promises.rm(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+      } catch {
+        // Cleanup is best-effort; preserve the original launch error for diagnosis.
+      }
     }
     throw error;
   }

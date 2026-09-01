@@ -1,7 +1,7 @@
 # Local analytics verification report
 
-- Final verification timestamp: `2026-09-01T22:02:02Z`
-- Verified base commit: `52beb903bdabb7a61840d087c87f80aa638461a3`
+- Final verification timestamp: `2026-09-01T22:04:54Z`
+- Verified base commit: `f60b22c8a66a461fd8e988590911580186d929a9`
 - Scope: local repository only
 - External mutations: none; no PostHog/Vercel/Lemon Squeezy changes, deployment, push, PR, or release
 
@@ -29,7 +29,7 @@ The final desktop aggregate uses an explicitly flagged E2E build. A subsequent s
 - Desktop aggregate tests invoke the flagged `test:e2e` path after renderer/main units.
 - New legacy Electron E2E profiles persist `analyticsConsent=denied` to Electron Store's actual `preferences.json` before process launch. The launch helper accepts explicit `unknown`, `granted`, or `denied`; an existing profile is preserved when no state is supplied.
 - Dedicated analytics consent scenarios explicitly request `unknown`, retaining real tutorial/prompt sequencing and assertions. No post-launch dialog dismissal or assertion weakening is used.
-- Failed Electron launches close/kill and wait for a partially started process, then remove only a newly created profile. Teardown tolerates an unusable partial `ElectronApplication` wrapper.
+- Failed Electron launches close/kill and wait for a partially started process, then make a best-effort removal of only a newly created profile without allowing cleanup failure to replace the original launch error. Teardown tolerates an unusable partial `ElectronApplication` wrapper.
 - Local Electron concurrency is capped at four workers (CI remains one) with zero retries, preventing startup starvation without masking failures.
 - Website has a package-local ESLint 9 flat config using the repository's TypeScript, React, Hooks, and Prettier rule families. The lint command enforces zero warnings; required lint dependencies are declared in the website workspace.
 
