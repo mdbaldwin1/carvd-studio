@@ -118,6 +118,7 @@ describe('saveProject', () => {
     expect(result.success).toBe(false);
     expect(result.canceled).toBe(true);
     expect(window.electronAPI.showSaveDialog).toHaveBeenCalled();
+    expect(analytics.capture).not.toHaveBeenCalled();
   });
 
   it('saves to existing path when filePath is set', async () => {
@@ -138,6 +139,7 @@ describe('saveProject', () => {
 
     await saveProject();
 
+    expect(analytics.capture).toHaveBeenCalledTimes(1);
     expect(analytics.capture).toHaveBeenCalledTimes(1);
     expect(analytics.capture).toHaveBeenCalledWith('project_saved', {
       save_kind: 'manual',
@@ -169,6 +171,7 @@ describe('saveProjectAs', () => {
     const result = await saveProjectAs();
     expect(result.success).toBe(false);
     expect(result.canceled).toBe(true);
+    expect(analytics.capture).not.toHaveBeenCalled();
   });
 
   it('returns canceled when filePath is empty', async () => {
@@ -205,6 +208,7 @@ describe('saveProjectAs', () => {
 
     await saveProjectAs();
 
+    expect(analytics.capture).toHaveBeenCalledTimes(1);
     expect(analytics.capture).toHaveBeenCalledWith('project_saved', {
       save_kind: 'save_as',
       part_count_bucket: '0'

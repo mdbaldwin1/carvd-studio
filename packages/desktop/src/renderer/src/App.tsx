@@ -388,6 +388,7 @@ function App() {
   const handleStartScreenStartTutorial = (project: Project) => {
     loadProject(project);
     markDirty(); // Mark as dirty since it's a new unsaved project
+    analytics.capture('project_created', { source: 'template', units: project.units });
     setShowStartScreen(false);
     setTutorialFromTemplate(true); // Track that this tutorial was started from template
     setShowTutorial(true); // Show the tutorial overlay
@@ -429,6 +430,7 @@ function App() {
   const handleTemplatesScreenStartTutorial = (project: Project) => {
     loadProject(project);
     markDirty();
+    analytics.capture('project_created', { source: 'template', units: project.units });
     setShowTemplatesScreen(false);
     setShowStartScreen(false);
     setTutorialFromTemplate(true);

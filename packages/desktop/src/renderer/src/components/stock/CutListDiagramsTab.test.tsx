@@ -411,6 +411,7 @@ describe('CutListDiagramsTab', () => {
       await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
 
       await waitFor(() => {
+        expect(analytics.capture).toHaveBeenCalledTimes(1);
         expect(analytics.capture).toHaveBeenCalledWith('export_completed', {
           export_type: 'cut_diagrams_pdf',
           success: true
@@ -448,6 +449,7 @@ describe('CutListDiagramsTab', () => {
 
       const toast = useUIStore.getState().toast;
       expect(toast).toBeNull();
+      expect(analytics.capture).not.toHaveBeenCalled();
     });
 
     it('shows error toast when PDF export throws', async () => {

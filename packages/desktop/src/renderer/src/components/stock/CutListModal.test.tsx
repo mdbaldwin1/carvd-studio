@@ -1114,6 +1114,7 @@ describe('CutListModal', () => {
       fireEvent.click(screen.getByText('Download Project Report'));
 
       await waitFor(() => {
+        expect(analytics.capture).toHaveBeenCalledTimes(1);
         expect(analytics.capture).toHaveBeenCalledWith('export_completed', {
           export_type: 'project_pdf',
           success: false
@@ -1136,6 +1137,7 @@ describe('CutListModal', () => {
 
       // showToast should not have been called for a cancel
       expect(showToast).not.toHaveBeenCalled();
+      expect(analytics.capture).not.toHaveBeenCalled();
     });
 
     it('shows error toast when export throws', async () => {

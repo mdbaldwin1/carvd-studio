@@ -347,7 +347,19 @@ describe('useFileOperations', () => {
         await result.current.handleNew();
       });
 
+      expect(analytics.capture).toHaveBeenCalledTimes(1);
       expect(analytics.capture).toHaveBeenCalledWith('project_created', { source: 'menu', units: 'metric' });
+    });
+
+    it('does not record a menu project creation when creation fails', async () => {
+      (newProject as ReturnType<typeof vi.fn>).mockResolvedValue({ success: false });
+      const { result } = renderHook(() => useFileOperations());
+
+      await act(async () => {
+        await result.current.handleNew();
+      });
+
+      expect(analytics.capture).not.toHaveBeenCalled();
     });
 
     it('shows unsaved changes dialog when dirty', async () => {

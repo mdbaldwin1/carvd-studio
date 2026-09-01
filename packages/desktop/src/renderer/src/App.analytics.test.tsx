@@ -162,13 +162,50 @@ vi.mock('./components/licensing/TrialExpiredModal', () => ({ TrialExpiredModal: 
 vi.mock('./components/parts-list/ImportToLibraryDialog', () => ({ ImportToLibraryDialog: () => null }));
 vi.mock('./components/project/NewProjectDialog', () => ({ NewProjectDialog: () => null }));
 vi.mock('./components/project/StartScreen', () => ({
-  StartScreen: ({ onStartTutorial }: { onStartTutorial: (project: never) => void }) => (
+  StartScreen: ({
+    onStartTutorial,
+    onViewAllTemplates
+  }: {
+    onStartTutorial: (project: never) => void;
+    onViewAllTemplates: () => void;
+  }) => (
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          onStartTutorial({
+            name: 'Template',
+            units: 'metric',
+            parts: [],
+            stocks: [],
+            groups: [],
+            groupMembers: [],
+            assemblies: []
+          } as never)
+        }
+      >
+        start template tutorial
+      </button>
+      <button type="button" onClick={onViewAllTemplates}>
+        view templates
+      </button>
+    </>
+  )
+}));
+vi.mock('./components/properties/PropertiesPanel', () => ({ PropertiesPanel: () => null }));
+vi.mock('./components/template/TemplateEditingExitDialog', () => ({
+  TemplateDiscardDialog: () => null,
+  TemplateSaveDialog: () => null,
+  TemplateSetupDialog: () => null
+}));
+vi.mock('./components/template/TemplatesScreen', () => ({
+  TemplatesScreen: ({ onStartTutorial }: { onStartTutorial: (project: never) => void }) => (
     <button
       type="button"
       onClick={() =>
         onStartTutorial({
           name: 'Template',
-          units: 'metric',
+          units: 'imperial',
           parts: [],
           stocks: [],
           groups: [],
@@ -177,15 +214,9 @@ vi.mock('./components/project/StartScreen', () => ({
         } as never)
       }
     >
-      start template tutorial
+      start templates-screen tutorial
     </button>
   )
-}));
-vi.mock('./components/properties/PropertiesPanel', () => ({ PropertiesPanel: () => null }));
-vi.mock('./components/template/TemplateEditingExitDialog', () => ({
-  TemplateDiscardDialog: () => null,
-  TemplateSaveDialog: () => null,
-  TemplateSetupDialog: () => null
 }));
 vi.mock('./components/update/UpdateNotificationBanner', () => ({ UpdateNotificationBanner: () => null }));
 vi.mock('./components/workspace/CanvasWithDrop', () => ({ CanvasWithDrop: () => null }));
@@ -244,5 +275,30 @@ describe('App analytics consent sequencing', () => {
     await waitFor(() => {
       expect(analytics.capture).toHaveBeenCalledWith('onboarding_completed', { source: 'template' });
     });
+  });
+
+  it('records template project creation before the start-screen tutorial begins', async () => {
+    mocks.getHasCompletedWelcome.mockResolvedValue(true);
+    mocks.getAnalyticsConsent.mockResolvedValue('granted');
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'start template tutorial' }));
+
+    expect(mocks.loadProject).toHaveBeenCalledTimes(1);
+    expect(analytics.capture).toHaveBeenCalledTimes(1);
+    expect(analytics.capture).toHaveBeenCalledWith('project_created', { source: 'template', units: 'metric' });
+  });
+
+  it('records template project creation before the templates-screen tutorial begins', async () => {
+    mocks.getHasCompletedWelcome.mockResolvedValue(true);
+    mocks.getAnalyticsConsent.mockResolvedValue('granted');
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'view templates' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'start templates-screen tutorial' }));
+
+    expect(mocks.loadProject).toHaveBeenCalledTimes(1);
+    expect(analytics.capture).toHaveBeenCalledTimes(1);
+    expect(analytics.capture).toHaveBeenCalledWith('project_created', { source: 'template', units: 'imperial' });
   });
 });

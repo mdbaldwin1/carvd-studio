@@ -18,11 +18,14 @@ interface TrialExpiredModalProps {
 }
 
 export function TrialExpiredModal({ onActivateLicense, onPurchase, onContinueFree }: TrialExpiredModalProps) {
-  const handlePurchase = () => {
-    // Open Lemon Squeezy checkout in default browser
-    window.electronAPI.openExternal(EXTERNAL_LINKS.checkout);
-    analytics.capture('checkout_opened', { surface: 'pricing_prompt', license_mode: 'free' });
-    onPurchase();
+  const handlePurchase = async () => {
+    try {
+      await window.electronAPI.openExternal(EXTERNAL_LINKS.checkout);
+      analytics.capture('checkout_opened', { surface: 'pricing_prompt', license_mode: 'free' });
+      onPurchase();
+    } catch {
+      // The checkout did not open, so do not record or continue it.
+    }
   };
 
   return (
@@ -60,7 +63,7 @@ export function TrialExpiredModal({ onActivateLicense, onPurchase, onContinueFre
                   Lifetime updates
                 </li>
               </ul>
-              <Button size="lg" className="w-full" onClick={handlePurchase}>
+              <Button size="lg" className="w-full" onClick={() => void handlePurchase()}>
                 Buy Now
               </Button>
             </CardContent>

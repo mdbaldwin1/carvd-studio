@@ -185,6 +185,7 @@ describe('ShoppingListTab', () => {
           success: true
         })
       );
+      expect(analytics.capture).toHaveBeenCalledTimes(1);
 
       await user.click(screen.getByText('Download'));
       await user.click(screen.getByRole('menuitem', { name: /download csv/i }));
@@ -194,6 +195,19 @@ describe('ShoppingListTab', () => {
           success: true
         })
       );
+      expect(analytics.capture).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not record a canceled shopping-list CSV export', async () => {
+      const user = userEvent.setup();
+      (window.electronAPI.showSaveDialog as ReturnType<typeof vi.fn>).mockResolvedValue({ canceled: true });
+      render(<ShoppingListTab {...defaultProps} />);
+
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download csv/i }));
+
+      await waitFor(() => expect(window.electronAPI.showSaveDialog).toHaveBeenCalledTimes(1));
+      expect(analytics.capture).not.toHaveBeenCalled();
     });
   });
 
