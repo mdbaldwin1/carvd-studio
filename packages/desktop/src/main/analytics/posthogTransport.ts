@@ -1,4 +1,4 @@
-import { PostHog } from 'posthog-node';
+import { PostHog, type EventMessage } from 'posthog-node';
 import type { QueuedAnalyticsEvent } from './analyticsQueue';
 
 export interface AnalyticsTransport {
@@ -6,13 +6,38 @@ export interface AnalyticsTransport {
   shutdown(): Promise<void>;
 }
 
-export function createPostHogTransport(environment: NodeJS.ProcessEnv = process.env): AnalyticsTransport | null {
+export interface PostHogEnvironment {
+  MAIN_VITE_POSTHOG_KEY?: string;
+  MAIN_VITE_POSTHOG_HOST?: string;
+}
+
+export interface PostHogConfig {
+  apiKey: string;
+  host: string;
+}
+
+export interface PostHogClient {
+  capture(event: EventMessage): void;
+  flush(): Promise<void>;
+  shutdown(timeoutMs?: number): Promise<void>;
+}
+
+export type PostHogClientFactory = (apiKey: string, options: { host: string }) => PostHogClient;
+
+export function getPostHogConfig(environment: PostHogEnvironment = import.meta.env): PostHogConfig | null {
   const apiKey = environment.MAIN_VITE_POSTHOG_KEY?.trim();
   const host = environment.MAIN_VITE_POSTHOG_HOST?.trim();
 
-  if (!apiKey || !host) return null;
+  return apiKey && host ? { apiKey, host } : null;
+}
 
-  const client = new PostHog(apiKey, { host });
+export function createPostHogTransport(
+  config: PostHogConfig | null = getPostHogConfig(),
+  createClient: PostHogClientFactory = (apiKey, options) => new PostHog(apiKey, options)
+): AnalyticsTransport | null {
+  if (!config) return null;
+
+  const client = createClient(config.apiKey, { host: config.host });
 
   return {
     async send(events): Promise<void> {

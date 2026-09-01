@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getAnalyticsInstallationId, getAnalyticsQueue, setAnalyticsConsentPreference } from '../store';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getAnalyticsInstallationId, getAnalyticsQueue, setAnalyticsConsentPreference, store } from '../store';
 import type { QueuedAnalyticsEvent } from './analyticsQueue';
 import {
   captureAnalytics,
@@ -23,6 +23,35 @@ class FakeTransport implements AnalyticsTransport {
   async shutdown(): Promise<void> {}
 }
 
+function createDeferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+  reject(reason: unknown): void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+class DeferredTransport implements AnalyticsTransport {
+  readonly sentBatches: QueuedAnalyticsEvent[][] = [];
+  readonly sendDeferred = createDeferred<void>();
+  shutdownCalls = 0;
+
+  send(events: QueuedAnalyticsEvent[]): Promise<void> {
+    this.sentBatches.push(events);
+    return this.sendDeferred.promise;
+  }
+
+  async shutdown(): Promise<void> {
+    this.shutdownCalls += 1;
+  }
+}
+
 describe('analytics service', () => {
   let transport: FakeTransport;
 
@@ -33,6 +62,7 @@ describe('analytics service', () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     await shutdownAnalytics();
   });
 
@@ -106,6 +136,143 @@ describe('analytics service', () => {
 
     expect(getAnalyticsQueue()).toEqual([]);
     expect(getAnalyticsInstallationId()).toBeNull();
+  });
+
+  it('invalidates an in-flight send and disables transport immediately on revoke', async () => {
+    await shutdownAnalytics();
+    const deferredTransport = new DeferredTransport();
+    initializeAnalytics({ transport: deferredTransport, createInstallationId: () => 'anonymous-installation' });
+    setAnalyticsConsent('granted');
+    captureAnalytics({ name: 'app_opened', properties: {} });
+    const inFlightFlush = flushAnalytics();
+
+    try {
+      expect(deferredTransport.sentBatches).toHaveLength(1);
+      expect(setAnalyticsConsent('denied')).toEqual({ success: true });
+      expect(deferredTransport.shutdownCalls).toBe(1);
+      expect(getAnalyticsQueue()).toEqual([]);
+      expect(getAnalyticsInstallationId()).toBeNull();
+
+      captureAnalytics({ name: 'app_opened', properties: {} });
+      await flushAnalytics();
+
+      expect(deferredTransport.sentBatches).toHaveLength(1);
+      expect(getAnalyticsQueue()).toEqual([]);
+    } finally {
+      deferredTransport.sendDeferred.resolve();
+      await inFlightFlush;
+    }
+  });
+
+  it('contains consent read and partial clearing failures', () => {
+    const originalGet = store.get.bind(store);
+    const getSpy = vi.spyOn(store, 'get').mockImplementation((key, defaultValue) => {
+      if (key === 'analyticsConsent') throw new Error('preferences unavailable');
+      return originalGet(key, defaultValue);
+    });
+
+    try {
+      expect(getAnalyticsConsent()).toBe('unknown');
+      expect(() => captureAnalytics({ name: 'app_opened', properties: {} })).not.toThrow();
+    } finally {
+      getSpy.mockRestore();
+    }
+
+    setAnalyticsConsent('granted');
+    const originalDelete = store.delete.bind(store);
+    const deleteSpy = vi.spyOn(store, 'delete').mockImplementation((key) => {
+      if (key === 'analyticsQueue') throw new Error('queue deletion failed');
+      return originalDelete(key);
+    });
+
+    try {
+      expect(() => setAnalyticsConsent('denied')).not.toThrow();
+      expect(setAnalyticsConsent('denied')).toEqual({ success: false });
+    } finally {
+      deleteSpy.mockRestore();
+    }
+  });
+
+  it('contains initialization prune failures and interval flush failures', async () => {
+    await shutdownAnalytics();
+    const originalGet = store.get.bind(store);
+    const getSpy = vi.spyOn(store, 'get').mockImplementation((key, defaultValue) => {
+      if (key === 'analyticsQueue') throw new Error('queue read failed');
+      return originalGet(key, defaultValue);
+    });
+    const intervalTransport = new FakeTransport();
+
+    try {
+      expect(() => initializeAnalytics({ transport: intervalTransport })).not.toThrow();
+      setAnalyticsConsent('granted');
+      vi.useFakeTimers();
+      await vi.advanceTimersByTimeAsync(60_000);
+    } finally {
+      getSpy.mockRestore();
+    }
+  });
+
+  it('initiates shutdown without waiting for an unsettled flush and returns within one second', async () => {
+    await shutdownAnalytics();
+    const deferredTransport = new DeferredTransport();
+    initializeAnalytics({ transport: deferredTransport, createInstallationId: () => 'anonymous-installation' });
+    setAnalyticsConsent('granted');
+    captureAnalytics({ name: 'app_opened', properties: {} });
+    vi.useFakeTimers();
+
+    const shutdown = shutdownAnalytics();
+
+    try {
+      expect(deferredTransport.sentBatches).toHaveLength(1);
+      expect(deferredTransport.shutdownCalls).toBe(1);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await shutdown;
+    } finally {
+      deferredTransport.sendDeferred.resolve();
+      await shutdown;
+    }
+  });
+
+  it('gives reinitialized services a fresh transport and flush mutex', async () => {
+    await shutdownAnalytics();
+    const oldTransport = new DeferredTransport();
+    initializeAnalytics({ transport: oldTransport, createInstallationId: () => 'old-installation' });
+    setAnalyticsConsent('granted');
+    captureAnalytics({ name: 'app_opened', properties: {} });
+    const oldFlush = flushAnalytics();
+
+    const newTransport = new FakeTransport();
+    initializeAnalytics({ transport: newTransport, createInstallationId: () => 'new-installation' });
+    captureAnalytics({ name: 'app_opened', properties: {} });
+    await flushAnalytics();
+
+    try {
+      expect(oldTransport.shutdownCalls).toBe(1);
+      expect(newTransport.sentBatches).toHaveLength(1);
+      expect(getAnalyticsQueue()).toEqual([]);
+    } finally {
+      oldTransport.sendDeferred.resolve();
+      await oldFlush;
+    }
+    expect(getAnalyticsQueue()).toEqual([]);
+  });
+
+  it('does not let a stale failed send back off the new lifecycle queue', async () => {
+    await shutdownAnalytics();
+    const oldTransport = new DeferredTransport();
+    initializeAnalytics({ transport: oldTransport, createInstallationId: () => 'old-installation' });
+    setAnalyticsConsent('granted');
+    captureAnalytics({ name: 'app_opened', properties: {} });
+    const oldFlush = flushAnalytics();
+
+    const newTransport = new FakeTransport();
+    initializeAnalytics({ transport: newTransport });
+    oldTransport.sendDeferred.reject(new Error('old transport failed'));
+    await oldFlush;
+    await flushAnalytics();
+
+    expect(newTransport.sentBatches).toHaveLength(1);
+    expect(getAnalyticsQueue()).toEqual([]);
   });
 
   it('is a no-op when PostHog configuration is absent', async () => {

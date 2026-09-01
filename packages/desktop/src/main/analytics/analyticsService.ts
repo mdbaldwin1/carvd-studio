@@ -20,88 +20,126 @@ export interface AnalyticsServiceOptions {
   createInstallationId?: () => string;
 }
 
-let queue: AnalyticsQueue | null = null;
-let transport: AnalyticsTransport | null = null;
-let flushInterval: ReturnType<typeof setInterval> | null = null;
-let inFlightFlush: Promise<void> | null = null;
+export interface AnalyticsConsentResult {
+  success: boolean;
+}
+
+interface AnalyticsLifecycle {
+  generation: number;
+  queue: AnalyticsQueue;
+  transport: AnalyticsTransport | null;
+  active: boolean;
+  flushInterval: ReturnType<typeof setInterval> | null;
+  flushPromise: Promise<void> | null;
+}
+
+let lifecycle: AnalyticsLifecycle | null = null;
+let nextGeneration = 0;
 let createInstallationId = randomUUID;
 
 export function initializeAnalytics(options: AnalyticsServiceOptions = {}): void {
-  if (flushInterval) clearInterval(flushInterval);
+  if (lifecycle) invalidateLifecycle(lifecycle);
 
-  queue = options.queue ?? createAnalyticsQueue(analyticsStorage, options.clock ?? Date.now);
-  transport = Object.hasOwn(options, 'transport') ? (options.transport ?? null) : createPostHogTransport();
+  const nextLifecycle: AnalyticsLifecycle = {
+    generation: ++nextGeneration,
+    queue: options.queue ?? createAnalyticsQueue(analyticsStorage, options.clock ?? Date.now),
+    transport: resolveTransport(options),
+    active: true,
+    flushInterval: null,
+    flushPromise: null
+  };
   createInstallationId = options.createInstallationId ?? randomUUID;
+  lifecycle = nextLifecycle;
 
-  queue.prune();
-  if (transport) {
-    flushInterval = setInterval(() => {
-      void flushAnalytics();
+  try {
+    nextLifecycle.queue.prune();
+  } catch {
+    // Durable storage is best-effort; a later capture or launch can retry maintenance.
+  }
+
+  if (nextLifecycle.transport) {
+    nextLifecycle.flushInterval = setInterval(() => {
+      void flushLifecycle(nextLifecycle).catch(() => undefined);
     }, FLUSH_INTERVAL_MS);
-  } else {
-    flushInterval = null;
   }
 }
 
 export function getAnalyticsConsent(): AnalyticsConsent {
-  return getAnalyticsConsentPreference();
+  try {
+    return getAnalyticsConsentPreference();
+  } catch {
+    return 'unknown';
+  }
 }
 
-export function setAnalyticsConsent(consent: AnalyticsConsent): void {
-  setAnalyticsConsentPreference(consent);
+export function setAnalyticsConsent(consent: AnalyticsConsent): AnalyticsConsentResult {
+  if (consent !== 'granted' && lifecycle) invalidateLifecycle(lifecycle);
+
+  try {
+    return { success: setAnalyticsConsentPreference(consent) };
+  } catch {
+    return { success: false };
+  }
 }
 
 export function captureAnalytics(input: unknown): void {
   try {
-    if (!transport || getAnalyticsConsent() !== 'granted') return;
+    const activeLifecycle = lifecycle;
+    if (!isCurrentLifecycle(activeLifecycle) || !activeLifecycle.transport || getAnalyticsConsent() !== 'granted')
+      return;
 
     const event = sanitizeDesktopAnalyticsEvent(input);
-    if (!event) return;
+    if (!event || !isCurrentLifecycle(activeLifecycle) || getAnalyticsConsent() !== 'granted') return;
 
     const distinctId = getAnalyticsInstallationId() ?? createInstallationId();
     if (typeof distinctId !== 'string' || distinctId.trim().length === 0) return;
 
+    if (!isCurrentLifecycle(activeLifecycle) || getAnalyticsConsent() !== 'granted') return;
     if (!getAnalyticsInstallationId()) setAnalyticsInstallationId(distinctId);
-    queue?.enqueue(event, distinctId);
+    activeLifecycle.queue.enqueue(event, distinctId);
   } catch {
     // Analytics is strictly best-effort and must never disrupt the application.
   }
 }
 
 export function flushAnalytics(): Promise<void> {
-  if (inFlightFlush) return inFlightFlush;
-
-  inFlightFlush = flushReadyEvents().finally(() => {
-    inFlightFlush = null;
-  });
-  return inFlightFlush;
+  return lifecycle ? flushLifecycle(lifecycle) : Promise.resolve();
 }
 
 export async function shutdownAnalytics(): Promise<void> {
-  if (flushInterval) {
-    clearInterval(flushInterval);
-    flushInterval = null;
-  }
+  const activeLifecycle = lifecycle;
+  if (!activeLifecycle) return;
 
-  const activeTransport = transport;
-  const shutdown = (async () => {
-    await flushAnalytics();
-    await activeTransport?.shutdown();
-  })();
-
-  await waitAtMost(shutdown, SHUTDOWN_TIMEOUT_MS);
-  queue = null;
-  transport = null;
+  const finalFlush = flushLifecycle(activeLifecycle);
+  invalidateLifecycle(activeLifecycle);
+  await waitAtMost(finalFlush, SHUTDOWN_TIMEOUT_MS);
 }
 
-async function flushReadyEvents(): Promise<void> {
-  const activeQueue = queue;
-  const activeTransport = transport;
-  if (!activeQueue || !activeTransport || getAnalyticsConsent() !== 'granted') return;
+function resolveTransport(options: AnalyticsServiceOptions): AnalyticsTransport | null {
+  try {
+    return Object.hasOwn(options, 'transport') ? (options.transport ?? null) : createPostHogTransport();
+  } catch {
+    return null;
+  }
+}
+
+function flushLifecycle(activeLifecycle: AnalyticsLifecycle): Promise<void> {
+  if (activeLifecycle.flushPromise) return activeLifecycle.flushPromise;
+
+  let flushPromise!: Promise<void>;
+  flushPromise = flushReadyEvents(activeLifecycle).finally(() => {
+    if (activeLifecycle.flushPromise === flushPromise) activeLifecycle.flushPromise = null;
+  });
+  activeLifecycle.flushPromise = flushPromise;
+  return flushPromise;
+}
+
+async function flushReadyEvents(activeLifecycle: AnalyticsLifecycle): Promise<void> {
+  if (!isCurrentLifecycle(activeLifecycle) || !activeLifecycle.transport || getAnalyticsConsent() !== 'granted') return;
 
   let events;
   try {
-    events = activeQueue.peekReady();
+    events = activeLifecycle.queue.peekReady();
   } catch {
     return;
   }
@@ -109,14 +147,41 @@ async function flushReadyEvents(): Promise<void> {
 
   const eventIds = events.map((event) => event.eventId);
   try {
-    await activeTransport.send(events);
-    activeQueue.acknowledge(eventIds);
+    await activeLifecycle.transport.send(events);
+    if (!isCurrentLifecycle(activeLifecycle) || getAnalyticsConsent() !== 'granted') return;
+    activeLifecycle.queue.acknowledge(eventIds);
   } catch {
+    if (!isCurrentLifecycle(activeLifecycle) || getAnalyticsConsent() !== 'granted') return;
     try {
-      activeQueue.markFailed(eventIds);
+      activeLifecycle.queue.markFailed(eventIds);
     } catch {
       // A failed retry update still leaves the durable queue untouched.
     }
+  }
+}
+
+function invalidateLifecycle(activeLifecycle: AnalyticsLifecycle): void {
+  activeLifecycle.active = false;
+  if (activeLifecycle.flushInterval) {
+    clearInterval(activeLifecycle.flushInterval);
+    activeLifecycle.flushInterval = null;
+  }
+  if (lifecycle === activeLifecycle) lifecycle = null;
+  shutdownTransport(activeLifecycle.transport);
+}
+
+function isCurrentLifecycle(candidate: AnalyticsLifecycle | null): candidate is AnalyticsLifecycle {
+  return (
+    candidate !== null && candidate.active && lifecycle === candidate && lifecycle.generation === candidate.generation
+  );
+}
+
+function shutdownTransport(transport: AnalyticsTransport | null): void {
+  if (!transport) return;
+  try {
+    void transport.shutdown().catch(() => undefined);
+  } catch {
+    // Transport teardown must not affect product shutdown or consent changes.
   }
 }
 

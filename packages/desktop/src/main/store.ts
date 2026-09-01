@@ -189,15 +189,32 @@ export const store = new Store<AppPreferences>({
 
 // Analytics preference accessors keep analytics services isolated from unrelated app settings.
 export function getAnalyticsConsentPreference(): AnalyticsConsent {
-  return store.get('analyticsConsent', 'unknown');
+  try {
+    return store.get('analyticsConsent', 'unknown');
+  } catch {
+    return 'unknown';
+  }
 }
 
-export function setAnalyticsConsentPreference(consent: AnalyticsConsent): void {
-  store.set('analyticsConsent', consent);
-  if (consent !== 'granted') {
-    store.delete('analyticsInstallationId');
-    store.delete('analyticsQueue');
+export function setAnalyticsConsentPreference(consent: AnalyticsConsent): boolean {
+  let success = true;
+  try {
+    store.set('analyticsConsent', consent);
+  } catch {
+    success = false;
   }
+
+  if (consent !== 'granted') {
+    for (const key of ['analyticsInstallationId', 'analyticsQueue'] as const) {
+      try {
+        store.delete(key);
+      } catch {
+        success = false;
+      }
+    }
+  }
+
+  return success;
 }
 
 export function getAnalyticsInstallationId(): string | null {
