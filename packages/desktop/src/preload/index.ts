@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { AnalyticsConsent, DesktopAnalyticsEvent } from '../shared/analytics';
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
@@ -31,6 +32,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Preferences
   getPreference: (key: string) => ipcRenderer.invoke('get-preference', key),
   setPreference: (key: string, value: unknown) => ipcRenderer.invoke('set-preference', key, value),
+
+  // Analytics consent and capture
+  captureAnalytics: (event: DesktopAnalyticsEvent) => ipcRenderer.invoke('analytics:capture', event),
+  getAnalyticsConsent: () => ipcRenderer.invoke('analytics:get-consent'),
+  setAnalyticsConsent: (consent: AnalyticsConsent, surface: 'onboarding' | 'settings') =>
+    ipcRenderer.invoke('analytics:set-consent', consent, surface),
 
   // File dialogs
   showSaveDialog: (options: Electron.SaveDialogOptions) => ipcRenderer.invoke('show-save-dialog', options),
@@ -232,6 +239,9 @@ export interface ElectronAPI {
   onMenuCommand: (callback: (command: string, ...args: unknown[]) => void) => () => void;
   getPreference: (key: string) => Promise<unknown>;
   setPreference: (key: string, value: unknown) => Promise<void>;
+  captureAnalytics: (event: DesktopAnalyticsEvent) => void;
+  getAnalyticsConsent: () => Promise<AnalyticsConsent>;
+  setAnalyticsConsent: (consent: AnalyticsConsent, surface: 'onboarding' | 'settings') => Promise<{ success: boolean }>;
   showSaveDialog: (options: Electron.SaveDialogOptions) => Promise<Electron.SaveDialogReturnValue>;
   showOpenDialog: (options: Electron.OpenDialogOptions) => Promise<Electron.OpenDialogReturnValue>;
   queueTestSaveDialogPath: (filePath: string | null) => Promise<{ success: boolean; error?: string }>;

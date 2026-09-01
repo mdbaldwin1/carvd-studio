@@ -80,6 +80,14 @@ import {
   simulateTrialDaysRemaining,
   simulateTrialExpired
 } from './trial';
+import {
+  captureAnalytics,
+  getAnalyticsConsent,
+  initializeAnalytics,
+  setAnalyticsConsent,
+  shutdownAnalytics
+} from './analytics/analyticsService';
+import { registerAnalyticsIpcHandlers } from './analytics/analyticsIpc';
 
 const isTestMode = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
 const queuedTestSaveDialogPaths: string[] = [];
@@ -1290,6 +1298,12 @@ ipcMain.handle('get-update-info', () => {
   return getUpdateInfo();
 });
 
+registerAnalyticsIpcHandlers(ipcMain, {
+  capture: captureAnalytics,
+  getConsent: getAnalyticsConsent,
+  setConsent: setAnalyticsConsent
+});
+
 // Watch for settings changes from other instances (cross-process sync)
 // The settings keys we want to sync across instances
 const syncedSettingsKeys = [
@@ -1323,6 +1337,9 @@ store.onDidAnyChange((newValue, oldValue) => {
 });
 
 app.whenReady().then(() => {
+  initializeAnalytics();
+  captureAnalytics({ name: 'app_opened', properties: {} });
+
   const isTest = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
   if (isTest) {
     log.info('[Main] Test mode detected — skipping splash screen and auto-updater');
@@ -1381,4 +1398,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', () => {
+  void shutdownAnalytics();
 });
