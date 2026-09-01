@@ -16,7 +16,7 @@ describe("PrivacyPolicyPage", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/optional anonymous product analytics/i),
+      screen.getAllByText(/optional anonymous product analytics/i)[0],
     ).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -24,12 +24,18 @@ describe("PrivacyPolicyPage", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/App Settings → Data & License/i),
+      screen.getAllByText(/App Settings → Data & License/i)[0],
     ).toBeInTheDocument();
     expect(
       screen.getByText(
         /queued analytics and the anonymous installation identifier are deleted/i,
       ),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/We do not use analytics services/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Since we don't collect your data/i),
+    ).not.toBeInTheDocument();
   });
 });
