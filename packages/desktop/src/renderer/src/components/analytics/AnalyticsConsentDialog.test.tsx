@@ -1,6 +1,14 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalyticsConsentDialog } from './AnalyticsConsentDialog';
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
 
 describe('AnalyticsConsentDialog', () => {
   const onResolved = vi.fn();
@@ -34,6 +42,23 @@ describe('AnalyticsConsentDialog', () => {
       expect(window.electronAPI.setAnalyticsConsent).toHaveBeenCalledWith('granted', 'onboarding');
       expect(onResolved).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('starts only one persistence request while an onboarding choice is in flight', async () => {
+    const persisted = createDeferred<{ success: boolean }>();
+    window.electronAPI.setAnalyticsConsent = vi.fn(() => persisted.promise);
+    render(<AnalyticsConsentDialog onResolved={onResolved} />);
+
+    const grant = screen.getByRole('button', { name: 'Share anonymous usage data' });
+    act(() => {
+      grant.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      grant.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(window.electronAPI.setAnalyticsConsent).toHaveBeenCalledTimes(1);
+
+    persisted.resolve({ success: true });
+    await waitFor(() => expect(onResolved).toHaveBeenCalledTimes(1));
   });
 
   it('persists onboarding denial and closes when the setter resolves false', async () => {

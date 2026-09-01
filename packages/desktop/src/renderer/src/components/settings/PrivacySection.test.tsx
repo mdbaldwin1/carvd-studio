@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analytics } from '../../utils/analytics';
 import { PrivacySection } from './PrivacySection';
@@ -58,7 +58,28 @@ describe('PrivacySection', () => {
         choice: 'granted',
         surface: 'settings'
       });
+      expect(screen.getByRole('switch', { name: 'Share anonymous usage data' })).toHaveAttribute(
+        'aria-checked',
+        'true'
+      );
     });
+  });
+
+  it('starts only one settings request while a consent change is in flight', async () => {
+    const persisted = createDeferred<{ success: boolean }>();
+    window.electronAPI.setAnalyticsConsent = vi.fn(() => persisted.promise);
+    render(<PrivacySection isVisible />);
+
+    const toggle = await screen.findByRole('switch', { name: 'Share anonymous usage data' });
+    act(() => {
+      toggle.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      toggle.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(window.electronAPI.setAnalyticsConsent).toHaveBeenCalledTimes(1);
+
+    persisted.resolve({ success: true });
+    await waitFor(() => expect(analytics.capture).toHaveBeenCalledTimes(1));
   });
 
   it('does not capture a grant when persistence reports failure', async () => {

@@ -319,7 +319,7 @@ describe('analytics service', () => {
     expect(getAnalyticsQueue()).toHaveLength(1);
   });
 
-  it('reports failed reactivation when the transport factory throws', () => {
+  it('reports persisted grant success when the optional transport factory throws', () => {
     initializeAnalytics({
       createTransport: () => {
         throw new Error('transport factory failed');
@@ -331,7 +331,31 @@ describe('analytics service', () => {
     expect(() => {
       result = setAnalyticsConsent('granted');
     }).not.toThrow();
-    expect(result).toEqual({ success: false });
+    expect(result).toEqual({ success: true });
+    expect(getAnalyticsConsent()).toBe('granted');
+  });
+
+  it('retries optional transport creation on a later re-grant after a factory failure', () => {
+    const recoveredTransport = new FakeTransport();
+    let factoryCalls = 0;
+    initializeAnalytics({
+      createTransport: () => {
+        factoryCalls += 1;
+        if (factoryCalls < 3) throw new Error('transport factory failed');
+        return recoveredTransport;
+      },
+      createInstallationId: () => 'recovered-installation'
+    });
+
+    expect(setAnalyticsConsent('denied')).toEqual({ success: true });
+    expect(setAnalyticsConsent('granted')).toEqual({ success: true });
+    expect(setAnalyticsConsent('denied')).toEqual({ success: true });
+    expect(setAnalyticsConsent('granted')).toEqual({ success: true });
+    captureAnalytics({ name: 'app_opened', properties: {} });
+
+    expect(factoryCalls).toBe(3);
+    expect(getAnalyticsInstallationId()).toBe('recovered-installation');
+    expect(getAnalyticsQueue()).toHaveLength(1);
   });
 
   it('is a no-op when PostHog configuration is absent', async () => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@renderer/components/ui/button';
 import {
   Dialog,
@@ -15,8 +15,12 @@ interface AnalyticsConsentDialogProps {
 
 export function AnalyticsConsentDialog({ onResolved }: AnalyticsConsentDialogProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const resolveConsent = async (consent: 'granted' | 'denied') => {
+    if (isSubmittingRef.current) return;
+
+    isSubmittingRef.current = true;
     setIsSaving(true);
     try {
       await window.electronAPI.setAnalyticsConsent(consent, 'onboarding');
@@ -24,6 +28,7 @@ export function AnalyticsConsentDialog({ onResolved }: AnalyticsConsentDialogPro
     } catch {
       // Leave the choice available if consent persistence cannot be reached.
     } finally {
+      isSubmittingRef.current = false;
       setIsSaving(false);
     }
   };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AnalyticsConsent } from '../../../shared/analytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { cn } from '@renderer/lib/utils';
@@ -12,6 +12,7 @@ export function PrivacySection({ isVisible }: PrivacySectionProps) {
   const [consent, setConsent] = useState<AnalyticsConsent>('unknown');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const isSavingRef = useRef(false);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -38,6 +39,9 @@ export function PrivacySection({ isVisible }: PrivacySectionProps) {
   const enabled = consent === 'granted';
 
   const toggleConsent = async () => {
+    if (isSavingRef.current) return;
+
+    isSavingRef.current = true;
     const nextConsent: AnalyticsConsent = enabled ? 'denied' : 'granted';
     setIsSaving(true);
     try {
@@ -51,6 +55,7 @@ export function PrivacySection({ isVisible }: PrivacySectionProps) {
     } catch {
       // Settings remain unchanged when consent persistence cannot be reached.
     } finally {
+      isSavingRef.current = false;
       setIsSaving(false);
     }
   };

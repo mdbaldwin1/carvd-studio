@@ -90,13 +90,19 @@ export function setAnalyticsConsent(consent: AnalyticsConsent): AnalyticsConsent
   try {
     const persisted = setAnalyticsConsentPreference(consent);
     if (!persisted) return { success: false };
-    if (consent === 'granted' && !lifecycle && restartOptions && !initializeLifecycle(restartOptions)) {
-      return { success: false };
-    }
-    return { success: true };
   } catch {
     return { success: false };
   }
+
+  if (consent === 'granted' && !lifecycle && restartOptions) {
+    try {
+      initializeLifecycle(restartOptions);
+    } catch {
+      // Delivery is optional. A later initialization or grant can retry it.
+    }
+  }
+
+  return { success: true };
 }
 
 export function captureAnalytics(input: unknown): void {
