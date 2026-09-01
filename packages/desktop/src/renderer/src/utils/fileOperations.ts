@@ -18,6 +18,8 @@ import {
   CarvdFile
 } from './fileFormat';
 import { logger } from './logger';
+import { analytics } from './analytics';
+import { bucketCount } from '../../../shared/analytics';
 
 export interface FileOperationResult {
   success: boolean;
@@ -33,20 +35,22 @@ export interface FileOperationResult {
 /**
  * Save project to current file path, or prompt for Save As if no path
  */
-export async function saveProject(): Promise<FileOperationResult> {
+export type ProjectSaveKind = 'initial' | 'manual' | 'auto' | 'save_as';
+
+export async function saveProject(saveKind?: 'manual' | 'auto'): Promise<FileOperationResult> {
   const state = useProjectStore.getState();
 
   if (state.filePath) {
-    return saveToPath(state.filePath);
+    return saveToPath(state.filePath, saveKind ?? 'manual');
   } else {
-    return saveProjectAs();
+    return saveProjectAs('initial');
   }
 }
 
 /**
  * Always prompt for a new file location
  */
-export async function saveProjectAs(): Promise<FileOperationResult> {
+export async function saveProjectAs(saveKind: ProjectSaveKind = 'save_as'): Promise<FileOperationResult> {
   const state = useProjectStore.getState();
 
   try {
@@ -63,7 +67,7 @@ export async function saveProjectAs(): Promise<FileOperationResult> {
     const newProjectName = getProjectNameFromPath(result.filePath);
     useProjectStore.getState().setProjectName(newProjectName);
 
-    return saveToPath(result.filePath);
+    return saveToPath(result.filePath, saveKind);
   } catch (error) {
     return { success: false, error: String(error) };
   }
@@ -72,7 +76,7 @@ export async function saveProjectAs(): Promise<FileOperationResult> {
 /**
  * Save to a specific file path
  */
-async function saveToPath(filePath: string): Promise<FileOperationResult> {
+async function saveToPath(filePath: string, saveKind: ProjectSaveKind): Promise<FileOperationResult> {
   const state = useProjectStore.getState();
 
   try {
@@ -124,6 +128,13 @@ async function saveToPath(filePath: string): Promise<FileOperationResult> {
 
     // Update window title
     updateWindowTitle();
+
+    if (saveKind !== 'auto') {
+      analytics.capture('project_saved', {
+        save_kind: saveKind,
+        part_count_bucket: bucketCount(state.parts.length)
+      });
+    }
 
     return { success: true, filePath };
   } catch (error) {

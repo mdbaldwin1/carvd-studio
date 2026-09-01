@@ -57,6 +57,7 @@ import { useUIStore } from './store/uiStore';
 import { Project, Stock } from './types';
 import { EXTERNAL_LINKS } from './utils/externalLinks';
 import { logger } from './utils/logger';
+import { analytics } from './utils/analytics';
 import { generateSeedProject } from './utils/seedData';
 
 // Lazy-loaded modal components (deferred until first use)
@@ -326,6 +327,7 @@ function App() {
   }, [isLicenseLoading, hasFullAccess, loadProject]);
 
   const handleTutorialComplete = async () => {
+    analytics.capture('onboarding_completed', { source: tutorialFromTemplate ? 'template' : 'first_run' });
     setShowTutorial(false);
     setIsWelcomeResolved(true);
 
@@ -379,6 +381,7 @@ function App() {
   const handleStartScreenSelectTemplate = (project: Project) => {
     loadProject(project);
     markDirty(); // Mark as dirty since it's a new unsaved project
+    analytics.capture('project_created', { source: 'template', units: project.units });
     setShowStartScreen(false);
   };
 
@@ -418,6 +421,7 @@ function App() {
   const handleTemplatesScreenSelectTemplate = (project: Project) => {
     loadProject(project);
     markDirty();
+    analytics.capture('project_created', { source: 'template', units: project.units });
     setShowTemplatesScreen(false);
     setShowStartScreen(false);
   };
@@ -485,6 +489,7 @@ function App() {
 
     loadProject(newProject);
     markDirty(); // Mark as dirty since it's a new unsaved project
+    analytics.capture('project_created', { source: 'start_screen', units: options.units });
     setShowNewProjectDialog(false);
     setShowStartScreen(false);
   };
@@ -509,6 +514,7 @@ function App() {
         setShowLicenseModal(false);
         // Refresh the license status hook to update trial UI
         refreshLicenseStatus();
+        analytics.capture('license_activated', { license_mode: 'licensed' });
         return { success: true };
       } else {
         return { success: false, error: result.error || 'Invalid license key' };
@@ -682,6 +688,7 @@ function App() {
     loadProject(project);
     // Mark as dirty since this is a new project (not saved to disk yet)
     markDirty();
+    analytics.capture('project_created', { source: 'template', units: project.units });
 
     // Add template stocks to the app-level stock library (if not already present)
     // Compare by name, dimensions, and thickness to avoid duplicates
@@ -880,6 +887,7 @@ function App() {
                       onClick={() => {
                         // Open purchase page in browser
                         window.open(EXTERNAL_LINKS.pricing, '_blank');
+                        analytics.capture('checkout_opened', { surface: 'pricing_prompt', license_mode: 'free' });
                         // Also open license modal to enter key
                         setShowLicenseModal(true);
                       }}

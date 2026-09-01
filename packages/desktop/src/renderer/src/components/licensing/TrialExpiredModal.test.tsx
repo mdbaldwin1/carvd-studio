@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TrialExpiredModal } from './TrialExpiredModal';
+import { analytics } from '@renderer/utils/analytics';
+
+vi.mock('@renderer/utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 
 // Mock window.electronAPI
 beforeAll(() => {
@@ -57,6 +60,10 @@ describe('TrialExpiredModal', () => {
     fireEvent.click(screen.getByText('Buy Now'));
     expect(window.electronAPI.openExternal).toHaveBeenCalledWith(expect.stringContaining('lemonsqueezy'));
     expect(onPurchase).toHaveBeenCalled();
+    expect(analytics.capture).toHaveBeenCalledWith('checkout_opened', {
+      surface: 'pricing_prompt',
+      license_mode: 'free'
+    });
   });
 
   it('calls onActivateLicense when license button is clicked', () => {

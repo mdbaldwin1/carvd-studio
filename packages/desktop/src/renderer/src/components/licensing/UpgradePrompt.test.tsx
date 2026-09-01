@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { UpgradePrompt } from './UpgradePrompt';
+import { analytics } from '@renderer/utils/analytics';
+
+vi.mock('@renderer/utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 
 // Mock window.electronAPI
 beforeAll(() => {
@@ -31,6 +34,10 @@ describe('UpgradePrompt', () => {
     fireEvent.click(screen.getByText('Upgrade'));
     expect(window.electronAPI.openExternal).toHaveBeenCalledWith(expect.stringContaining('lemonsqueezy'));
     expect(onUpgrade).toHaveBeenCalled();
+    expect(analytics.capture).toHaveBeenCalledWith('checkout_opened', {
+      surface: 'pricing_prompt',
+      license_mode: 'free'
+    });
   });
 
   it('does not render Dismiss button when onDismiss is not provided', () => {

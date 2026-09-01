@@ -6,7 +6,10 @@ import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
 import { useLicenseStore } from '../../store/licenseStore';
 import { generateOptimizedCutList } from '../../utils/cutListOptimizer';
+import { analytics } from '../../utils/analytics';
 import { Part, Stock, CutList } from '../../types';
+
+vi.mock('../../utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 
 // Mock the cutListOptimizer
 vi.mock('../../utils/cutListOptimizer', () => ({
@@ -253,6 +256,19 @@ describe('CutListModal', () => {
       fireEvent.click(screen.getByText('Generate Cut List'));
 
       expect(setCutList).toHaveBeenCalledWith(mockCutList);
+    });
+
+    it('records the generated cut-list result with coarse counts', () => {
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Generate Cut List'));
+
+      expect(analytics.capture).toHaveBeenCalledTimes(1);
+      expect(analytics.capture).toHaveBeenCalledWith('cut_list_generated', {
+        part_count_bucket: '1-5',
+        stock_count_bucket: '1-5',
+        success: true
+      });
     });
   });
 
@@ -1088,6 +1104,20 @@ describe('CutListModal', () => {
       await waitFor(() => {
         const showToast = useUIStore.getState().showToast;
         expect(showToast).toHaveBeenCalledWith('Failed to save PDF', 'error');
+      });
+    });
+
+    it('records a handled project-report export failure', async () => {
+      mockExportProjectReportToPdf.mockResolvedValueOnce({ success: false, error: 'Save failed' });
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Download Project Report'));
+
+      await waitFor(() => {
+        expect(analytics.capture).toHaveBeenCalledWith('export_completed', {
+          export_type: 'project_pdf',
+          success: false
+        });
       });
     });
 

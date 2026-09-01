@@ -3,11 +3,14 @@ import { renderHook, act } from '@testing-library/react';
 import { useAutoSave } from './useAutoSave';
 import { useProjectStore } from '../store/projectStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
+import { analytics } from '../utils/analytics';
+
+vi.mock('../utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 
 // Mock saveProject
 const mockSaveProject = vi.fn();
 vi.mock('../utils/fileOperations', () => ({
-  saveProject: () => mockSaveProject()
+  saveProject: (...args: unknown[]) => mockSaveProject(...args)
 }));
 
 // Mock logger
@@ -132,6 +135,39 @@ describe('useAutoSave', () => {
       });
 
       expect(mockSaveProject).toHaveBeenCalledTimes(1);
+    });
+
+    it('records one auto save after a successful write', async () => {
+      useProjectStore.setState({
+        isDirty: true,
+        filePath: '/test/project.carvd',
+        parts: [{ id: 'part-1' }, { id: 'part-2' }] as never
+      });
+
+      renderHook(() => useAutoSave());
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(31000);
+      });
+
+      expect(mockSaveProject).toHaveBeenCalledWith('auto');
+      expect(analytics.capture).toHaveBeenCalledWith('project_saved', {
+        save_kind: 'auto',
+        part_count_bucket: '1-5'
+      });
+    });
+
+    it('does not record an auto save when the write fails', async () => {
+      mockSaveProject.mockResolvedValueOnce({ success: false, error: 'Disk full' });
+      useProjectStore.setState({ isDirty: true, filePath: '/test/project.carvd' });
+
+      renderHook(() => useAutoSave());
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(31000);
+      });
+
+      expect(analytics.capture).not.toHaveBeenCalled();
     });
 
     it('sets isPending to true while waiting to save', async () => {

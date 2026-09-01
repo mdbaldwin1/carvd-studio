@@ -9,6 +9,7 @@ import { Button } from '@renderer/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@renderer/components/ui/dialog';
 import { EXTERNAL_LINKS } from '@renderer/utils/externalLinks';
+import { analytics } from '@renderer/utils/analytics';
 
 interface TrialExpiredModalProps {
   onActivateLicense: () => void;
@@ -20,6 +21,7 @@ export function TrialExpiredModal({ onActivateLicense, onPurchase, onContinueFre
   const handlePurchase = () => {
     // Open Lemon Squeezy checkout in default browser
     window.electronAPI.openExternal(EXTERNAL_LINKS.checkout);
+    analytics.capture('checkout_opened', { surface: 'pricing_prompt', license_mode: 'free' });
     onPurchase();
   };
 

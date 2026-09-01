@@ -8,6 +8,7 @@
 import { Alert, AlertDescription } from '@renderer/components/ui/alert';
 import { Button } from '@renderer/components/ui/button';
 import { EXTERNAL_LINKS } from '@renderer/utils/externalLinks';
+import { analytics } from '@renderer/utils/analytics';
 
 interface UpgradePromptProps {
   message: string;
@@ -19,6 +20,7 @@ export function UpgradePrompt({ message, onUpgrade, onDismiss }: UpgradePromptPr
   const handleUpgrade = () => {
     // Open Lemon Squeezy checkout in default browser
     window.electronAPI.openExternal(EXTERNAL_LINKS.checkout);
+    analytics.capture('checkout_opened', { surface: 'pricing_prompt', license_mode: 'free' });
     onUpgrade?.();
   };
 

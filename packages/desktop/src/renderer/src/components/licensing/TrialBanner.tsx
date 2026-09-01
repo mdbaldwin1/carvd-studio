@@ -8,6 +8,7 @@
 import { Alert, AlertDescription } from '@renderer/components/ui/alert';
 import { Button } from '@renderer/components/ui/button';
 import { EXTERNAL_LINKS } from '@renderer/utils/externalLinks';
+import { analytics } from '@renderer/utils/analytics';
 
 interface TrialBannerProps {
   daysRemaining: number;
@@ -21,6 +22,7 @@ export function TrialBanner({ daysRemaining, onActivateLicense, onPurchase }: Tr
   const handlePurchase = () => {
     // Open Lemon Squeezy checkout in default browser
     window.electronAPI.openExternal(EXTERNAL_LINKS.checkout);
+    analytics.capture('checkout_opened', { surface: 'trial', license_mode: 'trial' });
     onPurchase();
   };
 

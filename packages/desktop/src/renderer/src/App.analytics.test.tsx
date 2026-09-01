@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import { analytics } from './utils/analytics';
 
 const mocks = vi.hoisted(() => ({
   loadProject: vi.fn(),
@@ -160,7 +161,26 @@ vi.mock('./components/licensing/TrialBanner', () => ({ TrialBanner: () => null }
 vi.mock('./components/licensing/TrialExpiredModal', () => ({ TrialExpiredModal: () => null }));
 vi.mock('./components/parts-list/ImportToLibraryDialog', () => ({ ImportToLibraryDialog: () => null }));
 vi.mock('./components/project/NewProjectDialog', () => ({ NewProjectDialog: () => null }));
-vi.mock('./components/project/StartScreen', () => ({ StartScreen: () => <div>start screen</div> }));
+vi.mock('./components/project/StartScreen', () => ({
+  StartScreen: ({ onStartTutorial }: { onStartTutorial: (project: never) => void }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onStartTutorial({
+          name: 'Template',
+          units: 'metric',
+          parts: [],
+          stocks: [],
+          groups: [],
+          groupMembers: [],
+          assemblies: []
+        } as never)
+      }
+    >
+      start template tutorial
+    </button>
+  )
+}));
 vi.mock('./components/properties/PropertiesPanel', () => ({ PropertiesPanel: () => null }));
 vi.mock('./components/template/TemplateEditingExitDialog', () => ({
   TemplateDiscardDialog: () => null,
@@ -177,6 +197,7 @@ vi.mock('./components/tutorial/WelcomeTutorial', () => ({
     </button>
   )
 }));
+vi.mock('./utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 
 describe('App analytics consent sequencing', () => {
   beforeEach(() => {
@@ -209,6 +230,19 @@ describe('App analytics consent sequencing', () => {
     await waitFor(() => {
       expect(mocks.getAnalyticsConsent).toHaveBeenCalledTimes(1);
       expect(screen.getByRole('dialog', { name: 'Help improve Carvd Studio' })).toBeInTheDocument();
+    });
+    expect(analytics.capture).toHaveBeenCalledWith('onboarding_completed', { source: 'first_run' });
+  });
+
+  it('records template onboarding only after its tutorial completes', async () => {
+    mocks.getHasCompletedWelcome.mockResolvedValue(true);
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'start template tutorial' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'complete or skip welcome tutorial' }));
+
+    await waitFor(() => {
+      expect(analytics.capture).toHaveBeenCalledWith('onboarding_completed', { source: 'template' });
     });
   });
 });

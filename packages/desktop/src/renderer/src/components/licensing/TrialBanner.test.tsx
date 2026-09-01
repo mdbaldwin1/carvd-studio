@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TrialBanner } from './TrialBanner';
+import { analytics } from '@renderer/utils/analytics';
+
+vi.mock('@renderer/utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 
 // Mock window.electronAPI
 beforeAll(() => {
@@ -51,6 +54,7 @@ describe('TrialBanner', () => {
     fireEvent.click(screen.getByText('Buy Now'));
     expect(window.electronAPI.openExternal).toHaveBeenCalledWith(expect.stringContaining('lemonsqueezy'));
     expect(onPurchase).toHaveBeenCalled();
+    expect(analytics.capture).toHaveBeenCalledWith('checkout_opened', { surface: 'trial', license_mode: 'trial' });
   });
 
   it('applies normal styling when days > 3', () => {
