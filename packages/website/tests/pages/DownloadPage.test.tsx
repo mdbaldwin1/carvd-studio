@@ -216,6 +216,9 @@ describe("DownloadPage", () => {
       expect(
         screen.getByText(/Do I need an internet connection\?/i),
       ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/no internet required/i),
+      ).not.toBeInTheDocument();
     });
 
     it("renders update question", () => {

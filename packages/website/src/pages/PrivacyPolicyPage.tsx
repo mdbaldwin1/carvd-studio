@@ -69,7 +69,7 @@ export default function PrivacyPolicyPage() {
                   <li>
                     - Personal information beyond what you provide at purchase
                   </li>
-                  <li>- Browsing history or behavior tracking</li>
+                  <li>- Cross-site profiling or advertising identifiers</li>
                   <li>- Device fingerprints or hardware information</li>
                   <li>- Location data</li>
                 </ul>

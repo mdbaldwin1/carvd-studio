@@ -200,7 +200,7 @@ describe("HomePage", () => {
       renderHomePage();
       expect(screen.getByText(/Material Waste/i)).toBeInTheDocument();
       expect(screen.getByText(/Project Planning/i)).toBeInTheDocument();
-      expect(screen.getByText(/Offline & Private/i)).toBeInTheDocument();
+      expect(screen.getByText(/Projects & Designs/i)).toBeInTheDocument();
     });
   });
 

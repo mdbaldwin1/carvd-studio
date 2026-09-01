@@ -126,10 +126,10 @@ export default function HomePage() {
             </div>
             <div className="rounded-lg border border-border/70 bg-surface/65 p-8 text-center max-md:p-6">
               <span className="mb-2 block text-5xl font-bold text-highlight max-md:text-3xl max-sm:text-2xl">
-                100%
+                Local
               </span>
               <span className="text-lg text-text-muted max-md:text-base max-sm:text-sm">
-                Offline &amp; Private
+                Projects &amp; Designs
               </span>
             </div>
           </div>

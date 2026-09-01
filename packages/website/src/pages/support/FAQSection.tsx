@@ -59,10 +59,10 @@ export default function FAQSection() {
               Do I need internet to use Carvd Studio?
             </AccordionTrigger>
             <AccordionContent className="leading-relaxed text-text-muted max-sm:text-sm">
-              No! Carvd Studio is designed to work completely offline. Your
-              project files are saved locally on your computer. Optional
-              anonymous analytics never includes design content; internet is
-              otherwise only needed for license activation and updates.
+              Core project editing works offline. Your project files are saved
+              locally on your computer. Optional anonymous analytics never
+              includes design content; internet is used for license activation,
+              analytics you consent to, and updates.
             </AccordionContent>
           </AccordionItem>
 

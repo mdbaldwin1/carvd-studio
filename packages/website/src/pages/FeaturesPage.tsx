@@ -264,13 +264,13 @@ export default function FeaturesPage() {
                 <div className="grid gap-4">
                   <div>
                     <h3 className="mb-2 text-xl font-bold">
-                      100% Offline Operation
+                      Offline-First Project Editing
                     </h3>
                     <p className="mb-4 text-text-muted">
-                      Work anywhere: in your shop, at job sites, on the road. No
-                      internet required, ever. Everything runs locally on your
-                      computer. Fast, reliable, and always available when you
-                      need it.
+                      Core project editing works offline, so you can work in
+                      your shop, at job sites, or on the road. Internet is used
+                      for license activation, updates, and optional analytics
+                      only with your consent.
                     </p>
                   </div>
                   <div>

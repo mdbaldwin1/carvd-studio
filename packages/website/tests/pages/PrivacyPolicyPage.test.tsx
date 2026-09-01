@@ -37,5 +37,18 @@ describe("PrivacyPolicyPage", () => {
     expect(
       screen.queryByText(/Since we don't collect your data/i),
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Desktop anonymous analytics is explicit opt-in/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Website pageviews, downloads, and checkout starts/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/only product, currency, value cents, and test mode/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/PostHog:/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Browsing history or behavior tracking/i),
+    ).not.toBeInTheDocument();
   });
 });

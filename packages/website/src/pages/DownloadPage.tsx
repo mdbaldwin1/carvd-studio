@@ -294,7 +294,7 @@ export default function DownloadPage() {
                     Stock library management with custom materials
                   </li>
                   <li className="relative pl-6 text-text-muted before:absolute before:left-0 before:text-accent before:content-['•']">
-                    Offline-first architecture - no internet required
+                    Offline-first project editing with local project files
                   </li>
                 </ul>
               </div>
@@ -405,10 +405,10 @@ export default function DownloadPage() {
                   Do I need an internet connection?
                 </AccordionTrigger>
                 <AccordionContent className="leading-relaxed text-text-muted">
-                  No! Carvd Studio is designed to work completely offline. Your
-                  projects are saved locally on your computer. The only time
-                  internet is needed is for license activation and checking for
-                  updates.
+                  Core project editing works offline, and your projects are
+                  saved locally on your computer. Internet may be used for
+                  license activation, updates, and optional analytics only with
+                  your consent.
                 </AccordionContent>
               </AccordionItem>
 
