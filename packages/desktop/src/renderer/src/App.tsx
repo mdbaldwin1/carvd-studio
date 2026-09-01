@@ -4,6 +4,7 @@ import { SidebarProvider } from '@renderer/components/ui/sidebar';
 import { Check, Library, Pencil, Save, Settings } from 'lucide-react';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { AssemblyEditingExitDialog } from './components/assembly/AssemblyEditingExitDialog';
+import { AnalyticsConsentDialog } from './components/analytics/AnalyticsConsentDialog';
 import { AppHorizontalLogo } from './components/common/AppHorizontalLogo';
 import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { AppSidebar } from './components/layout/AppSidebar';
@@ -36,6 +37,7 @@ import {
   UNTITLED_TEMPLATE_NAME
 } from './constants/appDefaults';
 import { useAppSettings } from './hooks/useAppSettings';
+import { useAnalyticsConsentDialog } from './hooks/useAnalyticsConsentDialog';
 import { useAssemblyEditing } from './hooks/useAssemblyEditing';
 import { useAssemblyLibrary } from './hooks/useAssemblyLibrary';
 import { useAutoRecovery } from './hooks/useAutoRecovery';
@@ -280,8 +282,16 @@ function App() {
   // Welcome tutorial management
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialFromTemplate, setTutorialFromTemplate] = useState(false);
+  const [isWelcomeResolved, setIsWelcomeResolved] = useState(false);
   const loadProject = useProjectStore((s) => s.loadProject);
   const newProject = useProjectStore((s) => s.newProject);
+
+  const { shouldShowDialog: shouldShowAnalyticsConsentDialog, resolveDialog: resolveAnalyticsConsentDialog } =
+    useAnalyticsConsentDialog({
+      isLicenseLoading,
+      isWelcomeResolved,
+      isTutorialOpen: showTutorial
+    });
 
   // New project dialog state
   const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
@@ -291,8 +301,13 @@ function App() {
     const checkWelcome = async () => {
       try {
         const hasCompletedWelcome = await window.electronAPI.getHasCompletedWelcome();
+        if (hasCompletedWelcome) {
+          setIsWelcomeResolved(true);
+          return;
+        }
+
         // Show tutorial if user has full access (licensed or trial) and hasn't completed it
-        if (!hasCompletedWelcome && hasFullAccess) {
+        if (hasFullAccess) {
           // Load sample project for tutorial
           const sampleProject = generateSeedProject();
           loadProject(sampleProject);
@@ -312,6 +327,7 @@ function App() {
 
   const handleTutorialComplete = async () => {
     setShowTutorial(false);
+    setIsWelcomeResolved(true);
 
     // If tutorial was started from template, keep the user in the editor with their project
     if (tutorialFromTemplate) {
@@ -1121,6 +1137,8 @@ function App() {
             <LazyWelcomeTutorial onComplete={handleTutorialComplete} />
           </Suspense>
         )}
+
+        {shouldShowAnalyticsConsentDialog && <AnalyticsConsentDialog onResolved={resolveAnalyticsConsentDialog} />}
 
         {/* Start Screen (shown when no project is loaded, or while checking license/trial) */}
         {showStartScreen && canUseApp && !showTutorial && !isLicenseLoading && (
