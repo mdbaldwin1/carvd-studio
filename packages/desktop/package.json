@@ -34,7 +34,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run && vitest run --config vitest.main.config.ts && npm run build && playwright test",
+    "test": "vitest run && vitest run --config vitest.main.config.ts && npm run test:e2e",
     "test:unit": "vitest run && vitest run --config vitest.main.config.ts",
     "test:main": "vitest run --config vitest.main.config.ts",
     "test:watch": "vitest",

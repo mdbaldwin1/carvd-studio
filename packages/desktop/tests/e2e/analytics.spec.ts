@@ -65,7 +65,7 @@ test.describe.serial('privacy-safe desktop analytics', () => {
   });
 
   test('unknown consent appears only after tutorial resolution and records nothing', async () => {
-    running = await launchElectronApp();
+    running = await launchElectronApp({ analyticsConsent: 'unknown' });
     const { window } = running;
     const api = analyticsApi(window);
 
@@ -81,7 +81,7 @@ test.describe.serial('privacy-safe desktop analytics', () => {
   });
 
   test('denied consent never queues product outcome events', async () => {
-    running = await launchElectronApp();
+    running = await launchElectronApp({ analyticsConsent: 'unknown' });
     const { window } = running;
     const api = analyticsApi(window);
     await window.evaluate(() => window.electronAPI.setAnalyticsConsent('denied', 'onboarding'));
@@ -91,7 +91,7 @@ test.describe.serial('privacy-safe desktop analytics', () => {
   });
 
   test('offline events survive restart once, keep UUIDs, sanitize properties, and revoke synchronously', async () => {
-    running = await launchElectronApp({ analyticsMode: 'offline' });
+    running = await launchElectronApp({ analyticsMode: 'offline', analyticsConsent: 'unknown' });
     let api = analyticsApi(running.window);
     await running.window.evaluate(() => window.electronAPI.setAnalyticsConsent('granted', 'onboarding'));
     await performProductWorkflows(running, 'offline');

@@ -73,3 +73,17 @@ Nothing below was attempted locally:
 - [ ] Configure and test authorized Lemon Squeezy test/live webhook subscriptions and secrets
 - [ ] Run packaged signed-build consent/revocation checks on supported operating systems
 - [ ] Approve deployment, push/PR, release, or production enablement
+
+## Remediation verification
+
+Completed locally after the initial report on `2026-09-01`:
+
+- The desktop aggregate test now invokes the flagged `test:e2e` build path after unit suites.
+- New legacy E2E profiles preseed `analyticsConsent=denied` in Electron Store's real `preferences.json` before launch. The helper accepts an explicit unknown/granted/denied state and preserves an existing profile when no state is requested. Consent analytics tests explicitly request `unknown`, so the tutorial/prompt assertions still exercise the real UI rather than dismissing it in setup.
+- A mixed focused run of analytics and legacy happy-path specs passed 8/8.
+- Fresh `npm test --workspace=@carvd/desktop` passed: renderer 3,090/3,090, main 213/213, and Electron E2E 100/100; exit 0.
+- A subsequent normal `npm run verify:production-analytics-boundary --workspace=@carvd/desktop` passed; exit 0, confirming the flagged aggregate test did not weaken production output.
+- Added a package-local ESLint 9 flat config using the same TypeScript, React, Hooks, and Prettier rule families as desktop plus explicit browser globals. It does not disable rules wholesale. Required lint packages are declared in the website workspace.
+- Fresh website gates all passed with exit 0: lint, typecheck, 343/343 unit tests, and production build.
+
+The two initial local blockers are resolved. External operator work above remains pending and untouched.

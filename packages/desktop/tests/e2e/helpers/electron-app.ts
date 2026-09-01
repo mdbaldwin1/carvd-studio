@@ -42,6 +42,7 @@ export interface RunningElectronApp {
 
 export interface LaunchElectronAppOptions {
   analyticsMode?: 'success' | 'offline' | 'timeout';
+  analyticsConsent?: 'unknown' | 'granted' | 'denied';
   userDataDir?: string;
 }
 
@@ -92,7 +93,16 @@ export type ProjectSnapshot = {
 
 export async function launchElectronApp(options: LaunchElectronAppOptions = {}): Promise<RunningElectronApp> {
   const appPath = path.resolve(__dirname, '../../..');
+  const isNewProfile = options.userDataDir === undefined;
   const userDataDir = options.userDataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'carvd-e2e-'));
+  const analyticsConsent = options.analyticsConsent ?? (isNewProfile ? 'denied' : undefined);
+  if (analyticsConsent) {
+    const preferencesPath = path.join(userDataDir, 'preferences.json');
+    const existingPreferences = fs.existsSync(preferencesPath)
+      ? (JSON.parse(fs.readFileSync(preferencesPath, 'utf8')) as Record<string, unknown>)
+      : {};
+    fs.writeFileSync(preferencesPath, JSON.stringify({ ...existingPreferences, analyticsConsent }), 'utf8');
+  }
   const args = [appPath, '--test-mode', '--analytics-e2e-control', `--user-data-dir=${userDataDir}`];
   if (process.env.CI) {
     args.unshift('--no-sandbox');
