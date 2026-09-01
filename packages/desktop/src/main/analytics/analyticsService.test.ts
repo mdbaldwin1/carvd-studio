@@ -197,8 +197,12 @@ describe('analytics service', () => {
     await shutdownAnalytics();
     vi.useFakeTimers();
     const originalGet = store.get.bind(store);
+    let queueReadCount = 0;
     const getSpy = vi.spyOn(store, 'get').mockImplementation((key, defaultValue) => {
-      if (key === 'analyticsQueue') throw new Error('queue read failed');
+      if (key === 'analyticsQueue') {
+        queueReadCount += 1;
+        throw new Error('queue read failed');
+      }
       return originalGet(key, defaultValue);
     });
     const intervalTransport = new FakeTransport();
@@ -206,7 +210,9 @@ describe('analytics service', () => {
     try {
       expect(() => initializeAnalytics({ transport: intervalTransport })).not.toThrow();
       setAnalyticsConsent('granted');
+      const readsAfterInitialization = queueReadCount;
       await vi.advanceTimersByTimeAsync(60_000);
+      expect(queueReadCount).toBeGreaterThan(readsAfterInitialization);
     } finally {
       getSpy.mockRestore();
     }

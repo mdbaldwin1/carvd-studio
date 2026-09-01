@@ -52,8 +52,14 @@ export function createPostHogTransport(
 
   const controller = new AbortController();
   const fetchImplementation = options.fetch ?? globalThis.fetch;
-  const fetch: PostHogFetch = (url, request) =>
-    fetchImplementation(url, { ...request, signal: controller.signal }) as Promise<PostHogFetchResponse>;
+  const fetch: PostHogFetch = (url, request) => {
+    if (controller.signal.aborted || request.signal?.aborted) return Promise.reject(createAbortError());
+
+    return fetchImplementation(url, {
+      ...request,
+      signal: combineAbortSignals(controller.signal, request.signal)
+    }) as Promise<PostHogFetchResponse>;
+  };
   const createClient = options.createClient ?? ((apiKey, clientOptions) => new PostHog(apiKey, clientOptions));
   const client = createClient(config.apiKey, { host: config.host, fetchRetryCount: 0, fetch });
 
@@ -76,4 +82,30 @@ export function createPostHogTransport(
       await client.shutdown(1_000);
     }
   };
+}
+
+function combineAbortSignals(
+  lifecycleSignal: AbortController['signal'],
+  requestSignal?: AbortController['signal']
+): AbortController['signal'] {
+  if (!requestSignal) return lifecycleSignal;
+  if (typeof globalThis.AbortSignal.any === 'function') {
+    return globalThis.AbortSignal.any([lifecycleSignal, requestSignal]);
+  }
+
+  const combinedController = new AbortController();
+  const abort = () => combinedController.abort();
+  if (lifecycleSignal.aborted || requestSignal.aborted) {
+    abort();
+  } else {
+    lifecycleSignal.addEventListener('abort', abort, { once: true });
+    requestSignal.addEventListener('abort', abort, { once: true });
+  }
+  return combinedController.signal;
+}
+
+function createAbortError(): Error {
+  const error = new Error('Analytics transport is shut down');
+  error.name = 'AbortError';
+  return error;
 }

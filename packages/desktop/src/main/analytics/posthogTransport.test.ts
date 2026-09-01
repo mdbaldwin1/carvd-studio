@@ -98,6 +98,83 @@ describe('PostHog transport configuration', () => {
     expect(requestCount).toBe(1);
   });
 
+  it('does not call fetch when shutdown aborts the lifecycle before SDK dispatch', async () => {
+    let requestCount = 0;
+    let postHogFetch: PostHogClientFactory extends (apiKey: string, options: infer Options) => unknown
+      ? Options['fetch']
+      : never;
+    const client: PostHogClient = {
+      capture() {},
+      async flush() {},
+      async shutdown() {}
+    };
+    const transport = createPostHogTransport(
+      { apiKey: 'phc_public_project_key', host: 'https://analytics.example.test' },
+      {
+        createClient: (_apiKey, options) => {
+          postHogFetch = options.fetch;
+          return client;
+        },
+        fetch: async () => {
+          requestCount += 1;
+          return new Response();
+        }
+      }
+    );
+
+    await transport!.shutdown();
+
+    await expect(
+      postHogFetch!('https://analytics.example.test/capture', {
+        method: 'POST',
+        headers: {},
+        signal: new AbortController().signal
+      })
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(requestCount).toBe(0);
+  });
+
+  it('composes the SDK request signal with lifecycle shutdown', async () => {
+    const requestController = new AbortController();
+    const requestAborted = createDeferred<void>();
+    let postHogFetch: PostHogClientFactory extends (apiKey: string, options: infer Options) => unknown
+      ? Options['fetch']
+      : never;
+    const client: PostHogClient = {
+      capture() {},
+      async flush() {},
+      async shutdown() {}
+    };
+    const transport = createPostHogTransport(
+      { apiKey: 'phc_public_project_key', host: 'https://analytics.example.test' },
+      {
+        createClient: (_apiKey, options) => {
+          postHogFetch = options.fetch;
+          return client;
+        },
+        fetch: async (_url, options) => {
+          return new Promise((_, reject) => {
+            options.signal?.addEventListener('abort', () => {
+              requestAborted.resolve();
+              reject(new Error('request aborted'));
+            });
+          });
+        }
+      }
+    );
+
+    const request = postHogFetch!('https://analytics.example.test/capture', {
+      method: 'POST',
+      headers: {},
+      signal: requestController.signal
+    });
+    requestController.abort();
+
+    await requestAborted.promise;
+    await expect(request).rejects.toThrow('request aborted');
+    await transport!.shutdown();
+  });
+
   afterEach(() => {
     vi.useRealTimers();
   });
