@@ -89,19 +89,7 @@ function combineAbortSignals(
   requestSignal?: AbortController['signal']
 ): AbortController['signal'] {
   if (!requestSignal) return lifecycleSignal;
-  if (typeof globalThis.AbortSignal.any === 'function') {
-    return globalThis.AbortSignal.any([lifecycleSignal, requestSignal]);
-  }
-
-  const combinedController = new AbortController();
-  const abort = () => combinedController.abort();
-  if (lifecycleSignal.aborted || requestSignal.aborted) {
-    abort();
-  } else {
-    lifecycleSignal.addEventListener('abort', abort, { once: true });
-    requestSignal.addEventListener('abort', abort, { once: true });
-  }
-  return combinedController.signal;
+  return globalThis.AbortSignal.any([lifecycleSignal, requestSignal]);
 }
 
 function createAbortError(): Error {
