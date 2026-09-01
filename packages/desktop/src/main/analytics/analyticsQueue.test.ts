@@ -111,6 +111,33 @@ describe('analytics queue', () => {
     expect(queue.peekReady(50)[0].attemptCount).toBe(0);
   });
 
+  it('clamps an oversized ready batch request to 50 events', () => {
+    const store = createStore();
+    let nextId = 0;
+    const queue = createAnalyticsQueue(
+      store,
+      () => now,
+      () => `00000000-0000-4000-8000-${String(++nextId).padStart(12, '0')}`
+    );
+
+    for (let index = 0; index < 55; index += 1) queue.enqueue(createEvent(), 'installation-1');
+
+    expect(queue.peekReady(5_000)).toHaveLength(50);
+  });
+
+  it('rejects empty identities before writing an event', () => {
+    const store = createStore();
+    const queue = createAnalyticsQueue(
+      store,
+      () => now,
+      () => '00000000-0000-4000-8000-000000000001'
+    );
+
+    expect(() => queue.enqueue(createEvent(), '')).toThrow(/distinctId/i);
+    expect(() => queue.enqueue(createEvent(), '   ')).toThrow(/distinctId/i);
+    expect(store.writes).toHaveLength(0);
+  });
+
   it('does not return events whose retry time is in the future', () => {
     const store = createStore();
     const queue = createAnalyticsQueue(
@@ -185,5 +212,30 @@ describe('analytics queue', () => {
 
     expect(queue.size()).toBe(0);
     expect(store.writes.at(-1)).toEqual([]);
+  });
+
+  it('prunes entries with malformed occurrence timestamps', () => {
+    const store = createStore([
+      {
+        eventId: 'corrupted',
+        distinctId: 'installation-1',
+        name: 'app_opened',
+        properties: {},
+        occurredAt: 'not-a-timestamp',
+        attemptCount: 0,
+        nextAttemptAt: now
+      }
+    ]);
+    const queue = createAnalyticsQueue(
+      store,
+      () => now,
+      () => '00000000-0000-4000-8000-000000000001'
+    );
+
+    queue.prune(now);
+
+    expect(queue.size()).toBe(0);
+    expect(store.writes).toHaveLength(1);
+    expect(store.writes[0]).toEqual([]);
   });
 });

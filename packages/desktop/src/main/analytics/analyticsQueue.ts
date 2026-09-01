@@ -23,7 +23,7 @@ export interface AnalyticsQueueStore {
 }
 
 export interface AnalyticsQueue {
-  enqueue(event: DesktopAnalyticsEvent, distinctId?: string): QueuedAnalyticsEvent;
+  enqueue(event: DesktopAnalyticsEvent, distinctId: string): QueuedAnalyticsEvent;
   peekReady(limit?: number, now?: number): QueuedAnalyticsEvent[];
   acknowledge(eventIds: readonly string[]): void;
   markFailed(eventIds: readonly string[], now?: number): QueuedAnalyticsEvent | undefined;
@@ -53,12 +53,15 @@ export function createAnalyticsQueue(
     const cutoff = now - ANALYTICS_QUEUE_MAX_AGE_MS;
     return events.filter((event) => {
       const occurredAt = Date.parse(event.occurredAt);
-      return Number.isNaN(occurredAt) || occurredAt >= cutoff;
+      return !Number.isNaN(occurredAt) && occurredAt >= cutoff;
     });
   };
 
   return {
-    enqueue(event, distinctId = ''): QueuedAnalyticsEvent {
+    enqueue(event, distinctId): QueuedAnalyticsEvent {
+      if (typeof distinctId !== 'string' || distinctId.trim().length === 0) {
+        throw new Error('Analytics queue requires a non-empty distinctId');
+      }
       const now = clock();
       const queuedEvent: QueuedAnalyticsEvent = {
         eventId: createEventId(),
@@ -78,7 +81,7 @@ export function createAnalyticsQueue(
       if (limit <= 0) return [];
       return readEvents()
         .filter((event) => event.nextAttemptAt <= now)
-        .slice(0, Math.floor(limit))
+        .slice(0, Math.min(Math.floor(limit), ANALYTICS_QUEUE_READY_BATCH_SIZE))
         .map(cloneEvent);
     },
 
