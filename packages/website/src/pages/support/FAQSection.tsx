@@ -14,7 +14,7 @@ export const supportFAQs = [
   {
     question: "Do I need internet to use Carvd Studio?",
     answer:
-      "No. Carvd Studio works completely offline. Internet is only needed for license activation and checking for updates.",
+      "Core desktop editing works offline. Internet may be used for optional analytics, license activation, and updates; analytics never includes design content.",
   },
   {
     question: "Is there a free trial?",

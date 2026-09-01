@@ -81,7 +81,8 @@ export default function PrivacyPolicyPage() {
                   Data Stored on Your Computer
                 </h2>
                 <p className="mb-4 text-text-muted">
-                  All Carvd Studio data is stored locally on your computer:
+                  Project files and design data are stored locally on your
+                  computer:
                 </p>
                 <ul className="grid gap-2 text-text-muted">
                   <li>
@@ -111,8 +112,8 @@ export default function PrivacyPolicyPage() {
                   License Verification
                 </h2>
                 <p className="mb-4 text-text-muted">
-                  The only time Carvd Studio connects to the internet is for
-                  license verification:
+                  Core desktop editing works offline. Internet can be used for
+                  optional analytics, license verification, and updates:
                 </p>
                 <ul className="grid gap-2 text-text-muted">
                   <li>
@@ -134,9 +135,11 @@ export default function PrivacyPolicyPage() {
                   </li>
                 </ul>
                 <p className="mt-4 text-text-muted">
-                  During license verification, we transmit only your license
-                  key. We do not transmit any information about your designs or
-                  how you use the software.
+                  Desktop anonymous analytics is explicit opt-in and manageable
+                  in App Settings → Data & License. Website pageviews,
+                  downloads, and checkout starts operate only when that
+                  deployment is configured. Verified purchase conversion sends
+                  only product, currency, value cents, and test mode.
                 </p>
               </section>
 
@@ -179,6 +182,10 @@ export default function PrivacyPolicyPage() {
                       View their privacy policy →
                     </a>
                   </li>
+                  <li>
+                    <strong>PostHog:</strong> Optional anonymous product
+                    analytics and verified conversion measurement.
+                  </li>
                 </ul>
                 <p className="mt-4 text-text-muted">
                   You can change this choice at any time in App Settings → Data
@@ -191,8 +198,7 @@ export default function PrivacyPolicyPage() {
               <section>
                 <h2 className="mb-4 text-2xl font-bold">Your Rights</h2>
                 <p className="mb-4 text-text-muted">
-                  Since we don't collect your data, there's not much to manage.
-                  However, you have the right to:
+                  You can manage optional analytics and have the right to:
                 </p>
                 <ul className="grid gap-2 text-text-muted">
                   <li>

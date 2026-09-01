@@ -21,7 +21,7 @@ const faqItems = [
   {
     question: "Do I need an internet connection?",
     answer:
-      "No! Carvd Studio works 100% offline. Internet is only needed for license activation and checking for updates. All your designs and data stay on your computer.",
+      "Core desktop editing works offline. Internet may be used for optional analytics, license activation, and updates. Project files and designs stay on your computer.",
   },
   {
     question: "Can I use it on multiple computers?",
@@ -113,9 +113,9 @@ export default function FaqPage() {
             Do I need an internet connection?
           </h3>
           <p className="text-text-muted leading-[var(--line-height-relaxed)]">
-            No! Carvd Studio works 100% offline. Internet is only needed for
-            license activation and checking for updates. All your designs and
-            data stay on your computer.
+            Core desktop editing works offline. Internet may be used for
+            optional analytics, license activation and checking for updates. All
+            your designs and data stay on your computer.
           </p>
         </div>
 

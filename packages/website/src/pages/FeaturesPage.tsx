@@ -256,7 +256,8 @@ export default function FeaturesPage() {
                       Your Work Stays Private
                     </h2>
                     <p className="text-lg text-text-muted">
-                      No cloud. No tracking. No BS.
+                      No cloud for your project files. Optional analytics never
+                      includes design content.
                     </p>
                   </div>
                 </div>
@@ -278,9 +279,9 @@ export default function FeaturesPage() {
                     </h3>
                     <p className="mb-4 text-text-muted">
                       Your designs belong to you, not us. No cloud uploads, no
-                      data collection, no tracking. We'll never see your designs
-                      or sell your information. Your intellectual property stays
-                      on your computer where it belongs.
+                      design-content collection. We'll never see your designs or
+                      sell your information. Your intellectual property stays on
+                      your computer where it belongs.
                     </p>
                   </div>
                   <div>
