@@ -8,7 +8,7 @@ import {
 } from '../store';
 import { createAnalyticsQueue, type AnalyticsQueue } from './analyticsQueue';
 import { analyticsStorage } from './analyticsStorage';
-import { createPostHogTransport, type AnalyticsTransport } from './posthogTransport';
+import { createPostHogTransport, type AnalyticsTransport, type DesktopAnalyticsContext } from './posthogTransport';
 
 const FLUSH_INTERVAL_MS = 60_000;
 const SHUTDOWN_TIMEOUT_MS = 1_000;
@@ -19,6 +19,7 @@ export interface AnalyticsServiceOptions {
   queue?: AnalyticsQueue;
   clock?: () => number;
   createInstallationId?: () => string;
+  context?: DesktopAnalyticsContext;
 }
 
 export interface AnalyticsConsentResult {
@@ -145,7 +146,7 @@ function resolveTransport(options: AnalyticsServiceOptions): {
   try {
     if (Object.hasOwn(options, 'transport')) return { transport: options.transport ?? null, success: true };
     if (options.createTransport) return { transport: options.createTransport(), success: true };
-    return { transport: createPostHogTransport(), success: true };
+    return { transport: createPostHogTransport(undefined, { context: options.context }), success: true };
   } catch {
     return { transport: null, success: false };
   }

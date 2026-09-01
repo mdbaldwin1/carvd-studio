@@ -33,6 +33,12 @@ export type PostHogClientFactory = (
 export interface PostHogTransportOptions {
   createClient?: PostHogClientFactory;
   fetch?: AnalyticsFetch;
+  context?: DesktopAnalyticsContext;
+}
+
+export interface DesktopAnalyticsContext {
+  $os: 'macOS' | 'Windows' | 'Linux' | 'Other';
+  app_version: string;
 }
 
 type PostHogFetch = (url: string, options: PostHogFetchOptions) => Promise<PostHogFetchResponse>;
@@ -69,7 +75,7 @@ export function createPostHogTransport(
         client.capture({
           event: event.name,
           distinctId: event.distinctId,
-          properties: event.properties,
+          properties: { ...event.properties, ...options.context },
           timestamp: new Date(event.occurredAt),
           uuid: event.eventId
         });
@@ -82,6 +88,12 @@ export function createPostHogTransport(
       await client.shutdown(1_000);
     }
   };
+}
+
+export function createDesktopAnalyticsContext(platform: string, appVersion: string): DesktopAnalyticsContext {
+  const os: DesktopAnalyticsContext['$os'] =
+    platform === 'darwin' ? 'macOS' : platform === 'win32' ? 'Windows' : platform === 'linux' ? 'Linux' : 'Other';
+  return { $os: os, app_version: appVersion };
 }
 
 function combineAbortSignals(

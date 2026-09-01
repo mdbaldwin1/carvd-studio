@@ -24,7 +24,7 @@ In the Dev project, intentionally perform each trigger once. For every row in th
 - [ ] Check prohibited examples are absent. Inspect PostHog-added `$` properties separately.
 - [ ] Confirm the event occurs once at the documented successful/failed boundary and not on canceled or rejected operations.
 
-Explicitly exercise: both consent surfaces; both onboarding sources; start-screen/menu/template creation; initial/manual/auto/save-as; successful and failed cut list; every export type success/failure; every checkout surface/license mode; successful activation; representative page routes; both download platforms at every location; every website checkout location; and a Lemon Squeezy test-mode purchase.
+Explicitly exercise: a settings grant (the only `analytics_consent_changed` source); verify onboarding grant and all denials emit no consent-change event; both onboarding-completion sources; start-screen/menu/template creation; initial/manual/auto/save-as; successful and failed cut list; every export type success/failure; every checkout surface/license mode; successful activation; representative page routes; both download platforms at every location; every website checkout location; and a Lemon Squeezy test-mode purchase. For each desktop event verify trusted `$os` and `app_version` exist and cannot be spoofed from renderer properties.
 
 ## Desktop privacy and resilience
 
@@ -33,13 +33,14 @@ Explicitly exercise: both consent surfaces; both onboarding sources; start-scree
 - [ ] Grant: only subsequent allowed events appear; consent event contains only `choice=granted` and its surface.
 - [ ] Offline: editing, save, cut list, and export succeed; allowed events queue locally without blocking UI.
 - [ ] Restart online: queued UUIDs deliver exactly once with the same installation identity.
-- [ ] Revoke while offline: queued events and installation identity are synchronously deleted; relaunch remains denied.
+- [ ] In a packaged build, revoke while offline: queued events and installation identity are synchronously deleted; relaunch remains denied and core workflows remain available.
 - [ ] Malicious/unknown property injection is stripped or rejects the event; raw delivered JSON contains no injected key.
 - [ ] Packaged app exposes no analytics test-control IPC or preload methods.
 
 ## Website behavior
 
 - [ ] Route navigation sends one explicit `$pageview` with `$current_url`; no automatic duplicate is present.
+- [ ] Inspect a Dev `$pageview` raw payload and confirm PostHog's default `$referrer` and the explicit `$current_url` are present before using referrer/landing-path dashboard breakdowns.
 - [ ] Download and checkout events match exact platform/product/location values.
 - [ ] Aborted or timed-out PostHog requests do not delay or prevent navigation, download, checkout, or rendering.
 - [ ] No-config build produces no PostHog calls.

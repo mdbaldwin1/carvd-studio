@@ -138,8 +138,10 @@ export default function PrivacyPolicyPage() {
                   Desktop anonymous analytics is explicit opt-in and manageable
                   in App Settings → Data & License. Website pageviews,
                   downloads, and checkout starts operate only when that
-                  deployment is configured. Verified purchase conversion sends
-                  only product, currency, value cents, and test mode.
+                  deployment is configured. Desktop events include a coarse
+                  operating-system category and app version. Verified purchase
+                  conversion sends only product, currency, value cents, and test
+                  mode.
                 </p>
               </section>
 

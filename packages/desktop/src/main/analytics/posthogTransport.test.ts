@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createPostHogTransport,
+  createDesktopAnalyticsContext,
   getPostHogConfig,
   type AnalyticsFetch,
   type PostHogClient,
@@ -16,6 +17,39 @@ function createDeferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
 }
 
 describe('PostHog transport configuration', () => {
+  it.each([
+    ['darwin', 'macOS'],
+    ['win32', 'Windows'],
+    ['linux', 'Linux'],
+    ['aix', 'Other']
+  ])('maps %s to the stable coarse OS value %s', (platform, expected) => {
+    expect(createDesktopAnalyticsContext(platform, '1.2.3')).toEqual({ $os: expected, app_version: '1.2.3' });
+  });
+
+  it('adds trusted context after event properties so renderer values cannot override it', async () => {
+    const capture = vi.fn();
+    const client: PostHogClient = { capture, flush: vi.fn(), shutdown: vi.fn() };
+    const transport = createPostHogTransport(
+      { apiKey: 'key', host: 'https://analytics.example.test' },
+      { createClient: () => client, context: { $os: 'macOS', app_version: '1.2.3' } }
+    );
+
+    await transport!.send([
+      {
+        eventId: '8d4f0c37-9839-4cb9-8bbb-3c2dba7e45f2',
+        distinctId: 'anonymous-installation',
+        name: 'app_opened',
+        properties: { $os: 'spoofed', app_version: 'spoofed' } as never,
+        occurredAt: '2026-09-01T12:00:00.000Z',
+        attemptCount: 0,
+        nextAttemptAt: 0
+      }
+    ]);
+
+    expect(capture).toHaveBeenCalledWith(
+      expect.objectContaining({ properties: { $os: 'macOS', app_version: '1.2.3' } })
+    );
+  });
   it('constructs a client from packaged main-process configuration', () => {
     const construction: Array<{ apiKey: string; host: string; fetchRetryCount: number }> = [];
     const client: PostHogClient = {

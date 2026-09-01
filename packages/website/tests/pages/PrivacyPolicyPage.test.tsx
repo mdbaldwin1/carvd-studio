@@ -41,6 +41,9 @@ describe("PrivacyPolicyPage", () => {
       screen.getByText(/Desktop anonymous analytics is explicit opt-in/i),
     ).toBeInTheDocument();
     expect(
+      screen.getByText(/coarse operating-system category and app version/i),
+    ).toBeInTheDocument();
+    expect(
       screen.getByText(/Website pageviews, downloads, and checkout starts/i),
     ).toBeInTheDocument();
     expect(

@@ -90,6 +90,7 @@ import {
 } from './analytics/analyticsService';
 import { registerAnalyticsIpcHandlers } from './analytics/analyticsIpc';
 import { registerAnalyticsLifecycle } from './analytics/analyticsLifecycle';
+import { createDesktopAnalyticsContext } from './analytics/posthogTransport';
 
 const isTestMode = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
 const queuedTestSaveDialogPaths: string[] = [];
@@ -1322,7 +1323,9 @@ const analyticsTestControlsReady = analyticsTestControlsEnabled
 registerAnalyticsLifecycle(app, {
   initialize: async () => {
     const transport = await analyticsTestControlsReady;
-    initializeAnalytics(transport ? { transport } : undefined);
+    initializeAnalytics(
+      transport ? { transport } : { context: createDesktopAnalyticsContext(process.platform, app.getVersion()) }
+    );
   },
   capture: captureAnalytics,
   shutdown: shutdownAnalytics

@@ -15,7 +15,7 @@ Do not mix environments. Choose one PostHog region deliberately and use its matc
 
 ## Configuration placement
 
-Set values through local untracked environment files or Vercel environment settings; never commit values.
+Set values through local untracked environment files or Vercel environment settings; never commit values. Every PostHog key below is a project ingestion key only. Do not place a personal API key in the app, desktop bundle, webhook, or these variables.
 
 | Runtime                    | Names                                             | Scope                                                                                                        |
 | -------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -51,6 +51,20 @@ Use [EVENT-CATALOG.md](./EVENT-CATALOG.md) as the allowlist. In PostHog's event/
 
 If an unexpected property appears, disable ingestion using the kill switch in the release checklist, preserve a minimal audit record, remove the capture at source, and assess deletion requirements before restoring.
 
+PostHog Data Management catalogs observed events/properties; it is not a deny-by-default ingestion allowlist for this implementation. Use **Data Management → Events** and **Properties** to inspect newly observed definitions, archive misleading definitions only after investigation, and save this HogQL audit as the compensating control (adjust the interval as needed):
+
+```sql
+SELECT
+    event,
+    arraySort(groupUniqArray(arrayJoin(JSONExtractKeys(properties)))) AS observed_property_keys
+FROM events
+WHERE timestamp >= now() - INTERVAL 7 DAY
+GROUP BY event
+ORDER BY event
+```
+
+Compare results with the catalog. Website rows will include PostHog default `$` properties in addition to Carvd's custom properties; desktop rows must include trusted `$os` and `app_version`. Create a saved insight named `Analytics allowlist audit — 7 days`, run it after every release, and record the reviewer/date. Also filter `event NOT LIKE '$%'` in a second saved view to identify unexpected custom event names; explicitly include `$pageview` in the manual review.
+
 ## Dashboard construction (operator pending)
 
 Use unique persons unless a card explicitly says event totals. Desktop persons are anonymous installation UUIDs; website persons are PostHog browser identities; purchases use salted deterministic order identities. These are intentionally not joined, so cross-surface funnels measure directional conversion, not the same person end to end.
@@ -59,37 +73,42 @@ Use unique persons unless a card explicitly says event totals. Desktop persons a
 
 Create these insights with a rolling 30-day date range and daily interval:
 
-1. **Website reach:** unique persons performing `$pageview`; breakdown by `$pathname` if PostHog derives it, otherwise use the path portion of `$current_url`. Never group raw URLs containing query strings.
+1. **Landing reach:** unique persons performing `$pageview`; breakdown first by PostHog default `$referrer`, then landing path derived from the cataloged `$current_url`. Verify both fields in a Dev raw payload before building the card. `$referrer` is PostHog browser context, not a Carvd custom property. Never group raw URLs containing query strings.
 2. **Installer intent:** unique persons performing `download_clicked`; breakdown `platform`, then `location`.
 3. **Checkout intent:** unique persons performing `checkout_started`; breakdown `location`; filter `product=desktop_license`.
 4. **Verified purchases:** count of `purchase_completed`; filter `test_mode=false`; sum `value_cents / 100` grouped by `currency`. Never add different currencies together.
-5. **Website funnel:** `$pageview` → `download_clicked` → `checkout_started`, ordered, 14-day conversion window. This is browser-only and does not include desktop activation or purchase identity.
+5. **Relevant landing → download funnel:** `$pageview` filtered to download-relevant landing paths (`/`, `/download`, `/features`) → `download_clicked`, ordered, 14-day conversion window; break down the terminal step by `platform` and `location`.
+6. **Download → checkout funnel:** `download_clicked` → `checkout_started`, ordered, 14-day conversion window; filter checkout to `product=desktop_license` and break down by checkout `location`.
+7. **Checkout → verified purchase ratio:** count of `purchase_completed` with `test_mode=false` / count of `checkout_started`, same date window. Label this a directional aggregate ratio, not a person funnel, because purchase and website identities are intentionally separate.
 
 Display conversion formulas alongside cards:
 
-- download rate = unique downloaders / unique page viewers;
-- checkout-start rate = unique checkout starters / unique page viewers;
-- verified purchase count is reported separately because purchase identities cannot be joined to browser identities.
+- relevant-landing conversion = unique funnel conversions / unique persons entering the filtered `$pageview` step;
+- checkout/download = unique persons completing `checkout_started` / unique persons entering `download_clicked`;
+- purchase/checkout = verified non-test purchase event count / checkout-start event count. Show both numerator and denominator.
 
 ### Activation dashboard
 
 Use desktop events only, rolling 30 days:
 
-1. Ordered funnel with a 14-day window: `app_opened` → `onboarding_completed` → `project_created` → `project_saved` → `cut_list_generated` where `success=true` → `export_completed` where `success=true`.
+1. Ordered funnel with a 14-day window: `app_opened` → `onboarding_completed` → `project_created` → `project_saved` → `cut_list_generated` where `success=true` → `export_completed` where `success=true` → `license_activated`.
 2. Project creation mix: unique persons and event totals for `project_created`, breakdown by `source` and `units`.
 3. Save activation: unique persons performing `project_saved`, breakdown by `save_kind` and `part_count_bucket`.
 4. Optimizer success: event totals for `cut_list_generated`, formula success events / all cut-list events; breakdown by part and stock buckets.
 5. Export success: event totals for `export_completed`, formula success events / all export events; breakdown by `export_type`.
 6. License intent and activation: unique persons for `checkout_opened` and `license_activated`, separately; breakdown checkout by `surface` and `license_mode`.
+7. Duplicate the funnel with breakdowns by trusted `$os`, `app_version`, and first-seen week (cohort installations by the week of their first `app_opened`). Do not use PostHog browser OS for desktop reporting.
 
 Funnel caveat: optional consent means these rates describe consenting installations, not every installation. Do not label them total-user conversion.
 
 ### Retention dashboard
 
 1. Weekly retention: cohort on first `project_created`, return event `app_opened`, unique desktop installation identities, show weeks 0–8.
-2. Product retention: cohort on first successful `project_saved`, return on another `project_saved`, weekly.
+2. Product retention: cohort on first `project_saved`, return on another `project_saved`, weekly.
 3. Outcome retention: cohort on first successful `cut_list_generated`, return on successful `cut_list_generated` or `export_completed`, weekly.
-4. Usage frequency: per-person weekly count distributions for `app_opened`, `project_saved`, and successful exports. Prefer medians/percentiles over averages for small samples.
+4. Create explicit 1-day, 7-day, and 30-day return cards for each cohort/return pair: returning unique installation IDs / eligible cohort installation IDs. Exclude cohorts not old enough for the interval.
+5. Add `$os` and `app_version` filters and breakdowns to every retention card. Version comparisons describe the version at event time, not a permanent person attribute.
+6. Usage frequency: per-person weekly count distributions for `app_opened`, `project_saved`, and successful exports. Prefer medians/percentiles over averages for small samples.
 
 Do not combine website cookie identities, desktop installation identities, or purchase order identities in retention calculations. Identity resets on desktop consent revocation and browser storage clearing create new anonymous persons.
 
