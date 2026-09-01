@@ -40,6 +40,11 @@ export interface RunningElectronApp {
   consoleMessages: string[];
 }
 
+export interface LaunchElectronAppOptions {
+  analyticsMode?: 'success' | 'offline' | 'timeout';
+  userDataDir?: string;
+}
+
 export type ProjectSnapshot = {
   projectName: string;
   parts: Array<{
@@ -85,10 +90,10 @@ export type ProjectSnapshot = {
   activeSession: unknown;
 };
 
-export async function launchElectronApp(): Promise<RunningElectronApp> {
+export async function launchElectronApp(options: LaunchElectronAppOptions = {}): Promise<RunningElectronApp> {
   const appPath = path.resolve(__dirname, '../../..');
-  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'carvd-e2e-'));
-  const args = [appPath, '--test-mode', `--user-data-dir=${userDataDir}`];
+  const userDataDir = options.userDataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'carvd-e2e-'));
+  const args = [appPath, '--test-mode', '--analytics-e2e-control', `--user-data-dir=${userDataDir}`];
   if (process.env.CI) {
     args.unshift('--no-sandbox');
   }
@@ -97,7 +102,8 @@ export async function launchElectronApp(): Promise<RunningElectronApp> {
     args,
     env: {
       ...process.env,
-      NODE_ENV: 'test'
+      NODE_ENV: 'test',
+      CARVD_E2E_ANALYTICS_MODE: options.analyticsMode ?? 'success'
     }
   });
 
@@ -136,9 +142,13 @@ export async function waitForAutomationHooks(window: Page): Promise<void> {
   );
 }
 
-export async function closeElectronApp(running: RunningElectronApp | undefined): Promise<void> {
+export async function closeElectronApp(
+  running: RunningElectronApp | undefined,
+  options: { removeUserData?: boolean } = {}
+): Promise<void> {
   if (!running) return;
   const proc = running.electronApp.process();
+  if (options.removeUserData === false) return;
   try {
     await Promise.race([
       running.electronApp.close(),

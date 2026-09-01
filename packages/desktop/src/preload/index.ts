@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { AnalyticsConsent, DesktopAnalyticsEvent } from '../shared/analytics';
 
+const analyticsTestBridgeEnabled = process.argv.includes('--analytics-e2e-control');
+
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -44,6 +46,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAnalyticsConsent: () => ipcRenderer.invoke('analytics:get-consent'),
   setAnalyticsConsent: (consent: AnalyticsConsent, surface: 'onboarding' | 'settings') =>
     ipcRenderer.invoke('analytics:set-consent', consent, surface),
+  ...(analyticsTestBridgeEnabled
+    ? {
+        analyticsTestSetMode: (mode: 'success' | 'offline' | 'timeout') =>
+          ipcRenderer.invoke('analytics:test:set-mode', mode),
+        analyticsTestGetState: () => ipcRenderer.invoke('analytics:test:get-state'),
+        analyticsTestFlush: () => ipcRenderer.invoke('analytics:test:flush')
+      }
+    : {}),
 
   // File dialogs
   showSaveDialog: (options: Electron.SaveDialogOptions) => ipcRenderer.invoke('show-save-dialog', options),

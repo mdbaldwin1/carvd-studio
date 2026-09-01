@@ -15,7 +15,9 @@ export function initializeWebsiteAnalytics(): void {
       autocapture: false,
       disable_session_recording: true,
       capture_pageview: false,
+      advanced_disable_flags: true,
       persistence: "localStorage",
+      request_batching: import.meta.env.VITE_ANALYTICS_E2E !== "true",
     });
     initialized = true;
   } catch {

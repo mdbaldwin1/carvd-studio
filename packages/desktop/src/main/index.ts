@@ -82,6 +82,7 @@ import {
 } from './trial';
 import {
   captureAnalytics,
+  flushAnalytics,
   getAnalyticsConsent,
   initializeAnalytics,
   setAnalyticsConsent,
@@ -89,6 +90,7 @@ import {
 } from './analytics/analyticsService';
 import { registerAnalyticsIpcHandlers } from './analytics/analyticsIpc';
 import { registerAnalyticsLifecycle } from './analytics/analyticsLifecycle';
+import { analyticsTestTransport, registerAnalyticsTestControl } from './analytics/analyticsTestControl';
 
 const isTestMode = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
 const queuedTestSaveDialogPaths: string[] = [];
@@ -382,6 +384,7 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     icon: appIconPath ?? undefined,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      additionalArguments: analyticsTestControlsEnabled ? ['--analytics-e2e-control'] : [],
       contextIsolation: true,
       nodeIntegration: false,
       // SECURITY NOTE: Sandbox is disabled because the preload script requires
@@ -1305,8 +1308,13 @@ registerAnalyticsIpcHandlers(ipcMain, {
   setConsent: setAnalyticsConsent
 });
 
+const analyticsTestControlsEnabled =
+  process.argv.includes('--test-mode') && process.argv.includes('--analytics-e2e-control') && !app.isPackaged;
+registerAnalyticsTestControl(ipcMain, analyticsTestControlsEnabled, flushAnalytics);
+
 registerAnalyticsLifecycle(app, {
-  initialize: initializeAnalytics,
+  initialize: () =>
+    initializeAnalytics(analyticsTestControlsEnabled ? { transport: analyticsTestTransport } : undefined),
   capture: captureAnalytics,
   shutdown: shutdownAnalytics
 });

@@ -25,7 +25,9 @@ describe("website analytics", () => {
       autocapture: false,
       disable_session_recording: true,
       capture_pageview: false,
+      advanced_disable_flags: true,
       persistence: "localStorage",
+      request_batching: true,
     });
   });
 
