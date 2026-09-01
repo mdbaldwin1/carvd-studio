@@ -108,34 +108,43 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
     args.unshift('--no-sandbox');
   }
 
-  const electronApp = await electron.launch({
-    args,
-    env: {
-      ...process.env,
-      NODE_ENV: 'test',
-      CARVD_E2E_ANALYTICS_MODE: options.analyticsMode ?? 'success'
+  let electronApp: ElectronApplication | undefined;
+  try {
+    electronApp = await electron.launch({
+      args,
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        CARVD_E2E_ANALYTICS_MODE: options.analyticsMode ?? 'success'
+      }
+    });
+
+    const window = await getMainWindow(electronApp);
+    await window.setViewportSize({ width: 1400, height: 900 });
+    await waitForAutomationHooks(window);
+
+    const consoleMessages: string[] = [];
+    window.on('console', (msg) => {
+      const text = `[${msg.type()}] ${msg.text()}`;
+      consoleMessages.push(text);
+      if (msg.type() === 'error') {
+        console.log(`[E2E Console] ${text}`);
+      }
+    });
+    window.on('pageerror', (error) => {
+      const text = `[pageerror] ${error.message}`;
+      consoleMessages.push(text);
+      console.log(`[E2E] ${text}`);
+    });
+
+    return { electronApp, window, userDataDir, consoleMessages };
+  } catch (error) {
+    await closeElectronProcess(electronApp);
+    if (isNewProfile) {
+      await fs.promises.rm(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
     }
-  });
-
-  const window = await getMainWindow(electronApp);
-  await window.setViewportSize({ width: 1400, height: 900 });
-  await waitForAutomationHooks(window);
-
-  const consoleMessages: string[] = [];
-  window.on('console', (msg) => {
-    const text = `[${msg.type()}] ${msg.text()}`;
-    consoleMessages.push(text);
-    if (msg.type() === 'error') {
-      console.log(`[E2E Console] ${text}`);
-    }
-  });
-  window.on('pageerror', (error) => {
-    const text = `[pageerror] ${error.message}`;
-    consoleMessages.push(text);
-    console.log(`[E2E] ${text}`);
-  });
-
-  return { electronApp, window, userDataDir, consoleMessages };
+    throw error;
+  }
 }
 
 export async function waitForAutomationHooks(window: Page): Promise<void> {
@@ -157,7 +166,12 @@ export async function closeElectronApp(
   options: { removeUserData?: boolean } = {}
 ): Promise<void> {
   if (!running) return;
-  const proc = running.electronApp.process();
+  let proc: ReturnType<ElectronApplication['process']> | undefined;
+  try {
+    proc = running.electronApp.process();
+  } catch {
+    // A failed launch can leave Playwright's ElectronApplication wrapper unusable.
+  }
   try {
     await Promise.race([
       running.electronApp.close(),
@@ -166,7 +180,7 @@ export async function closeElectronApp(
   } catch {
     try {
       const signal = process.platform === 'win32' ? undefined : 'SIGKILL';
-      proc.kill(signal);
+      proc?.kill(signal);
     } catch {
       // Process may already be gone.
     }
@@ -174,17 +188,18 @@ export async function closeElectronApp(
   // Wait for the process to fully exit before removing the temp profile —
   // Chromium releases its file locks (e.g. cache journals on Windows, which
   // otherwise surface as EBUSY) only after exit, not when close() resolves.
-  await new Promise<void>((resolve) => {
-    if (proc.exitCode !== null || proc.signalCode !== null) {
-      resolve();
-      return;
-    }
-    const timer = setTimeout(resolve, 5000);
-    proc.once('exit', () => {
-      clearTimeout(timer);
-      resolve();
+  if (proc)
+    await new Promise<void>((resolve) => {
+      if (proc.exitCode !== null || proc.signalCode !== null) {
+        resolve();
+        return;
+      }
+      const timer = setTimeout(resolve, 5000);
+      proc.once('exit', () => {
+        clearTimeout(timer);
+        resolve();
+      });
     });
-  });
   if (options.removeUserData === false) return;
   try {
     await fs.promises.rm(running.userDataDir, {
@@ -196,6 +211,38 @@ export async function closeElectronApp(
   } catch {
     // Best-effort cleanup: a stray temp profile is harmless and must never
     // fail a test from teardown.
+  }
+}
+
+async function closeElectronProcess(electronApp: ElectronApplication | undefined): Promise<void> {
+  if (!electronApp) return;
+  let proc: ReturnType<ElectronApplication['process']> | undefined;
+  try {
+    proc = electronApp.process();
+  } catch {
+    // The wrapper may be only partially initialized.
+  }
+  try {
+    await Promise.race([
+      electronApp.close(),
+      new Promise<void>((_, reject) => setTimeout(() => reject(new Error('close timeout')), 5000))
+    ]);
+  } catch {
+    try {
+      proc?.kill(process.platform === 'win32' ? undefined : 'SIGKILL');
+    } catch {
+      // Process may already be gone.
+    }
+  }
+  if (proc) {
+    await new Promise<void>((resolve) => {
+      if (proc.exitCode !== null || proc.signalCode !== null) return resolve();
+      const timer = setTimeout(resolve, 5000);
+      proc.once('exit', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
   }
 }
 
