@@ -1,4 +1,6 @@
 import Store from 'electron-store';
+import type { AnalyticsConsent } from '../shared/analytics';
+import type { QueuedAnalyticsEvent } from './analytics/analyticsQueue';
 
 // Stock type for app-level library (mirrors renderer Stock type)
 export interface StockLibraryItem {
@@ -118,6 +120,10 @@ export interface AppPreferences {
   lastKnownVersion: string | null;
   // Onboarding
   hasCompletedWelcome: boolean;
+  // Privacy-safe product analytics
+  analyticsConsent: AnalyticsConsent;
+  analyticsInstallationId: string | null;
+  analyticsQueue: QueuedAnalyticsEvent[];
   // Other app data
   recentProjects: string[];
   favoriteProjects: string[]; // User-favorited project paths
@@ -153,6 +159,9 @@ const defaults: AppPreferences = {
   trialAcknowledgedExpired: false,
   lastKnownVersion: null,
   hasCompletedWelcome: false,
+  analyticsConsent: 'unknown',
+  analyticsInstallationId: null,
+  analyticsQueue: [],
   recentProjects: [],
   favoriteProjects: [],
   stockLibrary: [],
@@ -177,6 +186,35 @@ export const store = new Store<AppPreferences>({
   // Enable watching for changes from other processes (cross-instance sync)
   watch: true
 });
+
+// Analytics preference accessors keep analytics services isolated from unrelated app settings.
+export function getAnalyticsConsentPreference(): AnalyticsConsent {
+  return store.get('analyticsConsent', 'unknown');
+}
+
+export function setAnalyticsConsentPreference(consent: AnalyticsConsent): void {
+  store.set('analyticsConsent', consent);
+  if (consent !== 'granted') {
+    store.delete('analyticsInstallationId');
+    store.delete('analyticsQueue');
+  }
+}
+
+export function getAnalyticsInstallationId(): string | null {
+  return store.get('analyticsInstallationId', null);
+}
+
+export function setAnalyticsInstallationId(installationId: string): void {
+  store.set('analyticsInstallationId', installationId);
+}
+
+export function getAnalyticsQueue(): QueuedAnalyticsEvent[] {
+  return store.get('analyticsQueue', []);
+}
+
+export function setAnalyticsQueue(events: QueuedAnalyticsEvent[]): void {
+  store.set('analyticsQueue', events);
+}
 
 // App settings getters/setters
 export function getAppSettings(): Pick<
