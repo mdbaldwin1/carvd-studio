@@ -34,7 +34,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setPreference: (key: string, value: unknown) => ipcRenderer.invoke('set-preference', key, value),
 
   // Analytics consent and capture
-  captureAnalytics: (event: DesktopAnalyticsEvent) => ipcRenderer.invoke('analytics:capture', event),
+  captureAnalytics: (event: DesktopAnalyticsEvent) => {
+    try {
+      void ipcRenderer.invoke('analytics:capture', event).catch(() => undefined);
+    } catch {
+      // Analytics cannot affect renderer control flow.
+    }
+  },
   getAnalyticsConsent: () => ipcRenderer.invoke('analytics:get-consent'),
   setAnalyticsConsent: (consent: AnalyticsConsent, surface: 'onboarding' | 'settings') =>
     ipcRenderer.invoke('analytics:set-consent', consent, surface),

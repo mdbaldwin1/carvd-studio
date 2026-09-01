@@ -36,12 +36,24 @@ describe('preload analytics bridge', () => {
       .mockResolvedValueOnce('granted')
       .mockResolvedValueOnce({ success: true });
 
-    api.captureAnalytics(event);
+    expect(api.captureAnalytics(event)).toBeUndefined();
 
     await expect(api.getAnalyticsConsent()).resolves.toBe('granted');
     await expect(api.setAnalyticsConsent('granted', 'settings')).resolves.toEqual({ success: true });
     expect(electron.invoke).toHaveBeenNthCalledWith(1, 'analytics:capture', event);
     expect(electron.invoke).toHaveBeenNthCalledWith(2, 'analytics:get-consent');
     expect(electron.invoke).toHaveBeenNthCalledWith(3, 'analytics:set-consent', 'granted', 'settings');
+  });
+
+  it('swallows a rejected capture invocation', async () => {
+    const api = electron.exposeInMainWorld.mock.calls[0][1] as {
+      captureAnalytics: (event: unknown) => void;
+    };
+    electron.invoke.mockRejectedValueOnce(new Error('main process unavailable'));
+
+    expect(api.captureAnalytics({ name: 'app_opened', properties: {} })).toBeUndefined();
+    await Promise.resolve();
+
+    expect(electron.invoke).toHaveBeenCalledWith('analytics:capture', { name: 'app_opened', properties: {} });
   });
 });
