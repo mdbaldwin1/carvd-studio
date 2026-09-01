@@ -21,9 +21,10 @@ export function UpgradePrompt({ message, onUpgrade, onDismiss }: UpgradePromptPr
     try {
       await window.electronAPI.openExternal(EXTERNAL_LINKS.checkout);
       analytics.capture('checkout_opened', { surface: 'pricing_prompt', license_mode: 'free' });
-      onUpgrade?.();
     } catch {
-      // The checkout did not open, so do not record or continue it.
+      // The checkout did not open, so do not record it.
+    } finally {
+      onUpgrade?.();
     }
   };
 

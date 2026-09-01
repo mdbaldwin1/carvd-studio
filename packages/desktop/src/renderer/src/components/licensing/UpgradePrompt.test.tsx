@@ -60,7 +60,7 @@ describe('UpgradePrompt', () => {
     });
   });
 
-  it('does not record or continue checkout when opening the external URL fails', async () => {
+  it('does not record checkout but preserves its callback when opening the external URL fails', async () => {
     const onUpgrade = vi.fn();
     vi.mocked(window.electronAPI.openExternal).mockRejectedValueOnce(new Error('browser unavailable'));
     render(<UpgradePrompt {...defaultProps} onUpgrade={onUpgrade} />);
@@ -68,7 +68,7 @@ describe('UpgradePrompt', () => {
     fireEvent.click(screen.getByText('Upgrade'));
 
     await waitFor(() => expect(window.electronAPI.openExternal).toHaveBeenCalledTimes(1));
-    expect(onUpgrade).not.toHaveBeenCalled();
+    await waitFor(() => expect(onUpgrade).toHaveBeenCalledTimes(1));
     expect(analytics.capture).not.toHaveBeenCalled();
   });
 

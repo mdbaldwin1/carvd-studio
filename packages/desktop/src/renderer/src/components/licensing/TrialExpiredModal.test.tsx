@@ -86,7 +86,7 @@ describe('TrialExpiredModal', () => {
     });
   });
 
-  it('does not record or continue checkout when opening the external URL fails', async () => {
+  it('does not record checkout but preserves its callback when opening the external URL fails', async () => {
     const onPurchase = vi.fn();
     vi.mocked(window.electronAPI.openExternal).mockRejectedValueOnce(new Error('browser unavailable'));
     render(<TrialExpiredModal {...defaultProps} onPurchase={onPurchase} />);
@@ -94,7 +94,7 @@ describe('TrialExpiredModal', () => {
     fireEvent.click(screen.getByText('Buy Now'));
 
     await waitFor(() => expect(window.electronAPI.openExternal).toHaveBeenCalledTimes(1));
-    expect(onPurchase).not.toHaveBeenCalled();
+    await waitFor(() => expect(onPurchase).toHaveBeenCalledTimes(1));
     expect(analytics.capture).not.toHaveBeenCalled();
   });
 

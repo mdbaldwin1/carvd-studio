@@ -140,7 +140,6 @@ describe('saveProject', () => {
     await saveProject();
 
     expect(analytics.capture).toHaveBeenCalledTimes(1);
-    expect(analytics.capture).toHaveBeenCalledTimes(1);
     expect(analytics.capture).toHaveBeenCalledWith('project_saved', {
       save_kind: 'manual',
       part_count_bucket: '1-5'

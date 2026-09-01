@@ -23,9 +23,10 @@ export function TrialBanner({ daysRemaining, onActivateLicense, onPurchase }: Tr
     try {
       await window.electronAPI.openExternal(EXTERNAL_LINKS.checkout);
       analytics.capture('checkout_opened', { surface: 'trial', license_mode: 'trial' });
-      onPurchase();
     } catch {
-      // The checkout did not open, so do not record or continue it.
+      // The checkout did not open, so do not record it.
+    } finally {
+      onPurchase();
     }
   };
 
