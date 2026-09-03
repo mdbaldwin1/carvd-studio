@@ -67,7 +67,7 @@ describe("downloads", () => {
           platform: "macos",
           fileName: "mac.dmg",
           fileExtension: ".dmg",
-          minOsVersion: "macOS 10.15+",
+          minOsVersion: "macOS 12+",
         },
         "download-hero-card",
         "localhost",
@@ -129,7 +129,7 @@ describe("downloads", () => {
         platform: "macos-x64",
         fileName: "Carvd.Studio-0.1.0-x64.dmg",
         fileExtension: ".dmg",
-        minOsVersion: "macOS 10.15+",
+        minOsVersion: "macOS 12+",
         architectureLabel: "Intel",
       });
     });

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Mac installation guidance** — The download page now explains how to identify a Mac's processor and select the matching Apple Silicon or Intel installer without duplicating the shared installation steps.
+- **macOS requirements** — Updated the documented minimum to macOS 12 Monterey to match the Electron 41 runtime shipped by Carvd Studio 1.1.0.
 
 ## [1.0.6] - 2026-09-03
 

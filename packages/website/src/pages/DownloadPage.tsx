@@ -348,8 +348,8 @@ export default function DownloadPage() {
               </h3>
               <ul className="m-0 list-none p-0">
                 <li className="border-b border-border py-2 text-text-muted last:border-b-0">
-                  <strong className="text-text">OS:</strong> macOS 10.15
-                  (Catalina) or later
+                  <strong className="text-text">OS:</strong> macOS 12 (Monterey)
+                  or later
                 </li>
                 <li className="border-b border-border py-2 text-text-muted last:border-b-0">
                   <strong className="text-text">Processor:</strong> Intel or

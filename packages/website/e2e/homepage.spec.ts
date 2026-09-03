@@ -45,9 +45,9 @@ test.describe("Homepage", () => {
         .filter({ hasText: "Intel" });
 
       await expect(appleSiliconCard).toBeVisible();
-      await expect(appleSiliconCard).toContainText("macOS 10.15+");
+      await expect(appleSiliconCard).toContainText("macOS 12+");
       await expect(intelCard).toBeVisible();
-      await expect(intelCard).toContainText("macOS 10.15+");
+      await expect(intelCard).toContainText("macOS 12+");
     });
 
     test("displays Windows download card", async ({ page }) => {

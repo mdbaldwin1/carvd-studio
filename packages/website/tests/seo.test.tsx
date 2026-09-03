@@ -237,7 +237,7 @@ describe("Page SEO Integration", () => {
         platform: "macos-arm64",
         fileName: "test-arm64.dmg",
         fileExtension: ".dmg",
-        minOsVersion: "macOS 10.15+",
+        minOsVersion: "macOS 12+",
         architectureLabel: "Apple Silicon",
       },
       macX64Download: {
@@ -245,7 +245,7 @@ describe("Page SEO Integration", () => {
         platform: "macos-x64",
         fileName: "test-x64.dmg",
         fileExtension: ".dmg",
-        minOsVersion: "macOS 10.15+",
+        minOsVersion: "macOS 12+",
         architectureLabel: "Intel",
       },
       windowsDownload: {

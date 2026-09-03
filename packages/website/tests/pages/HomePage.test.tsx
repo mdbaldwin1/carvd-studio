@@ -21,7 +21,7 @@ vi.mock("../../src/utils/downloads", () => ({
       platform: "macos-arm64",
       fileName: "Carvd.Studio-0.1.0-arm64.dmg",
       fileExtension: ".dmg",
-      minOsVersion: "macOS 10.15+",
+      minOsVersion: "macOS 12+",
       architectureLabel: "Apple Silicon",
     },
     macX64Download: {
@@ -29,7 +29,7 @@ vi.mock("../../src/utils/downloads", () => ({
       platform: "macos-x64",
       fileName: "Carvd.Studio-0.1.0-x64.dmg",
       fileExtension: ".dmg",
-      minOsVersion: "macOS 10.15+",
+      minOsVersion: "macOS 12+",
       architectureLabel: "Intel",
     },
     windowsDownload: {
@@ -174,7 +174,7 @@ describe("HomePage", () => {
 
     it("displays system requirements", () => {
       renderHomePage();
-      expect(screen.getAllByText(/macOS 10\.15\+/i)).toHaveLength(2);
+      expect(screen.getAllByText(/macOS 12\+/i)).toHaveLength(2);
       expect(screen.getByText(/Windows 10\+/i)).toBeInTheDocument();
     });
 

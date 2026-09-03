@@ -21,7 +21,7 @@ vi.mock("../../src/utils/downloads", () => ({
       platform: "macos-arm64",
       fileName: "Carvd.Studio-0.1.0-arm64.dmg",
       fileExtension: ".dmg",
-      minOsVersion: "macOS 10.15+",
+      minOsVersion: "macOS 12+",
       architectureLabel: "Apple Silicon",
     },
     macX64Download: {
@@ -29,7 +29,7 @@ vi.mock("../../src/utils/downloads", () => ({
       platform: "macos-x64",
       fileName: "Carvd.Studio-0.1.0-x64.dmg",
       fileExtension: ".dmg",
-      minOsVersion: "macOS 10.15+",
+      minOsVersion: "macOS 12+",
       architectureLabel: "Intel",
     },
     windowsDownload: {
@@ -100,7 +100,7 @@ describe("DownloadPage", () => {
       expect(screen.getAllByText("macOS").length).toBeGreaterThan(0);
       expect(screen.getByText("Apple Silicon")).toBeInTheDocument();
       expect(screen.getByText("Intel")).toBeInTheDocument();
-      expect(screen.getAllByText("macOS 10.15+")).toHaveLength(2);
+      expect(screen.getAllByText("macOS 12+")).toHaveLength(2);
     });
 
     it("renders Windows download card", () => {
@@ -204,7 +204,7 @@ describe("DownloadPage", () => {
     it("renders macOS requirements", () => {
       renderDownloadPage();
       expect(
-        screen.getByText(/macOS 10.15 \(Catalina\) or later/i),
+        screen.getByText(/macOS 12 \(Monterey\) or later/i),
       ).toBeInTheDocument();
     });
 

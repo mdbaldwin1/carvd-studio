@@ -113,7 +113,7 @@ export function getMacDownloadInfo(
     platform: `macos-${architecture}`,
     fileName: `Carvd.Studio-${version}-${architecture}.dmg`,
     fileExtension: ".dmg",
-    minOsVersion: "macOS 10.15+",
+    minOsVersion: "macOS 12+",
     architectureLabel: isAppleSilicon ? "Apple Silicon" : "Intel",
   };
 }
