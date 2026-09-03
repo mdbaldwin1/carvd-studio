@@ -16,6 +16,12 @@ type NodeWebhookRequest = AsyncIterable<unknown> & {
 
 type WebhookRequest = Request | NodeWebhookRequest;
 
+type NodeWebhookResponse = {
+  statusCode: number;
+  setHeader(name: string, value: string): void;
+  end(body?: Buffer): void;
+};
+
 function getConfig(): WebhookConfig | null {
   const webhookSecret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET?.trim();
   const posthogProjectKey = process.env.POSTHOG_PROJECT_KEY?.trim();
@@ -105,9 +111,7 @@ function isOrderCreated(payload: unknown): payload is {
 }
 
 /** Lemon Squeezy must subscribe only to order_created for this endpoint. */
-export default async function handler(
-  request: WebhookRequest,
-): Promise<Response> {
+async function handleWebhook(request: WebhookRequest): Promise<Response> {
   if (request.method !== "POST") {
     return new Response(null, { status: 405, headers: { Allow: "POST" } });
   }
@@ -177,3 +181,23 @@ export default async function handler(
 
   return new Response(null, { status: 204 });
 }
+
+function handler(request: WebhookRequest): Promise<Response>;
+function handler(
+  request: NodeWebhookRequest,
+  response: NodeWebhookResponse,
+): Promise<void>;
+async function handler(
+  request: WebhookRequest,
+  response?: NodeWebhookResponse,
+): Promise<Response | void> {
+  const result = await handleWebhook(request);
+  if (!response) return result;
+
+  response.statusCode = result.status;
+  result.headers.forEach((value, name) => response.setHeader(name, value));
+  const body = Buffer.from(await result.arrayBuffer());
+  response.end(body.length > 0 ? body : undefined);
+}
+
+export default handler;

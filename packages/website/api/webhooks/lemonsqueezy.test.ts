@@ -178,6 +178,24 @@ describe("Lemon Squeezy webhook", () => {
     expect(response.status).toBe(204);
   });
 
+  it("writes the result through Vercel's Node response object", async () => {
+    const response = {
+      statusCode: 200,
+      setHeader: vi.fn(),
+      end: vi.fn(),
+    };
+
+    await (
+      handler as unknown as (
+        request: ReturnType<typeof signedNodeRequest>,
+        response: typeof response,
+      ) => Promise<void>
+    )(signedNodeRequest(), response);
+
+    expect(response.statusCode).toBe(204);
+    expect(response.end).toHaveBeenCalledTimes(1);
+  });
+
   it("uses the same event UUID for duplicate valid deliveries", async () => {
     await handler(signedRequest());
     await handler(signedRequest());
