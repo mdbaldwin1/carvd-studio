@@ -25,7 +25,8 @@ const warningBoxStyle = {
 export default function DownloadPage() {
   const {
     version: appVersion,
-    macDownload,
+    macArm64Download,
+    macX64Download,
     windowsDownload,
   } = useDownloadInfo();
 
@@ -64,10 +65,10 @@ export default function DownloadPage() {
             </p>
             <div className="flex flex-wrap justify-center gap-8 max-sm:flex-col max-sm:items-center">
               <a
-                href={getDownloadHref(macDownload, "download-hero-card")}
+                href={getDownloadHref(macArm64Download, "download-hero-card")}
                 onClick={() =>
                   captureDownloadClick(
-                    macDownload.platform,
+                    macArm64Download.platform,
                     "download-hero-card",
                   )
                 }
@@ -78,10 +79,31 @@ export default function DownloadPage() {
                 </span>
                 <span className="text-xl font-bold">macOS</span>
                 <span className="text-sm text-text-muted">
-                  {macDownload.fileExtension} installer
+                  {macArm64Download.architectureLabel}
                 </span>
                 <span className="mt-1 text-xs text-accent">
-                  {macDownload.minOsVersion}
+                  {macArm64Download.minOsVersion}
+                </span>
+              </a>
+              <a
+                href={getDownloadHref(macX64Download, "download-hero-card")}
+                onClick={() =>
+                  captureDownloadClick(
+                    macX64Download.platform,
+                    "download-hero-card",
+                  )
+                }
+                className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
+              >
+                <span>
+                  <AppleIcon size={32} />
+                </span>
+                <span className="text-xl font-bold">macOS</span>
+                <span className="text-sm text-text-muted">
+                  {macX64Download.architectureLabel}
+                </span>
+                <span className="mt-1 text-xs text-accent">
+                  {macX64Download.minOsVersion}
                 </span>
               </a>
               <a
@@ -131,8 +153,8 @@ export default function DownloadPage() {
                       Download the installer
                     </strong>
                     <p className="m-0 text-sm text-text-muted">
-                      Click the macOS download button above to get the .dmg
-                      file.
+                      Choose the Apple Silicon or Intel download above to get
+                      the matching .dmg file.
                     </p>
                   </div>
                 </li>
@@ -320,7 +342,7 @@ export default function DownloadPage() {
                 </li>
                 <li className="border-b border-border py-2 text-text-muted last:border-b-0">
                   <strong className="text-text">Processor:</strong> Intel or
-                  Apple Silicon
+                  Apple Silicon (separate installers)
                 </li>
                 <li className="border-b border-border py-2 text-text-muted last:border-b-0">
                   <strong className="text-text">Memory:</strong> 4 GB RAM
@@ -451,15 +473,31 @@ export default function DownloadPage() {
             <div className="mb-6 flex justify-center gap-4 max-sm:flex-col max-sm:items-center">
               <Button size="lg" asChild>
                 <a
-                  href={getDownloadHref(macDownload, "download-cta-footer")}
+                  href={getDownloadHref(
+                    macArm64Download,
+                    "download-cta-footer",
+                  )}
                   onClick={() =>
                     captureDownloadClick(
-                      macDownload.platform,
+                      macArm64Download.platform,
                       "download-cta-footer",
                     )
                   }
                 >
-                  Download for macOS
+                  macOS — Apple Silicon
+                </a>
+              </Button>
+              <Button size="lg" variant="outline" asChild>
+                <a
+                  href={getDownloadHref(macX64Download, "download-cta-footer")}
+                  onClick={() =>
+                    captureDownloadClick(
+                      macX64Download.platform,
+                      "download-cta-footer",
+                    )
+                  }
+                >
+                  macOS — Intel
                 </a>
               </Button>
               <Button size="lg" variant="outline" asChild>

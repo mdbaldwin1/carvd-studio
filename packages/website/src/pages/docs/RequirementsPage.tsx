@@ -32,7 +32,9 @@ export default function RequirementsPage() {
             <CheckItem>macOS 10.15 (Catalina) or later</CheckItem>
             <CheckItem>4 GB RAM minimum</CheckItem>
             <CheckItem>200 MB available disk space</CheckItem>
-            <CheckItem>Intel or Apple Silicon processor</CheckItem>
+            <CheckItem>
+              Intel or Apple Silicon processor (separate downloads)
+            </CheckItem>
             <CheckItem>1280&times;720 minimum display resolution</CheckItem>
           </ul>
         </div>

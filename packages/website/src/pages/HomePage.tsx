@@ -41,7 +41,8 @@ const surfaceGradientStyle = {
 export default function HomePage() {
   const {
     version: appVersion,
-    macDownload,
+    macArm64Download,
+    macX64Download,
     windowsDownload,
   } = useDownloadInfo();
 
@@ -439,9 +440,12 @@ export default function HomePage() {
             </p>
             <div className="flex flex-wrap justify-center gap-8 max-sm:flex-col max-sm:items-center">
               <a
-                href={getDownloadHref(macDownload, "home-hero-card")}
+                href={getDownloadHref(macArm64Download, "home-hero-card")}
                 onClick={() =>
-                  captureDownloadClick(macDownload.platform, "home-hero-card")
+                  captureDownloadClick(
+                    macArm64Download.platform,
+                    "home-hero-card",
+                  )
                 }
                 className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
@@ -450,10 +454,31 @@ export default function HomePage() {
                 </span>
                 <span className="text-xl font-bold">macOS</span>
                 <span className="text-sm text-text-muted">
-                  {macDownload.fileExtension} installer
+                  {macArm64Download.architectureLabel}
                 </span>
                 <span className="mt-1 text-xs text-accent">
-                  {macDownload.minOsVersion}
+                  {macArm64Download.minOsVersion}
+                </span>
+              </a>
+              <a
+                href={getDownloadHref(macX64Download, "home-hero-card")}
+                onClick={() =>
+                  captureDownloadClick(
+                    macX64Download.platform,
+                    "home-hero-card",
+                  )
+                }
+                className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
+              >
+                <span>
+                  <AppleIcon size={32} />
+                </span>
+                <span className="text-xl font-bold">macOS</span>
+                <span className="text-sm text-text-muted">
+                  {macX64Download.architectureLabel}
+                </span>
+                <span className="mt-1 text-xs text-accent">
+                  {macX64Download.minOsVersion}
                 </span>
               </a>
               <a

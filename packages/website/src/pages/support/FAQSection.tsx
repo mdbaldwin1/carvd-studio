@@ -205,7 +205,7 @@ export default function FAQSection() {
             </AccordionTrigger>
             <AccordionContent className="leading-relaxed text-text-muted max-sm:text-sm">
               <strong className="text-text">macOS:</strong> 10.15 (Catalina) or
-              later, Intel or Apple Silicon
+              later, Intel or Apple Silicon (choose the matching download)
               <br />
               <strong className="text-text">Windows:</strong> Windows 10 or
               later (64-bit)

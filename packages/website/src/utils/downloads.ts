@@ -15,11 +15,14 @@ const FALLBACK_VERSION = "0.1.0";
 export interface DownloadInfo {
   url: string;
   trackedUrl: string;
-  platform: "macos" | "windows";
+  platform: "macos-arm64" | "macos-x64" | "windows";
   fileName: string;
   fileExtension: string;
   minOsVersion: string;
+  architectureLabel?: "Apple Silicon" | "Intel";
 }
+
+export type MacArchitecture = "arm64" | "x64";
 
 /** Module-level cache for the fetched version */
 let cachedVersion: string | null = null;
@@ -47,8 +50,11 @@ export async function fetchLatestVersion(): Promise<string> {
 /**
  * Get download URL for macOS installer (.dmg)
  */
-export function getMacDownloadUrl(version: string): string {
-  return `https://github.com/${GITHUB_REPO}/releases/download/v${version}/Carvd.Studio-${version}-arm64.dmg`;
+export function getMacDownloadUrl(
+  version: string,
+  architecture: MacArchitecture,
+): string {
+  return `https://github.com/${GITHUB_REPO}/releases/download/v${version}/Carvd.Studio-${version}-${architecture}.dmg`;
 }
 
 /**
@@ -59,7 +65,7 @@ export function getWindowsDownloadUrl(version: string): string {
 }
 
 export function getTrackedDownloadUrl(
-  platform: "macos" | "windows",
+  platform: DownloadInfo["platform"],
   source: string = "website",
 ): string {
   const encodedSource = encodeURIComponent(source);
@@ -96,14 +102,19 @@ export function captureDownloadClick(
 /**
  * Get full download info for macOS
  */
-export function getMacDownloadInfo(version: string): DownloadInfo {
+export function getMacDownloadInfo(
+  version: string,
+  architecture: MacArchitecture,
+): DownloadInfo {
+  const isAppleSilicon = architecture === "arm64";
   return {
-    url: getMacDownloadUrl(version),
-    trackedUrl: getTrackedDownloadUrl("macos"),
-    platform: "macos",
-    fileName: `Carvd.Studio-${version}-arm64.dmg`,
+    url: getMacDownloadUrl(version, architecture),
+    trackedUrl: getTrackedDownloadUrl(`macos-${architecture}`),
+    platform: `macos-${architecture}`,
+    fileName: `Carvd.Studio-${version}-${architecture}.dmg`,
     fileExtension: ".dmg",
     minOsVersion: "macOS 10.15+",
+    architectureLabel: isAppleSilicon ? "Apple Silicon" : "Intel",
   };
 }
 
@@ -124,7 +135,8 @@ export function getWindowsDownloadInfo(version: string): DownloadInfo {
 export interface UseDownloadInfoResult {
   loading: boolean;
   version: string;
-  macDownload: DownloadInfo;
+  macArm64Download: DownloadInfo;
+  macX64Download: DownloadInfo;
   windowsDownload: DownloadInfo;
 }
 
@@ -152,7 +164,8 @@ export function useDownloadInfo(): UseDownloadInfoResult {
   return {
     loading,
     version,
-    macDownload: getMacDownloadInfo(version),
+    macArm64Download: getMacDownloadInfo(version, "arm64"),
+    macX64Download: getMacDownloadInfo(version, "x64"),
     windowsDownload: getWindowsDownloadInfo(version),
   };
 }

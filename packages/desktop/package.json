@@ -19,7 +19,7 @@
     "preview": "unset ELECTRON_RUN_AS_NODE && electron-vite preview",
     "prepare:runtime-deps": "npm install --omit=dev --workspaces=false",
     "package": "npm run build && npm run prepare:runtime-deps && electron-builder --mac zip --arm64",
-    "package:mac": "npm run build && npm run prepare:runtime-deps && electron-builder --mac zip --arm64",
+    "package:mac": "npm run build && npm run prepare:runtime-deps && electron-builder --mac --arm64 --x64",
     "package:mac:dmg": "npm run build && npm run prepare:runtime-deps && electron-builder --mac dmg --arm64",
     "package:mac:x64": "npm run build && npm run prepare:runtime-deps && electron-builder --mac --x64",
     "package:mac:universal": "npm run build && npm run prepare:runtime-deps && electron-builder --mac --universal",

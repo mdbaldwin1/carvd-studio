@@ -7,24 +7,30 @@ import { captureDownloadClick } from "../../src/utils/downloads";
 // Mock the downloads utility
 vi.mock("../../src/utils/downloads", () => ({
   captureDownloadClick: vi.fn(),
-  getTrackedDownloadUrl: (platform: "macos" | "windows", source = "website") =>
+  getTrackedDownloadUrl: (platform: string, source = "website") =>
     `/api/download?platform=${platform}&source=${encodeURIComponent(source)}`,
-  getDownloadHref: (
-    download: { platform: "macos" | "windows" },
-    source = "website",
-  ) =>
+  getDownloadHref: (download: { platform: string }, source = "website") =>
     `/api/download?platform=${download.platform}&source=${encodeURIComponent(
       source,
     )}`,
   useDownloadInfo: () => ({
     loading: false,
     version: "0.1.0",
-    macDownload: {
+    macArm64Download: {
       url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg",
-      platform: "macos",
+      platform: "macos-arm64",
       fileName: "Carvd.Studio-0.1.0-arm64.dmg",
       fileExtension: ".dmg",
       minOsVersion: "macOS 10.15+",
+      architectureLabel: "Apple Silicon",
+    },
+    macX64Download: {
+      url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-x64.dmg",
+      platform: "macos-x64",
+      fileName: "Carvd.Studio-0.1.0-x64.dmg",
+      fileExtension: ".dmg",
+      minOsVersion: "macOS 10.15+",
+      architectureLabel: "Intel",
     },
     windowsDownload: {
       url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio.Setup.0.1.0.exe",
@@ -83,7 +89,7 @@ describe("DownloadPage", () => {
       fireEvent.click(screen.getAllByRole("link", { name: /macOS/i })[0]);
 
       expect(captureDownloadClick).toHaveBeenCalledWith(
-        "macos",
+        "macos-arm64",
         "download-hero-card",
       );
     });
@@ -92,8 +98,9 @@ describe("DownloadPage", () => {
       renderDownloadPage();
       // "macOS" appears in download card, installation section, and system requirements
       expect(screen.getAllByText("macOS").length).toBeGreaterThan(0);
-      expect(screen.getByText(".dmg installer")).toBeInTheDocument();
-      expect(screen.getByText("macOS 10.15+")).toBeInTheDocument();
+      expect(screen.getByText("Apple Silicon")).toBeInTheDocument();
+      expect(screen.getByText("Intel")).toBeInTheDocument();
+      expect(screen.getAllByText("macOS 10.15+")).toHaveLength(2);
     });
 
     it("renders Windows download card", () => {
@@ -114,7 +121,11 @@ describe("DownloadPage", () => {
       );
       expect(macLinks[0]).toHaveAttribute(
         "href",
-        expect.stringContaining("platform=macos"),
+        expect.stringContaining("platform=macos-arm64"),
+      );
+      expect(macLinks[1]).toHaveAttribute(
+        "href",
+        expect.stringContaining("platform=macos-x64"),
       );
     });
 
@@ -292,7 +303,10 @@ describe("DownloadPage", () => {
     it("renders CTA download buttons", () => {
       renderDownloadPage();
       expect(
-        screen.getByRole("link", { name: /Download for macOS/i }),
+        screen.getByRole("link", { name: /macOS — Apple Silicon/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /macOS — Intel/i }),
       ).toBeInTheDocument();
       expect(
         screen.getByRole("link", { name: /Download for Windows/i }),

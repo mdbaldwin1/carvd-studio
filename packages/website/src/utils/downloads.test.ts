@@ -23,9 +23,15 @@ beforeEach(() => {
 
 describe("downloads", () => {
   describe("getMacDownloadUrl", () => {
-    it("returns correct URL for a given version", () => {
-      expect(getMacDownloadUrl("1.2.3")).toBe(
+    it("returns the Apple Silicon URL for a given version", () => {
+      expect(getMacDownloadUrl("1.2.3", "arm64")).toBe(
         "https://github.com/mdbaldwin1/carvd-studio/releases/download/v1.2.3/Carvd.Studio-1.2.3-arm64.dmg",
+      );
+    });
+
+    it("returns the Intel URL for a given version", () => {
+      expect(getMacDownloadUrl("1.2.3", "x64")).toBe(
+        "https://github.com/mdbaldwin1/carvd-studio/releases/download/v1.2.3/Carvd.Studio-1.2.3-x64.dmg",
       );
     });
   });
@@ -39,9 +45,9 @@ describe("downloads", () => {
   });
 
   describe("getTrackedDownloadUrl", () => {
-    it("returns tracked macOS endpoint", () => {
-      expect(getTrackedDownloadUrl("macos", "download-page")).toBe(
-        "/api/download?platform=macos&source=download-page",
+    it("returns an architecture-specific tracked macOS endpoint", () => {
+      expect(getTrackedDownloadUrl("macos-x64", "download-page")).toBe(
+        "/api/download?platform=macos-x64&source=download-page",
       );
     });
 
@@ -115,15 +121,16 @@ describe("downloads", () => {
   });
 
   describe("getMacDownloadInfo", () => {
-    it("returns complete download info", () => {
-      const info = getMacDownloadInfo("0.1.0");
+    it("returns complete Intel download info", () => {
+      const info = getMacDownloadInfo("0.1.0", "x64");
       expect(info).toEqual({
-        url: "https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg",
-        trackedUrl: "/api/download?platform=macos&source=website",
-        platform: "macos",
-        fileName: "Carvd.Studio-0.1.0-arm64.dmg",
+        url: "https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio-0.1.0-x64.dmg",
+        trackedUrl: "/api/download?platform=macos-x64&source=website",
+        platform: "macos-x64",
+        fileName: "Carvd.Studio-0.1.0-x64.dmg",
         fileExtension: ".dmg",
         minOsVersion: "macOS 10.15+",
+        architectureLabel: "Intel",
       });
     });
   });
