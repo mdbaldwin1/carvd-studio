@@ -253,7 +253,7 @@ export default function DocsLayout() {
                   >
                     <a href="/download">Download Free Trial</a>
                   </Button>
-                  <BuyButton />
+                  <BuyButton location="docs-cta" />
                 </div>
               </div>
             </div>

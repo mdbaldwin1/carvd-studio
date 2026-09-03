@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { websiteAnalytics } from "../analytics/analytics";
 import {
   getMacDownloadUrl,
   getWindowsDownloadUrl,
@@ -8,7 +9,12 @@ import {
   getWindowsDownloadInfo,
   fetchLatestVersion,
   _resetCache,
+  captureDownloadClick,
 } from "./downloads";
+
+vi.mock("../analytics/analytics", () => ({
+  websiteAnalytics: { capture: vi.fn() },
+}));
 
 beforeEach(() => {
   _resetCache();
@@ -81,6 +87,30 @@ describe("downloads", () => {
       expect(href).toContain("/api/download");
       expect(href).toContain("platform=windows");
       expect(href).toContain("source=download-hero-card");
+    });
+  });
+
+  describe("captureDownloadClick", () => {
+    it("captures the platform and stable location without affecting navigation", () => {
+      captureDownloadClick("macos", "download-hero-card");
+
+      expect(websiteAnalytics.capture).toHaveBeenCalledWith(
+        "download_clicked",
+        {
+          platform: "macos",
+          location: "download-hero-card",
+        },
+      );
+    });
+
+    it("contains analytics failures", () => {
+      vi.mocked(websiteAnalytics.capture).mockImplementationOnce(() => {
+        throw new Error("offline");
+      });
+
+      expect(() =>
+        captureDownloadClick("windows", "download-cta-footer"),
+      ).not.toThrow();
     });
   });
 

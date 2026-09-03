@@ -141,6 +141,9 @@ jobs:
         working-directory: packages/desktop
 
       - name: Build desktop app
+        env:
+          MAIN_VITE_POSTHOG_KEY: ${{ vars.MAIN_VITE_POSTHOG_KEY }}
+          MAIN_VITE_POSTHOG_HOST: ${{ vars.MAIN_VITE_POSTHOG_HOST }}
         run: npm run build --workspace=@carvd/desktop
 
       - name: Import Apple certificate (macOS only)

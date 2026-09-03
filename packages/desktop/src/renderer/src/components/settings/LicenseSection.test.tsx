@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { LicenseSection } from './LicenseSection';
+import { analytics } from '@renderer/utils/analytics';
+
+vi.mock('@renderer/utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 
 beforeAll(() => {
   window.confirm = vi.fn();
@@ -104,6 +107,17 @@ describe('LicenseSection', () => {
       expect(link).toBeInTheDocument();
       expect(link.getAttribute('href')).toBe('https://carvd-studio.com/pricing');
       expect(link.getAttribute('target')).toBe('_blank');
+    });
+
+    it('records the settings checkout link with its current license mode', () => {
+      render(<LicenseSection licenseMode="free" licenseData={licenseData} onClose={vi.fn()} />);
+
+      fireEvent.click(screen.getByText('Purchase License'));
+
+      expect(analytics.capture).toHaveBeenCalledWith('checkout_opened', {
+        surface: 'settings',
+        license_mode: 'free'
+      });
     });
 
     it('shows enter license key button when callback provided', () => {

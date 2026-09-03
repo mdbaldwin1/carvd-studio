@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
+import { analytics } from '../../utils/analytics';
 import type { CutList, StockSummary, CustomShoppingItem } from '../../types';
+
+vi.mock('../../utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 
 // Mock logger
 vi.mock('../../utils/logger', () => ({
@@ -15,8 +19,9 @@ vi.mock('../../utils/featureLimits', () => ({
 }));
 
 // Mock pdfExport (dynamic import)
+const mockExportShoppingListToPdf = vi.fn().mockResolvedValue({ success: true, filePath: '/tmp/shopping.pdf' });
 vi.mock('../../utils/pdfExport', () => ({
-  exportShoppingListToPdf: vi.fn().mockResolvedValue({ success: true }),
+  exportShoppingListToPdf: (...args: unknown[]) => mockExportShoppingListToPdf(...args),
   exportShoppingListToCsv: vi.fn().mockReturnValue('Name,Qty,Price\nPlywood,2,$50.00')
 }));
 
@@ -93,6 +98,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockExportShoppingListToPdf.mockResolvedValue({ success: true, filePath: '/tmp/shopping.pdf' });
   useProjectStore.setState({
     customShoppingItems: [],
     addCustomShoppingItem: vi.fn(),
@@ -158,6 +164,50 @@ describe('ShoppingListTab', () => {
       render(<ShoppingListTab {...defaultProps} />);
       expect(screen.getByText('Waste value:')).toBeInTheDocument();
       expect(screen.getByText(/\$25.00/)).toBeInTheDocument();
+    });
+  });
+
+  describe('export analytics', () => {
+    it('records each successful shopping-list PDF and CSV completion', async () => {
+      const user = userEvent.setup();
+      (window.electronAPI.showSaveDialog as ReturnType<typeof vi.fn>).mockResolvedValue({
+        canceled: false,
+        filePath: '/tmp/shopping.csv'
+      });
+      (window.electronAPI.writeFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+      render(<ShoppingListTab {...defaultProps} />);
+
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
+      await waitFor(() =>
+        expect(analytics.capture).toHaveBeenCalledWith('export_completed', {
+          export_type: 'shopping_pdf',
+          success: true
+        })
+      );
+      expect(analytics.capture).toHaveBeenCalledTimes(1);
+
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download csv/i }));
+      await waitFor(() =>
+        expect(analytics.capture).toHaveBeenCalledWith('export_completed', {
+          export_type: 'shopping_csv',
+          success: true
+        })
+      );
+      expect(analytics.capture).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not record a canceled shopping-list CSV export', async () => {
+      const user = userEvent.setup();
+      (window.electronAPI.showSaveDialog as ReturnType<typeof vi.fn>).mockResolvedValue({ canceled: true });
+      render(<ShoppingListTab {...defaultProps} />);
+
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download csv/i }));
+
+      await waitFor(() => expect(window.electronAPI.showSaveDialog).toHaveBeenCalledTimes(1));
+      expect(analytics.capture).not.toHaveBeenCalled();
     });
   });
 

@@ -14,7 +14,7 @@ export const supportFAQs = [
   {
     question: "Do I need internet to use Carvd Studio?",
     answer:
-      "No. Carvd Studio works completely offline. Internet is only needed for license activation and checking for updates.",
+      "Core desktop editing works offline. Internet may be used for optional analytics, license activation, and updates; analytics never includes design content.",
   },
   {
     question: "Is there a free trial?",
@@ -59,9 +59,10 @@ export default function FAQSection() {
               Do I need internet to use Carvd Studio?
             </AccordionTrigger>
             <AccordionContent className="leading-relaxed text-text-muted max-sm:text-sm">
-              No! Carvd Studio is designed to work completely offline. Your
-              projects are saved locally on your computer. Internet is only
-              needed for license activation and checking for updates.
+              Core project editing works offline. Your project files are saved
+              locally on your computer. Optional anonymous analytics never
+              includes design content; internet is used for license activation,
+              analytics you consent to, and updates.
             </AccordionContent>
           </AccordionItem>
 

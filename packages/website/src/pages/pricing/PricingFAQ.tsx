@@ -28,7 +28,8 @@ export const pricingFAQs = [
   },
   {
     question: "Will it work offline?",
-    answer: "Yes. Carvd Studio works 100% offline. No internet required, ever.",
+    answer:
+      "Yes. Core project editing works offline. Internet is used for license activation and updates, and optional analytics only with your consent.",
   },
 ];
 
@@ -103,9 +104,10 @@ export default function PricingFAQ() {
             Will it work offline?
           </AccordionTrigger>
           <AccordionContent className="text-text-muted">
-            Yes. Carvd Studio works 100% offline. Take your laptop to job sites,
-            work in your shop without WiFi, design anywhere. No internet
-            required, ever.
+            Yes. Core project editing works offline, so you can design at job
+            sites or in your shop without WiFi. Internet is used for license
+            activation and updates, and optional analytics only with your
+            consent.
           </AccordionContent>
         </AccordionItem>
 

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { useProjectStore } from '../store/projectStore';
 
+vi.mock('./analytics', () => ({ analytics: { capture: vi.fn() } }));
+
 // Mock fileFormat module
 vi.mock('./fileFormat', () => ({
   serializeProject: vi.fn().mockReturnValue({ version: '1.0', projectName: 'Test' }),
@@ -50,6 +52,7 @@ import {
 import { parseCarvdFile, deserializeToProject, repairCarvdFile } from './fileFormat';
 import type { CarvdFile, Part } from '../types';
 import { generateThumbnail } from '../store/projectStore';
+import { analytics } from './analytics';
 
 // ============================================================
 // Setup
@@ -115,6 +118,7 @@ describe('saveProject', () => {
     expect(result.success).toBe(false);
     expect(result.canceled).toBe(true);
     expect(window.electronAPI.showSaveDialog).toHaveBeenCalled();
+    expect(analytics.capture).not.toHaveBeenCalled();
   });
 
   it('saves to existing path when filePath is set', async () => {
@@ -126,6 +130,29 @@ describe('saveProject', () => {
     expect(result.success).toBe(true);
     expect(result.filePath).toBe('/path/to/project.carvd');
     expect(window.electronAPI.showSaveDialog).not.toHaveBeenCalled();
+  });
+
+  it('captures a manual save only after the existing file write succeeds', async () => {
+    useProjectStore.setState({ filePath: '/path/to/project.carvd', parts: [{ id: 'part-1' }] as Part[] });
+    (window.electronAPI.writeFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (window.electronAPI.addRecentProject as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+    await saveProject();
+
+    expect(analytics.capture).toHaveBeenCalledTimes(1);
+    expect(analytics.capture).toHaveBeenCalledWith('project_saved', {
+      save_kind: 'manual',
+      part_count_bucket: '1-5'
+    });
+  });
+
+  it('does not capture a failed save', async () => {
+    useProjectStore.setState({ filePath: '/path/to/project.carvd' });
+    (window.electronAPI.writeFile as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Disk full'));
+
+    await saveProject();
+
+    expect(analytics.capture).not.toHaveBeenCalled();
   });
 });
 
@@ -143,6 +170,7 @@ describe('saveProjectAs', () => {
     const result = await saveProjectAs();
     expect(result.success).toBe(false);
     expect(result.canceled).toBe(true);
+    expect(analytics.capture).not.toHaveBeenCalled();
   });
 
   it('returns canceled when filePath is empty', async () => {
@@ -167,6 +195,23 @@ describe('saveProjectAs', () => {
     const result = await saveProjectAs();
     expect(result.success).toBe(true);
     expect(result.filePath).toBe('/new/path/MyProject.carvd');
+  });
+
+  it('captures a Save As only after the selected file is written', async () => {
+    (window.electronAPI.showSaveDialog as ReturnType<typeof vi.fn>).mockResolvedValue({
+      canceled: false,
+      filePath: '/new/path/MyProject.carvd'
+    });
+    (window.electronAPI.writeFile as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (window.electronAPI.addRecentProject as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+
+    await saveProjectAs();
+
+    expect(analytics.capture).toHaveBeenCalledTimes(1);
+    expect(analytics.capture).toHaveBeenCalledWith('project_saved', {
+      save_kind: 'save_as',
+      part_count_bucket: '0'
+    });
   });
 
   it('updates project name from chosen filename', async () => {

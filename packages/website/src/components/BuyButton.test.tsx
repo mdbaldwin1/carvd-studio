@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import BuyButton from "./BuyButton";
+import { websiteAnalytics } from "../analytics/analytics";
+
+vi.mock("../analytics/analytics", () => ({
+  websiteAnalytics: { capture: vi.fn() },
+}));
 
 // Helper to render with router
 const renderWithRouter = (ui: React.ReactElement) => {
@@ -12,6 +17,7 @@ describe("BuyButton", () => {
   beforeEach(() => {
     vi.resetModules();
     (window.open as ReturnType<typeof vi.fn>).mockClear();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -85,6 +91,63 @@ describe("BuyButton", () => {
 
       fireEvent.click(button);
 
+      expect(window.open).toHaveBeenCalledWith(checkoutUrl, "_blank");
+    });
+
+    it("captures checkout with its stable location before opening checkout", async () => {
+      const checkoutUrl = "https://store.lemonsqueezy.com/checkout/buy/123";
+      vi.stubEnv("VITE_LEMON_SQUEEZY_CHECKOUT_URL", checkoutUrl);
+      const { default: BuyButtonFresh } = await import("./BuyButton");
+      renderWithRouter(<BuyButtonFresh location="home-cta" />);
+
+      fireEvent.click(screen.getByRole("link"));
+
+      expect(websiteAnalytics.capture).toHaveBeenCalledWith(
+        "checkout_started",
+        {
+          product: "desktop_license",
+          location: "home-cta",
+        },
+      );
+      expect(window.open).toHaveBeenCalledWith(checkoutUrl, "_blank");
+      expect(
+        vi.mocked(websiteAnalytics.capture).mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        (window.open as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0],
+      );
+    });
+
+    it("uses pricing-card as its default checkout location", async () => {
+      vi.stubEnv(
+        "VITE_LEMON_SQUEEZY_CHECKOUT_URL",
+        "https://store.lemonsqueezy.com/checkout/buy/123",
+      );
+      const { default: BuyButtonFresh } = await import("./BuyButton");
+      renderWithRouter(<BuyButtonFresh />);
+
+      fireEvent.click(screen.getByRole("link"));
+
+      expect(websiteAnalytics.capture).toHaveBeenCalledWith(
+        "checkout_started",
+        {
+          product: "desktop_license",
+          location: "pricing-card",
+        },
+      );
+    });
+
+    it("opens checkout when analytics capture fails", async () => {
+      const checkoutUrl = "https://store.lemonsqueezy.com/checkout/buy/123";
+      vi.stubEnv("VITE_LEMON_SQUEEZY_CHECKOUT_URL", checkoutUrl);
+      vi.mocked(websiteAnalytics.capture).mockImplementationOnce(() => {
+        throw new Error("offline");
+      });
+      const { default: BuyButtonFresh } = await import("./BuyButton");
+      renderWithRouter(<BuyButtonFresh />);
+
+      fireEvent.click(screen.getByRole("link"));
+
+      expect(websiteAnalytics.capture).toHaveBeenCalledTimes(1);
       expect(window.open).toHaveBeenCalledWith(checkoutUrl, "_blank");
     });
 

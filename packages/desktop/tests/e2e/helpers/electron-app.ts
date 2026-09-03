@@ -40,6 +40,12 @@ export interface RunningElectronApp {
   consoleMessages: string[];
 }
 
+export interface LaunchElectronAppOptions {
+  analyticsMode?: 'success' | 'offline' | 'timeout';
+  analyticsConsent?: 'unknown' | 'granted' | 'denied';
+  userDataDir?: string;
+}
+
 export type ProjectSnapshot = {
   projectName: string;
   parts: Array<{
@@ -85,41 +91,64 @@ export type ProjectSnapshot = {
   activeSession: unknown;
 };
 
-export async function launchElectronApp(): Promise<RunningElectronApp> {
+export async function launchElectronApp(options: LaunchElectronAppOptions = {}): Promise<RunningElectronApp> {
   const appPath = path.resolve(__dirname, '../../..');
-  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'carvd-e2e-'));
-  const args = [appPath, '--test-mode', `--user-data-dir=${userDataDir}`];
+  const isNewProfile = options.userDataDir === undefined;
+  const userDataDir = options.userDataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'carvd-e2e-'));
+  const analyticsConsent = options.analyticsConsent ?? (isNewProfile ? 'denied' : undefined);
+  if (analyticsConsent) {
+    const preferencesPath = path.join(userDataDir, 'preferences.json');
+    const existingPreferences = fs.existsSync(preferencesPath)
+      ? (JSON.parse(fs.readFileSync(preferencesPath, 'utf8')) as Record<string, unknown>)
+      : {};
+    fs.writeFileSync(preferencesPath, JSON.stringify({ ...existingPreferences, analyticsConsent }), 'utf8');
+  }
+  const args = [appPath, '--test-mode', '--analytics-e2e-control', `--user-data-dir=${userDataDir}`];
   if (process.env.CI) {
     args.unshift('--no-sandbox');
   }
 
-  const electronApp = await electron.launch({
-    args,
-    env: {
-      ...process.env,
-      NODE_ENV: 'test'
+  let electronApp: ElectronApplication | undefined;
+  try {
+    electronApp = await electron.launch({
+      args,
+      env: {
+        ...process.env,
+        NODE_ENV: 'test',
+        CARVD_E2E_ANALYTICS_MODE: options.analyticsMode ?? 'success'
+      }
+    });
+
+    const window = await getMainWindow(electronApp);
+    await window.setViewportSize({ width: 1400, height: 900 });
+    await waitForAutomationHooks(window);
+
+    const consoleMessages: string[] = [];
+    window.on('console', (msg) => {
+      const text = `[${msg.type()}] ${msg.text()}`;
+      consoleMessages.push(text);
+      if (msg.type() === 'error') {
+        console.log(`[E2E Console] ${text}`);
+      }
+    });
+    window.on('pageerror', (error) => {
+      const text = `[pageerror] ${error.message}`;
+      consoleMessages.push(text);
+      console.log(`[E2E] ${text}`);
+    });
+
+    return { electronApp, window, userDataDir, consoleMessages };
+  } catch (error) {
+    await closeElectronProcess(electronApp);
+    if (isNewProfile) {
+      try {
+        await fs.promises.rm(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+      } catch {
+        // Cleanup is best-effort; preserve the original launch error for diagnosis.
+      }
     }
-  });
-
-  const window = await getMainWindow(electronApp);
-  await window.setViewportSize({ width: 1400, height: 900 });
-  await waitForAutomationHooks(window);
-
-  const consoleMessages: string[] = [];
-  window.on('console', (msg) => {
-    const text = `[${msg.type()}] ${msg.text()}`;
-    consoleMessages.push(text);
-    if (msg.type() === 'error') {
-      console.log(`[E2E Console] ${text}`);
-    }
-  });
-  window.on('pageerror', (error) => {
-    const text = `[pageerror] ${error.message}`;
-    consoleMessages.push(text);
-    console.log(`[E2E] ${text}`);
-  });
-
-  return { electronApp, window, userDataDir, consoleMessages };
+    throw error;
+  }
 }
 
 export async function waitForAutomationHooks(window: Page): Promise<void> {
@@ -136,8 +165,17 @@ export async function waitForAutomationHooks(window: Page): Promise<void> {
   );
 }
 
-export async function closeElectronApp(running: RunningElectronApp | undefined): Promise<void> {
+export async function closeElectronApp(
+  running: RunningElectronApp | undefined,
+  options: { removeUserData?: boolean } = {}
+): Promise<void> {
   if (!running) return;
+  let proc: ReturnType<ElectronApplication['process']> | undefined;
+  try {
+    proc = running.electronApp.process();
+  } catch {
+    // A failed launch can leave Playwright's ElectronApplication wrapper unusable.
+  }
   try {
     await Promise.race([
       running.electronApp.close(),
@@ -146,12 +184,70 @@ export async function closeElectronApp(running: RunningElectronApp | undefined):
   } catch {
     try {
       const signal = process.platform === 'win32' ? undefined : 'SIGKILL';
-      running.electronApp.process().kill(signal);
+      proc?.kill(signal);
     } catch {
       // Process may already be gone.
     }
   }
-  fs.rmSync(running.userDataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 250 });
+  // Wait for the process to fully exit before removing the temp profile —
+  // Chromium releases its file locks (e.g. cache journals on Windows, which
+  // otherwise surface as EBUSY) only after exit, not when close() resolves.
+  if (proc)
+    await new Promise<void>((resolve) => {
+      if (proc.exitCode !== null || proc.signalCode !== null) {
+        resolve();
+        return;
+      }
+      const timer = setTimeout(resolve, 5000);
+      proc.once('exit', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  if (options.removeUserData === false) return;
+  try {
+    await fs.promises.rm(running.userDataDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 500
+    });
+  } catch {
+    // Best-effort cleanup: a stray temp profile is harmless and must never
+    // fail a test from teardown.
+  }
+}
+
+async function closeElectronProcess(electronApp: ElectronApplication | undefined): Promise<void> {
+  if (!electronApp) return;
+  let proc: ReturnType<ElectronApplication['process']> | undefined;
+  try {
+    proc = electronApp.process();
+  } catch {
+    // The wrapper may be only partially initialized.
+  }
+  try {
+    await Promise.race([
+      electronApp.close(),
+      new Promise<void>((_, reject) => setTimeout(() => reject(new Error('close timeout')), 5000))
+    ]);
+  } catch {
+    try {
+      proc?.kill(process.platform === 'win32' ? undefined : 'SIGKILL');
+    } catch {
+      // Process may already be gone.
+    }
+  }
+  if (proc) {
+    await new Promise<void>((resolve) => {
+      if (proc.exitCode !== null || proc.signalCode !== null) return resolve();
+      const timer = setTimeout(resolve, 5000);
+      proc.once('exit', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+  }
 }
 
 export async function getMainWindow(electronApp: ElectronApplication): Promise<Page> {

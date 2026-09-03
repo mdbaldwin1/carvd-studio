@@ -256,20 +256,21 @@ export default function FeaturesPage() {
                       Your Work Stays Private
                     </h2>
                     <p className="text-lg text-text-muted">
-                      No cloud. No tracking. No BS.
+                      No cloud for your project files. Optional analytics never
+                      includes design content.
                     </p>
                   </div>
                 </div>
                 <div className="grid gap-4">
                   <div>
                     <h3 className="mb-2 text-xl font-bold">
-                      100% Offline Operation
+                      Offline-First Project Editing
                     </h3>
                     <p className="mb-4 text-text-muted">
-                      Work anywhere: in your shop, at job sites, on the road. No
-                      internet required, ever. Everything runs locally on your
-                      computer. Fast, reliable, and always available when you
-                      need it.
+                      Core project editing works offline, so you can work in
+                      your shop, at job sites, or on the road. Internet is used
+                      for license activation, updates, and optional analytics
+                      only with your consent.
                     </p>
                   </div>
                   <div>
@@ -278,9 +279,9 @@ export default function FeaturesPage() {
                     </h3>
                     <p className="mb-4 text-text-muted">
                       Your designs belong to you, not us. No cloud uploads, no
-                      data collection, no tracking. We'll never see your designs
-                      or sell your information. Your intellectual property stays
-                      on your computer where it belongs.
+                      design-content collection. We'll never see your designs or
+                      sell your information. Your intellectual property stays on
+                      your computer where it belongs.
                     </p>
                   </div>
                   <div>
@@ -416,7 +417,7 @@ export default function FeaturesPage() {
                 <Button size="lg" asChild>
                   <a href="/download">Download Free Trial</a>
                 </Button>
-                <BuyButton />
+                <BuyButton location="features-cta" />
               </div>
               <p className="text-sm text-text-muted">
                 ✓ 30-day money-back guarantee &nbsp;•&nbsp; ✓ No subscription

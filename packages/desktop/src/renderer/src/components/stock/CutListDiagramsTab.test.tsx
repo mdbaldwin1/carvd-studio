@@ -3,7 +3,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useProjectStore } from '../../store/projectStore';
 import { useUIStore } from '../../store/uiStore';
+import { analytics } from '../../utils/analytics';
 import type { CutList, StockBoard } from '../../types';
+
+vi.mock('../../utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 
 // Mock logger
 vi.mock('../../utils/logger', () => ({
@@ -399,6 +402,23 @@ describe('CutListDiagramsTab', () => {
       });
     });
 
+    it('records a completed cutting-diagrams PDF export', async () => {
+      const user = userEvent.setup();
+      mockExportDiagramsToPdf.mockResolvedValueOnce({ success: true, filePath: '/tmp/diagrams.pdf' });
+      render(<CutListDiagramsTab {...defaultProps} />);
+
+      await user.click(screen.getByText('Download'));
+      await user.click(screen.getByRole('menuitem', { name: /download pdf/i }));
+
+      await waitFor(() => {
+        expect(analytics.capture).toHaveBeenCalledTimes(1);
+        expect(analytics.capture).toHaveBeenCalledWith('export_completed', {
+          export_type: 'cut_diagrams_pdf',
+          success: true
+        });
+      });
+    });
+
     it('shows error toast on PDF export error result', async () => {
       const user = userEvent.setup();
       mockExportDiagramsToPdf.mockResolvedValueOnce({ success: false, error: 'Save failed' });
@@ -429,6 +449,7 @@ describe('CutListDiagramsTab', () => {
 
       const toast = useUIStore.getState().toast;
       expect(toast).toBeNull();
+      expect(analytics.capture).not.toHaveBeenCalled();
     });
 
     it('shows error toast when PDF export throws', async () => {

@@ -1,3 +1,5 @@
+import type { AnalyticsConsent, DesktopAnalyticsEvent } from '../../shared/analytics';
+
 // Type definitions for the Electron API exposed via preload
 export interface ElectronAPI {
   onOpenProject: (callback: (filePath: string) => void) => () => void;
@@ -5,6 +7,9 @@ export interface ElectronAPI {
   onMenuCommand: (callback: (command: string, ...args: unknown[]) => void) => () => void;
   getPreference: (key: string) => Promise<unknown>;
   setPreference: (key: string, value: unknown) => Promise<void>;
+  captureAnalytics: (event: DesktopAnalyticsEvent) => void;
+  getAnalyticsConsent: () => Promise<AnalyticsConsent>;
+  setAnalyticsConsent: (consent: AnalyticsConsent, surface: 'onboarding' | 'settings') => Promise<{ success: boolean }>;
   showSaveDialog: (options: Electron.SaveDialogOptions) => Promise<Electron.SaveDialogReturnValue>;
   showOpenDialog: (options: Electron.OpenDialogOptions) => Promise<Electron.OpenDialogReturnValue>;
   readFile: (filePath: string) => Promise<string>;

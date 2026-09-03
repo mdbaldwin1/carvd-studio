@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import DownloadPage from "../../src/pages/DownloadPage";
+import { captureDownloadClick } from "../../src/utils/downloads";
 
 // Mock the downloads utility
 vi.mock("../../src/utils/downloads", () => ({
+  captureDownloadClick: vi.fn(),
   getTrackedDownloadUrl: (platform: "macos" | "windows", source = "website") =>
     `/api/download?platform=${platform}&source=${encodeURIComponent(source)}`,
   getDownloadHref: (
@@ -75,6 +77,17 @@ describe("DownloadPage", () => {
   });
 
   describe("download cards", () => {
+    it("records the platform and stable location before the download link navigates", () => {
+      renderDownloadPage();
+
+      fireEvent.click(screen.getAllByRole("link", { name: /macOS/i })[0]);
+
+      expect(captureDownloadClick).toHaveBeenCalledWith(
+        "macos",
+        "download-hero-card",
+      );
+    });
+
     it("renders macOS download card", () => {
       renderDownloadPage();
       // "macOS" appears in download card, installation section, and system requirements
@@ -203,6 +216,9 @@ describe("DownloadPage", () => {
       expect(
         screen.getByText(/Do I need an internet connection\?/i),
       ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/no internet required/i),
+      ).not.toBeInTheDocument();
     });
 
     it("renders update question", () => {

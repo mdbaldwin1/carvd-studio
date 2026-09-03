@@ -80,6 +80,17 @@ import {
   simulateTrialDaysRemaining,
   simulateTrialExpired
 } from './trial';
+import {
+  captureAnalytics,
+  flushAnalytics,
+  getAnalyticsConsent,
+  initializeAnalytics,
+  setAnalyticsConsent,
+  shutdownAnalytics
+} from './analytics/analyticsService';
+import { registerAnalyticsIpcHandlers } from './analytics/analyticsIpc';
+import { registerAnalyticsLifecycle } from './analytics/analyticsLifecycle';
+import { createDesktopAnalyticsContext } from './analytics/posthogTransport';
 
 const isTestMode = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
 const queuedTestSaveDialogPaths: string[] = [];
@@ -373,6 +384,7 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     icon: appIconPath ?? undefined,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      additionalArguments: analyticsTestControlsEnabled ? ['--analytics-e2e-control'] : [],
       contextIsolation: true,
       nodeIntegration: false,
       // SECURITY NOTE: Sandbox is disabled because the preload script requires
@@ -1290,6 +1302,35 @@ ipcMain.handle('get-update-info', () => {
   return getUpdateInfo();
 });
 
+registerAnalyticsIpcHandlers(ipcMain, {
+  capture: captureAnalytics,
+  getConsent: getAnalyticsConsent,
+  setConsent: setAnalyticsConsent
+});
+
+const analyticsTestControlsEnabled =
+  import.meta.env.MAIN_VITE_ANALYTICS_E2E === '1' &&
+  process.argv.includes('--test-mode') &&
+  process.argv.includes('--analytics-e2e-control') &&
+  !app.isPackaged;
+const analyticsTestControlsReady = analyticsTestControlsEnabled
+  ? import('./analytics/analyticsTestControl').then((controls) => {
+      controls.registerAnalyticsTestControl(ipcMain, true, flushAnalytics);
+      return controls.analyticsTestTransport;
+    })
+  : Promise.resolve(null);
+
+registerAnalyticsLifecycle(app, {
+  initialize: async () => {
+    const transport = await analyticsTestControlsReady;
+    initializeAnalytics(
+      transport ? { transport } : { context: createDesktopAnalyticsContext(process.platform, app.getVersion()) }
+    );
+  },
+  capture: captureAnalytics,
+  shutdown: shutdownAnalytics
+});
+
 // Watch for settings changes from other instances (cross-process sync)
 // The settings keys we want to sync across instances
 const syncedSettingsKeys = [
@@ -1322,7 +1363,9 @@ store.onDidAnyChange((newValue, oldValue) => {
   }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // In E2E builds, register test-only IPC before exposing the renderer bridge.
+  await analyticsTestControlsReady;
   const isTest = process.env.NODE_ENV === 'test' || process.argv.includes('--test-mode');
   if (isTest) {
     log.info('[Main] Test mode detected — skipping splash screen and auto-updater');

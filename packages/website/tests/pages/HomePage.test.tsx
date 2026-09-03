@@ -1,10 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import HomePage from "../../src/pages/HomePage";
+import { captureDownloadClick } from "../../src/utils/downloads";
 
 // Mock the downloads utility
 vi.mock("../../src/utils/downloads", () => ({
+  captureDownloadClick: vi.fn(),
   getTrackedDownloadUrl: (platform: "macos" | "windows", source = "website") =>
     `/api/download?platform=${platform}&source=${encodeURIComponent(source)}`,
   getDownloadHref: (
@@ -102,6 +104,17 @@ describe("HomePage", () => {
   });
 
   describe("download section", () => {
+    it("records the platform and stable location before the download link navigates", () => {
+      renderHomePage();
+
+      fireEvent.click(screen.getAllByRole("link", { name: /macOS/i })[0]);
+
+      expect(captureDownloadClick).toHaveBeenCalledWith(
+        "macos",
+        "home-hero-card",
+      );
+    });
+
     it("renders download section heading", () => {
       renderHomePage();
       expect(screen.getByText(/Download Carvd Studio/i)).toBeInTheDocument();
@@ -187,7 +200,7 @@ describe("HomePage", () => {
       renderHomePage();
       expect(screen.getByText(/Material Waste/i)).toBeInTheDocument();
       expect(screen.getByText(/Project Planning/i)).toBeInTheDocument();
-      expect(screen.getByText(/Offline & Private/i)).toBeInTheDocument();
+      expect(screen.getByText(/Projects & Designs/i)).toBeInTheDocument();
     });
   });
 

@@ -3,6 +3,7 @@ import { Button, buttonVariants } from '@renderer/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { cn } from '@renderer/lib/utils';
 import { EXTERNAL_LINKS } from '@renderer/utils/externalLinks';
+import { analytics } from '@renderer/utils/analytics';
 
 interface LicenseSectionProps {
   licenseMode?: 'trial' | 'licensed' | 'free';
@@ -81,6 +82,9 @@ export function LicenseSection({
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(buttonVariants({ size: 'sm' }))}
+                onClick={() => {
+                  analytics.capture('checkout_opened', { surface: 'settings', license_mode: licenseMode });
+                }}
               >
                 Purchase License
               </a>
