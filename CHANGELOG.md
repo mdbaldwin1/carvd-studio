@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-03
+
 ### Added
 
 - **Intel Mac downloads** — Release builds now publish separate signed macOS installers for Apple Silicon and Intel processors, and the website offers an explicit architecture choice with separately tracked download links.
+
+### Changed
+
+- **Mac installation guidance** — The download page now explains how to identify a Mac's processor and select the matching Apple Silicon or Intel installer without duplicating the shared installation steps.
 
 ## [1.0.6] - 2026-09-03
 

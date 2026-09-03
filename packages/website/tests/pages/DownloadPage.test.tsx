@@ -150,6 +150,17 @@ describe("DownloadPage", () => {
       expect(screen.getByText(/macOS Installation/i)).toBeInTheDocument();
     });
 
+    it("explains how to choose the matching Mac installer", () => {
+      renderDownloadPage();
+
+      expect(screen.getByText(/Which Mac do I have\?/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Apple menu.*About This Mac/i),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/M1, M2, M3, M4, or newer/i)).toBeInTheDocument();
+      expect(screen.getByText(/Intel processor/i)).toBeInTheDocument();
+    });
+
     it("renders Windows installation section", () => {
       renderDownloadPage();
       expect(screen.getByText(/Windows Installation/i)).toBeInTheDocument();
@@ -177,7 +188,10 @@ describe("DownloadPage", () => {
     it("renders current version entry", () => {
       renderDownloadPage();
       expect(screen.getByText(/v0.1.0/)).toBeInTheDocument();
-      expect(screen.getByText(/Initial Release/i)).toBeInTheDocument();
+      expect(screen.getByText(/Latest Release/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Native downloads for Apple Silicon and Intel Macs/i),
+      ).toBeInTheDocument();
     });
   });
 

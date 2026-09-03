@@ -143,6 +143,14 @@ export default function DownloadPage() {
               <h3 className="mb-6 flex items-center gap-2 text-2xl font-bold">
                 <AppleIcon size={24} /> macOS Installation
               </h3>
+              <div className="mb-6 rounded-lg border border-border bg-surface-elevated p-4">
+                <strong className="mb-2 block">Which Mac do I have?</strong>
+                <p className="m-0 text-sm text-text-muted">
+                  Open the Apple menu and choose About This Mac. If the Chip
+                  field says M1, M2, M3, M4, or newer, choose Apple Silicon. If
+                  it lists an Intel processor, choose Intel.
+                </p>
+              </div>
               <ol className="m-0 list-none p-0">
                 <li className="mb-6 flex items-start gap-4 last:mb-0 max-md:gap-2">
                   <span className="flex h-8 w-8 min-w-[32px] items-center justify-center rounded-full bg-accent text-sm font-bold text-bg max-md:h-7 max-md:w-7 max-md:min-w-[28px] max-md:text-xs">
@@ -295,8 +303,11 @@ export default function DownloadPage() {
                 </Badge>
               </div>
               <div>
-                <h3 className="mb-2 font-bold">Initial Release</h3>
+                <h3 className="mb-2 font-bold">Latest Release</h3>
                 <ul className="m-0 list-none p-0">
+                  <li className="relative mb-2 pl-6 text-text-muted before:absolute before:left-0 before:text-accent before:content-['•'] last:mb-0">
+                    Native downloads for Apple Silicon and Intel Macs
+                  </li>
                   <li className="relative mb-2 pl-6 text-text-muted before:absolute before:left-0 before:text-accent before:content-['•'] last:mb-0">
                     3D furniture design workspace with intuitive controls
                   </li>
