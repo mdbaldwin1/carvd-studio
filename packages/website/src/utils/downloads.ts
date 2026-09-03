@@ -15,11 +15,11 @@ const FALLBACK_VERSION = "0.1.0";
 export interface DownloadInfo {
   url: string;
   trackedUrl: string;
-  platform: "macos-arm64" | "macos-x64" | "windows";
+  platform: "macos-arm64" | "macos-x64" | "windows" | "linux";
   fileName: string;
   fileExtension: string;
   minOsVersion: string;
-  architectureLabel?: "Apple Silicon" | "Intel";
+  architectureLabel?: "Apple Silicon" | "Intel" | "x64";
 }
 
 export type MacArchitecture = "arm64" | "x64";
@@ -62,6 +62,11 @@ export function getMacDownloadUrl(
  */
 export function getWindowsDownloadUrl(version: string): string {
   return `https://github.com/${GITHUB_REPO}/releases/download/v${version}/Carvd.Studio.Setup.${version}.exe`;
+}
+
+/** Get the broadly compatible Linux AppImage URL. */
+export function getLinuxDownloadUrl(version: string): string {
+  return `https://github.com/${GITHUB_REPO}/releases/download/v${version}/Carvd.Studio-${version}-x86_64.AppImage`;
 }
 
 export function getTrackedDownloadUrl(
@@ -132,12 +137,26 @@ export function getWindowsDownloadInfo(version: string): DownloadInfo {
   };
 }
 
+/** Get full download info for 64-bit Linux. */
+export function getLinuxDownloadInfo(version: string): DownloadInfo {
+  return {
+    url: getLinuxDownloadUrl(version),
+    trackedUrl: getTrackedDownloadUrl("linux"),
+    platform: "linux",
+    fileName: `Carvd.Studio-${version}-x86_64.AppImage`,
+    fileExtension: ".AppImage",
+    minOsVersion: "64-bit Linux",
+    architectureLabel: "x64",
+  };
+}
+
 export interface UseDownloadInfoResult {
   loading: boolean;
   version: string;
   macArm64Download: DownloadInfo;
   macX64Download: DownloadInfo;
   windowsDownload: DownloadInfo;
+  linuxDownload: DownloadInfo;
 }
 
 /**
@@ -167,6 +186,7 @@ export function useDownloadInfo(): UseDownloadInfoResult {
     macArm64Download: getMacDownloadInfo(version, "arm64"),
     macX64Download: getMacDownloadInfo(version, "x64"),
     windowsDownload: getWindowsDownloadInfo(version),
+    linuxDownload: getLinuxDownloadInfo(version),
   };
 }
 

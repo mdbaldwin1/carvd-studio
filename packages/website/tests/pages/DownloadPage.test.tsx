@@ -39,6 +39,14 @@ vi.mock("../../src/utils/downloads", () => ({
       fileExtension: ".exe",
       minOsVersion: "Windows 10+",
     },
+    linuxDownload: {
+      url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-x86_64.AppImage",
+      platform: "linux",
+      fileName: "Carvd.Studio-0.1.0-x86_64.AppImage",
+      fileExtension: ".AppImage",
+      minOsVersion: "64-bit Linux",
+      architectureLabel: "x64",
+    },
   }),
 }));
 
@@ -142,6 +150,17 @@ describe("DownloadPage", () => {
         expect.stringContaining("platform=windows"),
       );
     });
+
+    it("renders a tracked Linux AppImage download card", () => {
+      renderDownloadPage();
+      const linuxLinks = screen.getAllByRole("link", { name: /Linux/i });
+
+      expect(linuxLinks[0]).toHaveTextContent(/\.AppImage/i);
+      expect(linuxLinks[0]).toHaveAttribute(
+        "href",
+        expect.stringContaining("platform=linux"),
+      );
+    });
   });
 
   describe("installation instructions", () => {
@@ -164,6 +183,14 @@ describe("DownloadPage", () => {
     it("renders Windows installation section", () => {
       renderDownloadPage();
       expect(screen.getByText(/Windows Installation/i)).toBeInTheDocument();
+    });
+
+    it("renders Linux AppImage and Debian installation instructions", () => {
+      renderDownloadPage();
+
+      expect(screen.getByText(/Linux Installation/i)).toBeInTheDocument();
+      expect(screen.getByText(/chmod \+x/i)).toBeInTheDocument();
+      expect(screen.getByText(/sudo apt install/i)).toBeInTheDocument();
     });
 
     it("renders macOS security warning", () => {
@@ -190,7 +217,7 @@ describe("DownloadPage", () => {
       expect(screen.getByText(/v0.1.0/)).toBeInTheDocument();
       expect(screen.getByText(/Latest Release/i)).toBeInTheDocument();
       expect(
-        screen.getByText(/Native downloads for Apple Silicon and Intel Macs/i),
+        screen.getByText(/Native downloads for macOS, Windows, and Linux/i),
       ).toBeInTheDocument();
     });
   });
@@ -213,6 +240,14 @@ describe("DownloadPage", () => {
       expect(
         screen.getByText(/Windows 10 or later \(64-bit\)/i),
       ).toBeInTheDocument();
+    });
+
+    it("renders Linux x64 requirements", () => {
+      renderDownloadPage();
+      expect(
+        screen.getAllByText(/64-bit Linux distribution/i).length,
+      ).toBeGreaterThan(0);
+      expect(screen.getByText(/x86-64 processor/i)).toBeInTheDocument();
     });
   });
 
@@ -324,6 +359,9 @@ describe("DownloadPage", () => {
       ).toBeInTheDocument();
       expect(
         screen.getByRole("link", { name: /Download for Windows/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /Download for Linux/i }),
       ).toBeInTheDocument();
     });
   });

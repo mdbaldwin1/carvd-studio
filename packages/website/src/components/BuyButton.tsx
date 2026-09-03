@@ -12,7 +12,7 @@ interface BuyButtonProps {
 
 /**
  * A button that links to the Lemon Squeezy checkout for purchasing a license key.
- * Single product - license works on both Mac and Windows.
+ * Single product - license works on macOS, Windows, and Linux.
  */
 export default function BuyButton({
   className,

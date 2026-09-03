@@ -13,7 +13,7 @@ This repository contains two packages:
 ```
 carvd-studio/
 ├── packages/
-│   ├── desktop/        → Electron desktop application (macOS/Windows)
+│   ├── desktop/        → Electron desktop application (macOS/Windows/Linux)
 │   └── website/        → Marketing and documentation website (Vercel)
 ├── package.json        → Root workspace configuration
 └── README.md           → This file
@@ -47,6 +47,7 @@ npm run build:desktop
 # Package desktop app for distribution
 npm run package:mac    # macOS DMG
 npm run package:win    # Windows installer
+npm run package:linux  # Linux AppImage and Debian package
 
 # Build website for deployment
 npm run build:website
@@ -68,6 +69,7 @@ Electron-based desktop application for designing custom furniture.
 **Tech Stack**: Electron, React, TypeScript, Three.js, Zustand
 
 **Features**:
+
 - 3D visualization with real-time rendering
 - Hierarchical part organization with groups
 - Stock material management and assignment
@@ -86,6 +88,7 @@ Marketing and documentation website.
 **Tech Stack**: React, TypeScript, Vite, Tailwind CSS
 
 **Features**:
+
 - Product showcase and features
 - Pricing information
 - Documentation and guides
@@ -114,20 +117,20 @@ npm run generate-test-license
 
 ### Root Commands
 
-| Command | Description |
-|---------|-------------|
-| `npm install` | Install all packages |
-| `npm run dev:desktop` | Run desktop app in dev mode |
-| `npm run dev:website` | Run website dev server |
-| `npm run build:desktop` | Build desktop app |
-| `npm run build:website` | Build website for production |
-| `npm run package:mac` | Create macOS DMG installer |
-| `npm run package:win` | Create Windows installer |
-| `npm run deploy:website` | Deploy website to Vercel |
-| `npm run lint` | Lint all packages |
-| `npm run format` | Format all packages |
-| `npm run clean` | Remove all node_modules and build artifacts |
-| `npm run fresh-install` | Clean and reinstall everything |
+| Command                  | Description                                 |
+| ------------------------ | ------------------------------------------- |
+| `npm install`            | Install all packages                        |
+| `npm run dev:desktop`    | Run desktop app in dev mode                 |
+| `npm run dev:website`    | Run website dev server                      |
+| `npm run build:desktop`  | Build desktop app                           |
+| `npm run build:website`  | Build website for production                |
+| `npm run package:mac`    | Create macOS DMG installer                  |
+| `npm run package:win`    | Create Windows installer                    |
+| `npm run deploy:website` | Deploy website to Vercel                    |
+| `npm run lint`           | Lint all packages                           |
+| `npm run format`         | Format all packages                         |
+| `npm run clean`          | Remove all node_modules and build artifacts |
+| `npm run fresh-install`  | Clean and reinstall everything              |
 
 ## Development Workflow
 
@@ -164,6 +167,7 @@ npm run dev:desktop
 ### Desktop App Distribution
 
 1. **macOS**:
+
    ```bash
    npm run package:mac
    # Output: packages/desktop/dist/Carvd Studio-0.1.0.dmg
@@ -205,6 +209,7 @@ npm install <package> -D -w
 ## Tech Stack
 
 ### Desktop
+
 - **Electron** - Cross-platform desktop framework
 - **React** - UI library
 - **Three.js** - 3D rendering
@@ -212,6 +217,7 @@ npm install <package> -D -w
 - **electron-store** - Persistent storage
 
 ### Website
+
 - **Vite** - Build tool
 - **React Router** - Routing
 - **Tailwind CSS** - Styling

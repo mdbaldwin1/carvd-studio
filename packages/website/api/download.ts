@@ -1,6 +1,6 @@
 const GITHUB_REPO = "mdbaldwin1/carvd-studio";
 
-type Platform = "macos" | "macos-arm64" | "macos-x64" | "windows";
+type Platform = "macos" | "macos-arm64" | "macos-x64" | "windows" | "linux";
 
 function getPlatformFromUrl(url: URL): Platform | null {
   const platform = url.searchParams.get("platform");
@@ -8,7 +8,8 @@ function getPlatformFromUrl(url: URL): Platform | null {
     platform === "macos" ||
     platform === "macos-arm64" ||
     platform === "macos-x64" ||
-    platform === "windows"
+    platform === "windows" ||
+    platform === "linux"
   ) {
     return platform;
   }
@@ -28,7 +29,7 @@ export default async function handler(request: Request): Promise<Response> {
     return Response.json(
       {
         error:
-          "Missing or invalid platform. Use ?platform=macos-arm64|macos-x64|windows",
+          "Missing or invalid platform. Use ?platform=macos-arm64|macos-x64|windows|linux",
       },
       {
         status: 400,
@@ -66,7 +67,9 @@ export default async function handler(request: Request): Promise<Response> {
         ? (assetName: string) => assetName.endsWith("-arm64.dmg")
         : platform === "macos-x64"
           ? (assetName: string) => assetName.endsWith("-x64.dmg")
-          : (assetName: string) => assetName.endsWith(".exe");
+          : platform === "windows"
+            ? (assetName: string) => assetName.endsWith(".exe")
+            : (assetName: string) => assetName.endsWith(".AppImage");
 
     const asset = assets.find(
       (a) => typeof a.name === "string" && matcher(a.name),

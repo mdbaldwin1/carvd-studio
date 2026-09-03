@@ -300,7 +300,7 @@ describe('StocksTab', () => {
           'success',
           expect.objectContaining({
             action: expect.objectContaining({
-              label: expect.stringMatching(/Show in (Finder|File Explorer)/),
+              label: expect.stringMatching(/Show in (Finder|File Explorer|Folder)/),
               onClick: expect.any(Function)
             })
           })

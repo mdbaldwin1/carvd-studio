@@ -1,7 +1,10 @@
 import { useUIStore } from '@renderer/store/uiStore';
 
-function isMacPlatform(): boolean {
-  return window.navigator.userAgent.toUpperCase().includes('MAC');
+export function getRevealActionLabel(userAgent: string): string {
+  const normalized = userAgent.toUpperCase();
+  if (normalized.includes('MAC')) return 'Show in Finder';
+  if (normalized.includes('WINDOWS')) return 'Show in File Explorer';
+  return 'Show in Folder';
 }
 
 export async function revealInFileManager(filePath: string): Promise<void> {
@@ -16,7 +19,7 @@ export async function revealInFileManager(filePath: string): Promise<void> {
 }
 
 export function showSavedFileToast(message: string, filePath: string): void {
-  const actionLabel = isMacPlatform() ? 'Show in Finder' : 'Show in File Explorer';
+  const actionLabel = getRevealActionLabel(window.navigator.userAgent);
   useUIStore.getState().showToast(message, 'success', {
     duration: Number.POSITIVE_INFINITY,
     action: {

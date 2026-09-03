@@ -65,7 +65,7 @@ export default function PricingCard() {
               "Core project editing works offline; internet supports activation, updates, and optional consented analytics",
               "Complete data privacy—your designs stay on your computer",
               "Free lifetime updates with new features",
-              "Install on up to 3 devices (Mac & Windows)",
+              "Install on up to 3 devices (Mac, Windows & Linux)",
               "Email support with actual woodworkers",
             ].map((item) => (
               <li key={item} className="flex items-start gap-4">
