@@ -21,6 +21,7 @@ import { BehaviorSection } from './BehaviorSection';
 import { SnappingSection } from './SnappingSection';
 import { StockConstraintsSection } from './StockConstraintsSection';
 import { DataManagementSection } from './DataManagementSection';
+import { PrivacySection } from './PrivacySection';
 
 interface AppSettingsModalProps {
   isOpen: boolean;
@@ -84,6 +85,7 @@ export function AppSettingsModal({
   // Local form state
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [isExporting, setIsExporting] = useState(false);
+  const [activeTab, setActiveTab] = useState('general');
   const showToast = useUIStore((s) => s.showToast);
 
   // Handle export app state
@@ -153,7 +155,7 @@ export function AppSettingsModal({
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="general" className="flex min-h-0 flex-1 flex-col">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
           <TabsList className="mx-5 my-2 border-b border-border">
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="defaults">New Project Defaults</TabsTrigger>
@@ -200,6 +202,7 @@ export function AppSettingsModal({
                 onShowImportModal?.();
               }}
             />
+            <PrivacySection isVisible={activeTab === 'data'} />
           </TabsContent>
         </Tabs>
 

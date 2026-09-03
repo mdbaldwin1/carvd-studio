@@ -14,7 +14,7 @@ export const supportFAQs = [
   {
     question: "Do I need internet to use Carvd Studio?",
     answer:
-      "No. Carvd Studio works completely offline. Internet is only needed for license activation and checking for updates.",
+      "Core desktop editing works offline. Internet may be used for optional analytics, license activation, and updates; analytics never includes design content.",
   },
   {
     question: "Is there a free trial?",
@@ -59,9 +59,10 @@ export default function FAQSection() {
               Do I need internet to use Carvd Studio?
             </AccordionTrigger>
             <AccordionContent className="leading-relaxed text-text-muted max-sm:text-sm">
-              No! Carvd Studio is designed to work completely offline. Your
-              projects are saved locally on your computer. Internet is only
-              needed for license activation and checking for updates.
+              Core project editing works offline. Your project files are saved
+              locally on your computer. Optional anonymous analytics never
+              includes design content; internet is used for license activation,
+              analytics you consent to, and updates.
             </AccordionContent>
           </AccordionItem>
 
@@ -203,11 +204,14 @@ export default function FAQSection() {
               What are the system requirements?
             </AccordionTrigger>
             <AccordionContent className="leading-relaxed text-text-muted max-sm:text-sm">
-              <strong className="text-text">macOS:</strong> 10.15 (Catalina) or
-              later, Intel or Apple Silicon
+              <strong className="text-text">macOS:</strong> 12 (Monterey) or
+              later, Intel or Apple Silicon (choose the matching download)
               <br />
               <strong className="text-text">Windows:</strong> Windows 10 or
               later (64-bit)
+              <br />
+              <strong className="text-text">Linux:</strong> Modern 64-bit Linux
+              distribution on an x86-64 processor
               <br />
               <strong className="text-text">RAM:</strong> 4 GB minimum (8 GB
               recommended for large projects)

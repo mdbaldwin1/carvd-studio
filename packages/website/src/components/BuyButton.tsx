@@ -1,21 +1,24 @@
 import { Button } from "@/components/ui/button";
 import { getCheckoutUrl } from "../utils/lemonSqueezy";
 import { cn } from "@/lib/utils";
+import { websiteAnalytics } from "../analytics/analytics";
 
 interface BuyButtonProps {
   className?: string;
   children?: React.ReactNode;
   size?: "sm" | "default" | "lg" | "icon";
+  location?: string;
 }
 
 /**
  * A button that links to the Lemon Squeezy checkout for purchasing a license key.
- * Single product - license works on both Mac and Windows.
+ * Single product - license works on macOS, Windows, and Linux.
  */
 export default function BuyButton({
   className,
   children,
   size = "lg",
+  location = "pricing-card",
 }: BuyButtonProps) {
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     const url = getCheckoutUrl();
@@ -24,6 +27,14 @@ export default function BuyButton({
       return;
     }
     e.preventDefault();
+    try {
+      websiteAnalytics.capture("checkout_started", {
+        product: "desktop_license",
+        location,
+      });
+    } catch {
+      // Analytics failures must not interrupt checkout navigation.
+    }
     window.open(url, "_blank");
   };
 

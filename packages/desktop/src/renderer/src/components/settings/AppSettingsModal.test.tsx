@@ -100,6 +100,17 @@ describe('AppSettingsModal', () => {
 
       expect(screen.getByText('Done')).toBeInTheDocument();
     });
+
+    it('places Privacy below Data Management in the Data & License tab', () => {
+      window.electronAPI.getAnalyticsConsent = vi.fn().mockResolvedValue('denied');
+      render(<AppSettingsModal {...defaultProps} />);
+
+      openTab('Data & License');
+
+      expect(screen.getByText('Data Management').compareDocumentPosition(screen.getByText('Privacy'))).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING
+      );
+    });
   });
 
   describe('theme settings', () => {

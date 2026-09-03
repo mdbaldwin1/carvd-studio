@@ -20,6 +20,8 @@ import { getDocsUrl } from '../../utils/docsLinks';
 import { showSavedFileToast } from '../../utils/fileToast';
 // pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { logger } from '../../utils/logger';
+import { analytics } from '../../utils/analytics';
+import { bucketCount } from '../../../../shared/analytics';
 import { PartValidationIssue } from '../../types';
 import { CutListPartsTab } from './CutListPartsTab';
 import { CutListDiagramsTab } from './CutListDiagramsTab';
@@ -65,6 +67,11 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
 
     if (blockingIssues.length > 0) {
       setValidationIssues(issues);
+      analytics.capture('cut_list_generated', {
+        part_count_bucket: bucketCount(parts.length),
+        stock_count_bucket: bucketCount(stocks.length),
+        success: false
+      });
       return;
     }
 
@@ -74,6 +81,11 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
     const newCutList = generateOptimizedCutList(parts, stocks, kerfWidth, overageFactor, modifiedAt, bypassedIssues);
 
     setCutList(newCutList);
+    analytics.capture('cut_list_generated', {
+      part_count_bucket: bucketCount(parts.length),
+      stock_count_bucket: bucketCount(stocks.length),
+      success: true
+    });
   }, [parts, stocks, kerfWidth, overageFactor, modifiedAt, setCutList, limits.canUseOptimizer, showToast]);
 
   // Export project report PDF
@@ -105,9 +117,16 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
         showToast('Failed to save PDF', 'error');
         logger.error('Project report PDF export error:', result.error);
       }
+      if (result.success || result.error) {
+        analytics.capture('export_completed', {
+          export_type: 'project_pdf',
+          success: !!result.success && !!result.filePath
+        });
+      }
     } catch (error) {
       logger.error('Project report PDF export error:', error);
       showToast('Failed to export project report', 'error');
+      analytics.capture('export_completed', { export_type: 'project_pdf', success: false });
     }
   }, [cutList, projectName, projectNotes, units, customShoppingItems, limits.canExportPDF, showToast]);
 

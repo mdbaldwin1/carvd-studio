@@ -41,6 +41,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Project shortcuts no longer reach the part being edited in Part Cuts** — While the cuts workspace is open, project-level shortcuts (undo/redo, rotate, duplicate, delete, copy/paste) and the header undo buttons are disabled so they can't silently change the part behind the editor.
 - **Saving cuts reports rejection honestly** — If overlap prevention rejects the updated part shape, saving cuts now shows an error and stays in the editor instead of falsely reporting success.
 
+## [1.2.0] - 2026-09-03
+
+### Added
+
+- **Linux desktop release** — Added an x64 Linux build published as both a portable AppImage and a Debian package, with Linux update metadata included in GitHub releases.
+- **Linux downloads and installation guidance** — Added separately tracked Linux download links, AppImage and Debian installation instructions, and Linux system requirements throughout the website and documentation.
+
+### Changed
+
+- **Cross-platform product messaging** — Updated checkout context, pricing, support, SEO metadata, and analytics documentation to recognize macOS, Windows, and Linux.
+
+## [1.1.0] - 2026-09-03
+
+### Added
+
+- **Intel Mac downloads** — Release builds now publish separate signed macOS installers for Apple Silicon and Intel processors, and the website offers an explicit architecture choice with separately tracked download links.
+
+### Changed
+
+- **Mac installation guidance** — The download page now explains how to identify a Mac's processor and select the matching Apple Silicon or Intel installer without duplicating the shared installation steps.
+- **macOS requirements** — Updated the documented minimum to macOS 12 Monterey to match the Electron 41 runtime shipped by Carvd Studio 1.1.0.
+
+## [1.0.6] - 2026-09-03
+
+### Added
+
+- **Consent-gated desktop analytics delivery** — Added durable local consent preferences, anonymous installation identifiers, bounded offline delivery with retry backoff, and optional PostHog transport configuration. Analytics stays disabled until explicitly granted and clears local analytics data immediately on revocation.
+- **Analytics privacy controls** — Added a first-run optional analytics choice after onboarding and a permanent App Settings → Data & License control with a clear disclosure of anonymous usage data and prohibited project data.
+- **Privacy disclosure** — Clarified that analytics remains optional, anonymous, and disabled until configured/consented; project design content remains local and revocation deletes queued analytics and the anonymous identifier.
+
+### Fixed
+
+- **Purchase webhook runtime compatibility** — Accept Lemon Squeezy's signed raw request body from Vercel's Node function runtime while retaining exact HMAC verification and retry behavior.
+- **Cross-platform release verification** — Made analytics-enabled Electron E2E commands portable to Windows and added a single CI-only retry for transient desktop UI runner failures while keeping local test runs strict.
+
 ## [1.0.5] - 2026-08-13
 
 ### Added

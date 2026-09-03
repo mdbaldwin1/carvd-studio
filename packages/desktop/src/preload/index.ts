@@ -1,4 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { AnalyticsConsent, DesktopAnalyticsEvent } from '../shared/analytics';
+
+const analyticsTestBridgeEnabled =
+  import.meta.env.PRELOAD_VITE_ANALYTICS_E2E === '1' && process.argv.includes('--analytics-e2e-control');
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
@@ -31,6 +35,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Preferences
   getPreference: (key: string) => ipcRenderer.invoke('get-preference', key),
   setPreference: (key: string, value: unknown) => ipcRenderer.invoke('set-preference', key, value),
+
+  // Analytics consent and capture
+  captureAnalytics: (event: DesktopAnalyticsEvent) => {
+    try {
+      void ipcRenderer.invoke('analytics:capture', event).catch(() => undefined);
+    } catch {
+      // Analytics cannot affect renderer control flow.
+    }
+  },
+  getAnalyticsConsent: () => ipcRenderer.invoke('analytics:get-consent'),
+  setAnalyticsConsent: (consent: AnalyticsConsent, surface: 'onboarding' | 'settings') =>
+    ipcRenderer.invoke('analytics:set-consent', consent, surface),
+  ...(analyticsTestBridgeEnabled
+    ? {
+        analyticsTestSetMode: (mode: 'success' | 'offline' | 'timeout') =>
+          ipcRenderer.invoke('analytics:test:set-mode', mode),
+        analyticsTestGetState: () => ipcRenderer.invoke('analytics:test:get-state'),
+        analyticsTestFlush: () => ipcRenderer.invoke('analytics:test:flush')
+      }
+    : {}),
 
   // File dialogs
   showSaveDialog: (options: Electron.SaveDialogOptions) => ipcRenderer.invoke('show-save-dialog', options),
@@ -232,6 +256,9 @@ export interface ElectronAPI {
   onMenuCommand: (callback: (command: string, ...args: unknown[]) => void) => () => void;
   getPreference: (key: string) => Promise<unknown>;
   setPreference: (key: string, value: unknown) => Promise<void>;
+  captureAnalytics: (event: DesktopAnalyticsEvent) => void;
+  getAnalyticsConsent: () => Promise<AnalyticsConsent>;
+  setAnalyticsConsent: (consent: AnalyticsConsent, surface: 'onboarding' | 'settings') => Promise<{ success: boolean }>;
   showSaveDialog: (options: Electron.SaveDialogOptions) => Promise<Electron.SaveDialogReturnValue>;
   showOpenDialog: (options: Electron.OpenDialogOptions) => Promise<Electron.OpenDialogReturnValue>;
   queueTestSaveDialogPath: (filePath: string | null) => Promise<{ success: boolean; error?: string }>;

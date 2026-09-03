@@ -2,7 +2,11 @@ import BuyButton from "../components/BuyButton";
 import SEO from "../components/SEO";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { getDownloadHref, useDownloadInfo } from "../utils/downloads";
+import {
+  captureDownloadClick,
+  getDownloadHref,
+  useDownloadInfo,
+} from "../utils/downloads";
 import { AppleIcon, WindowsIcon } from "../components/BrandIcons";
 import {
   createOrganizationSchema,
@@ -20,6 +24,7 @@ import {
   Building2,
   Armchair,
   Home,
+  Terminal,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -37,8 +42,10 @@ const surfaceGradientStyle = {
 export default function HomePage() {
   const {
     version: appVersion,
-    macDownload,
+    macArm64Download,
+    macX64Download,
     windowsDownload,
+    linuxDownload,
   } = useDownloadInfo();
 
   return (
@@ -65,7 +72,8 @@ export default function HomePage() {
               />
             </div>
             <Badge variant="outline" className="hero-kicker mx-auto mb-6 gap-1">
-              <Sparkles size={16} /> Now Available for macOS &amp; Windows
+              <Sparkles size={16} /> Now Available for macOS, Windows &amp;
+              Linux
             </Badge>
             <h1 className="mb-6 break-words text-6xl font-bold leading-tight max-md:text-4xl max-sm:text-3xl">
               Stop Wasting Wood.
@@ -122,10 +130,10 @@ export default function HomePage() {
             </div>
             <div className="rounded-lg border border-border/70 bg-surface/65 p-8 text-center max-md:p-6">
               <span className="mb-2 block text-5xl font-bold text-highlight max-md:text-3xl max-sm:text-2xl">
-                100%
+                Local
               </span>
               <span className="text-lg text-text-muted max-md:text-base max-sm:text-sm">
-                Offline &amp; Private
+                Projects &amp; Designs
               </span>
             </div>
           </div>
@@ -233,9 +241,9 @@ export default function HomePage() {
                 Your Designs Stay Yours
               </h3>
               <p className="leading-relaxed text-text-muted">
-                No cloud. No subscriptions. No data mining. Everything stays on
-                your computer where it belongs. Work in your shop, at job sites,
-                or anywhere—even without internet. Complete privacy guaranteed.
+                Project files stay local on your computer. Optional anonymous
+                analytics never includes design content, so you can work offline
+                with your designs kept private.
               </p>
             </Card>
             <Card className="feature-card p-8 max-md:p-6">
@@ -435,7 +443,13 @@ export default function HomePage() {
             </p>
             <div className="flex flex-wrap justify-center gap-8 max-sm:flex-col max-sm:items-center">
               <a
-                href={getDownloadHref(macDownload, "home-hero-card")}
+                href={getDownloadHref(macArm64Download, "home-hero-card")}
+                onClick={() =>
+                  captureDownloadClick(
+                    macArm64Download.platform,
+                    "home-hero-card",
+                  )
+                }
                 className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
                 <span>
@@ -443,14 +457,41 @@ export default function HomePage() {
                 </span>
                 <span className="text-xl font-bold">macOS</span>
                 <span className="text-sm text-text-muted">
-                  {macDownload.fileExtension} installer
+                  {macArm64Download.architectureLabel}
                 </span>
                 <span className="mt-1 text-xs text-accent">
-                  {macDownload.minOsVersion}
+                  {macArm64Download.minOsVersion}
+                </span>
+              </a>
+              <a
+                href={getDownloadHref(macX64Download, "home-hero-card")}
+                onClick={() =>
+                  captureDownloadClick(
+                    macX64Download.platform,
+                    "home-hero-card",
+                  )
+                }
+                className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
+              >
+                <span>
+                  <AppleIcon size={32} />
+                </span>
+                <span className="text-xl font-bold">macOS</span>
+                <span className="text-sm text-text-muted">
+                  {macX64Download.architectureLabel}
+                </span>
+                <span className="mt-1 text-xs text-accent">
+                  {macX64Download.minOsVersion}
                 </span>
               </a>
               <a
                 href={getDownloadHref(windowsDownload, "home-hero-card")}
+                onClick={() =>
+                  captureDownloadClick(
+                    windowsDownload.platform,
+                    "home-hero-card",
+                  )
+                }
                 className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
                 <span>
@@ -462,6 +503,24 @@ export default function HomePage() {
                 </span>
                 <span className="mt-1 text-xs text-accent">
                   {windowsDownload.minOsVersion}
+                </span>
+              </a>
+              <a
+                href={getDownloadHref(linuxDownload, "home-hero-card")}
+                onClick={() =>
+                  captureDownloadClick(linuxDownload.platform, "home-hero-card")
+                }
+                className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
+              >
+                <span>
+                  <Terminal size={32} aria-label="Linux" />
+                </span>
+                <span className="text-xl font-bold">Linux</span>
+                <span className="text-sm text-text-muted">
+                  {linuxDownload.fileExtension} download
+                </span>
+                <span className="mt-1 text-xs text-accent">
+                  {linuxDownload.minOsVersion}
                 </span>
               </a>
             </div>
@@ -492,7 +551,7 @@ export default function HomePage() {
               furniture.
             </p>
             <div className="mb-6 flex justify-center gap-4 max-sm:flex-col max-sm:items-center">
-              <BuyButton />
+              <BuyButton location="home-cta" />
             </div>
             <p className="text-sm text-text-muted">
               ✓ 14-day free trial &nbsp;•&nbsp; ✓ No subscription required

@@ -32,6 +32,10 @@ The site will be available at http://localhost:3000
 npm run build --workspace=@carvd/website
 ```
 
+## Analytics configuration
+
+`VITE_POSTHOG_KEY` and `VITE_POSTHOG_HOST` enable optional public website analytics; blank keys are no-ops. Use separate development and production projects. `src/analytics` owns `$pageview`, `download_clicked`, and `checkout_started`; `api/webhooks/lemonsqueezy.ts` owns `purchase_completed`; `packages/desktop/src/shared/analytics.ts` owns desktop events. Server webhook variables are `LEMON_SQUEEZY_WEBHOOK_SECRET`, `POSTHOG_PROJECT_KEY`, `POSTHOG_HOST`, and `ANALYTICS_ID_SALT`; subscribe only to `order_created`. Clear `VITE_POSTHOG_KEY` in Vercel to stop website delivery. Desktop consent defaults off; revoking it deletes queued analytics and its anonymous identifier.
+
 ## Deployment
 
 This website can be deployed to:

@@ -94,6 +94,8 @@ jobs:
             platform: mac
           - os: windows-latest
             platform: win
+          - os: ubuntu-latest
+            platform: linux
 
     steps:
       - name: Checkout code
@@ -104,8 +106,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
+          node-version-file: ".nvmrc"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -141,6 +143,9 @@ jobs:
         working-directory: packages/desktop
 
       - name: Build desktop app
+        env:
+          MAIN_VITE_POSTHOG_KEY: ${{ vars.MAIN_VITE_POSTHOG_KEY }}
+          MAIN_VITE_POSTHOG_HOST: ${{ vars.MAIN_VITE_POSTHOG_HOST }}
         run: npm run build --workspace=@carvd/desktop
 
       - name: Import Apple certificate (macOS only)
@@ -205,7 +210,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
         working-directory: packages/desktop
-        run: npx electron-builder@26.7.0 --mac --publish never
+        run: npx electron-builder@26.7.0 --mac --arm64 --x64 --publish never
 
       - name: Package app (Windows)
         if: matrix.platform == 'win'
@@ -215,6 +220,31 @@ jobs:
           CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
         working-directory: packages/desktop
         run: npx electron-builder@26.7.0 --win --publish never
+
+      - name: Package app (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
+        working-directory: packages/desktop
+        run: npx electron-builder@26.7.0 --linux AppImage deb --x64 --publish never
+
+      - name: Verify Linux packages
+        if: matrix.platform == 'linux'
+        shell: bash
+        working-directory: packages/desktop
+        run: |
+          APPIMAGE="dist/Carvd.Studio-${{ needs.prepare.outputs.version }}-x86_64.AppImage"
+          DEB="dist/Carvd.Studio-${{ needs.prepare.outputs.version }}-amd64.deb"
+
+          test -x "$APPIMAGE"
+          test "$(stat -c%s "$APPIMAGE")" -gt 1000000
+          file "$APPIMAGE" | grep -q "ELF 64-bit.*x86-64"
+
+          test "$(stat -c%s "$DEB")" -gt 1000000
+          dpkg-deb --info "$DEB" > /dev/null
+          grep -q "Carvd.Studio-${{ needs.prepare.outputs.version }}-x86_64.AppImage" dist/latest-linux.yml
 
       - name: Upload artifacts (macOS)
         if: matrix.platform == 'mac'
@@ -235,6 +265,17 @@ jobs:
           path: |
             packages/desktop/dist/*.exe
             packages/desktop/dist/latest.yml
+          retention-days: 7
+
+      - name: Upload artifacts (Linux)
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-build
+          path: |
+            packages/desktop/dist/*.AppImage
+            packages/desktop/dist/*.deb
+            packages/desktop/dist/latest-linux.yml
           retention-days: 7
 
   # ── Step 3: Create GitHub Release with artifacts ────────────────────────────
@@ -262,6 +303,12 @@ jobs:
           name: windows-build
           path: dist/win
 
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: linux-build
+          path: dist/linux
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -276,6 +323,9 @@ jobs:
             dist/mac/latest-mac.yml
             dist/win/*.exe
             dist/win/latest.yml
+            dist/linux/*.AppImage
+            dist/linux/*.deb
+            dist/linux/latest-linux.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -1,28 +1,36 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import HomePage from "../../src/pages/HomePage";
+import { captureDownloadClick } from "../../src/utils/downloads";
 
 // Mock the downloads utility
 vi.mock("../../src/utils/downloads", () => ({
-  getTrackedDownloadUrl: (platform: "macos" | "windows", source = "website") =>
+  captureDownloadClick: vi.fn(),
+  getTrackedDownloadUrl: (platform: string, source = "website") =>
     `/api/download?platform=${platform}&source=${encodeURIComponent(source)}`,
-  getDownloadHref: (
-    download: { platform: "macos" | "windows" },
-    source = "website",
-  ) =>
+  getDownloadHref: (download: { platform: string }, source = "website") =>
     `/api/download?platform=${download.platform}&source=${encodeURIComponent(
       source,
     )}`,
   useDownloadInfo: () => ({
     loading: false,
     version: "0.1.0",
-    macDownload: {
+    macArm64Download: {
       url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg",
-      platform: "macos",
+      platform: "macos-arm64",
       fileName: "Carvd.Studio-0.1.0-arm64.dmg",
       fileExtension: ".dmg",
-      minOsVersion: "macOS 10.15+",
+      minOsVersion: "macOS 12+",
+      architectureLabel: "Apple Silicon",
+    },
+    macX64Download: {
+      url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-x64.dmg",
+      platform: "macos-x64",
+      fileName: "Carvd.Studio-0.1.0-x64.dmg",
+      fileExtension: ".dmg",
+      minOsVersion: "macOS 12+",
+      architectureLabel: "Intel",
     },
     windowsDownload: {
       url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio.Setup.0.1.0.exe",
@@ -30,6 +38,14 @@ vi.mock("../../src/utils/downloads", () => ({
       fileName: "Carvd.Studio.Setup.0.1.0.exe",
       fileExtension: ".exe",
       minOsVersion: "Windows 10+",
+    },
+    linuxDownload: {
+      url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-x86_64.AppImage",
+      platform: "linux",
+      fileName: "Carvd.Studio-0.1.0-x86_64.AppImage",
+      fileExtension: ".AppImage",
+      minOsVersion: "64-bit Linux",
+      architectureLabel: "x64",
     },
   }),
 }));
@@ -102,6 +118,17 @@ describe("HomePage", () => {
   });
 
   describe("download section", () => {
+    it("records the platform and stable location before the download link navigates", () => {
+      renderHomePage();
+
+      fireEvent.click(screen.getAllByRole("link", { name: /macOS/i })[0]);
+
+      expect(captureDownloadClick).toHaveBeenCalledWith(
+        "macos-arm64",
+        "home-hero-card",
+      );
+    });
+
     it("renders download section heading", () => {
       renderHomePage();
       expect(screen.getByText(/Download Carvd Studio/i)).toBeInTheDocument();
@@ -110,11 +137,8 @@ describe("HomePage", () => {
     it("renders macOS download card", () => {
       renderHomePage();
       // macOS appears in badge and download card - use download-specific content
-      const dmgInstallerText = screen.getByText(/\.dmg installer/i);
-      expect(dmgInstallerText).toBeInTheDocument();
-      // Find the download card containing .dmg and verify macOS is there
-      const downloadCard = dmgInstallerText.closest("a");
-      expect(downloadCard).toHaveTextContent(/macOS/i);
+      expect(screen.getByText("Apple Silicon")).toBeInTheDocument();
+      expect(screen.getByText("Intel")).toBeInTheDocument();
     });
 
     it("renders Windows download card", () => {
@@ -127,18 +151,29 @@ describe("HomePage", () => {
       expect(downloadCard).toHaveTextContent(/Windows/i);
     });
 
+    it("renders a tracked Linux AppImage download card", () => {
+      renderHomePage();
+      const appImageText = screen.getByText(/\.AppImage download/i);
+      const linuxLink = appImageText.closest("a");
+
+      expect(linuxLink).toHaveTextContent(/Linux/i);
+      expect(linuxLink).toHaveAttribute(
+        "href",
+        expect.stringContaining("platform=linux"),
+      );
+    });
+
     it("has correct macOS download href", () => {
       renderHomePage();
       // Find the download card by the .dmg installer text
-      const dmgInstallerText = screen.getByText(/\.dmg installer/i);
-      const macLink = dmgInstallerText.closest("a");
-      expect(macLink).toHaveAttribute(
+      const macLinks = screen.getAllByRole("link", { name: /macOS/i });
+      expect(macLinks[0]).toHaveAttribute(
         "href",
-        expect.stringContaining("/api/download"),
+        expect.stringContaining("platform=macos-arm64"),
       );
-      expect(macLink).toHaveAttribute(
+      expect(macLinks[1]).toHaveAttribute(
         "href",
-        expect.stringContaining("platform=macos"),
+        expect.stringContaining("platform=macos-x64"),
       );
     });
 
@@ -159,8 +194,9 @@ describe("HomePage", () => {
 
     it("displays system requirements", () => {
       renderHomePage();
-      expect(screen.getByText(/macOS 10\.15\+/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/macOS 12\+/i)).toHaveLength(2);
       expect(screen.getByText(/Windows 10\+/i)).toBeInTheDocument();
+      expect(screen.getByText(/64-bit Linux/i)).toBeInTheDocument();
     });
 
     it("displays version badge", () => {
@@ -187,7 +223,7 @@ describe("HomePage", () => {
       renderHomePage();
       expect(screen.getByText(/Material Waste/i)).toBeInTheDocument();
       expect(screen.getByText(/Project Planning/i)).toBeInTheDocument();
-      expect(screen.getByText(/Offline & Private/i)).toBeInTheDocument();
+      expect(screen.getByText(/Projects & Designs/i)).toBeInTheDocument();
     });
   });
 

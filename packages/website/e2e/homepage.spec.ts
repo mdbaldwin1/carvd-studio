@@ -25,9 +25,9 @@ test.describe("Homepage", () => {
     });
 
     test("displays platform availability badge", async ({ page }) => {
-      await expect(page.locator("text=macOS & Windows").first()).toContainText(
-        "macOS & Windows",
-      );
+      await expect(
+        page.locator("text=macOS, Windows & Linux").first(),
+      ).toContainText("macOS, Windows & Linux");
     });
   });
 
@@ -36,11 +36,18 @@ test.describe("Homepage", () => {
       await expect(page.locator("text=Download Carvd Studio")).toBeVisible();
     });
 
-    test("displays macOS download card", async ({ page }) => {
-      const macCard = page.locator("#download a").filter({ hasText: "macOS" });
-      await expect(macCard).toBeVisible();
-      await expect(macCard).toContainText(".dmg installer");
-      await expect(macCard).toContainText("macOS 10.15+");
+    test("displays both macOS download cards", async ({ page }) => {
+      const appleSiliconCard = page
+        .locator("#download a")
+        .filter({ hasText: "Apple Silicon" });
+      const intelCard = page
+        .locator("#download a")
+        .filter({ hasText: "Intel" });
+
+      await expect(appleSiliconCard).toBeVisible();
+      await expect(appleSiliconCard).toContainText("macOS 12+");
+      await expect(intelCard).toBeVisible();
+      await expect(intelCard).toContainText("macOS 12+");
     });
 
     test("displays Windows download card", async ({ page }) => {
@@ -52,18 +59,48 @@ test.describe("Homepage", () => {
       await expect(winCard).toContainText("Windows 10+");
     });
 
-    test("download links point to GitHub releases", async ({ page }) => {
-      const macLink = page.locator("#download a").filter({ hasText: "macOS" });
-      await expect(macLink).toHaveAttribute("href", /github\.com.*\.dmg/);
+    test("displays Linux AppImage download card", async ({ page }) => {
+      const linuxCard = page
+        .locator("#download a")
+        .filter({ hasText: ".AppImage download" });
+      await expect(linuxCard).toBeVisible();
+      await expect(linuxCard).toContainText("Linux");
+      await expect(linuxCard).toContainText("64-bit Linux");
+    });
+
+    test("download links point to architecture-specific artifacts", async ({
+      page,
+    }) => {
+      const appleSiliconLink = page
+        .locator("#download a")
+        .filter({ hasText: "Apple Silicon" });
+      const intelLink = page
+        .locator("#download a")
+        .filter({ hasText: "Intel" });
+      await expect(appleSiliconLink).toHaveAttribute(
+        "href",
+        /github\.com.*-arm64\.dmg/,
+      );
+      await expect(intelLink).toHaveAttribute("href", /github\.com.*-x64\.dmg/);
 
       const winLink = page
         .locator("#download a")
         .filter({ hasText: "Windows" });
       await expect(winLink).toHaveAttribute("href", /github\.com.*\.exe/);
+
+      const linuxLink = page
+        .locator("#download a")
+        .filter({ hasText: ".AppImage download" });
+      await expect(linuxLink).toHaveAttribute(
+        "href",
+        /github\.com.*-x86_64\.AppImage/,
+      );
     });
 
     test("displays version badge", async ({ page }) => {
-      await expect(page.locator("text=/Version \\d+\\.\\d+\\.\\d+/")).toBeVisible();
+      await expect(
+        page.locator("text=/Version \\d+\\.\\d+\\.\\d+/"),
+      ).toBeVisible();
     });
   });
 

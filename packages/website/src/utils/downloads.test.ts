@@ -1,14 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { websiteAnalytics } from "../analytics/analytics";
 import {
   getMacDownloadUrl,
   getWindowsDownloadUrl,
+  getLinuxDownloadUrl,
   getTrackedDownloadUrl,
   getDownloadHref,
   getMacDownloadInfo,
   getWindowsDownloadInfo,
+  getLinuxDownloadInfo,
   fetchLatestVersion,
   _resetCache,
+  captureDownloadClick,
 } from "./downloads";
+
+vi.mock("../analytics/analytics", () => ({
+  websiteAnalytics: { capture: vi.fn() },
+}));
 
 beforeEach(() => {
   _resetCache();
@@ -17,9 +25,15 @@ beforeEach(() => {
 
 describe("downloads", () => {
   describe("getMacDownloadUrl", () => {
-    it("returns correct URL for a given version", () => {
-      expect(getMacDownloadUrl("1.2.3")).toBe(
+    it("returns the Apple Silicon URL for a given version", () => {
+      expect(getMacDownloadUrl("1.2.3", "arm64")).toBe(
         "https://github.com/mdbaldwin1/carvd-studio/releases/download/v1.2.3/Carvd.Studio-1.2.3-arm64.dmg",
+      );
+    });
+
+    it("returns the Intel URL for a given version", () => {
+      expect(getMacDownloadUrl("1.2.3", "x64")).toBe(
+        "https://github.com/mdbaldwin1/carvd-studio/releases/download/v1.2.3/Carvd.Studio-1.2.3-x64.dmg",
       );
     });
   });
@@ -32,10 +46,18 @@ describe("downloads", () => {
     });
   });
 
+  describe("getLinuxDownloadUrl", () => {
+    it("returns the AppImage URL for a given version", () => {
+      expect(getLinuxDownloadUrl("1.2.3")).toBe(
+        "https://github.com/mdbaldwin1/carvd-studio/releases/download/v1.2.3/Carvd.Studio-1.2.3-x86_64.AppImage",
+      );
+    });
+  });
+
   describe("getTrackedDownloadUrl", () => {
-    it("returns tracked macOS endpoint", () => {
-      expect(getTrackedDownloadUrl("macos", "download-page")).toBe(
-        "/api/download?platform=macos&source=download-page",
+    it("returns an architecture-specific tracked macOS endpoint", () => {
+      expect(getTrackedDownloadUrl("macos-x64", "download-page")).toBe(
+        "/api/download?platform=macos-x64&source=download-page",
       );
     });
 
@@ -55,7 +77,7 @@ describe("downloads", () => {
           platform: "macos",
           fileName: "mac.dmg",
           fileExtension: ".dmg",
-          minOsVersion: "macOS 10.15+",
+          minOsVersion: "macOS 12+",
         },
         "download-hero-card",
         "localhost",
@@ -84,16 +106,41 @@ describe("downloads", () => {
     });
   });
 
+  describe("captureDownloadClick", () => {
+    it("captures the platform and stable location without affecting navigation", () => {
+      captureDownloadClick("macos", "download-hero-card");
+
+      expect(websiteAnalytics.capture).toHaveBeenCalledWith(
+        "download_clicked",
+        {
+          platform: "macos",
+          location: "download-hero-card",
+        },
+      );
+    });
+
+    it("contains analytics failures", () => {
+      vi.mocked(websiteAnalytics.capture).mockImplementationOnce(() => {
+        throw new Error("offline");
+      });
+
+      expect(() =>
+        captureDownloadClick("windows", "download-cta-footer"),
+      ).not.toThrow();
+    });
+  });
+
   describe("getMacDownloadInfo", () => {
-    it("returns complete download info", () => {
-      const info = getMacDownloadInfo("0.1.0");
+    it("returns complete Intel download info", () => {
+      const info = getMacDownloadInfo("0.1.0", "x64");
       expect(info).toEqual({
-        url: "https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg",
-        trackedUrl: "/api/download?platform=macos&source=website",
-        platform: "macos",
-        fileName: "Carvd.Studio-0.1.0-arm64.dmg",
+        url: "https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio-0.1.0-x64.dmg",
+        trackedUrl: "/api/download?platform=macos-x64&source=website",
+        platform: "macos-x64",
+        fileName: "Carvd.Studio-0.1.0-x64.dmg",
         fileExtension: ".dmg",
-        minOsVersion: "macOS 10.15+",
+        minOsVersion: "macOS 12+",
+        architectureLabel: "Intel",
       });
     });
   });
@@ -108,6 +155,21 @@ describe("downloads", () => {
         fileName: "Carvd.Studio.Setup.0.1.0.exe",
         fileExtension: ".exe",
         minOsVersion: "Windows 10+",
+      });
+    });
+  });
+
+  describe("getLinuxDownloadInfo", () => {
+    it("returns complete x64 AppImage download info", () => {
+      const info = getLinuxDownloadInfo("0.1.0");
+      expect(info).toEqual({
+        url: "https://github.com/mdbaldwin1/carvd-studio/releases/download/v0.1.0/Carvd.Studio-0.1.0-x86_64.AppImage",
+        trackedUrl: "/api/download?platform=linux&source=website",
+        platform: "linux",
+        fileName: "Carvd.Studio-0.1.0-x86_64.AppImage",
+        fileExtension: ".AppImage",
+        minOsVersion: "64-bit Linux",
+        architectureLabel: "x64",
       });
     });
   });

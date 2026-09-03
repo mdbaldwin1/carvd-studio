@@ -11,6 +11,7 @@ import { getAncestorGroupIds } from '../../utils/interactionSelection';
 // pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { showSavedFileToast } from '../../utils/fileToast';
 import { logger } from '../../utils/logger';
+import { analytics } from '../../utils/analytics';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { CutList, CutPlacement, StockBoard } from '../../types';
 import { DropdownButton, DropdownItem } from '../common/DropdownButton';
@@ -64,10 +65,17 @@ export function CutListDiagramsTab({
         showToast('Failed to save PDF', 'error');
         logger.error('PDF export error:', result.error);
       }
+      if (result.success || result.error) {
+        analytics.capture('export_completed', {
+          export_type: 'cut_diagrams_pdf',
+          success: !!result.success && !!result.filePath
+        });
+      }
       // If canceled, do nothing
     } catch (error) {
       logger.error('PDF export error:', error);
       showToast('Failed to export PDF', 'error');
+      analytics.capture('export_completed', { export_type: 'cut_diagrams_pdf', success: false });
     }
   }, [cutList, projectName, units, showToast, canExportPDF]);
 

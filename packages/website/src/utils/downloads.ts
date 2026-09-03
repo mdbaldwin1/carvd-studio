@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { websiteAnalytics } from "../analytics/analytics";
 
 const GITHUB_REPO = "mdbaldwin1/carvd-studio";
 const FALLBACK_VERSION = "0.1.0";
@@ -14,11 +15,14 @@ const FALLBACK_VERSION = "0.1.0";
 export interface DownloadInfo {
   url: string;
   trackedUrl: string;
-  platform: "macos" | "windows";
+  platform: "macos-arm64" | "macos-x64" | "windows" | "linux";
   fileName: string;
   fileExtension: string;
   minOsVersion: string;
+  architectureLabel?: "Apple Silicon" | "Intel" | "x64";
 }
+
+export type MacArchitecture = "arm64" | "x64";
 
 /** Module-level cache for the fetched version */
 let cachedVersion: string | null = null;
@@ -46,8 +50,11 @@ export async function fetchLatestVersion(): Promise<string> {
 /**
  * Get download URL for macOS installer (.dmg)
  */
-export function getMacDownloadUrl(version: string): string {
-  return `https://github.com/${GITHUB_REPO}/releases/download/v${version}/Carvd.Studio-${version}-arm64.dmg`;
+export function getMacDownloadUrl(
+  version: string,
+  architecture: MacArchitecture,
+): string {
+  return `https://github.com/${GITHUB_REPO}/releases/download/v${version}/Carvd.Studio-${version}-${architecture}.dmg`;
 }
 
 /**
@@ -57,8 +64,13 @@ export function getWindowsDownloadUrl(version: string): string {
   return `https://github.com/${GITHUB_REPO}/releases/download/v${version}/Carvd.Studio.Setup.${version}.exe`;
 }
 
+/** Get the broadly compatible Linux AppImage URL. */
+export function getLinuxDownloadUrl(version: string): string {
+  return `https://github.com/${GITHUB_REPO}/releases/download/v${version}/Carvd.Studio-${version}-x86_64.AppImage`;
+}
+
 export function getTrackedDownloadUrl(
-  platform: "macos" | "windows",
+  platform: DownloadInfo["platform"],
   source: string = "website",
 ): string {
   const encodedSource = encodeURIComponent(source);
@@ -81,17 +93,33 @@ export function getDownloadHref(
   return getTrackedDownloadUrl(download.platform, source);
 }
 
+export function captureDownloadClick(
+  platform: DownloadInfo["platform"],
+  location: string,
+): void {
+  try {
+    websiteAnalytics.capture("download_clicked", { platform, location });
+  } catch {
+    // Analytics failures must not interrupt the browser's normal navigation.
+  }
+}
+
 /**
  * Get full download info for macOS
  */
-export function getMacDownloadInfo(version: string): DownloadInfo {
+export function getMacDownloadInfo(
+  version: string,
+  architecture: MacArchitecture,
+): DownloadInfo {
+  const isAppleSilicon = architecture === "arm64";
   return {
-    url: getMacDownloadUrl(version),
-    trackedUrl: getTrackedDownloadUrl("macos"),
-    platform: "macos",
-    fileName: `Carvd.Studio-${version}-arm64.dmg`,
+    url: getMacDownloadUrl(version, architecture),
+    trackedUrl: getTrackedDownloadUrl(`macos-${architecture}`),
+    platform: `macos-${architecture}`,
+    fileName: `Carvd.Studio-${version}-${architecture}.dmg`,
     fileExtension: ".dmg",
-    minOsVersion: "macOS 10.15+",
+    minOsVersion: "macOS 12+",
+    architectureLabel: isAppleSilicon ? "Apple Silicon" : "Intel",
   };
 }
 
@@ -109,11 +137,26 @@ export function getWindowsDownloadInfo(version: string): DownloadInfo {
   };
 }
 
+/** Get full download info for 64-bit Linux. */
+export function getLinuxDownloadInfo(version: string): DownloadInfo {
+  return {
+    url: getLinuxDownloadUrl(version),
+    trackedUrl: getTrackedDownloadUrl("linux"),
+    platform: "linux",
+    fileName: `Carvd.Studio-${version}-x86_64.AppImage`,
+    fileExtension: ".AppImage",
+    minOsVersion: "64-bit Linux",
+    architectureLabel: "x64",
+  };
+}
+
 export interface UseDownloadInfoResult {
   loading: boolean;
   version: string;
-  macDownload: DownloadInfo;
+  macArm64Download: DownloadInfo;
+  macX64Download: DownloadInfo;
   windowsDownload: DownloadInfo;
+  linuxDownload: DownloadInfo;
 }
 
 /**
@@ -140,8 +183,10 @@ export function useDownloadInfo(): UseDownloadInfoResult {
   return {
     loading,
     version,
-    macDownload: getMacDownloadInfo(version),
+    macArm64Download: getMacDownloadInfo(version, "arm64"),
+    macX64Download: getMacDownloadInfo(version, "x64"),
     windowsDownload: getWindowsDownloadInfo(version),
+    linuxDownload: getLinuxDownloadInfo(version),
   };
 }
 

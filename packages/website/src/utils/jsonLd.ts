@@ -16,7 +16,7 @@ export function createSoftwareAppSchema() {
     "@type": "SoftwareApplication",
     name: "Carvd Studio",
     applicationCategory: "DesignApplication",
-    operatingSystem: "macOS, Windows",
+    operatingSystem: "macOS, Windows, Linux",
     description:
       "Design furniture in 3D, generate optimized cut lists, and track material costs.",
     offers: {

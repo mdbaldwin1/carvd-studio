@@ -92,6 +92,10 @@ Copy the generated license key and paste it in the app's activation modal.
 
 ## Configuration
 
+### Optional anonymous analytics
+
+`MAIN_VITE_POSTHOG_KEY` and `MAIN_VITE_POSTHOG_HOST` configure desktop delivery; blank values are a local no-op. Use separate development and production PostHog projects. Consent defaults to off and can be changed in App Settings → Data & License; revocation deletes the queue and anonymous installation identifier. The catalog in `src/shared/analytics.ts` owns allowed events/properties. Kill switch: remove `MAIN_VITE_POSTHOG_KEY` from the next build.
+
 ### Code Signing (macOS)
 
 Update `package.json` build section with your Apple Developer ID:

@@ -22,6 +22,7 @@ import {
 import { FileRepairResult, getProjectNameFromPath } from '../utils/fileFormat';
 import { UnsavedChangesDialog, UnsavedChangesAction } from '../components/project/UnsavedChangesDialog';
 import { FileRecoveryModal } from '../components/project/FileRecoveryModal';
+import { analytics } from '../utils/analytics';
 
 interface UseFileOperationsOptions {
   // Template editing mode
@@ -266,6 +267,13 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   }, []);
 
   // File operation handlers
+  const createMenuProject = useCallback(async () => {
+    const result = await newProject();
+    if (result?.success) {
+      analytics.capture('project_created', { source: 'menu', units: useProjectStore.getState().units });
+    }
+  }, []);
+
   const handleSave = useCallback(async () => {
     // Check if we're in template or assembly editing mode
     if (isEditingTemplate && onSaveTemplate) {
@@ -324,13 +332,13 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       setPendingAction({
         type: 'new',
         execute: async () => {
-          await newProject();
+          await createMenuProject();
         }
       });
     } else {
-      await newProject();
+      await createMenuProject();
     }
-  }, [showToast, isEditingTemplate, isEditingAssembly]);
+  }, [showToast, isEditingTemplate, isEditingAssembly, createMenuProject]);
 
   const handleOpen = useCallback(async () => {
     // Block when editing template or assembly
