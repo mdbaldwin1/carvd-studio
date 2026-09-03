@@ -7,24 +7,30 @@ import { captureDownloadClick } from "../../src/utils/downloads";
 // Mock the downloads utility
 vi.mock("../../src/utils/downloads", () => ({
   captureDownloadClick: vi.fn(),
-  getTrackedDownloadUrl: (platform: "macos" | "windows", source = "website") =>
+  getTrackedDownloadUrl: (platform: string, source = "website") =>
     `/api/download?platform=${platform}&source=${encodeURIComponent(source)}`,
-  getDownloadHref: (
-    download: { platform: "macos" | "windows" },
-    source = "website",
-  ) =>
+  getDownloadHref: (download: { platform: string }, source = "website") =>
     `/api/download?platform=${download.platform}&source=${encodeURIComponent(
       source,
     )}`,
   useDownloadInfo: () => ({
     loading: false,
     version: "0.1.0",
-    macDownload: {
+    macArm64Download: {
       url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg",
-      platform: "macos",
+      platform: "macos-arm64",
       fileName: "Carvd.Studio-0.1.0-arm64.dmg",
       fileExtension: ".dmg",
-      minOsVersion: "macOS 10.15+",
+      minOsVersion: "macOS 12+",
+      architectureLabel: "Apple Silicon",
+    },
+    macX64Download: {
+      url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-x64.dmg",
+      platform: "macos-x64",
+      fileName: "Carvd.Studio-0.1.0-x64.dmg",
+      fileExtension: ".dmg",
+      minOsVersion: "macOS 12+",
+      architectureLabel: "Intel",
     },
     windowsDownload: {
       url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio.Setup.0.1.0.exe",
@@ -83,7 +89,7 @@ describe("DownloadPage", () => {
       fireEvent.click(screen.getAllByRole("link", { name: /macOS/i })[0]);
 
       expect(captureDownloadClick).toHaveBeenCalledWith(
-        "macos",
+        "macos-arm64",
         "download-hero-card",
       );
     });
@@ -92,8 +98,9 @@ describe("DownloadPage", () => {
       renderDownloadPage();
       // "macOS" appears in download card, installation section, and system requirements
       expect(screen.getAllByText("macOS").length).toBeGreaterThan(0);
-      expect(screen.getByText(".dmg installer")).toBeInTheDocument();
-      expect(screen.getByText("macOS 10.15+")).toBeInTheDocument();
+      expect(screen.getByText("Apple Silicon")).toBeInTheDocument();
+      expect(screen.getByText("Intel")).toBeInTheDocument();
+      expect(screen.getAllByText("macOS 12+")).toHaveLength(2);
     });
 
     it("renders Windows download card", () => {
@@ -114,7 +121,11 @@ describe("DownloadPage", () => {
       );
       expect(macLinks[0]).toHaveAttribute(
         "href",
-        expect.stringContaining("platform=macos"),
+        expect.stringContaining("platform=macos-arm64"),
+      );
+      expect(macLinks[1]).toHaveAttribute(
+        "href",
+        expect.stringContaining("platform=macos-x64"),
       );
     });
 
@@ -137,6 +148,17 @@ describe("DownloadPage", () => {
     it("renders macOS installation section", () => {
       renderDownloadPage();
       expect(screen.getByText(/macOS Installation/i)).toBeInTheDocument();
+    });
+
+    it("explains how to choose the matching Mac installer", () => {
+      renderDownloadPage();
+
+      expect(screen.getByText(/Which Mac do I have\?/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Apple menu.*About This Mac/i),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/M1, M2, M3, M4, or newer/i)).toBeInTheDocument();
+      expect(screen.getByText(/Intel processor/i)).toBeInTheDocument();
     });
 
     it("renders Windows installation section", () => {
@@ -166,7 +188,10 @@ describe("DownloadPage", () => {
     it("renders current version entry", () => {
       renderDownloadPage();
       expect(screen.getByText(/v0.1.0/)).toBeInTheDocument();
-      expect(screen.getByText(/Initial Release/i)).toBeInTheDocument();
+      expect(screen.getByText(/Latest Release/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Native downloads for Apple Silicon and Intel Macs/i),
+      ).toBeInTheDocument();
     });
   });
 
@@ -179,7 +204,7 @@ describe("DownloadPage", () => {
     it("renders macOS requirements", () => {
       renderDownloadPage();
       expect(
-        screen.getByText(/macOS 10.15 \(Catalina\) or later/i),
+        screen.getByText(/macOS 12 \(Monterey\) or later/i),
       ).toBeInTheDocument();
     });
 
@@ -292,7 +317,10 @@ describe("DownloadPage", () => {
     it("renders CTA download buttons", () => {
       renderDownloadPage();
       expect(
-        screen.getByRole("link", { name: /Download for macOS/i }),
+        screen.getByRole("link", { name: /macOS — Apple Silicon/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: /macOS — Intel/i }),
       ).toBeInTheDocument();
       expect(
         screen.getByRole("link", { name: /Download for Windows/i }),

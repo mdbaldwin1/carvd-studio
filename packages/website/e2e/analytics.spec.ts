@@ -106,7 +106,10 @@ test.describe("explicit website analytics", () => {
       )
       .toBe(true);
     await page.goto("/");
-    await page.locator("#download a").filter({ hasText: "macOS" }).click();
+    await page
+      .locator("#download a")
+      .filter({ hasText: "Apple Silicon" })
+      .click();
     await expect
       .poll(
         () =>
@@ -148,7 +151,7 @@ test.describe("explicit website analytics", () => {
     expect({
       platform: download?.properties.platform,
       location: download?.properties.location,
-    }).toEqual({ platform: "macos", location: "home-hero-card" });
+    }).toEqual({ platform: "macos-arm64", location: "home-hero-card" });
     const checkout = events.find(({ event }) => event === "checkout_started");
     expect({
       product: checkout?.properties.product,
