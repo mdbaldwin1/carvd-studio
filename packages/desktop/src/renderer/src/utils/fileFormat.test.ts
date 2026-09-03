@@ -548,6 +548,47 @@ describe('fileFormat', () => {
       expect(result.errors).toContain('parts[0].features[0].target is invalid');
     });
 
+    it.each([
+      ['null part', { parts: [null] }, 'parts[0] is invalid'],
+      ['primitive part', { parts: ['bad'] }, 'parts[0] is invalid'],
+      ['non-array assemblies', { assemblies: {} }, 'Invalid assemblies array'],
+      ['null assembly', { assemblies: [null] }, 'assemblies[0] is invalid'],
+      ['assembly without parts', { assemblies: [{}] }, 'assemblies[0].parts must be an array'],
+      ['invalid assembly part', { assemblies: [{ parts: [false] }] }, 'assemblies[0].parts[0] is invalid']
+    ])('rejects a %s without throwing', (_name, overrides, expectedError) => {
+      const file = { ...createValidCarvdFile(), ...overrides };
+      expect(() => validateCarvdFile(file)).not.toThrow();
+      expect(validateCarvdFile(file).errors).toContain(expectedError);
+    });
+
+    it('rejects cuts mislabeled as a version 1 project', () => {
+      const file = createValidCarvdFile({
+        parts: [
+          createTestPart({
+            features: [
+              {
+                id: 'end-cut',
+                kind: 'end_cut',
+                version: 1,
+                enabled: true,
+                target: { type: 'face', face: 'left_end' },
+                reference: { primaryFrom: 'min' },
+                cutType: 'mitre',
+                lengthMode: 'long_point',
+                parameters: { horizontalAngle: 45 }
+              }
+            ]
+          })
+        ]
+      });
+      file.version = 1;
+
+      const result = validateCarvdFile(file);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Projects containing part cuts require file version 2 or newer');
+    });
+
     it('rejects missing project metadata', () => {
       const file: Record<string, unknown> = { ...createValidCarvdFile() };
       delete file.project;

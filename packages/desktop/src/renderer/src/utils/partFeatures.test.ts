@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
 import type { AssemblyPart, EndCutFeature, Part, RectCutFeature } from '../types';
-import { clonePartFeature, clonePartFeatures, normalizeAssemblyPart, normalizePart } from './partFeatures';
+import {
+  clonePartFeature,
+  clonePartFeatures,
+  normalizeAssemblyPart,
+  normalizePart,
+  validateSerializedPartFeatures
+} from './partFeatures';
 
 function createEndCutFeature(): EndCutFeature {
   return {
@@ -34,6 +40,37 @@ function createRectCutFeature(target?: RectCutFeature['target']): RectCutFeature
 }
 
 describe('partFeatures', () => {
+  describe('validateSerializedPartFeatures', () => {
+    it.each([
+      ['missing length mode', { ...createEndCutFeature(), lengthMode: undefined }, 'lengthMode'],
+      [
+        'invalid end target',
+        { ...createEndCutFeature(), target: { type: 'face', face: 'top_face' } },
+        'target is invalid for an end cut'
+      ],
+      [
+        'invalid optional flip',
+        { ...createEndCutFeature(), parameters: { horizontalAngle: 45, horizontalFlip: 'yes' } },
+        'parameters'
+      ],
+      [
+        'invalid nested measurement reference',
+        {
+          ...createEndCutFeature(),
+          parameters: { horizontalAngle: 45, reference: { mode: 'centerline', value: Number.NaN } }
+        },
+        'parameters'
+      ],
+      [
+        'invalid secondary origin',
+        { ...createEndCutFeature(), reference: { primaryFrom: 'min', secondaryFrom: 'sideways' } },
+        'reference'
+      ]
+    ])('rejects %s', (_name, candidate, expectedError) => {
+      expect(validateSerializedPartFeatures([candidate], 'features').join('\n')).toContain(expectedError);
+    });
+  });
+
   describe('clonePartFeature', () => {
     it('deep-clones end cut features so mutations do not leak back', () => {
       const original = createEndCutFeature();

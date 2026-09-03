@@ -167,23 +167,52 @@ export function validateCarvdFile(data: unknown): FileValidationResult {
   if (!Array.isArray(obj.groupMembers)) {
     errors.push('Missing groupMembers array');
   }
+  if (obj.assemblies !== undefined && !Array.isArray(obj.assemblies)) {
+    errors.push('Invalid assemblies array');
+  }
 
   if (errors.length > 0) {
     return { valid: false, errors, warnings };
   }
 
-  const candidateFile = obj as unknown as CarvdFile;
-  candidateFile.parts.forEach((part, index) => {
-    errors.push(...validateSerializedPartFeatures((part as Part).features, `parts[${index}].features`));
+  let containsPartFeatures = false;
+  (obj.parts as unknown[]).forEach((part, index) => {
+    if (!part || typeof part !== 'object' || Array.isArray(part)) {
+      errors.push(`parts[${index}] is invalid`);
+      return;
+    }
+    const features = (part as Record<string, unknown>).features;
+    if (Array.isArray(features) && features.length > 0) containsPartFeatures = true;
+    errors.push(...validateSerializedPartFeatures(features, `parts[${index}].features`));
   });
-  candidateFile.assemblies?.forEach((assembly, assemblyIndex) => {
-    assembly.parts.forEach((part, partIndex) => {
+  (obj.assemblies as unknown[] | undefined)?.forEach((assembly, assemblyIndex) => {
+    if (!assembly || typeof assembly !== 'object' || Array.isArray(assembly)) {
+      errors.push(`assemblies[${assemblyIndex}] is invalid`);
+      return;
+    }
+    const assemblyParts = (assembly as Record<string, unknown>).parts;
+    if (!Array.isArray(assemblyParts)) {
+      errors.push(`assemblies[${assemblyIndex}].parts must be an array`);
+      return;
+    }
+    assemblyParts.forEach((part, partIndex) => {
+      if (!part || typeof part !== 'object' || Array.isArray(part)) {
+        errors.push(`assemblies[${assemblyIndex}].parts[${partIndex}] is invalid`);
+        return;
+      }
+      const features = (part as Record<string, unknown>).features;
+      if (Array.isArray(features) && features.length > 0) containsPartFeatures = true;
       errors.push(
-        ...validateSerializedPartFeatures(part.features, `assemblies[${assemblyIndex}].parts[${partIndex}].features`)
+        ...validateSerializedPartFeatures(features, `assemblies[${assemblyIndex}].parts[${partIndex}].features`)
       );
     });
   });
+  if (containsPartFeatures && typeof obj.version === 'number' && obj.version < 2) {
+    errors.push('Projects containing part cuts require file version 2 or newer');
+  }
   if (errors.length > 0) return { valid: false, errors, warnings };
+
+  const candidateFile = obj as unknown as CarvdFile;
 
   // Migrate if needed
   const migratedData = migrateFile(candidateFile);

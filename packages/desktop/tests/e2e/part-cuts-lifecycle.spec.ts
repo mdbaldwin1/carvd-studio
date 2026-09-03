@@ -4,11 +4,14 @@ import fs from 'fs';
 import path from 'path';
 import {
   addPartFromSidebar,
+  clickMenuItem,
   closeElectronApp,
   createBlankProject,
   launchElectronApp,
+  openSelectionContextMenu,
   queueOpenPaths,
   queueSavePath,
+  seedProject,
   type RunningElectronApp
 } from './helpers/electron-app';
 
@@ -38,11 +41,22 @@ async function openPartCutsFromProperties(window: Page): Promise<void> {
 }
 
 async function addDadoCut(window: Page): Promise<void> {
+  await addPresetCut(window, 'Dado');
+}
+
+async function addPresetCut(window: Page, preset: string): Promise<void> {
   await window.getByRole('button', { name: '+ Add Cut' }).click();
-  // The preset button's accessible name is the label plus its hint copy;
-  // anchor to the start so "Dado" does not also match "Stopped Dado".
-  await window.getByRole('button', { name: /^Dado\b/ }).click();
+  await window.getByRole('button', { name: new RegExp(`^${preset}\\b`) }).click();
   await window.getByRole('button', { name: 'Save Cut' }).click();
+}
+
+async function getFirstPartFeatures(window: Page): Promise<Array<{ id: string; cutType: string }>> {
+  return window.evaluate(() =>
+    (window.useProjectStore.getState().parts[0]?.features ?? []).map((feature) => ({
+      id: feature.id,
+      cutType: feature.kind === 'end_cut' ? feature.cutType : feature.cutType
+    }))
+  );
 }
 
 async function pressSaveShortcut(window: Page): Promise<void> {
@@ -145,5 +159,78 @@ test.describe('part cuts editing lifecycle', () => {
 
     await openPartCutsFromProperties(window);
     await expect(window.getByText(/^1\./)).toBeVisible();
+  });
+
+  test('authors mortise-and-tenon operations through the real cuts controls', async () => {
+    const { window } = running;
+    await openPartCutsFromProperties(window);
+    await addPresetCut(window, 'Tenon');
+    await addPresetCut(window, 'Mortise');
+    await window.getByRole('button', { name: 'Save Part' }).click();
+
+    await expect.poll(() => getFirstPartFeatureCount(window)).toBe(2);
+    expect((await getFirstPartFeatures(window)).map((feature) => feature.cutType)).toEqual(['tenon', 'mortise']);
+  });
+
+  test('blocks conflicting duplicate end cuts and keeps the workspace open', async () => {
+    const { window } = running;
+    await openPartCutsFromProperties(window);
+    await addPresetCut(window, 'End Cut');
+    await addPresetCut(window, 'End Cut');
+
+    await expect(window.getByText(/Only one enabled cut per end or edge/i).first()).toBeVisible();
+    await expect(window.getByRole('button', { name: 'Save Part' })).toBeDisabled();
+    expect(await isEditingPartCuts(window)).toBe(true);
+  });
+
+  test('copies cuts to another part with independent feature ids', async () => {
+    const { window } = running;
+    await openPartCutsFromProperties(window);
+    await addDadoCut(window);
+    await window.getByRole('button', { name: 'Save Part' }).click();
+    await addPartFromSidebar(window);
+
+    await window.evaluate(() => {
+      const source = window.useProjectStore.getState().parts[0];
+      window.useSelectionStore.getState().selectPart(source.id);
+    });
+    await openSelectionContextMenu(window);
+    await clickMenuItem(window, 'Copy Cuts');
+    await window.evaluate(() => {
+      const target = window.useProjectStore.getState().parts[1];
+      window.useSelectionStore.getState().selectPart(target.id);
+    });
+    await openSelectionContextMenu(window);
+    await window.getByRole('menuitem', { name: /^Paste Cuts/ }).click();
+    await expect
+      .poll(async () => window.evaluate(() => window.useProjectStore.getState().parts[1].features?.length))
+      .toBe(1);
+
+    const result = await window.evaluate(() => {
+      const parts = window.useProjectStore.getState().parts;
+      return {
+        sourceIds: parts[0].features?.map((feature) => feature.id) ?? [],
+        targetIds: parts[1].features?.map((feature) => feature.id) ?? [],
+        targetTypes: parts[1].features?.map((feature) => feature.kind === 'rect_cut' && feature.cutType) ?? []
+      };
+    });
+
+    expect(result.targetTypes).toEqual(['dado']);
+    expect(result.targetIds).toHaveLength(1);
+    expect(result.targetIds[0]).not.toBe(result.sourceIds[0]);
+  });
+
+  test('shows saved operations in fabrication output', async () => {
+    const { window } = running;
+    await seedProject(window, 'stocked-one-part');
+    await openPartCutsFromProperties(window);
+    await addDadoCut(window);
+    await window.getByRole('button', { name: 'Save Part' }).click();
+
+    await window.getByRole('button', { name: /Generate Cut List|View Cut List/ }).click();
+    const dialog = window.getByRole('dialog').filter({ has: window.getByRole('heading', { name: 'Cut List' }) });
+    await dialog.getByRole('button', { name: 'Generate Cut List' }).click();
+    await expect(dialog.getByText(/Cut blanks first/i)).toBeVisible();
+    await expect(dialog.getByText(/Dado/i)).toBeVisible();
   });
 });

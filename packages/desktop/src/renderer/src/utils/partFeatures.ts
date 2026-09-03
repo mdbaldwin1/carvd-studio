@@ -28,6 +28,9 @@ const RECT_CUT_TYPES = new Set([
   'mortise',
   'tenon'
 ]);
+const REFERENCE_ORIGINS = new Set(['min', 'center', 'max']);
+const END_CUT_FACES = new Set(['left_end', 'right_end', 'front_face', 'back_face']);
+const LENGTH_MODES = new Set(['long_point', 'short_point', 'centerline']);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -43,6 +46,10 @@ function isValidTarget(value: unknown): boolean {
   if (value.type === 'edge') return typeof value.edge === 'string' && EDGE_TARGETS.has(value.edge);
   if (value.type === 'corner') return typeof value.corner === 'string' && CORNER_TARGETS.has(value.corner);
   return false;
+}
+
+function isOptionalBoolean(value: unknown): boolean {
+  return value === undefined || typeof value === 'boolean';
 }
 
 export function validateSerializedPartFeatures(value: unknown, path: string): string[] {
@@ -62,15 +69,43 @@ export function validateSerializedPartFeatures(value: unknown, path: string): st
     else ids.add(candidate.id);
     if (candidate.version !== 1) errors.push(`${featurePath}.version is invalid`);
     if (typeof candidate.enabled !== 'boolean') errors.push(`${featurePath}.enabled is invalid`);
+    if (candidate.label !== undefined && typeof candidate.label !== 'string')
+      errors.push(`${featurePath}.label is invalid`);
+    if (candidate.metadata !== undefined && !isRecord(candidate.metadata))
+      errors.push(`${featurePath}.metadata is invalid`);
     if (!isValidTarget(candidate.target)) errors.push(`${featurePath}.target is invalid`);
-    if (!isRecord(candidate.reference) || !['min', 'center', 'max'].includes(String(candidate.reference.primaryFrom))) {
+    if (
+      !isRecord(candidate.reference) ||
+      !REFERENCE_ORIGINS.has(String(candidate.reference.primaryFrom)) ||
+      (candidate.reference.secondaryFrom !== undefined &&
+        !REFERENCE_ORIGINS.has(String(candidate.reference.secondaryFrom))) ||
+      (candidate.reference.tertiaryFrom !== undefined &&
+        !REFERENCE_ORIGINS.has(String(candidate.reference.tertiaryFrom)))
+    ) {
       errors.push(`${featurePath}.reference is invalid`);
     }
 
     if (candidate.kind === 'end_cut') {
+      if (
+        !isRecord(candidate.target) ||
+        candidate.target.type !== 'face' ||
+        !END_CUT_FACES.has(String(candidate.target.face))
+      )
+        errors.push(`${featurePath}.target is invalid for an end cut`);
       if (!['mitre', 'bevel', 'compound'].includes(String(candidate.cutType)))
         errors.push(`${featurePath}.cutType is invalid`);
-      if (!isRecord(candidate.parameters) || !isFiniteNumber(candidate.parameters.horizontalAngle)) {
+      if (!LENGTH_MODES.has(String(candidate.lengthMode))) errors.push(`${featurePath}.lengthMode is invalid`);
+      if (
+        !isRecord(candidate.parameters) ||
+        !isFiniteNumber(candidate.parameters.horizontalAngle) ||
+        !isOptionalBoolean(candidate.parameters.horizontalFlip) ||
+        (candidate.parameters.verticalAngle !== undefined && !isFiniteNumber(candidate.parameters.verticalAngle)) ||
+        !isOptionalBoolean(candidate.parameters.verticalFlip) ||
+        (candidate.parameters.reference !== undefined &&
+          (!isRecord(candidate.parameters.reference) ||
+            !LENGTH_MODES.has(String(candidate.parameters.reference.mode)) ||
+            !isFiniteNumber(candidate.parameters.reference.value)))
+      ) {
         errors.push(`${featurePath}.parameters are invalid`);
       }
       return;
