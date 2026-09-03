@@ -2,7 +2,11 @@ import BuyButton from "../components/BuyButton";
 import SEO from "../components/SEO";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { getDownloadHref, useDownloadInfo } from "../utils/downloads";
+import {
+  captureDownloadClick,
+  getDownloadHref,
+  useDownloadInfo,
+} from "../utils/downloads";
 import { AppleIcon, WindowsIcon } from "../components/BrandIcons";
 import {
   createOrganizationSchema,
@@ -122,10 +126,10 @@ export default function HomePage() {
             </div>
             <div className="rounded-lg border border-border/70 bg-surface/65 p-8 text-center max-md:p-6">
               <span className="mb-2 block text-5xl font-bold text-highlight max-md:text-3xl max-sm:text-2xl">
-                100%
+                Local
               </span>
               <span className="text-lg text-text-muted max-md:text-base max-sm:text-sm">
-                Offline &amp; Private
+                Projects &amp; Designs
               </span>
             </div>
           </div>
@@ -233,9 +237,9 @@ export default function HomePage() {
                 Your Designs Stay Yours
               </h3>
               <p className="leading-relaxed text-text-muted">
-                No cloud. No subscriptions. No data mining. Everything stays on
-                your computer where it belongs. Work in your shop, at job sites,
-                or anywhere—even without internet. Complete privacy guaranteed.
+                Project files stay local on your computer. Optional anonymous
+                analytics never includes design content, so you can work offline
+                with your designs kept private.
               </p>
             </Card>
             <Card className="feature-card p-8 max-md:p-6">
@@ -436,6 +440,9 @@ export default function HomePage() {
             <div className="flex flex-wrap justify-center gap-8 max-sm:flex-col max-sm:items-center">
               <a
                 href={getDownloadHref(macDownload, "home-hero-card")}
+                onClick={() =>
+                  captureDownloadClick(macDownload.platform, "home-hero-card")
+                }
                 className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
                 <span>
@@ -451,6 +458,12 @@ export default function HomePage() {
               </a>
               <a
                 href={getDownloadHref(windowsDownload, "home-hero-card")}
+                onClick={() =>
+                  captureDownloadClick(
+                    windowsDownload.platform,
+                    "home-hero-card",
+                  )
+                }
                 className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
               >
                 <span>
@@ -492,7 +505,7 @@ export default function HomePage() {
               furniture.
             </p>
             <div className="mb-6 flex justify-center gap-4 max-sm:flex-col max-sm:items-center">
-              <BuyButton />
+              <BuyButton location="home-cta" />
             </div>
             <p className="text-sm text-text-muted">
               ✓ 14-day free trial &nbsp;•&nbsp; ✓ No subscription required

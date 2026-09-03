@@ -62,7 +62,7 @@ export default function PricingCard() {
               "Reusable assembly library for common components",
               "Joinery allowances for extra material on tenons, dados, etc.",
               "Professional PDF export for cut sheets and presentations",
-              "100% offline operation—no internet required ever",
+              "Core project editing works offline; internet supports activation, updates, and optional consented analytics",
               "Complete data privacy—your designs stay on your computer",
               "Free lifetime updates with new features",
               "Install on up to 3 devices (Mac & Windows)",

@@ -8,6 +8,7 @@
 import { Alert, AlertDescription } from '@renderer/components/ui/alert';
 import { Button } from '@renderer/components/ui/button';
 import { EXTERNAL_LINKS } from '@renderer/utils/externalLinks';
+import { analytics } from '@renderer/utils/analytics';
 
 interface UpgradePromptProps {
   message: string;
@@ -16,10 +17,15 @@ interface UpgradePromptProps {
 }
 
 export function UpgradePrompt({ message, onUpgrade, onDismiss }: UpgradePromptProps) {
-  const handleUpgrade = () => {
-    // Open Lemon Squeezy checkout in default browser
-    window.electronAPI.openExternal(EXTERNAL_LINKS.checkout);
-    onUpgrade?.();
+  const handleUpgrade = async () => {
+    try {
+      await window.electronAPI.openExternal(EXTERNAL_LINKS.checkout);
+      analytics.capture('checkout_opened', { surface: 'pricing_prompt', license_mode: 'free' });
+    } catch {
+      // The checkout did not open, so do not record it.
+    } finally {
+      onUpgrade?.();
+    }
   };
 
   return (
@@ -27,7 +33,7 @@ export function UpgradePrompt({ message, onUpgrade, onDismiss }: UpgradePromptPr
       <AlertDescription className="mt-0 flex items-center justify-between gap-4">
         <p className="m-0 text-[13px] text-text">{message}</p>
         <div className="flex flex-shrink-0 gap-2">
-          <Button size="sm" onClick={handleUpgrade}>
+          <Button size="sm" onClick={() => void handleUpgrade()}>
             Upgrade
           </Button>
           {onDismiss && (

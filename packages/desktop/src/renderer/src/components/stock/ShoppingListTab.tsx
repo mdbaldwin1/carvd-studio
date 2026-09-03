@@ -6,6 +6,7 @@ import { getBlockedMessage } from '../../utils/featureLimits';
 // pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { showSavedFileToast } from '../../utils/fileToast';
 import { logger } from '../../utils/logger';
+import { analytics } from '../../utils/analytics';
 import { CutList } from '../../types';
 import { Button } from '@renderer/components/ui/button';
 import { DropdownButton, DropdownItem } from '../common/DropdownButton';
@@ -90,9 +91,16 @@ export function ShoppingListTab({
         showToast('Failed to save PDF', 'error');
         logger.error('Shopping list PDF export error:', result.error);
       }
+      if (result.success || result.error) {
+        analytics.capture('export_completed', {
+          export_type: 'shopping_pdf',
+          success: !!result.success && !!result.filePath
+        });
+      }
     } catch (error) {
       logger.error('Shopping list PDF export error:', error);
       showToast('Failed to export PDF', 'error');
+      analytics.capture('export_completed', { export_type: 'shopping_pdf', success: false });
     }
   }, [cutList, customShoppingItems, projectName, units, canExportPDF, showToast]);
 
@@ -114,9 +122,11 @@ export function ShoppingListTab({
       const BOM = '\uFEFF';
       await window.electronAPI.writeFile(result.filePath, BOM + csvContent);
       showSavedFileToast('Shopping list saved to CSV', result.filePath);
+      analytics.capture('export_completed', { export_type: 'shopping_csv', success: true });
     } catch (error) {
       logger.error('Shopping list CSV export error:', error);
       showToast('Failed to export CSV', 'error');
+      analytics.capture('export_completed', { export_type: 'shopping_csv', success: false });
     }
   }, [cutList, customShoppingItems, units, projectName, showToast]);
 

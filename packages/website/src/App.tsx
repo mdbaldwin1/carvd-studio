@@ -5,6 +5,7 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 import HomePage from "./pages/HomePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ScrollToHash from "./components/ScrollToHash";
+import { PostHogPageviews } from "./analytics/PostHogPageviews";
 
 const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
@@ -40,6 +41,7 @@ function App() {
   return (
     <Router>
       <ScrollToHash />
+      <PostHogPageviews />
       <Suspense fallback={null}>
         <Routes>
           <Route path="/" element={<HomePage />} />

@@ -1,11 +1,14 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { TrialBanner } from './TrialBanner';
+import { analytics } from '@renderer/utils/analytics';
+
+vi.mock('@renderer/utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 
 // Mock window.electronAPI
 beforeAll(() => {
   window.electronAPI = {
-    openExternal: vi.fn()
+    openExternal: vi.fn().mockResolvedValue(undefined)
   } as unknown as typeof window.electronAPI;
 });
 
@@ -15,6 +18,11 @@ describe('TrialBanner', () => {
     onActivateLicense: vi.fn(),
     onPurchase: vi.fn()
   };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(window.electronAPI.openExternal).mockResolvedValue(undefined);
+  });
 
   it('renders days remaining text', () => {
     render(<TrialBanner {...defaultProps} />);
@@ -44,13 +52,41 @@ describe('TrialBanner', () => {
     expect(onActivateLicense).toHaveBeenCalled();
   });
 
-  it('opens external URL when Buy Now is clicked', () => {
+  it('records a checkout only after Buy Now opens the external URL', async () => {
     const onPurchase = vi.fn();
+    let resolveOpen: (() => void) | undefined;
+    vi.mocked(window.electronAPI.openExternal).mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveOpen = resolve;
+        })
+    );
     render(<TrialBanner {...defaultProps} onPurchase={onPurchase} />);
 
     fireEvent.click(screen.getByText('Buy Now'));
     expect(window.electronAPI.openExternal).toHaveBeenCalledWith(expect.stringContaining('lemonsqueezy'));
-    expect(onPurchase).toHaveBeenCalled();
+    expect(onPurchase).not.toHaveBeenCalled();
+    expect(analytics.capture).not.toHaveBeenCalled();
+
+    resolveOpen?.();
+
+    await waitFor(() => {
+      expect(onPurchase).toHaveBeenCalledTimes(1);
+      expect(analytics.capture).toHaveBeenCalledTimes(1);
+      expect(analytics.capture).toHaveBeenCalledWith('checkout_opened', { surface: 'trial', license_mode: 'trial' });
+    });
+  });
+
+  it('does not record checkout but preserves its callback when opening the external URL fails', async () => {
+    const onPurchase = vi.fn();
+    vi.mocked(window.electronAPI.openExternal).mockRejectedValueOnce(new Error('browser unavailable'));
+    render(<TrialBanner {...defaultProps} onPurchase={onPurchase} />);
+
+    fireEvent.click(screen.getByText('Buy Now'));
+
+    await waitFor(() => expect(window.electronAPI.openExternal).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onPurchase).toHaveBeenCalledTimes(1));
+    expect(analytics.capture).not.toHaveBeenCalled();
   });
 
   it('applies normal styling when days > 3', () => {

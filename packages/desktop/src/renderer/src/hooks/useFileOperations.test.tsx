@@ -4,6 +4,8 @@ import React from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useUIStore } from '../store/uiStore';
 
+vi.mock('../utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
+
 // Mock fileOperations module
 vi.mock('../utils/fileOperations', () => ({
   saveProject: vi.fn(),
@@ -46,6 +48,7 @@ import {
 } from '../utils/fileOperations';
 import { UnsavedChangesDialog } from '../components/project/UnsavedChangesDialog';
 import { FileRecoveryModal } from '../components/project/FileRecoveryModal';
+import { analytics } from '../utils/analytics';
 
 // ============================================================
 // Setup
@@ -333,6 +336,30 @@ describe('useFileOperations', () => {
       });
 
       expect(newProject).toHaveBeenCalled();
+    });
+
+    it('records a confirmed menu project creation with the active units', async () => {
+      (newProject as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
+      useProjectStore.setState({ units: 'metric' });
+      const { result } = renderHook(() => useFileOperations());
+
+      await act(async () => {
+        await result.current.handleNew();
+      });
+
+      expect(analytics.capture).toHaveBeenCalledTimes(1);
+      expect(analytics.capture).toHaveBeenCalledWith('project_created', { source: 'menu', units: 'metric' });
+    });
+
+    it('does not record a menu project creation when creation fails', async () => {
+      (newProject as ReturnType<typeof vi.fn>).mockResolvedValue({ success: false });
+      const { result } = renderHook(() => useFileOperations());
+
+      await act(async () => {
+        await result.current.handleNew();
+      });
+
+      expect(analytics.capture).not.toHaveBeenCalled();
     });
 
     it('shows unsaved changes dialog when dirty', async () => {

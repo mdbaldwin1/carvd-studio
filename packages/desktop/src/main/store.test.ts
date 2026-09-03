@@ -37,6 +37,12 @@ import {
   setLastKnownVersion,
   getHasCompletedWelcome,
   setHasCompletedWelcome,
+  getAnalyticsConsentPreference,
+  setAnalyticsConsentPreference,
+  getAnalyticsInstallationId,
+  setAnalyticsInstallationId,
+  getAnalyticsQueue,
+  setAnalyticsQueue,
   getUserTemplates,
   addUserTemplate,
   updateUserTemplate,
@@ -65,6 +71,7 @@ import {
   type UserTemplateItem,
   type AppStateExport
 } from './store';
+import type { QueuedAnalyticsEvent } from './analytics/analyticsQueue';
 
 // ============================================================
 // Factory helpers
@@ -151,6 +158,45 @@ describe('store', () => {
     store.set('licenseActivatedAt', null);
     store.set('lastKnownVersion', null);
     store.set('hasCompletedWelcome', false);
+    setAnalyticsConsentPreference('unknown');
+  });
+
+  // ============================
+  // Analytics preferences
+  // ============================
+
+  describe('analytics preferences', () => {
+    it('defaults analytics consent to unknown', () => {
+      expect(getAnalyticsConsentPreference()).toBe('unknown');
+    });
+
+    it.each(['unknown', 'granted', 'denied'] as const)('round-trips %s analytics consent', (consent) => {
+      setAnalyticsConsentPreference(consent);
+
+      expect(getAnalyticsConsentPreference()).toBe(consent);
+    });
+
+    it('deletes analytics identity and queued events when consent is revoked', () => {
+      const queuedEvent: QueuedAnalyticsEvent = {
+        eventId: '8d4f0c37-9839-4cb9-8bbb-3c2dba7e45f2',
+        distinctId: 'anonymous-installation',
+        name: 'app_opened',
+        properties: {},
+        occurredAt: '2026-09-01T12:00:00.000Z',
+        attemptCount: 0,
+        nextAttemptAt: 0
+      };
+      setAnalyticsConsentPreference('granted');
+      setAnalyticsInstallationId('anonymous-installation');
+      setAnalyticsQueue([queuedEvent]);
+
+      setAnalyticsConsentPreference('denied');
+
+      expect(getAnalyticsInstallationId()).toBeNull();
+      expect(getAnalyticsQueue()).toEqual([]);
+      expect(store.has('analyticsInstallationId')).toBe(false);
+      expect(store.has('analyticsQueue')).toBe(false);
+    });
   });
 
   // ============================

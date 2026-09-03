@@ -35,19 +35,18 @@ export default function PrivacyPolicyPage() {
                   Our Commitment to Your Privacy
                 </h2>
                 <p className="mb-4 text-text-muted">
-                  Carvd Studio is designed with privacy as a core principle.
-                  Unlike most modern software, we don't collect your data, track
-                  your usage, or require an internet connection to function.
-                  Your designs, your data, and your privacy belong to you.
+                  Project files and designs remain local unless you explicitly
+                  export or share them. Carvd Studio offers optional anonymous
+                  product analytics.
                 </p>
                 <div
                   className="rounded-lg border p-8 max-sm:p-6"
                   style={highlightBoxStyle}
                 >
                   <p className="font-semibold">
-                    TL;DR: We don't collect your data. Carvd Studio runs
-                    entirely on your computer. We can't see your designs, and we
-                    don't want to.
+                    Analytics never includes project names, filenames, paths,
+                    notes, dimensions, design content, email addresses, or
+                    license keys.
                   </p>
                 </div>
               </section>
@@ -63,11 +62,14 @@ export default function PrivacyPolicyPage() {
                 </p>
                 <ul className="grid gap-2 text-text-muted">
                   <li>- Your furniture designs or project files</li>
-                  <li>- Usage analytics or telemetry data</li>
+                  <li>
+                    - Project names, filenames, paths, notes, dimensions, and
+                    design content
+                  </li>
                   <li>
                     - Personal information beyond what you provide at purchase
                   </li>
-                  <li>- Browsing history or behavior tracking</li>
+                  <li>- Cross-site profiling or advertising identifiers</li>
                   <li>- Device fingerprints or hardware information</li>
                   <li>- Location data</li>
                 </ul>
@@ -79,7 +81,8 @@ export default function PrivacyPolicyPage() {
                   Data Stored on Your Computer
                 </h2>
                 <p className="mb-4 text-text-muted">
-                  All Carvd Studio data is stored locally on your computer:
+                  Project files and design data are stored locally on your
+                  computer:
                 </p>
                 <ul className="grid gap-2 text-text-muted">
                   <li>
@@ -109,8 +112,8 @@ export default function PrivacyPolicyPage() {
                   License Verification
                 </h2>
                 <p className="mb-4 text-text-muted">
-                  The only time Carvd Studio connects to the internet is for
-                  license verification:
+                  Core desktop editing works offline. Internet can be used for
+                  optional analytics, license verification, and updates:
                 </p>
                 <ul className="grid gap-2 text-text-muted">
                   <li>
@@ -132,9 +135,13 @@ export default function PrivacyPolicyPage() {
                   </li>
                 </ul>
                 <p className="mt-4 text-text-muted">
-                  During license verification, we transmit only your license
-                  key. We do not transmit any information about your designs or
-                  how you use the software.
+                  Desktop anonymous analytics is explicit opt-in and manageable
+                  in App Settings → Data & License. Website pageviews,
+                  downloads, and checkout starts operate only when that
+                  deployment is configured. Desktop events include a coarse
+                  operating-system category and app version. Verified purchase
+                  conversion sends only product, currency, value cents, and test
+                  mode.
                 </p>
               </section>
 
@@ -177,11 +184,15 @@ export default function PrivacyPolicyPage() {
                       View their privacy policy →
                     </a>
                   </li>
+                  <li>
+                    <strong>PostHog:</strong> Optional anonymous product
+                    analytics and verified conversion measurement.
+                  </li>
                 </ul>
                 <p className="mt-4 text-text-muted">
-                  We do not use analytics services, advertising networks, or any
-                  other third-party tracking within the Carvd Studio
-                  application.
+                  You can change this choice at any time in App Settings → Data
+                  & License. When disabled, queued analytics and the anonymous
+                  installation identifier are deleted.
                 </p>
               </section>
 
@@ -189,8 +200,7 @@ export default function PrivacyPolicyPage() {
               <section>
                 <h2 className="mb-4 text-2xl font-bold">Your Rights</h2>
                 <p className="mb-4 text-text-muted">
-                  Since we don't collect your data, there's not much to manage.
-                  However, you have the right to:
+                  You can manage optional analytics and have the right to:
                 </p>
                 <ul className="grid gap-2 text-text-muted">
                   <li>

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-09-03
+
+### Added
+
+- **Consent-gated desktop analytics delivery** — Added durable local consent preferences, anonymous installation identifiers, bounded offline delivery with retry backoff, and optional PostHog transport configuration. Analytics stays disabled until explicitly granted and clears local analytics data immediately on revocation.
+- **Analytics privacy controls** — Added a first-run optional analytics choice after onboarding and a permanent App Settings → Data & License control with a clear disclosure of anonymous usage data and prohibited project data.
+- **Privacy disclosure** — Clarified that analytics remains optional, anonymous, and disabled until configured/consented; project design content remains local and revocation deletes queued analytics and the anonymous identifier.
+
+### Fixed
+
+- **Purchase webhook runtime compatibility** — Accept Lemon Squeezy's signed raw request body from Vercel's Node function runtime while retaining exact HMAC verification and retry behavior.
+- **Cross-platform release verification** — Made analytics-enabled Electron E2E commands portable to Windows and added a single CI-only retry for transient desktop UI runner failures while keeping local test runs strict.
+
 ## [1.0.5] - 2026-08-13
 
 ### Added

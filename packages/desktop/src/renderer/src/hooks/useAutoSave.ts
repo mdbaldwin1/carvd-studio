@@ -9,6 +9,8 @@ import { useUIStore } from '../store/uiStore';
 import { useAppSettingsStore } from '../store/appSettingsStore';
 import { saveProject } from '../utils/fileOperations';
 import { logger } from '../utils/logger';
+import { analytics } from '../utils/analytics';
+import { bucketCount } from '../../../shared/analytics';
 
 // Auto-save delay after last change (30 seconds)
 const AUTO_SAVE_DELAY = 30 * 1000;
@@ -71,9 +73,14 @@ export function useAutoSave(options: UseAutoSaveOptions = {}): UseAutoSaveResult
       }
 
       // Save to existing file
-      const result = await saveProject();
+      const partCount = useProjectStore.getState().parts.length;
+      const result = await saveProject('auto');
       if (result.success) {
         setLastAutoSave(new Date());
+        analytics.capture('project_saved', {
+          save_kind: 'auto',
+          part_count_bucket: bucketCount(partCount)
+        });
         logger.info('[AutoSave] Project auto-saved');
       } else if (result.error) {
         logger.error('[AutoSave] Failed to auto-save:', result.error);
