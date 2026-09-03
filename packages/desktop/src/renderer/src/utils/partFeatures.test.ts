@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
-import type { AssemblyPart, EndCutFeature, Part, RectCutFeature } from '../types';
+import type { AssemblyPart, CircularCutFeature, EndCutFeature, Part, RectCutFeature } from '../types';
 import {
   clonePartFeature,
   clonePartFeatures,
@@ -39,8 +39,115 @@ function createRectCutFeature(target?: RectCutFeature['target']): RectCutFeature
   };
 }
 
+function createCircularCutFeature(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'round-hole-1',
+    kind: 'circular_cut',
+    version: 1,
+    enabled: true,
+    target: { type: 'face', face: 'top_face' },
+    reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+    cutType: 'round_hole',
+    placement: { primary: 2, secondary: 1, rotation: 0 },
+    parameters: {
+      diameter: 0.375,
+      depthMode: 'through',
+      tilt: 0,
+      direction: 0
+    },
+    ...overrides
+  };
+}
+
+function createRoundedCutFeature(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'rounded-slot-1',
+    kind: 'rounded_cut',
+    version: 1,
+    enabled: true,
+    target: { type: 'face', face: 'front_face' },
+    reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+    cutType: 'rounded_slot',
+    placement: { primary: 0, secondary: 0, rotation: 90 },
+    parameters: {
+      length: 3,
+      width: 0.5,
+      cornerRadius: 0.25,
+      depthMode: 'blind',
+      depth: 0.25
+    },
+    ...overrides
+  };
+}
+
 describe('partFeatures', () => {
   describe('validateSerializedPartFeatures', () => {
+    it.each([
+      ['round hole', createCircularCutFeature()],
+      [
+        'countersink',
+        createCircularCutFeature({
+          cutType: 'countersink',
+          parameters: {
+            diameter: 0.25,
+            depthMode: 'through',
+            tilt: 15,
+            direction: 90,
+            countersink: { majorDiameter: 0.5, includedAngle: 82 }
+          }
+        })
+      ],
+      [
+        'counterbore pattern',
+        createCircularCutFeature({
+          cutType: 'counterbore',
+          parameters: {
+            diameter: 0.25,
+            depthMode: 'blind',
+            depth: 1,
+            tilt: 0,
+            direction: 0,
+            counterbore: { diameter: 0.5, depth: 0.25 }
+          },
+          pattern: { type: 'linear', count: 4, spacing: 2, direction: 0 }
+        })
+      ],
+      ['rounded slot', createRoundedCutFeature()],
+      [
+        'rounded rectangle',
+        createRoundedCutFeature({
+          cutType: 'rounded_rectangle',
+          parameters: { length: 4, width: 2, cornerRadius: 0.375, depthMode: 'through' }
+        })
+      ]
+    ])('accepts a valid %s', (_name, candidate) => {
+      expect(validateSerializedPartFeatures([candidate], 'features')).toEqual([]);
+    });
+
+    it.each([
+      ['non-finite diameter', createCircularCutFeature({ parameters: { diameter: Number.NaN } }), 'diameter'],
+      ['invalid target', createCircularCutFeature({ target: { type: 'edge', edge: 'top_front_edge' } }), 'target'],
+      [
+        'excessive pattern count',
+        createCircularCutFeature({ pattern: { type: 'linear', count: 129, spacing: 1, direction: 0 } }),
+        'pattern'
+      ],
+      [
+        'malformed dowel metadata',
+        createCircularCutFeature({ metadata: { dowelJoint: { jointId: '', matePartId: 42 } } }),
+        'dowelJoint'
+      ],
+      [
+        'oversized rounded corner radius',
+        createRoundedCutFeature({
+          parameters: { length: 3, width: 0.5, cornerRadius: 1, depthMode: 'through' }
+        }),
+        'cornerRadius'
+      ]
+    ])('rejects %s', (_name, candidate, expectedError) => {
+      expect(validateSerializedPartFeatures([candidate], 'features').join('\n')).toContain(expectedError);
+    });
+
     it.each([
       ['missing length mode', { ...createEndCutFeature(), lengthMode: undefined }, 'lengthMode'],
       [
@@ -72,6 +179,45 @@ describe('partFeatures', () => {
   });
 
   describe('clonePartFeature', () => {
+    it('deep-clones circular cut patterns, termination details, and dowel metadata', () => {
+      const original = createCircularCutFeature({
+        cutType: 'counterbore',
+        metadata: {
+          dowelJoint: {
+            jointId: 'joint-1',
+            matePartId: 'part-2',
+            memberIndex: 0,
+            dowelDiameter: 0.375,
+            dowelLength: 2,
+            embedmentDepth: 1
+          }
+        },
+        parameters: {
+          diameter: 0.25,
+          depthMode: 'blind',
+          depth: 1,
+          tilt: 0,
+          direction: 0,
+          counterbore: { diameter: 0.5, depth: 0.25 }
+        },
+        pattern: { type: 'linear', count: 3, spacing: 2, direction: 0 }
+      }) as unknown as CircularCutFeature;
+
+      const clone = clonePartFeature(original);
+      expect(clone).toEqual(original);
+      if (clone.kind !== 'circular_cut') throw new Error('expected circular cut clone');
+      expect(clone.pattern).not.toBe(original.pattern);
+      expect(clone.parameters.counterbore).not.toBe(original.parameters.counterbore);
+      expect(clone.metadata?.dowelJoint).not.toBe(original.metadata?.dowelJoint);
+
+      if (clone.pattern?.type === 'linear') clone.pattern.count = 7;
+      if (clone.parameters.counterbore) clone.parameters.counterbore.depth = 0.125;
+      (clone.metadata?.dowelJoint as { jointId: string }).jointId = 'joint-clone';
+      expect((original.pattern as { count: number }).count).toBe(3);
+      expect(original.parameters.counterbore?.depth).toBe(0.25);
+      expect((original.metadata?.dowelJoint as { jointId: string }).jointId).toBe('joint-1');
+    });
+
     it('deep-clones end cut features so mutations do not leak back', () => {
       const original = createEndCutFeature();
       const clone = clonePartFeature(original);

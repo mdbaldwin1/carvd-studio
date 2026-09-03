@@ -31,6 +31,9 @@ const RECT_CUT_TYPES = new Set([
 const REFERENCE_ORIGINS = new Set(['min', 'center', 'max']);
 const END_CUT_FACES = new Set(['left_end', 'right_end', 'front_face', 'back_face']);
 const LENGTH_MODES = new Set(['long_point', 'short_point', 'centerline']);
+const CIRCULAR_CUT_TYPES = new Set(['round_hole', 'countersink', 'counterbore']);
+const ROUNDED_CUT_TYPES = new Set(['rounded_slot', 'rounded_rectangle']);
+const MAX_PATTERN_MEMBERS = 128;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -50,6 +53,78 @@ function isValidTarget(value: unknown): boolean {
 
 function isOptionalBoolean(value: unknown): boolean {
   return value === undefined || typeof value === 'boolean';
+}
+
+function isPositiveFiniteNumber(value: unknown): value is number {
+  return isFiniteNumber(value) && value > 0;
+}
+
+function isPositiveIntegerAtMost(value: unknown, maximum: number): value is number {
+  return Number.isInteger(value) && Number(value) > 0 && Number(value) <= maximum;
+}
+
+function validateFacePlacement(candidate: Record<string, unknown>, featurePath: string, errors: string[]): void {
+  if (
+    !isRecord(candidate.target) ||
+    candidate.target.type !== 'face' ||
+    !FACE_TARGETS.has(String(candidate.target.face))
+  ) {
+    errors.push(`${featurePath}.target is invalid`);
+  }
+  if (
+    !isRecord(candidate.placement) ||
+    !isFiniteNumber(candidate.placement.primary) ||
+    !isFiniteNumber(candidate.placement.secondary) ||
+    !isFiniteNumber(candidate.placement.rotation)
+  ) {
+    errors.push(`${featurePath}.placement is invalid`);
+  }
+}
+
+function validatePattern(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.type === 'linear') {
+    return (
+      isPositiveIntegerAtMost(value.count, MAX_PATTERN_MEMBERS) &&
+      isPositiveFiniteNumber(value.spacing) &&
+      isFiniteNumber(value.direction)
+    );
+  }
+  if (value.type === 'grid') {
+    return (
+      isPositiveIntegerAtMost(value.rows, MAX_PATTERN_MEMBERS) &&
+      isPositiveIntegerAtMost(value.columns, MAX_PATTERN_MEMBERS) &&
+      Number(value.rows) * Number(value.columns) <= MAX_PATTERN_MEMBERS &&
+      isPositiveFiniteNumber(value.rowSpacing) &&
+      isPositiveFiniteNumber(value.columnSpacing) &&
+      isFiniteNumber(value.rotation)
+    );
+  }
+  if (value.type === 'circular') {
+    return (
+      isPositiveIntegerAtMost(value.count, MAX_PATTERN_MEMBERS) &&
+      isPositiveFiniteNumber(value.radius) &&
+      isFiniteNumber(value.startAngle)
+    );
+  }
+  return false;
+}
+
+function validateDowelMetadata(metadata: unknown): boolean {
+  if (!isRecord(metadata) || metadata.dowelJoint === undefined) return true;
+  const dowel = metadata.dowelJoint;
+  return (
+    isRecord(dowel) &&
+    typeof dowel.jointId === 'string' &&
+    dowel.jointId.length > 0 &&
+    typeof dowel.matePartId === 'string' &&
+    dowel.matePartId.length > 0 &&
+    Number.isInteger(dowel.memberIndex) &&
+    Number(dowel.memberIndex) >= 0 &&
+    isPositiveFiniteNumber(dowel.dowelDiameter) &&
+    isPositiveFiniteNumber(dowel.dowelLength) &&
+    isPositiveFiniteNumber(dowel.embedmentDepth)
+  );
 }
 
 export function validateSerializedPartFeatures(value: unknown, path: string): string[] {
@@ -73,6 +148,7 @@ export function validateSerializedPartFeatures(value: unknown, path: string): st
       errors.push(`${featurePath}.label is invalid`);
     if (candidate.metadata !== undefined && !isRecord(candidate.metadata))
       errors.push(`${featurePath}.metadata is invalid`);
+    else if (!validateDowelMetadata(candidate.metadata)) errors.push(`${featurePath}.metadata.dowelJoint is invalid`);
     if (!isValidTarget(candidate.target)) errors.push(`${featurePath}.target is invalid`);
     if (
       !isRecord(candidate.reference) ||
@@ -107,6 +183,66 @@ export function validateSerializedPartFeatures(value: unknown, path: string): st
             !isFiniteNumber(candidate.parameters.reference.value)))
       ) {
         errors.push(`${featurePath}.parameters are invalid`);
+      }
+      return;
+    }
+    if (candidate.kind === 'circular_cut') {
+      validateFacePlacement(candidate, featurePath, errors);
+      if (!CIRCULAR_CUT_TYPES.has(String(candidate.cutType))) errors.push(`${featurePath}.cutType is invalid`);
+      const parameters = candidate.parameters;
+      if (!isRecord(parameters)) {
+        errors.push(`${featurePath}.parameters are invalid`);
+      } else {
+        if (!isPositiveFiniteNumber(parameters.diameter)) errors.push(`${featurePath}.parameters.diameter is invalid`);
+        if (!['through', 'blind'].includes(String(parameters.depthMode)))
+          errors.push(`${featurePath}.parameters.depthMode is invalid`);
+        if (parameters.depthMode === 'blind' && !isPositiveFiniteNumber(parameters.depth))
+          errors.push(`${featurePath}.parameters.depth is invalid`);
+        if (!isFiniteNumber(parameters.tilt) || parameters.tilt < 0 || parameters.tilt >= 90)
+          errors.push(`${featurePath}.parameters.tilt is invalid`);
+        if (!isFiniteNumber(parameters.direction)) errors.push(`${featurePath}.parameters.direction is invalid`);
+        if (
+          candidate.cutType === 'countersink' &&
+          (!isRecord(parameters.countersink) ||
+            !isPositiveFiniteNumber(parameters.countersink.majorDiameter) ||
+            parameters.countersink.majorDiameter <= Number(parameters.diameter) ||
+            !isPositiveFiniteNumber(parameters.countersink.includedAngle) ||
+            parameters.countersink.includedAngle >= 180)
+        ) {
+          errors.push(`${featurePath}.parameters.countersink is invalid`);
+        }
+        if (
+          candidate.cutType === 'counterbore' &&
+          (!isRecord(parameters.counterbore) ||
+            !isPositiveFiniteNumber(parameters.counterbore.diameter) ||
+            parameters.counterbore.diameter <= Number(parameters.diameter) ||
+            !isPositiveFiniteNumber(parameters.counterbore.depth))
+        ) {
+          errors.push(`${featurePath}.parameters.counterbore is invalid`);
+        }
+      }
+      if (candidate.pattern !== undefined && !validatePattern(candidate.pattern))
+        errors.push(`${featurePath}.pattern is invalid`);
+      return;
+    }
+    if (candidate.kind === 'rounded_cut') {
+      validateFacePlacement(candidate, featurePath, errors);
+      if (!ROUNDED_CUT_TYPES.has(String(candidate.cutType))) errors.push(`${featurePath}.cutType is invalid`);
+      const parameters = candidate.parameters;
+      if (!isRecord(parameters)) {
+        errors.push(`${featurePath}.parameters are invalid`);
+      } else {
+        if (!isPositiveFiniteNumber(parameters.length)) errors.push(`${featurePath}.parameters.length is invalid`);
+        if (!isPositiveFiniteNumber(parameters.width)) errors.push(`${featurePath}.parameters.width is invalid`);
+        if (
+          !isPositiveFiniteNumber(parameters.cornerRadius) ||
+          parameters.cornerRadius > Math.min(Number(parameters.length), Number(parameters.width)) / 2
+        )
+          errors.push(`${featurePath}.parameters.cornerRadius is invalid`);
+        if (!['through', 'blind'].includes(String(parameters.depthMode)))
+          errors.push(`${featurePath}.parameters.depthMode is invalid`);
+        if (parameters.depthMode === 'blind' && !isPositiveFiniteNumber(parameters.depth))
+          errors.push(`${featurePath}.parameters.depth is invalid`);
       }
       return;
     }
@@ -168,6 +304,33 @@ export function clonePartFeature(feature: PartFeature): PartFeature {
       reference: cloneFeatureReference(feature.reference),
       metadata: feature.metadata ? { ...feature.metadata } : undefined,
       parameters: { ...feature.parameters }
+    };
+  }
+
+  if (feature.kind === 'circular_cut') {
+    return {
+      ...feature,
+      target: cloneFeatureTarget(feature.target) as typeof feature.target,
+      reference: cloneFeatureReference(feature.reference),
+      metadata: feature.metadata ? structuredClone(feature.metadata) : undefined,
+      parameters: {
+        ...feature.parameters,
+        countersink: feature.parameters.countersink ? { ...feature.parameters.countersink } : undefined,
+        counterbore: feature.parameters.counterbore ? { ...feature.parameters.counterbore } : undefined
+      },
+      placement: { ...feature.placement },
+      pattern: feature.pattern ? { ...feature.pattern } : undefined
+    };
+  }
+
+  if (feature.kind === 'rounded_cut') {
+    return {
+      ...feature,
+      target: cloneFeatureTarget(feature.target) as typeof feature.target,
+      reference: cloneFeatureReference(feature.reference),
+      metadata: feature.metadata ? structuredClone(feature.metadata) : undefined,
+      parameters: { ...feature.parameters },
+      placement: { ...feature.placement }
     };
   }
 

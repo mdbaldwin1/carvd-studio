@@ -96,7 +96,7 @@ export interface Rotation3D {
 
 export type PartFeatureId = string;
 export type PartFeatureVersion = 1;
-export type PartFeatureKind = 'end_cut' | 'rect_cut';
+export type PartFeatureKind = 'end_cut' | 'rect_cut' | 'circular_cut' | 'rounded_cut';
 
 export type FaceTarget = 'left_end' | 'right_end' | 'top_face' | 'bottom_face' | 'front_face' | 'back_face';
 
@@ -184,7 +184,59 @@ export interface RectCutFeature extends PartFeatureBase {
   };
 }
 
-export type PartFeature = EndCutFeature | RectCutFeature;
+export type CircularPattern =
+  | { type: 'linear'; count: number; spacing: number; direction: number }
+  | {
+      type: 'grid';
+      rows: number;
+      columns: number;
+      rowSpacing: number;
+      columnSpacing: number;
+      rotation: number;
+    }
+  | { type: 'circular'; count: number; radius: number; startAngle: number };
+
+export interface DowelJointMetadata {
+  jointId: string;
+  matePartId: string;
+  memberIndex: number;
+  dowelDiameter: number;
+  dowelLength: number;
+  embedmentDepth: number;
+}
+
+export interface CircularCutFeature extends PartFeatureBase {
+  kind: 'circular_cut';
+  target: { type: 'face'; face: FaceTarget };
+  cutType: 'round_hole' | 'countersink' | 'counterbore';
+  placement: { primary: number; secondary: number; rotation: number };
+  parameters: {
+    diameter: number;
+    depthMode: 'through' | 'blind';
+    depth?: number;
+    tilt: number;
+    direction: number;
+    countersink?: { majorDiameter: number; includedAngle: number };
+    counterbore?: { diameter: number; depth: number };
+  };
+  pattern?: CircularPattern;
+}
+
+export interface RoundedCutFeature extends PartFeatureBase {
+  kind: 'rounded_cut';
+  target: { type: 'face'; face: FaceTarget };
+  cutType: 'rounded_slot' | 'rounded_rectangle';
+  placement: { primary: number; secondary: number; rotation: number };
+  parameters: {
+    length: number;
+    width: number;
+    cornerRadius: number;
+    depthMode: 'through' | 'blind';
+    depth?: number;
+  };
+}
+
+export type PartFeature = EndCutFeature | RectCutFeature | CircularCutFeature | RoundedCutFeature;
 
 export interface Part {
   id: string;

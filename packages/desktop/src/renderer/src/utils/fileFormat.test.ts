@@ -91,6 +91,37 @@ describe('fileFormat', () => {
       expect(file.version).toBe(CARVD_FILE_VERSION);
     });
 
+    it('round-trips a patterned counterbore in file version 2', () => {
+      const featured = createTestPart({
+        features: [
+          {
+            id: 'counterbore-1',
+            kind: 'circular_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'counterbore',
+            placement: { primary: 2, secondary: 1, rotation: 0 },
+            parameters: {
+              diameter: 0.25,
+              depthMode: 'blind',
+              depth: 1,
+              tilt: 0,
+              direction: 0,
+              counterbore: { diameter: 0.5, depth: 0.25 }
+            },
+            pattern: { type: 'linear', count: 3, spacing: 2, direction: 0 }
+          }
+        ]
+      });
+
+      const result = parseCarvdFile(stringifyCarvdFile(createValidCarvdFile({ parts: [featured] })));
+      expect(result.valid).toBe(true);
+      expect(result.data?.version).toBe(CARVD_FILE_VERSION);
+      expect(result.data?.parts[0].features?.[0]).toEqual(featured.features?.[0]);
+    });
+
     it('includes project metadata', () => {
       const file = createValidCarvdFile({
         projectName: 'My Bookshelf',
