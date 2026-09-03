@@ -46,7 +46,7 @@ describe("lemonSqueezy", () => {
       expect(detectPlatform()).toBe("windows");
     });
 
-    it("returns windows for Linux user agent", async () => {
+    it("returns linux for Linux user agent", async () => {
       Object.defineProperty(window, "navigator", {
         value: {
           userAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
@@ -55,7 +55,7 @@ describe("lemonSqueezy", () => {
       });
 
       const { detectPlatform } = await import("./lemonSqueezy");
-      expect(detectPlatform()).toBe("windows");
+      expect(detectPlatform()).toBe("linux");
     });
 
     it("is case insensitive for mac detection", async () => {

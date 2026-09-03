@@ -4,13 +4,13 @@
  * Business model:
  * - Users download the app for FREE from GitHub releases
  * - 14-day full-featured trial
- * - Purchase a LICENSE KEY (single product, works on Mac & Windows)
+ * - Purchase a LICENSE KEY (single product, works on macOS, Windows, and Linux)
  * - License key unlocks full features
  */
 
 const CHECKOUT_URL = import.meta.env.VITE_LEMON_SQUEEZY_CHECKOUT_URL;
 
-export type Platform = "macos" | "windows";
+export type Platform = "macos" | "windows" | "linux";
 
 /**
  * Detects the user's operating system (for download buttons)
@@ -20,12 +20,15 @@ export function detectPlatform(): Platform {
   if (userAgent.includes("mac")) {
     return "macos";
   }
+  if (userAgent.includes("linux")) {
+    return "linux";
+  }
   return "windows";
 }
 
 /**
  * Returns the Lemon Squeezy checkout URL for purchasing a license key.
- * Single product - license works on both Mac and Windows.
+ * Single product - license works on macOS, Windows, and Linux.
  */
 export function getCheckoutUrl(): string {
   // Direct checkout URL takes priority

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-03
+
+### Added
+
+- **Linux desktop release** — Added an x64 Linux build published as both a portable AppImage and a Debian package, with Linux update metadata included in GitHub releases.
+- **Linux downloads and installation guidance** — Added separately tracked Linux download links, AppImage and Debian installation instructions, and Linux system requirements throughout the website and documentation.
+
+### Changed
+
+- **Cross-platform product messaging** — Updated checkout context, pricing, support, SEO metadata, and analytics documentation to recognize macOS, Windows, and Linux.
+
 ## [1.1.0] - 2026-09-03
 
 ### Added

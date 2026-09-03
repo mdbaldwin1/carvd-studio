@@ -25,9 +25,9 @@ test.describe("Homepage", () => {
     });
 
     test("displays platform availability badge", async ({ page }) => {
-      await expect(page.locator("text=macOS & Windows").first()).toContainText(
-        "macOS & Windows",
-      );
+      await expect(
+        page.locator("text=macOS, Windows & Linux").first(),
+      ).toContainText("macOS, Windows & Linux");
     });
   });
 
@@ -59,6 +59,15 @@ test.describe("Homepage", () => {
       await expect(winCard).toContainText("Windows 10+");
     });
 
+    test("displays Linux AppImage download card", async ({ page }) => {
+      const linuxCard = page
+        .locator("#download a")
+        .filter({ hasText: ".AppImage download" });
+      await expect(linuxCard).toBeVisible();
+      await expect(linuxCard).toContainText("Linux");
+      await expect(linuxCard).toContainText("64-bit Linux");
+    });
+
     test("download links point to architecture-specific artifacts", async ({
       page,
     }) => {
@@ -78,6 +87,14 @@ test.describe("Homepage", () => {
         .locator("#download a")
         .filter({ hasText: "Windows" });
       await expect(winLink).toHaveAttribute("href", /github\.com.*\.exe/);
+
+      const linuxLink = page
+        .locator("#download a")
+        .filter({ hasText: ".AppImage download" });
+      await expect(linuxLink).toHaveAttribute(
+        "href",
+        /github\.com.*-x86_64\.AppImage/,
+      );
     });
 
     test("displays version badge", async ({ page }) => {

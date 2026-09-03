@@ -39,6 +39,14 @@ vi.mock("../../src/utils/downloads", () => ({
       fileExtension: ".exe",
       minOsVersion: "Windows 10+",
     },
+    linuxDownload: {
+      url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-x86_64.AppImage",
+      platform: "linux",
+      fileName: "Carvd.Studio-0.1.0-x86_64.AppImage",
+      fileExtension: ".AppImage",
+      minOsVersion: "64-bit Linux",
+      architectureLabel: "x64",
+    },
   }),
 }));
 
@@ -143,6 +151,18 @@ describe("HomePage", () => {
       expect(downloadCard).toHaveTextContent(/Windows/i);
     });
 
+    it("renders a tracked Linux AppImage download card", () => {
+      renderHomePage();
+      const appImageText = screen.getByText(/\.AppImage download/i);
+      const linuxLink = appImageText.closest("a");
+
+      expect(linuxLink).toHaveTextContent(/Linux/i);
+      expect(linuxLink).toHaveAttribute(
+        "href",
+        expect.stringContaining("platform=linux"),
+      );
+    });
+
     it("has correct macOS download href", () => {
       renderHomePage();
       // Find the download card by the .dmg installer text
@@ -176,6 +196,7 @@ describe("HomePage", () => {
       renderHomePage();
       expect(screen.getAllByText(/macOS 12\+/i)).toHaveLength(2);
       expect(screen.getByText(/Windows 10\+/i)).toBeInTheDocument();
+      expect(screen.getByText(/64-bit Linux/i)).toBeInTheDocument();
     });
 
     it("displays version badge", () => {

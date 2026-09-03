@@ -19,8 +19,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
+          node-version-file: ".nvmrc"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -32,7 +32,7 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit --workspace=@carvd/desktop
         env:
-          NODE_ENV: 'test'
+          NODE_ENV: "test"
 
       - name: Upload coverage
         uses: codecov/codecov-action@v6
@@ -56,8 +56,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
+          node-version-file: ".nvmrc"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -93,14 +93,14 @@ jobs:
         run: xvfb-run --auto-servernum npm run test:e2e --workspace=@carvd/desktop
         env:
           CI: true
-          NODE_ENV: 'test'
+          NODE_ENV: "test"
 
       - name: Run E2E tests (macOS/Windows)
         if: runner.os != 'Linux'
         run: npm run test:e2e --workspace=@carvd/desktop
         env:
           CI: true
-          NODE_ENV: 'test'
+          NODE_ENV: "test"
 
       - name: Upload test results
         if: always()
@@ -109,6 +109,73 @@ jobs:
           name: playwright-report-${{ matrix.os }}
           path: packages/desktop/playwright-report/
           retention-days: 7
+
+  linux-package:
+    name: Linux Package Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare app-builder binary
+        id: app-builder
+        shell: bash
+        run: |
+          BINARY=$(node -p "require('app-builder-bin').appBuilderPath")
+          SAFE_PATH="${RUNNER_TEMP}/$(basename "$BINARY")"
+          cp "$BINARY" "$SAFE_PATH"
+          chmod +x "$SAFE_PATH"
+          echo "safe_path=$SAFE_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Setup test license key
+        run: echo "${{ secrets.LICENSE_PRIVATE_KEY }}" > license-private-key.pem
+        working-directory: packages/desktop
+
+      - name: Build desktop app
+        run: npm run build --workspace=@carvd/desktop
+
+      - name: Disable workspace detection for packaging
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+            delete pkg.workspaces;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Install desktop runtime dependencies locally
+        working-directory: packages/desktop
+        run: npm run prepare:runtime-deps
+
+      - name: Package and verify Linux artifacts
+        working-directory: packages/desktop
+        env:
+          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
+        run: |
+          npx electron-builder@26.7.0 --linux AppImage deb --x64 --publish never
+
+          VERSION=$(node -p "require('./package.json').version")
+          APPIMAGE="dist/Carvd.Studio-${VERSION}-x86_64.AppImage"
+          DEB="dist/Carvd.Studio-${VERSION}-amd64.deb"
+
+          test -x "$APPIMAGE"
+          test "$(stat -c%s "$APPIMAGE")" -gt 1000000
+          file "$APPIMAGE" | grep -q "ELF 64-bit.*x86-64"
+
+          test "$(stat -c%s "$DEB")" -gt 1000000
+          dpkg-deb --info "$DEB" > /dev/null
+          grep -q "$(basename "$APPIMAGE")" dist/latest-linux.yml
 
   lint:
     name: Lint & Type Check
@@ -121,8 +188,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
+          node-version-file: ".nvmrc"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -153,8 +220,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
+          node-version-file: ".nvmrc"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -162,7 +229,7 @@ jobs:
       - name: Run website unit tests
         run: npm run test:run --workspace=@carvd/website
         env:
-          NODE_ENV: 'test'
+          NODE_ENV: "test"
 
       - name: Upload coverage
         uses: codecov/codecov-action@v6
@@ -182,8 +249,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
+          node-version-file: ".nvmrc"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci

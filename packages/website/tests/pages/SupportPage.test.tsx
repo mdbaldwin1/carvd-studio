@@ -250,6 +250,7 @@ describe("SupportPage", () => {
       renderSupportPage();
       fireEvent.click(screen.getByText(/what are the system requirements\?/i));
       expect(screen.getByText(/12 \(Monterey\) or later/i)).toBeInTheDocument();
+      expect(screen.getByText(/Modern 64-bit Linux/i)).toBeInTheDocument();
     });
 
     it("renders FAQ about updates", () => {

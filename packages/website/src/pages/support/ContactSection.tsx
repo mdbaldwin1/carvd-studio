@@ -54,7 +54,7 @@ export default function ContactSection() {
         </h3>
         <ul className="m-0 list-none p-0">
           <li className="relative mb-2 pl-8 text-text-muted before:absolute before:left-0 before:text-accent before:content-['•'] last:mb-0">
-            Your operating system (macOS/Windows) and version
+            Your operating system (macOS/Windows/Linux) and version
           </li>
           <li className="relative mb-2 pl-8 text-text-muted before:absolute before:left-0 before:text-accent before:content-['•'] last:mb-0">
             Carvd Studio version (found in Help → About)

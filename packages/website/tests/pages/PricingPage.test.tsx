@@ -71,9 +71,9 @@ describe("PricingPage", () => {
         screen.getByText(/Real-time material cost tracking/i),
       ).toBeInTheDocument();
       expect(screen.getByText(/Free lifetime updates/i)).toBeInTheDocument();
-      expect(
-        screen.getByText(/Install on up to 3 devices/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Install on up to 3 devices/i)).toHaveTextContent(
+        /Mac, Windows & Linux/i,
+      );
       expect(
         screen.getAllByText(/Core project editing works offline/i).length,
       ).toBeGreaterThan(0);

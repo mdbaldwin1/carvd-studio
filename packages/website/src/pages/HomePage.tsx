@@ -24,6 +24,7 @@ import {
   Building2,
   Armchair,
   Home,
+  Terminal,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -44,6 +45,7 @@ export default function HomePage() {
     macArm64Download,
     macX64Download,
     windowsDownload,
+    linuxDownload,
   } = useDownloadInfo();
 
   return (
@@ -70,7 +72,8 @@ export default function HomePage() {
               />
             </div>
             <Badge variant="outline" className="hero-kicker mx-auto mb-6 gap-1">
-              <Sparkles size={16} /> Now Available for macOS &amp; Windows
+              <Sparkles size={16} /> Now Available for macOS, Windows &amp;
+              Linux
             </Badge>
             <h1 className="mb-6 break-words text-6xl font-bold leading-tight max-md:text-4xl max-sm:text-3xl">
               Stop Wasting Wood.
@@ -500,6 +503,24 @@ export default function HomePage() {
                 </span>
                 <span className="mt-1 text-xs text-accent">
                   {windowsDownload.minOsVersion}
+                </span>
+              </a>
+              <a
+                href={getDownloadHref(linuxDownload, "home-hero-card")}
+                onClick={() =>
+                  captureDownloadClick(linuxDownload.platform, "home-hero-card")
+                }
+                className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
+              >
+                <span>
+                  <Terminal size={32} aria-label="Linux" />
+                </span>
+                <span className="text-xl font-bold">Linux</span>
+                <span className="text-sm text-text-muted">
+                  {linuxDownload.fileExtension} download
+                </span>
+                <span className="mt-1 text-xs text-accent">
+                  {linuxDownload.minOsVersion}
                 </span>
               </a>
             </div>

@@ -210,6 +210,9 @@ export default function FAQSection() {
               <strong className="text-text">Windows:</strong> Windows 10 or
               later (64-bit)
               <br />
+              <strong className="text-text">Linux:</strong> Modern 64-bit Linux
+              distribution on an x86-64 processor
+              <br />
               <strong className="text-text">RAM:</strong> 4 GB minimum (8 GB
               recommended for large projects)
               <br />
