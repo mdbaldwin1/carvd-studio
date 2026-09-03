@@ -45,17 +45,26 @@ describe('analytics queue', () => {
   });
 
   it('keeps only the newest events at the queue cap', () => {
-    const store = createStore();
-    let nextId = 0;
+    const existingEvents = Array.from(
+      { length: 5_000 },
+      (_, index): QueuedAnalyticsEvent => ({
+        eventId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+        distinctId: 'installation-1',
+        name: 'app_opened',
+        properties: {},
+        occurredAt: '2026-09-01T12:00:00.000Z',
+        attemptCount: 0,
+        nextAttemptAt: now
+      })
+    );
+    const store = createStore(existingEvents);
     const queue = createAnalyticsQueue(
       store,
       () => now,
-      () => `00000000-0000-4000-8000-${String(++nextId).padStart(12, '0')}`
+      () => '00000000-0000-4000-8000-000000005001'
     );
 
-    for (let index = 0; index < 5_001; index += 1) {
-      queue.enqueue(createEvent(), 'installation-1');
-    }
+    queue.enqueue(createEvent(), 'installation-1');
 
     expect(queue.size()).toBe(5_000);
     expect(queue.peekReady(1)[0].eventId).toContain('000000000002');

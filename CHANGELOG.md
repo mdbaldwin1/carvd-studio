@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6] - 2026-09-03
+
 ### Added
 
 - **Consent-gated desktop analytics delivery** — Added durable local consent preferences, anonymous installation identifiers, bounded offline delivery with retry backoff, and optional PostHog transport configuration. Analytics stays disabled until explicitly granted and clears local analytics data immediately on revocation.
