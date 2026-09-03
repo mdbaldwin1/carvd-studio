@@ -1,10 +1,11 @@
 const GITHUB_REPO = "mdbaldwin1/carvd-studio";
 
-type Platform = "macos-arm64" | "macos-x64" | "windows";
+type Platform = "macos" | "macos-arm64" | "macos-x64" | "windows";
 
 function getPlatformFromUrl(url: URL): Platform | null {
   const platform = url.searchParams.get("platform");
   if (
+    platform === "macos" ||
     platform === "macos-arm64" ||
     platform === "macos-x64" ||
     platform === "windows"
@@ -61,7 +62,7 @@ export default async function handler(request: Request): Promise<Response> {
 
     const assets = releaseData.assets ?? [];
     const matcher =
-      platform === "macos-arm64"
+      platform === "macos" || platform === "macos-arm64"
         ? (assetName: string) => assetName.endsWith("-arm64.dmg")
         : platform === "macos-x64"
           ? (assetName: string) => assetName.endsWith("-x64.dmg")

@@ -46,11 +46,14 @@ describe("download redirect", () => {
     },
   );
 
-  it("rejects ambiguous legacy macOS requests", async () => {
+  it("keeps legacy macOS requests compatible with Apple Silicon", async () => {
     const response = await handler(
       new Request("https://carvd-studio.com/api/download?platform=macos"),
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe(
+      "https://example.test/apple-silicon.dmg",
+    );
   });
 });
