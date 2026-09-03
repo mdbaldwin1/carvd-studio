@@ -179,7 +179,12 @@ describe("Lemon Squeezy webhook", () => {
   });
 
   it("writes the result through Vercel's Node response object", async () => {
-    const response = {
+    type FakeNodeResponse = {
+      statusCode: number;
+      setHeader: ReturnType<typeof vi.fn>;
+      end: ReturnType<typeof vi.fn>;
+    };
+    const response: FakeNodeResponse = {
       statusCode: 200,
       setHeader: vi.fn(),
       end: vi.fn(),
@@ -188,7 +193,7 @@ describe("Lemon Squeezy webhook", () => {
     await (
       handler as unknown as (
         request: ReturnType<typeof signedNodeRequest>,
-        response: typeof response,
+        response: FakeNodeResponse,
       ) => Promise<void>
     )(signedNodeRequest(), response);
 
