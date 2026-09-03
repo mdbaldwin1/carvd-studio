@@ -8,6 +8,8 @@ import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { usePartCutsEditingStore } from '../../store/partCutsEditingStore';
 import { getFeatureLimits } from '../../utils/featureLimits';
+import { analytics } from '../../utils/analytics';
+import { bucketCount } from '../../../../shared/analytics';
 import { getContainingGroupId, resolveExplicitSelectedPartIds } from '../../utils/interactionSelection';
 import { MenuPanel, MenuItemButton, MenuSeparator, MenuLabel, MenuSub } from '../ui/context-menu';
 
@@ -225,6 +227,10 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
       return;
     }
     startEditingPartCuts(singleSelectedPart.id, singleSelectedPart.name, singleSelectedPart.features);
+    analytics.capture('part_cuts_opened', {
+      source: 'context_menu',
+      operation_count_bucket: bucketCount(singleSelectedPart.features?.length ?? 0)
+    });
     onClose();
   };
 

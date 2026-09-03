@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Privacy-safe Custom Cuts analytics** — Consent-gated analytics can report whether the cuts workspace was opened from Properties or the context menu and a coarse operation-count bucket; part names, dimensions, cut parameters, project identifiers, and file paths are never included.
+
 - **Tenons** — A `Tenon` cut leaves a tongue on a board's end, sized by length, width, and thickness and centred in the blank's thickness, with shoulders cut back on all four sides (or a bare-faced full-width variant). Tenons can be cut on both ends of a rail, pair with the new side-face mortises to complete mortise-and-tenon joinery, and need no separate cut-list allowance because the board length already includes the tongue.
 - **Side-face mortises and pockets** — Mortises and cutouts can now target the front or back face of a board, recessing into its width — the layout needed for leg-and-apron mortise-and-tenon joinery. Side-face pockets are always blind, render as true recesses within their height band, respect opposing-pocket depth conflicts, and are edited through the inspector with thickness-aware field labels.
 - **Long-edge bevels (Edge Bevel)** — Rip bevels along a board's front or back edge, unlocking mitred boxes and waterfall edges. Edge bevels render as true tilted faces, snap and overlap by their real shape, keep the board width locked to the long point with derived long/short-point width readouts, and appear in summaries and fabrication instructions.
@@ -31,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Project file format version 2** — Projects that use part cuts now save as file format version 2, so older app versions show a clear "please update" message instead of silently opening them with the cuts missing. Projects without cuts keep the older format for maximum compatibility.
 
 ### Fixed
+
+- **Bounded cut geometry cache** — Live cut editing now evicts old generated geometry instead of allowing preview memory use to grow without limit during long editing sessions.
+- **Defensive Custom Cuts file loading** — Version 2 project files now validate all saved cut payloads before migration, reporting malformed or unsupported operations instead of crashing while opening a project.
 
 - **Prevent Overlap during resize** — Prevent Overlap now blocks dimension-only edits (including resize commits) that would make a part overlap another part.
 - **Part context menu right-click** — Restored right-click-on-part context menu behavior on macOS trackpads (`ctrl`+click).

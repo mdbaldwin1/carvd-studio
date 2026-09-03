@@ -351,12 +351,13 @@ export default function FeaturesPage() {
                   <Target size={28} />
                 </span>
                 <h3 className="mb-2 text-xl font-bold max-md:text-lg">
-                  Joinery Allowances
+                  Custom Cuts & Joinery
                 </h3>
                 <p className="leading-relaxed text-text-muted">
-                  Add extra material for joinery like tenons, dados, or rabbets.
-                  Set the extra length or width in part properties, and the cut
-                  list includes this additional material automatically.
+                  Shape boards with tenons, mortises, dados, grooves, rabbets,
+                  notches, cutouts, mitres, and bevels in a dedicated 3D cuts
+                  workspace. Cut lists keep the blank dimensions and include
+                  ordered, shop-ready instructions for every operation.
                 </p>
               </Card>
 

@@ -1,10 +1,14 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from 'playwright';
+import fs from 'fs';
+import path from 'path';
 import {
   addPartFromSidebar,
   closeElectronApp,
   createBlankProject,
   launchElectronApp,
+  queueOpenPaths,
+  queueSavePath,
   type RunningElectronApp
 } from './helpers/electron-app';
 
@@ -39,6 +43,10 @@ async function addDadoCut(window: Page): Promise<void> {
   // anchor to the start so "Dado" does not also match "Stopped Dado".
   await window.getByRole('button', { name: /^Dado\b/ }).click();
   await window.getByRole('button', { name: 'Save Cut' }).click();
+}
+
+async function pressSaveShortcut(window: Page): Promise<void> {
+  await window.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+S`);
 }
 
 test.describe('part cuts editing lifecycle', () => {
@@ -110,5 +118,32 @@ test.describe('part cuts editing lifecycle', () => {
     expect(await window.evaluate(() => window.useProjectStore.getState().parts[0].rotation)).toEqual(rotationBefore);
     expect(await window.evaluate(() => window.useUIStore.getState().pendingDeletePartIds)).toBeNull();
     expect(await isEditingPartCuts(window)).toBe(true);
+  });
+
+  test('persists custom cuts through a project save and reload', async () => {
+    const { window, userDataDir } = running;
+    const projectPath = path.join(userDataDir, 'part-cuts-persistence.carvd');
+
+    await openPartCutsFromProperties(window);
+    await addDadoCut(window);
+    await window.getByRole('button', { name: 'Save Part' }).click();
+    await queueSavePath(window, projectPath);
+    await pressSaveShortcut(window);
+
+    await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
+    const saved = JSON.parse(fs.readFileSync(projectPath, 'utf8')) as {
+      version: number;
+      parts: Array<{ features?: Array<{ kind: string; cutType: string }> }>;
+    };
+    expect(saved.version).toBe(2);
+    expect(saved.parts[0].features).toEqual([expect.objectContaining({ kind: 'rect_cut', cutType: 'dado' })]);
+
+    await window.getByRole('button', { name: 'Carvd Studio home' }).click();
+    await queueOpenPaths(window, [projectPath]);
+    await window.getByRole('button', { name: 'Open file...' }).click();
+    await expect.poll(() => getFirstPartFeatureCount(window), { timeout: 5000 }).toBe(1);
+
+    await openPartCutsFromProperties(window);
+    await expect(window.getByText(/^1\./)).toBeVisible();
   });
 });

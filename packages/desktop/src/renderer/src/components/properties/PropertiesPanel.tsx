@@ -23,6 +23,8 @@ import { useUIStore } from '@renderer/store/uiStore';
 import { Stock } from '@renderer/types';
 import { getDocsUrl } from '@renderer/utils/docsLinks';
 import { getFeatureLimits } from '@renderer/utils/featureLimits';
+import { analytics } from '@renderer/utils/analytics';
+import { bucketCount } from '../../../../shared/analytics';
 import { normalizeRotation, snapAngle } from '@renderer/utils/rotation';
 import { useMemo, useRef, useState } from 'react';
 import {
@@ -526,7 +528,13 @@ export function PropertiesPanel() {
       <SinglePartCutsSummaryCard
         selectedPart={selectedPart}
         units={units}
-        onEditCuts={() => startEditingPartCuts(selectedPart.id, selectedPart.name, selectedPart.features)}
+        onEditCuts={() => {
+          startEditingPartCuts(selectedPart.id, selectedPart.name, selectedPart.features);
+          analytics.capture('part_cuts_opened', {
+            source: 'properties',
+            operation_count_bucket: bucketCount(selectedPart.features?.length ?? 0)
+          });
+        }}
       />
 
       <SinglePartMaterialCard

@@ -7,6 +7,8 @@ import { getPartFeatureConflicts } from '../utils/partFeatureConflicts';
 import { clonePartFeatures } from '../utils/partFeatures';
 import { getFeatureTargetLabel } from '../utils/partFeatureSummary';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
+import { analytics } from '../utils/analytics';
+import { bucketCount } from '../../../shared/analytics';
 
 export function usePartCutsEditing() {
   const parts = useProjectStore((s) => s.parts);
@@ -68,6 +70,7 @@ export function usePartCutsEditing() {
       showToast('Couldn\u2019t save cuts \u2014 the updated part would overlap another part', 'error');
       return false;
     }
+    analytics.capture('part_cuts_saved', { operation_count_bucket: bucketCount(draftFeatures.length) });
     finishEditing();
     selectPart(sourcePartId);
     showToast(`Saved cuts for "${currentPart.name}"`, 'success');

@@ -7,6 +7,9 @@ import { useProjectStore } from '../store/projectStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useUIStore } from '../store/uiStore';
 
+const { captureAnalytics } = vi.hoisted(() => ({ captureAnalytics: vi.fn() }));
+vi.mock('../utils/analytics', () => ({ analytics: { capture: captureAnalytics } }));
+
 const openPartOne = () => {
   const part = useProjectStore.getState().parts.find((p) => p.id === 'part-1')!;
   usePartCutsEditingStore.getState().startEditingPartCuts(part.id, part.name, part.features);
@@ -15,6 +18,7 @@ const openPartOne = () => {
 
 describe('usePartCutsEditing', () => {
   beforeEach(() => {
+    captureAnalytics.mockClear();
     usePartCutsEditingStore.getState().finishEditing();
     useProjectStore.setState({
       parts: [
@@ -116,6 +120,7 @@ describe('usePartCutsEditing', () => {
       })
     );
     expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(false);
+    expect(captureAnalytics).toHaveBeenCalledWith('part_cuts_saved', { operation_count_bucket: '1-5' });
   });
 
   it('blocks save when the draft contains duplicate enabled end cuts on the same end', () => {
