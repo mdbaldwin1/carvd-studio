@@ -10,6 +10,7 @@ import Footer from "../components/Footer";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Terminal } from "lucide-react";
 import {
   Accordion,
   AccordionItem,
@@ -28,13 +29,14 @@ export default function DownloadPage() {
     macArm64Download,
     macX64Download,
     windowsDownload,
+    linuxDownload,
   } = useDownloadInfo();
 
   return (
     <div className="site-shell">
       <SEO
         title="Download"
-        description="Download Carvd Studio for macOS and Windows. Free 14-day trial with all features. No credit card required."
+        description="Download Carvd Studio for macOS, Windows, and Linux. Free 14-day trial with all features. No credit card required."
         path="/download"
       />
       <Header />
@@ -127,6 +129,27 @@ export default function DownloadPage() {
                   {windowsDownload.minOsVersion}
                 </span>
               </a>
+              <a
+                href={getDownloadHref(linuxDownload, "download-hero-card")}
+                onClick={() =>
+                  captureDownloadClick(
+                    linuxDownload.platform,
+                    "download-hero-card",
+                  )
+                }
+                className="flex min-w-[200px] flex-col items-center gap-2 feature-card px-8 py-8 text-text no-underline max-sm:w-full max-sm:max-w-[280px] max-sm:px-6 max-sm:py-6"
+              >
+                <span>
+                  <Terminal size={32} aria-label="Linux" />
+                </span>
+                <span className="text-xl font-bold">Linux</span>
+                <span className="text-sm text-text-muted">
+                  {linuxDownload.fileExtension} download
+                </span>
+                <span className="mt-1 text-xs text-accent">
+                  {linuxDownload.minOsVersion}
+                </span>
+              </a>
             </div>
           </div>
         </section>
@@ -137,7 +160,7 @@ export default function DownloadPage() {
             Installation Instructions
           </h2>
 
-          <div className="grid grid-cols-2 gap-8 max-md:grid-cols-1">
+          <div className="grid grid-cols-3 gap-8 max-lg:grid-cols-1">
             {/* macOS Instructions */}
             <Card className="p-8 max-md:p-6">
               <h3 className="mb-6 flex items-center gap-2 text-2xl font-bold">
@@ -282,6 +305,77 @@ export default function DownloadPage() {
                 </p>
               </div>
             </Card>
+
+            {/* Linux Instructions */}
+            <Card className="p-8 max-md:p-6">
+              <h3 className="mb-6 flex items-center gap-2 text-2xl font-bold">
+                <Terminal size={24} /> Linux Installation
+              </h3>
+              <p className="mb-5 text-sm text-text-muted">
+                The main download is an AppImage that works across modern 64-bit
+                Linux distributions. A Debian package is also available from the
+                GitHub release for Ubuntu and Debian-based systems.
+              </p>
+              <ol className="m-0 list-none p-0">
+                <li className="mb-6 flex items-start gap-4 max-md:gap-2">
+                  <span className="flex h-8 w-8 min-w-[32px] items-center justify-center rounded-full bg-accent text-sm font-bold text-bg">
+                    1
+                  </span>
+                  <div className="flex-1">
+                    <strong className="mb-1 block">
+                      Download the AppImage
+                    </strong>
+                    <p className="m-0 text-sm text-text-muted">
+                      Use the Linux button above, then open a terminal in your
+                      Downloads folder.
+                    </p>
+                  </div>
+                </li>
+                <li className="mb-6 flex items-start gap-4 max-md:gap-2">
+                  <span className="flex h-8 w-8 min-w-[32px] items-center justify-center rounded-full bg-accent text-sm font-bold text-bg">
+                    2
+                  </span>
+                  <div className="flex-1">
+                    <strong className="mb-1 block">Make it executable</strong>
+                    <code className="text-sm text-accent">
+                      chmod +x Carvd.Studio-*-x86_64.AppImage
+                    </code>
+                  </div>
+                </li>
+                <li className="flex items-start gap-4 max-md:gap-2">
+                  <span className="flex h-8 w-8 min-w-[32px] items-center justify-center rounded-full bg-accent text-sm font-bold text-bg">
+                    3
+                  </span>
+                  <div className="flex-1">
+                    <strong className="mb-1 block">Launch Carvd Studio</strong>
+                    <p className="m-0 text-sm text-text-muted">
+                      Double-click the AppImage or run it from your terminal.
+                    </p>
+                  </div>
+                </li>
+              </ol>
+              <div className="mt-6 rounded-lg border border-border bg-surface-elevated p-4">
+                <strong className="mb-2 block">Ubuntu or Debian?</strong>
+                <p className="mb-2 text-sm text-text-muted">
+                  Download the .deb asset from the GitHub release and install it
+                  with:
+                </p>
+                <code className="text-sm text-accent">
+                  sudo apt install ./Carvd.Studio-*-amd64.deb
+                </code>
+              </div>
+              <div
+                className="mt-4 rounded-lg border p-4"
+                style={warningBoxStyle}
+              >
+                <strong>AppImage will not launch?</strong>
+                <p className="mt-2 text-sm text-text-muted">
+                  Some newer distributions do not install FUSE 2 by default.
+                  Install your distribution&apos;s FUSE 2 compatibility package,
+                  or launch with the --appimage-extract-and-run option.
+                </p>
+              </div>
+            </Card>
           </div>
         </section>
 
@@ -306,7 +400,7 @@ export default function DownloadPage() {
                 <h3 className="mb-2 font-bold">Latest Release</h3>
                 <ul className="m-0 list-none p-0">
                   <li className="relative mb-2 pl-6 text-text-muted before:absolute before:left-0 before:text-accent before:content-['•'] last:mb-0">
-                    Native downloads for Apple Silicon and Intel Macs
+                    Native downloads for macOS, Windows, and Linux
                   </li>
                   <li className="relative mb-2 pl-6 text-text-muted before:absolute before:left-0 before:text-accent before:content-['•'] last:mb-0">
                     3D furniture design workspace with intuitive controls
@@ -341,7 +435,7 @@ export default function DownloadPage() {
             System Requirements
           </h2>
 
-          <div className="mx-auto grid max-w-4xl grid-cols-2 gap-8 max-md:grid-cols-1">
+          <div className="mx-auto grid max-w-6xl grid-cols-3 gap-8 max-lg:grid-cols-1">
             <Card className="p-8 max-md:p-6">
               <h3 className="mb-4 flex items-center gap-2 text-xl font-bold">
                 <AppleIcon size={20} /> macOS
@@ -388,6 +482,33 @@ export default function DownloadPage() {
                 </li>
                 <li className="border-b border-border py-2 text-text-muted last:border-b-0">
                   <strong className="text-text">Storage:</strong> 200 MB
+                  available space
+                </li>
+                <li className="py-2 text-text-muted">
+                  <strong className="text-text">Display:</strong> 1280x720
+                  minimum resolution
+                </li>
+              </ul>
+            </Card>
+            <Card className="p-8 max-md:p-6">
+              <h3 className="mb-4 flex items-center gap-2 text-xl font-bold">
+                <Terminal size={20} /> Linux
+              </h3>
+              <ul className="m-0 list-none p-0">
+                <li className="border-b border-border py-2 text-text-muted">
+                  <strong className="text-text">OS:</strong> Modern 64-bit Linux
+                  distribution
+                </li>
+                <li className="border-b border-border py-2 text-text-muted">
+                  <strong className="text-text">Processor:</strong> x86-64
+                  processor
+                </li>
+                <li className="border-b border-border py-2 text-text-muted">
+                  <strong className="text-text">Memory:</strong> 4 GB RAM
+                  minimum
+                </li>
+                <li className="border-b border-border py-2 text-text-muted">
+                  <strong className="text-text">Storage:</strong> 250 MB
                   available space
                 </li>
                 <li className="py-2 text-text-muted">
@@ -450,10 +571,11 @@ export default function DownloadPage() {
                   How do I update to a new version?
                 </AccordionTrigger>
                 <AccordionContent className="leading-relaxed text-text-muted">
-                  Carvd Studio will notify you when updates are available. You
-                  can also manually check by going to Help → Check for Updates
-                  in the app menu. Updates are downloaded in the background and
-                  installed when you restart the app.
+                  Carvd Studio will notify macOS, Windows, and Linux AppImage
+                  users when updates are available. You can also manually check
+                  by going to Help → Check for Updates in the app menu. Debian
+                  package users can install the newest .deb from the latest
+                  GitHub release.
                 </AccordionContent>
               </AccordionItem>
 
@@ -522,6 +644,19 @@ export default function DownloadPage() {
                   }
                 >
                   Download for Windows
+                </a>
+              </Button>
+              <Button size="lg" variant="outline" asChild>
+                <a
+                  href={getDownloadHref(linuxDownload, "download-cta-footer")}
+                  onClick={() =>
+                    captureDownloadClick(
+                      linuxDownload.platform,
+                      "download-cta-footer",
+                    )
+                  }
+                >
+                  Download for Linux
                 </a>
               </Button>
             </div>

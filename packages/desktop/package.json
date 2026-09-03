@@ -1,6 +1,6 @@
 {
   "name": "@carvd/desktop",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "An offline-only desktop app for designing and planning custom furniture and cabinetry.",
   "private": true,
   "type": "module",
@@ -10,7 +10,10 @@
     "url": "git@github.com:mdbaldwin1/carvd-studio.git"
   },
   "license": "ISC",
-  "author": "Michael Baldwin",
+  "author": {
+    "name": "Michael Baldwin",
+    "email": "support@carvd-studio.com"
+  },
   "scripts": {
     "predev": "node scripts/ensure-dev-runtime.cjs",
     "dev": "unset ELECTRON_RUN_AS_NODE && electron-vite dev",
@@ -24,6 +27,7 @@
     "package:mac:x64": "npm run build && npm run prepare:runtime-deps && electron-builder --mac --x64",
     "package:mac:universal": "npm run build && npm run prepare:runtime-deps && electron-builder --mac --universal",
     "package:win": "npm run build && npm run prepare:runtime-deps && electron-builder --win",
+    "package:linux": "npm run build && npm run prepare:runtime-deps && electron-builder --linux --x64",
     "generate-keys": "node scripts/generate-license-keys.cjs",
     "generate-test-license": "node scripts/generate-test-license.cjs",
     "test:license": "node scripts/test-license-flow.cjs",
@@ -182,6 +186,21 @@
       "target": [
         "nsis"
       ]
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Graphics",
+      "synopsis": "Furniture design and cut-list planning",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "appImage": {
+      "artifactName": "Carvd.Studio-${version}-x86_64.${ext}"
+    },
+    "deb": {
+      "artifactName": "Carvd.Studio-${version}-amd64.${ext}"
     },
     "nsis": {
       "artifactName": "Carvd.Studio.Setup.${version}.${ext}",
