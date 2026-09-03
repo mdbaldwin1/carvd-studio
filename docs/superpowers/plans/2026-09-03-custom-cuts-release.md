@@ -25,6 +25,7 @@
 ### Task 1: Integrate current develop
 
 **Files:**
+
 - Modify: `CHANGELOG.md`
 - Modify: `packages/desktop/src/renderer/src/components/stock/CutListModal.test.tsx`
 - Verify merged overlap: `packages/desktop/src/renderer/src/App.tsx`
@@ -32,6 +33,7 @@
 - Verify merged overlap: `packages/desktop/tests/e2e/helpers/electron-app.ts`
 
 **Interfaces:**
+
 - Consumes: current `origin/develop` platform, analytics, release, and version changes.
 - Produces: one integrated Custom Cuts branch based on current `develop` with file-format and UI behavior preserved.
 
@@ -45,10 +47,12 @@
 ### Task 2: Bound generated feature geometry
 
 **Files:**
+
 - Modify: `packages/desktop/src/renderer/src/utils/partFeatureGeometry.ts`
 - Modify: `packages/desktop/src/renderer/src/utils/partFeatureGeometry.test.ts`
 
 **Interfaces:**
+
 - Consumes: `getPartRenderGeometry(part: Part): THREE.BufferGeometry`.
 - Produces: bounded cache behavior and test-only cache observations without changing renderer callers.
 
@@ -63,12 +67,14 @@
 ### Task 3: Validate file-format-v2 feature payloads
 
 **Files:**
+
 - Modify: `packages/desktop/src/renderer/src/utils/partFeatures.ts`
 - Modify: `packages/desktop/src/renderer/src/utils/fileFormat.ts`
 - Modify: `packages/desktop/src/renderer/src/utils/fileFormat.test.ts`
 - Test: `packages/desktop/src/renderer/src/utils/partFeatures.test.ts`
 
 **Interfaces:**
+
 - Produces: `validateSerializedPartFeatures(value: unknown, path: string): string[]`.
 - Consumes: the existing `PartFeature`, target, operation, and parameter enums.
 
@@ -84,10 +90,12 @@
 ### Task 4: Expand critical Electron lifecycle coverage
 
 **Files:**
+
 - Modify: `packages/desktop/tests/e2e/part-cuts-lifecycle.spec.ts`
 - Modify only if required: `packages/desktop/tests/e2e/helpers/electron-app.ts`
 
 **Interfaces:**
+
 - Consumes: accessible Part Cuts controls and existing Electron file helpers.
 - Produces: system-level proof of persistence, operation-family editing, copy/paste, conflict blocking, and manufacturing output.
 
@@ -104,6 +112,7 @@
 ### Task 5: Add privacy-safe adoption measurement
 
 **Files:**
+
 - Modify: `packages/desktop/src/shared/analytics.ts`
 - Modify: `packages/desktop/src/shared/analytics.test.ts`
 - Modify: `packages/desktop/src/renderer/src/hooks/usePartCutsEditing.ts`
@@ -111,6 +120,7 @@
 - Modify: `docs/analytics/EVENT-CATALOG.md`
 
 **Interfaces:**
+
 - Produces events `part_cuts_opened` and `part_cuts_saved`.
 - Permitted properties: `source` and coarse `operation_count_bucket`; no cut labels, types, dimensions, part IDs, or project data.
 
@@ -124,6 +134,7 @@
 ### Task 6: Documentation and beta readiness
 
 **Files:**
+
 - Modify: `CHANGELOG.md`
 - Modify: `.claude/docs/features-roadmap.md`
 - Modify: `packages/website/src/pages/FeaturesPage.tsx`
@@ -132,6 +143,7 @@
 - Create: `.claude/docs/custom-cuts-beta-checklist.md`
 
 **Interfaces:**
+
 - Produces: accurate public copy and a concrete Paul acceptance script.
 
 - [ ] Update website tests first to require blank-plus-operations wording, supported operation families, and no promise of freeform CAD.
@@ -145,9 +157,11 @@
 ### Task 7: Full verification and PR
 
 **Files:**
+
 - Verify all files changed by Tasks 1–6.
 
 **Interfaces:**
+
 - Produces: reviewable PR targeting `develop`, with no direct protected-branch push.
 
 - [ ] Run desktop lint, typecheck, format check, renderer/main tests, production build, and full Electron E2E matrix.
@@ -156,4 +170,3 @@
 - [ ] Request an independent code review and resolve every Important/Critical finding test-first.
 - [ ] Push `codex/custom-cuts-release` and open a PR targeting `develop` with test evidence and the Paul beta checklist.
 - [ ] Wait for CI and fix any reproducible failures before merge.
-
