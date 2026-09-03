@@ -521,6 +521,33 @@ describe('fileFormat', () => {
       expect(result.errors[0]).toContain('newer than supported');
     });
 
+    it('rejects malformed custom cuts before migration can clone them', () => {
+      const file = createValidCarvdFile({
+        parts: [
+          createTestPart({
+            features: [
+              {
+                id: 'broken-cut',
+                kind: 'rect_cut',
+                version: 1,
+                enabled: true,
+                cutType: 'cutout',
+                reference: { primaryFrom: 'min' },
+                parameters: { size: { length: 2, width: 1 }, depthMode: 'through' },
+                placement: { x: 0, z: 0 }
+              } as never
+            ]
+          })
+        ]
+      });
+      file.version = CARVD_FILE_VERSION;
+
+      expect(() => validateCarvdFile(file)).not.toThrow();
+      const result = validateCarvdFile(file);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('parts[0].features[0].target is invalid');
+    });
+
     it('rejects missing project metadata', () => {
       const file: Record<string, unknown> = { ...createValidCarvdFile() };
       delete file.project;

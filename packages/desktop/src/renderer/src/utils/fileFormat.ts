@@ -21,7 +21,7 @@ import {
   Stock,
   StockConstraintSettings
 } from '../types';
-import { normalizeAssemblyPart, normalizePart } from './partFeatures';
+import { normalizeAssemblyPart, normalizePart, validateSerializedPartFeatures } from './partFeatures';
 
 // Default stock constraints for migration
 const DEFAULT_STOCK_CONSTRAINTS: StockConstraintSettings = {
@@ -172,8 +172,21 @@ export function validateCarvdFile(data: unknown): FileValidationResult {
     return { valid: false, errors, warnings };
   }
 
+  const candidateFile = obj as unknown as CarvdFile;
+  candidateFile.parts.forEach((part, index) => {
+    errors.push(...validateSerializedPartFeatures((part as Part).features, `parts[${index}].features`));
+  });
+  candidateFile.assemblies?.forEach((assembly, assemblyIndex) => {
+    assembly.parts.forEach((part, partIndex) => {
+      errors.push(
+        ...validateSerializedPartFeatures(part.features, `assemblies[${assemblyIndex}].parts[${partIndex}].features`)
+      );
+    });
+  });
+  if (errors.length > 0) return { valid: false, errors, warnings };
+
   // Migrate if needed
-  const migratedData = migrateFile(obj as CarvdFile);
+  const migratedData = migrateFile(candidateFile);
 
   // Validate referential integrity
   const integrityResult = validateReferentialIntegrity(migratedData);
