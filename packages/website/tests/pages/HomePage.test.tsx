@@ -7,24 +7,30 @@ import { captureDownloadClick } from "../../src/utils/downloads";
 // Mock the downloads utility
 vi.mock("../../src/utils/downloads", () => ({
   captureDownloadClick: vi.fn(),
-  getTrackedDownloadUrl: (platform: "macos" | "windows", source = "website") =>
+  getTrackedDownloadUrl: (platform: string, source = "website") =>
     `/api/download?platform=${platform}&source=${encodeURIComponent(source)}`,
-  getDownloadHref: (
-    download: { platform: "macos" | "windows" },
-    source = "website",
-  ) =>
+  getDownloadHref: (download: { platform: string }, source = "website") =>
     `/api/download?platform=${download.platform}&source=${encodeURIComponent(
       source,
     )}`,
   useDownloadInfo: () => ({
     loading: false,
     version: "0.1.0",
-    macDownload: {
+    macArm64Download: {
       url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-arm64.dmg",
-      platform: "macos",
+      platform: "macos-arm64",
       fileName: "Carvd.Studio-0.1.0-arm64.dmg",
       fileExtension: ".dmg",
-      minOsVersion: "macOS 10.15+",
+      minOsVersion: "macOS 12+",
+      architectureLabel: "Apple Silicon",
+    },
+    macX64Download: {
+      url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio-0.1.0-x64.dmg",
+      platform: "macos-x64",
+      fileName: "Carvd.Studio-0.1.0-x64.dmg",
+      fileExtension: ".dmg",
+      minOsVersion: "macOS 12+",
+      architectureLabel: "Intel",
     },
     windowsDownload: {
       url: "https://github.com/test/repo/releases/download/v0.1.0/Carvd.Studio.Setup.0.1.0.exe",
@@ -110,7 +116,7 @@ describe("HomePage", () => {
       fireEvent.click(screen.getAllByRole("link", { name: /macOS/i })[0]);
 
       expect(captureDownloadClick).toHaveBeenCalledWith(
-        "macos",
+        "macos-arm64",
         "home-hero-card",
       );
     });
@@ -123,11 +129,8 @@ describe("HomePage", () => {
     it("renders macOS download card", () => {
       renderHomePage();
       // macOS appears in badge and download card - use download-specific content
-      const dmgInstallerText = screen.getByText(/\.dmg installer/i);
-      expect(dmgInstallerText).toBeInTheDocument();
-      // Find the download card containing .dmg and verify macOS is there
-      const downloadCard = dmgInstallerText.closest("a");
-      expect(downloadCard).toHaveTextContent(/macOS/i);
+      expect(screen.getByText("Apple Silicon")).toBeInTheDocument();
+      expect(screen.getByText("Intel")).toBeInTheDocument();
     });
 
     it("renders Windows download card", () => {
@@ -143,15 +146,14 @@ describe("HomePage", () => {
     it("has correct macOS download href", () => {
       renderHomePage();
       // Find the download card by the .dmg installer text
-      const dmgInstallerText = screen.getByText(/\.dmg installer/i);
-      const macLink = dmgInstallerText.closest("a");
-      expect(macLink).toHaveAttribute(
+      const macLinks = screen.getAllByRole("link", { name: /macOS/i });
+      expect(macLinks[0]).toHaveAttribute(
         "href",
-        expect.stringContaining("/api/download"),
+        expect.stringContaining("platform=macos-arm64"),
       );
-      expect(macLink).toHaveAttribute(
+      expect(macLinks[1]).toHaveAttribute(
         "href",
-        expect.stringContaining("platform=macos"),
+        expect.stringContaining("platform=macos-x64"),
       );
     });
 
@@ -172,7 +174,7 @@ describe("HomePage", () => {
 
     it("displays system requirements", () => {
       renderHomePage();
-      expect(screen.getByText(/macOS 10\.15\+/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/macOS 12\+/i)).toHaveLength(2);
       expect(screen.getByText(/Windows 10\+/i)).toBeInTheDocument();
     });
 

@@ -223,27 +223,30 @@ describe("JSON-LD Helpers", () => {
 describe("Page SEO Integration", () => {
   // Mock downloads for pages that need it
   vi.mock("../src/utils/downloads", () => ({
-    getTrackedDownloadUrl: (
-      platform: "macos" | "windows",
-      source = "website",
-    ) =>
+    getTrackedDownloadUrl: (platform: string, source = "website") =>
       `/api/download?platform=${platform}&source=${encodeURIComponent(source)}`,
-    getDownloadHref: (
-      download: { platform: "macos" | "windows" },
-      source = "website",
-    ) =>
+    getDownloadHref: (download: { platform: string }, source = "website") =>
       `/api/download?platform=${download.platform}&source=${encodeURIComponent(
         source,
       )}`,
     useDownloadInfo: () => ({
       loading: false,
       version: "0.1.0",
-      macDownload: {
+      macArm64Download: {
         url: "#",
-        platform: "macos",
-        fileName: "test.dmg",
+        platform: "macos-arm64",
+        fileName: "test-arm64.dmg",
         fileExtension: ".dmg",
-        minOsVersion: "macOS 10.15+",
+        minOsVersion: "macOS 12+",
+        architectureLabel: "Apple Silicon",
+      },
+      macX64Download: {
+        url: "#",
+        platform: "macos-x64",
+        fileName: "test-x64.dmg",
+        fileExtension: ".dmg",
+        minOsVersion: "macOS 12+",
+        architectureLabel: "Intel",
       },
       windowsDownload: {
         url: "#",
