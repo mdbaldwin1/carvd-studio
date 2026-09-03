@@ -9,6 +9,13 @@ interface WebhookConfig {
   analyticsIdSalt: string;
 }
 
+type NodeWebhookRequest = AsyncIterable<unknown> & {
+  method?: string;
+  headers: Record<string, string | string[] | undefined>;
+};
+
+type WebhookRequest = Request | NodeWebhookRequest;
+
 function getConfig(): WebhookConfig | null {
   const webhookSecret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET?.trim();
   const posthogProjectKey = process.env.POSTHOG_PROJECT_KEY?.trim();
@@ -43,6 +50,27 @@ function hasValidSignature(
   );
 }
 
+function getHeader(request: WebhookRequest, name: string): string | null {
+  if (request.headers instanceof Headers) return request.headers.get(name);
+
+  const value = request.headers[name.toLowerCase()];
+  return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
+}
+
+async function readRawBody(request: WebhookRequest): Promise<string> {
+  if ("text" in request && typeof request.text === "function") {
+    return request.text();
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of request as NodeWebhookRequest) {
+    if (typeof chunk === "string") chunks.push(Buffer.from(chunk));
+    else if (chunk instanceof Uint8Array) chunks.push(Buffer.from(chunk));
+    else throw new TypeError("Unsupported webhook request body chunk");
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 function isOrderCreated(payload: unknown): payload is {
   meta: { event_name: "order_created"; test_mode?: unknown };
   data: {
@@ -58,24 +86,28 @@ function isOrderCreated(payload: unknown): payload is {
       attributes?: { currency?: unknown; total?: unknown };
     };
   };
+  const data = value.data;
+  const attributes = data?.attributes;
   return (
     value.meta?.event_name === "order_created" &&
-    (typeof value.data?.id === "string"
-      ? value.data.id.trim().length > 0
-      : typeof value.data?.id === "number" && Number.isFinite(value.data.id)) &&
-    typeof value.data.attributes?.currency === "string" &&
-    value.data.attributes.currency.trim().length > 0 &&
-    typeof value.data.attributes?.total === "number" &&
-    Number.isFinite(value.data.attributes.total) &&
-    Number.isInteger(value.data.attributes.total) &&
-    value.data.attributes.total >= 0 &&
+    (typeof data?.id === "string"
+      ? data.id.trim().length > 0
+      : typeof data?.id === "number" && Number.isFinite(data.id)) &&
+    typeof attributes?.currency === "string" &&
+    attributes.currency.trim().length > 0 &&
+    typeof attributes?.total === "number" &&
+    Number.isFinite(attributes.total) &&
+    Number.isInteger(attributes.total) &&
+    attributes.total >= 0 &&
     (value.meta.test_mode === undefined ||
       typeof value.meta.test_mode === "boolean")
   );
 }
 
 /** Lemon Squeezy must subscribe only to order_created for this endpoint. */
-export default async function handler(request: Request): Promise<Response> {
+export default async function handler(
+  request: WebhookRequest,
+): Promise<Response> {
   if (request.method !== "POST") {
     return new Response(null, { status: 405, headers: { Allow: "POST" } });
   }
@@ -83,11 +115,11 @@ export default async function handler(request: Request): Promise<Response> {
   const config = getConfig();
   if (!config) return new Response(null, { status: 503 });
 
-  const rawBody = await request.text();
+  const rawBody = await readRawBody(request);
   if (
     !hasValidSignature(
       rawBody,
-      request.headers.get("X-Signature"),
+      getHeader(request, "X-Signature"),
       config.webhookSecret,
     )
   ) {

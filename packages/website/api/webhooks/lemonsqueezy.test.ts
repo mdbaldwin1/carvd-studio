@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import handler from "./lemonsqueezy";
 
@@ -24,6 +25,16 @@ function signedRequest(body = rawOrder, signature = sign(body)): Request {
     headers: { "X-Signature": signature },
     body,
   });
+}
+
+function signedNodeRequest(body = rawOrder, signature = sign(body)) {
+  const request = Readable.from([body]) as Readable & {
+    method: string;
+    headers: Record<string, string>;
+  };
+  request.method = "POST";
+  request.headers = { "x-signature": signature };
+  return request;
 }
 
 function sign(body: string): string {
@@ -159,6 +170,12 @@ describe("Lemon Squeezy webhook", () => {
     expect(JSON.stringify(event)).not.toMatch(
       /private@example|secret-license|customer-456|order-123|Private/,
     );
+  });
+
+  it("accepts the Node request shape used by Vercel functions", async () => {
+    const response = await handler(signedNodeRequest());
+
+    expect(response.status).toBe(204);
   });
 
   it("uses the same event UUID for duplicate valid deliveries", async () => {

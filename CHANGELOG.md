@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Analytics privacy controls** — Added a first-run optional analytics choice after onboarding and a permanent App Settings → Data & License control with a clear disclosure of anonymous usage data and prohibited project data.
 - **Privacy disclosure** — Clarified that analytics remains optional, anonymous, and disabled until configured/consented; project design content remains local and revocation deletes queued analytics and the anonymous identifier.
 
+### Fixed
+
+- **Purchase webhook runtime compatibility** — Accept Lemon Squeezy's signed raw request body from Vercel's Node function runtime while retaining exact HMAC verification and retry behavior.
+
 ## [1.0.5] - 2026-08-13
 
 ### Added
