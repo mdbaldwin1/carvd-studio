@@ -3,6 +3,7 @@ import { createTestPart } from '../../../../tests/helpers/factories';
 import type { PartFeature } from '../types';
 import {
   clearPartGeometryCache,
+  getPartGeometryCacheSizeForTests,
   getPartLocalBoundingBox,
   getPartLocalConvexVertices,
   getPartLocalCorners,
@@ -63,6 +64,50 @@ describe('partFeatureGeometry', () => {
     const first = getPartRenderGeometry(part);
     const second = getPartRenderGeometry(part);
     expect(second).toBe(first);
+  });
+
+  it('bounds cached feature geometries and disposes the oldest entry', () => {
+    const first = getPartRenderGeometry(
+      createTestPart({
+        features: [
+          {
+            id: 'first',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'right_end' },
+            reference: { primaryFrom: 'max' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 1 }
+          }
+        ]
+      })
+    );
+    const dispose = vi.spyOn(first, 'dispose');
+
+    for (let angle = 2; angle <= 140; angle += 1) {
+      getPartRenderGeometry(
+        createTestPart({
+          features: [
+            {
+              id: `feature-${angle}`,
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'right_end' },
+              reference: { primaryFrom: 'max' },
+              cutType: 'mitre',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: angle }
+            }
+          ]
+        })
+      );
+    }
+
+    expect(getPartGeometryCacheSizeForTests()).toBeLessThanOrEqual(128);
+    expect(dispose).toHaveBeenCalledOnce();
   });
 
   it('shortens the profile on mitred ends', () => {

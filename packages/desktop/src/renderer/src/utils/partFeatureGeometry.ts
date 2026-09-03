@@ -14,6 +14,7 @@ import {
 type Point2 = { x: number; z: number };
 
 const geometryCache = new Map<string, THREE.BufferGeometry>();
+const MAX_GEOMETRY_CACHE_ENTRIES = 128;
 const _worldAabbPosition = new THREE.Vector3();
 const _worldAabbQuaternion = new THREE.Quaternion();
 const _worldAabbEuler = new THREE.Euler();
@@ -756,11 +757,26 @@ export function getPartRenderGeometry(part: Part): THREE.BufferGeometry {
 
   const key = featureKey(part);
   const cached = geometryCache.get(key);
-  if (cached) return cached;
+  if (cached) {
+    geometryCache.delete(key);
+    geometryCache.set(key, cached);
+    return cached;
+  }
 
   const geometry = createFeatureGeometry(part);
+  if (geometryCache.size >= MAX_GEOMETRY_CACHE_ENTRIES) {
+    const oldestKey = geometryCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      geometryCache.get(oldestKey)?.dispose();
+      geometryCache.delete(oldestKey);
+    }
+  }
   geometryCache.set(key, geometry);
   return geometry;
+}
+
+export function getPartGeometryCacheSizeForTests(): number {
+  return geometryCache.size;
 }
 
 /**
