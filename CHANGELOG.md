@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Purchase webhook runtime compatibility** — Accept Lemon Squeezy's signed raw request body from Vercel's Node function runtime while retaining exact HMAC verification and retry behavior.
+- **Cross-platform release verification** — Made analytics-enabled Electron E2E commands portable to Windows and added a single CI-only retry for transient desktop UI runner failures while keeping local test runs strict.
 
 ## [1.0.5] - 2026-08-13
 
