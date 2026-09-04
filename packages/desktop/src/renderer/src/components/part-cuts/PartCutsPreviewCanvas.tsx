@@ -60,27 +60,23 @@ export function buildPreviewPart(part: Part, draftFeatures: Part['features'], dr
  */
 export function getPreviewGeometrySignature(part: Part): string {
   const geometry = getPartRenderGeometry(part);
-  try {
-    const position = geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
-    if (!position) return 'empty';
-    geometry.computeBoundingBox();
-    const bounds = geometry.boundingBox;
-    const values = position.array as Float32Array;
-    const step = Math.max(1, Math.floor(values.length / 2048));
-    let hash = 2166136261;
-    for (let index = 0; index < values.length; index += step) {
-      hash ^= Math.round(values[index] * 10000);
-      hash = Math.imul(hash, 16777619);
-    }
-    const boundary = bounds
-      ? [bounds.min.x, bounds.min.y, bounds.min.z, bounds.max.x, bounds.max.y, bounds.max.z]
-          .map((value) => value.toFixed(4))
-          .join(',')
-      : 'unbounded';
-    return `${position.count}:${geometry.index?.count ?? 0}:${hash >>> 0}:${boundary}`;
-  } finally {
-    if (typeof geometry.dispose === 'function') geometry.dispose();
+  const position = geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+  if (!position) return 'empty';
+  geometry.computeBoundingBox();
+  const bounds = geometry.boundingBox;
+  const values = position.array as Float32Array;
+  const step = Math.max(1, Math.floor(values.length / 2048));
+  let hash = 2166136261;
+  for (let index = 0; index < values.length; index += step) {
+    hash ^= Math.round(values[index] * 10000);
+    hash = Math.imul(hash, 16777619);
   }
+  const boundary = bounds
+    ? [bounds.min.x, bounds.min.y, bounds.min.z, bounds.max.x, bounds.max.y, bounds.max.z]
+        .map((value) => value.toFixed(4))
+        .join(',')
+    : 'unbounded';
+  return `${position.count}:${geometry.index?.count ?? 0}:${hash >>> 0}:${boundary}`;
 }
 
 type HandleKind = 'move' | 'length' | 'width';

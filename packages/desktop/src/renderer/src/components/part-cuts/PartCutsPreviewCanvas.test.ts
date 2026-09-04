@@ -21,6 +21,7 @@ import {
   PartCutsPreviewCanvas,
   supportsPreviewHandles
 } from './PartCutsPreviewCanvas';
+import { clearPartGeometryCache, getPartRenderGeometry } from '@renderer/utils/partFeatureGeometry';
 
 // The global setup mocks 'three' with a minimal surface; the preview geometry
 // builders need the real library (same pattern as partFeatureGeometry.test.ts).
@@ -158,6 +159,27 @@ describe('getPreviewGeometrySignature', () => {
     const cutPart = buildPreviewPart(part, [], createRectDraft('mortise', { sizeLength: 3, sizeWidth: 2 }));
 
     expect(getPreviewGeometrySignature(cutPart)).not.toBe(uncutSignature);
+  });
+
+  it('does not dispose feature geometry borrowed from the render cache', () => {
+    const cutPart = buildPreviewPart(
+      createTestPart({ length: 24, width: 12, thickness: 0.75 }),
+      [],
+      createRectDraft('mortise', { sizeLength: 3, sizeWidth: 2 })
+    );
+    const cachedGeometry = getPartRenderGeometry(cutPart);
+    const onDispose = vi.fn();
+    cachedGeometry.addEventListener('dispose', onDispose);
+
+    try {
+      getPreviewGeometrySignature(cutPart);
+
+      expect(onDispose).not.toHaveBeenCalled();
+      expect(getPartRenderGeometry(cutPart)).toBe(cachedGeometry);
+    } finally {
+      cachedGeometry.removeEventListener('dispose', onDispose);
+      clearPartGeometryCache();
+    }
   });
 });
 
