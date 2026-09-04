@@ -245,7 +245,7 @@ describe('partCutsEditingStore', () => {
       expect(usePartCutsEditingStore.getState().draftFeatures[0]).toMatchObject({ pattern: { spacing: 3 } });
     });
 
-    it('preserves nested cut payloads through duplicate, reorder, enable, mirror, undo, and redo', () => {
+    it('preserves independent nested cut payloads through duplicate, reorder, enable, mirror, undo, and redo', () => {
       const round: PartFeature = {
         id: 'round',
         kind: 'circular_cut',
@@ -282,19 +282,24 @@ describe('partCutsEditingStore', () => {
       const roundCircular = round as Extract<PartFeature, { kind: 'circular_cut' }>;
       const duplicateRound = duplicate as Extract<PartFeature, { kind: 'circular_cut' }>;
       const mirrored = mirrorFeature(rounded, 'across_width', { length: 24, width: 12, thickness: 0.75 });
+
+      expect(duplicateRound.pattern).not.toBe(roundCircular.pattern);
+      expect(duplicateRound.parameters.counterbore).not.toBe(roundCircular.parameters.counterbore);
+
       store.setDraftFeatures([round, rounded, duplicate]);
       store.setDraftFeatures([duplicate, round, rounded]);
-      store.setDraftFeatures([duplicate, { ...round, enabled: false }, rounded]);
-      store.setDraftFeatures([mirrored, duplicate, { ...round, enabled: false }, rounded]);
-      const editedDuplicate = {
-        ...duplicate,
-        pattern: { ...duplicateRound.pattern!, rotation: 45 },
-        parameters: {
-          ...duplicateRound.parameters,
-          counterbore: { ...duplicateRound.parameters.counterbore!, depth: 0.2 }
-        }
-      };
-      store.setDraftFeatures([mirrored, editedDuplicate, { ...round, enabled: false }, rounded]);
+      const disabledRound = { ...round, enabled: false };
+      store.setDraftFeatures([duplicate, disabledRound, rounded]);
+      const reenabledRound = { ...disabledRound, enabled: true };
+      store.setDraftFeatures([duplicate, reenabledRound, rounded]);
+      store.setDraftFeatures([mirrored, duplicate, reenabledRound, rounded]);
+
+      // Edit the actual object returned by duplicateFeature. If duplicateFeature
+      // ever becomes a shallow clone, these mutations will corrupt `round` and
+      // the original-payload assertions below will fail.
+      duplicateRound.pattern!.rotation = 45;
+      duplicateRound.parameters.counterbore!.depth = 0.2;
+      store.setDraftFeatures([mirrored, duplicateRound, reenabledRound, rounded]);
 
       expect(usePartCutsEditingStore.getState().draftFeatures.map((feature) => feature.id)).toEqual([
         mirrored.id,
@@ -306,7 +311,7 @@ describe('partCutsEditingStore', () => {
         expect.arrayContaining([
           expect.objectContaining({
             id: 'round',
-            enabled: false,
+            enabled: true,
             pattern: expect.objectContaining({
               type: 'grid',
               rows: 2,
@@ -331,19 +336,50 @@ describe('partCutsEditingStore', () => {
       expect(roundCircular.parameters.counterbore).toMatchObject({ depth: 0.125 });
 
       usePartCutsEditingStore.getState().undoDraft();
-      expect(usePartCutsEditingStore.getState().draftFeatures.map((feature) => feature.id)).toEqual([
-        mirrored.id,
-        duplicate.id,
-        'round',
-        'rounded'
-      ]);
+      const undoneFeatures = usePartCutsEditingStore.getState().draftFeatures;
+      expect(undoneFeatures.map((feature) => feature.id)).toEqual([mirrored.id, duplicate.id, 'round', 'rounded']);
+      const undoneOriginal = undoneFeatures.find(
+        (feature): feature is Extract<PartFeature, { kind: 'circular_cut' }> =>
+          feature.id === 'round' && feature.kind === 'circular_cut'
+      );
+      const undoneDuplicate = undoneFeatures.find(
+        (feature): feature is Extract<PartFeature, { kind: 'circular_cut' }> =>
+          feature.id === duplicate.id && feature.kind === 'circular_cut'
+      );
+      expect(undoneOriginal).toMatchObject({
+        enabled: true,
+        pattern: { rotation: 15 },
+        parameters: { counterbore: { depth: 0.125 } }
+      });
+      expect(undoneDuplicate).toMatchObject({
+        pattern: { rotation: 15 },
+        parameters: { counterbore: { depth: 0.125 } }
+      });
+      expect(undoneDuplicate?.pattern).not.toBe(undoneOriginal?.pattern);
+      expect(undoneDuplicate?.parameters.counterbore).not.toBe(undoneOriginal?.parameters.counterbore);
+
       usePartCutsEditingStore.getState().redoDraft();
-      expect(usePartCutsEditingStore.getState().draftFeatures.map((feature) => feature.id)).toEqual([
-        mirrored.id,
-        duplicate.id,
-        'round',
-        'rounded'
-      ]);
+      const redoneFeatures = usePartCutsEditingStore.getState().draftFeatures;
+      expect(redoneFeatures.map((feature) => feature.id)).toEqual([mirrored.id, duplicate.id, 'round', 'rounded']);
+      const redoneOriginal = redoneFeatures.find(
+        (feature): feature is Extract<PartFeature, { kind: 'circular_cut' }> =>
+          feature.id === 'round' && feature.kind === 'circular_cut'
+      );
+      const redoneDuplicate = redoneFeatures.find(
+        (feature): feature is Extract<PartFeature, { kind: 'circular_cut' }> =>
+          feature.id === duplicate.id && feature.kind === 'circular_cut'
+      );
+      expect(redoneOriginal).toMatchObject({
+        enabled: true,
+        pattern: { rotation: 15 },
+        parameters: { counterbore: { depth: 0.125 } }
+      });
+      expect(redoneDuplicate).toMatchObject({
+        pattern: { rotation: 45 },
+        parameters: { counterbore: { depth: 0.2 } }
+      });
+      expect(redoneDuplicate?.pattern).not.toBe(redoneOriginal?.pattern);
+      expect(redoneDuplicate?.parameters.counterbore).not.toBe(redoneOriginal?.parameters.counterbore);
     });
   });
 });

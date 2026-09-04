@@ -8,6 +8,8 @@ import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { useProjectStore } from '@renderer/store/projectStore';
 import { useSelectionStore } from '@renderer/store/selectionStore';
 import { validateCircularCut } from '@renderer/utils/roundCutUtils';
+import { buildDraftFromFeature } from '@renderer/components/part-features/partFeatureEditorState';
+import { getEditableHandleOverlay } from './PartCutsPreviewCanvas';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
 
 type WorkspaceProps = ComponentProps<typeof PartCutsWorkspace>;
@@ -244,6 +246,58 @@ describe('PartCutsWorkspace', () => {
           parameters: expect.objectContaining({ [parameter]: parameter === 'diameter' ? 0.5 : 3.25 })
         })
       );
+    }
+  );
+
+  it.each([
+    {
+      rotation: 90,
+      lengthHandle: [0, 0.455, -1.625],
+      widthHandle: [-0.625, 0.455, 0]
+    },
+    {
+      rotation: 37,
+      lengthHandle: [1.297783, 0.455, -0.977949],
+      widthHandle: [-0.376134, 0.455, -0.499147]
+    }
+  ])(
+    'keeps the production rounded preview controls on authored local axes at $rotation°',
+    ({ rotation, lengthHandle, widthHandle }) => {
+      const part = createTestPart({ name: 'Panel', length: 24, width: 12, thickness: 0.75 });
+      const onDraftFeaturesChange = vi.fn();
+      renderWorkspace({ part, onDraftFeaturesChange });
+      startCut('Rounded Rectangle');
+      fireEvent.change(screen.getByLabelText('Rotation (degrees)'), { target: { value: String(rotation) } });
+
+      const preview = screen.getByRole('img', { name: 'Part cuts geometry preview' });
+      fireEvent.click(within(preview).getByRole('button', { name: 'Extend Length' }));
+      expect(screen.getByLabelText('Opening Length')).toHaveValue('3 1/4');
+      expect(screen.getByLabelText('Opening Width')).toHaveValue('1');
+      expect(screen.getByLabelText('Offset Along Face')).toHaveValue('0');
+      expect(screen.getByLabelText('Offset Across Face')).toHaveValue('0');
+
+      fireEvent.click(within(preview).getByRole('button', { name: 'Widen' }));
+      expect(screen.getByLabelText('Opening Length')).toHaveValue('3 1/4');
+      expect(screen.getByLabelText('Opening Width')).toHaveValue('1 1/4');
+      expect(screen.getByLabelText('Offset Along Face')).toHaveValue('0');
+      expect(screen.getByLabelText('Offset Across Face')).toHaveValue('0');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
+      const savedFeature = lastFeatures(onDraftFeaturesChange)[0];
+      expect(savedFeature).toMatchObject({
+        kind: 'rounded_cut',
+        placement: { primary: 0, secondary: 0, rotation },
+        parameters: { length: 3.25, width: 1.25 }
+      });
+
+      const overlay = getEditableHandleOverlay(part, buildDraftFromFeature(savedFeature), [savedFeature]);
+      expect(overlay?.center).toEqual([0, 0.455, -0]);
+      expect(overlay?.lengthHandle?.[0]).toBeCloseTo(lengthHandle[0], 5);
+      expect(overlay?.lengthHandle?.[1]).toBeCloseTo(lengthHandle[1], 5);
+      expect(overlay?.lengthHandle?.[2]).toBeCloseTo(lengthHandle[2], 5);
+      expect(overlay?.widthHandle?.[0]).toBeCloseTo(widthHandle[0], 5);
+      expect(overlay?.widthHandle?.[1]).toBeCloseTo(widthHandle[1], 5);
+      expect(overlay?.widthHandle?.[2]).toBeCloseTo(widthHandle[2], 5);
     }
   );
 
