@@ -6,6 +6,7 @@ import { createTestPart } from '../../../../../tests/helpers/factories';
 import type { EndCutFeature, RectCutFeature } from '@renderer/types';
 import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { useProjectStore } from '@renderer/store/projectStore';
+import { useSelectionStore } from '@renderer/store/selectionStore';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
 
 type WorkspaceProps = ComponentProps<typeof PartCutsWorkspace>;
@@ -105,6 +106,23 @@ describe('PartCutsWorkspace', () => {
 
     expect(screen.getByRole('dialog', { name: 'Create Dowel Joint' })).toBeInTheDocument();
     expect(screen.getByLabelText('Mating Part')).toHaveValue('second');
+  });
+
+  it('returns to the project with both dowel parts selected for alignment', () => {
+    const part = createTestPart({ id: 'first', name: 'Lower rail' });
+    const mate = createTestPart({ id: 'second', name: 'Upper rail', position: { x: 20, y: 10, z: 0 } });
+    const onExit = vi.fn();
+    useProjectStore.setState({ parts: [part, mate] });
+    useSelectionStore.getState().clearSelection();
+    renderWorkspace({ part, onExit });
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Create Dowel Joint/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Project & Align Parts' }));
+
+    expect(useSelectionStore.getState().selectedPartIds).toEqual(['first', 'second']);
+    expect(onExit).toHaveBeenCalled();
   });
 
   it('creates an angled patterned round hole from the Round Cuts group', () => {

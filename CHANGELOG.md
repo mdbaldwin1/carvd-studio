@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Woodworker-oriented dowel setup** — The paired-dowel wizard now validates mating faces before measurement entry, offers a direct return to part alignment, measures hole centers from visible board edges, previews the drilling layout, blocks out-of-bounds holes immediately, and reviews both boards' drilling setups before creation.
 - **End-cut measurement semantics** — The part length stays authoritative for cut-list sizing, mitres use an explicit `High Point On` direction control instead of long/short/centerline reference math, saved cuts keep their stored measurement reference across edits, and the editor shows derived long-point, short-point, and centerline measurements as shop-facing data.
 - **Ordered multi-cut validation** — Cuts on a board evaluate in list order; duplicate enabled end cuts on the same end, cuts starting inside removed material, and opposing-face blind intersections are blocking conflicts, with the same rules enforced in the cuts workspace, part summaries, and cut-list validation.
 - **Project file format version 2** — Projects that use part cuts now save as file format version 2, so older app versions show a clear "please update" message instead of silently opening them with the cuts missing. Projects without cuts keep the older format for maximum compatibility.

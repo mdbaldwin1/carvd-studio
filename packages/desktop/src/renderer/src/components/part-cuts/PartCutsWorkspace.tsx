@@ -3,6 +3,7 @@ import { PartCutsPreviewCanvas } from '@renderer/components/part-cuts/PartCutsPr
 import { DowelJointDialog } from '@renderer/components/part-cuts/DowelJointDialog';
 import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { useProjectStore } from '@renderer/store/projectStore';
+import { useSelectionStore } from '@renderer/store/selectionStore';
 import {
   applyTargetToFeatureDraft,
   buildDraftFromFeature,
@@ -1779,6 +1780,12 @@ export function PartCutsWorkspace({
             setPanelMode('list');
           }}
           onCreate={addDowelJoint}
+          onAlignRequested={({ firstPartId, secondPartId }) => {
+            setShowDowelDialog(false);
+            setPanelMode('list');
+            useSelectionStore.getState().selectParts([firstPartId, secondPartId]);
+            onExit();
+          }}
         />
       )}
     </div>

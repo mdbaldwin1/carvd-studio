@@ -8,6 +8,8 @@ interface FractionInputProps {
   onChange: (value: number) => void;
   min?: number;
   className?: string;
+  id?: string;
+  ariaLabel?: string;
 }
 
 /**
@@ -15,7 +17,7 @@ interface FractionInputProps {
  * or as millimeters (metric), based on project settings.
  * All values are stored internally as inches.
  */
-export function FractionInput({ value, onChange, min = 0, className }: FractionInputProps) {
+export function FractionInput({ value, onChange, min = 0, className, id, ariaLabel }: FractionInputProps) {
   const units = useProjectStore((s) => s.units);
 
   // Display value formatted according to units when not editing
@@ -99,6 +101,8 @@ export function FractionInput({ value, onChange, min = 0, className }: FractionI
 
   return (
     <Input
+      id={id}
+      aria-label={ariaLabel}
       type="text"
       value={displayValue}
       onChange={handleChange}

@@ -23,6 +23,8 @@ export interface DowelJointResult {
   secondFeatures: CircularCutFeature[];
 }
 
+export type DowelJointFaceInput = Pick<CreateDowelJointInput, 'firstPart' | 'firstFace' | 'secondPart' | 'secondFace'>;
+
 export interface DowelVisualization {
   jointId: string;
   memberIndex: number;
@@ -107,6 +109,18 @@ function feature(
   };
 }
 
+export function validateDowelJointFaces(input: DowelJointFaceInput): void {
+  const firstFrame = getFaceFrame(input.firstPart, input.firstFace);
+  const secondFrame = getFaceFrame(input.secondPart, input.secondFace);
+  const firstNormal = worldDirection(input.firstPart, firstFrame.inwardNormal);
+  const secondNormal = worldDirection(input.secondPart, secondFrame.inwardNormal);
+  if (firstNormal.dot(secondNormal) > -0.999) throw new Error('Selected faces must be parallel and opposing.');
+  const firstFaceOrigin = worldPoint(input.firstPart, firstFrame.origin);
+  const secondFaceOrigin = worldPoint(input.secondPart, secondFrame.origin);
+  if (Math.abs(secondFaceOrigin.clone().sub(firstFaceOrigin).dot(firstNormal)) > 1e-4)
+    throw new Error('Selected faces must be touching to create a dowel joint.');
+}
+
 export function createDowelJoint(input: CreateDowelJointInput): DowelJointResult {
   if (!Number.isInteger(input.count) || input.count < 1 || input.count > 128)
     throw new Error('Dowel count must be between 1 and 128.');
@@ -120,15 +134,8 @@ export function createDowelJoint(input: CreateDowelJointInput): DowelJointResult
   if (input.firstEmbedmentDepth + input.secondEmbedmentDepth > input.dowelLength + 1e-9)
     throw new Error('Combined embedment depths cannot exceed the dowel length.');
 
-  const firstFrame = getFaceFrame(input.firstPart, input.firstFace);
+  validateDowelJointFaces(input);
   const secondFrame = getFaceFrame(input.secondPart, input.secondFace);
-  const firstNormal = worldDirection(input.firstPart, firstFrame.inwardNormal);
-  const secondNormal = worldDirection(input.secondPart, secondFrame.inwardNormal);
-  if (firstNormal.dot(secondNormal) > -0.999) throw new Error('Selected faces must be parallel and opposing.');
-  const firstFaceOrigin = worldPoint(input.firstPart, firstFrame.origin);
-  const secondFaceOrigin = worldPoint(input.secondPart, secondFrame.origin);
-  if (Math.abs(secondFaceOrigin.clone().sub(firstFaceOrigin).dot(firstNormal)) > 1e-4)
-    throw new Error('Selected faces must be touching to create a dowel joint.');
 
   const jointId = id('dowel-joint');
   const firstFeatures: CircularCutFeature[] = [];
