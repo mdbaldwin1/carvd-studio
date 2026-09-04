@@ -250,11 +250,16 @@ function buildRoundHandleOverlay(
   const y = point.y + (draft.faceTarget === 'top_face' ? HANDLE_EPSILON : -HANDLE_EPSILON);
   const length = draft.mode === 'circular_cut' ? draft.diameter : draft.length;
   const width = draft.mode === 'circular_cut' ? draft.diameter : draft.width;
+  const angle = draft.mode === 'rounded_cut' ? (draft.rotation * Math.PI) / 180 : 0;
+  const lengthX = Math.cos(angle) * (length / 2);
+  const lengthZ = Math.sin(angle) * (length / 2);
+  const widthX = -Math.sin(angle) * (width / 2);
+  const widthZ = Math.cos(angle) * (width / 2);
   return {
     mode: draft.mode === 'circular_cut' ? 'round' : 'rounded',
     center: [point.x, y, -point.z],
-    lengthHandle: [point.x + length / 2, y, -point.z],
-    widthHandle: draft.mode === 'circular_cut' ? null : [point.x, y, -point.z - width / 2],
+    lengthHandle: [point.x + lengthX, y, -(point.z + lengthZ)],
+    widthHandle: draft.mode === 'circular_cut' ? null : [point.x + widthX, y, -(point.z + widthZ)],
     operationLabel:
       draft.mode === 'circular_cut' && draft.pattern
         ? `${draft.cutType.replace('_', ' ')} pattern origin`
@@ -590,11 +595,40 @@ export function applyHandleDelta(
     } else if (startDraft.mode === 'circular_cut' && kind === 'length') {
       nextDraft.diameter = Math.max(MIN_DIMENSION, startDraft.diameter + deltaX);
     } else if (startDraft.mode === 'rounded_cut' && kind === 'length') {
-      nextDraft.length = Math.max(MIN_DIMENSION, startDraft.length + deltaX);
+      const angle = (startDraft.rotation * Math.PI) / 180;
+      nextDraft.length = Math.max(
+        MIN_DIMENSION,
+        startDraft.length + deltaX * Math.cos(angle) + deltaZ * Math.sin(angle)
+      );
     } else if (startDraft.mode === 'rounded_cut' && kind === 'width') {
-      nextDraft.width = Math.max(MIN_DIMENSION, startDraft.width + deltaZ);
+      const angle = (startDraft.rotation * Math.PI) / 180;
+      nextDraft.width = Math.max(MIN_DIMENSION, startDraft.width - deltaX * Math.sin(angle) + deltaZ * Math.cos(angle));
     }
-    return isHandleDraftValid(part, nextDraft) ? nextDraft : startDraft;
+    if (isHandleDraftValid(part, nextDraft)) return nextDraft;
+    let low = 0;
+    let high = 1;
+    let clampedDraft = startDraft;
+    for (let attempt = 0; attempt < 32; attempt += 1) {
+      const ratio = (low + high) / 2;
+      const candidate = { ...startDraft };
+      if (kind === 'move') {
+        candidate.placementPrimary =
+          startDraft.placementPrimary + (nextDraft.placementPrimary - startDraft.placementPrimary) * ratio;
+        candidate.placementSecondary =
+          startDraft.placementSecondary + (nextDraft.placementSecondary - startDraft.placementSecondary) * ratio;
+      } else if (candidate.mode === 'circular_cut') {
+        candidate.diameter = startDraft.diameter + (nextDraft.diameter - startDraft.diameter) * ratio;
+      } else if (kind === 'length') {
+        candidate.length = startDraft.length + (nextDraft.length - startDraft.length) * ratio;
+      } else {
+        candidate.width = startDraft.width + (nextDraft.width - startDraft.width) * ratio;
+      }
+      if (isHandleDraftValid(part, candidate)) {
+        low = ratio;
+        clampedDraft = candidate;
+      } else high = ratio;
+    }
+    return clampedDraft;
   }
 
   const nextDraft: FeatureDraft = { ...startDraft };

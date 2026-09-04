@@ -433,6 +433,20 @@ describe('applyHandleDelta', () => {
     else expect(resized.length).toBeCloseTo(draft.length + 0.5);
   });
 
+  it('clamps circular and rotated rounded handle drags at their valid physical edge', () => {
+    const circular = createCircularDraft({ placementPrimary: 11, placementSecondary: 0 });
+    const circularAtEdge = applyHandleDelta(part, circular, 'move', 100, 0);
+    expect(circularAtEdge.placementPrimary).toBeCloseTo(11.875);
+    expect(applyHandleDelta(part, circularAtEdge, 'move', 1, 0).placementPrimary).toBeCloseTo(11.875);
+
+    const rotated = createRoundedDraft('rounded_rectangle', { rotation: 90 });
+    const lengthened = applyHandleDelta(part, rotated, 'length', 0, 1);
+    expect(lengthened.length).toBeCloseTo(rotated.length + 1);
+    const overlay = getEditableHandleOverlay(part, rotated);
+    expect(overlay?.lengthHandle?.[0]).toBeCloseTo(0);
+    expect(overlay?.lengthHandle?.[2]).toBeCloseTo(-rotated.length / 2);
+  });
+
   it('moves the pocket and clamps to the part bounds', () => {
     const draft = createRectDraft('mortise', { placementX: 4, placementZ: 3 });
 

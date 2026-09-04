@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { PartFeature } from '../types';
+import { duplicateFeature } from '../components/part-features/partFeatureEditorState';
+import { mirrorFeature } from '../utils/partFeatureActions';
 import { useCameraStore } from './cameraStore';
 import { usePartCutsEditingStore } from './partCutsEditingStore';
 
@@ -241,6 +243,90 @@ describe('partCutsEditingStore', () => {
       });
       usePartCutsEditingStore.getState().redoDraft();
       expect(usePartCutsEditingStore.getState().draftFeatures[0]).toMatchObject({ pattern: { spacing: 3 } });
+    });
+
+    it('preserves nested cut payloads through duplicate, reorder, enable, mirror, undo, and redo', () => {
+      const round: PartFeature = {
+        id: 'round',
+        kind: 'circular_cut',
+        version: 1,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        cutType: 'counterbore',
+        placement: { primary: 3, secondary: 2, rotation: 0 },
+        parameters: {
+          diameter: 0.25,
+          depthMode: 'blind',
+          depth: 0.5,
+          tilt: 0,
+          direction: 20,
+          counterbore: { diameter: 0.5, depth: 0.125 }
+        },
+        pattern: { type: 'grid', rows: 2, columns: 3, rowSpacing: 0.5, columnSpacing: 0.75, rotation: 15 }
+      };
+      const rounded: PartFeature = {
+        id: 'rounded',
+        kind: 'rounded_cut',
+        version: 1,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+        cutType: 'rounded_rectangle',
+        placement: { primary: 2, secondary: 1, rotation: 30 },
+        parameters: { length: 3, width: 1, cornerRadius: 0.25, depthMode: 'blind', depth: 0.25 }
+      };
+      const store = usePartCutsEditingStore.getState();
+      store.startEditingPartCuts('p1', 'Panel', [round, rounded]);
+      const duplicate = duplicateFeature(round);
+      const mirrored = mirrorFeature(rounded, 'across_width', { length: 24, width: 12, thickness: 0.75 });
+      const finalFeatures = [mirrored, { ...round, enabled: false }, duplicate, rounded];
+      store.setDraftFeatures(finalFeatures);
+
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((feature) => feature.id)).toEqual([
+        mirrored.id,
+        'round',
+        duplicate.id,
+        'rounded'
+      ]);
+      expect(usePartCutsEditingStore.getState().draftFeatures).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'round',
+            enabled: false,
+            pattern: expect.objectContaining({
+              type: 'grid',
+              rows: 2,
+              columns: 3,
+              rowSpacing: 0.5,
+              columnSpacing: 0.75,
+              rotation: 15
+            })
+          }),
+          expect.objectContaining({
+            id: duplicate.id,
+            parameters: expect.objectContaining({ counterbore: { diameter: 0.5, depth: 0.125 } })
+          }),
+          expect.objectContaining({
+            id: mirrored.id,
+            placement: expect.objectContaining({ primary: 2, secondary: -1, rotation: -30 })
+          })
+        ])
+      );
+      expect((duplicate as Extract<PartFeature, { kind: 'circular_cut' }>).pattern).not.toBe(round.pattern);
+
+      usePartCutsEditingStore.getState().undoDraft();
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((feature) => feature.id)).toEqual([
+        'round',
+        'rounded'
+      ]);
+      usePartCutsEditingStore.getState().redoDraft();
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((feature) => feature.id)).toEqual([
+        mirrored.id,
+        'round',
+        duplicate.id,
+        'rounded'
+      ]);
     });
   });
 });

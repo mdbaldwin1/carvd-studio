@@ -266,6 +266,18 @@ describe('PartCutsWorkspace', () => {
     );
   });
 
+  it('shows a Save-disabled error for zero spacing entered through the inspector', async () => {
+    renderWorkspace();
+    startCut('Round Hole');
+    fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'linear' } });
+    setMeasurementField('Spacing', '0');
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+      expect(screen.getByText(/spacing must be greater than zero/i)).toBeInTheDocument();
+    });
+  });
+
   it.each([
     [
       'zero-member grid',

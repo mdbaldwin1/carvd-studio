@@ -1186,7 +1186,7 @@ export function PartCutsWorkspace({
                                 ariaLabel="Counterbore Depth"
                                 value={inspectorDraft.counterboreDepth}
                                 onChange={(counterboreDepth) => setDraft({ ...inspectorDraft, counterboreDepth })}
-                                min={0.001}
+                                min={0}
                               />
                             </div>
                           </div>
@@ -1271,7 +1271,7 @@ export function PartCutsWorkspace({
                                     pattern: { ...inspectorDraft.pattern!, spacing } as never
                                   })
                                 }
-                                min={0.001}
+                                min={0}
                               />
                             </div>
                             <div>
