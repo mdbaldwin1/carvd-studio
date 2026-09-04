@@ -178,7 +178,7 @@ Copy/paste and duplicate actions always mint new feature IDs. Copying one part o
 
 ### Exact representation
 
-The current layered extrusion algorithm remains the source for straight cuts. Round and rounded operations extend the part-feature geometry derivation with analytic profile sampling:
+The current layered extrusion algorithm remains the source for straight cuts. Round and rounded operations extend the part-feature geometry derivation with analytic profile sampling plus a bounded `three-bvh-csg` subtraction path for non-vertical bores whose horizontal slices can contain disconnected material regions:
 
 - circles use a deterministic segment count selected by physical diameter and capped for performance;
 - rounded rectangles and slots use deterministic quarter-arc sampling;
@@ -186,6 +186,7 @@ The current layered extrusion algorithm remains the source for straight cuts. Ro
 - through bores are represented through all intersected layers;
 - angled cylinders are sliced at layer boundaries to produce the correct shifted elliptical cross-section;
 - countersinks and counterbores contribute additional depth intervals and profiles.
+- side-face, end-face, and arbitrary-angle bores use finite analytic cylinder/cone cutters through `three-bvh-csg`; the result is immediately converted back to the existing cached `BufferGeometry` contract.
 
 The derived geometry bundle remains the single consumer contract for rendering, hit testing, bounds, snapping, measurement, ground constraints, and collision. No consumer receives a special-case round-hole path.
 

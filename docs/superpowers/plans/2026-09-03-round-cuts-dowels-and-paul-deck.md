@@ -6,7 +6,7 @@
 
 **Architecture:** Add `circular_cut` and `rounded_cut` variants to the existing ordered `PartFeature` model, expand patterns only during derivation, and keep the geometry-bundle contract as the sole source for rendering and interaction. Represent dowel joints as paired circular features with validated relationship metadata and derived dowel visualization. Validate Paul's raw project read-only and commit only anonymized minimal regression fixtures.
 
-**Tech Stack:** TypeScript, React 19, Zustand, Three.js, React Three Fiber, Vitest, Playwright Electron, Electron file format v2.
+**Tech Stack:** TypeScript, React 19, Zustand, Three.js, `three-bvh-csg`/`three-mesh-bvh`, React Three Fiber, Vitest, Playwright Electron, Electron file format v2.
 
 **Spec:** `docs/superpowers/specs/2026-09-03-round-cuts-dowels-and-paul-deck-design.md`
 

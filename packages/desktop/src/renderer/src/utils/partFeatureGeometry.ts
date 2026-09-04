@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CircularCutFeature, Part, PartFeature, RectCutFeature, RoundedCutFeature } from '../types';
 import { getEdgeBevelInsetAt, getEndCutInsetAt, getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
@@ -733,17 +734,90 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     layerGeometries.push(getLayerGeometry(layerContour, layerHoles, layerDepth, yMin));
   }
 
-  const geometry =
+  let geometry =
     layerGeometries.length === 1
       ? layerGeometries[0]
       : (mergeGeometries(layerGeometries, false) ?? getLayerGeometry(contour, [], part.thickness, -part.thickness / 2));
 
   applyVerticalEndCuts(geometry, part);
   applyEdgeBevels(geometry, part);
+  geometry = subtractNonVerticalCircularCuts(geometry, part);
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
+}
+
+function subtractNonVerticalCircularCuts(baseGeometry: THREE.BufferGeometry, part: Part): THREE.BufferGeometry {
+  const features = getEnabledFeatures(part).filter(
+    (feature): feature is CircularCutFeature =>
+      feature.kind === 'circular_cut' &&
+      feature.target.type === 'face' &&
+      feature.target.face !== 'top_face' &&
+      feature.target.face !== 'bottom_face'
+  );
+  if (features.length === 0) return baseGeometry;
+
+  const evaluator = new Evaluator();
+  evaluator.useGroups = false;
+  let current = new Brush(baseGeometry);
+  current.updateMatrixWorld(true);
+  const diagonal = Math.hypot(part.length, part.width, part.thickness);
+
+  for (const feature of features) {
+    for (const member of expandCircularCut(feature, part)) {
+      const axis = new THREE.Vector3(member.axis.x, member.axis.y, member.axis.z).normalize();
+      const subtractCutter = (entryRadius: number, endRadius: number, length: number, startOffset: number): void => {
+        const cutterLength = length + 0.002;
+        const cutterGeometry = new THREE.CylinderGeometry(
+          endRadius,
+          entryRadius,
+          cutterLength,
+          Math.min(64, Math.max(16, Math.ceil(Math.max(entryRadius, endRadius) * 24))),
+          1,
+          false
+        );
+        const cutter = new Brush(cutterGeometry);
+        cutter.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+        cutter.position
+          .set(member.entryPoint.x, member.entryPoint.y, member.entryPoint.z)
+          .addScaledVector(axis, startOffset + cutterLength / 2);
+        cutter.updateMatrixWorld(true);
+        const result = evaluator.evaluate(current, cutter, SUBTRACTION) as Brush;
+        result.geometry.computeVertexNormals();
+        if (current.geometry !== baseGeometry) current.geometry.dispose();
+        cutterGeometry.dispose();
+        current = result;
+        current.updateMatrixWorld(true);
+      };
+
+      const pilotLength = feature.parameters.depthMode === 'blind' ? Number(feature.parameters.depth) : diagonal * 2;
+      if (!(pilotLength > 0)) continue;
+      if (feature.cutType === 'counterbore' && feature.parameters.counterbore) {
+        subtractCutter(
+          feature.parameters.counterbore.diameter / 2,
+          feature.parameters.counterbore.diameter / 2,
+          feature.parameters.counterbore.depth,
+          -0.002
+        );
+      } else if (feature.cutType === 'countersink' && feature.parameters.countersink) {
+        const entryRadius = feature.parameters.countersink.majorDiameter / 2;
+        const endRadius = feature.parameters.diameter / 2;
+        const sinkDepth =
+          (entryRadius - endRadius) / Math.tan((feature.parameters.countersink.includedAngle * Math.PI) / 360);
+        subtractCutter(entryRadius, endRadius, sinkDepth, -0.002);
+      }
+      subtractCutter(
+        feature.parameters.diameter / 2,
+        feature.parameters.diameter / 2,
+        pilotLength,
+        feature.parameters.depthMode === 'through' ? -diagonal / 2 : -0.002
+      );
+    }
+  }
+
+  if (current.geometry !== baseGeometry) baseGeometry.dispose();
+  return current.geometry;
 }
 
 function applyVerticalEndCuts(geometry: THREE.BufferGeometry, part: Part): void {

@@ -104,6 +104,63 @@ describe('partFeatureGeometry', () => {
       const origin = new THREE.Vector3(-axis.x * 2, 1 - axis.y * 2, 0);
       expect(new THREE.Raycaster(origin, axis).intersectObject(mesh)).toHaveLength(0);
     });
+
+    it.each([
+      ['front face', 'front_face', new THREE.Vector3(0, 0, -4), new THREE.Vector3(0, 0, 1)],
+      ['left end', 'left_end', new THREE.Vector3(-5, 0, 0), new THREE.Vector3(1, 0, 0)]
+    ] as const)('opens a through-hole from the %s', (_name, face, origin, direction) => {
+      const part = circularPart('through');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'circular_cut') throw new Error('expected circular feature');
+      feature.target = { type: 'face', face };
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      expect(new THREE.Raycaster(origin, direction).intersectObject(mesh)).toHaveLength(0);
+    });
+
+    it('opens an angled bore from a side face along its authored axis', () => {
+      const part = circularPart('through');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'circular_cut') throw new Error('expected circular feature');
+      feature.target = { type: 'face', face: 'front_face' };
+      feature.parameters.tilt = 25;
+      feature.parameters.direction = 0;
+      const axis = new THREE.Vector3(Math.sin(THREE.MathUtils.degToRad(25)), 0, Math.cos(THREE.MathUtils.degToRad(25)));
+      const entry = new THREE.Vector3(0, 0, -3);
+      const origin = entry.clone().addScaledVector(axis, -2);
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      expect(new THREE.Raycaster(origin, axis).intersectObject(mesh)).toHaveLength(0);
+    });
+
+    it('cuts a flat-bottomed counterbore from a side face', () => {
+      const part = circularPart('through');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'circular_cut') throw new Error('expected circular feature');
+      feature.target = { type: 'face', face: 'front_face' };
+      feature.cutType = 'counterbore';
+      feature.parameters.diameter = 0.5;
+      feature.parameters.counterbore = { diameter: 1, depth: 0.25 };
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      const hits = new THREE.Raycaster(new THREE.Vector3(0.4, 0, -4), new THREE.Vector3(0, 0, 1)).intersectObject(mesh);
+      expect(hits[0].point.z).toBeCloseTo(-2.75, 4);
+    });
+
+    it('cuts a tapered countersink from an end face', () => {
+      const part = circularPart('through');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'circular_cut') throw new Error('expected circular feature');
+      feature.target = { type: 'face', face: 'left_end' };
+      feature.cutType = 'countersink';
+      feature.parameters.diameter = 0.5;
+      feature.parameters.countersink = { majorDiameter: 1, includedAngle: 90 };
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      const hits = new THREE.Raycaster(new THREE.Vector3(-5, 0.4, 0), new THREE.Vector3(1, 0, 0)).intersectObject(mesh);
+      expect(hits[0].point.x).toBeGreaterThan(-4);
+      expect(hits[0].point.x).toBeLessThan(-3.7);
+    });
   });
 
   describe('rounded cut geometry', () => {
