@@ -139,10 +139,23 @@ describe('partFeatureSummary', () => {
       ).toBe('Mitre 45° on Left End · Long point on Back');
     });
 
-    it('mirrors the long point on the right end', () => {
+    it('reports the rendered front long point on the right end', () => {
       expect(getFeatureSummary(createEndCut({ cutType: 'mitre', face: 'right_end' }), 'imperial')).toBe(
-        'Mitre 45° on Right End · Long point on Back'
+        'Mitre 45° on Right End · Long point on Front'
       );
+    });
+
+    it('reports the rendered back long point on a flipped right-end compound cut', () => {
+      expect(
+        getFeatureSummary(
+          createEndCut({
+            cutType: 'compound',
+            face: 'right_end',
+            parameters: { horizontalAngle: 22.5, horizontalFlip: true, verticalAngle: 15, verticalFlip: false }
+          }),
+          'imperial'
+        )
+      ).toBe('Compound 22.5° / 15° bevel on Right End · Long point on Back · High point on Top');
     });
 
     it('summarizes a bevel with the vertical angle and high point', () => {

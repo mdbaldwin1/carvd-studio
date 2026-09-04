@@ -70,6 +70,24 @@ async function generateCutList(window: Page): Promise<ReturnType<Page['getByRole
   return dialog;
 }
 
+function extractJsPdfLiteralText(pdfPath: string): string {
+  const pdf = fs.readFileSync(pdfPath, 'latin1');
+  const literals = [...pdf.matchAll(/\((?:\\.|[^\\)])*\)\s*Tj/g)].map((match) =>
+    match[0].slice(1, match[0].lastIndexOf(')'))
+  );
+  return literals
+    .map((literal) =>
+      literal
+        .replace(/\\([0-7]{1,3})/g, (_escape, octal: string) => String.fromCharCode(Number.parseInt(octal, 8)))
+        .replace(
+          /\\([nrtbf])/g,
+          (_escape, character: string) => ({ n: '\n', r: '\r', t: '\t', b: '\b', f: '\f' })[character]
+        )
+        .replace(/\\([\\()])/g, '$1')
+    )
+    .join('');
+}
+
 function buildStressFeatures() {
   const features: Array<Record<string, unknown>> = [
     {
@@ -190,6 +208,8 @@ test.describe('hands-on custom cuts qualification', () => {
     test.setTimeout(120000);
     const { window, userDataDir } = running;
     const projectPath = path.join(userDataDir, 'metric-fractional-custom-cuts.carvd');
+    const csvPath = path.join(userDataDir, 'metric-fractional-custom-cuts.csv');
+    const pdfPath = path.join(userDataDir, 'metric-fractional-custom-cuts.pdf');
     await seedProject(window, 'stocked-one-part');
     await setProjectUnits(window, 'metric');
     await openSelectedPartCuts(window);
@@ -234,22 +254,43 @@ test.describe('hands-on custom cuts qualification', () => {
       const features = window.useProjectStore.getState().parts[0].features;
       return {
         units: window.useProjectStore.getState().units,
+        mitreTarget: features[0].target,
         angle: features[0].parameters.horizontalAngle,
+        mitreHorizontalFlip: features[0].parameters.horizontalFlip,
         dadoWidth: features[1].parameters.size.length,
         dadoDepth: features[1].parameters.depth,
-        mortise: features[2],
-        hole: features[3]
+        mortiseTarget: features[2].target,
+        mortiseLength: features[2].parameters.size.length,
+        mortiseWidth: features[2].parameters.size.width,
+        mortiseDepth: features[2].parameters.depth,
+        mortisePrimary: features[2].placement.x,
+        mortiseSecondary: features[2].placement.z,
+        holeTarget: features[3].target,
+        holeDiameter: features[3].parameters.diameter,
+        holeDepth: features[3].parameters.depth,
+        holePrimary: features[3].placement.primary,
+        holeSecondary: features[3].placement.secondary
       };
     });
-    expect(metric.units).toBe('metric');
-    expect(metric.angle).toBe(45);
+    expect(metric).toMatchObject({
+      units: 'metric',
+      mitreTarget: { type: 'face', face: 'right_end' },
+      angle: 45,
+      mitreHorizontalFlip: true,
+      mortiseTarget: { type: 'face', face: 'bottom_face' },
+      holeTarget: { type: 'face', face: 'front_face' }
+    });
     expect(metric.dadoWidth).toBeCloseTo(0.75, 8);
     expect(metric.dadoDepth).toBeCloseTo(0.25, 8);
-    expect(metric.mortise.parameters.size.length).toBeCloseTo(2, 8);
-    expect(metric.mortise.parameters.size.width).toBeCloseTo(1, 8);
-    expect(metric.mortise.parameters.depth).toBeCloseTo(0.375, 8);
-    expect(metric.hole.parameters.diameter).toBeCloseTo(0.25, 8);
-    expect(metric.hole.parameters.depth).toBeCloseTo(0.5, 8);
+    expect(metric.mortiseLength).toBeCloseTo(2, 8);
+    expect(metric.mortiseWidth).toBeCloseTo(1, 8);
+    expect(metric.mortiseDepth).toBeCloseTo(0.375, 8);
+    expect(metric.mortisePrimary).toBeCloseTo(6, 8);
+    expect(metric.mortiseSecondary).toBeCloseTo(2, 8);
+    expect(metric.holeDiameter).toBeCloseTo(0.25, 8);
+    expect(metric.holeDepth).toBeCloseTo(0.5, 8);
+    expect(metric.holePrimary).toBeCloseTo(9, 8);
+    expect(metric.holeSecondary).toBeCloseTo(0.25, 8);
 
     await setProjectUnits(window, 'imperial');
     await openSelectedPartCuts(window);
@@ -289,27 +330,43 @@ test.describe('hands-on custom cuts qualification', () => {
       return {
         units: window.useProjectStore.getState().units,
         labels: features.map((feature: { label: string }) => feature.label),
+        mitreTarget: features[0].target,
         angle: features[0].parameters.horizontalAngle,
+        mitreHorizontalFlip: features[0].parameters.horizontalFlip,
         dadoWidth: features[1].parameters.size.length,
         dadoDepth: features[1].parameters.depth,
+        mortiseTarget: features[2].target,
         mortiseLength: features[2].parameters.size.length,
         mortiseWidth: features[2].parameters.size.width,
         mortiseDepth: features[2].parameters.depth,
+        mortisePrimary: features[2].placement.x,
+        mortiseSecondary: features[2].placement.z,
+        holeTarget: features[3].target,
         holeDiameter: features[3].parameters.diameter,
-        holeDepth: features[3].parameters.depth
+        holeDepth: features[3].parameters.depth,
+        holePrimary: features[3].placement.primary,
+        holeSecondary: features[3].placement.secondary
       };
     });
     expect(fractional).toMatchObject({
       units: 'imperial',
       labels: ['Fractional frame mitre', 'Fractional shelf dado', 'Fractional rail mortise', 'Fractional face hole'],
+      mitreTarget: { type: 'face', face: 'right_end' },
       angle: 22.5,
+      mitreHorizontalFlip: false,
       dadoWidth: 0.8125,
       dadoDepth: 0.3125,
+      mortiseTarget: { type: 'face', face: 'bottom_face' },
       mortiseLength: 2.375,
       mortiseWidth: 1.125,
       mortiseDepth: 0.4375,
+      mortisePrimary: 6.25,
+      mortiseSecondary: 2.25,
+      holeTarget: { type: 'face', face: 'front_face' },
       holeDiameter: 0.3125,
-      holeDepth: 0.5625
+      holeDepth: 0.5625,
+      holePrimary: 8.5,
+      holeSecondary: 0.375
     });
 
     const expected = await window.evaluate(() => JSON.stringify(window.useProjectStore.getState().parts[0].features));
@@ -319,9 +376,45 @@ test.describe('hands-on custom cuts qualification', () => {
       .poll(() => window.evaluate(() => JSON.stringify(window.useProjectStore.getState().parts[0].features)))
       .toBe(expected);
     const dialog = await generateCutList(window);
-    for (const label of fractional.labels) await expect(dialog.getByText(new RegExp(label))).toBeVisible();
-    await expect(dialog.getByText(/13\/16" wide × 5\/16" deep/)).toBeVisible();
-    await expect(dialog.getByText(/5\/16" diameter/)).toBeVisible();
+    const fabricationLines = [
+      '1. Fractional frame mitre — Mitre 22.5° on Right End · Long point on Front',
+      '2. Fractional shelf dado — Dado on Top Face · 13/16" wide × 5/16" deep',
+      '3. Fractional rail mortise — Mortise on Bottom Face · 2 3/8" × 1 1/8" × 7/16" deep',
+      '4. Fractional face hole — Round Hole on Front Face · 5/16" diameter × 9/16" deep'
+    ];
+    const operationSummary = dialog
+      .locator('.cut-list-parts-tab tbody tr')
+      .first()
+      .locator('td')
+      .last()
+      .locator('span.italic');
+    await expect(operationSummary).toHaveText(fabricationLines.join('; '));
+
+    await queueSavePath(window, csvPath);
+    await dialog.locator('.cut-list-parts-tab').getByRole('button', { name: 'Download' }).click();
+    await window.getByRole('menuitem', { name: 'Download CSV' }).click();
+    await expect
+      .poll(() => (fs.existsSync(csvPath) ? fs.statSync(csvPath).size : 0), { timeout: 5000 })
+      .toBeGreaterThan(0);
+    const csv = fs.readFileSync(csvPath, 'utf8');
+    for (const line of fabricationLines) expect(csv).toContain(line.replaceAll('"', '""'));
+
+    await queueSavePath(window, pdfPath);
+    await dialog.locator('.cut-list-parts-tab').getByRole('button', { name: 'Download' }).click();
+    await window.getByRole('menuitem', { name: 'Download PDF' }).click();
+    await expect
+      .poll(() => (fs.existsSync(pdfPath) ? fs.statSync(pdfPath).size : 0), { timeout: 5000 })
+      .toBeGreaterThan(0);
+    const normalizedPdfText = extractJsPdfLiteralText(pdfPath).replace(/\s+/g, ' ');
+    for (const line of fabricationLines) {
+      const pdfLine = line
+        .replaceAll('—', ' - ')
+        .replaceAll('·', ' | ')
+        .replaceAll('°', ' deg')
+        .replaceAll('×', ' x ')
+        .replace(/\s+/g, ' ');
+      expect(normalizedPdfText).toContain(pdfLine);
+    }
   });
 
   test('keeps a 20-feature part pickable through orbit, edit, reorder, history, save, reopen, and output', async () => {

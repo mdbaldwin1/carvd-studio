@@ -68,7 +68,7 @@ function toTitleCase(input: string): string {
 
 function getEndCutLongPointLabel(feature: Extract<PartFeature, { kind: 'end_cut' }>): string {
   const horizontalFlip = feature.parameters.horizontalFlip ?? false;
-  const longPointOnFront = feature.target.face === 'left_end' ? !horizontalFlip : horizontalFlip;
+  const longPointOnFront = !horizontalFlip;
   return longPointOnFront ? 'Long point on Front' : 'Long point on Back';
 }
 

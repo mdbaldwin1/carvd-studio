@@ -3,6 +3,53 @@ import { createTestPart } from '../../../../tests/helpers/factories';
 import { getInstructionFabricationLines, groupCutInstructions } from './cutListInstructions';
 
 describe('cutListInstructions', () => {
+  it('preserves a right-end compound cut rendered long point in fabrication output', () => {
+    const part = createTestPart({
+      features: [
+        {
+          id: 'right-compound',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          label: 'Right frame corner',
+          target: { type: 'face', face: 'right_end' },
+          reference: { primaryFrom: 'max' },
+          cutType: 'compound',
+          lengthMode: 'long_point',
+          parameters: {
+            horizontalAngle: 22.5,
+            horizontalFlip: false,
+            verticalAngle: 15,
+            verticalFlip: false
+          }
+        }
+      ]
+    });
+
+    expect(
+      getInstructionFabricationLines(
+        {
+          partId: part.id,
+          partName: part.name,
+          cutLength: part.length,
+          cutWidth: part.width,
+          thickness: part.thickness,
+          stockId: 'stock-1',
+          stockName: 'Maple',
+          grainSensitive: false,
+          grainDirection: 'length',
+          isGlueUp: false,
+          quantity: 1,
+          features: part.features,
+          notes: ''
+        },
+        'imperial'
+      )
+    ).toEqual([
+      '1. Right frame corner — Compound 22.5° / 15° bevel on Right End · Long point on Front · High point on Top'
+    ]);
+  });
+
   it('includes round-cut fabrication details and pattern spacing', () => {
     const part = createTestPart({
       features: [
