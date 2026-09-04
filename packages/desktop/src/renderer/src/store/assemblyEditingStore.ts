@@ -18,6 +18,7 @@ import { useProjectStore } from './projectStore';
 import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useCameraStore } from './cameraStore';
+import { clonePartFeatures, normalizeAssemblyPart, normalizePart } from '../utils/partFeatures';
 
 export interface ProjectSnapshot {
   projectName: string;
@@ -78,7 +79,7 @@ export const useAssemblyEditingStore = create<AssemblyEditingStoreState>((set, g
     // Save current project state as snapshot (including UI state)
     const snapshot: ProjectSnapshot = {
       projectName: projectState.projectName,
-      parts: projectState.parts,
+      parts: projectState.parts.map((part) => normalizePart(part)),
       stocks: projectState.stocks,
       groups: projectState.groups,
       groupMembers: projectState.groupMembers,
@@ -117,9 +118,9 @@ export const useAssemblyEditingStore = create<AssemblyEditingStoreState>((set, g
     // Load assembly parts into workspace
     useProjectStore.setState({
       projectName: `Editing: ${assemblyName}`,
-      parts,
-      groups,
-      groupMembers,
+      parts: parts.map((part) => normalizePart(part)),
+      groups: groups.map((group) => ({ ...group })),
+      groupMembers: groupMembers.map((member) => ({ ...member })),
       stocks: mergedStocks,
       assemblies: [],
       filePath: null,
@@ -179,7 +180,7 @@ export const useAssemblyEditingStore = create<AssemblyEditingStoreState>((set, g
         }
       }
 
-      return {
+      return normalizeAssemblyPart({
         name: part.name,
         length: part.length,
         width: part.width,
@@ -197,8 +198,9 @@ export const useAssemblyEditingStore = create<AssemblyEditingStoreState>((set, g
         notes: part.notes,
         extraLength: part.extraLength,
         extraWidth: part.extraWidth,
+        features: clonePartFeatures(part.features),
         embeddedStock
-      };
+      });
     });
 
     // Map part IDs to indices for group members

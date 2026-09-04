@@ -1,4 +1,6 @@
+import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
+import { getFeatureBadgeLabel, getPrimaryFeatureText } from '@renderer/utils/partFeatureSummary';
 import { AlertTriangle, ChevronDown, ChevronRight, Layers } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { useStockLibrary } from '../../hooks/useStockLibrary';
@@ -249,7 +251,7 @@ interface PartItemProps {
   hasError: boolean;
   hasWarning: boolean;
   issueMessages: string;
-  units: string;
+  units: 'imperial' | 'metric';
   onPartClick: (partId: string, e: React.MouseEvent) => void;
   onDuplicate: (partId: string) => void;
   onDelete: (partId: string) => void;
@@ -268,13 +270,16 @@ const PartItem = React.memo(function PartItem({
   onDelete
 }: PartItemProps) {
   const dimsText = `${formatMeasurementWithUnit(part.length, units)} × ${formatMeasurementWithUnit(part.width, units)} × ${formatMeasurementWithUnit(part.thickness, units)}`;
+  const featureBadge = getFeatureBadgeLabel(part.features);
+  const featureSummary = getPrimaryFeatureText(part.features, units);
+  const titleText = `${part.name}\n${dimsText}${featureSummary ? `\n${featureSummary}` : ''}${issueMessages ? '\n\n⚠ ' + issueMessages : ''}`;
 
   return (
     <li
       className={`part-item group/part flex items-center gap-2 py-2 px-3 cursor-pointer transition-colors duration-100 select-none hover:bg-surface-hover ${isSelected ? 'selected bg-selected' : ''}`}
       style={{ paddingLeft: `${12 + level * 16}px` }}
       onClick={(e) => onPartClick(part.id, e)}
-      title={`${part.name}\n${dimsText}${issueMessages ? '\n\n⚠ ' + issueMessages : ''}`}
+      title={titleText}
     >
       <span className="part-color w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: part.color }} />
       {(hasError || hasWarning) && (
@@ -285,7 +290,17 @@ const PartItem = React.memo(function PartItem({
           <AlertTriangle size={12} />
         </span>
       )}
-      <span className="part-name flex-1 truncate">{part.name}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="part-name truncate">{part.name}</span>
+          {featureBadge && (
+            <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[10px] font-medium">
+              {featureBadge}
+            </Badge>
+          )}
+        </div>
+        {featureSummary && <p className="mt-0.5 truncate text-[11px] text-text-muted">{featureSummary}</p>}
+      </div>
       <div className="flex gap-0.5 opacity-0 group-hover/part:opacity-100 transition-opacity duration-100">
         <IconButton
           label={`Duplicate ${part.name}`}

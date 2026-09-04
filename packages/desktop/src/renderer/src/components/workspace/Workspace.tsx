@@ -11,6 +11,7 @@ import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { CameraState } from '../../types';
+import { getPartLocalCorners } from '../../utils/partFeatureGeometry';
 import { getPartGroupContext } from './partClickHandler';
 import { AxisIndicator } from './AxisIndicator';
 import { CameraController } from './CameraController';
@@ -913,12 +914,6 @@ export function Workspace() {
       const selectedIds: string[] = [];
 
       for (const part of parts) {
-        // Get part's 3D bounding box corners
-        const halfLength = part.length / 2;
-        const halfThickness = part.thickness / 2;
-        const halfWidth = part.width / 2;
-
-        // Reuse pooled objects (no allocations in this loop)
         _selEuler.set(
           (part.rotation.x * Math.PI) / 180,
           (part.rotation.y * Math.PI) / 180,
@@ -927,16 +922,7 @@ export function Workspace() {
         );
         _selQuat.setFromEuler(_selEuler);
         _selPosition.set(part.position.x, part.position.y, part.position.z);
-
-        // Set corner values in-place
-        _selCorners[0].set(-halfLength, -halfThickness, -halfWidth);
-        _selCorners[1].set(-halfLength, -halfThickness, halfWidth);
-        _selCorners[2].set(-halfLength, halfThickness, -halfWidth);
-        _selCorners[3].set(-halfLength, halfThickness, halfWidth);
-        _selCorners[4].set(halfLength, -halfThickness, -halfWidth);
-        _selCorners[5].set(halfLength, -halfThickness, halfWidth);
-        _selCorners[6].set(halfLength, halfThickness, -halfWidth);
-        _selCorners[7].set(halfLength, halfThickness, halfWidth);
+        const localCorners = getPartLocalCorners(part);
 
         // Transform corners to screen space and track bounding box
         let partLeft = Infinity,
@@ -944,7 +930,8 @@ export function Workspace() {
           partTop = Infinity,
           partBottom = -Infinity;
 
-        for (const corner of _selCorners) {
+        for (let i = 0; i < localCorners.length; i += 1) {
+          const corner = _selCorners[i].copy(localCorners[i]);
           corner.applyQuaternion(_selQuat);
           corner.add(_selPosition);
           corner.project(camera);

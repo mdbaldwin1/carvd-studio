@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // Use real Three.js so rotation math actually works in getPartAABB tests
 vi.unmock('three');
@@ -334,6 +334,38 @@ describe('workspaceUtils', () => {
       expect(aabb.maxY).toBeCloseTo(4);
       expect(aabb.minZ).toBeCloseTo(0);
       expect(aabb.maxZ).toBeCloseTo(4);
+    });
+
+    it('accounts for feature-backed shapes', () => {
+      const part = {
+        position: { x: 10, y: 2, z: -3 },
+        rotation: { x: 0, y: 0, z: 0 },
+        length: 24,
+        width: 12,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'corner', corner: 'front_left_corner' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'corner_notch',
+            parameters: {
+              size: { length: 2, width: 2 },
+              depthMode: 'through'
+            },
+            placement: { x: 0, z: 0 }
+          }
+        ]
+      };
+
+      const aabb = getPartAABB(part);
+      expect(aabb.minX).toBeCloseTo(-2);
+      expect(aabb.maxX).toBeCloseTo(22);
+      expect(aabb.minZ).toBeCloseTo(-9);
+      expect(aabb.maxZ).toBeCloseTo(3);
     });
 
     it('can derive local bounds from the geometry bundle cache', () => {

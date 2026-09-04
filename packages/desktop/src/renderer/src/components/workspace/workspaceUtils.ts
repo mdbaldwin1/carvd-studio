@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { GeometryCache } from '../../interaction/geometry/cache';
 import { LightingMode } from '../../types';
+import { getPartLocalBoundingBox } from '../../utils/partFeatureGeometry';
 
 // Lighting presets for different viewing conditions
 export const LIGHTING_PRESETS: Record<
@@ -176,8 +177,6 @@ export function createPointerRafQueue(
   };
 }
 
-// Module-level reusable objects for getPartAABB calculations.
-// Safe because JS is single-threaded and the return value is a plain object.
 const _aabbEuler = new THREE.Euler();
 const _aabbQuat = new THREE.Quaternion();
 const _aabbCorners = Array.from({ length: 8 }, () => new THREE.Vector3());
@@ -192,6 +191,7 @@ export function getPartAABB(
     length: number;
     width: number;
     thickness: number;
+    features?: import('../../types').PartFeature[];
   },
   geometryCache?: GeometryCache
 ) {
@@ -203,16 +203,21 @@ export function getPartAABB(
   );
   _aabbQuat.setFromEuler(_aabbEuler);
 
+  // Feature-bearing parts (custom cuts) have a tighter local box than their
+  // raw dimensions; the geometry cache is not feature-aware, so use the exact
+  // feature geometry for those.
   const localAabb =
-    geometryCache && part.id
-      ? geometryCache.get({
-          ...part,
-          id: part.id
-        } as Parameters<GeometryCache['get']>[0]).bounds.localAabb
-      : {
-          min: { x: -part.length / 2, y: -part.thickness / 2, z: -part.width / 2 },
-          max: { x: part.length / 2, y: part.thickness / 2, z: part.width / 2 }
-        };
+    part.features && part.features.length > 0
+      ? getPartLocalBoundingBox(part as Parameters<typeof getPartLocalBoundingBox>[0])
+      : geometryCache && part.id
+        ? geometryCache.get({
+            ...part,
+            id: part.id
+          } as Parameters<GeometryCache['get']>[0]).bounds.localAabb
+        : {
+            min: { x: -part.length / 2, y: -part.thickness / 2, z: -part.width / 2 },
+            max: { x: part.length / 2, y: part.thickness / 2, z: part.width / 2 }
+          };
 
   _aabbCorners[0].set(localAabb.min.x, localAabb.min.y, localAabb.min.z);
   _aabbCorners[1].set(localAabb.min.x, localAabb.min.y, localAabb.max.z);

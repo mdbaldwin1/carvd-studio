@@ -7,6 +7,7 @@ import {
   Assembly,
   CameraState,
   CARVD_FILE_VERSION,
+  CARVD_FILE_VERSION_BASE,
   CarvdFile,
   CutList,
   CustomShoppingItem,
@@ -20,6 +21,7 @@ import {
   Stock,
   StockConstraintSettings
 } from '../types';
+import { normalizeAssemblyPart, normalizePart, validateSerializedPartFeatures } from './partFeatures';
 
 // Default stock constraints for migration
 const DEFAULT_STOCK_CONSTRAINTS: StockConstraintSettings = {
@@ -53,8 +55,16 @@ export function serializeProject(state: {
   thumbnail?: ProjectThumbnail | null;
   cameraState?: CameraState | null;
 }): CarvdFile {
+  const partHasFeatures = (part: Part) => (part.features?.length ?? 0) > 0;
+  const usesPartFeatures =
+    state.parts.some(partHasFeatures) ||
+    state.assemblies.some((assembly) => assembly.parts.some((part) => (part.features?.length ?? 0) > 0));
+
   return {
-    version: CARVD_FILE_VERSION,
+    // Featured projects need version 2 so older builds warn instead of
+    // silently dropping cuts; plain projects stay at the base version for
+    // maximum backward compatibility.
+    version: usesPartFeatures ? CARVD_FILE_VERSION : CARVD_FILE_VERSION_BASE,
     project: {
       name: state.projectName,
       createdAt: state.createdAt,
@@ -94,11 +104,14 @@ export function deserializeToProject(file: CarvdFile): Project {
     overageFactor: file.project.overageFactor,
     projectNotes: file.project.projectNotes,
     stockConstraints: file.project.stockConstraints,
-    parts: file.parts,
+    parts: file.parts.map((part) => normalizePart(part)),
     stocks: file.stocks,
     groups: file.groups,
     groupMembers: file.groupMembers,
-    assemblies: file.assemblies,
+    assemblies: file.assemblies?.map((assembly) => ({
+      ...assembly,
+      parts: assembly.parts.map((part) => normalizeAssemblyPart(part))
+    })),
     snapGuides: file.snapGuides,
     customShoppingItems: file.customShoppingItems,
     cutList: file.cutList,
@@ -154,13 +167,55 @@ export function validateCarvdFile(data: unknown): FileValidationResult {
   if (!Array.isArray(obj.groupMembers)) {
     errors.push('Missing groupMembers array');
   }
+  if (obj.assemblies !== undefined && !Array.isArray(obj.assemblies)) {
+    errors.push('Invalid assemblies array');
+  }
 
   if (errors.length > 0) {
     return { valid: false, errors, warnings };
   }
 
+  let containsPartFeatures = false;
+  (obj.parts as unknown[]).forEach((part, index) => {
+    if (!part || typeof part !== 'object' || Array.isArray(part)) {
+      errors.push(`parts[${index}] is invalid`);
+      return;
+    }
+    const features = (part as Record<string, unknown>).features;
+    if (Array.isArray(features) && features.length > 0) containsPartFeatures = true;
+    errors.push(...validateSerializedPartFeatures(features, `parts[${index}].features`));
+  });
+  (obj.assemblies as unknown[] | undefined)?.forEach((assembly, assemblyIndex) => {
+    if (!assembly || typeof assembly !== 'object' || Array.isArray(assembly)) {
+      errors.push(`assemblies[${assemblyIndex}] is invalid`);
+      return;
+    }
+    const assemblyParts = (assembly as Record<string, unknown>).parts;
+    if (!Array.isArray(assemblyParts)) {
+      errors.push(`assemblies[${assemblyIndex}].parts must be an array`);
+      return;
+    }
+    assemblyParts.forEach((part, partIndex) => {
+      if (!part || typeof part !== 'object' || Array.isArray(part)) {
+        errors.push(`assemblies[${assemblyIndex}].parts[${partIndex}] is invalid`);
+        return;
+      }
+      const features = (part as Record<string, unknown>).features;
+      if (Array.isArray(features) && features.length > 0) containsPartFeatures = true;
+      errors.push(
+        ...validateSerializedPartFeatures(features, `assemblies[${assemblyIndex}].parts[${partIndex}].features`)
+      );
+    });
+  });
+  if (containsPartFeatures && typeof obj.version === 'number' && obj.version < 2) {
+    errors.push('Projects containing part cuts require file version 2 or newer');
+  }
+  if (errors.length > 0) return { valid: false, errors, warnings };
+
+  const candidateFile = obj as unknown as CarvdFile;
+
   // Migrate if needed
-  const migratedData = migrateFile(obj as CarvdFile);
+  const migratedData = migrateFile(candidateFile);
 
   // Validate referential integrity
   const integrityResult = validateReferentialIntegrity(migratedData);
@@ -224,6 +279,10 @@ function validateReferentialIntegrity(file: CarvdFile): { errors: string[]; warn
 function migrateFile(file: CarvdFile): CarvdFile {
   let migrated = { ...file };
 
+  // Version 1 -> 2: part features (custom cuts) were introduced. V1 files
+  // simply have no features; `normalizePart` on load seeds the field, so no
+  // structural rewrite is required.
+
   // Version 0 -> 1 migration (hypothetical, for future use)
   // if (migrated.version < 1) {
   //   migrated = migrateV0ToV1(migrated);
@@ -244,14 +303,24 @@ function migrateFile(file: CarvdFile): CarvdFile {
 
   // Ensure parts have all required fields
   migrated.parts = migrated.parts.map((part) => ({
-    ...part,
-    grainSensitive: part.grainSensitive ?? true,
-    grainDirection: part.grainDirection ?? 'length',
-    rotation: part.rotation ?? { x: 0, y: 0, z: 0 },
+    ...normalizePart(part),
     extraLength: part.extraLength ?? undefined,
     extraWidth: part.extraWidth ?? undefined,
     glueUpPanel: part.glueUpPanel ?? undefined
   }));
+
+  if (migrated.assemblies) {
+    migrated.assemblies = migrated.assemblies.map((assembly) => ({
+      ...assembly,
+      parts: assembly.parts.map((part) =>
+        normalizeAssemblyPart({
+          ...part,
+          extraLength: part.extraLength ?? undefined,
+          extraWidth: part.extraWidth ?? undefined
+        })
+      )
+    }));
+  }
 
   // Ensure stocks have all required fields
   migrated.stocks = migrated.stocks.map((stock) => ({

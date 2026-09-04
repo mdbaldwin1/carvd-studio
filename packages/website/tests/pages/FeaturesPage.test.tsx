@@ -126,9 +126,10 @@ describe("FeaturesPage", () => {
       expect(screen.getByText(/Precision Measurements/i)).toBeInTheDocument();
     });
 
-    it("renders joinery allowances card", () => {
+    it("renders custom cuts and joinery card", () => {
       renderFeaturesPage();
-      expect(screen.getByText(/Joinery Allowances/i)).toBeInTheDocument();
+      expect(screen.getByText(/Custom Cuts & Joinery/i)).toBeInTheDocument();
+      expect(screen.getByText(/tenons, mortises, dados/i)).toBeInTheDocument();
     });
 
     it("renders export options card", () => {

@@ -33,6 +33,7 @@ export function createTestPart(overrides?: Partial<Part>): Part {
     grainSensitive: true,
     grainDirection: 'length',
     color: '#d4a574',
+    features: [],
     ...overrides
   };
 }
@@ -57,7 +58,7 @@ export function createTestStock(overrides?: Partial<Stock>): Stock {
     thickness: 0.75,
     grainDirection: 'length',
     pricingUnit: 'board_foot',
-    pricePerUnit: 5.50,
+    pricePerUnit: 5.5,
     color: '#d4a574',
     ...overrides
   };
@@ -71,7 +72,7 @@ export function createPlywoodStock(overrides?: Partial<Stock>): Stock {
     thickness: 0.75,
     grainDirection: 'length',
     pricingUnit: 'per_item',
-    pricePerUnit: 45.00,
+    pricePerUnit: 45.0,
     ...overrides
   });
 }
@@ -84,7 +85,7 @@ export function createBoardStock(overrides?: Partial<Stock>): Stock {
     thickness: 0.75,
     grainDirection: 'length',
     pricingUnit: 'board_foot',
-    pricePerUnit: 3.50,
+    pricePerUnit: 3.5,
     ...overrides
   });
 }
@@ -192,9 +193,7 @@ export function createDefaultStockConstraints(): StockConstraintSettings {
 // Custom Shopping Item Factory
 // ============================================================
 
-export function createTestCustomShoppingItem(
-  overrides?: Partial<CustomShoppingItem>
-): CustomShoppingItem {
+export function createTestCustomShoppingItem(overrides?: Partial<CustomShoppingItem>): CustomShoppingItem {
   return {
     id: uuidv4(),
     name: 'Test Item',

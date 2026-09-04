@@ -11,7 +11,7 @@ import {
   CARVD_FILE_EXTENSION,
   CARVD_FILE_FILTER
 } from './fileFormat';
-import { CARVD_FILE_VERSION, GroupMember } from '../types';
+import { CARVD_FILE_VERSION, CARVD_FILE_VERSION_BASE, GroupMember } from '../types';
 import {
   createTestPart,
   createTestStock,
@@ -60,12 +60,66 @@ describe('fileFormat', () => {
     it('creates valid CarvdFile structure', () => {
       const file = createValidCarvdFile();
 
-      expect(file.version).toBe(CARVD_FILE_VERSION);
+      // Plain projects serialize at the base version so older builds can
+      // still open them; only featured projects require the newer reader.
+      expect(file.version).toBe(CARVD_FILE_VERSION_BASE);
       expect(file.project).toBeDefined();
       expect(file.parts).toEqual([]);
       expect(file.stocks).toEqual([]);
       expect(file.groups).toEqual([]);
       expect(file.groupMembers).toEqual([]);
+    });
+
+    it('stamps the current version when any part carries cut features', () => {
+      const featured = createTestPart({
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 45 }
+          }
+        ]
+      });
+      const file = createValidCarvdFile({ parts: [featured] });
+
+      expect(file.version).toBe(CARVD_FILE_VERSION);
+    });
+
+    it('round-trips a patterned counterbore in file version 2', () => {
+      const featured = createTestPart({
+        features: [
+          {
+            id: 'counterbore-1',
+            kind: 'circular_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'counterbore',
+            placement: { primary: 2, secondary: 1, rotation: 0 },
+            parameters: {
+              diameter: 0.25,
+              depthMode: 'blind',
+              depth: 1,
+              tilt: 0,
+              direction: 0,
+              counterbore: { diameter: 0.5, depth: 0.25 }
+            },
+            pattern: { type: 'linear', count: 3, spacing: 2, direction: 0 }
+          }
+        ]
+      });
+
+      const result = parseCarvdFile(stringifyCarvdFile(createValidCarvdFile({ parts: [featured] })));
+      expect(result.valid).toBe(true);
+      expect(result.data?.version).toBe(CARVD_FILE_VERSION);
+      expect(result.data?.parts[0].features?.[0]).toEqual(featured.features?.[0]);
     });
 
     it('includes project metadata', () => {
@@ -114,6 +168,67 @@ describe('fileFormat', () => {
 
       expect(file.groups).toHaveLength(1);
       expect(file.groupMembers).toHaveLength(1);
+    });
+
+    it('includes generated cut lists with feature-backed instructions', () => {
+      const stock = createTestStock({ id: 'stock-1', name: 'Plywood' });
+      const part = createTestPart({ id: 'part-1', name: 'Shelf', stockId: stock.id });
+
+      const file = createValidCarvdFile({
+        parts: [part],
+        stocks: [stock],
+        cutList: {
+          id: 'cutlist-1',
+          generatedAt: '2026-03-07T00:00:00.000Z',
+          projectModifiedAt: '2026-03-07T00:00:00.000Z',
+          isStale: false,
+          instructions: [
+            {
+              partId: 'part-1',
+              partName: 'Shelf',
+              cutLength: 24,
+              cutWidth: 12,
+              thickness: 0.75,
+              stockId: 'stock-1',
+              stockName: 'Plywood',
+              grainSensitive: false,
+              canRotate: true,
+              isGlueUp: false,
+              features: [
+                {
+                  id: 'feature-1',
+                  kind: 'end_cut',
+                  version: 1,
+                  enabled: true,
+                  target: { type: 'face', face: 'left_end' },
+                  reference: { primaryFrom: 'min' },
+                  cutType: 'mitre',
+                  lengthMode: 'long_point',
+                  parameters: { horizontalAngle: 45 }
+                }
+              ]
+            }
+          ],
+          stockBoards: [],
+          statistics: {
+            totalParts: 1,
+            totalStockBoards: 1,
+            totalBoardFeet: 2,
+            totalWasteSquareInches: 10,
+            wastePercentage: 5,
+            estimatedCost: 20,
+            totalWasteCost: 1,
+            byStock: []
+          },
+          bypassedIssues: [],
+          skippedParts: [],
+          kerfWidth: 0.125,
+          overageFactor: 0.1
+        }
+      });
+
+      expect(file.cutList?.instructions[0].features).toHaveLength(1);
+      expect(file.cutList?.instructions[0].features?.[0].kind).toBe('end_cut');
     });
 
     it('omits empty optional arrays', () => {
@@ -170,7 +285,7 @@ describe('fileFormat', () => {
 
       expect(project.name).toBe('Test Project');
       expect(project.units).toBe('imperial');
-      expect(project.version).toBe(String(CARVD_FILE_VERSION));
+      expect(project.version).toBe(String(CARVD_FILE_VERSION_BASE));
     });
 
     it('preserves all project data', () => {
@@ -207,6 +322,16 @@ describe('fileFormat', () => {
 
       expect(project.assemblies).toHaveLength(1);
       expect(project.customShoppingItems).toHaveLength(1);
+    });
+
+    it('normalizes missing part features to an empty array', () => {
+      const part = createTestPart();
+      delete (part as Record<string, unknown>).features;
+
+      const file = createValidCarvdFile({ parts: [part] });
+      const project = deserializeToProject(file);
+
+      expect(project.parts[0].features).toEqual([]);
     });
   });
 
@@ -255,6 +380,100 @@ describe('fileFormat', () => {
       expect(deserialized.parts[0].length).toBe(part.length);
       expect(deserialized.parts[0].notes).toBe(part.notes);
       expect(deserialized.stocks[0].name).toBe(stock.name);
+    });
+
+    it('serialize then deserialize preserves cut-list instruction features', () => {
+      const stock = createTestStock({ id: 'stock-1', name: 'Oak' });
+      const part = createTestPart({
+        id: 'part-1',
+        name: 'Rail',
+        stockId: stock.id
+      });
+
+      const original = {
+        projectName: 'Feature Roundtrip',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        modifiedAt: '2024-01-01T12:00:00.000Z',
+        units: 'imperial' as const,
+        gridSize: 0.0625,
+        kerfWidth: 0.125,
+        overageFactor: 0.1,
+        projectNotes: '',
+        stockConstraints: createDefaultStockConstraints(),
+        parts: [part],
+        stocks: [stock],
+        groups: [],
+        groupMembers: [],
+        assemblies: [],
+        snapGuides: [],
+        customShoppingItems: [],
+        cutList: {
+          id: 'cutlist-1',
+          generatedAt: '2026-03-07T00:00:00.000Z',
+          projectModifiedAt: '2026-03-07T00:00:00.000Z',
+          isStale: false,
+          instructions: [
+            {
+              partId: 'part-1',
+              partName: 'Rail',
+              cutLength: 24,
+              cutWidth: 2,
+              thickness: 0.75,
+              stockId: 'stock-1',
+              stockName: 'Oak',
+              grainSensitive: false,
+              canRotate: true,
+              isGlueUp: false,
+              features: [
+                {
+                  id: 'feature-1',
+                  kind: 'rect_cut',
+                  version: 1,
+                  enabled: true,
+                  target: { type: 'face', face: 'top_face' },
+                  reference: { primaryFrom: 'min' },
+                  cutType: 'dado',
+                  parameters: {
+                    size: { length: 0.75, width: 2 },
+                    depthMode: 'blind',
+                    depth: 0.375
+                  },
+                  placement: { x: 4, z: 0 }
+                }
+              ]
+            }
+          ],
+          stockBoards: [],
+          statistics: {
+            totalParts: 1,
+            totalStockBoards: 1,
+            totalBoardFeet: 2,
+            totalWasteSquareInches: 10,
+            wastePercentage: 5,
+            estimatedCost: 20,
+            totalWasteCost: 1,
+            byStock: []
+          },
+          bypassedIssues: [],
+          skippedParts: [],
+          kerfWidth: 0.125,
+          overageFactor: 0.1
+        },
+        thumbnail: null
+      };
+
+      const serialized = serializeProject(original);
+      const deserialized = deserializeToProject(serialized);
+
+      expect(deserialized.cutList?.instructions[0].features).toHaveLength(1);
+      expect(deserialized.cutList?.instructions[0].features?.[0].kind).toBe('rect_cut');
+      expect(deserialized.cutList?.instructions[0].features?.[0]).toMatchObject({
+        cutType: 'dado',
+        parameters: {
+          depthMode: 'blind',
+          depth: 0.375
+        }
+      });
     });
 
     it('handles special characters in names', () => {
@@ -331,6 +550,74 @@ describe('fileFormat', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors[0]).toContain('newer than supported');
+    });
+
+    it('rejects malformed custom cuts before migration can clone them', () => {
+      const file = createValidCarvdFile({
+        parts: [
+          createTestPart({
+            features: [
+              {
+                id: 'broken-cut',
+                kind: 'rect_cut',
+                version: 1,
+                enabled: true,
+                cutType: 'cutout',
+                reference: { primaryFrom: 'min' },
+                parameters: { size: { length: 2, width: 1 }, depthMode: 'through' },
+                placement: { x: 0, z: 0 }
+              } as never
+            ]
+          })
+        ]
+      });
+      file.version = CARVD_FILE_VERSION;
+
+      expect(() => validateCarvdFile(file)).not.toThrow();
+      const result = validateCarvdFile(file);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('parts[0].features[0].target is invalid');
+    });
+
+    it.each([
+      ['null part', { parts: [null] }, 'parts[0] is invalid'],
+      ['primitive part', { parts: ['bad'] }, 'parts[0] is invalid'],
+      ['non-array assemblies', { assemblies: {} }, 'Invalid assemblies array'],
+      ['null assembly', { assemblies: [null] }, 'assemblies[0] is invalid'],
+      ['assembly without parts', { assemblies: [{}] }, 'assemblies[0].parts must be an array'],
+      ['invalid assembly part', { assemblies: [{ parts: [false] }] }, 'assemblies[0].parts[0] is invalid']
+    ])('rejects a %s without throwing', (_name, overrides, expectedError) => {
+      const file = { ...createValidCarvdFile(), ...overrides };
+      expect(() => validateCarvdFile(file)).not.toThrow();
+      expect(validateCarvdFile(file).errors).toContain(expectedError);
+    });
+
+    it('rejects cuts mislabeled as a version 1 project', () => {
+      const file = createValidCarvdFile({
+        parts: [
+          createTestPart({
+            features: [
+              {
+                id: 'end-cut',
+                kind: 'end_cut',
+                version: 1,
+                enabled: true,
+                target: { type: 'face', face: 'left_end' },
+                reference: { primaryFrom: 'min' },
+                cutType: 'mitre',
+                lengthMode: 'long_point',
+                parameters: { horizontalAngle: 45 }
+              }
+            ]
+          })
+        ]
+      });
+      file.version = 1;
+
+      const result = validateCarvdFile(file);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContain('Projects containing part cuts require file version 2 or newer');
     });
 
     it('rejects missing project metadata', () => {
@@ -613,6 +900,17 @@ describe('fileFormat', () => {
 
       expect(result.valid).toBe(true);
       expect(result.data?.parts[0].rotation).toEqual({ x: 0, y: 0, z: 0 });
+    });
+
+    it('adds default features to parts if missing', () => {
+      const part = createTestPart();
+      delete (part as Record<string, unknown>).features;
+
+      const file = createValidCarvdFile({ parts: [part] });
+      const result = validateCarvdFile(file);
+
+      expect(result.valid).toBe(true);
+      expect(result.data?.parts[0].features).toEqual([]);
     });
 
     it('adds default pricingUnit to stocks if missing', () => {

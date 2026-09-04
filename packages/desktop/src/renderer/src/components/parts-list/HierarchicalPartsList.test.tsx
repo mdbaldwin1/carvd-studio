@@ -50,7 +50,23 @@ describe('HierarchicalPartsList', () => {
       x: 0,
       y: 0,
       z: 0,
-      color: '#c4a574'
+      color: '#c4a574',
+      features: [
+        {
+          id: 'feature-1',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          label: 'Frame mitre',
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mitre',
+          lengthMode: 'long_point',
+          parameters: {
+            horizontalAngle: 45
+          }
+        }
+      ]
     },
     {
       id: 'part-2',
@@ -147,6 +163,13 @@ describe('HierarchicalPartsList', () => {
 
       expect(duplicateButtons).toHaveLength(2);
       expect(deleteButtons).toHaveLength(2);
+    });
+
+    it('shows operation badges and summaries for feature-bearing parts', () => {
+      render(<HierarchicalPartsList {...defaultProps} />);
+
+      expect(screen.getByText('Ops 1')).toBeInTheDocument();
+      expect(screen.getByText('Frame mitre')).toBeInTheDocument();
     });
   });
 

@@ -17,6 +17,7 @@ interface CameraStoreState {
   showGrainDirection: boolean;
   displayMode: DisplayMode;
   showGrid: boolean;
+  showDowels: boolean;
 
   // Camera state (position and target) for restoring view on project load
   cameraState: CameraState | null;
@@ -38,6 +39,7 @@ interface CameraStoreState {
   toggleGrainDirection: () => void;
   setDisplayMode: (mode: DisplayMode) => void;
   setShowGrid: (show: boolean) => void;
+  toggleDowels: () => void;
 
   // Actions - Camera state persistence
   setCameraState: (state: CameraState | null) => void;
@@ -55,6 +57,7 @@ export const useCameraStore = create<CameraStoreState>((set) => ({
   showGrainDirection: false,
   displayMode: 'solid',
   showGrid: true,
+  showDowels: true,
   cameraState: null,
   pendingCameraRestore: false,
 
@@ -69,6 +72,7 @@ export const useCameraStore = create<CameraStoreState>((set) => ({
   toggleGrainDirection: () => set((state) => ({ showGrainDirection: !state.showGrainDirection })),
   setDisplayMode: (displayMode) => set({ displayMode }),
   setShowGrid: (showGrid) => set({ showGrid }),
+  toggleDowels: () => set((state) => ({ showDowels: !state.showDowels })),
 
   setCameraState: (state) => set({ cameraState: state }),
   clearPendingCameraRestore: () => set({ pendingCameraRestore: false })

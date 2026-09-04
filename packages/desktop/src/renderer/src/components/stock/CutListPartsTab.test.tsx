@@ -40,6 +40,7 @@ function createInstruction(overrides: Partial<CutInstruction> = {}): CutInstruct
     grainSensitive: false,
     canRotate: true,
     isGlueUp: false,
+    features: [],
     ...overrides
   };
 }
@@ -111,7 +112,7 @@ describe('CutListPartsTab', () => {
   describe('rendering', () => {
     it('renders parts count summary', () => {
       render(<CutListPartsTab {...defaultProps} />);
-      expect(screen.getByText(/1 unique dimension/)).toBeInTheDocument();
+      expect(screen.getByText(/1 unique blank/)).toBeInTheDocument();
       expect(screen.getByText(/1 parts total/)).toBeInTheDocument();
     });
 
@@ -119,10 +120,11 @@ describe('CutListPartsTab', () => {
       render(<CutListPartsTab {...defaultProps} />);
       expect(screen.getByText('Qty')).toBeInTheDocument();
       expect(screen.getByText('Part Name')).toBeInTheDocument();
-      expect(screen.getByText('Cut Length')).toBeInTheDocument();
-      expect(screen.getByText('Cut Width')).toBeInTheDocument();
+      expect(screen.getByText('Blank Length')).toBeInTheDocument();
+      expect(screen.getByText('Blank Width')).toBeInTheDocument();
       expect(screen.getByText('Thickness')).toBeInTheDocument();
       expect(screen.getByText('Stock')).toBeInTheDocument();
+      expect(screen.getByText('Operations / Notes')).toBeInTheDocument();
     });
 
     it('renders part name for single items', () => {
@@ -145,6 +147,35 @@ describe('CutListPartsTab', () => {
       render(<CutListPartsTab {...defaultProps} cutList={cutList} />);
       expect(screen.getByText('Grain')).toBeInTheDocument();
     });
+
+    it('shows fabrication summaries for feature-bearing parts', () => {
+      const cutList = createCutList({
+        instructions: [
+          createInstruction({
+            features: [
+              {
+                id: 'feature-1',
+                kind: 'end_cut',
+                version: 1,
+                enabled: true,
+                target: { type: 'face', face: 'left_end' },
+                reference: { primaryFrom: 'min' },
+                cutType: 'mitre',
+                lengthMode: 'long_point',
+                parameters: {
+                  horizontalAngle: 45
+                }
+              }
+            ]
+          })
+        ]
+      });
+
+      render(<CutListPartsTab {...defaultProps} cutList={cutList} />);
+
+      expect(screen.getByText('1. Mitre 45° on Left End · Long point on Front')).toBeInTheDocument();
+      expect(screen.getByText(/Cut blanks first/)).toBeInTheDocument();
+    });
   });
 
   describe('grouping', () => {
@@ -158,6 +189,53 @@ describe('CutListPartsTab', () => {
       render(<CutListPartsTab {...defaultProps} cutList={cutList} />);
       // Should show quantity 2 for the group
       expect(screen.getByText('2')).toBeInTheDocument();
+    });
+
+    it('does not group identical blanks when authored operations differ', () => {
+      const cutList = createCutList({
+        instructions: [
+          createInstruction({
+            partId: 'p1',
+            partName: 'Rail A',
+            features: [
+              {
+                id: 'feature-1',
+                kind: 'end_cut',
+                version: 1,
+                enabled: true,
+                target: { type: 'face', face: 'left_end' },
+                reference: { primaryFrom: 'min' },
+                cutType: 'mitre',
+                lengthMode: 'long_point',
+                parameters: { horizontalAngle: 45 }
+              }
+            ]
+          }),
+          createInstruction({
+            partId: 'p2',
+            partName: 'Rail B',
+            features: [
+              {
+                id: 'feature-2',
+                kind: 'end_cut',
+                version: 1,
+                enabled: true,
+                target: { type: 'face', face: 'right_end' },
+                reference: { primaryFrom: 'max' },
+                cutType: 'mitre',
+                lengthMode: 'long_point',
+                parameters: { horizontalAngle: 45 }
+              }
+            ]
+          })
+        ]
+      });
+
+      render(<CutListPartsTab {...defaultProps} cutList={cutList} />);
+
+      expect(screen.getByText(/2 unique blanks/)).toBeInTheDocument();
+      expect(screen.getByText('Rail A')).toBeInTheDocument();
+      expect(screen.getByText('Rail B')).toBeInTheDocument();
     });
 
     it('shows expand/collapse for multi-part groups', () => {
@@ -190,12 +268,12 @@ describe('CutListPartsTab', () => {
   });
 
   describe('pluralization', () => {
-    it('uses singular for 1 unique dimension', () => {
+    it('uses singular for 1 unique blank', () => {
       render(<CutListPartsTab {...defaultProps} />);
-      expect(screen.getByText(/1 unique dimension \(/)).toBeInTheDocument();
+      expect(screen.getByText(/1 unique blank \(/)).toBeInTheDocument();
     });
 
-    it('uses plural for multiple unique dimensions', () => {
+    it('uses plural for multiple unique blanks', () => {
       const cutList = createCutList({
         instructions: [
           createInstruction({ partId: 'p1', cutLength: 24, cutWidth: 12 }),
@@ -203,7 +281,7 @@ describe('CutListPartsTab', () => {
         ]
       });
       render(<CutListPartsTab {...defaultProps} cutList={cutList} />);
-      expect(screen.getByText(/2 unique dimensions/)).toBeInTheDocument();
+      expect(screen.getByText(/2 unique blanks/)).toBeInTheDocument();
     });
   });
 

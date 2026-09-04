@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { ThreeEvent } from '@react-three/fiber';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Part as PartType } from '../../types';
+import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useSnapStore } from '../../store/snapStore';
-import { useAppSettingsStore } from '../../store/appSettingsStore';
+import { Part as PartType } from '../../types';
 import { useInteractionStore } from '../../store/interactionStore';
 import {
   beginResizeInteractionSession,
@@ -41,7 +41,7 @@ export function usePartResize(
   camera: THREE.Camera,
   gl: THREE.WebGLRenderer,
   controls: THREE.EventDispatcher<object> | null,
-  updatePart: (id: string, updates: Partial<PartType>) => void
+  updatePart: (id: string, updates: Partial<PartType>) => boolean
 ) {
   const [isResizing, setIsResizing] = useState(false);
   const snappedDimensionsRef = useRef<{ length: boolean; width: boolean; thickness: boolean }>({
@@ -276,6 +276,20 @@ export function usePartResize(
         startingPosition: { x: partPos.x, y: partPos.y, z: partPos.z }
       });
     applyCommitInstructions(resizeTool.commit(commitState, commitPreview), { updatePart });
+
+    // Prevent Overlap can reject the dimension commit inside the store; the
+    // store is authoritative after commit, so re-sync the live preview to it
+    // instead of leaving a phantom resize on screen.
+    const latestPart = useProjectStore.getState().parts.find((p) => p.id === part.id) ?? part;
+    setLiveDims((prev) => ({
+      ...prev,
+      x: latestPart.position.x,
+      y: latestPart.position.y,
+      z: latestPart.position.z,
+      length: latestPart.length,
+      width: latestPart.width,
+      thickness: latestPart.thickness
+    }));
 
     setIsResizing(false);
     snappedDimensionsRef.current = { length: false, width: false, thickness: false };

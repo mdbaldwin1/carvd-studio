@@ -4,6 +4,7 @@
  */
 
 import { useEffect } from 'react';
+import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 import { useProjectStore } from '../store/projectStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useUIStore } from '../store/uiStore';
@@ -59,6 +60,7 @@ export function useDevTools() {
       (window as unknown as Record<string, unknown>).useCameraStore = useCameraStore;
       (window as unknown as Record<string, unknown>).useLicenseStore = useLicenseStore;
       (window as unknown as Record<string, unknown>).useAssemblyEditingStore = useAssemblyEditingStore;
+      (window as unknown as Record<string, unknown>).usePartCutsEditingStore = usePartCutsEditingStore;
       window.carvdDev = {
         /**
          * Load the seed project (Simple Writing Desk)
@@ -343,6 +345,7 @@ export function useDevTools() {
       if (shouldExposeTools) {
         delete window.carvdDev;
         delete (window as unknown as Record<string, unknown>).useProjectStore;
+        delete (window as unknown as Record<string, unknown>).usePartCutsEditingStore;
         delete (window as unknown as Record<string, unknown>).useSelectionStore;
         delete (window as unknown as Record<string, unknown>).useUIStore;
         delete (window as unknown as Record<string, unknown>).useInteractionStore;

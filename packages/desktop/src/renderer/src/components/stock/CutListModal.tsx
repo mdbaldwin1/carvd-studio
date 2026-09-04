@@ -182,7 +182,8 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
                     <h3 className="text-[14px] font-semibold text-text m-0 mb-2">Issues Found</h3>
                     {hasBlockingIssues && (
                       <p className="text-[12px] text-text-muted mb-2 m-0">
-                        Fix the errors below before generating. Each part must be assigned to a stock material.
+                        Fix the errors below before generating. Blank dimensions, stock assignments, and authored
+                        operations must all be valid.
                       </p>
                     )}
                     <ul className="list-none p-0 m-0">

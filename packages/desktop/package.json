@@ -1,6 +1,6 @@
 {
   "name": "@carvd/desktop",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "An offline-only desktop app for designing and planning custom furniture and cabinetry.",
   "private": true,
   "type": "module",
@@ -78,6 +78,8 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.1",
     "three": "^0.183.2",
+    "three-bvh-csg": "^0.0.18",
+    "three-mesh-bvh": "0.9.7",
     "uuid": "^13.0.0",
     "zundo": "^2.3.0",
     "zustand": "^5.0.1"

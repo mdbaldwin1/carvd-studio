@@ -57,7 +57,12 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       ref={ref}
       className={cn(
         buttonVariants({ variant, size }),
-        active && 'bg-accent text-accent-foreground border-accent',
+        // Hover variants are emitted after base utilities, so a variant's
+        // hover background would otherwise replace the accent fill while the
+        // accent (dark) text stayed — making the label of the *selected*
+        // button vanish on hover. Pin the hover state to the active look.
+        active &&
+          'bg-accent text-accent-foreground border-accent hover:enabled:bg-accent hover:enabled:text-accent-foreground hover:enabled:border-accent',
         className
       )}
       {...props}

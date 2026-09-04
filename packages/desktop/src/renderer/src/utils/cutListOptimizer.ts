@@ -4,6 +4,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import {
   Part,
+  PartFeature,
   Stock,
   CutList,
   CutInstruction,
@@ -14,6 +15,7 @@ import {
   PartValidationIssue
 } from '../types';
 import { logger } from './logger';
+import { clonePartFeatures } from './partFeatures';
 
 // Internal types for the algorithm
 interface Rectangle {
@@ -33,6 +35,10 @@ interface PartToPlace {
   notes?: string;
   isGlueUp: boolean;
   boardsNeeded?: number;
+}
+
+function getEnabledPartFeatures(part: Part): PartFeature[] {
+  return clonePartFeatures((part.features ?? []).filter((feature) => feature.enabled));
 }
 
 interface PlacementResult {
@@ -144,6 +150,7 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
         grainSensitive: part.grainSensitive,
         canRotate: !part.grainSensitive,
         isGlueUp: false,
+        features: getEnabledPartFeatures(part),
         notes: part.notes
       }
     ];
@@ -170,6 +177,7 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
       canRotate: false, // Glue-up strips should not rotate (need consistent grain)
       isGlueUp: true,
       boardsNeeded: numStrips,
+      features: getEnabledPartFeatures(part),
       notes:
         i === 0
           ? `Glue-up panel: ${numStrips} strips × ${stripWidth.toFixed(2)}" = ${cutWidth}" final width${part.notes ? '. ' + part.notes : ''}`

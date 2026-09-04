@@ -149,6 +149,57 @@ describe('Workflow: Part creation → stock assignment → cut list generation',
     expect(useProjectStore.getState().cutList!.isStale).toBe(true);
   });
 
+  it('carries authored operations into generated cut-list instructions', () => {
+    const store = useProjectStore.getState();
+
+    const stockId = store.addStock({
+      name: 'Feature Stock',
+      length: 96,
+      width: 48,
+      thickness: 0.75,
+      pricingUnit: 'per_item',
+      pricePerUnit: 60,
+      color: '#d4a574'
+    })!;
+    const partId = store.addPart({ name: 'Featured Rail', length: 24, width: 3 })!;
+
+    useProjectStore.getState().updatePart(partId, {
+      features: [
+        {
+          id: 'feature-1',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mitre',
+          lengthMode: 'long_point',
+          parameters: { horizontalAngle: 45 }
+        }
+      ]
+    });
+
+    useSelectionStore.getState().selectParts([partId]);
+    useProjectStore.getState().assignStockToSelectedParts(stockId);
+
+    const state = useProjectStore.getState();
+    const issues = validatePartsForCutList(state.parts, state.stocks);
+    expect(issues.filter((issue) => issue.severity === 'error')).toHaveLength(0);
+
+    const cutList = generateOptimizedCutList(
+      state.parts,
+      state.stocks,
+      state.kerfWidth,
+      state.overageFactor,
+      state.modifiedAt,
+      []
+    );
+
+    expect(cutList.instructions).toHaveLength(1);
+    expect(cutList.instructions[0].features).toHaveLength(1);
+    expect(cutList.instructions[0].features?.[0].kind).toBe('end_cut');
+  });
+
   it('handles parts without stock assignment in validation', () => {
     const store = useProjectStore.getState();
 

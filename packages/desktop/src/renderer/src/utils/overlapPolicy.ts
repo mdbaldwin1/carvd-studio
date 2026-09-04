@@ -1,13 +1,55 @@
 import { Part } from '../types';
-import { getPartOBB, obbsOverlap, type PartOBB } from './snapToPartsUtil';
+import { getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
+import {
+  getPartWorldContour,
+  hasRenderablePartFeatures,
+  partsOverlapOnYAxis,
+  worldContoursOverlap
+} from './partFeatureGeometry';
+import {
+  convexShapesOverlap,
+  getPartConvexShape,
+  getPartOBB,
+  getPartSubOBBs,
+  obbsOverlap,
+  type PartOBB
+} from './snapToPartsUtil';
 import { dragDebug } from './dragDebug';
 import type { GeometryCache } from '../interaction/geometry/cache';
 
 const OBB_EPSILON = 1e-6;
 const OBB_SEPARATION_TOLERANCE = 1e-8;
+const CONTOUR_TOLERANCE = 1e-6;
 const SAFE_SEARCH_STEPS = 14;
 const MIN_DIRECTIONAL_FRACTION = 0.005;
 type TranslationDelta = { x: number; y: number; z: number };
+
+function hasVerticalEndCuts(part: Part): boolean {
+  const profiles = getPartEndCutProfiles(part);
+  if (profiles.left.verticalInset > 0 || profiles.right.verticalInset > 0) return true;
+  // Long-edge bevels also remove material along Y, so they need the same
+  // convex-shape treatment to avoid ghost corners at the beveled face.
+  const edgeProfiles = getPartEdgeBevelProfiles(part);
+  return edgeProfiles.front.inset > 0 || edgeProfiles.back.inset > 0;
+}
+
+function hasNonRectangularContour(part: Part): boolean {
+  if (!hasRenderablePartFeatures(part)) return false;
+  const features = (part.features ?? []).filter((f) => f.enabled);
+  return features.some(
+    (f) => f.kind === 'rect_cut' && (f as { parameters: { depthMode: string } }).parameters.depthMode === 'through'
+  );
+}
+
+/** True when the part lies flat (only rotated around Y, if at all). */
+function isFlat(part: Part): boolean {
+  const rx = Math.abs(part.rotation.x % 360);
+  const rz = Math.abs(part.rotation.z % 360);
+  return (
+    (rx < 0.01 || Math.abs(rx - 180) < 0.01 || Math.abs(rx - 360) < 0.01) &&
+    (rz < 0.01 || Math.abs(rz - 180) < 0.01 || Math.abs(rz - 360) < 0.01)
+  );
+}
 
 export function overlapCheckEnabled(a: Part, b: Part): boolean {
   // If either part explicitly allows overlap, the pair is exempt.
@@ -16,6 +58,41 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
 
 export function partsOverlap(a: Part, b: Part, geometryCache?: GeometryCache): boolean {
   if (!overlapCheckEnabled(a, b)) return false;
+
+  // Use convex shape SAT when either part has vertical end cuts (bevels,
+  // compounds) that remove material along the Y axis — OBB cannot represent
+  // the angled face and creates a "ghost corner".
+  if (hasVerticalEndCuts(a) || hasVerticalEndCuts(b)) {
+    return convexShapesOverlap(getPartConvexShape(a), getPartConvexShape(b), OBB_SEPARATION_TOLERANCE, false);
+  }
+
+  // For flat parts with through-depth features (corner notches, edge notches, etc.),
+  // use direct 2D polygon intersection on the actual contour shape.
+  // This is exact for any contour geometry — no sub-box approximation.
+  // Non-flat parts (rotated around X or Z) fall through to the sub-OBB path
+  // because the 2D contour projection doesn't work for tilted parts.
+  if (hasNonRectangularContour(a) || hasNonRectangularContour(b)) {
+    if (isFlat(a) && isFlat(b)) {
+      if (!partsOverlapOnYAxis(a, b, CONTOUR_TOLERANCE)) return false;
+      const contourA = getPartWorldContour(a);
+      const contourB = getPartWorldContour(b);
+      return worldContoursOverlap(contourA, contourB, CONTOUR_TOLERANCE);
+    }
+
+    // Non-flat featured parts: use sub-OBB decomposition which handles 3D rotation
+    const obbsA = getPartSubOBBs(a);
+    const obbsB = getPartSubOBBs(b);
+    for (const obbA of obbsA) {
+      for (const obbB of obbsB) {
+        if (obbsOverlap(obbA, obbB, OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Simple rectangular parts: fast OBB test
   return obbsOverlap(
     getPartOBB(a, a.position, geometryCache),
     getPartOBB(b, b.position, geometryCache),
@@ -64,7 +141,8 @@ export function wouldTranslationCauseOverlap(
   parts: Part[],
   movingIds: Set<string>,
   delta: TranslationDelta,
-  geometryCache?: GeometryCache
+  geometryCache?: GeometryCache,
+  exemptIds?: Set<string>
 ): boolean {
   for (const p of parts) {
     if (!movingIds.has(p.id)) continue;
@@ -80,6 +158,7 @@ export function wouldTranslationCauseOverlap(
 
     for (const other of parts) {
       if (movingIds.has(other.id)) continue;
+      if (exemptIds && exemptIds.has(other.id)) continue;
       if (existingOverlapDoesNotWorsen(p, movedPart, other, geometryCache)) {
         continue;
       }
@@ -99,6 +178,14 @@ function existingOverlapDoesNotWorsen(
   geometryCache?: GeometryCache
 ): boolean {
   if (!overlapCheckEnabled(part, other)) return true;
+  // The depth comparison below reasons over raw OBBs, which is only valid
+  // when the OBB is the actual overlap representation. Feature-bearing parts
+  // (custom cuts) can interlock: their coarse OBBs overlap deeply and stably,
+  // so any translation would look like "not worsening" and bypass the exact
+  // contour/sub-OBB checks in partsOverlap.
+  if ((part.features && part.features.length > 0) || (other.features && other.features.length > 0)) {
+    return false;
+  }
   const beforeDepth = getObbOverlapDepth(
     getPartOBB(part, part.position, geometryCache),
     getPartOBB(other, other.position, geometryCache)
@@ -176,9 +263,10 @@ export function resolveSafeTranslationDelta(
   parts: Part[],
   movingIds: Set<string>,
   proposedDelta: TranslationDelta,
-  geometryCache?: GeometryCache
+  geometryCache?: GeometryCache,
+  exemptIds?: Set<string>
 ): TranslationDelta | null {
-  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta, geometryCache)) {
+  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta, geometryCache, exemptIds)) {
     return proposedDelta;
   }
 
@@ -193,7 +281,7 @@ export function resolveSafeTranslationDelta(
       y: proposedDelta.y * mid,
       z: proposedDelta.z * mid
     };
-    if (wouldTranslationCauseOverlap(parts, movingIds, candidate, geometryCache)) {
+    if (wouldTranslationCauseOverlap(parts, movingIds, candidate, geometryCache, exemptIds)) {
       high = mid;
     } else {
       low = mid;

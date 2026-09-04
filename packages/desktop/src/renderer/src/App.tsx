@@ -10,6 +10,8 @@ import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { ContextMenu } from './components/layout/ContextMenu';
 import { UndoRedoButtons } from './components/layout/UndoRedoButtons';
+import { PartCutsEditingExitDialog } from './components/part-cuts/PartCutsEditingExitDialog';
+import { PartCutsWorkspace } from './components/part-cuts/PartCutsWorkspace';
 import { TrialBanner } from './components/licensing/TrialBanner';
 import { TrialExpiredModal } from './components/licensing/TrialExpiredModal';
 import { ImportToLibraryDialog } from './components/parts-list/ImportToLibraryDialog';
@@ -48,6 +50,7 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useLibraryImportCheck } from './hooks/useLibraryImportCheck';
 import { useLicenseStatus } from './hooks/useLicenseStatus';
 import { useMenuCommands } from './hooks/useMenuCommands';
+import { usePartCutsEditing } from './hooks/usePartCutsEditing';
 import { useStockLibrary } from './hooks/useStockLibrary';
 import { useTemplateEditing } from './hooks/useTemplateEditing';
 import { useAssemblyEditingStore } from './store/assemblyEditingStore';
@@ -175,6 +178,26 @@ function App() {
     }
   });
 
+  const {
+    isEditingPartCuts,
+    sourcePart,
+    sourcePartName,
+    draftFeatures,
+    selectedFeatureId,
+    hoveredTarget: partCutsHoveredTarget,
+    pendingTarget: partCutsPendingTarget,
+    showExitDialog: showPartCutsExitDialog,
+    saveAndExit: savePartCutsAndExit,
+    discardAndExit: discardPartCutsAndExit,
+    requestExit: requestPartCutsExit,
+    cancelExit: cancelPartCutsExit,
+    hasUnsavedChanges: partCutsHasUnsavedChanges,
+    setDraftFeatures: setPartCutsDraftFeatures,
+    selectFeature: selectPartCutsFeature,
+    setHoveredTarget: setPartCutsHoveredTarget,
+    setPendingTarget: setPartCutsPendingTarget
+  } = usePartCutsEditing();
+
   // File operations - now after editing hooks so we can route save commands appropriately
   const {
     UnsavedChangesDialogComponent,
@@ -199,7 +222,7 @@ function App() {
   // Auto-save - saves project automatically when changes are made (if enabled in settings)
   useAutoSave({
     onInitialSaveNeeded: handleSave,
-    blocked: isEditingTemplate || isEditingAssembly || showStartScreen
+    blocked: isEditingTemplate || isEditingAssembly || isEditingPartCuts || showStartScreen
   });
 
   // Platform detection for custom title bar
@@ -551,15 +574,19 @@ function App() {
   const [isHeaderNameEditing, setIsHeaderNameEditing] = useState(false);
   const [headerNameDraft, setHeaderNameDraft] = useState('');
 
-  const headerMode: 'project' | 'template' | 'assembly' = isEditingAssembly
-    ? 'assembly'
-    : isEditingTemplate
-      ? 'template'
-      : 'project';
+  const headerMode: 'project' | 'template' | 'assembly' | 'part-cuts' = isEditingPartCuts
+    ? 'part-cuts'
+    : isEditingAssembly
+      ? 'assembly'
+      : isEditingTemplate
+        ? 'template'
+        : 'project';
   const displayName =
     headerMode === 'assembly'
       ? editingAssemblyName || 'Untitled Assembly'
-      : projectName || (headerMode === 'template' ? UNTITLED_TEMPLATE_NAME : UNTITLED_PROJECT_NAME);
+      : headerMode === 'part-cuts'
+        ? sourcePartName || 'Part Cuts'
+        : projectName || (headerMode === 'template' ? UNTITLED_TEMPLATE_NAME : UNTITLED_PROJECT_NAME);
 
   useEffect(() => {
     if (!isHeaderNameEditing) {
@@ -568,11 +595,17 @@ function App() {
   }, [displayName, isHeaderNameEditing]);
 
   const handleStartHeaderNameEdit = () => {
+    if (headerMode === 'part-cuts') return;
     setHeaderNameDraft(displayName);
     setIsHeaderNameEditing(true);
   };
 
   const handleCommitHeaderName = () => {
+    if (headerMode === 'part-cuts') {
+      setIsHeaderNameEditing(false);
+      setHeaderNameDraft(displayName);
+      return;
+    }
     const trimmed = headerNameDraft.trim();
     const nextName = trimmed || displayName;
 
@@ -598,6 +631,10 @@ function App() {
   };
 
   const handleExitEditMode = () => {
+    if (isEditingPartCuts) {
+      requestPartCutsExit();
+      return;
+    }
     if (isEditingAssembly) {
       requestAssemblyExit();
       return;
@@ -605,6 +642,22 @@ function App() {
     if (isEditingTemplate) {
       requestTemplateDiscard();
     }
+  };
+
+  const handleLogoClick = () => {
+    if (isEditingPartCuts) {
+      requestPartCutsExit();
+      return;
+    }
+    void handleGoHome();
+  };
+
+  const handlePrimarySave = async () => {
+    if (isEditingPartCuts) {
+      savePartCutsAndExit();
+      return;
+    }
+    await handleSave();
   };
 
   // Part deletion confirmation
@@ -751,7 +804,9 @@ function App() {
     onOpenProject: handleOpen,
     onOpenRecentProject: handleOpenRecent,
     onCloseProject: handleGoHome,
-    // Template/assembly editing mode - route save commands appropriately
+    // Focused editing modes - route save commands appropriately
+    isEditingPartCuts,
+    onSavePartCuts: savePartCutsAndExit,
     isEditingTemplate,
     onSaveTemplate: saveTemplateDirectly,
     onSaveAssembly: saveAssemblyAndExit
@@ -786,7 +841,7 @@ function App() {
                 <div className="header-title">
                   <button
                     className="app-name-btn"
-                    onClick={handleGoHome}
+                    onClick={handleLogoClick}
                     title="Return to start screen"
                     aria-label="Carvd Studio home"
                   >
@@ -799,13 +854,15 @@ function App() {
                       className={
                         headerMode === 'template'
                           ? 'header-mode-chip border-warning/50 bg-warning-bg text-warning'
-                          : 'header-mode-chip border-info bg-info-bg text-info'
+                          : headerMode === 'part-cuts'
+                            ? 'header-mode-chip border-primary/40 bg-primary/10 text-primary'
+                            : 'header-mode-chip border-info bg-info-bg text-info'
                       }
                     >
-                      {headerMode === 'template' ? 'Template' : 'Assembly'}
+                      {headerMode === 'template' ? 'Template' : headerMode === 'part-cuts' ? 'Part Cuts' : 'Assembly'}
                     </Badge>
                   )}
-                  {isHeaderNameEditing ? (
+                  {isHeaderNameEditing && headerMode !== 'part-cuts' ? (
                     <span className="header-name-editor">
                       <Input
                         type="text"
@@ -834,10 +891,11 @@ function App() {
                       size="xs"
                       className="project-name h-auto gap-1.5 rounded px-2 py-1"
                       onClick={handleStartHeaderNameEdit}
-                      title="Click to rename"
+                      title={headerMode === 'part-cuts' ? 'Part cuts workspace' : 'Click to rename'}
+                      disabled={headerMode === 'part-cuts'}
                     >
                       <span>{displayName}</span>
-                      <Pencil size={12} className="opacity-60" />
+                      {headerMode !== 'part-cuts' && <Pencil size={12} className="opacity-60" />}
                       {isDirty && <span className="dirty-indicator"> •</span>}
                     </Button>
                   )}
@@ -845,22 +903,54 @@ function App() {
               </div>
               <div className="header-actions">
                 <div className="header-actions-group">
-                  <UndoRedoButtons />
-                  {(isEditingTemplate || isEditingAssembly) && (
+                  {/* Project undo/redo would silently edit the project behind
+                      the cuts workspace; the cut draft has its own save/discard. */}
+                  {!isEditingPartCuts && <UndoRedoButtons />}
+                  {(isEditingTemplate || isEditingAssembly || isEditingPartCuts) && (
                     <Button
-                      variant={isDirty ? 'secondary' : 'outline'}
+                      variant={
+                        isEditingPartCuts
+                          ? partCutsHasUnsavedChanges
+                            ? 'secondary'
+                            : 'outline'
+                          : isDirty
+                            ? 'secondary'
+                            : 'outline'
+                      }
                       size="xs"
                       className="h-7 px-2"
                       onClick={handleExitEditMode}
-                      title={isDirty ? 'Cancel editing' : 'Exit editing'}
+                      title={
+                        isEditingPartCuts
+                          ? partCutsHasUnsavedChanges
+                            ? 'Cancel editing'
+                            : 'Exit editing'
+                          : isDirty
+                            ? 'Cancel editing'
+                            : 'Exit editing'
+                      }
                     >
-                      {isDirty ? 'Cancel' : 'Exit'}
+                      {isEditingPartCuts
+                        ? partCutsHasUnsavedChanges
+                          ? 'Cancel'
+                          : 'Exit'
+                        : isDirty
+                          ? 'Cancel'
+                          : 'Exit'}
                     </Button>
                   )}
                   <Button
-                    variant={isDirty ? 'default' : 'outline'}
+                    variant={
+                      isEditingPartCuts
+                        ? partCutsHasUnsavedChanges
+                          ? 'default'
+                          : 'outline'
+                        : isDirty
+                          ? 'default'
+                          : 'outline'
+                    }
                     size="icon"
-                    onClick={handleSave}
+                    onClick={handlePrimarySave}
                     title="Save (Cmd+S)"
                   >
                     <Save size={18} />
@@ -909,14 +999,34 @@ function App() {
               />
             )}
             <SidebarProvider className="app-main">
-              <AppSidebar
-                onOpenProjectSettings={() => setIsProjectSettingsOpen(true)}
-                onOpenCutList={openCutListModal}
-                onCreateNewAssembly={startCreatingNewAssembly}
-                onShowLicenseModal={() => setShowLicenseModal(true)}
-              />
-              <CanvasWithDrop />
-              <PropertiesPanel />
+              {isEditingPartCuts && sourcePart ? (
+                <PartCutsWorkspace
+                  part={sourcePart}
+                  draftFeatures={draftFeatures}
+                  units={useProjectStore.getState().units}
+                  selectedFeatureId={selectedFeatureId}
+                  hoveredTarget={partCutsHoveredTarget}
+                  pendingTarget={partCutsPendingTarget}
+                  onSelectFeature={selectPartCutsFeature}
+                  onDraftFeaturesChange={setPartCutsDraftFeatures}
+                  onHoveredTargetChange={setPartCutsHoveredTarget}
+                  onPendingTargetChange={setPartCutsPendingTarget}
+                  onExit={requestPartCutsExit}
+                  onSave={savePartCutsAndExit}
+                  hasUnsavedChanges={partCutsHasUnsavedChanges}
+                />
+              ) : (
+                <>
+                  <AppSidebar
+                    onOpenProjectSettings={() => setIsProjectSettingsOpen(true)}
+                    onOpenCutList={openCutListModal}
+                    onCreateNewAssembly={startCreatingNewAssembly}
+                    onShowLicenseModal={() => setShowLicenseModal(true)}
+                  />
+                  <CanvasWithDrop />
+                  <PropertiesPanel />
+                </>
+              )}
             </SidebarProvider>
           </>
         )}
@@ -1081,6 +1191,13 @@ function App() {
         {/* Unsaved Changes Dialog */}
         <UnsavedChangesDialogComponent />
         <FileRecoveryModalComponent />
+        <PartCutsEditingExitDialog
+          isOpen={showPartCutsExitDialog}
+          partName={sourcePartName}
+          onSave={savePartCutsAndExit}
+          onDiscard={discardPartCutsAndExit}
+          onCancel={cancelPartCutsExit}
+        />
 
         {/* Auto-Recovery Dialog */}
         <RecoveryDialog

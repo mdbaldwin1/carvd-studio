@@ -17,6 +17,24 @@ Core features complete. UX polish in progress for 1.0 release.
 - Advanced snapping (parts, guides, equal spacing, dimension matching)
 - Reference parts for precision alignment
 
+### Part Cuts (Custom Cuts)
+
+- Dedicated Part Cuts workspace (peer editing mode alongside template/assembly editing)
+- Woodworking operations for end cuts, channels, pockets, notches, round holes,
+  countersinks, counterbores, rounded openings, and editable hole patterns
+- Paired dowel-joint workflow that authors matching holes on two parts atomically,
+  visualizes the dowels, and warns when the parts move out of alignment
+- True 3D preview geometry with drag handles (face pockets, stopped channels) and
+  direct face/edge/corner target picking
+- Cut mirroring (opposite end, across length/width)
+- Ordered multi-cut conflict validation shared by cuts mode and cut-list validation
+- Cut-aware snapping/overlap/ground interaction, socket mating snaps
+- Cut-aware fabrication output (numbered instructions in cut list/CSV/PDF, Ops badges)
+- Explicit product boundary: Custom Cuts produces woodworking geometry and shop
+  instructions, not free-form CAD or machine-ready CNC/G-code
+- File format v2 for projects using cuts (older builds warn instead of silently
+  dropping cut data)
+
 ### Cut List System
 
 - Guillotine bin-packing optimization
@@ -136,7 +154,7 @@ None currently.
 
 ## Known Limitations (By Design)
 
-1. **Boxes only** - No curves, all parts are rectangular
+1. **Rectangular blanks with rectangular cuts** - Parts start as rectangular blanks shaped by straight cuts (mitres, bevels, dados, notches, etc.); no curves or freeform geometry
 2. **Arbitrary rotation** - Supported; angled drag/snap UX is actively being refined
 3. **Guillotine cuts** - Table saw workflow
 4. **Offline-only** - No cloud, no accounts

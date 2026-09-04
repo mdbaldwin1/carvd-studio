@@ -127,9 +127,14 @@ export function CutListDiagramsTab({
     <>
       <div className="cut-list-diagrams-tab flex flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex items-center justify-between py-2 px-0 mb-2 shrink-0">
-          <span className="text-[12px] text-text-muted">
-            {cutList.stockBoards.length} board{cutList.stockBoards.length !== 1 ? 's' : ''} needed
-          </span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[12px] text-text-muted">
+              {cutList.stockBoards.length} board{cutList.stockBoards.length !== 1 ? 's' : ''} needed
+            </span>
+            <span className="text-[11px] text-text-muted">
+              Diagrams show blank breakdown only. Apply operations after cutting blanks to size.
+            </span>
+          </div>
           <DropdownButton label="Download" icon={<Download size={14} />} items={downloadItems} />
         </div>
 

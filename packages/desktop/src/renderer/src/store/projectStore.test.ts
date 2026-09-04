@@ -1,18 +1,20 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useProjectStore, validatePartsForCutList } from './projectStore';
-import { useLicenseStore } from './licenseStore';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  createTestAssembly,
+  createTestPart,
+  createTestProject,
+  createTestStock
+} from '../../../../tests/helpers/factories';
+import type { CutList, Stock } from '../types';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
+import { useLicenseStore } from './licenseStore';
+import { useProjectStore, validatePartsForCutList } from './projectStore';
 import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
-import {
-  createTestPart,
-  createTestStock,
-  createTestProject,
-  createTestAssembly
-} from '../../../../tests/helpers/factories';
-import type { CutList, Stock } from '../types';
+
+vi.unmock('three');
 
 // Helper to reset store state before each test
 const resetStore = () => {
@@ -151,6 +153,31 @@ describe('projectStore', () => {
         const part2 = state.parts.find((p) => p.id === part2Id);
         expect(part2?.name).toBe('Part 2');
       });
+
+      it('prevents dimension updates that would overlap another part when preventOverlap is enabled', () => {
+        const store = useProjectStore.getState();
+
+        const partAId = store.addPart({
+          name: 'A',
+          position: { x: 0, y: 0.5, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        });
+        store.addPart({
+          name: 'B',
+          position: { x: 12, y: 0.5, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        });
+
+        store.updatePart(partAId, { length: 30 });
+
+        const state = useProjectStore.getState();
+        const partA = state.parts.find((p) => p.id === partAId);
+        expect(partA?.length).toBe(10);
+      });
     });
 
     describe('updateParts', () => {
@@ -170,8 +197,22 @@ describe('projectStore', () => {
     describe('batchUpdateParts', () => {
       it('updates multiple parts with different changes each', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1', color: '#ffffff' });
-        const part2Id = store.addPart({ name: 'Part 2', color: '#ffffff' });
+        const part1Id = store.addPart({
+          name: 'Part 1',
+          color: '#ffffff',
+          position: { x: 0, y: 0.75, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        });
+        const part2Id = store.addPart({
+          name: 'Part 2',
+          color: '#ffffff',
+          position: { x: 20, y: 0.75, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        });
 
         store.batchUpdateParts([
           { id: part1Id, changes: { color: '#ff0000', length: 30 } },
@@ -209,6 +250,84 @@ describe('projectStore', () => {
         const state = useProjectStore.getState();
         expect(state.parts).toHaveLength(1);
         expect(state.parts[0].name).toBe('Updated');
+      });
+
+      it('prevents batched dimension updates that would cause overlap when preventOverlap is enabled', () => {
+        const store = useProjectStore.getState();
+
+        const partAId = store.addPart({
+          name: 'A',
+          position: { x: 0, y: 0.5, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        });
+        store.addPart({
+          name: 'B',
+          position: { x: 12, y: 0.5, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        });
+
+        store.batchUpdateParts([{ id: partAId, changes: { length: 30 } }]);
+
+        const state = useProjectStore.getState();
+        const partA = state.parts.find((p) => p.id === partAId);
+        expect(partA?.length).toBe(10);
+      });
+    });
+
+    describe('addDowelJoint', () => {
+      it('adds both feature sets in one undoable project transaction', () => {
+        const store = useProjectStore.getState();
+        const firstPartId = store.addPart({
+          name: 'Lower rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        });
+        const secondPartId = store.addPart({
+          name: 'Upper rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        });
+        expect(firstPartId).not.toBeNull();
+        expect(secondPartId).not.toBeNull();
+        useProjectStore.temporal.getState().clear();
+
+        const jointId = (
+          store as typeof store & {
+            addDowelJoint: (input: Record<string, unknown>) => string | null;
+          }
+        ).addDowelJoint({
+          firstPartId,
+          firstFace: 'top_face',
+          secondPartId,
+          secondFace: 'bottom_face',
+          diameter: 0.375,
+          dowelLength: 0.75,
+          firstEmbedmentDepth: 0.375,
+          secondEmbedmentDepth: 0.375,
+          count: 2,
+          spacing: 2,
+          firstPrimary: -1,
+          firstSecondary: 0
+        });
+
+        expect(jointId, useUIStore.getState().toast?.message).toEqual(expect.any(String));
+        let state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features).toHaveLength(2);
+        expect(state.parts.find((part) => part.id === secondPartId)?.features).toHaveLength(2);
+        expect(useProjectStore.temporal.getState().pastStates).toHaveLength(1);
+
+        useProjectStore.temporal.getState().undo();
+        state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features ?? []).toHaveLength(0);
+        expect(state.parts.find((part) => part.id === secondPartId)?.features ?? []).toHaveLength(0);
       });
     });
 
@@ -342,6 +461,36 @@ describe('projectStore', () => {
         expect(duplicate?.name).toBe('Original (copy)');
         expect(duplicate?.length).toBe(30);
         expect(duplicate?.width).toBe(15);
+      });
+
+      it('copies part features onto the duplicate', () => {
+        const store = useProjectStore.getState();
+        const originalId = store.addPart({
+          name: 'Featured',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'mitre',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 45 }
+            }
+          ]
+        });
+
+        const duplicateId = store.duplicatePart(originalId);
+        const duplicate = useProjectStore.getState().parts.find((p) => p.id === duplicateId);
+
+        expect(duplicate?.features).toEqual(
+          useProjectStore.getState().parts.find((p) => p.id === originalId)?.features
+        );
+        expect(duplicate?.features).not.toBe(
+          useProjectStore.getState().parts.find((p) => p.id === originalId)?.features
+        );
       });
 
       it('generates smart copy names', () => {
@@ -1245,6 +1394,35 @@ describe('projectStore', () => {
 
         expect(assembly!.parts[0].stockId).toBe(stockId);
       });
+
+      it('includes part features in assembly parts', () => {
+        const store = useProjectStore.getState();
+        const partId = store.addPart({
+          name: 'Featured Part',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'rect_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'corner', corner: 'back_left_corner' },
+              reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+              cutType: 'corner_notch',
+              parameters: {
+                size: { length: 0.75, width: 0.75 },
+                depthMode: 'through'
+              },
+              placement: { x: 0, z: 0 }
+            }
+          ]
+        });
+
+        useSelectionStore.getState().selectParts([partId]);
+        const assembly = store.createAssemblyFromSelection('Featured Assembly');
+
+        expect(assembly?.parts[0].features).toHaveLength(1);
+        expect(assembly?.parts[0].features?.[0].kind).toBe('rect_cut');
+      });
     });
 
     describe('placeAssembly', () => {
@@ -1307,6 +1485,37 @@ describe('projectStore', () => {
         expect(placedPart.color).toBe('#ff0000');
         expect(placedPart.grainSensitive).toBe(true);
         expect(placedPart.grainDirection).toBe('width');
+      });
+
+      it('preserves part features when placing', () => {
+        const store = useProjectStore.getState();
+
+        const partId = store.addPart({
+          name: 'Featured Part',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'right_end' },
+              reference: { primaryFrom: 'max' },
+              cutType: 'bevel',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 0, verticalAngle: 10 }
+            }
+          ]
+        });
+        useSelectionStore.getState().selectParts([partId]);
+        const assembly = store.createAssemblyFromSelection('Featured Assembly');
+        store.addAssembly(assembly!);
+        store.deletePart(partId);
+
+        store.placeAssembly(assembly!.id, { x: 0, y: 0, z: 0 });
+
+        const placedPart = useProjectStore.getState().parts[0];
+        expect(placedPart.features).toHaveLength(1);
+        expect(placedPart.features?.[0].kind).toBe('end_cut');
       });
 
       it('creates new groups when placing grouped assembly', () => {
@@ -2079,6 +2288,98 @@ describe('validatePartsForCutList', () => {
       const issues = validatePartsForCutList(parts, [stock]);
 
       expect(issues.filter((i) => i.type === 'grain_mismatch')).toHaveLength(0);
+    });
+  });
+
+  describe('feature validation', () => {
+    it('returns error for invalid rectangular operations loaded from part data', () => {
+      const stock = createTestStock({
+        id: 'stock-1',
+        length: 96,
+        width: 48,
+        thickness: 0.75
+      });
+      const parts = [
+        createTestPart({
+          name: 'Feature Part',
+          stockId: 'stock-1',
+          length: 24,
+          width: 12,
+          thickness: 0.75,
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'rect_cut',
+              version: 1,
+              enabled: true,
+              label: 'Bad cutout',
+              target: { type: 'face', face: 'top_face' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'cutout',
+              parameters: {
+                size: { length: 30, width: 4 },
+                depthMode: 'through'
+              },
+              placement: { x: 0, z: 0 }
+            }
+          ]
+        })
+      ];
+
+      const issues = validatePartsForCutList(parts, [stock]);
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0].type).toBe('feature_validation');
+      expect(issues[0].message).toContain('Bad cutout');
+    });
+
+    it('returns feature validation errors for duplicate enabled end cuts on the same end', () => {
+      const stock = createTestStock({
+        id: 'stock-1',
+        length: 96,
+        width: 48,
+        thickness: 0.75
+      });
+      const parts = [
+        createTestPart({
+          name: 'Feature Part',
+          stockId: 'stock-1',
+          length: 24,
+          width: 12,
+          thickness: 0.75,
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'mitre',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 45 }
+            },
+            {
+              id: 'feature-2',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'bevel',
+              lengthMode: 'centerline',
+              parameters: { horizontalAngle: 0, verticalAngle: 15 }
+            }
+          ]
+        })
+      ];
+
+      const issues = validatePartsForCutList(parts, [stock]);
+
+      const featureIssues = issues.filter((issue) => issue.type === 'feature_validation' && issue.severity === 'error');
+
+      expect(featureIssues).toHaveLength(1);
+      expect(featureIssues[0]?.message).toContain('Only one enabled cut per end or edge');
     });
   });
 

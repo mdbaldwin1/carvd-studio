@@ -10,6 +10,7 @@ import { useInteractionStore } from '../../store/interactionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { Part as PartType } from '../../types';
 import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
+import { getPartRenderGeometry, hasRenderablePartFeatures } from '../../utils/partFeatureGeometry';
 import {
   beginRotateInteractionSession,
   clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances,
@@ -116,7 +117,13 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
 
   // Enforce ground constraint after rotation or dimension changes
   useEffect(() => {
-    const worldHalfHeight = calculateWorldHalfHeightFromDegrees(part.rotation, part.length, part.thickness, part.width);
+    const worldHalfHeight = calculateWorldHalfHeightFromDegrees(
+      part.rotation,
+      part.length,
+      part.thickness,
+      part.width,
+      part.features
+    );
 
     if (part.position.y < worldHalfHeight) {
       updatePart(part.id, {
@@ -306,6 +313,8 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
 
   // Use live dimensions for rendering
   const dims: [number, number, number] = [liveDims.length, liveDims.thickness, liveDims.width];
+  const renderGeometry = useMemo(() => getPartRenderGeometry(part), [part]);
+  const isFeaturePart = hasRenderablePartFeatures(part);
 
   // Calculate render position
   let renderX = liveDims.x;
@@ -438,7 +447,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             hitTarget: { kind: 'part-body', nodeId: part.id, partId: part.id }
           }}
         >
-          <boxGeometry args={dims} />
+          {isFeaturePart ? <primitive object={renderGeometry} attach="geometry" /> : <boxGeometry args={dims} />}
           {displayMode === 'solid' && <meshStandardMaterial color={part.color} />}
           {displayMode === 'wireframe' && <meshBasicMaterial color={part.color} wireframe />}
           {displayMode === 'translucent' && (

@@ -1,0 +1,17 @@
+{
+  "description": "Anonymized adjacent deck-board transforms derived from a customer project",
+  "target": {
+    "length": 108,
+    "width": 6,
+    "thickness": 1,
+    "position": { "x": 0, "y": 0, "z": 0 },
+    "rotation": { "x": 180, "y": -90, "z": 0 }
+  },
+  "moving": {
+    "length": 108,
+    "width": 6,
+    "thickness": 1,
+    "position": { "x": -6.000072348, "y": 0.000000004, "z": -0.020581884 },
+    "rotation": { "x": 180, "y": -90, "z": 0 }
+  }
+}

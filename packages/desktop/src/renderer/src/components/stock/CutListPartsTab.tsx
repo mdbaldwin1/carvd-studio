@@ -2,59 +2,15 @@ import { Badge } from '@renderer/components/ui/badge';
 import { ChevronDown, ChevronRight, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import React, { useState, useCallback, useMemo } from 'react';
 import { useUIStore } from '../../store/uiStore';
+import { getInstructionFabricationSummary, groupCutInstructions } from '../../utils/cutListInstructions';
 import { getBlockedMessage } from '../../utils/featureLimits';
 import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { showSavedFileToast } from '../../utils/fileToast';
 // pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { logger } from '../../utils/logger';
-import { CutList, CutInstruction } from '../../types';
+import { CutList } from '../../types';
 import { DropdownButton, DropdownItem } from '../common/DropdownButton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@renderer/components/ui/table';
-
-// Grouped cut instruction for parts with identical dimensions
-interface GroupedCutInstruction {
-  key: string;
-  cutLength: number;
-  cutWidth: number;
-  thickness: number;
-  stockId: string;
-  stockName: string;
-  grainSensitive: boolean;
-  isGlueUp: boolean;
-  quantity: number;
-  items: CutInstruction[];
-}
-
-// Group identical cut instructions together
-function groupCutInstructions(instructions: CutInstruction[]): GroupedCutInstruction[] {
-  const groups = new Map<string, GroupedCutInstruction>();
-
-  for (const inst of instructions) {
-    // Create a key from the attributes that make parts "identical"
-    const key = `${inst.cutLength}-${inst.cutWidth}-${inst.thickness}-${inst.stockId}-${inst.grainSensitive}-${inst.isGlueUp}`;
-
-    const existing = groups.get(key);
-    if (existing) {
-      existing.quantity++;
-      existing.items.push(inst);
-    } else {
-      groups.set(key, {
-        key,
-        cutLength: inst.cutLength,
-        cutWidth: inst.cutWidth,
-        thickness: inst.thickness,
-        stockId: inst.stockId,
-        stockName: inst.stockName,
-        grainSensitive: inst.grainSensitive,
-        isGlueUp: inst.isGlueUp,
-        quantity: 1,
-        items: [inst]
-      });
-    }
-  }
-
-  return Array.from(groups.values());
-}
 
 export function CutListPartsTab({
   cutList,
@@ -148,10 +104,15 @@ export function CutListPartsTab({
   return (
     <div className="cut-list-parts-tab flex flex-col flex-1 min-h-0 overflow-hidden">
       <div className="flex items-center justify-between py-2 px-0 mb-2 shrink-0">
-        <span className="text-[12px] text-text-muted">
-          {groupedInstructions.length} unique dimension{groupedInstructions.length !== 1 ? 's' : ''} (
-          {cutList.instructions.length} parts total)
-        </span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[12px] text-text-muted">
+            {groupedInstructions.length} unique blank{groupedInstructions.length !== 1 ? 's' : ''} (
+            {cutList.instructions.length} parts total)
+          </span>
+          <span className="text-[11px] text-text-muted">
+            Cut blanks first, then apply listed operations and shop notes.
+          </span>
+        </div>
         <DropdownButton label="Download" icon={<Download size={14} />} items={downloadItems} />
       </div>
       <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 border border-border rounded bg-surface">
@@ -161,17 +122,18 @@ export function CutListPartsTab({
               <TableHead className="col-expand sticky top-0 z-[1] w-6 text-center"></TableHead>
               <TableHead className="col-qty sticky top-0 z-[1] w-12 text-center">Qty</TableHead>
               <TableHead className="sticky top-0 z-[1]">Part Name</TableHead>
-              <TableHead className="sticky top-0 z-[1]">Cut Length</TableHead>
-              <TableHead className="sticky top-0 z-[1]">Cut Width</TableHead>
+              <TableHead className="sticky top-0 z-[1]">Blank Length</TableHead>
+              <TableHead className="sticky top-0 z-[1]">Blank Width</TableHead>
               <TableHead className="sticky top-0 z-[1]">Thickness</TableHead>
               <TableHead className="sticky top-0 z-[1]">Stock</TableHead>
-              <TableHead className="sticky top-0 z-[1]">Notes</TableHead>
+              <TableHead className="sticky top-0 z-[1]">Operations / Notes</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {groupedInstructions.map((group) => {
               const isExpanded = expandedGroups.has(group.key);
               const hasMultiple = group.quantity > 1;
+              const fabricationSummary = getInstructionFabricationSummary(group.items[0], units);
 
               return (
                 <React.Fragment key={group.key}>
@@ -214,27 +176,32 @@ export function CutListPartsTab({
                           Grain
                         </Badge>
                       )}
-                      {!hasMultiple && group.items[0].notes && (
-                        <span className="text-[11px] text-text-muted italic">{group.items[0].notes}</span>
+                      {fabricationSummary && (
+                        <span className="text-[11px] text-text-muted italic">{fabricationSummary}</span>
                       )}
                     </TableCell>
                   </TableRow>
 
                   {/* Expanded item rows */}
                   {isExpanded &&
-                    group.items.map((item) => (
-                      <TableRow key={item.partId} className="bg-bg-alt">
-                        <TableCell className="col-expand w-6 border-[rgba(255,255,255,0.05)] text-center"></TableCell>
-                        <TableCell className="col-qty w-12 border-[rgba(255,255,255,0.05)] text-center"></TableCell>
-                        <TableCell className="col-part-name border-[rgba(255,255,255,0.05)] pl-2 text-[12px] text-text-muted">
-                          {item.partName}
-                        </TableCell>
-                        <TableCell className="border-[rgba(255,255,255,0.05)]" colSpan={4}></TableCell>
-                        <TableCell className="border-[rgba(255,255,255,0.05)]">
-                          {item.notes && <span className="text-[11px] text-text-muted italic">{item.notes}</span>}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    group.items.map((item) => {
+                      const itemFabricationSummary = getInstructionFabricationSummary(item, units);
+                      return (
+                        <TableRow key={item.partId} className="bg-bg-alt">
+                          <TableCell className="col-expand w-6 border-[rgba(255,255,255,0.05)] text-center"></TableCell>
+                          <TableCell className="col-qty w-12 border-[rgba(255,255,255,0.05)] text-center"></TableCell>
+                          <TableCell className="col-part-name border-[rgba(255,255,255,0.05)] pl-2 text-[12px] text-text-muted">
+                            {item.partName}
+                          </TableCell>
+                          <TableCell className="border-[rgba(255,255,255,0.05)]" colSpan={4}></TableCell>
+                          <TableCell className="border-[rgba(255,255,255,0.05)]">
+                            {itemFabricationSummary && (
+                              <span className="text-[11px] text-text-muted italic">{itemFabricationSummary}</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                 </React.Fragment>
               );
             })}

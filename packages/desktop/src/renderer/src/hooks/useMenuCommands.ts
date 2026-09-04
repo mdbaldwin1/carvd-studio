@@ -32,6 +32,8 @@ interface UseMenuCommandsOptions {
   onCloseProject?: () => void;
   // Template/assembly editing mode
   isEditingTemplate?: boolean;
+  isEditingPartCuts?: boolean;
+  onSavePartCuts?: () => void | Promise<void>;
   onSaveTemplate?: () => Promise<void>;
   onSaveAssembly?: () => Promise<void>;
 }
@@ -51,10 +53,20 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
       const showToast = useUIStore.getState().showToast;
       const filePath = useProjectStore.getState().filePath;
 
-      // Block certain file operations when editing a template or assembly
+      // Block certain file operations when editing a focused sub-mode
       const blockableFileCommands = ['new-project', 'new-from-template', 'open-project', 'open-recent'];
-      if ((isEditingAssembly || opts.isEditingTemplate) && blockableFileCommands.includes(command)) {
-        showToast(isEditingAssembly ? 'Finish editing assembly first' : 'Finish editing template first', 'warning');
+      if (
+        (isEditingAssembly || opts.isEditingTemplate || opts.isEditingPartCuts) &&
+        blockableFileCommands.includes(command)
+      ) {
+        showToast(
+          isEditingAssembly
+            ? 'Finish editing assembly first'
+            : opts.isEditingTemplate
+              ? 'Finish editing template first'
+              : 'Finish editing part cuts first',
+          'warning'
+        );
         return;
       }
 
@@ -111,6 +123,10 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         }
 
         case 'save-project': {
+          if (opts.isEditingPartCuts && opts.onSavePartCuts) {
+            await opts.onSavePartCuts();
+            break;
+          }
           // Route to template or assembly save when in those modes
           if (opts.isEditingTemplate && opts.onSaveTemplate) {
             await opts.onSaveTemplate();
@@ -131,7 +147,11 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         }
 
         case 'save-project-as': {
-          // "Save As" doesn't apply to template or assembly editing
+          // "Save As" doesn't apply to focused editing modes
+          if (opts.isEditingPartCuts) {
+            showToast('Use "Save" to commit part cuts before saving the project', 'info');
+            break;
+          }
           if (opts.isEditingTemplate) {
             showToast('Use "Save Template" to save template changes', 'info');
             break;

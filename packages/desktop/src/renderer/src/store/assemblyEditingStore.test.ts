@@ -1,16 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  createTestGroup,
+  createTestGroupMember,
+  createTestPart,
+  createTestStock
+} from '../../../../tests/helpers/factories';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
 import { useProjectStore } from './projectStore';
 import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
-import {
-  createTestPart,
-  createTestStock,
-  createTestGroup,
-  createTestGroupMember
-} from '../../../../tests/helpers/factories';
 
 const resetStores = () => {
   const store = useProjectStore.getState();
@@ -91,6 +91,35 @@ describe('assemblyEditingStore', () => {
       expect(state.parts).toHaveLength(2);
       expect(state.parts[0].name).toBe('Assembly Part 1');
       expect(state.parts[1].name).toBe('Assembly Part 2');
+    });
+
+    it('preserves part features when loading assembly parts into the workspace', () => {
+      const assemblyParts = [
+        createTestPart({
+          id: 'part-1',
+          name: 'Featured Assembly Part',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'right_end' },
+              reference: { primaryFrom: 'max' },
+              cutType: 'bevel',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 0, verticalAngle: 10 }
+            }
+          ]
+        })
+      ];
+
+      useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test Assembly', assemblyParts);
+
+      const loadedPart = useProjectStore.getState().parts[0];
+      expect(loadedPart.features).toHaveLength(1);
+      expect(loadedPart.features?.[0].kind).toBe('end_cut');
+      expect(loadedPart.features).not.toBe(assemblyParts[0].features);
     });
 
     it('merges embedded stocks with existing stocks', () => {
@@ -244,6 +273,36 @@ describe('assemblyEditingStore', () => {
       expect(assembly!.groups).toHaveLength(1);
       expect(assembly!.groups[0].name).toBe('Test Group');
       expect(assembly!.groupMembers).toHaveLength(2);
+    });
+
+    it('preserves part features in the saved assembly', () => {
+      useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test Assembly', [
+        createTestPart({
+          name: 'Featured Part',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'rect_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'corner', corner: 'front_right_corner' },
+              reference: { primaryFrom: 'max', secondaryFrom: 'min' },
+              cutType: 'corner_notch',
+              parameters: {
+                size: { length: 1, width: 1.5 },
+                depthMode: 'blind',
+                depth: 0.25
+              },
+              placement: { x: 0.5, z: 0.25 }
+            }
+          ]
+        })
+      ]);
+
+      const assembly = useAssemblyEditingStore.getState().saveEditingAssembly();
+
+      expect(assembly?.parts[0].features).toHaveLength(1);
+      expect(assembly?.parts[0].features?.[0].kind).toBe('rect_cut');
     });
   });
 

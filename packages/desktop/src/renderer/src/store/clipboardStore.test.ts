@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { createTestPart } from '../../../../tests/helpers/factories';
 import { useClipboardStore } from './clipboardStore';
+import { useLicenseStore } from './licenseStore';
 import { useProjectStore } from './projectStore';
 import { useSelectionStore } from './selectionStore';
-import { useLicenseStore } from './licenseStore';
 import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
 
@@ -103,6 +104,34 @@ describe('clipboardStore', () => {
       expect(clipboard.groups).toHaveLength(1);
       expect(clipboard.groupMembers).toHaveLength(2);
     });
+
+    it('deep copies part features into the clipboard', () => {
+      const partId = useProjectStore.getState().addPart({
+        name: 'Featured Part',
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 45 }
+          }
+        ]
+      });
+      useSelectionStore.getState().selectPart(partId);
+
+      useClipboardStore.getState().copySelectedParts();
+
+      const original = useProjectStore.getState().parts.find((part) => part.id === partId);
+      const copied = useClipboardStore.getState().clipboard.parts[0];
+
+      expect(copied.features).toEqual(original?.features);
+      expect(copied.features).not.toBe(original?.features);
+    });
   });
 
   // ============================================================
@@ -145,6 +174,116 @@ describe('clipboardStore', () => {
       const newIds = useClipboardStore.getState().pasteClipboard();
 
       expect(useSelectionStore.getState().selectedPartIds).toEqual(newIds);
+    });
+
+    it('preserves part features when pasting', () => {
+      const partId = useProjectStore.getState().addPart({
+        name: 'Original',
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'corner', corner: 'back_left_corner' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'corner_notch',
+            parameters: {
+              size: { length: 0.75, width: 0.75 },
+              depthMode: 'through'
+            },
+            placement: { x: 0, z: 0 }
+          }
+        ]
+      });
+      useSelectionStore.getState().selectPart(partId);
+      useClipboardStore.getState().copySelectedParts();
+
+      const newIds = useClipboardStore.getState().pasteClipboard();
+      const pasted = useProjectStore.getState().parts.find((part) => part.id === newIds[0]);
+
+      expect(pasted?.features).toHaveLength(1);
+      expect(pasted?.features?.[0].kind).toBe('rect_cut');
+      expect(pasted?.features).not.toBe(useClipboardStore.getState().clipboard.parts[0].features);
+    });
+
+    it('removes a stale dowel relationship when only one mate is pasted', () => {
+      const part = createTestPart({
+        id: 'first',
+        features: [
+          {
+            id: 'hole-1',
+            kind: 'circular_cut',
+            version: 1,
+            enabled: true,
+            metadata: {
+              dowelJoint: {
+                jointId: 'joint-1',
+                matePartId: 'second',
+                memberIndex: 0,
+                dowelDiameter: 0.375,
+                dowelLength: 2,
+                embedmentDepth: 1
+              }
+            },
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+            cutType: 'round_hole',
+            placement: { primary: 0, secondary: 0, rotation: 0 },
+            parameters: { diameter: 0.375, depthMode: 'blind', depth: 1, tilt: 0, direction: 0 }
+          }
+        ]
+      });
+      useProjectStore.setState({ parts: [part] });
+      useSelectionStore.getState().selectPart(part.id);
+      useClipboardStore.getState().copySelectedParts();
+
+      const [pastedId] = useClipboardStore.getState().pasteClipboard();
+      const pasted = useProjectStore.getState().parts.find((candidate) => candidate.id === pastedId)!;
+      expect(pasted.features?.[0].id).not.toBe('hole-1');
+      expect(pasted.features?.[0].metadata?.dowelJoint).toBeUndefined();
+    });
+
+    it('remaps both mates and the joint id when a complete dowel pair is pasted', () => {
+      const makePart = (id: string, matePartId: string) =>
+        createTestPart({
+          id,
+          features: [
+            {
+              id: `hole-${id}`,
+              kind: 'circular_cut',
+              version: 1,
+              enabled: true,
+              metadata: {
+                dowelJoint: {
+                  jointId: 'joint-1',
+                  matePartId,
+                  memberIndex: 0,
+                  dowelDiameter: 0.375,
+                  dowelLength: 2,
+                  embedmentDepth: 1
+                }
+              },
+              target: { type: 'face', face: id === 'first' ? 'top_face' : 'bottom_face' },
+              reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+              cutType: 'round_hole',
+              placement: { primary: 0, secondary: 0, rotation: 0 },
+              parameters: { diameter: 0.375, depthMode: 'blind', depth: 1, tilt: 0, direction: 0 }
+            }
+          ]
+        });
+      useProjectStore.setState({ parts: [makePart('first', 'second'), makePart('second', 'first')] });
+      useSelectionStore.getState().selectParts(['first', 'second']);
+      useClipboardStore.getState().copySelectedParts();
+
+      const pastedIds = useClipboardStore.getState().pasteClipboard();
+      const pasted = useProjectStore.getState().parts.filter((part) => pastedIds.includes(part.id));
+      const firstDowel = pasted[0].features?.[0].metadata?.dowelJoint as { jointId: string; matePartId: string };
+      const secondDowel = pasted[1].features?.[0].metadata?.dowelJoint as { jointId: string; matePartId: string };
+      expect(firstDowel.jointId).toBe(secondDowel.jointId);
+      expect(firstDowel.jointId).not.toBe('joint-1');
+      expect(firstDowel.matePartId).toBe(pasted[1].id);
+      expect(secondDowel.matePartId).toBe(pasted[0].id);
     });
   });
 
@@ -558,6 +697,51 @@ describe('clipboardStore', () => {
       useProjectStore.getState().newProject();
 
       expect(useClipboardStore.getState().clipboard.parts).toHaveLength(0);
+    });
+  });
+  describe('cuts clipboard', () => {
+    const dado = {
+      id: 'dado-1',
+      kind: 'rect_cut' as const,
+      version: 1,
+      enabled: true,
+      cutType: 'dado' as const,
+      target: { type: 'face' as const, face: 'top_face' as const },
+      reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+      parameters: { size: { length: 0.75, width: 4 }, depthMode: 'blind' as const, depth: 0.375 },
+      placement: { x: 6, z: 0 }
+    };
+
+    it('copies cuts from a part and applies fresh instances to targets', () => {
+      const source = createTestPart({ id: 'src', features: [dado] });
+      const t1 = createTestPart({ id: 't1' });
+      const t2 = createTestPart({ id: 't2' });
+      useProjectStore.setState({ parts: [source, t1, t2] });
+
+      const copied = useClipboardStore.getState().copyPartCuts('src');
+      expect(copied).toBe(true);
+
+      const applied = useClipboardStore.getState().pastePartCutsToParts(['t1', 't2']);
+      expect(applied).toBe(2);
+
+      const parts = useProjectStore.getState().parts;
+      const t1Features = parts.find((p) => p.id === 't1')!.features!;
+      const t2Features = parts.find((p) => p.id === 't2')!.features!;
+      expect(t1Features).toHaveLength(1);
+      expect(t2Features).toHaveLength(1);
+      expect(t1Features[0].cutType).toBe('dado');
+      // Fresh ids per target, independent of the source and each other
+      expect(t1Features[0].id).not.toBe('dado-1');
+      expect(t1Features[0].id).not.toBe(t2Features[0].id);
+    });
+
+    it('refuses to copy from parts without cuts and paste without a clipboard', () => {
+      const bare = createTestPart({ id: 'bare' });
+      useProjectStore.setState({ parts: [bare] });
+      useClipboardStore.setState({ cutsClipboard: null });
+
+      expect(useClipboardStore.getState().copyPartCuts('bare')).toBe(false);
+      expect(useClipboardStore.getState().pastePartCutsToParts(['bare'])).toBe(0);
     });
   });
 });

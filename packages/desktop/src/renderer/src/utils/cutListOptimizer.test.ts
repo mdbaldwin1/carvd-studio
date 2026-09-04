@@ -116,6 +116,47 @@ describe('cutListOptimizer', () => {
 
       expect(cutList.instructions[0].notes).toBe('Edge band front and back');
     });
+
+    it('preserves enabled authored features in cut instructions', () => {
+      const stock = createTestStock();
+      const part = createTestPart({
+        stockId: stock.id,
+        features: [
+          {
+            id: 'feature-enabled',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: {
+              horizontalAngle: 45
+            }
+          },
+          {
+            id: 'feature-disabled',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: false,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'cutout',
+            parameters: {
+              size: { length: 2, width: 2 },
+              depthMode: 'through'
+            },
+            placement: { x: 1, z: 1 }
+          }
+        ]
+      });
+
+      const cutList = generateOptimizedCutList([part], [stock], 0.125, 0.1, new Date().toISOString(), []);
+
+      expect(cutList.instructions[0].features).toHaveLength(1);
+      expect(cutList.instructions[0].features?.[0].id).toBe('feature-enabled');
+    });
   });
 
   // ============================================================

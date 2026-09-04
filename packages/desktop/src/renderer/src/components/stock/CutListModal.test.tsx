@@ -258,6 +258,41 @@ describe('CutListModal', () => {
       expect(setCutList).toHaveBeenCalledWith(mockCutList);
     });
 
+    it('blocks generation and shows issue list for invalid saved operations', () => {
+      useProjectStore.setState({
+        parts: [
+          {
+            ...mockPart,
+            features: [
+              {
+                id: 'feature-1',
+                kind: 'rect_cut',
+                version: 1,
+                enabled: true,
+                label: 'Oversized cutout',
+                target: { type: 'face', face: 'top_face' },
+                reference: { primaryFrom: 'min' },
+                cutType: 'cutout',
+                parameters: {
+                  size: { length: 30, width: 4 },
+                  depthMode: 'through'
+                },
+                placement: { x: 0, z: 0 }
+              }
+            ]
+          }
+        ]
+      });
+
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Generate Cut List'));
+
+      expect(generateOptimizedCutList).not.toHaveBeenCalled();
+      expect(screen.getByText('Issues Found')).toBeInTheDocument();
+      expect(screen.getByText(/Oversized cutout/)).toBeInTheDocument();
+    });
+
     it('records the generated cut-list result with coarse counts', () => {
       render(<CutListModal {...defaultProps} />);
 
@@ -351,6 +386,7 @@ describe('CutListModal', () => {
       fireEvent.mouseDown(screen.getByRole('tab', { name: /Cutting Diagrams/i }));
 
       expect(screen.getByText('1 board needed')).toBeInTheDocument();
+      expect(screen.getByText(/Diagrams show blank breakdown only/)).toBeInTheDocument();
     });
 
     it('switches to Shopping List tab', () => {
@@ -372,9 +408,10 @@ describe('CutListModal', () => {
 
       expect(screen.getByText('Qty')).toBeInTheDocument();
       expect(screen.getByText('Part Name')).toBeInTheDocument();
-      expect(screen.getByText('Cut Length')).toBeInTheDocument();
-      expect(screen.getByText('Cut Width')).toBeInTheDocument();
+      expect(screen.getByText('Blank Length')).toBeInTheDocument();
+      expect(screen.getByText('Blank Width')).toBeInTheDocument();
       expect(screen.getByText('Stock')).toBeInTheDocument();
+      expect(screen.getByText('Operations / Notes')).toBeInTheDocument();
     });
 
     it('shows stock name in parts list', () => {
