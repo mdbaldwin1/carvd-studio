@@ -796,6 +796,37 @@ describe('partFeatureGeometry', () => {
     expect([...positiveYLevels]).toContain(0.375);
   });
 
+  it.each(['mortise', 'stopped_groove', 'cutout'] as const)(
+    'renders an off-center %s void on the sign-inverted cross-width side',
+    (cutType) => {
+      const part = createTestPart({
+        length: 12,
+        width: 6,
+        thickness: 1,
+        features: [
+          {
+            id: `${cutType}-off-center`,
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType,
+            parameters: { size: { length: 0.755, width: 1 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 5.6225, z: 0.5 }
+          }
+        ]
+      });
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      const hitY = (z: number) =>
+        new THREE.Raycaster(new THREE.Vector3(0, 3, z), new THREE.Vector3(0, -1, 0)).intersectObject(mesh)[0].point.y;
+
+      expect(hitY(2)).toBeCloseTo(0);
+      expect(hitY(-2)).toBeCloseTo(0.5);
+    }
+  );
+
   it('renders blind top-edge notches as layered recesses', () => {
     const geometry = getPartRenderGeometry(
       createTestPart({

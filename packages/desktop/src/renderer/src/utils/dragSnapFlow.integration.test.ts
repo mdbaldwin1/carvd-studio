@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { AppSettings, Part, SnapLine } from '../types';
-import { detectFeatureSnaps, detectFractionalFaceSnaps, detectSurfaceAnchorSnaps, getPartOBB } from './snapToPartsUtil';
+import type { AppSettings, GroupMember, Part, SnapLine } from '../types';
+import {
+  detectFeatureSnaps,
+  detectFractionalFaceSnaps,
+  detectSurfaceAnchorSnaps,
+  getCombinedBounds,
+  getPartOBB
+} from './snapToPartsUtil';
 import { createAxisSnapWinners, tryApplyAxisSnap } from './snapPriority';
-import { solvePartMoveSnapPreview } from './interactionMovePreview';
+import { solveGroupMoveSnapPreview, solvePartMoveSnapPreview } from './interactionMovePreview';
 import { resolveSafeTranslationDelta } from './overlapPolicy';
 import { resolveLiveGridReleasePosition } from '../components/workspace/partTypes';
+import { resolveGroupReleaseMove, resolveMoveSelection } from './interactionMovement';
 
 function createPart(overrides: Partial<Part> = {}): Part {
   return {
@@ -240,6 +247,56 @@ describe('drag snap flow integration', () => {
     expect(resolveLiveGridReleasePosition(preview.position, preview.snappedAxes, true)).toEqual(preview.position);
   });
 
+  it('preserves zero-delta off-grid mate tangents when only the insertion axis moves', () => {
+    const host = createPart({
+      id: 'zero-delta-dado-host',
+      length: 12,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 4.03, y: 0.375, z: 4.07 },
+      features: [
+        {
+          id: 'zero-delta-dado-socket',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'dado',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          placement: { x: 5.6225, z: 0 },
+          parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 }
+        }
+      ]
+    });
+    const divider = createPart({
+      id: 'zero-delta-divider',
+      length: 4,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 4.03, y: 2.8, z: 4.07 },
+      rotation: { x: 0, y: 0, z: 90 }
+    });
+
+    const preview = solvePartMoveSnapPreview({
+      part: divider,
+      position: divider.position,
+      axes: { x: false, y: true, z: false },
+      worldHalfHeight: 2,
+      referenceParts: [host],
+      movingPartIds: [divider.id],
+      snapGuides: [],
+      settings: { ...socketSettings, liveGridSnap: true },
+      snapThreshold: 0.5,
+      latchedFaceSnap: null,
+      resolveFeatureStage: () => 'feature'
+    });
+
+    expect(preview.position).toEqual({ x: 4.03, y: 2.375, z: 4.07 });
+    expect(preview.snappedAxes).toEqual({ x: true, y: true, z: true });
+    expect(preview.mateHostPartId).toBe(host.id);
+    expect(resolveLiveGridReleasePosition(preview.position, preview.snappedAxes, true)).toEqual(preview.position);
+  });
+
   it('suppresses socket mating for a multi-selection preview', () => {
     const host = createPart({
       id: 'multi-dado-host',
@@ -287,6 +344,67 @@ describe('drag snap flow integration', () => {
 
     expect(preview.mateHostPartId).toBeUndefined();
     expect(preview.position.y).not.toBeCloseTo(2.375);
+  });
+
+  it('keeps a selected one-member group preview and release on the ordinary collision path', () => {
+    const host = createPart({
+      id: 'selected-group-dado-host',
+      length: 12,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [
+        {
+          id: 'selected-group-dado-socket',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'dado',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          placement: { x: 5.6225, z: 0 },
+          parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 }
+        }
+      ]
+    });
+    const groupedDivider = createPart({
+      id: 'selected-group-divider',
+      length: 0.75,
+      width: 6,
+      thickness: 4,
+      position: { x: 2, y: 2.8, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 }
+    });
+    const groupMembers: GroupMember[] = [
+      { id: 'selected-group-member', groupId: 'selected-group', memberType: 'part', memberId: groupedDivider.id }
+    ];
+    const selection = { selectedPartIds: [], selectedGroupIds: ['selected-group'], editingGroupId: null };
+    const parts = [host, groupedDivider];
+    const moveSelection = resolveMoveSelection(selection, parts, groupMembers);
+    const preview = solveGroupMoveSnapPreview({
+      initialBounds: getCombinedBounds(moveSelection.affectedParts),
+      anchorPosition: moveSelection.anchorPosition,
+      delta: { x: -1.99, y: 0, z: 0 },
+      axes: { x: true, y: true, z: true },
+      referenceParts: parts,
+      movingPartIds: moveSelection.affectedPartIds,
+      movingParts: moveSelection.affectedParts,
+      snapGuides: [],
+      settings: socketSettings,
+      snapThreshold: 0.5
+    });
+    const release = resolveGroupReleaseMove({
+      parts,
+      groupMembers,
+      selection,
+      proposedDelta: preview.delta,
+      fallbackDeltaOnOverlap: preview.delta,
+      preventOverlap: true
+    });
+    expect(moveSelection.affectedPartIds).toEqual([groupedDivider.id]);
+    expect(groupedDivider.position.y + preview.delta.y).not.toBeCloseTo(2.375);
+    expect(release.constrained.delta).toEqual(preview.delta);
+    expect(release.constrained.overlapBlocked).toBe(false);
   });
 
   it('centers a holistic mortise mate across locked axes and axes that return to the drag origin', () => {

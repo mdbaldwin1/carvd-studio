@@ -335,7 +335,6 @@ export function solveGroupMoveSnapPreview(params: {
       enableGoldenRatioAnchors: settings.enableGoldenRatioAnchors ?? false,
       enableFeatureAnchors: settings.enableFeatureAnchors ?? true,
       detectors: {
-        mate: () => getSnapContext().advancedDetectors.mate(),
         surface: () => getSnapContext().advancedDetectors.surface(),
         fraction: () => getSnapContext().advancedDetectors.fraction(),
         feature: () => getSnapContext().advancedDetectors.feature() as SnapResult,

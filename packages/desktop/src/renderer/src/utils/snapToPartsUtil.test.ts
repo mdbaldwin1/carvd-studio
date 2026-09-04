@@ -2007,6 +2007,56 @@ describe('snapToPartsUtil', () => {
       ).toBeUndefined();
     });
 
+    it('places an off-center tenon tongue on its rendered cross-width side', () => {
+      const hostPart = createTestPart({
+        id: 'centered-mortise-host',
+        length: 12,
+        width: 6,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [
+          {
+            id: 'centered-mortise',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'mortise',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.51, width: 1.01 }, depthMode: 'blind', depth: 0.75 },
+            placement: { x: 5.745, z: 2.495 }
+          }
+        ]
+      });
+      const tenonedRail = createTestPart({
+        id: 'off-center-tenon-rail',
+        length: 4,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 2.25, z: -0.25 },
+        rotation: { x: 0, y: 0, z: 90 },
+        features: [
+          {
+            id: 'off-center-tenon',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'tenon',
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.75, width: 1 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 0, z: 0.25 }
+          }
+        ]
+      });
+
+      const result = detectFeatureMateSnaps(tenonedRail, tenonedRail.position, [hostPart], [tenonedRail.id], 0.03);
+      expect(result.mateHostPartId).toBe(hostPart.id);
+      expect(result.adjustedPosition.x).toBeCloseTo(tenonedRail.position.x);
+      expect(result.adjustedPosition.y).toBeCloseTo(tenonedRail.position.y);
+      expect(result.adjustedPosition.z).toBeCloseTo(tenonedRail.position.z);
+    });
+
     it('mates complementary half-lap solids and rejects a depth mismatch', () => {
       const halfLap = (id: string, face: 'top_face' | 'bottom_face', depth: number) => ({
         id,
@@ -2051,6 +2101,40 @@ describe('snapToPartsUtil', () => {
         detectFeatureMateSnaps(mismatchedPart, mismatchedPart.position, [hostPart], [mismatchedPart.id], 0.5)
           .mateHostPartId
       ).toBeUndefined();
+    });
+
+    it('places an off-center blind remaining-solid shape on its rendered cross-width side', () => {
+      const blindCut = (id: string, face: 'top_face' | 'bottom_face', z: number) => ({
+        id,
+        kind: 'rect_cut' as const,
+        version: 1,
+        enabled: true,
+        cutType: 'cutout' as const,
+        target: { type: 'face' as const, face },
+        reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+        parameters: { size: { length: 2, width: 1 }, depthMode: 'blind' as const, depth: 0.375 },
+        placement: { x: 2, z }
+      });
+      const hostPart = createTestPart({
+        id: 'centered-blind-host',
+        length: 6,
+        width: 2,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [blindCut('centered-top-cut', 'top_face', 0.5)]
+      });
+      const movingPart = createTestPart({
+        id: 'off-center-blind-mover',
+        length: 6,
+        width: 2,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: -0.25 },
+        features: [blindCut('off-center-bottom-cut', 'bottom_face', 0.25)]
+      });
+
+      const result = detectFeatureMateSnaps(movingPart, movingPart.position, [hostPart], [movingPart.id], 0.03);
+      expect(result.mateHostPartId).toBe(hostPart.id);
+      expect(result.adjustedPosition).toEqual(movingPart.position);
     });
 
     it('snaps part into a matching cutout pocket', () => {
@@ -2213,9 +2297,10 @@ describe('snapToPartsUtil', () => {
       });
 
       // Mortise world center:
-      // localCenterX = -12 + 10 + 1 = -1, localCenterZ = -3 + 2 + 0.5 = -0.5
-      // worldCenter = (-1, 1.5, -0.5)
-      const currentPos = { x: -1, y: 2.5, z: -0.5 };
+      // localCenterX = -12 + 10 + 1 = -1. The rendered geometry rotates
+      // contour Z through -90 degrees, so authored local Z -0.5 renders at +0.5.
+      // worldCenter = (-1, 1.5, 0.5)
+      const currentPos = { x: -1, y: 2.5, z: 0.5 };
 
       const result = detectFeatureMateSnaps(dragPart, currentPos, [hostPart, dragPart], ['drag'], 0.5);
       expect(result.mateHostPartId).toBe('host');

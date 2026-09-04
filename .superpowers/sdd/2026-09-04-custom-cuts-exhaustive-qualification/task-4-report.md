@@ -71,3 +71,25 @@ The first review identified five gaps in the initial narrow exemption. Each was 
 - Prettier and `git diff --check`: passed for all changed files.
 
 The material-cell proof is intentionally conservative outside supported rectangular top/bottom operations and tenon shoulders: unsupported removed geometry is treated as solid, which may decline a future exotic mate but cannot create a collision bypass. There is no known Task 4 blocker.
+
+## Review round 2 — rendered geometry and group-path consistency
+
+The second review found that feature mating and collision material used authored contour Z directly even though the renderer maps contour Z to part-local Z with a sign inversion. It also found that axes already exactly aligned to a holistic mate were absent from the snapped-axis result, and that the group solver still exposed single-part mate detection.
+
+- Added one rendered-local-Z interval conversion and applied it consistently to rectangular socket centers, host cut-volume material cells, tenon tongue material/mate shapes, and blind-cut remaining-solid mate shapes. Render-ray characterization and collision regressions cover off-center mortise, stopped-groove, and cutout voids: a member seats in the visible void, while the mirrored solid location cannot detect or claim a host exemption. An off-center tenon regression additionally proves both its visible tongue placement and exact moving-material validation.
+- Mate candidates now carry the world axes constrained by their insertion normal and tight tangents. Those axes remain snapped even when their accepted delta is zero, so an exact off-grid tangent survives Live Grid release while only the insertion axis moves. Loose sliding tangents remain unconstrained.
+- Removed mate detection from the group preview solver. A selected-group Electron RED then exposed a second ownership defect: the central canvas fallback launched a direct-part drag over the already-started group drag and restored the forbidden mate. The fallback now yields whenever the hit part belongs to a selected group. A real pointer gesture on a singleton group proves the live preview contains only ordinary face/surface winners, release commits the same non-penetrating transform, selection remains group-only, and ordinary collision protection remains active.
+- Updated legacy mortise, half-lap, and rabbet qualification fixtures that intentionally targeted the former mirrored cross-width coordinate so they continue to describe the same visibly rendered geometry.
+
+### Review-round-2 verification
+
+- Review-focused Vitest suites: 5 files, 229 tests passed.
+- Full desktop renderer tests: 173 files, 3,727 tests passed.
+- Full desktop main-process tests: 9 files, 213 tests passed.
+- Desktop lint and typecheck: passed.
+- Fresh production Electron build: passed.
+- `custom-cuts-assembly.spec.ts`: 5/5 passed, including the real selected singleton-group gesture.
+- Full Electron run: all 5 assembly tests passed; overall 123/124 passed. The sole failure is the same unrelated countersink lifecycle case documented above (`Save Cut` disabled at `part-cuts-lifecycle.spec.ts:935`).
+- Prettier and `git diff --check`: passed for all changed files.
+
+There is no known Task 4 blocker. The selected-group fallback guard is deliberately narrow: it changes ownership only for a part already contained by the active selected group and leaves direct-part and ordinary multi-part fallback behavior unchanged.

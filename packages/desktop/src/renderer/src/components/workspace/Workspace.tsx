@@ -596,6 +596,21 @@ export function Workspace() {
         if (action.button !== 0 || action.hit?.kind !== 'part-body') return;
         const activeSession = useInteractionStore.getState().activeSession;
         const selectionState = useSelectionStore.getState();
+        const projectState = useProjectStore.getState();
+        const hitContext = getPartGroupContext(
+          action.hit.partId,
+          projectState.groupMembers,
+          selectionState.editingGroupId
+        );
+        const isSelectedGroupDrag = hitContext.ancestorGroupIds.some((groupId) =>
+          selectionState.selectedGroupIds.includes(groupId)
+        );
+        if (isSelectedGroupDrag) {
+          debugSelection('session:dragstart:part-fallback:skipped-selected-group', {
+            partId: action.hit.partId
+          });
+          return;
+        }
         const isDirectPartDragAlreadyActive =
           activeSession?.kind === 'move' &&
           activeSession.primaryPartId === action.hit.partId &&

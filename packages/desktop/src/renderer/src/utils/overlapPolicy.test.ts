@@ -456,7 +456,7 @@ describe('overlapPolicy', () => {
     const offsetCut = createPart({
       ...crossing,
       id: 'offset-cut',
-      position: { x: -0.25, y: 0.375, z: 0 },
+      position: { x: 0.25, y: 0.375, z: 0 },
       features: [{ ...halfLap('offset-cut-feature', 'bottom_face', 0.375, 2, 2, 2, 0.25), cutType: 'cutout' }]
     });
     const depthMismatch = createPart({
@@ -478,6 +478,124 @@ describe('overlapPolicy', () => {
     for (const candidate of [wrongFace, partialLength, partialWidth, offsetCut, depthMismatch]) {
       expect(overlapsAtCurrentPosition(candidate), candidate.id).toBe(true);
     }
+  });
+
+  it.each(['mortise', 'stopped_groove', 'cutout'] as const)(
+    'uses the rendered cross-width side for an off-center %s socket exemption',
+    (cutType) => {
+      const host = createPart({
+        id: `${cutType}-host`,
+        length: 12,
+        width: 6,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [
+          {
+            id: `${cutType}-socket`,
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.755, width: 1 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 5.6225, z: 0.5 }
+          }
+        ]
+      });
+      const mateAt = (id: string, z: number) =>
+        createPart({
+          id,
+          length: 4,
+          width: 1,
+          thickness: 0.75,
+          position: { x: 0, y: 2.5, z },
+          rotation: { x: 0, y: 0, z: 90 }
+        });
+      // Authored contour Z [-2.5, -1.5] renders at world Z [1.5, 2.5].
+      const visibleVoidMate = mateAt('visible-void-mate', 2);
+      const mirroredSolidMate = mateAt('mirrored-solid-mate', -2);
+      const exactMate = (candidate: Part) =>
+        detectFeatureMateSnaps(candidate, candidate.position, [host], [candidate.id], 0.03);
+      const overlapWithClaimedHost = (candidate: Part) =>
+        wouldTranslationCauseOverlap(
+          [host, candidate],
+          new Set([candidate.id]),
+          { x: 0, y: 0, z: 0 },
+          undefined,
+          host.id
+        );
+
+      expect(exactMate(visibleVoidMate).mateHostPartId).toBe(host.id);
+      expect(overlapWithClaimedHost(visibleVoidMate)).toBe(false);
+      expect(exactMate(mirroredSolidMate).mateHostPartId).toBeUndefined();
+      expect(overlapWithClaimedHost(mirroredSolidMate)).toBe(true);
+    }
+  );
+
+  it('uses the rendered cross-width side for an off-center tenon material shape', () => {
+    const host = createPart({
+      id: 'tenon-material-host',
+      length: 12,
+      width: 6,
+      thickness: 1,
+      position: { x: 0, y: 0.5, z: 0 },
+      features: [
+        {
+          id: 'tenon-material-mortise',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'mortise',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          parameters: { size: { length: 0.51, width: 1.01 }, depthMode: 'blind', depth: 0.75 },
+          placement: { x: 5.745, z: 2.495 }
+        }
+      ]
+    });
+    const tenonedRail = createPart({
+      id: 'off-center-tenon-material',
+      length: 4,
+      width: 2,
+      thickness: 1,
+      position: { x: 0, y: 2.25, z: -0.25 },
+      rotation: { x: 0, y: 0, z: 90 },
+      features: [
+        {
+          id: 'off-center-tenon-material-cut',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'tenon',
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          parameters: { size: { length: 0.75, width: 1 }, depthMode: 'blind', depth: 0.5 },
+          placement: { x: 0, z: 0.25 }
+        }
+      ]
+    });
+    const mate = detectFeatureMateSnaps(tenonedRail, tenonedRail.position, [host], [tenonedRail.id], 0.03);
+
+    expect(mate.mateHostPartId).toBe(host.id);
+    expect(
+      wouldTranslationCauseOverlap(
+        [host, tenonedRail],
+        new Set([tenonedRail.id]),
+        { x: 0, y: 0, z: 0 },
+        undefined,
+        host.id
+      )
+    ).toBe(false);
+    expect(
+      wouldTranslationCauseOverlap(
+        [host, { ...tenonedRail, position: { ...tenonedRail.position, z: 0.25 } }],
+        new Set([tenonedRail.id]),
+        { x: 0, y: 0, z: 0 },
+        undefined,
+        host.id
+      )
+    ).toBe(true);
   });
 
   it('decomposes corner notch contour into correct sub-boxes', () => {

@@ -40,10 +40,15 @@ const rectCut = (
   parameters: { size, depthMode: 'blind', depth }
 });
 
-async function seedFixture(window: Page, parts: FixturePart[], selectedPartId: string): Promise<void> {
+async function seedFixture(
+  window: Page,
+  parts: FixturePart[],
+  selectedPartId: string,
+  singletonGroupMemberId?: string
+): Promise<void> {
   await seedProject(window, 'empty');
   await window.evaluate(
-    ({ fixtureParts, selectedId }) => {
+    ({ fixtureParts, selectedId, groupMemberId }) => {
       const project = window.useProjectStore.getState();
       project.setStockConstraints({ ...project.stockConstraints, preventOverlap: true });
       window.useSnapStore.getState().setSnapToPartsEnabled(true);
@@ -57,9 +62,13 @@ async function seedFixture(window: Page, parts: FixturePart[], selectedPartId: s
           grainDirection: 'length'
         });
       }
-      window.useSelectionStore.getState().selectPart(selectedId);
+      if (groupMemberId) {
+        project.createGroup('Singleton Mate Group', [{ id: groupMemberId, type: 'part' }]);
+      } else {
+        window.useSelectionStore.getState().selectPart(selectedId);
+      }
     },
-    { fixtureParts: parts, selectedId: selectedPartId }
+    { fixtureParts: parts, selectedId: selectedPartId, groupMemberId: singletonGroupMemberId }
   );
   await window.waitForTimeout(300);
 }
@@ -129,6 +138,45 @@ async function selectedTransform(window: Page) {
       .parts.find((candidate: { id: string }) => candidate.id === selectedId);
     return { position: part.position, rotation: part.rotation };
   });
+}
+
+async function dragSelectedGroupOnFace(window: Page, partId: string, delta: { x: number; y: number }) {
+  const start = await window.evaluate((id) => window.__carvdE2E?.getPartScreenPoint(id) ?? null, partId);
+  if (!start) throw new Error(`No canvas point is available for grouped part ${partId}`);
+
+  await window.mouse.move(start.x, start.y);
+  await window.waitForTimeout(150);
+  await window.mouse.down();
+  try {
+    await window.waitForTimeout(250);
+    for (let i = 1; i <= 12; i += 1) {
+      await window.mouse.move(start.x + (delta.x * i) / 12, start.y + (delta.y * i) / 12);
+      await window.waitForTimeout(20);
+    }
+    await expect
+      .poll(() =>
+        window.evaluate(() => {
+          const session = window.useInteractionStore.getState().activeSession;
+          return session?.kind === 'move' ? session.delta : null;
+        })
+      )
+      .not.toBeNull();
+    return await window.evaluate(() => {
+      const session = window.useInteractionStore.getState().activeSession;
+      const selection = window.useSelectionStore.getState();
+      return session?.kind === 'move'
+        ? {
+            delta: session.delta,
+            snapLines: window.useSnapStore.getState().activeSnapLines,
+            selectedPartIds: selection.selectedPartIds,
+            selectedGroupIds: selection.selectedGroupIds
+          }
+        : null;
+    });
+  } finally {
+    await window.mouse.up();
+    await window.waitForTimeout(500);
+  }
 }
 
 test.describe.serial('custom cuts assembly qualification', () => {
@@ -231,6 +279,66 @@ test.describe.serial('custom cuts assembly qualification', () => {
     expect(after.dividerTransform).toBe(before.dividerTransform);
   });
 
+  test('keeps a selected singleton group on the ordinary face-snap and collision path', async () => {
+    await seedFixture(
+      running.window,
+      [
+        {
+          id: 'group-dado-host',
+          name: 'Group Dado Host',
+          length: 12,
+          width: 6,
+          thickness: 0.75,
+          position: { x: 4, y: 0.375, z: 4 },
+          features: [
+            rectCut('group-dado-slot', 'dado', { type: 'face', face: 'top_face' }, { length: 0.755, width: 6 }, 0.375, {
+              x: 5.6225,
+              z: 0
+            })
+          ]
+        },
+        {
+          id: 'grouped-dado-divider',
+          name: 'Grouped Dado Divider',
+          length: 0.75,
+          width: 6,
+          thickness: 4,
+          position: { x: 4.1, y: 2.8, z: 4 }
+        }
+      ],
+      'grouped-dado-divider',
+      'grouped-dado-divider'
+    );
+    await enablePrecisionSnapping(running.window);
+    await setCamera(running.window, 'front');
+
+    const previewDelta = await dragSelectedGroupOnFace(running.window, 'grouped-dado-divider', { x: 7, y: 0 });
+    const state = await running.window.evaluate(() => {
+      const selection = window.useSelectionStore.getState();
+      const part = window.useProjectStore
+        .getState()
+        .parts.find((candidate: { id: string }) => candidate.id === 'grouped-dado-divider');
+      return {
+        position: part.position,
+        selectedPartIds: selection.selectedPartIds,
+        selectedGroupIds: selection.selectedGroupIds
+      };
+    });
+
+    expect(previewDelta).not.toBeNull();
+    expect(previewDelta!.selectedPartIds).toEqual([]);
+    expect(previewDelta!.selectedGroupIds).toHaveLength(1);
+    expect(previewDelta!.snapLines).not.toHaveLength(0);
+    expect(previewDelta!.snapLines.every((line: { family?: string }) => line.family !== undefined)).toBe(true);
+    expect(previewDelta!.snapLines.map((line: { family?: string }) => line.family)).toContain('face');
+    expect(2.8 + previewDelta!.delta.y).toBeCloseTo(2.75, 3);
+    expect(state.position.y).toBeCloseTo(2.75, 3);
+    expect(state.position.y).not.toBeCloseTo(2.375, 2);
+    expect(state.selectedPartIds).toEqual([]);
+    expect(state.selectedGroupIds).toHaveLength(1);
+    await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);
+  });
+
   test('seats groove, stopped-groove, and rabbet fits while respecting a stopped termination', async () => {
     let configuredSnapping = false;
     const cases = [
@@ -259,7 +367,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
         size: { length: 12, width: 0.755 },
         placement: { x: 0, z: 0 },
         candidateX: 4,
-        candidateZ: 1.4775
+        candidateZ: 6.7225
       }
     ];
 

@@ -41,6 +41,18 @@ export interface PartOBB {
   halfExtents: [number, number, number];
 }
 
+// Rect-cut contours are authored in XY and rotated -90 degrees about X for the
+// board, so authored contour Z maps to the opposite sign in part-local Z.
+function getRenderedLocalZRange(partWidth: number, placementZ: number, featureWidth: number) {
+  const contourMin = -partWidth / 2 + placementZ;
+  const contourMax = contourMin + featureWidth;
+  return {
+    min: -contourMax,
+    max: -contourMin,
+    center: -(contourMin + contourMax) / 2
+  };
+}
+
 // Snap suggestion for a single axis
 interface AxisSnap {
   snapped: boolean;
@@ -350,11 +362,11 @@ export function getPartMaterialOBBs(
       const halfThickness = part.thickness / 2;
       const depth = getRectCutDepth(feature, part.thickness);
       const rawXMin = -halfLength + feature.placement.x;
-      const rawZMin = -halfWidth + feature.placement.z;
+      const renderedZ = getRenderedLocalZRange(part.width, feature.placement.z, feature.parameters.size.width);
       const xMin = Math.max(-halfLength, rawXMin);
       const xMax = Math.min(halfLength, rawXMin + feature.parameters.size.length);
-      const zMin = Math.max(-halfWidth, rawZMin);
-      const zMax = Math.min(halfWidth, rawZMin + feature.parameters.size.width);
+      const zMin = Math.max(-halfWidth, renderedZ.min);
+      const zMax = Math.min(halfWidth, renderedZ.max);
       const yMin = isBottomTarget(feature) ? -halfThickness : halfThickness - depth;
       const yMax = isBottomTarget(feature) ? -halfThickness + depth : halfThickness;
       return { xMin, xMax, yMin, yMax, zMin, zMax };
@@ -387,8 +399,9 @@ export function getPartMaterialOBBs(
     const xMin = isLeft ? -halfLength : halfLength - length;
     const xMax = isLeft ? -halfLength + length : halfLength;
     const tongueHalfThickness = Math.min(halfThickness, Math.max(0, tenon.parameters.depth ?? 0) / 2);
-    const zMin = Math.max(-halfWidth, -halfWidth + tenon.placement.z);
-    const zMax = Math.min(halfWidth, zMin + tenon.parameters.size.width);
+    const renderedZ = getRenderedLocalZRange(part.width, tenon.placement.z, tenon.parameters.size.width);
+    const zMin = Math.max(-halfWidth, renderedZ.min);
+    const zMax = Math.min(halfWidth, renderedZ.max);
     xs.add(xMin);
     xs.add(xMax);
     ys.add(-tongueHalfThickness);
@@ -3618,7 +3631,6 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
   const axZ: Vec3 = { x: 2 * (xz + wy), y: 2 * (yz - wx), z: 1 - 2 * (xx + yy) };
 
   const halfLength = part.length / 2;
-  const halfWidth = part.width / 2;
   const halfThick = part.thickness / 2;
 
   const sockets: FeatureSocket[] = [];
@@ -3642,10 +3654,9 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
     // Local-space opening rectangle
     const startX = -halfLength + resolved.placement.x;
     const endX = startX + resolved.parameters.size.length;
-    const startZ = -halfWidth + resolved.placement.z;
-    const endZ = startZ + resolved.parameters.size.width;
+    const renderedZ = getRenderedLocalZRange(part.width, resolved.placement.z, resolved.parameters.size.width);
     const localCenterX = (startX + endX) / 2;
-    const localCenterZ = (startZ + endZ) / 2;
+    const localCenterZ = renderedZ.center;
     const localCenterY = isTop ? halfThick : -halfThick;
 
     // Transform to world space
@@ -3695,7 +3706,6 @@ function getMateShapes(part: Part, position: Vec3): MateShape[] {
   const base = getPartOBB({ ...part, features: [] }, position);
   const [axisX, axisY, axisZ] = base.axes;
   const halfLength = part.length / 2;
-  const halfWidth = part.width / 2;
 
   if (tenons.length > 0) {
     return tenons.map((tenon) => {
@@ -3704,7 +3714,7 @@ function getMateShapes(part: Part, position: Vec3): MateShape[] {
       const tongueWidth = tenon.parameters.size.width;
       const tongueThickness = tenon.parameters.depth ?? 0;
       const localCenterX = leftEnd ? -halfLength + tenonLength / 2 : halfLength - tenonLength / 2;
-      const localCenterZ = -halfWidth + tenon.placement.z + tongueWidth / 2;
+      const localCenterZ = getRenderedLocalZRange(part.width, tenon.placement.z, tongueWidth).center;
       const insertionAxis = leftEnd ? axisX : mulVec(axisX, -1);
 
       return {
@@ -3726,7 +3736,7 @@ function getMateShapes(part: Part, position: Vec3): MateShape[] {
     if (cutDepth <= 0 || remainingThickness <= 0) continue;
 
     const localCenterX = -halfLength + cut.placement.x + cut.parameters.size.length / 2;
-    const localCenterZ = -halfWidth + cut.placement.z + cut.parameters.size.width / 2;
+    const localCenterZ = getRenderedLocalZRange(part.width, cut.placement.z, cut.parameters.size.width).center;
     const localCenterY = isBottomTarget(cut) ? cutDepth / 2 : -cutDepth / 2;
     shapes.push({
       obb: {
@@ -3768,6 +3778,7 @@ export function detectFeatureMateSnaps(
   let bestDelta: Vec3 | undefined;
   let bestDistance = Infinity;
   let bestHostPartId: string | undefined;
+  let bestConstrainedAxes: { x: boolean; y: boolean; z: boolean } | undefined;
 
   for (const hostPart of nearParts) {
     const sockets = getPartFeatureSockets(hostPart);
@@ -3792,6 +3803,7 @@ export function detectFeatureMateSnaps(
         bestDistance = match.distance;
         bestDelta = match.delta;
         bestHostPartId = hostPart.id;
+        bestConstrainedAxes = match.constrainedAxes;
       }
     }
   }
@@ -3807,9 +3819,9 @@ export function detectFeatureMateSnaps(
   }
 
   const adjustedPosition = addVec(currentPosition, bestDelta);
-  const snappedX = Math.abs(bestDelta.x) > 1e-5;
-  const snappedY = Math.abs(bestDelta.y) > 1e-5;
-  const snappedZ = Math.abs(bestDelta.z) > 1e-5;
+  const snappedX = bestConstrainedAxes?.x ?? false;
+  const snappedY = bestConstrainedAxes?.y ?? false;
+  const snappedZ = bestConstrainedAxes?.z ?? false;
   const axis = dominantAxisFromDelta(bestDelta);
 
   return {
@@ -3838,7 +3850,7 @@ function findBestMateMatch(
   draggingOBB: PartOBB,
   socket: FeatureSocket,
   snapThreshold: number
-): { delta: Vec3; distance: number } | undefined {
+): { delta: Vec3; distance: number; constrainedAxes: { x: boolean; y: boolean; z: boolean } } | undefined {
   const [axisX, axisY, axisZ] = draggingOBB.axes;
   const [hx, hy, hz] = draggingOBB.halfExtents;
 
@@ -3870,7 +3882,9 @@ function findBestMateMatch(
     }
   ];
 
-  let bestResult: { delta: Vec3; distance: number } | undefined;
+  let bestResult:
+    | { delta: Vec3; distance: number; constrainedAxes: { x: boolean; y: boolean; z: boolean } }
+    | undefined;
   let bestDist = Infinity;
 
   for (const cand of candidates) {
@@ -3957,7 +3971,16 @@ function findBestMateMatch(
     const distance = lenVec(delta);
     if (distance < bestDist) {
       bestDist = distance;
-      bestResult = { delta, distance };
+      const constrainedDirections = [n, ...(tight1 ? [snapT1] : []), ...(tight2 ? [snapT2] : [])];
+      bestResult = {
+        delta,
+        distance,
+        constrainedAxes: {
+          x: constrainedDirections.some((direction) => Math.abs(direction.x) > 1e-5),
+          y: constrainedDirections.some((direction) => Math.abs(direction.y) > 1e-5),
+          z: constrainedDirections.some((direction) => Math.abs(direction.z) > 1e-5)
+        }
+      };
     }
   }
 
