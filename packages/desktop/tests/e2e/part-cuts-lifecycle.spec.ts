@@ -1173,6 +1173,23 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByRole('button', { name: 'Save Cut' }).click();
 
     await window.getByRole('button', { name: '+ Add Cut' }).click();
+    await window.getByRole('button', { name: /^Countersink\b/ }).click();
+    await window.getByLabel('Repeating Pattern').selectOption('grid');
+    await window.getByLabel('Rows').fill('3');
+    await window.getByLabel('Columns').fill('2');
+    await fillFraction(window, 'Row Spacing', 0.25);
+    await fillFraction(window, 'Column Spacing', 0.5);
+    await window.getByRole('button', { name: 'Save Cut' }).click();
+
+    await window.getByRole('button', { name: '+ Add Cut' }).click();
+    await window.getByRole('button', { name: /^Counterbore\b/ }).click();
+    await window.getByLabel('Repeating Pattern').selectOption('circular');
+    await window.getByLabel('Hole Count').fill('4');
+    await fillFraction(window, 'Pattern Radius', 0.5);
+    await window.getByLabel('Start Angle').fill('30');
+    await window.getByRole('button', { name: 'Save Cut' }).click();
+
+    await window.getByRole('button', { name: '+ Add Cut' }).click();
     await window.getByRole('button', { name: /^Rounded Rectangle\b/ }).click();
     await window.getByRole('button', { name: 'Save Cut' }).click();
     await window.getByRole('button', { name: 'Save Part' }).click();
@@ -1184,16 +1201,21 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByRole('button', { name: 'Carvd Studio home' }).click();
     await queueOpenPaths(window, [projectPath]);
     await window.getByRole('button', { name: 'Open file...' }).click();
-    await expect.poll(() => getFirstPartFeatureCount(window), { timeout: 5000 }).toBe(2);
+    await expect.poll(() => getFirstPartFeatureCount(window), { timeout: 5000 }).toBe(4);
 
-    const savedKinds = await window.evaluate(() =>
+    const savedFeatures = await window.evaluate(() =>
       (window.useProjectStore.getState().parts[0].features ?? []).map((feature) => ({
         kind: feature.kind,
-        pattern: feature.kind === 'circular_cut' ? feature.pattern?.type : undefined
+        pattern: feature.kind === 'circular_cut' ? feature.pattern : undefined
       }))
     );
-    expect(savedKinds).toEqual([
-      { kind: 'circular_cut', pattern: 'linear' },
+    expect(savedFeatures).toEqual([
+      { kind: 'circular_cut', pattern: { type: 'linear', count: 3, spacing: 1, direction: 0 } },
+      {
+        kind: 'circular_cut',
+        pattern: { type: 'grid', rows: 3, columns: 2, rowSpacing: 0.25, columnSpacing: 0.5, rotation: 0 }
+      },
+      { kind: 'circular_cut', pattern: { type: 'circular', count: 4, radius: 0.5, startAngle: 30 } },
       { kind: 'rounded_cut', pattern: undefined }
     ]);
   });

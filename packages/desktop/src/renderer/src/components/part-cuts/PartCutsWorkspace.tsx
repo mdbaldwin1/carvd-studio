@@ -1809,16 +1809,15 @@ export function PartCutsWorkspace({
                                 : 'Blind previews use top or bottom targets so the recess direction stays clear.'}
                             </p>
                           )}
-
-                        {draftValidationMessage && (
-                          <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-[11px] text-danger">
-                            {draftValidationMessage}
-                          </div>
-                        )}
                       </>
                     )}
                   </div>
                 </div>
+                {draftValidationMessage && (
+                  <div className="mt-3 rounded-md border border-danger/30 bg-danger/5 p-3 text-[11px] text-danger">
+                    {draftValidationMessage}
+                  </div>
+                )}
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button type="button" size="sm" onClick={handleSaveDraft} disabled={!!draftValidationMessage}>
                     Save Cut

@@ -193,9 +193,54 @@ function distanceToExit(point: Point3, axis: Point3, part: Part): number {
 export function validateCircularCut(feature: CircularCutFeature, part: Part): string | null {
   if (!Number.isFinite(feature.parameters.diameter) || feature.parameters.diameter <= 0)
     return 'Hole diameter must be greater than zero.';
+  if (!Number.isFinite(feature.parameters.tilt) || feature.parameters.tilt < 0 || feature.parameters.tilt >= 90)
+    return 'Hole tilt must be at least 0° and less than 90°.';
+  if (!Number.isFinite(feature.parameters.direction)) return 'Hole tilt direction must be a finite angle.';
+
+  const pattern = feature.pattern;
+  if (pattern?.type === 'linear') {
+    if (!Number.isInteger(pattern.count) || pattern.count < 1 || pattern.count > 128)
+      return 'Linear pattern count must be between 1 and 128.';
+    if (!Number.isFinite(pattern.spacing) || pattern.spacing <= 0)
+      return 'Linear pattern spacing must be greater than zero.';
+    if (!Number.isFinite(pattern.direction)) return 'Linear pattern direction must be a finite angle.';
+  }
+  if (pattern?.type === 'grid') {
+    if (
+      !Number.isInteger(pattern.rows) ||
+      !Number.isInteger(pattern.columns) ||
+      pattern.rows < 1 ||
+      pattern.columns < 1
+    )
+      return 'Grid pattern rows and columns must be whole numbers greater than zero.';
+    if (pattern.rows * pattern.columns > 128) return 'Grid pattern count must be between 1 and 128.';
+    if (
+      !Number.isFinite(pattern.rowSpacing) ||
+      !Number.isFinite(pattern.columnSpacing) ||
+      pattern.rowSpacing <= 0 ||
+      pattern.columnSpacing <= 0
+    )
+      return 'Grid pattern spacing must be greater than zero.';
+    if (!Number.isFinite(pattern.rotation)) return 'Grid pattern rotation must be a finite angle.';
+  }
+  if (pattern?.type === 'circular') {
+    if (!Number.isInteger(pattern.count) || pattern.count < 1 || pattern.count > 128)
+      return 'Circular pattern count must be between 1 and 128.';
+    if (!Number.isFinite(pattern.radius) || pattern.radius <= 0)
+      return 'Circular pattern radius must be greater than zero.';
+    if (!Number.isFinite(pattern.startAngle)) return 'Circular pattern start angle must be a finite angle.';
+  }
+
+  if (feature.parameters.depthMode === 'blind') {
+    const depth = feature.parameters.depth;
+    if (!Number.isFinite(depth) || depth === undefined || depth <= 0)
+      return 'Blind-hole depth must be greater than zero.';
+  }
   if (
     feature.cutType === 'countersink' &&
     (!feature.parameters.countersink ||
+      !Number.isFinite(feature.parameters.countersink.majorDiameter) ||
+      !Number.isFinite(feature.parameters.countersink.includedAngle) ||
       feature.parameters.countersink.majorDiameter <= feature.parameters.diameter ||
       feature.parameters.countersink.includedAngle <= 0 ||
       feature.parameters.countersink.includedAngle >= 180)
@@ -204,12 +249,20 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
   if (
     feature.cutType === 'counterbore' &&
     (!feature.parameters.counterbore ||
+      !Number.isFinite(feature.parameters.counterbore.diameter) ||
+      !Number.isFinite(feature.parameters.counterbore.depth) ||
       feature.parameters.counterbore.diameter <= feature.parameters.diameter ||
       feature.parameters.counterbore.depth <= 0)
   )
     return 'Counterbore diameter must exceed the hole diameter and its recess depth must be greater than zero.';
   const frame = getFaceFrame(part, feature.target.face);
-  const radius = feature.parameters.diameter / 2;
+  const profileDiameter =
+    feature.cutType === 'countersink'
+      ? feature.parameters.countersink!.majorDiameter
+      : feature.cutType === 'counterbore'
+        ? feature.parameters.counterbore!.diameter
+        : feature.parameters.diameter;
+  const radius = profileDiameter / 2;
   const expanded = expandCircularCut(feature, part);
   for (const member of expanded) {
     const delta = {

@@ -425,6 +425,25 @@ describe('applyHandleDelta', () => {
     const stoppedDado = createRectDraft('stopped_dado');
     expect(applyHandleDelta(part, stoppedDado, 'width', 0, 0.5).sizeWidth).toBe(stoppedDado.sizeWidth);
   });
+
+  it.each([
+    ['cutout', true],
+    ['stopped_dado', false],
+    ['stopped_groove', true],
+    ['mortise', true]
+  ] as const)('keeps %s handle moves and resizes inside the blank', (cutType, hasWidthHandle) => {
+    const draft = createRectDraft(cutType, { placementX: 20, placementZ: 9, sizeLength: 2, sizeWidth: 1 });
+
+    const moved = applyHandleDelta(part, draft, 'move', 100, 100);
+    const lengthened = applyHandleDelta(part, moved, 'length', 100, 0);
+    const widened = applyHandleDelta(part, moved, 'width', 0, 100);
+
+    expect(moved.placementX + moved.sizeLength).toBeCloseTo(part.length);
+    expect(moved.placementZ + moved.sizeWidth).toBeLessThanOrEqual(part.width);
+    expect(lengthened.placementX + lengthened.sizeLength).toBeCloseTo(part.length);
+    if (hasWidthHandle) expect(widened.placementZ + widened.sizeWidth).toBeCloseTo(part.width);
+    else expect(widened.sizeWidth).toBe(draft.sizeWidth);
+  });
 });
 
 describe('nudgeDraft', () => {

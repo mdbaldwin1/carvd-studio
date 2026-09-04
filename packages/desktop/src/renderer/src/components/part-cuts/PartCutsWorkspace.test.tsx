@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ComponentProps } from 'react';
 import { describe, expect, it, vi, type Mock } from 'vitest';
@@ -7,6 +7,7 @@ import type { EndCutFeature, RectCutFeature } from '@renderer/types';
 import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { useProjectStore } from '@renderer/store/projectStore';
 import { useSelectionStore } from '@renderer/store/selectionStore';
+import { validateCircularCut } from '@renderer/utils/roundCutUtils';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
 
 type WorkspaceProps = ComponentProps<typeof PartCutsWorkspace>;
@@ -154,6 +155,85 @@ describe('PartCutsWorkspace', () => {
         pattern: expect.objectContaining({ type: 'linear', count: 3 })
       })
     ]);
+  });
+
+  // This fails if round-cut validation permits unsafe drilling geometry to
+  // reach the Save Cut action (for example by removing pattern/tilt checks).
+  it.each([
+    {
+      title: 'a zero-member linear pattern',
+      configure: () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'linear' } });
+        fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '0' } });
+      },
+      message: /between 1 and 128/i
+    },
+    {
+      title: 'a 129-member linear pattern',
+      configure: () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'linear' } });
+        fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '129' } });
+      },
+      message: /between 1 and 128/i
+    },
+    {
+      title: 'a 90 degree drill tilt',
+      configure: () => {
+        fireEvent.change(screen.getByLabelText('Tilt From Square (degrees)'), { target: { value: '90' } });
+      },
+      message: /tilt must be at least 0° and less than 90°/i
+    },
+    {
+      title: 'a countersink whose major profile exits the blank',
+      configure: () => {
+        fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+        fireEvent.click(screen.getByText('Countersink'));
+        setMeasurementField('Offset Along Face', '11 1/2');
+        setMeasurementField('Countersink Major Diameter', '1 1/4');
+      },
+      message: /profile extends beyond/i,
+      preset: 'countersink'
+    }
+  ])('disables Save Cut for $title', async ({ configure, message, preset }) => {
+    renderWorkspace();
+    if (!preset) startCut('Round Hole');
+
+    configure();
+
+    await waitFor(() => {
+      expect(screen.getByText(message)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    });
+  });
+
+  it('accepts a 128-member in-bounds linear pattern and an 89 degree tilt', () => {
+    renderWorkspace();
+    startCut('Round Hole');
+    fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'linear' } });
+    fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '128' } });
+    setMeasurementField('Spacing', '0.01');
+    fireEvent.change(screen.getByLabelText('Tilt From Square (degrees)'), { target: { value: '89' } });
+
+    expect(screen.getByRole('button', { name: 'Save Cut' })).toBeEnabled();
+  });
+
+  it('rejects an externally supplied zero-spacing linear pattern', () => {
+    const invalid = {
+      id: 'invalid-round-pattern',
+      kind: 'circular_cut' as const,
+      version: 1,
+      enabled: true,
+      target: { type: 'face' as const, face: 'top_face' as const },
+      reference: { primaryFrom: 'center' as const, secondaryFrom: 'center' as const },
+      cutType: 'round_hole' as const,
+      placement: { primary: 0, secondary: 0, rotation: 0 },
+      parameters: { diameter: 0.25, depthMode: 'through' as const, tilt: 0, direction: 0 },
+      pattern: { type: 'linear' as const, count: 2, spacing: 0, direction: 0 }
+    };
+
+    expect(validateCircularCut(invalid, createTestPart({ length: 24, width: 12, thickness: 0.75 }))).toMatch(
+      /spacing must be greater than zero/i
+    );
   });
 
   it('shows dedicated rounded opening controls', () => {
