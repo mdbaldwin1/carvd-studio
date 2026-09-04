@@ -42,6 +42,7 @@ import {
   clearTransformDraggingPart,
   clearTransformInteractionPreview,
   clearTransformInteractionPreviewKeepingReferenceDistances,
+  isActiveMoveInteractionOwner,
   markTransformDraggingPart,
   publishSelectionDragDelta,
   publishMoveInteractionPreview
@@ -130,7 +131,10 @@ export function usePartDrag(
     wasSnappedByParts.current = { x: false, y: false, z: false };
   };
 
-  const finishDragState = (didMove: boolean, clearPreview = clearTransformInteractionPreview) => {
+  const finishDragState = (
+    didMove: boolean,
+    clearPreview: () => void = () => clearTransformInteractionPreview('part')
+  ) => {
     setIsDragging(false);
     resetDragRefs();
     markJustFinishedDragging(didMove);
@@ -323,7 +327,8 @@ export function usePartDrag(
       setIsDragging(true);
       beginMoveInteractionSession({
         affectedPartIds: moveSelection.affectedPartIds,
-        primaryPartId: part.id
+        primaryPartId: part.id,
+        moveOwner: 'part'
       });
       dragStart.current = {
         point: startPoint.clone(),
@@ -368,7 +373,7 @@ export function usePartDrag(
         // Safety net: drag was started but second useEffect hasn't attached its listeners yet.
         // Do minimal cleanup to prevent stuck drag state.
         removeIntentListeners();
-        finishDragState(false, clearTransformInteractionPreviewKeepingReferenceDistances);
+        finishDragState(false, () => clearTransformInteractionPreviewKeepingReferenceDistances('part'));
       }
     };
 
@@ -397,7 +402,7 @@ export function usePartDrag(
     }
 
     const pointerRafQueue = createPointerRafQueue(window, (evt) => {
-      if (!isDragging || !dragStart.current) return;
+      if (!isDragging || !dragStart.current || !isActiveMoveInteractionOwner('part')) return;
 
       const currentPoint = getWorldPoint(evt);
       if (currentPoint) {
@@ -621,6 +626,7 @@ export function usePartDrag(
         publishMoveInteractionPreview({
           delta: previewDelta,
           snapLines,
+          moveOwner: 'part',
           referenceDistances,
           referenceState,
           publishSelectionDragDelta: false
@@ -631,6 +637,15 @@ export function usePartDrag(
         const proposedDelta = { ...previewDelta };
 
         if (stockConstraints.preventOverlap) {
+          dragDebug('partDrag:move:collisionInput', {
+            partId: part.id,
+            mateHostPartId: mateHostPartIdRef.current,
+            proposedPosition: {
+              x: dragStart.current.partPos.x + proposedDelta.x,
+              y: dragStart.current.partPos.y + proposedDelta.y,
+              z: dragStart.current.partPos.z + proposedDelta.z
+            }
+          });
           const safeDelta = resolveSafeTranslationDelta(
             allParts,
             new Set(effectiveDraggingIds),
@@ -702,6 +717,11 @@ export function usePartDrag(
     };
 
     const handleWindowPointerUp = () => {
+      if (!isActiveMoveInteractionOwner('part')) {
+        pointerRafQueue.cancel();
+        finishDragState(false, () => clearTransformInteractionPreviewKeepingReferenceDistances('part'));
+        return;
+      }
       if (isDragging && dragStart.current && lastDragPosition.current) {
         const dragDistanceSq =
           (lastDragPosition.current.x - dragStart.current.partOriginalPos.x) ** 2 +
@@ -765,6 +785,11 @@ export function usePartDrag(
             state: commitState,
             mateHostPartId: mateHostPartIdRef.current ?? undefined
           });
+          dragDebug('partDrag:release:commitInput', {
+            partId: part.id,
+            mateHostPartId: mateHostPartIdRef.current,
+            position
+          });
           applyCommitInstructions(moveTool.commit(commitState, commitPreview), { updatePart });
         };
 
@@ -807,7 +832,7 @@ export function usePartDrag(
 
           dragDebug('partDrag:release:multi:commit', { partId: part.id, delta: constrainedMultiDelta.delta });
           moveSelectedParts(constrainedMultiDelta.delta);
-          clearTransformInteractionPreview();
+          clearTransformInteractionPreview('part');
         } else {
           // ADR-006: single-part release runs ground + collision in one
           // pipeline call. groundConstraint lifts the part to the floor if
@@ -821,6 +846,11 @@ export function usePartDrag(
             width: liveDims.width
           };
           const stockConstraints = useProjectStore.getState().stockConstraints;
+          dragDebug('partDrag:release:collisionInput', {
+            partId: part.id,
+            mateHostPartId: mateHostPartIdRef.current,
+            proposedPosition: { x: newX, y: newY, z: newZ }
+          });
           const releaseResult = resolveSinglePartReleaseMove({
             part: releasePart,
             projectParts: allParts,
@@ -869,7 +899,7 @@ export function usePartDrag(
     return () => {
       unbindPointerSession();
       pointerRafQueue.cancel();
-      clearTransformInteractionPreview();
+      clearTransformInteractionPreview('part');
     };
     // Depend only on the *dimension* fields of liveDims, not the position fields.
     // Position fields (x/y/z) update on every drag frame via setLiveDims, and
@@ -986,7 +1016,8 @@ export function usePartDrag(
       setIsDragging(true);
       beginMoveInteractionSession({
         affectedPartIds: moveSelection.affectedPartIds,
-        primaryPartId: part.id
+        primaryPartId: part.id,
+        moveOwner: 'part'
       });
       dragStart.current = {
         point: startPoint.clone(),

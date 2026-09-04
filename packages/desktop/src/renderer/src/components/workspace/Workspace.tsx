@@ -28,7 +28,7 @@ import { SnapAlignmentLines } from './SnapAlignmentLines';
 import { SnapGuides } from './SnapGuides';
 import { ThumbnailCaptureHandler } from './ThumbnailCaptureHandler';
 import { useGroupDrag } from './useGroupDrag';
-import { installDragDebugTools } from '../../utils/dragDebug';
+import { dragDebug, installDragDebugTools } from '../../utils/dragDebug';
 import { hasInteractiveHitAt as resolveHasInteractiveHitAt } from '../../interaction/hitTest';
 import { useCanvasPointerSession } from '../../interaction/useCanvasPointerSession';
 import { computeOverlayModel } from '../../interaction/overlayModel';
@@ -619,6 +619,10 @@ export function Workspace() {
           return;
         }
         if (fallback === 'start-group-owner') {
+          dragDebug('canvasDrag:fallback:group', {
+            partId: action.hit.partId,
+            displacedMoveOwner: activeSession?.kind === 'move' ? activeSession.moveOwner : null
+          });
           debugSelection('session:dragstart:part-fallback:restored-group-owner', {
             partId: action.hit.partId
           });

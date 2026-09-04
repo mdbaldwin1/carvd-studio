@@ -107,7 +107,10 @@ async function dragSelectedOnFace(
   delta: { x: number; y: number },
   bodyOffset = 0.65,
   edgeOnly = false
-): Promise<void> {
+): Promise<{
+  previewDelta: { x: number; y: number; z: number } | null;
+  debugLogs: Array<{ event: string; payload?: unknown }>;
+}> {
   const center = await getSelectedPartCanvasPoint(window);
   const targets = edgeOnly
     ? await Promise.all([
@@ -131,7 +134,24 @@ async function dragSelectedOnFace(
   };
   await window.keyboard.down('Shift');
   try {
-    await dragCanvas(window, start, delta);
+    await window.mouse.move(start.x, start.y);
+    await window.waitForTimeout(150);
+    await window.mouse.down();
+    await window.waitForTimeout(250);
+    for (let i = 1; i <= 12; i += 1) {
+      await window.mouse.move(start.x + (delta.x * i) / 12, start.y + (delta.y * i) / 12);
+      await window.waitForTimeout(20);
+    }
+    const previewDelta = await window.evaluate(() => {
+      const session = window.useInteractionStore.getState().activeSession;
+      return session?.kind === 'move' ? { ...session.delta } : null;
+    });
+    await window.mouse.up();
+    await window.waitForTimeout(500);
+    const debugLogs = await window.evaluate(
+      () => window.dumpDragDebugLogs?.().map(({ event, payload }) => ({ event, payload })) ?? []
+    );
+    return { previewDelta, debugLogs };
   } finally {
     await window.keyboard.up('Shift');
   }
@@ -147,12 +167,43 @@ async function selectedTransform(window: Page) {
   });
 }
 
-async function dragSelectedGroupOnFace(window: Page, partId: string, delta: { x: number; y: number }) {
+async function resetDragTrace(window: Page): Promise<void> {
+  await window.waitForFunction(() => typeof window.enableDragDebug === 'function');
+  await window.evaluate(() => {
+    window.enableDragDebug!();
+    window.clearDragDebugLogs!();
+  });
+}
+
+function lastDragEvent<T extends Record<string, unknown>>(
+  logs: Array<{ event: string; payload?: unknown }>,
+  event: string
+): T | null {
+  return (logs.filter((entry) => entry.event === event).at(-1)?.payload as T | undefined) ?? null;
+}
+
+async function dragSelectedGroupOnFace(
+  window: Page,
+  partId: string,
+  delta: { x: number; y: number },
+  options: { suppressPerMeshPointerDown?: boolean; createGroupAfterPointerDown?: boolean } = {}
+) {
   const start = await window.evaluate((id) => window.__carvdE2E?.getPartScreenPoint(id) ?? null, partId);
   if (!start) throw new Error(`No canvas point is available for grouped part ${partId}`);
 
   await window.mouse.move(start.x, start.y);
   await window.waitForTimeout(150);
+  if (options.suppressPerMeshPointerDown) {
+    await window.evaluate(() => {
+      const canvas = document.querySelector('canvas');
+      if (!canvas) throw new Error('Canvas not found');
+      const suppressPerMeshPointerDown = (event: Event) => {
+        canvas.removeEventListener('pointerdown', suppressPerMeshPointerDown, true);
+        event.stopImmediatePropagation();
+      };
+      canvas.addEventListener('pointerdown', suppressPerMeshPointerDown, true);
+    });
+  }
   await window.mouse.down();
   try {
     await window.waitForTimeout(250);
@@ -165,6 +216,11 @@ async function dragSelectedGroupOnFace(window: Page, partId: string, delta: { x:
         selectedGroupIds: selection.selectedGroupIds
       };
     });
+    if (options.createGroupAfterPointerDown) {
+      await window.evaluate((id) => {
+        window.useProjectStore.getState().createGroup('Fallback Takeover Group', [{ id, type: 'part' }]);
+      }, partId);
+    }
     for (let i = 1; i <= 12; i += 1) {
       await window.mouse.move(start.x + (delta.x * i) / 12, start.y + (delta.y * i) / 12);
       await window.waitForTimeout(20);
@@ -184,7 +240,6 @@ async function dragSelectedGroupOnFace(window: Page, partId: string, delta: { x:
         ? {
             delta: session.delta,
             moveOwner: session.moveOwner ?? null,
-            hasMateHostPartId: Object.prototype.hasOwnProperty.call(session, 'mateHostPartId'),
             snapLines: window.useSnapStore.getState().activeSnapLines,
             selectedPartIds: selection.selectedPartIds,
             selectedGroupIds: selection.selectedGroupIds,
@@ -251,7 +306,9 @@ test.describe.serial('custom cuts assembly qualification', () => {
         }
         await rotateSelected(running.window, 'Z');
         await setCamera(running.window, 'front');
-        await dragSelectedOnFace(running.window, { x: 7, y: 0 });
+        if (label === 'nominal') await resetDragTrace(running.window);
+        const beforeDrag = await selectedTransform(running.window);
+        const drag = await dragSelectedOnFace(running.window, { x: 7, y: 0 });
 
         const transform = await selectedTransform(running.window);
         expect(transform.rotation.z).toBe(90);
@@ -263,6 +320,33 @@ test.describe.serial('custom cuts assembly qualification', () => {
           expect(transform.position.x).toBeCloseTo(4, 3);
           expect(transform.position.z).toBeCloseTo(4, 3);
           await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);
+          if (label === 'nominal') {
+            expect(drag.previewDelta).not.toBeNull();
+            for (const axis of ['x', 'y', 'z'] as const) {
+              expect(transform.position[axis]).toBeCloseTo(beforeDrag.position[axis] + drag.previewDelta![axis], 3);
+            }
+
+            const previewCollision = lastDragEvent<{
+              mateHostPartId?: string;
+              proposedPosition: { x: number; y: number; z: number };
+            }>(drag.debugLogs, 'partDrag:move:collisionInput');
+            const releaseCollision = lastDragEvent<{
+              mateHostPartId?: string;
+              proposedPosition: { x: number; y: number; z: number };
+            }>(drag.debugLogs, 'partDrag:release:collisionInput');
+            const commit = lastDragEvent<{
+              mateHostPartId?: string;
+              position: { x: number; y: number; z: number };
+            }>(drag.debugLogs, 'partDrag:release:commitInput');
+
+            expect(previewCollision?.mateHostPartId).toBe('dado-host');
+            expect(releaseCollision?.mateHostPartId).toBe('dado-host');
+            expect(commit?.mateHostPartId).toBe('dado-host');
+            for (const axis of ['x', 'y', 'z'] as const) {
+              expect(releaseCollision!.proposedPosition[axis]).toBeCloseTo(previewCollision!.proposedPosition[axis], 3);
+              expect(commit!.position[axis]).toBeCloseTo(previewCollision!.proposedPosition[axis], 3);
+            }
+          }
         }
       });
     }
@@ -330,8 +414,14 @@ test.describe.serial('custom cuts assembly qualification', () => {
     );
     await enablePrecisionSnapping(running.window);
     await setCamera(running.window, 'front');
+    await resetDragTrace(running.window);
 
-    const previewDelta = await dragSelectedGroupOnFace(running.window, 'grouped-dado-divider', { x: 7, y: 0 });
+    const previewDelta = await dragSelectedGroupOnFace(
+      running.window,
+      'grouped-dado-divider',
+      { x: 7, y: 0 },
+      { suppressPerMeshPointerDown: true }
+    );
     const state = await running.window.evaluate(() => {
       const selection = window.useSelectionStore.getState();
       const part = window.useProjectStore
@@ -343,19 +433,113 @@ test.describe.serial('custom cuts assembly qualification', () => {
         selectedGroupIds: selection.selectedGroupIds
       };
     });
+    const fallbackTrace = await running.window.evaluate(
+      () =>
+        window
+          .dumpDragDebugLogs?.()
+          .filter((entry) => entry.event === 'canvasDrag:fallback:group')
+          .at(-1)?.payload ?? null
+    );
 
     expect(previewDelta).not.toBeNull();
     expect(previewDelta!.moveOwner).toBe('group');
+    expect(previewDelta!.pointerDown.moveOwner).toBeNull();
     expect(previewDelta!.selectedPartIds).toEqual([]);
     expect(previewDelta!.selectedGroupIds).toHaveLength(1);
     expect(previewDelta!.snapLines).not.toHaveLength(0);
     expect(previewDelta!.snapLines.every((line: { family?: string }) => line.family !== undefined)).toBe(true);
     expect(previewDelta!.snapLines.map((line: { family?: string }) => line.family)).toContain('face');
     expect(2.8 + previewDelta!.delta.y).toBeCloseTo(2.75, 3);
-    expect(state.position.y).toBeCloseTo(2.75, 3);
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const startPosition = { x: 4.1, y: 2.8, z: 4 };
+      expect(state.position[axis]).toBeCloseTo(startPosition[axis] + previewDelta!.delta[axis], 3);
+    }
     expect(state.position.y).not.toBeCloseTo(2.375, 2);
     expect(state.selectedPartIds).toEqual([]);
     expect(state.selectedGroupIds).toHaveLength(1);
+    expect(fallbackTrace).toMatchObject({ displacedMoveOwner: null, partId: 'grouped-dado-divider' });
+    await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);
+  });
+
+  test('exclusively takes a live direct-part gesture over for the selected-group fallback', async () => {
+    await seedFixture(
+      running.window,
+      [
+        {
+          id: 'takeover-host',
+          name: 'Takeover Host',
+          length: 12,
+          width: 6,
+          thickness: 0.75,
+          position: { x: 4, y: 0.375, z: 4 },
+          features: [
+            rectCut('takeover-slot', 'dado', { type: 'face', face: 'top_face' }, { length: 0.755, width: 6 }, 0.375, {
+              x: 5.6225,
+              z: 0
+            })
+          ]
+        },
+        {
+          id: 'takeover-divider',
+          name: 'Takeover Divider',
+          length: 0.75,
+          width: 6,
+          thickness: 4,
+          position: { x: 4.1, y: 2.8, z: 4 }
+        }
+      ],
+      'takeover-divider'
+    );
+    await enablePrecisionSnapping(running.window);
+    await setCamera(running.window, 'front');
+    await resetDragTrace(running.window);
+
+    const preview = await dragSelectedGroupOnFace(
+      running.window,
+      'takeover-divider',
+      { x: 7, y: 0 },
+      { createGroupAfterPointerDown: true }
+    );
+    const result = await running.window.evaluate(() => {
+      const selection = window.useSelectionStore.getState();
+      const part = window.useProjectStore
+        .getState()
+        .parts.find((candidate: { id: string }) => candidate.id === 'takeover-divider');
+      return {
+        position: part.position,
+        selectedPartIds: selection.selectedPartIds,
+        selectedGroupIds: selection.selectedGroupIds,
+        logs: window.dumpDragDebugLogs?.().map(({ event, payload }) => ({ event, payload })) ?? []
+      };
+    });
+
+    expect(preview).not.toBeNull();
+    expect(preview!.pointerDown.moveOwner).toBe('part');
+    expect(preview!.moveOwner).toBe('group');
+    expect(preview!.selectedPartIds).toEqual([]);
+    expect(preview!.selectedGroupIds).toHaveLength(1);
+    expect(preview!.snapLines.map((line: { family?: string }) => line.family)).toContain('face');
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const startPosition = { x: 4.1, y: 2.8, z: 4 };
+      expect(result.position[axis]).toBeCloseTo(startPosition[axis] + preview!.delta[axis], 3);
+    }
+    expect(result.position.y).toBeCloseTo(2.75, 3);
+    expect(result.position.y).not.toBeCloseTo(2.375, 2);
+    expect(result.selectedPartIds).toEqual([]);
+    expect(result.selectedGroupIds).toHaveLength(1);
+
+    const fallbackIndex = result.logs.findIndex((entry) => entry.event === 'canvasDrag:fallback:group');
+    expect(fallbackIndex).toBeGreaterThanOrEqual(0);
+    expect(result.logs[fallbackIndex]?.payload).toMatchObject({
+      displacedMoveOwner: 'part',
+      partId: 'takeover-divider'
+    });
+    expect(
+      result.logs
+        .slice(fallbackIndex + 1)
+        .filter((entry) => entry.event.startsWith('partDrag:move') || entry.event.startsWith('partDrag:release'))
+    ).toEqual([]);
+    expect(result.logs.some((entry) => entry.event === 'groupDrag:release:commit')).toBe(true);
     await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);
   });
 
@@ -420,13 +604,15 @@ test.describe.serial('custom cuts assembly qualification', () => {
     expect(preview!.pointerDown.selectedGroupIds).toHaveLength(1);
     expect(preview!.selectedPartIds).toEqual([]);
     expect(preview!.selectedGroupIds).toHaveLength(1);
-    expect(preview!.hasMateHostPartId).toBe(false);
     expect(preview!.snapLines).not.toHaveLength(0);
     expect(preview!.snapLines.every((line: { family?: string }) => line.family !== undefined)).toBe(true);
     expect(preview!.snapLines.map((line: { family?: string }) => line.family)).toContain('face');
     expect(2.8 + preview!.delta.y).toBeCloseTo(2.75, 3);
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const startPosition = { x: 4.1, y: 2.8, z: 4 };
+      expect(state.position[axis]).toBeCloseTo(startPosition[axis] + preview!.delta[axis], 3);
+    }
     expect(state.position.y).toBeCloseTo(2.75, 3);
-    expect(state.position.y).toBeCloseTo(2.8 + preview!.delta.y, 3);
     expect(state.selectedPartIds).toEqual([]);
     expect(state.selectedGroupIds).toHaveLength(1);
     await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);

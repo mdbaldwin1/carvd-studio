@@ -451,6 +451,7 @@ export function useGroupDrag(
         publishMoveInteractionPreview({
           delta: proposedDelta,
           snapLines,
+          moveOwner: 'group',
           referenceDistances,
           referenceState,
           publishSelectionDragDelta: true
@@ -553,7 +554,7 @@ export function useGroupDrag(
         unbindPointerSession();
         cleanupRef.current = null;
         resetGroupDragRefs();
-        clearTransformInteractionPreviewKeepingReferenceDistances();
+        clearTransformInteractionPreviewKeepingReferenceDistances('group');
         resumeOrbitControls(controls);
       };
 

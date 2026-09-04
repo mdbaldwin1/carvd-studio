@@ -113,3 +113,23 @@ The third review identified an event-ordering gap on the first drag of an initia
 - Prettier and `git diff --check`: passed for all changed files.
 
 There is no known Task 4 blocker. Group mating remains deliberately suppressed; the new owner field only routes the gesture to the already-established ordinary group snap/collision path.
+
+## Review round 4 — exclusive fallback takeover and observable mate boundaries
+
+The fourth review found two qualification gaps in the ownership and Electron evidence rather than in the joinery geometry itself.
+
+- Move preview and cleanup now accept an expected move owner. Every direct-part RAF preview, pointer-up release, commit path, and effect cleanup is gated by `moveOwner: 'part'`; the group hook publishes and clears only as `moveOwner: 'group'`. When the canvas fallback replaces an accidental live part owner, stale part callbacks can no longer update the group preview, clear its session, run collision/mate state, or commit on release. A unit RED reproduced the displaced part cleanup erasing the replacement group session before this guard was added.
+- A real Electron takeover begins as an ungrouped direct-part gesture, creates/selects the singleton group while the pointer remains down, and then crosses the canvas threshold. The trace proves the fallback displaced a live part owner, group preview and release completed, and no part move/release callback ran after takeover. A second Electron gesture suppresses the per-mesh pointer-down handler so the central canvas fallback is forced with no owner; group-only selection, ordinary face lines, collision behavior, and full-vector preview/release equality remain intact.
+- Electron now reads debug-only events emitted immediately before the actual preview collision call, release collision call, and move-tool commit. The nominal dado case observes `dado-host` from the private `mateHostPartIdRef` at all three boundaries. It also compares released X/Y/Z against the complete live preview transform, replacing the former Y-only assertion and the invalid interaction-store field check.
+
+### Review-round-4 verification
+
+- Ownership/joinery-focused Vitest suites: 6 files, 179 tests passed.
+- Desktop lint: passed with zero warnings.
+- Desktop typecheck: passed.
+- Prettier: passed for every changed TypeScript/TSX file.
+- Fresh desktop production build: passed.
+- `custom-cuts-assembly.spec.ts`: 7/7 passed from that fresh build, including the ownerless central fallback and live direct-part takeover cases.
+- `git diff --check`: passed.
+
+There is no known Task 4 blocker. The ownership guard is deliberately scoped to the existing `part`/`group` session boundary; it does not introduce a second gesture coordinator or expose mate identity in application state.

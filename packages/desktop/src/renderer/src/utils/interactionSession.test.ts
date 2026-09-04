@@ -91,6 +91,34 @@ describe('interactionSession', () => {
     expect(useSnapStore.getState().activeSnapLines).toEqual([]);
   });
 
+  it('does not let a displaced part owner preview or clear the replacement group session', () => {
+    beginMoveInteractionSession({
+      affectedPartIds: ['p1'],
+      primaryPartId: 'p1',
+      moveOwner: 'part'
+    });
+    beginMoveInteractionSession({
+      affectedPartIds: ['p1'],
+      primaryPartId: 'p1',
+      moveOwner: 'group'
+    });
+
+    publishMoveInteractionPreview({
+      delta: { x: 9, y: 8, z: 7 },
+      snapLines: [],
+      moveOwner: 'part'
+    });
+    clearMoveInteractionPreview({
+      moveOwner: 'part'
+    });
+
+    expect(useInteractionStore.getState().activeSession).toMatchObject({
+      kind: 'move',
+      moveOwner: 'group',
+      delta: { x: 0, y: 0, z: 0 }
+    });
+  });
+
   it('clears transform previews with named cleanup intents', () => {
     useSelectionStore.getState().setActiveDragDelta({ x: 9, y: 0, z: 0 });
     beginMoveInteractionSession({ affectedPartIds: ['p1'] });
