@@ -912,6 +912,14 @@ async function firstDraftFeatureSnapshot(window: Page): Promise<unknown | null> 
   });
 }
 
+async function draftFeatureSnapshots(window: Page): Promise<Array<Record<string, unknown>>> {
+  return window.evaluate(() =>
+    window.usePartCutsEditingStore
+      .getState()
+      .draftFeatures.map((feature) => JSON.parse(JSON.stringify(feature)) as Record<string, unknown>)
+  );
+}
+
 async function previewGeometrySignature(window: Page): Promise<string> {
   const signature = await window
     .getByRole('img', { name: 'Part cuts geometry preview' })
@@ -963,6 +971,27 @@ async function qualifyOperationLifecycle(window: Page, scenario: OperationScenar
   expect(editedFeature).not.toBeNull();
   await expect.poll(() => firstDraftFeatureSnapshot(window)).toEqual(editedFeature);
   const geometryBeforeDelete = await previewGeometrySignature(window);
+
+  // Exercise the user-facing duplicate action for every operation family and
+  // prove the copy preserves all authored values while receiving a fresh ID.
+  const sourceBeforeDuplicate = (await draftFeatureSnapshots(window))[0];
+  await window.getByRole('button', { name: 'Actions for cut 1' }).click();
+  await window.getByRole('menuitem', { name: 'Duplicate' }).click();
+  await expect.poll(async () => (await draftFeatureSnapshots(window)).length).toBe(2);
+  const [sourceAfterDuplicate, duplicate] = await draftFeatureSnapshots(window);
+  const { id: sourceId, ...sourceWithoutId } = sourceAfterDuplicate;
+  const { id: duplicateId, ...duplicateWithoutId } = duplicate;
+  expect(sourceId).toBe(sourceBeforeDuplicate.id);
+  expect(duplicateId).not.toBe(sourceId);
+  expect(duplicateWithoutId).toEqual(sourceWithoutId);
+  await window
+    .getByLabel(/^Part cuts for /)
+    .getByRole('button', { name: 'Cancel' })
+    .click();
+  await window.getByRole('button', { name: 'Actions for cut 2' }).click();
+  await window.getByRole('menuitem', { name: 'Delete' }).click();
+  await expect.poll(async () => (await draftFeatureSnapshots(window)).length).toBe(1);
+  await expect.poll(() => firstDraftFeatureSnapshot(window)).toEqual(editedFeature);
 
   await window.getByRole('button', { name: 'Actions for cut 1' }).click();
   await window.getByRole('menuitem', { name: 'Delete' }).click();
