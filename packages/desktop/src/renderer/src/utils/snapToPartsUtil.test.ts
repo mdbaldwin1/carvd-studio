@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Part, SnapGuide } from '../types';
+import paulDeckFixture from '../../../../tests/fixtures/paul-deck-snap-regression.json';
 import {
   calculateGroupReferenceDistances,
   calculateReferenceDistances,
@@ -1709,6 +1710,27 @@ describe('snapToPartsUtil', () => {
       expect(result.snappedX || result.snappedY || result.snappedZ).toBe(true);
       expect(result.snapLines.length).toBeGreaterThan(0);
       expect(result.closestDistance).toBeLessThanOrEqual(0.2 + 1e-3);
+    });
+
+    it('recovers flush alignment for anonymized adjacent boards from Paul’s deck', () => {
+      const target = createTestPart({ id: 'deck-board-a', ...paulDeckFixture.target });
+      const moving = createTestPart({ id: 'deck-board-b', ...paulDeckFixture.moving });
+      const perturbed = {
+        x: moving.position.x + 0.18,
+        y: moving.position.y,
+        z: moving.position.z + 0.22
+      };
+
+      const faceContact = detectFeatureSnaps(moving, perturbed, [target, moving], [moving.id], 0.5);
+      expect(faceContact.snappedX).toBe(true);
+      expect(faceContact.adjustedPosition.x).toBeCloseTo(-6, 3);
+
+      // Drag snapping is recomputed every frame. Once face contact is held,
+      // the next pass must preserve it and recover the tangential end flush.
+      const endFlush = detectFeatureSnaps(moving, faceContact.adjustedPosition, [target, moving], [moving.id], 0.5);
+      expect(endFlush.snappedZ).toBe(true);
+      expect(endFlush.adjustedPosition.x).toBeCloseTo(-6, 3);
+      expect(endFlush.adjustedPosition.z).toBeCloseTo(0, 3);
     });
   });
 
