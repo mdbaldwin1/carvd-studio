@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { Part, PartFeature, RectCutFeature } from '../types';
+import { CircularCutFeature, Part, PartFeature, RectCutFeature, RoundedCutFeature } from '../types';
 import { getEdgeBevelInsetAt, getEndCutInsetAt, getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
 import {
   getRectCutDepth,
@@ -10,6 +10,7 @@ import {
   isSideFaceTarget,
   isTopTarget
 } from './rectCutUtils';
+import { expandCircularCut } from './roundCutUtils';
 
 type Point2 = { x: number; z: number };
 
@@ -253,6 +254,72 @@ function getRectCutHole(feature: RectCutFeature, part: Part): Point2[] | null {
   ];
 }
 
+function getCircularCutHoles(
+  feature: CircularCutFeature,
+  part: Part,
+  y: number,
+  diameter = feature.parameters.diameter
+): Point2[][] {
+  const segments = Math.min(64, Math.max(16, Math.ceil(diameter * 12)));
+  const radius = diameter / 2;
+  return expandCircularCut(feature, part).map(({ entryPoint, axis }) => {
+    const travel = Math.abs(axis.y) > 1e-9 ? (y - entryPoint.y) / axis.y : 0;
+    const centerX = entryPoint.x + axis.x * travel;
+    const centerZ = entryPoint.z + axis.z * travel;
+    const projectedLength = Math.hypot(axis.x, axis.z);
+    const majorX = projectedLength > 1e-9 ? axis.x / projectedLength : 1;
+    const majorZ = projectedLength > 1e-9 ? axis.z / projectedLength : 0;
+    const minorX = -majorZ;
+    const minorZ = majorX;
+    const majorRadius = Math.abs(axis.y) > 1e-9 ? radius / Math.abs(axis.y) : radius;
+    const points: Point2[] = [];
+    for (let index = 0; index < segments; index += 1) {
+      const angle = -(index / segments) * Math.PI * 2;
+      points.push({
+        x: centerX + Math.cos(angle) * majorRadius * majorX + Math.sin(angle) * radius * minorX,
+        // ExtrudeGeometry's contour Z is mirrored into world Z.
+        z: -(centerZ + Math.cos(angle) * majorRadius * majorZ + Math.sin(angle) * radius * minorZ)
+      });
+    }
+    return points;
+  });
+}
+
+function referencedFeatureOffset(value: number, size: number, from: 'min' | 'center' | 'max' | undefined): number {
+  if (from === 'min') return -size / 2 + value;
+  if (from === 'max') return size / 2 - value;
+  return value;
+}
+
+function getRoundedCutHole(feature: RoundedCutFeature, part: Part): Point2[] {
+  const centerX = referencedFeatureOffset(feature.placement.primary, part.length, feature.reference.primaryFrom);
+  const centerZ = referencedFeatureOffset(feature.placement.secondary, part.width, feature.reference.secondaryFrom);
+  const halfLength = feature.parameters.length / 2;
+  const halfWidth = feature.parameters.width / 2;
+  const radius = feature.cutType === 'rounded_slot' ? halfWidth : feature.parameters.cornerRadius;
+  const cornerX = halfLength - radius;
+  const cornerZ = halfWidth - radius;
+  const rotation = (feature.placement.rotation * Math.PI) / 180;
+  const points: Point2[] = [];
+  const corners: Array<[number, number, number]> = [
+    [-cornerX, cornerZ, Math.PI],
+    [cornerX, cornerZ, Math.PI / 2],
+    [cornerX, -cornerZ, 0],
+    [-cornerX, -cornerZ, -Math.PI / 2]
+  ];
+  for (const [cx, cz, start] of corners) {
+    for (let step = 0; step <= 8; step += 1) {
+      const angle = start - (step * Math.PI) / 16;
+      const localX = cx + Math.cos(angle) * radius;
+      const localZ = cz + Math.sin(angle) * radius;
+      const worldX = centerX + localX * Math.cos(rotation) - localZ * Math.sin(rotation);
+      const worldZ = centerZ + localX * Math.sin(rotation) + localZ * Math.cos(rotation);
+      points.push({ x: worldX, z: -worldZ });
+    }
+  }
+  return points;
+}
+
 /**
  * Apply a through-depth cutout as a contour modification when it's flush
  * with one or more edges. Returns the modified contour, or null if the
@@ -477,6 +544,18 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
   const supportedRectCuts = rectCuts.filter(
     (feature) => feature.parameters.depthMode === 'through' || getRectCutPreviewSupport(feature).supported
   );
+  const circularCuts = getEnabledFeatures(part).filter(
+    (feature): feature is CircularCutFeature =>
+      feature.kind === 'circular_cut' &&
+      feature.target.type === 'face' &&
+      (feature.target.face === 'top_face' || feature.target.face === 'bottom_face')
+  );
+  const roundedCuts = getEnabledFeatures(part).filter(
+    (feature): feature is RoundedCutFeature =>
+      feature.kind === 'rounded_cut' &&
+      feature.target.type === 'face' &&
+      (feature.target.face === 'top_face' || feature.target.face === 'bottom_face')
+  );
   const sliceY = new Set<number>([-part.thickness / 2, part.thickness / 2]);
 
   for (const feature of supportedRectCuts) {
@@ -506,6 +585,36 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
       sliceY.add(part.thickness / 2 - depth);
     } else if (isBottomTarget(feature)) {
       sliceY.add(-part.thickness / 2 + depth);
+    }
+  }
+
+  for (const feature of circularCuts) {
+    if (feature.parameters.depthMode !== 'blind' || !feature.parameters.depth) continue;
+    const verticalDepth = feature.parameters.depth * Math.cos((feature.parameters.tilt * Math.PI) / 180);
+    if (feature.target.face === 'top_face') sliceY.add(part.thickness / 2 - verticalDepth);
+    else sliceY.add(-part.thickness / 2 + verticalDepth);
+  }
+  for (const feature of roundedCuts) {
+    if (feature.parameters.depthMode !== 'blind' || !feature.parameters.depth) continue;
+    if (feature.target.face === 'top_face') sliceY.add(part.thickness / 2 - feature.parameters.depth);
+    else sliceY.add(-part.thickness / 2 + feature.parameters.depth);
+  }
+  for (const feature of circularCuts) {
+    if (feature.parameters.tilt === 0) continue;
+    for (let step = 1; step < 16; step += 1) sliceY.add(-part.thickness / 2 + (part.thickness * step) / 16);
+  }
+  for (const feature of circularCuts) {
+    let recessDepth = 0;
+    if (feature.cutType === 'counterbore') recessDepth = feature.parameters.counterbore?.depth ?? 0;
+    if (feature.cutType === 'countersink' && feature.parameters.countersink) {
+      const radialDifference = (feature.parameters.countersink.majorDiameter - feature.parameters.diameter) / 2;
+      recessDepth = radialDifference / Math.tan((feature.parameters.countersink.includedAngle * Math.PI) / 360);
+    }
+    if (recessDepth <= 0) continue;
+    const steps = feature.cutType === 'countersink' ? 8 : 1;
+    for (let step = 1; step <= steps; step += 1) {
+      const depth = (recessDepth * step) / steps;
+      sliceY.add(feature.target.face === 'top_face' ? part.thickness / 2 - depth : -part.thickness / 2 + depth);
     }
   }
 
@@ -581,6 +690,44 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
 
       const hole = getRectCutHole(feature, part);
       if (hole) layerHoles.push(hole);
+    }
+
+    for (const feature of circularCuts) {
+      const active =
+        feature.parameters.depthMode === 'through' ||
+        (feature.target.face === 'top_face'
+          ? (part.thickness / 2 - yMid) / Math.cos((feature.parameters.tilt * Math.PI) / 180) <
+            Number(feature.parameters.depth)
+          : (yMid + part.thickness / 2) / Math.cos((feature.parameters.tilt * Math.PI) / 180) <
+            Number(feature.parameters.depth));
+      if (!active) continue;
+      const surfaceDepth = feature.target.face === 'top_face' ? part.thickness / 2 - yMid : yMid + part.thickness / 2;
+      let diameter = feature.parameters.diameter;
+      if (
+        feature.cutType === 'counterbore' &&
+        feature.parameters.counterbore &&
+        surfaceDepth < feature.parameters.counterbore.depth
+      ) {
+        diameter = feature.parameters.counterbore.diameter;
+      } else if (feature.cutType === 'countersink' && feature.parameters.countersink) {
+        const radialDifference = (feature.parameters.countersink.majorDiameter - feature.parameters.diameter) / 2;
+        const sinkDepth = radialDifference / Math.tan((feature.parameters.countersink.includedAngle * Math.PI) / 360);
+        if (surfaceDepth < sinkDepth) {
+          const progress = surfaceDepth / sinkDepth;
+          diameter =
+            feature.parameters.countersink.majorDiameter -
+            (feature.parameters.countersink.majorDiameter - feature.parameters.diameter) * progress;
+        }
+      }
+      layerHoles.push(...getCircularCutHoles(feature, part, yMid, diameter));
+    }
+    for (const feature of roundedCuts) {
+      const active =
+        feature.parameters.depthMode === 'through' ||
+        (feature.target.face === 'top_face'
+          ? yMid >= part.thickness / 2 - Number(feature.parameters.depth)
+          : yMid <= -part.thickness / 2 + Number(feature.parameters.depth));
+      if (active) layerHoles.push(getRoundedCutHole(feature, part));
     }
 
     layerGeometries.push(getLayerGeometry(layerContour, layerHoles, layerDepth, yMin));

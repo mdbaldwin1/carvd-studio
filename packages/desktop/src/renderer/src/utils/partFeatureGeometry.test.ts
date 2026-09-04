@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as THREE from 'three';
 import { createTestPart } from '../../../../tests/helpers/factories';
 import type { PartFeature } from '../types';
 import {
@@ -19,6 +20,118 @@ vi.unmock('three');
 describe('partFeatureGeometry', () => {
   afterEach(() => {
     clearPartGeometryCache();
+  });
+
+  describe('circular cut geometry', () => {
+    const circularPart = (depthMode: 'through' | 'blind') =>
+      createTestPart({
+        length: 8,
+        width: 6,
+        thickness: 2,
+        features: [
+          {
+            id: `hole-${depthMode}`,
+            kind: 'circular_cut' as const,
+            version: 1,
+            enabled: true,
+            target: { type: 'face' as const, face: 'top_face' as const },
+            reference: { primaryFrom: 'center' as const, secondaryFrom: 'center' as const },
+            cutType: 'round_hole' as const,
+            placement: { primary: 0, secondary: 0, rotation: 0 },
+            parameters: {
+              diameter: 1,
+              depthMode,
+              depth: depthMode === 'blind' ? 0.75 : undefined,
+              tilt: 0,
+              direction: 0
+            }
+          }
+        ]
+      });
+
+    const rayHits = (part: ReturnType<typeof circularPart>) => {
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      return new THREE.Raycaster(new THREE.Vector3(0, 3, 0), new THREE.Vector3(0, -1, 0)).intersectObject(mesh);
+    };
+
+    it('leaves the center of a top-face through-hole open', () => {
+      expect(rayHits(circularPart('through'))).toHaveLength(0);
+    });
+
+    it('places a blind-hole floor at the requested depth', () => {
+      const hits = rayHits(circularPart('blind'));
+      expect(hits.length).toBeGreaterThan(0);
+      expect(hits[0].point.y).toBeCloseTo(0.25, 4);
+    });
+
+    it('cuts a conical countersink above the pilot hole', () => {
+      const part = circularPart('through');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'circular_cut') throw new Error('expected circular feature');
+      feature.cutType = 'countersink';
+      feature.parameters.diameter = 0.5;
+      feature.parameters.countersink = { majorDiameter: 1, includedAngle: 90 };
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      const hits = new THREE.Raycaster(new THREE.Vector3(0.4, 3, 0), new THREE.Vector3(0, -1, 0)).intersectObject(mesh);
+      expect(hits[0].point.y).toBeLessThan(0.99);
+      expect(hits[0].point.y).toBeGreaterThan(0.7);
+    });
+
+    it('cuts a flat-bottomed counterbore above the pilot hole', () => {
+      const part = circularPart('through');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'circular_cut') throw new Error('expected circular feature');
+      feature.cutType = 'counterbore';
+      feature.parameters.diameter = 0.5;
+      feature.parameters.counterbore = { diameter: 1, depth: 0.25 };
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      const hits = new THREE.Raycaster(new THREE.Vector3(0.4, 3, 0), new THREE.Vector3(0, -1, 0)).intersectObject(mesh);
+      expect(hits[0].point.y).toBeCloseTo(0.75, 4);
+    });
+
+    it('keeps the authored axis open through an angled bore', () => {
+      const part = circularPart('through');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'circular_cut') throw new Error('expected circular feature');
+      feature.parameters.tilt = 30;
+      feature.parameters.direction = 0;
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      const axis = new THREE.Vector3(0.5, -Math.sqrt(3) / 2, 0);
+      const origin = new THREE.Vector3(-axis.x * 2, 1 - axis.y * 2, 0);
+      expect(new THREE.Raycaster(origin, axis).intersectObject(mesh)).toHaveLength(0);
+    });
+  });
+
+  describe('rounded cut geometry', () => {
+    it('opens a rounded slot through the part', () => {
+      const part = createTestPart({
+        length: 8,
+        width: 6,
+        thickness: 2,
+        features: [
+          {
+            id: 'slot-1',
+            kind: 'rounded_cut' as const,
+            version: 1,
+            enabled: true,
+            target: { type: 'face' as const, face: 'top_face' as const },
+            reference: { primaryFrom: 'center' as const, secondaryFrom: 'center' as const },
+            cutType: 'rounded_slot' as const,
+            placement: { primary: 0, secondary: 0, rotation: 0 },
+            parameters: { length: 3, width: 1, cornerRadius: 0.5, depthMode: 'through' as const }
+          }
+        ]
+      });
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      expect(
+        new THREE.Raycaster(new THREE.Vector3(0, 3, 0), new THREE.Vector3(0, -1, 0)).intersectObject(mesh)
+      ).toHaveLength(0);
+    });
   });
 
   it('detects when a part needs the feature geometry path', () => {
