@@ -355,9 +355,11 @@ export default function FeaturesPage() {
                 </h3>
                 <p className="leading-relaxed text-text-muted">
                   Shape boards with tenons, mortises, dados, grooves, rabbets,
-                  notches, cutouts, mitres, and bevels in a dedicated 3D cuts
-                  workspace. Cut lists keep the blank dimensions and include
-                  ordered, shop-ready instructions for every operation.
+                  notches, round and rounded openings, mitres, and bevels in a
+                  dedicated 3D cuts workspace. Create matching holes for paired
+                  dowel joints, then keep fabrication clear with ordered,
+                  shop-ready instructions. These are woodworking planning tools,
+                  not CNC or G-code output.
                 </p>
               </Card>
 

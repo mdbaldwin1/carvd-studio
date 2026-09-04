@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Round cuts and editable hole patterns** — Custom Cuts now supports through and blind round holes, angled bores, countersinks, counterbores, rounded openings, and linear, grid, or circular hole patterns with validated 3D geometry and unit-aware fabrication instructions.
+- **Paired dowel joints** — Choose two parts and opposing faces to create matching dowel holes atomically, visualize the physical dowels in the workspace, detect misalignment after parts move, undo the whole joint in one step, and report consolidated dowel drilling instructions in cut-list output.
+- **Flush-alignment regression coverage** — An anonymized fixture derived from a real deck project now protects joist-corner and deck-board end-flush snapping without committing customer project data.
 - **Privacy-safe Custom Cuts analytics** — Consent-gated analytics can report whether the cuts workspace was opened from Properties or the context menu and a coarse operation-count bucket; part names, dimensions, cut parameters, project identifiers, and file paths are never included.
 
 - **Tenons** — A `Tenon` cut leaves a tongue on a board's end, sized by length, width, and thickness and centred in the blank's thickness, with shoulders cut back on all four sides (or a bare-faced full-width variant). Tenons can be cut on both ends of a rail, pair with the new side-face mortises to complete mortise-and-tenon joinery, and need no separate cut-list allowance because the board length already includes the tongue.

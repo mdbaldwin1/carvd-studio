@@ -6,6 +6,9 @@ Use this checklist with at least one real project before promoting Custom Cuts f
 
 - [ ] Open Custom Cuts from both Properties and the part context menu.
 - [ ] Create and save a mitre or bevel, tenon, dado or groove, rabbet or notch, and mortise or cutout.
+- [ ] Create a through round hole, angled blind hole, countersink, counterbore, rounded opening, and each hole-pattern type.
+- [ ] Create a paired dowel joint; verify both parts receive matching holes in one undo step and the dowel display can be toggled.
+- [ ] Move one dowel-joint part out of alignment and confirm the dowels show a non-destructive warning; undo and confirm alignment returns.
 - [ ] Reopen each saved operation and confirm its target, dimensions, and rendered shape.
 - [ ] Undo and redo edits inside the cuts workspace.
 - [ ] Copy cuts from one part and paste them onto multiple compatible parts.
@@ -19,6 +22,7 @@ Use this checklist with at least one real project before promoting Custom Cuts f
 - [ ] Confirm the Ops count and numbered fabrication instructions match the authored order.
 - [ ] Export PDF and CSV output and verify the instructions are readable in the workshop.
 - [ ] Open one older project without cuts and confirm it remains unchanged.
+- [ ] Confirm dowel fabrication output states quantity, diameter, dowel length, and drilling depth for each part.
 
 ## Geometry and safety
 
@@ -34,6 +38,7 @@ Use this checklist with at least one real project before promoting Custom Cuts f
 - [ ] Complete the workflow on Windows x64.
 - [ ] Complete the workflow on Linux x64.
 - [ ] Record tester, project type, app version, platform, blocking issues, and final go/no-go decision below.
+- [ ] Run the anonymized Paul deck alignment regression and record joist-corner and deck-board end-flush results below.
 
 ## Beta record
 
@@ -42,4 +47,6 @@ Use this checklist with at least one real project before promoting Custom Cuts f
 - Version / platform:
 - Blocking issues:
 - Non-blocking feedback:
+- Paul deck joist-corner result:
+- Paul deck board end-flush result:
 - Decision: Go / No-go

@@ -233,4 +233,78 @@ test.describe('part cuts editing lifecycle', () => {
     await expect(dialog.getByText(/Cut blanks first/i)).toBeVisible();
     await expect(dialog.getByText(/Dado/i)).toBeVisible();
   });
+
+  test('persists round and rounded operations through save and reopen', async () => {
+    const { window, userDataDir } = running;
+    const projectPath = path.join(userDataDir, 'round-cuts-persistence.carvd');
+
+    await openPartCutsFromProperties(window);
+    await window.getByRole('button', { name: '+ Add Cut' }).click();
+    await window.getByRole('button', { name: /^Round Hole\b/ }).click();
+    await window.getByLabel('Depth').selectOption('blind');
+    await window.getByLabel('Tilt From Square (degrees)').fill('15');
+    await window.getByLabel('Repeating Pattern').selectOption('linear');
+    await window.getByLabel('Hole Count').fill('3');
+    await window.getByRole('button', { name: 'Save Cut' }).click();
+
+    await window.getByRole('button', { name: '+ Add Cut' }).click();
+    await window.getByRole('button', { name: /^Rounded Rectangle\b/ }).click();
+    await window.getByRole('button', { name: 'Save Cut' }).click();
+    await window.getByRole('button', { name: 'Save Part' }).click();
+
+    await queueSavePath(window, projectPath);
+    await pressSaveShortcut(window);
+    await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
+
+    await window.getByRole('button', { name: 'Carvd Studio home' }).click();
+    await queueOpenPaths(window, [projectPath]);
+    await window.getByRole('button', { name: 'Open file...' }).click();
+    await expect.poll(() => getFirstPartFeatureCount(window), { timeout: 5000 }).toBe(2);
+
+    const savedKinds = await window.evaluate(() =>
+      (window.useProjectStore.getState().parts[0].features ?? []).map((feature) => ({
+        kind: feature.kind,
+        pattern: feature.kind === 'circular_cut' ? feature.pattern?.type : undefined
+      }))
+    );
+    expect(savedKinds).toEqual([
+      { kind: 'circular_cut', pattern: 'linear' },
+      { kind: 'rounded_cut', pattern: undefined }
+    ]);
+  });
+
+  test('creates and undoes both sides of a paired dowel joint atomically', async () => {
+    const { window } = running;
+    await addPartFromSidebar(window);
+    await window.evaluate(() => {
+      const [first, second] = window.useProjectStore.getState().parts;
+      window.useProjectStore.setState({
+        parts: [
+          { ...first, name: 'Lower rail', position: { x: 0, y: 0, z: 0 } },
+          { ...second, name: 'Upper rail', position: { x: 0, y: first.thickness, z: 0 } }
+        ]
+      });
+      window.useSelectionStore.getState().selectPart(first.id);
+    });
+
+    await openPartCutsFromProperties(window);
+    await window.getByRole('button', { name: '+ Add Cut' }).click();
+    await window.getByRole('button', { name: /^Create Dowel Joint\b/ }).click();
+    await window.getByRole('button', { name: 'Next' }).click();
+    await window.getByRole('button', { name: 'Next' }).click();
+    await window.getByRole('button', { name: 'Next' }).click();
+    await window.getByRole('button', { name: 'Create Dowel Joint' }).click();
+
+    await expect
+      .poll(async () =>
+        window.evaluate(() => window.useProjectStore.getState().parts.map((part) => part.features?.length ?? 0))
+      )
+      .toEqual([2, 2]);
+    await window.evaluate(() => window.useProjectStore.temporal.getState().undo());
+    await expect
+      .poll(async () =>
+        window.evaluate(() => window.useProjectStore.getState().parts.map((part) => part.features?.length ?? 0))
+      )
+      .toEqual([0, 0]);
+  });
 });

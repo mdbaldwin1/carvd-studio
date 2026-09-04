@@ -20,14 +20,18 @@ Core features complete. UX polish in progress for 1.0 release.
 ### Part Cuts (Custom Cuts)
 
 - Dedicated Part Cuts workspace (peer editing mode alongside template/assembly editing)
-- Ten woodworking operations: end cuts (mitre/bevel/compound), dado, stopped dado,
-  groove, stopped groove, rabbet, mortise, cutout, edge notch, corner notch
+- Woodworking operations for end cuts, channels, pockets, notches, round holes,
+  countersinks, counterbores, rounded openings, and editable hole patterns
+- Paired dowel-joint workflow that authors matching holes on two parts atomically,
+  visualizes the dowels, and warns when the parts move out of alignment
 - True 3D preview geometry with drag handles (face pockets, stopped channels) and
   direct face/edge/corner target picking
 - Cut mirroring (opposite end, across length/width)
 - Ordered multi-cut conflict validation shared by cuts mode and cut-list validation
 - Cut-aware snapping/overlap/ground interaction, socket mating snaps
 - Cut-aware fabrication output (numbered instructions in cut list/CSV/PDF, Ops badges)
+- Explicit product boundary: Custom Cuts produces woodworking geometry and shop
+  instructions, not free-form CAD or machine-ready CNC/G-code
 - File format v2 for projects using cuts (older builds warn instead of silently
   dropping cut data)
 
