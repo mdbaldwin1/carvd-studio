@@ -762,6 +762,11 @@ export function applyTargetToFeatureDraft(draft: FeatureDraft, target: PartFeatu
 export function duplicateFeature(feature: PartFeature): PartFeature {
   const duplicate = clonePartFeature(feature);
   duplicate.id = generateFeatureId();
+  if (duplicate.metadata?.dowelJoint !== undefined) {
+    const ordinaryMetadata = { ...duplicate.metadata };
+    delete ordinaryMetadata.dowelJoint;
+    duplicate.metadata = Object.keys(ordinaryMetadata).length > 0 ? ordinaryMetadata : undefined;
+  }
   return duplicate;
 }
 

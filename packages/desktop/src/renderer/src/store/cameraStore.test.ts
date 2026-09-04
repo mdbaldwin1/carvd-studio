@@ -2,6 +2,15 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useCameraStore } from './cameraStore';
 
 describe('cameraStore', () => {
+  it('toggles derived dowel visibility independently of parts', () => {
+    useCameraStore.setState({ showDowels: true } as never);
+    const getDowelState = () =>
+      useCameraStore.getState() as unknown as { showDowels: boolean; toggleDowels: () => void };
+    getDowelState().toggleDowels();
+    expect(getDowelState().showDowels).toBe(false);
+    getDowelState().toggleDowels();
+    expect(getDowelState().showDowels).toBe(true);
+  });
   beforeEach(() => {
     useCameraStore.setState({
       centerCameraRequested: false,

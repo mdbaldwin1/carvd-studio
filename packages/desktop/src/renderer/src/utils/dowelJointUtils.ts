@@ -23,6 +23,16 @@ export interface DowelJointResult {
   secondFeatures: CircularCutFeature[];
 }
 
+export interface DowelVisualization {
+  jointId: string;
+  memberIndex: number;
+  center: { x: number; y: number; z: number };
+  axis: { x: number; y: number; z: number };
+  diameter: number;
+  length: number;
+  aligned: boolean;
+}
+
 function id(prefix: string): string {
   return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
@@ -32,9 +42,9 @@ function id(prefix: string): string {
 function quaternionFor(part: Part): THREE.Quaternion {
   return new THREE.Quaternion().setFromEuler(
     new THREE.Euler(
-      THREE.MathUtils.degToRad(part.rotation.x),
-      THREE.MathUtils.degToRad(part.rotation.y),
-      THREE.MathUtils.degToRad(part.rotation.z),
+      (part.rotation.x * Math.PI) / 180,
+      (part.rotation.y * Math.PI) / 180,
+      (part.rotation.z * Math.PI) / 180,
       'XYZ'
     )
   );
@@ -182,8 +192,53 @@ export function getDowelJointAlignment(
   const secondEntry = worldPoint(secondPart, secondMember.entryPoint);
   const firstAxis = worldDirection(firstPart, firstMember.axis);
   const secondAxis = worldDirection(secondPart, secondMember.axis);
-  const axisDot = THREE.MathUtils.clamp(firstAxis.dot(secondAxis), -1, 1);
-  const axisErrorDegrees = THREE.MathUtils.radToDeg(Math.acos(-axisDot));
+  const axisDot = Math.min(1, Math.max(-1, firstAxis.dot(secondAxis)));
+  const axisErrorDegrees = (Math.acos(-axisDot) * 180) / Math.PI;
   const offset = firstEntry.distanceTo(secondEntry);
   return { aligned: offset <= tolerance && axisErrorDegrees <= 0.5, offset, axisErrorDegrees };
+}
+
+function getDowelMetadata(feature: CircularCutFeature): DowelJointMetadata | null {
+  const value = feature.metadata?.dowelJoint;
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<DowelJointMetadata>;
+  return typeof candidate.jointId === 'string' && typeof candidate.memberIndex === 'number'
+    ? (candidate as DowelJointMetadata)
+    : null;
+}
+
+export function getDowelVisualizations(parts: Part[]): DowelVisualization[] {
+  const members = new Map<string, Array<{ part: Part; feature: CircularCutFeature; metadata: DowelJointMetadata }>>();
+  for (const part of parts) {
+    for (const feature of part.features ?? []) {
+      if (feature.kind !== 'circular_cut') continue;
+      const dowelMetadata = getDowelMetadata(feature);
+      if (!dowelMetadata) continue;
+      const key = `${dowelMetadata.jointId}:${dowelMetadata.memberIndex}`;
+      const entries = members.get(key) ?? [];
+      entries.push({ part, feature, metadata: dowelMetadata });
+      members.set(key, entries);
+    }
+  }
+
+  const visuals: DowelVisualization[] = [];
+  for (const entries of members.values()) {
+    if (entries.length !== 2) continue;
+    const [first, second] = entries;
+    const member = expandCircularCut(first.feature, first.part)[0];
+    const entry = worldPoint(first.part, member.entryPoint);
+    const axis = worldDirection(first.part, member.axis);
+    const center = entry.clone().addScaledVector(axis, first.metadata.embedmentDepth - first.metadata.dowelLength / 2);
+    const alignment = getDowelJointAlignment(first.part, first.feature, second.part, second.feature);
+    visuals.push({
+      jointId: first.metadata.jointId,
+      memberIndex: first.metadata.memberIndex,
+      center: { x: center.x, y: center.y, z: center.z },
+      axis: { x: axis.x, y: axis.y, z: axis.z },
+      diameter: first.metadata.dowelDiameter,
+      length: first.metadata.dowelLength,
+      aligned: alignment.aligned
+    });
+  }
+  return visuals.sort((a, b) => a.jointId.localeCompare(b.jointId) || a.memberIndex - b.memberIndex);
 }

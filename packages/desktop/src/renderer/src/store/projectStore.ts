@@ -37,6 +37,12 @@ import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
 import { rotationTool } from '../interaction/tools/rotationTool';
 import { resolveSelectedGroupIdsWithDescendants, resolveTransformSelectedPartIds } from '../utils/interactionSelection';
 import { dragDebug } from '../utils/dragDebug';
+import { createDowelJoint, type CreateDowelJointInput } from '../utils/dowelJointUtils';
+
+export type AddDowelJointInput = Omit<CreateDowelJointInput, 'firstPart' | 'secondPart'> & {
+  firstPartId: string;
+  secondPartId: string;
+};
 
 interface ProjectState {
   // Project data
@@ -74,6 +80,7 @@ interface ProjectState {
   updatePart: (id: string, updates: Partial<Part>) => boolean;
   updateParts: (ids: string[], updates: Partial<Part>) => void;
   batchUpdateParts: (updates: Array<{ id: string; changes: Partial<Part> }>) => void;
+  addDowelJoint: (input: AddDowelJointInput) => string | null;
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
   rotateSelectedParts: (axis: 'x' | 'y' | 'z', degrees: number, pivot: { x: number; y: number; z: number }) => void;
   deletePart: (id: string) => void;
@@ -594,6 +601,40 @@ export const useProjectStore = create<ProjectState>()(
         if (!didUpdate) return;
         get().markCutListStale();
         useSnapStore.getState().updateReferenceDistances();
+      },
+
+      addDowelJoint: (input) => {
+        const { parts } = get();
+        const firstPart = parts.find((part) => part.id === input.firstPartId);
+        const secondPart = parts.find((part) => part.id === input.secondPartId);
+        if (!firstPart || !secondPart || firstPart.id === secondPart.id) return null;
+
+        try {
+          const result = createDowelJoint({
+            ...input,
+            firstPart,
+            secondPart
+          });
+          set((state) => ({
+            parts: state.parts.map((part) => {
+              if (part.id === firstPart.id) {
+                return { ...part, features: [...(part.features ?? []), ...result.firstFeatures] };
+              }
+              if (part.id === secondPart.id) {
+                return { ...part, features: [...(part.features ?? []), ...result.secondFeatures] };
+              }
+              return part;
+            }),
+            isDirty: true
+          }));
+          get().markCutListStale();
+          return result.jointId;
+        } catch (error) {
+          useUIStore
+            .getState()
+            .showToast(error instanceof Error ? error.message : 'Unable to create the dowel joint.', 'warning');
+          return null;
+        }
       },
 
       moveSelectedParts: (delta) => {

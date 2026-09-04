@@ -5,6 +5,7 @@ import { describe, expect, it, vi, type Mock } from 'vitest';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 import type { EndCutFeature, RectCutFeature } from '@renderer/types';
 import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
+import { useProjectStore } from '@renderer/store/projectStore';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
 
 type WorkspaceProps = ComponentProps<typeof PartCutsWorkspace>;
@@ -92,6 +93,20 @@ function lastFeatures(onDraftFeaturesChange: WorkspaceProps['onDraftFeaturesChan
 }
 
 describe('PartCutsWorkspace', () => {
+  it('opens paired dowel joinery from the Joinery group', () => {
+    const part = createTestPart({ id: 'first', name: 'Lower rail' });
+    const mate = createTestPart({ id: 'second', name: 'Upper rail', position: { x: 0, y: 1, z: 0 } });
+    useProjectStore.setState({ parts: [part, mate] });
+    renderWorkspace({ part });
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    expect(screen.getByText('Joinery')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Create Dowel Joint/ }));
+
+    expect(screen.getByRole('dialog', { name: 'Create Dowel Joint' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Mating Part')).toHaveValue('second');
+  });
+
   it('creates an angled patterned round hole from the Round Cuts group', () => {
     const onDraftFeaturesChange = vi.fn();
     renderWorkspace({ onDraftFeaturesChange });

@@ -1,6 +1,8 @@
 import { FractionInput } from '@renderer/components/common/FractionInput';
 import { PartCutsPreviewCanvas } from '@renderer/components/part-cuts/PartCutsPreviewCanvas';
+import { DowelJointDialog } from '@renderer/components/part-cuts/DowelJointDialog';
 import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
+import { useProjectStore } from '@renderer/store/projectStore';
 import {
   applyTargetToFeatureDraft,
   buildDraftFromFeature,
@@ -177,6 +179,7 @@ export function PartCutsWorkspace({
 }: PartCutsWorkspaceProps) {
   const [draft, setDraft] = useState<FeatureDraft | null>(null);
   const [panelMode, setPanelMode] = useState<CutsPanelMode>('list');
+  const [showDowelDialog, setShowDowelDialog] = useState(false);
   const workspaceRootRef = useRef<HTMLDivElement | null>(null);
 
   // The workspace replaces the whole editor surface; move focus into it so
@@ -187,6 +190,8 @@ export function PartCutsWorkspace({
 
   const undoDraft = usePartCutsEditingStore((state) => state.undoDraft);
   const redoDraft = usePartCutsEditingStore((state) => state.redoDraft);
+  const projectParts = useProjectStore((state) => state.parts);
+  const addDowelJoint = useProjectStore((state) => state.addDowelJoint);
   const canUndoDraft = usePartCutsEditingStore((state) => state.draftHistory.length > 0);
   const canRedoDraft = usePartCutsEditingStore((state) => state.draftFuture.length > 0);
 
@@ -753,6 +758,21 @@ export function PartCutsWorkspace({
                       </div>
                     </div>
                   ))}
+                  <div>
+                    <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                      Joinery
+                    </div>
+                    <button
+                      type="button"
+                      className="w-full rounded-md border border-border bg-bg px-3 py-2 text-left transition-colors hover:border-accent hover:bg-accent/5"
+                      onClick={() => setShowDowelDialog(true)}
+                    >
+                      <div className="text-sm font-semibold text-text">Create Dowel Joint</div>
+                      <div className="mt-0.5 text-[11px] leading-snug text-text-muted">
+                        Add matching holes to this part and a mating part in one step.
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -1747,6 +1767,18 @@ export function PartCutsWorkspace({
           </CardContent>
         </Card>
       </div>
+      {showDowelDialog && (
+        <DowelJointDialog
+          open
+          firstPart={part}
+          candidateParts={projectParts.filter((candidate) => candidate.id !== part.id)}
+          onClose={() => {
+            setShowDowelDialog(false);
+            setPanelMode('list');
+          }}
+          onCreate={addDowelJoint}
+        />
+      )}
     </div>
   );
 }

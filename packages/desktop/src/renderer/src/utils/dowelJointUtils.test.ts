@@ -1,12 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
-import { createDowelJoint, getDowelJointAlignment } from './dowelJointUtils';
+import { createDowelJoint, getDowelJointAlignment, getDowelVisualizations } from './dowelJointUtils';
 
 vi.unmock('three');
 
 describe('dowelJointUtils', () => {
   it('creates matching part-local holes on opposing mating faces', () => {
-    const firstPart = createTestPart({ id: 'first', length: 10, width: 4, thickness: 1 });
+    const firstPart = createTestPart({
+      id: 'first',
+      length: 10,
+      width: 4,
+      thickness: 1,
+      position: { x: 0, y: 0, z: 0 }
+    });
     const secondPart = createTestPart({
       id: 'second',
       length: 10,
@@ -76,7 +82,13 @@ describe('dowelJointUtils', () => {
   });
 
   it('reports non-destructive misalignment after a mating part moves', () => {
-    const firstPart = createTestPart({ id: 'first', length: 10, width: 4, thickness: 1 });
+    const firstPart = createTestPart({
+      id: 'first',
+      length: 10,
+      width: 4,
+      thickness: 1,
+      position: { x: 0, y: 0, z: 0 }
+    });
     const secondPart = createTestPart({
       id: 'second',
       length: 10,
@@ -102,5 +114,56 @@ describe('dowelJointUtils', () => {
     expect(
       getDowelJointAlignment(firstPart, result.firstFeatures[0], secondPart, result.secondFeatures[0]).aligned
     ).toBe(false);
+  });
+
+  it('derives one visualization per physical dowel without creating parts', () => {
+    const firstPart = createTestPart({
+      id: 'first',
+      length: 10,
+      width: 4,
+      thickness: 1,
+      position: { x: 0, y: 0, z: 0 }
+    });
+    const secondPart = createTestPart({
+      id: 'second',
+      length: 10,
+      width: 4,
+      thickness: 1,
+      position: { x: 0, y: 1, z: 0 }
+    });
+    const joint = createDowelJoint({
+      firstPart,
+      firstFace: 'top_face',
+      secondPart,
+      secondFace: 'bottom_face',
+      diameter: 0.375,
+      dowelLength: 0.75,
+      firstEmbedmentDepth: 0.375,
+      secondEmbedmentDepth: 0.375,
+      count: 2,
+      spacing: 2,
+      firstPrimary: -1,
+      firstSecondary: 0
+    });
+    const parts = [
+      { ...firstPart, features: joint.firstFeatures },
+      { ...secondPart, features: joint.secondFeatures }
+    ];
+    expect(getDowelJointAlignment(parts[0], joint.firstFeatures[0], parts[1], joint.secondFeatures[0])).toEqual({
+      aligned: true,
+      offset: 0,
+      axisErrorDegrees: 0
+    });
+
+    const visuals = getDowelVisualizations(parts);
+    expect(visuals).toHaveLength(2);
+    expect(visuals[0]).toMatchObject({
+      jointId: joint.jointId,
+      memberIndex: 0,
+      diameter: 0.375,
+      length: 0.75,
+      aligned: true
+    });
+    expect(visuals[0].center).toMatchObject({ x: -1, y: 0.5, z: 0 });
   });
 });

@@ -549,6 +549,36 @@ describe('partFeatureEditorState', () => {
       expect(feature.parameters.size.length).toBe(2);
     });
 
+    it('turns a duplicated dowel member into an ordinary hole', () => {
+      const feature: PartFeature = {
+        id: 'dowel-1',
+        kind: 'circular_cut',
+        version: 1,
+        enabled: true,
+        metadata: {
+          source: 'manual',
+          dowelJoint: {
+            jointId: 'joint-1',
+            matePartId: 'part-2',
+            memberIndex: 0,
+            dowelDiameter: 0.375,
+            dowelLength: 2,
+            embedmentDepth: 1
+          }
+        },
+        target: { type: 'face', face: 'right_end' },
+        reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+        cutType: 'round_hole',
+        placement: { primary: 0, secondary: 0, rotation: 0 },
+        parameters: { diameter: 0.375, depthMode: 'blind', depth: 1, tilt: 0, direction: 0 }
+      };
+
+      const duplicate = duplicateFeature(feature);
+
+      expect(duplicate.metadata).toEqual({ source: 'manual' });
+      expect(feature.metadata?.dowelJoint).toBeDefined();
+    });
+
     it('generates unique feature ids', () => {
       expect(generateFeatureId()).not.toBe(generateFeatureId());
     });

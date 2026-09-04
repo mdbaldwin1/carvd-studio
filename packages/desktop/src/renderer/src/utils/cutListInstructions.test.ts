@@ -48,6 +48,54 @@ describe('cutListInstructions', () => {
     );
   });
 
+  it('collapses paired dowel holes into one unit-aware fabrication line', () => {
+    const dowelMetadata = (memberIndex: number) => ({
+      dowelJoint: {
+        jointId: 'joint-1',
+        matePartId: 'mate-1',
+        memberIndex,
+        dowelDiameter: 0.375,
+        dowelLength: 2,
+        embedmentDepth: 1
+      }
+    });
+    const features = [0, 1, 2].map((memberIndex) => ({
+      id: `dowel-${memberIndex}`,
+      kind: 'circular_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      label: `Dowel hole ${memberIndex + 1}`,
+      metadata: dowelMetadata(memberIndex),
+      target: { type: 'face' as const, face: 'right_end' as const },
+      reference: { primaryFrom: 'center' as const, secondaryFrom: 'center' as const },
+      cutType: 'round_hole' as const,
+      placement: { primary: memberIndex * 2, secondary: 0, rotation: 0 },
+      parameters: { diameter: 0.375, depthMode: 'blind' as const, depth: 1, tilt: 0, direction: 0 }
+    }));
+    const instruction = {
+      partId: 'part-1',
+      partName: 'Rail',
+      cutLength: 24,
+      cutWidth: 4,
+      thickness: 2,
+      stockId: 'stock-1',
+      stockName: 'Maple',
+      grainSensitive: false,
+      grainDirection: 'length' as const,
+      isGlueUp: false,
+      quantity: 1,
+      features,
+      notes: ''
+    };
+
+    expect(getInstructionFabricationLines(instruction, 'imperial')).toEqual([
+      '1. Dowel joint: 3 × 3/8" dowels, 2" long; drill 1" into this part.'
+    ]);
+    expect(getInstructionFabricationLines(instruction, 'metric')).toEqual([
+      '1. Dowel joint: 3 × 9.5mm dowels, 50.8mm long; drill 25.4mm into this part.'
+    ]);
+  });
+
   it('does not group instructions whose circular patterns differ', () => {
     const base = {
       partId: 'part-1',

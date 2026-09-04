@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createTestAssembly,
   createTestPart,
@@ -13,6 +13,8 @@ import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
+
+vi.unmock('three');
 
 // Helper to reset store state before each test
 const resetStore = () => {
@@ -273,6 +275,59 @@ describe('projectStore', () => {
         const state = useProjectStore.getState();
         const partA = state.parts.find((p) => p.id === partAId);
         expect(partA?.length).toBe(10);
+      });
+    });
+
+    describe('addDowelJoint', () => {
+      it('adds both feature sets in one undoable project transaction', () => {
+        const store = useProjectStore.getState();
+        const firstPartId = store.addPart({
+          name: 'Lower rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        });
+        const secondPartId = store.addPart({
+          name: 'Upper rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        });
+        expect(firstPartId).not.toBeNull();
+        expect(secondPartId).not.toBeNull();
+        useProjectStore.temporal.getState().clear();
+
+        const jointId = (
+          store as typeof store & {
+            addDowelJoint: (input: Record<string, unknown>) => string | null;
+          }
+        ).addDowelJoint({
+          firstPartId,
+          firstFace: 'top_face',
+          secondPartId,
+          secondFace: 'bottom_face',
+          diameter: 0.375,
+          dowelLength: 0.75,
+          firstEmbedmentDepth: 0.375,
+          secondEmbedmentDepth: 0.375,
+          count: 2,
+          spacing: 2,
+          firstPrimary: -1,
+          firstSecondary: 0
+        });
+
+        expect(jointId, useUIStore.getState().toast?.message).toEqual(expect.any(String));
+        let state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features).toHaveLength(2);
+        expect(state.parts.find((part) => part.id === secondPartId)?.features).toHaveLength(2);
+        expect(useProjectStore.temporal.getState().pastStates).toHaveLength(1);
+
+        useProjectStore.temporal.getState().undo();
+        state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features ?? []).toHaveLength(0);
+        expect(state.parts.find((part) => part.id === secondPartId)?.features ?? []).toHaveLength(0);
       });
     });
 
