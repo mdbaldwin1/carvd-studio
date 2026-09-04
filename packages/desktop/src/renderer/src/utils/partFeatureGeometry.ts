@@ -1308,21 +1308,20 @@ export function getPartWorldContour(
     return contour.map((p) => ({ x: p.x + position.x, z: -p.z + position.z }));
   }
 
-  // General rotation: use Euler XYZ → rotation matrix, project onto XZ
+  // Match Three.js's canonical XYZ Euler transform used by rendered parts and
+  // OBBs. Only the X/Z projection columns are needed for a flat contour.
   const cx = Math.cos(rx),
     sx = Math.sin(rx);
   const cy = Math.cos(rad),
     sy = Math.sin(rad);
   const cz = Math.cos(rz),
     sz = Math.sin(rz);
+  const m00 = cy * cz;
+  const m02 = sy;
+  const m20 = sx * sz - cx * sy * cz;
+  const m22 = cx * cy;
 
-  // Rotation matrix columns for X and Z (we only need XZ projection)
-  const m00 = cy * cz + sy * sx * sz;
-  const m02 = -sy * cx;
-  const m20 = sy * cz - cy * sx * sz;
-  const m22 = cy * cx;
-
-  // Negate contour Z to match the rotateX(-π/2) applied by the render geometry.
+  // Negate authored contour Z first to match the render geometry convention.
   return contour.map((p) => ({
     x: m00 * p.x + m02 * -p.z + position.x,
     z: m20 * p.x + m22 * -p.z + position.z

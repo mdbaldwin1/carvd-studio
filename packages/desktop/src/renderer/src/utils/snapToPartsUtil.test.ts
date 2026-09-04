@@ -1413,6 +1413,27 @@ describe('snapToPartsUtil', () => {
   });
 
   describe('detectFaceSnaps', () => {
+    const endCut = (
+      face: 'left_end' | 'right_end',
+      cutType: 'mitre' | 'bevel' | 'compound',
+      parameters: {
+        horizontalAngle: number;
+        horizontalFlip?: boolean;
+        verticalAngle?: number;
+        verticalFlip?: boolean;
+      }
+    ) => ({
+      id: `${face}-${cutType}`,
+      kind: 'end_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      target: { type: 'face' as const, face },
+      reference: { primaryFrom: face === 'left_end' ? ('min' as const) : ('max' as const) },
+      cutType,
+      lengthMode: 'long_point' as const,
+      parameters
+    });
+
     it('detects face-to-face snap on X axis (right to left)', () => {
       const draggingPart = createTestPart({
         id: 'dragging',
@@ -1523,6 +1544,205 @@ describe('snapToPartsUtil', () => {
 
       expect(result.snapLines.length).toBeGreaterThan(0);
       expect(result.snapLines[0].type).toBe('face');
+    });
+
+    it.each([
+      {
+        title: 'default 45 degree frame corner',
+        firstFlip: false,
+        secondFlip: true,
+        separatedPosition: { x: 4.2, y: 0.5, z: 4.2 },
+        assembledPosition: { x: 4, y: 0.5, z: 4 }
+      },
+      {
+        title: 'oppositely flipped 45 degree frame corner',
+        firstFlip: true,
+        secondFlip: false,
+        rotationY: -90,
+        separatedPosition: { x: 4.2, y: 0.5, z: -4.2 },
+        assembledPosition: { x: 4, y: 0.5, z: -4 }
+      }
+    ])(
+      'snaps the actual mitre planes for a $title',
+      ({ firstFlip, secondFlip, rotationY = 90, separatedPosition, assembledPosition }) => {
+        const horizontal = createTestPart({
+          id: 'horizontal-frame',
+          length: 10,
+          width: 2,
+          thickness: 1,
+          position: { x: 0, y: 0.5, z: 0 },
+          features: [endCut('right_end', 'mitre', { horizontalAngle: 45, horizontalFlip: firstFlip })]
+        });
+        const vertical = createTestPart({
+          id: 'vertical-frame',
+          length: 10,
+          width: 2,
+          thickness: 1,
+          position: separatedPosition,
+          rotation: { x: 0, y: rotationY, z: 0 },
+          features: [endCut('right_end', 'mitre', { horizontalAngle: 45, horizontalFlip: secondFlip })]
+        });
+
+        const result = detectFaceSnaps(vertical, separatedPosition, [horizontal, vertical], [vertical.id], 0.5);
+
+        expect(result.snappedX).toBe(true);
+        expect(result.snappedZ).toBe(true);
+        expect(result.adjustedPosition.x).toBeCloseTo(assembledPosition.x, 3);
+        expect(result.adjustedPosition.y).toBeCloseTo(assembledPosition.y, 5);
+        expect(result.adjustedPosition.z).toBeCloseTo(assembledPosition.z, 3);
+      }
+    );
+
+    it('snaps complementary 22.5 degree mitres for a 45 degree frame turn', () => {
+      const horizontal = createTestPart({
+        id: 'horizontal-22-5',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 22.5 })]
+      });
+      const assembledPosition = { x: 7.82842712, y: 0.5, z: 3.24264069 };
+      const separatedPosition = { x: 8.01320303, y: 0.5, z: 3.31917738 };
+      const diagonal = createTestPart({
+        id: 'diagonal-22-5',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: separatedPosition,
+        rotation: { x: 0, y: 135, z: 0 },
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 22.5, horizontalFlip: true })]
+      });
+
+      const result = detectFaceSnaps(diagonal, separatedPosition, [horizontal, diagonal], [diagonal.id], 0.5);
+
+      expect(result.snappedX).toBe(true);
+      expect(result.snappedZ).toBe(true);
+      expect(result.adjustedPosition.x).toBeCloseTo(assembledPosition.x, 3);
+      expect(result.adjustedPosition.z).toBeCloseTo(assembledPosition.z, 3);
+    });
+
+    it('recomputes shaped snap planes after a mitre angle edit', () => {
+      const editedHost = createTestPart({
+        id: 'edited-host',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 30 })]
+      });
+      const stale45Mate = createTestPart({
+        id: 'stale-45-mate',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 4.2, y: 0.5, z: 4.2 },
+        rotation: { x: 0, y: 90, z: 0 },
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 45, horizontalFlip: true })]
+      });
+
+      const staleResult = detectFaceSnaps(
+        stale45Mate,
+        stale45Mate.position,
+        [editedHost, stale45Mate],
+        [stale45Mate.id],
+        0.5
+      );
+      expect(staleResult.closestDistance).toBeUndefined();
+
+      const faceCenter = 5 - Math.tan(Math.PI / 6);
+      const assembledPosition = {
+        x: faceCenter * 1.5,
+        y: 0.5,
+        z: (faceCenter * Math.sqrt(3)) / 2
+      };
+      const separatedPosition = {
+        x: assembledPosition.x + Math.cos(Math.PI / 6) * 0.2,
+        y: 0.5,
+        z: assembledPosition.z + Math.sin(Math.PI / 6) * 0.2
+      };
+      const editedMate = createTestPart({
+        ...stale45Mate,
+        id: 'edited-mate',
+        position: separatedPosition,
+        rotation: { x: 0, y: 120, z: 0 },
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 30, horizontalFlip: true })]
+      });
+      const refreshedResult = detectFaceSnaps(
+        editedMate,
+        editedMate.position,
+        [editedHost, editedMate],
+        [editedMate.id],
+        0.5
+      );
+
+      expect(refreshedResult.snappedX).toBe(true);
+      expect(refreshedResult.snappedZ).toBe(true);
+      expect(refreshedResult.adjustedPosition.x).toBeCloseTo(assembledPosition.x, 3);
+      expect(refreshedResult.adjustedPosition.z).toBeCloseTo(assembledPosition.z, 3);
+    });
+
+    it('snaps complementary bevel and compound end planes in three dimensions', () => {
+      const bevelInset = Math.tan(Math.PI / 6);
+      const bevelCenter = 5 - bevelInset / 2;
+      const bevelA = createTestPart({
+        id: 'bevel-a',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [endCut('right_end', 'bevel', { horizontalAngle: 0, verticalAngle: 30 })]
+      });
+      const bevelAssembled = { x: bevelCenter * 2, y: 0.5, z: 0 };
+      const bevelSeparated = {
+        x: bevelAssembled.x + Math.cos(Math.PI / 6) * 0.2,
+        y: bevelAssembled.y - Math.sin(Math.PI / 6) * 0.2,
+        z: 0
+      };
+      const bevelB = createTestPart({
+        id: 'bevel-b',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: bevelSeparated,
+        features: [endCut('left_end', 'bevel', { horizontalAngle: 0, verticalAngle: 30 })]
+      });
+
+      const bevelResult = detectFaceSnaps(bevelB, bevelSeparated, [bevelA, bevelB], [bevelB.id], 0.5);
+      expect(bevelResult.adjustedPosition.x).toBeCloseTo(bevelAssembled.x, 3);
+      expect(bevelResult.adjustedPosition.y).toBeCloseTo(bevelAssembled.y, 3);
+
+      const horizontalInset = Math.tan(Math.PI / 8) * 2;
+      const verticalInset = Math.tan(Math.PI / 12);
+      const compoundCenter = 5 - (horizontalInset + verticalInset) / 2;
+      const compoundA = createTestPart({
+        id: 'compound-a',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [endCut('right_end', 'compound', { horizontalAngle: 22.5, verticalAngle: 15 })]
+      });
+      const compoundAssembled = { x: compoundCenter * 2, y: 0.5, z: 0 };
+      const normalLength = Math.sqrt(1 + Math.tan(Math.PI / 12) ** 2 + Math.tan(Math.PI / 8) ** 2);
+      const compoundSeparated = {
+        x: compoundAssembled.x + 0.2 / normalLength,
+        y: compoundAssembled.y - (Math.tan(Math.PI / 12) * 0.2) / normalLength,
+        z: (Math.tan(Math.PI / 8) * 0.2) / normalLength
+      };
+      const compoundB = createTestPart({
+        id: 'compound-b',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: compoundSeparated,
+        features: [endCut('left_end', 'compound', { horizontalAngle: 22.5, verticalAngle: 15 })]
+      });
+
+      const compoundResult = detectFaceSnaps(compoundB, compoundSeparated, [compoundA, compoundB], [compoundB.id], 0.5);
+      expect(compoundResult.adjustedPosition.x).toBeCloseTo(compoundAssembled.x, 3);
+      expect(compoundResult.adjustedPosition.y).toBeCloseTo(compoundAssembled.y, 3);
+      expect(compoundResult.adjustedPosition.z).toBeCloseTo(compoundAssembled.z, 3);
     });
   });
 

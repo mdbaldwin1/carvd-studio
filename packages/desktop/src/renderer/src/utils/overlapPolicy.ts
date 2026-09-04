@@ -26,11 +26,18 @@ const SAFE_SEARCH_STEPS = 14;
 const MIN_DIRECTIONAL_FRACTION = 0.005;
 type TranslationDelta = { x: number; y: number; z: number };
 
-function hasVerticalEndCuts(part: Part): boolean {
+function hasAngledEndCuts(part: Part): boolean {
   const profiles = getPartEndCutProfiles(part);
-  if (profiles.left.verticalInset > 0 || profiles.right.verticalInset > 0) return true;
+  if (profiles.left.maxInset > 0 || profiles.right.maxInset > 0) return true;
   // Long-edge bevels also remove material along Y, so they need the same
   // convex-shape treatment to avoid ghost corners at the beveled face.
+  const edgeProfiles = getPartEdgeBevelProfiles(part);
+  return edgeProfiles.front.inset > 0 || edgeProfiles.back.inset > 0;
+}
+
+function hasVerticalCuts(part: Part): boolean {
+  const profiles = getPartEndCutProfiles(part);
+  if (profiles.left.verticalInset > 0 || profiles.right.verticalInset > 0) return true;
   const edgeProfiles = getPartEdgeBevelProfiles(part);
   return edgeProfiles.front.inset > 0 || edgeProfiles.back.inset > 0;
 }
@@ -61,10 +68,19 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
 export function partsOverlap(a: Part, b: Part, geometryCache?: GeometryCache): boolean {
   if (!overlapCheckEnabled(a, b)) return false;
 
-  // Use convex shape SAT when either part has vertical end cuts (bevels,
-  // compounds) that remove material along the Y axis — OBB cannot represent
-  // the angled face and creates a "ghost corner".
-  if (hasVerticalEndCuts(a) || hasVerticalEndCuts(b)) {
+  const hasAngledCuts = hasAngledEndCuts(a) || hasAngledEndCuts(b);
+
+  // Flat horizontal end cuts have an exact top-view contour. Prefer that to
+  // the 3D convex fallback so contact is accepted while a real intrusion is
+  // still rejected at the authored mitre plane.
+  if (hasAngledCuts && !hasVerticalCuts(a) && !hasVerticalCuts(b) && isFlat(a) && isFlat(b)) {
+    if (!partsOverlapOnYAxis(a, b, CONTOUR_TOLERANCE)) return false;
+    return worldContoursOverlap(getPartWorldContour(a), getPartWorldContour(b), CONTOUR_TOLERANCE);
+  }
+
+  // Bevels, compounds, edge bevels, and tilted horizontal cuts require the
+  // full 3D convex shape.
+  if (hasAngledCuts) {
     return convexShapesOverlap(getPartConvexShape(a), getPartConvexShape(b), OBB_SEPARATION_TOLERANCE, false);
   }
 

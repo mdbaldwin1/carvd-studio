@@ -29,6 +29,18 @@ function createPart(overrides: Partial<Part> = {}): Part {
 }
 
 describe('overlapPolicy', () => {
+  const mitre = (horizontalFlip: boolean) => ({
+    id: `mitre-${horizontalFlip ? 'flipped' : 'default'}`,
+    kind: 'end_cut' as const,
+    version: 1 as const,
+    enabled: true,
+    target: { type: 'face' as const, face: 'right_end' as const },
+    reference: { primaryFrom: 'max' as const },
+    cutType: 'mitre' as const,
+    lengthMode: 'long_point' as const,
+    parameters: { horizontalAngle: 45, horizontalFlip }
+  });
+
   it('disables overlap checking when either part ignores overlap', () => {
     const a = createPart({ id: 'a', ignoreOverlap: true });
     const b = createPart({ id: 'b' });
@@ -43,6 +55,66 @@ describe('overlapPolicy', () => {
 
     expect(partsOverlap(a, b)).toBe(false);
   });
+
+  it.each([
+    {
+      firstFlip: false,
+      secondFlip: true,
+      rotationY: 90,
+      assembled: { x: 4, z: 4 },
+      intrusion: { x: -0.01, z: -0.01 }
+    },
+    {
+      firstFlip: true,
+      secondFlip: false,
+      rotationY: -90,
+      assembled: { x: 4, z: -4 },
+      intrusion: { x: -0.01, z: 0.01 }
+    }
+  ])(
+    'uses the actual complementary mitre solids for frame contact ($firstFlip/$secondFlip)',
+    ({ firstFlip, secondFlip, rotationY, assembled, intrusion }) => {
+      const horizontal = createPart({
+        id: 'mitre-horizontal',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [mitre(firstFlip)]
+      });
+      const vertical = createPart({
+        id: 'mitre-vertical',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: assembled.x, y: 0.5, z: assembled.z },
+        rotation: { x: 0, y: rotationY, z: 0 },
+        features: [mitre(secondFlip)]
+      });
+
+      expect(partsOverlap(horizontal, vertical)).toBe(false);
+      expect(
+        partsOverlap(horizontal, {
+          ...vertical,
+          position: {
+            ...vertical.position,
+            x: vertical.position.x - intrusion.x,
+            z: vertical.position.z - intrusion.z
+          }
+        })
+      ).toBe(false);
+      expect(
+        partsOverlap(horizontal, {
+          ...vertical,
+          position: {
+            ...vertical.position,
+            x: vertical.position.x + intrusion.x,
+            z: vertical.position.z + intrusion.z
+          }
+        })
+      ).toBe(true);
+    }
+  );
 
   it('detects overlap after transformed updates', () => {
     const a = createPart({ id: 'a', position: { x: 0, y: 0.5, z: 0 } });

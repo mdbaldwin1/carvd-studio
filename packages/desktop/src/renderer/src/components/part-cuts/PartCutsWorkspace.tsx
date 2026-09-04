@@ -42,6 +42,7 @@ import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import { isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
 import { getAvailableMirrorActions, getMirrorActionLabel, mirrorFeature } from '@renderer/utils/partFeatureActions';
 import { getPartFeatureConflicts } from '@renderer/utils/partFeatureConflicts';
+import { clonePartFeature } from '@renderer/utils/partFeatures';
 import {
   CORNER_LABELS,
   EDGE_LABELS,
@@ -345,7 +346,13 @@ export function PartCutsWorkspace({
     if (!draft) return;
     if (draftValidationMessage) return;
 
-    const nextFeature = buildFeatureFromDraft(draft.mode === 'end_cut' ? normalizeEndCutDraft(draft) : draft);
+    const builtFeature = buildFeatureFromDraft(draft.mode === 'end_cut' ? normalizeEndCutDraft(draft) : draft);
+    const originalFeature = draft.featureId
+      ? draftFeatures.find((feature) => feature.id === draft.featureId)
+      : undefined;
+    const nextFeature = originalFeature?.metadata
+      ? { ...builtFeature, metadata: clonePartFeature(originalFeature).metadata }
+      : builtFeature;
     const nextFeatures = draft.featureId
       ? draftFeatures.map((feature) => (feature.id === draft.featureId ? nextFeature : feature))
       : [...draftFeatures, nextFeature];
@@ -1857,7 +1864,13 @@ export function PartCutsWorkspace({
             setShowDowelDialog(false);
             setPanelMode('list');
           }}
-          onCreate={addDowelJoint}
+          onCreate={(input) => {
+            const jointId = addDowelJoint(input);
+            if (!jointId) return null;
+            const refreshedPart = useProjectStore.getState().parts.find((candidate) => candidate.id === part.id);
+            if (refreshedPart) onDraftFeaturesChange(refreshedPart.features ?? []);
+            return jointId;
+          }}
           onAlignRequested={({ firstPartId, secondPartId }) => {
             setShowDowelDialog(false);
             setPanelMode('list');

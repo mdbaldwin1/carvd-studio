@@ -224,20 +224,30 @@ export function DowelJointDialog({
               </svg>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Dowel Diameter</Label>
-                  <FractionInput value={diameter} onChange={setDiameter} min={0.001} />
+                  <Label htmlFor="dowel-diameter">Dowel Diameter</Label>
+                  <FractionInput id="dowel-diameter" value={diameter} onChange={setDiameter} min={0.001} />
                 </div>
                 <div>
-                  <Label>Dowel Length</Label>
-                  <FractionInput value={dowelLength} onChange={setDowelLength} min={0.001} />
+                  <Label htmlFor="dowel-length">Dowel Length</Label>
+                  <FractionInput id="dowel-length" value={dowelLength} onChange={setDowelLength} min={0.001} />
                 </div>
                 <div>
-                  <Label>Depth into {firstPart.name}</Label>
-                  <FractionInput value={firstEmbedmentDepth} onChange={setFirstEmbedmentDepth} min={0.001} />
+                  <Label htmlFor="dowel-first-depth">Depth into {firstPart.name}</Label>
+                  <FractionInput
+                    id="dowel-first-depth"
+                    value={firstEmbedmentDepth}
+                    onChange={setFirstEmbedmentDepth}
+                    min={0.001}
+                  />
                 </div>
                 <div>
-                  <Label>Depth into {secondPart?.name ?? 'mate'}</Label>
-                  <FractionInput value={secondEmbedmentDepth} onChange={setSecondEmbedmentDepth} min={0.001} />
+                  <Label htmlFor="dowel-second-depth">Depth into {secondPart?.name ?? 'mate'}</Label>
+                  <FractionInput
+                    id="dowel-second-depth"
+                    value={secondEmbedmentDepth}
+                    onChange={setSecondEmbedmentDepth}
+                    min={0.001}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="dowel-count">Dowel Count</Label>

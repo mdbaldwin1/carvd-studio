@@ -17,7 +17,7 @@ export function DowelVisualizations({ visualizations }: DowelVisualizationsProps
           <mesh
             key={`${visual.jointId}:${visual.memberIndex}`}
             name={`dowel-${visual.jointId}-${visual.memberIndex}`}
-            data-aligned={String(visual.aligned)}
+            userData={{ kind: 'dowel-visualization', aligned: visual.aligned }}
             position={[visual.center.x, visual.center.y, visual.center.z]}
             quaternion={quaternion}
             raycast={() => undefined}

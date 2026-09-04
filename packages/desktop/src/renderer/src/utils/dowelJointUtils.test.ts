@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
+import { clonePartFeature } from './partFeatures';
 import {
   createDowelJoint,
+  detachDeletedDowelMates,
   getDowelJointAlignment,
   getDowelVisualizations,
   validateDowelRelationships
@@ -258,5 +260,103 @@ describe('dowelJointUtils', () => {
       aligned: true
     });
     expect(visuals[0].center).toMatchObject({ x: -1, y: 0.5, z: 0 });
+  });
+
+  it('marks a coaxial 1/4 inch and 1/2 inch mismatch invalid in both diagnostics and visualization', () => {
+    const firstPart = createTestPart({ id: 'first', thickness: 1, position: { x: 0, y: 0, z: 0 } });
+    const secondPart = createTestPart({ id: 'second', thickness: 1, position: { x: 0, y: 1, z: 0 } });
+    const joint = createDowelJoint({
+      firstPart,
+      firstFace: 'top_face',
+      secondPart,
+      secondFace: 'bottom_face',
+      diameter: 0.25,
+      dowelLength: 0.75,
+      firstEmbedmentDepth: 0.375,
+      secondEmbedmentDepth: 0.375,
+      count: 1,
+      spacing: 1,
+      firstPrimary: 0,
+      firstSecondary: 0
+    });
+    joint.secondFeatures[0].parameters.diameter = 0.5;
+    const parts = [
+      { ...firstPart, features: joint.firstFeatures },
+      { ...secondPart, features: joint.secondFeatures }
+    ];
+
+    expect(getDowelJointAlignment(parts[0], joint.firstFeatures[0], parts[1], joint.secondFeatures[0]).offset).toBe(0);
+    expect(validateDowelRelationships(parts)).toEqual([expect.stringMatching(/mismatched or misaligned/i)]);
+    expect(getDowelVisualizations(parts)).toEqual([expect.objectContaining({ aligned: false })]);
+  });
+
+  it('keeps authored holes part-local while move diagnostics change and restore', () => {
+    const firstPart = createTestPart({ id: 'first', thickness: 1, position: { x: 0, y: 0, z: 0 } });
+    const secondPart = createTestPart({ id: 'second', thickness: 1, position: { x: 0, y: 1, z: 0 } });
+    const joint = createDowelJoint({
+      firstPart,
+      firstFace: 'top_face',
+      secondPart,
+      secondFace: 'bottom_face',
+      diameter: 0.375,
+      dowelLength: 0.75,
+      firstEmbedmentDepth: 0.375,
+      secondEmbedmentDepth: 0.375,
+      count: 1,
+      spacing: 1,
+      firstPrimary: 0,
+      firstSecondary: 0
+    });
+    const originalSecondFeature = clonePartFeature(joint.secondFeatures[0]);
+    const movedSecond = { ...secondPart, position: { x: 0.25, y: 1, z: 0 }, features: joint.secondFeatures };
+
+    expect(getDowelVisualizations([{ ...firstPart, features: joint.firstFeatures }, movedSecond])[0].aligned).toBe(
+      false
+    );
+    expect(joint.secondFeatures[0]).toEqual(originalSecondFeature);
+
+    const restoredSecond = { ...movedSecond, position: { ...secondPart.position } };
+    expect(getDowelVisualizations([{ ...firstPart, features: joint.firstFeatures }, restoredSecond])[0].aligned).toBe(
+      true
+    );
+    expect(joint.secondFeatures[0]).toEqual(originalSecondFeature);
+  });
+
+  it('detaches the surviving mate as an ordinary hole when one paired hole is deleted', () => {
+    const firstPart = createTestPart({ id: 'first', thickness: 1, position: { x: 0, y: 0, z: 0 } });
+    const secondPart = createTestPart({ id: 'second', thickness: 1, position: { x: 0, y: 1, z: 0 } });
+    const joint = createDowelJoint({
+      firstPart,
+      firstFace: 'top_face',
+      secondPart,
+      secondFace: 'bottom_face',
+      diameter: 0.375,
+      dowelLength: 0.75,
+      firstEmbedmentDepth: 0.375,
+      secondEmbedmentDepth: 0.375,
+      count: 1,
+      spacing: 1,
+      firstPrimary: 0,
+      firstSecondary: 0
+    });
+    const parts = [
+      { ...firstPart, features: joint.firstFeatures },
+      { ...secondPart, features: joint.secondFeatures }
+    ];
+
+    const reconciled = detachDeletedDowelMates(parts, firstPart.id, []);
+    const survivingHole = reconciled.find((part) => part.id === secondPart.id)?.features?.[0];
+
+    expect(reconciled.find((part) => part.id === firstPart.id)?.features).toEqual([]);
+    expect(survivingHole).toMatchObject({
+      id: joint.secondFeatures[0].id,
+      label: 'Round hole 1',
+      kind: 'circular_cut',
+      cutType: 'round_hole',
+      parameters: { diameter: 0.375, depthMode: 'blind', depth: 0.375 }
+    });
+    expect(survivingHole?.metadata?.dowelJoint).toBeUndefined();
+    expect(validateDowelRelationships(reconciled)).toEqual([]);
+    expect(getDowelVisualizations(reconciled)).toEqual([]);
   });
 });

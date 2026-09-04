@@ -21,6 +21,27 @@ declare global {
     useAssemblyEditingStore: { getState: () => any };
     __carvdE2E?: {
       getPartScreenPoint: (partId?: string) => { x: number; y: number } | null;
+      getPartLocalScreenPoint: (
+        partId: string,
+        point: { x: number; y: number; z: number }
+      ) => { x: number; y: number } | null;
+      getPartMaterialScreenPoints: (partId: string) => Array<{ x: number; y: number }>;
+      getWorldScreenPoint: (point: { x: number; y: number; z: number }) => { x: number; y: number };
+      getPartRenderedWorldPosition: (partId: string) => { x: number; y: number; z: number } | null;
+      getDowelVisualizations: () => Array<{
+        jointId: string;
+        memberIndex: number;
+        center: { x: number; y: number; z: number };
+        axis: { x: number; y: number; z: number };
+        diameter: number;
+        length: number;
+        aligned: boolean;
+      }>;
+      partsOverlap: (
+        firstPartId: string,
+        secondPartId: string,
+        secondPosition?: { x: number; y: number; z: number }
+      ) => boolean | null;
       getResizeHandleScreenPoint: (
         handle: { x: -1 | 0 | 1; y: -1 | 0 | 1; z: -1 | 0 | 1 },
         partId?: string

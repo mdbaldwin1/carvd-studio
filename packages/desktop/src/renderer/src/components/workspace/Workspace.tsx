@@ -12,6 +12,8 @@ import { useCameraStore } from '../../store/cameraStore';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { CameraState } from '../../types';
 import { getPartLocalCorners } from '../../utils/partFeatureGeometry';
+import { getDowelVisualizations, type DowelVisualization } from '../../utils/dowelJointUtils';
+import { partsOverlap } from '../../utils/overlapPolicy';
 import { resolveCanvasPartDragFallback } from '../../utils/interactionMovement';
 import { getPartGroupContext } from './partClickHandler';
 import { AxisIndicator } from './AxisIndicator';
@@ -45,7 +47,19 @@ declare global {
     __selectionDebugLogs?: Array<{ ts: string; args: unknown[] }>;
     __carvdE2E?: {
       getPartScreenPoint: (partId?: string) => { x: number; y: number } | null;
+      getPartLocalScreenPoint: (
+        partId: string,
+        point: { x: number; y: number; z: number }
+      ) => { x: number; y: number } | null;
+      getPartMaterialScreenPoints: (partId: string) => Array<{ x: number; y: number }>;
+      getWorldScreenPoint: (point: { x: number; y: number; z: number }) => { x: number; y: number };
       getPartRenderedWorldPosition: (partId: string) => { x: number; y: number; z: number } | null;
+      getDowelVisualizations: () => DowelVisualization[];
+      partsOverlap: (
+        firstPartId: string,
+        secondPartId: string,
+        secondPosition?: { x: number; y: number; z: number }
+      ) => boolean | null;
       getResizeHandleScreenPoint: (
         handle: { x: -1 | 0 | 1; y: -1 | 0 | 1; z: -1 | 0 | 1 },
         partId?: string
@@ -227,10 +241,62 @@ export function Workspace() {
         if (!part) return null;
         return projectWorld(world.set(part.position.x, part.position.y, part.position.z));
       },
+      getPartLocalScreenPoint: (partId, point) => {
+        const part = resolvePart(partId);
+        if (!part) return null;
+        local.set(point.x, point.y, point.z).applyQuaternion(partQuaternion(part.rotation));
+        world.set(part.position.x, part.position.y, part.position.z).add(local);
+        return projectWorld(world);
+      },
+      getPartMaterialScreenPoints: (partId) => {
+        let partMesh: THREE.Mesh | null = null;
+        scene.traverse((object) => {
+          if (
+            !partMesh &&
+            object instanceof THREE.Mesh &&
+            object.userData.partId === partId &&
+            object.userData.hitTarget?.kind === 'part-body'
+          ) {
+            partMesh = object;
+          }
+        });
+        if (!partMesh) return [];
+
+        scene.updateMatrixWorld(true);
+        const geometry = partMesh.geometry;
+        const positions = geometry.getAttribute('position');
+        if (!positions) return [];
+        const index = geometry.getIndex();
+        const triangleCount = Math.floor((index?.count ?? positions.count) / 3);
+        const centroid = new THREE.Vector3();
+        const vertex = new THREE.Vector3();
+        const points: Array<{ x: number; y: number }> = [];
+        const seen = new Set<string>();
+
+        for (let triangle = 0; triangle < triangleCount; triangle += 1) {
+          centroid.set(0, 0, 0);
+          for (let corner = 0; corner < 3; corner += 1) {
+            const offset = triangle * 3 + corner;
+            vertex.fromBufferAttribute(positions, index ? index.getX(offset) : offset);
+            centroid.add(vertex);
+          }
+          centroid.multiplyScalar(1 / 3);
+          partMesh.localToWorld(centroid);
+          const point = projectWorld(centroid);
+          const key = `${Math.round(point.x * 10)},${Math.round(point.y * 10)}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            points.push(point);
+          }
+        }
+
+        return points;
+      },
+      getWorldScreenPoint: (point) => projectWorld(world.set(point.x, point.y, point.z)),
       getPartRenderedWorldPosition: (partId: string) => {
         let renderedPart: THREE.Object3D | null = null;
         scene.traverse((object) => {
-          if (!renderedPart && object.userData.partId === partId) {
+          if (!renderedPart && object.userData.partId === partId && object.userData.hitTarget?.kind === 'part-body') {
             renderedPart = object;
           }
         });
@@ -238,6 +304,15 @@ export function Workspace() {
         scene.updateMatrixWorld(true);
         renderedPart.getWorldPosition(world);
         return { x: world.x, y: world.y, z: world.z };
+      },
+      getDowelVisualizations: () => getDowelVisualizations(useProjectStore.getState().parts),
+      partsOverlap: (firstPartId, secondPartId, secondPosition) => {
+        const parts = useProjectStore.getState().parts;
+        const firstPart = parts.find((part) => part.id === firstPartId);
+        const secondPart = parts.find((part) => part.id === secondPartId);
+        return firstPart && secondPart
+          ? partsOverlap(firstPart, secondPosition ? { ...secondPart, position: secondPosition } : secondPart)
+          : null;
       },
       getResizeHandleScreenPoint: (handle, partId?: string) => {
         const part = resolvePart(partId);

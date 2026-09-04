@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Part, RectCutFeature, ReferenceDistanceIndicator, SnapDistanceIndicator, SnapGuide, SnapLine } from '../types';
-import { getPartEndCutProfiles } from './endCutUtils';
+import { getEndCutInsetAt, getPartEndCutProfiles } from './endCutUtils';
 import {
   getPartContourSubBoxes,
   getPartLocalBoundingBox,
@@ -2639,24 +2639,30 @@ function getPartFaces(part: Part, position: { x: number; y: number; z: number })
   const [axisX, axisY, axisZ] = obb.axes;
   const [halfLength, halfThickness, halfWidth] = obb.halfExtents;
   const partCenter = obb.center;
+  const profiles = getPartEndCutProfiles(part);
 
-  const faces: OrientedFace[] = [
-    {
+  const faces: OrientedFace[] = [];
+  if (profiles.right.maxInset <= 0) {
+    faces.push({
       normal: axisX,
       center: addScaledVec(partCenter, axisX, halfLength),
       tangent1: axisY,
       tangent2: axisZ,
       half1: halfThickness,
       half2: halfWidth
-    },
-    {
+    });
+  }
+  if (profiles.left.maxInset <= 0) {
+    faces.push({
       normal: { x: -axisX.x, y: -axisX.y, z: -axisX.z },
       center: addScaledVec(partCenter, axisX, -halfLength),
       tangent1: axisY,
       tangent2: axisZ,
       half1: halfThickness,
       half2: halfWidth
-    },
+    });
+  }
+  faces.push(
     {
       normal: axisY,
       center: addScaledVec(partCenter, axisY, halfThickness),
@@ -2689,110 +2695,85 @@ function getPartFaces(part: Part, position: { x: number; y: number; z: number })
       half1: halfLength,
       half2: halfThickness
     }
-  ];
+  );
 
-  // Add bevel / compound end cut faces so the face snap can align the actual
-  // angled surface rather than the bounding-box edge.
-  addBevelSnapFaces(faces, part, partCenter, axisX, axisY, axisZ, halfLength, halfThickness, halfWidth);
+  // Replace cut ends with their actual planar surfaces. Keeping the broad OBB
+  // end as an additional candidate would let the removed wedge win instead.
+  addEndCutSnapFaces(faces, part, position, axisX, axisY, axisZ);
 
   return faces;
 }
 
 /**
- * Append oriented-face entries for each bevel / compound end-cut face so the
- * face snap system can align the actual angled surface.
- *
- * A bevel face in local space runs from one edge of the end face to the
- * opposite (shifted by the vertical inset). Its center, normal, and tangent
- * vectors are computed in local space and then rotated to world space using
- * the OBB axes (which already encode the part's rotation).
+ * Append the exact planar face for mitre, bevel, and compound end cuts. The
+ * four local corners come from the same inset function used by rendering, so
+ * angle edits and either flip refresh snap anchors without a second geometry
+ * approximation.
  */
-function addBevelSnapFaces(
+function addEndCutSnapFaces(
   faces: OrientedFace[],
   part: Part,
-  partCenter: Vec3,
+  position: Vec3,
   axisX: Vec3,
   axisY: Vec3,
-  axisZ: Vec3,
-  halfLength: number,
-  halfThickness: number,
-  halfWidth: number
+  axisZ: Vec3
 ): void {
   const profiles = getPartEndCutProfiles(part);
+  const halfLength = part.length / 2;
+  const halfThickness = part.thickness / 2;
+  const halfWidth = part.width / 2;
+
+  const toWorldPoint = (local: Vec3): Vec3 => ({
+    x: position.x + axisX.x * local.x + axisY.x * local.y + axisZ.x * local.z,
+    y: position.y + axisX.y * local.x + axisY.y * local.y + axisZ.y * local.z,
+    z: position.z + axisX.z * local.x + axisY.z * local.y + axisZ.z * local.z
+  });
+  const toWorldDirection = (local: Vec3): Vec3 => ({
+    x: axisX.x * local.x + axisY.x * local.y + axisZ.x * local.z,
+    y: axisX.y * local.x + axisY.y * local.y + axisZ.y * local.z,
+    z: axisX.z * local.x + axisY.z * local.y + axisZ.z * local.z
+  });
 
   for (const side of ['left', 'right'] as const) {
     const profile = side === 'left' ? profiles.left : profiles.right;
-    if (profile.verticalInset <= 0) continue;
+    if (profile.maxInset <= 0) continue;
 
-    const vi = profile.verticalInset;
-    const thickness = 2 * halfThickness;
-
-    // The bevel slope length in the X-Y plane
-    const slopeLen = Math.sqrt(vi * vi + thickness * thickness);
-    const halfSlope = slopeLen / 2;
-
-    // Local bevel face normal (perpendicular to slope, pointing outward).
-    // For verticalFlip=false: slope goes from (-hl, -ht) to (-hl+vi, +ht), normal points -X/+Y
-    // For verticalFlip=true: slope goes from (-hl, +ht) to (-hl+vi, -ht), normal points -X/-Y
-    let localNormal: Vec3;
-    let localTangentSlope: Vec3;
-    if (side === 'left') {
-      if (profile.verticalFlip) {
-        // Slope: (-hl, +ht) → (-hl+vi, -ht). Edge dir = (vi, -thickness).
-        // Outward normal rotated 90° CW in XY: (-thickness → normal_x, -vi → ?)
-        // Normal = perpendicular pointing outward (-X side) = (-thickness/sl, -vi/sl, 0)
-        localNormal = { x: -thickness / slopeLen, y: -vi / slopeLen, z: 0 };
-        localTangentSlope = { x: vi / slopeLen, y: -thickness / slopeLen, z: 0 };
-      } else {
-        // Slope: (-hl, -ht) → (-hl+vi, +ht). Edge dir = (vi, thickness).
-        // Normal pointing outward (-X side) = (-thickness/sl, vi/sl, 0)
-        localNormal = { x: -thickness / slopeLen, y: vi / slopeLen, z: 0 };
-        localTangentSlope = { x: vi / slopeLen, y: thickness / slopeLen, z: 0 };
-      }
-    } else {
-      if (profile.verticalFlip) {
-        // Right side, flip: slope from (+hl, -ht) → (+hl-vi, +ht).
-        localNormal = { x: thickness / slopeLen, y: vi / slopeLen, z: 0 };
-        localTangentSlope = { x: -vi / slopeLen, y: thickness / slopeLen, z: 0 };
-      } else {
-        // Right side, no flip: slope from (+hl, +ht) → (+hl-vi, -ht).
-        localNormal = { x: thickness / slopeLen, y: -vi / slopeLen, z: 0 };
-        localTangentSlope = { x: -vi / slopeLen, y: -thickness / slopeLen, z: 0 };
-      }
-    }
-
-    // Local center of the bevel face: midpoint of the slope edge
-    const midInset = vi / 2;
-    const localCenterX = side === 'left' ? -halfLength + midInset : halfLength - midInset;
-    const localCenterY = 0; // Midpoint of thickness range
-
-    // Transform local vectors to world space via OBB axes:
-    // world = axisX * local.x + axisY * local.y + axisZ * local.z
-    const worldNormal: Vec3 = {
-      x: axisX.x * localNormal.x + axisY.x * localNormal.y + axisZ.x * localNormal.z,
-      y: axisX.y * localNormal.x + axisY.y * localNormal.y + axisZ.y * localNormal.z,
-      z: axisX.z * localNormal.x + axisY.z * localNormal.y + axisZ.z * localNormal.z
+    const localPoint = (y: number, authoredZ: number): Vec3 => {
+      const inset = getEndCutInsetAt(side, profiles, part, { y, z: authoredZ });
+      return {
+        x: side === 'left' ? -halfLength + inset : halfLength - inset,
+        y,
+        // Rendering mirrors authored contour Z.
+        z: -authoredZ
+      };
     };
+    const lowLow = localPoint(-halfThickness, -halfWidth);
+    const highLow = localPoint(halfThickness, -halfWidth);
+    const lowHigh = localPoint(-halfThickness, halfWidth);
+    const highHigh = localPoint(halfThickness, halfWidth);
+    const tangent1Vector = subVec(highLow, lowLow);
+    const tangent2Vector = subVec(lowHigh, lowLow);
+    const tangent1Length = lenVec(tangent1Vector);
+    const tangent2Length = lenVec(tangent2Vector);
+    if (tangent1Length <= 1e-9 || tangent2Length <= 1e-9) continue;
 
-    const worldTangentSlope: Vec3 = {
-      x: axisX.x * localTangentSlope.x + axisY.x * localTangentSlope.y,
-      y: axisX.y * localTangentSlope.x + axisY.y * localTangentSlope.y,
-      z: axisX.z * localTangentSlope.x + axisY.z * localTangentSlope.y
-    };
+    let localNormal = normalizeVec({
+      x: tangent1Vector.y * tangent2Vector.z - tangent1Vector.z * tangent2Vector.y,
+      y: tangent1Vector.z * tangent2Vector.x - tangent1Vector.x * tangent2Vector.z,
+      z: tangent1Vector.x * tangent2Vector.y - tangent1Vector.y * tangent2Vector.x
+    });
+    const expectedOutwardX = side === 'left' ? -1 : 1;
+    if (localNormal.x * expectedOutwardX < 0) localNormal = mulVec(localNormal, -1);
 
-    const worldCenter: Vec3 = {
-      x: partCenter.x + axisX.x * localCenterX + axisY.x * localCenterY,
-      y: partCenter.y + axisX.y * localCenterX + axisY.y * localCenterY,
-      z: partCenter.z + axisX.z * localCenterX + axisY.z * localCenterY
-    };
+    const localCenter = mulVec(addVec(addVec(lowLow, highLow), addVec(lowHigh, highHigh)), 0.25);
 
     faces.push({
-      normal: worldNormal,
-      center: worldCenter,
-      tangent1: worldTangentSlope,
-      tangent2: axisZ,
-      half1: halfSlope,
-      half2: halfWidth
+      normal: toWorldDirection(localNormal),
+      center: toWorldPoint(localCenter),
+      tangent1: toWorldDirection(normalizeVec(tangent1Vector)),
+      tangent2: toWorldDirection(normalizeVec(tangent2Vector)),
+      half1: tangent1Length / 2,
+      half2: tangent2Length / 2
     });
   }
 }

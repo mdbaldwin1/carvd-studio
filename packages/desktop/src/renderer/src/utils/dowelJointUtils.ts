@@ -1,4 +1,5 @@
 import type { CircularCutFeature, DowelJointMetadata, FaceTarget, Part } from '@renderer/types';
+import { clonePartFeature } from '@renderer/utils/partFeatures';
 import { expandCircularCut, getFaceFrame, validateCircularCut } from '@renderer/utils/roundCutUtils';
 import * as THREE from 'three';
 
@@ -190,6 +191,85 @@ export function createDowelJoint(input: CreateDowelJointInput): DowelJointResult
   return { jointId, firstFeatures, secondFeatures };
 }
 
+function dowelKey(metadata: DowelJointMetadata): string {
+  return `${metadata.jointId}:${metadata.memberIndex}`;
+}
+
+/**
+ * Apply a part's edited feature list and dissolve only relationships whose
+ * feature was deleted. The physical hole on the other member remains as an
+ * ordinary, independently editable drilling operation.
+ */
+export function detachDeletedDowelMates(parts: Part[], partId: string, nextFeatures: Part['features']): Part[] {
+  const source = parts.find((part) => part.id === partId);
+  if (!source) return parts;
+
+  const retained = new Map(
+    (nextFeatures ?? []).map((feature) => {
+      const metadata = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
+      return [feature.id, metadata ? dowelKey(metadata) : null] as const;
+    })
+  );
+  const removedKeys = new Set<string>();
+  for (const feature of source.features ?? []) {
+    const metadata = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
+    if (!metadata) continue;
+    if (retained.get(feature.id) !== dowelKey(metadata)) removedKeys.add(dowelKey(metadata));
+  }
+
+  return parts.map((part) => {
+    if (part.id === partId) return { ...part, features: nextFeatures ?? [] };
+    if (removedKeys.size === 0 || !part.features) return part;
+    let changed = false;
+    const features = part.features.map((feature) => {
+      const metadata = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
+      if (!metadata || metadata.matePartId !== partId || !removedKeys.has(dowelKey(metadata))) return feature;
+      const detached = clonePartFeature(feature);
+      if (detached.label === `Dowel hole ${metadata.memberIndex + 1}`) {
+        detached.label = `Round hole ${metadata.memberIndex + 1}`;
+      }
+      const remainingMetadata = { ...detached.metadata };
+      delete remainingMetadata.dowelJoint;
+      detached.metadata = Object.keys(remainingMetadata).length > 0 ? remainingMetadata : undefined;
+      changed = true;
+      return detached;
+    });
+    return changed ? { ...part, features } : part;
+  });
+}
+
+function isValidDowelPair(
+  first: { part: Part; feature: CircularCutFeature; metadata: DowelJointMetadata },
+  second: { part: Part; feature: CircularCutFeature; metadata: DowelJointMetadata }
+): boolean {
+  const reciprocal = first.metadata.matePartId === second.part.id && second.metadata.matePartId === first.part.id;
+  const matchingMetadata =
+    first.metadata.dowelDiameter === second.metadata.dowelDiameter &&
+    first.metadata.dowelLength === second.metadata.dowelLength;
+  const matchingFeatures =
+    first.feature.cutType === 'round_hole' &&
+    second.feature.cutType === 'round_hole' &&
+    first.feature.pattern === undefined &&
+    second.feature.pattern === undefined &&
+    first.feature.parameters.countersink === undefined &&
+    second.feature.parameters.countersink === undefined &&
+    first.feature.parameters.counterbore === undefined &&
+    second.feature.parameters.counterbore === undefined &&
+    first.feature.parameters.diameter === first.metadata.dowelDiameter &&
+    second.feature.parameters.diameter === second.metadata.dowelDiameter &&
+    first.feature.parameters.depthMode === 'blind' &&
+    second.feature.parameters.depthMode === 'blind' &&
+    first.feature.parameters.depth === first.metadata.embedmentDepth &&
+    second.feature.parameters.depth === second.metadata.embedmentDepth &&
+    first.metadata.embedmentDepth + second.metadata.embedmentDepth <= first.metadata.dowelLength + 1e-9;
+  return (
+    reciprocal &&
+    matchingMetadata &&
+    matchingFeatures &&
+    getDowelJointAlignment(first.part, first.feature, second.part, second.feature).aligned
+  );
+}
+
 export function validateDowelRelationships(parts: Part[]): string[] {
   const errors: string[] = [];
   const entries = new Map<string, Array<{ part: Part; feature: CircularCutFeature; metadata: DowelJointMetadata }>>();
@@ -213,28 +293,7 @@ export function validateDowelRelationships(parts: Part[]): string[] {
       continue;
     }
     const [first, second] = members;
-    const reciprocal = first.metadata.matePartId === second.part.id && second.metadata.matePartId === first.part.id;
-    const matchingMetadata =
-      first.metadata.dowelDiameter === second.metadata.dowelDiameter &&
-      first.metadata.dowelLength === second.metadata.dowelLength;
-    const matchingFeatures =
-      first.feature.cutType === 'round_hole' &&
-      second.feature.cutType === 'round_hole' &&
-      first.feature.pattern === undefined &&
-      second.feature.pattern === undefined &&
-      first.feature.parameters.countersink === undefined &&
-      second.feature.parameters.countersink === undefined &&
-      first.feature.parameters.counterbore === undefined &&
-      second.feature.parameters.counterbore === undefined &&
-      first.feature.parameters.diameter === first.metadata.dowelDiameter &&
-      second.feature.parameters.diameter === second.metadata.dowelDiameter &&
-      first.feature.parameters.depthMode === 'blind' &&
-      second.feature.parameters.depthMode === 'blind' &&
-      first.feature.parameters.depth === first.metadata.embedmentDepth &&
-      second.feature.parameters.depth === second.metadata.embedmentDepth &&
-      first.metadata.embedmentDepth + second.metadata.embedmentDepth <= first.metadata.dowelLength + 1e-9;
-    const aligned = getDowelJointAlignment(first.part, first.feature, second.part, second.feature).aligned;
-    if (!reciprocal || !matchingMetadata || !matchingFeatures || !aligned)
+    if (!isValidDowelPair(first, second))
       errors.push(`Dowel joint member ${key} has mismatched or misaligned hole geometry.`);
   }
   return errors;
@@ -290,7 +349,6 @@ export function getDowelVisualizations(parts: Part[]): DowelVisualization[] {
     const entry = worldPoint(first.part, member.entryPoint);
     const axis = worldDirection(first.part, member.axis);
     const center = entry.clone().addScaledVector(axis, first.metadata.embedmentDepth - first.metadata.dowelLength / 2);
-    const alignment = getDowelJointAlignment(first.part, first.feature, second.part, second.feature);
     visuals.push({
       jointId: first.metadata.jointId,
       memberIndex: first.metadata.memberIndex,
@@ -298,7 +356,7 @@ export function getDowelVisualizations(parts: Part[]): DowelVisualization[] {
       axis: { x: axis.x, y: axis.y, z: axis.z },
       diameter: first.metadata.dowelDiameter,
       length: first.metadata.dowelLength,
-      aligned: alignment.aligned
+      aligned: isValidDowelPair(first, second)
     });
   }
   return visuals.sort((a, b) => a.jointId.localeCompare(b.jointId) || a.memberIndex - b.memberIndex);

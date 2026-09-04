@@ -1012,6 +1012,28 @@ describe('partFeatureGeometry', () => {
       // The notch vertex at local (-1, 0) should negate to world (-1, 0)
       expect(contour.some((p) => Math.abs(p.x - -1) < 0.01 && Math.abs(p.z - 0) < 0.01)).toBe(true);
     });
+
+    it('matches the rendered Three.js transform for combined XYZ rotation', () => {
+      const part = createTestPart({
+        length: 6,
+        width: 4,
+        thickness: 0.75,
+        position: { x: 3, y: 2, z: -5 },
+        rotation: { x: 30, y: 40, z: 20 }
+      });
+      const contour = getPartWorldContour(part);
+      const euler = new THREE.Euler(Math.PI / 6, (2 * Math.PI) / 9, Math.PI / 9, 'XYZ');
+      const expected = [
+        [-3, 2],
+        [3, 2],
+        [3, -2],
+        [-3, -2]
+      ].map(([x, renderedZ]) => new THREE.Vector3(x, 0, renderedZ).applyEuler(euler).add(new THREE.Vector3(3, 2, -5)));
+
+      for (const point of expected) {
+        expect(contour.some((candidate) => Math.hypot(candidate.x - point.x, candidate.z - point.z) < 1e-6)).toBe(true);
+      }
+    });
   });
 
   describe('flush edge notch geometry', () => {

@@ -219,6 +219,42 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByRole('button', { name: 'Save Cut' })).toBeEnabled();
   });
 
+  it('preserves dowel relationship metadata while editing a paired hole', () => {
+    const onDraftFeaturesChange = vi.fn();
+    const pairedHole = {
+      id: 'paired-hole',
+      kind: 'circular_cut' as const,
+      version: 1,
+      enabled: true,
+      label: 'Dowel hole 1',
+      metadata: {
+        dowelJoint: {
+          jointId: 'joint-1',
+          matePartId: 'mate',
+          memberIndex: 0,
+          dowelDiameter: 0.375,
+          dowelLength: 0.75,
+          embedmentDepth: 0.375
+        }
+      },
+      target: { type: 'face' as const, face: 'top_face' as const },
+      reference: { primaryFrom: 'center' as const, secondaryFrom: 'center' as const },
+      cutType: 'round_hole' as const,
+      placement: { primary: 0, secondary: 0, rotation: 0 },
+      parameters: { diameter: 0.375, depthMode: 'blind' as const, depth: 0.375, tilt: 0, direction: 0 }
+    };
+    renderWorkspace({ draftFeatures: [pairedHole], onDraftFeaturesChange });
+
+    fireEvent.click(screen.getByRole('button', { name: /^1\./ }));
+    setMeasurementField('Hole Diameter', '1/2');
+    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
+
+    expect(lastFeatures(onDraftFeaturesChange)[0]).toMatchObject({
+      parameters: { diameter: 0.5 },
+      metadata: pairedHole.metadata
+    });
+  });
+
   it.each([
     ['Round Hole', 'Enlarge Hole', 'Hole Diameter', 'diameter'],
     ['Rounded Slot', 'Extend Length', 'Opening Length', 'length'],

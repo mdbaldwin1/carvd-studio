@@ -32,6 +32,6 @@ describe('DowelVisualizations', () => {
     );
 
     expect(container.querySelectorAll('mesh')).toHaveLength(2);
-    expect(container.querySelector('[name="dowel-joint-1-1"]')).toHaveAttribute('data-aligned', 'false');
+    expect(container.querySelectorAll('meshstandardmaterial')[1]).toHaveAttribute('color', '#ef4444');
   });
 });

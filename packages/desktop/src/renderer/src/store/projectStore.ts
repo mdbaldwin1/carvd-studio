@@ -37,7 +37,7 @@ import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
 import { rotationTool } from '../interaction/tools/rotationTool';
 import { resolveSelectedGroupIdsWithDescendants, resolveTransformSelectedPartIds } from '../utils/interactionSelection';
 import { dragDebug } from '../utils/dragDebug';
-import { createDowelJoint, type CreateDowelJointInput } from '../utils/dowelJointUtils';
+import { createDowelJoint, detachDeletedDowelMates, type CreateDowelJointInput } from '../utils/dowelJointUtils';
 
 export type AddDowelJointInput = Omit<CreateDowelJointInput, 'firstPart' | 'secondPart'> & {
   firstPartId: string;
@@ -541,8 +541,10 @@ export const useProjectStore = create<ProjectState>()(
           }
 
           didUpdate = true;
+          const relationshipSafeParts =
+            updates.features === undefined ? state.parts : detachDeletedDowelMates(state.parts, id, nextPart.features);
           return {
-            parts: state.parts.map((p) => (p.id === id ? nextPart : p)),
+            parts: relationshipSafeParts.map((p) => (p.id === id ? nextPart : p)),
             isDirty: true
           };
         });

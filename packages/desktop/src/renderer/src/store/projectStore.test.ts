@@ -13,6 +13,8 @@ import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
+import { validateDowelRelationships } from '../utils/dowelJointUtils';
+import { getInstructionFabricationLines } from '../utils/cutListInstructions';
 
 vi.unmock('three');
 
@@ -420,6 +422,81 @@ describe('projectStore', () => {
         state = useProjectStore.getState();
         expect(state.parts.find((part) => part.id === firstPartId)?.features ?? []).toHaveLength(0);
         expect(state.parts.find((part) => part.id === secondPartId)?.features ?? []).toHaveLength(0);
+      });
+
+      it('atomically turns the surviving mate into an ordinary hole when one member is deleted', () => {
+        const store = useProjectStore.getState();
+        const firstPartId = store.addPart({
+          name: 'Lower rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        });
+        const secondPartId = store.addPart({
+          name: 'Upper rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        });
+        store.addDowelJoint({
+          firstPartId,
+          firstFace: 'top_face',
+          secondPartId,
+          secondFace: 'bottom_face',
+          diameter: 0.375,
+          dowelLength: 0.75,
+          firstEmbedmentDepth: 0.375,
+          secondEmbedmentDepth: 0.375,
+          count: 1,
+          spacing: 1,
+          firstPrimary: 0,
+          firstSecondary: 0
+        });
+        useProjectStore.temporal.getState().clear();
+
+        store.updatePart(firstPartId, { features: [] });
+
+        let state = useProjectStore.getState();
+        const survivingHole = state.parts.find((part) => part.id === secondPartId)?.features?.[0];
+        expect(state.parts.find((part) => part.id === firstPartId)?.features).toEqual([]);
+        expect(survivingHole).toMatchObject({
+          kind: 'circular_cut',
+          cutType: 'round_hole',
+          parameters: { diameter: 0.375, depthMode: 'blind', depth: 0.375 }
+        });
+        expect(survivingHole?.metadata?.dowelJoint).toBeUndefined();
+        expect(validateDowelRelationships(state.parts)).toEqual([]);
+        expect(
+          getInstructionFabricationLines(
+            {
+              partId: secondPartId,
+              partName: 'Upper rail',
+              cutLength: 10,
+              cutWidth: 4,
+              thickness: 1,
+              stockId: 'stock-1',
+              stockName: 'Test stock',
+              grainSensitive: false,
+              grainDirection: 'length',
+              isGlueUp: false,
+              quantity: 1,
+              features: survivingHole ? [survivingHole] : [],
+              notes: ''
+            },
+            'imperial'
+          )
+        ).toEqual([
+          expect.stringMatching(/^1\. Round hole 1 — Round Hole on Bottom Face · 3\/8" diameter × 3\/8" deep$/)
+        ]);
+        expect(useProjectStore.temporal.getState().pastStates).toHaveLength(1);
+
+        useProjectStore.temporal.getState().undo();
+        state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features?.[0]?.metadata?.dowelJoint).toBeDefined();
+        expect(state.parts.find((part) => part.id === secondPartId)?.features?.[0]?.metadata?.dowelJoint).toBeDefined();
+        expect(validateDowelRelationships(state.parts)).toEqual([]);
       });
     });
 

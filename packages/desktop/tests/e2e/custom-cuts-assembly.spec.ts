@@ -53,6 +53,7 @@ async function seedFixture(
       const project = window.useProjectStore.getState();
       project.setStockConstraints({ ...project.stockConstraints, preventOverlap: true });
       window.useSnapStore.getState().setSnapToPartsEnabled(true);
+      window.useSelectionStore.getState().setHoveredPart(null);
       for (const part of fixtureParts) {
         project.addPart({
           ...part,
@@ -180,6 +181,222 @@ function lastDragEvent<T extends Record<string, unknown>>(
   event: string
 ): T | null {
   return (logs.filter((entry) => entry.event === event).at(-1)?.payload as T | undefined) ?? null;
+}
+
+const MODIFIER = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+async function selectFixturePart(window: Page, partId: string): Promise<void> {
+  await window.evaluate((id) => window.useSelectionStore.getState().selectPart(id), partId);
+  await window.waitForTimeout(100);
+}
+
+async function selectCanvasPart(window: Page, partId: string): Promise<void> {
+  // Remove rotation/resize controls before locating material. This keeps a
+  // camera-dependent handle projection from turning a selection click into a
+  // transform gesture when the target happens to already be selected.
+  await window.keyboard.press('Escape');
+  await expect.poll(() => window.evaluate(() => window.useSelectionStore.getState().selectedPartIds)).toEqual([]);
+  await window.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+  );
+  await window.waitForFunction(
+    (id) => typeof window.__carvdE2E?.getPartScreenPoint === 'function' && !!window.__carvdE2E.getPartScreenPoint(id),
+    partId
+  );
+  const point = await window.evaluate((id) => window.__carvdE2E?.getPartScreenPoint(id) ?? null, partId);
+  if (!point) throw new Error(`Unable to project part ${partId} for canvas selection.`);
+  await window.mouse.click(point.x, point.y);
+  await expect.poll(() => window.evaluate(() => window.useSelectionStore.getState().selectedPartIds)).toEqual([partId]);
+}
+
+async function openSelectedPartCuts(window: Page, partId: string): Promise<void> {
+  await selectFixturePart(window, partId);
+  await window.getByRole('button', { name: 'Edit Part Cuts' }).click();
+  await expect(window.locator('.header-mode-chip', { hasText: 'Part Cuts' })).toBeVisible();
+}
+
+async function authorRightMitre(window: Page, partId: string, flip: boolean): Promise<void> {
+  await openSelectedPartCuts(window, partId);
+  await window.getByRole('button', { name: '+ Add Cut' }).click();
+  await window.getByRole('button', { name: /^End Cut\b/ }).click();
+  await window.getByRole('button', { name: 'Right End', exact: true }).click();
+  await window.getByLabel('Cut Style', { exact: true }).selectOption('mitre');
+  await window.getByLabel('Mitre Angle', { exact: true }).fill('45');
+  const longPoint = window.getByLabel('Long Point On', { exact: true });
+  await longPoint.selectOption(flip ? 'back' : 'front');
+  await expect(longPoint).toHaveValue(flip ? 'back' : 'front');
+  await window.getByRole('button', { name: 'Save Cut' }).click();
+  await window.getByRole('button', { name: 'Save Part' }).click();
+  await expect
+    .poll(() => window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
+    .toBe(false);
+  await expect
+    .poll(() =>
+      window.evaluate((id) => {
+        const part = window.useProjectStore.getState().parts.find((candidate: { id: string }) => candidate.id === id);
+        return part.features[0].parameters.horizontalFlip;
+      }, partId)
+    )
+    .toBe(flip);
+}
+
+async function editFirstMitreAngle(window: Page, partId: string, angle: number): Promise<void> {
+  await openSelectedPartCuts(window, partId);
+  await window.getByRole('button', { name: /^1\./ }).click();
+  const preview = window.getByRole('img', { name: 'Part cuts geometry preview' });
+  const before = await preview.getAttribute('data-geometry-signature');
+  await window.getByLabel('Mitre Angle', { exact: true }).fill(String(angle));
+  await expect.poll(() => preview.getAttribute('data-geometry-signature')).not.toBe(before);
+  await window.getByRole('button', { name: 'Save Cut' }).click();
+  await window.getByRole('button', { name: 'Save Part' }).click();
+  await expect
+    .poll(() => window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
+    .toBe(false);
+  await window.waitForFunction(() => typeof window.__carvdE2E?.getDowelVisualizations === 'function');
+}
+
+async function createDefaultDowelJoint(window: Page, firstPartId: string): Promise<void> {
+  await openSelectedPartCuts(window, firstPartId);
+  await window.getByRole('button', { name: '+ Add Cut' }).click();
+  await window.getByRole('button', { name: /^Create Dowel Joint\b/ }).click();
+  await window.getByRole('button', { name: 'Next' }).click();
+  await window.getByRole('button', { name: 'Next' }).click();
+  await expect(window.getByLabel('Dowel Diameter', { exact: true })).toHaveValue('3/8');
+  await expect(window.getByLabel('Dowel Count', { exact: true })).toHaveValue('2');
+  await window.getByRole('button', { name: 'Next' }).click();
+  await expect(window.getByText('All holes fit within both boards.')).toBeVisible();
+  await window.getByRole('button', { name: 'Create Dowel Joint' }).click();
+  await window.getByRole('button', { name: 'Back to Project' }).click();
+  await window.waitForFunction(() => typeof window.__carvdE2E?.getDowelVisualizations === 'function');
+}
+
+async function editFirstHoleDiameter(window: Page, partId: string, diameter: number): Promise<void> {
+  await openSelectedPartCuts(window, partId);
+  await window.getByRole('button', { name: /^1\./ }).click();
+  const input = window.getByLabel('Hole Diameter', { exact: true });
+  await input.fill(String(diameter));
+  await input.press('Enter');
+  await window.getByRole('button', { name: 'Save Cut' }).click();
+  await window.getByRole('button', { name: 'Save Part' }).click();
+  await expect
+    .poll(() => window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
+    .toBe(false);
+  await window.waitForFunction(() => typeof window.__carvdE2E?.getDowelVisualizations === 'function');
+}
+
+async function dragSelectedToWorld(
+  window: Page,
+  target: { x: number; y: number; z: number },
+  bodyOffset = 0.65,
+  materialPoint?: { x: number; y: number; z: number },
+  deselectBeforeDrag = true
+) {
+  const points = await window.evaluate((worldTarget) => {
+    const selectedId = window.useSelectionStore.getState().selectedPartIds[0];
+    const selected = window.useProjectStore.getState().parts.find((part: { id: string }) => part.id === selectedId);
+    const rendered = window.__carvdE2E?.getPartRenderedWorldPosition(selectedId) ?? null;
+    const current = rendered
+      ? (window.__carvdE2E?.getWorldScreenPoint(rendered) ?? null)
+      : (window.__carvdE2E?.getPartScreenPoint() ?? null);
+    const destination = window.__carvdE2E?.getWorldScreenPoint(worldTarget) ?? null;
+    return {
+      current,
+      destination,
+      rendered,
+      selectedId,
+      storedPosition: selected?.position ?? null,
+      storedRotation: selected?.rotation ?? null
+    };
+  }, target);
+  if (!points.current || !points.destination) throw new Error('Unable to project the selected part drag target.');
+  if (materialPoint) {
+    const starts = await window.evaluate(
+      ({ partId, point }) => {
+        const requested = window.__carvdE2E?.getPartLocalScreenPoint(partId, point) ?? null;
+        const material = window.__carvdE2E?.getPartMaterialScreenPoints(partId) ?? [];
+        return requested ? [requested, ...material] : material;
+      },
+      { partId: points.selectedId, point: materialPoint }
+    );
+    if (starts.length === 0) throw new Error('Unable to project the selected part material point.');
+    if (deselectBeforeDrag) {
+      // Deselect through the real project shortcut so the six rotation rings
+      // do not sit in front of the material hit point. Pointer-down reselects
+      // the board and starts the ordinary part move in one gesture.
+      await window.keyboard.press('Escape');
+      await expect.poll(() => window.evaluate(() => window.useSelectionStore.getState().selectedPartIds)).toEqual([]);
+      // Selection moves the board from the individual renderer back into the
+      // instanced mesh. Let React and R3F publish that frame before hit-testing.
+      await window.evaluate(
+        () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+      );
+    }
+    await window.keyboard.down('Alt');
+    try {
+      let start: { x: number; y: number } | null = null;
+      for (const candidate of starts) {
+        await window.mouse.move(candidate.x, candidate.y);
+        await window.waitForTimeout(75);
+        const hoveredPartId = await window.evaluate(() => window.useSelectionStore.getState().hoveredPartId);
+        if (hoveredPartId === points.selectedId) {
+          start = candidate;
+          break;
+        }
+      }
+      if (!start) throw new Error(`No rendered material point hit selected part ${points.selectedId}.`);
+      await window.mouse.down();
+      await window.waitForTimeout(250);
+      const pointerSessionKind = await window.evaluate(
+        () => window.useInteractionStore.getState().activeSession?.kind ?? null
+      );
+      if (pointerSessionKind !== 'move') {
+        await window.mouse.up();
+        throw new Error(`Material drag started ${String(pointerSessionKind)} instead of a move session.`);
+      }
+      let altPreviewDelta: { x: number; y: number; z: number } | null = null;
+      for (let index = 1; index <= 40; index += 1) {
+        if (index === 39) await window.keyboard.up('Alt');
+        await window.mouse.move(
+          start.x + ((points.destination.x - points.current.x) * index) / 40,
+          start.y + ((points.destination.y - points.current.y) * index) / 40
+        );
+        await window.waitForTimeout(20);
+        if (index === 38) {
+          altPreviewDelta = await window.evaluate(() => {
+            const session = window.useInteractionStore.getState().activeSession;
+            return session?.kind === 'move' ? { ...session.delta } : null;
+          });
+        }
+      }
+      const previewState = await window.evaluate(() => {
+        const session = window.useInteractionStore.getState().activeSession;
+        return {
+          delta: session?.kind === 'move' ? { ...session.delta } : null,
+          snapLines: window.useSnapStore.getState().activeSnapLines
+        };
+      });
+      await window.mouse.up();
+      await window.waitForTimeout(500);
+      return {
+        previewDelta: previewState.delta,
+        debugLogs: [
+          { event: 'drag-projection', payload: { ...points, start } },
+          { event: 'alt-preview-delta', payload: altPreviewDelta },
+          { event: 'preview-snap-lines', payload: previewState.snapLines }
+        ]
+      };
+    } finally {
+      await window.keyboard.up('Alt');
+    }
+  }
+  return dragSelectedOnFace(
+    window,
+    {
+      x: points.destination.x - points.current.x,
+      y: points.destination.y - points.current.y
+    },
+    bodyOffset
+  );
 }
 
 async function dragSelectedGroupOnFace(
@@ -870,5 +1087,356 @@ test.describe.serial('custom cuts assembly qualification', () => {
     const shoulderY = seated.position.y - (4 / 2 - 0.75);
     expect(shoulderY).toBeCloseTo(1, 3);
     await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);
+  });
+
+  test('authors, rotates, and drags complementary mitres into exact corners for both flip directions', async () => {
+    let configuredSnapping = false;
+    for (const scenario of [
+      {
+        title: 'front long point',
+        firstFlip: false,
+        secondFlip: true,
+        start: { x: 8, y: 0.5, z: 8 },
+        assembled: { x: 4, y: 0.5, z: 4 },
+        turns: 1,
+        expectedRotation: 90
+      },
+      {
+        title: 'back long point',
+        firstFlip: true,
+        secondFlip: false,
+        start: { x: 8, y: 0.5, z: -8 },
+        assembled: { x: 4, y: 0.5, z: -4 },
+        turns: 3,
+        expectedRotation: -90
+      }
+    ] as const) {
+      await test.step(scenario.title, async () => {
+        await seedFixture(
+          running.window,
+          [
+            {
+              id: 'mitre-horizontal',
+              name: 'Mitre Horizontal',
+              length: 10,
+              width: 2,
+              thickness: 1,
+              position: { x: 0, y: 0.5, z: 0 }
+            },
+            {
+              id: 'mitre-turn',
+              name: 'Mitre Turn',
+              length: 10,
+              width: 2,
+              thickness: 1,
+              position: scenario.start
+            }
+          ],
+          'mitre-turn'
+        );
+        if (!configuredSnapping) {
+          await enablePrecisionSnapping(running.window);
+          configuredSnapping = true;
+        }
+        await authorRightMitre(running.window, 'mitre-horizontal', scenario.firstFlip);
+        await authorRightMitre(running.window, 'mitre-turn', scenario.secondFlip);
+        await selectCanvasPart(running.window, 'mitre-turn');
+        await rotateSelected(running.window, 'Y', scenario.turns);
+        await expect
+          .poll(() =>
+            running.window.evaluate(() => {
+              const part = window.useProjectStore
+                .getState()
+                .parts.find((candidate: { id: string }) => candidate.id === 'mitre-turn');
+              return part.rotation.y;
+            })
+          )
+          .toBe(scenario.expectedRotation);
+        expect(
+          await running.window.evaluate(
+            ({ position }) => window.__carvdE2E?.partsOverlap('mitre-horizontal', 'mitre-turn', position),
+            { position: scenario.assembled }
+          )
+        ).toBe(false);
+        await setCamera(running.window, 'top');
+        const drag = await dragSelectedToWorld(running.window, scenario.assembled, 0.25, { x: -2.5, y: 0, z: -0.5 });
+        expect(drag.previewDelta, JSON.stringify(drag.debugLogs.slice(-8))).not.toBeNull();
+
+        const result = await running.window.evaluate(() => {
+          const parts = window.useProjectStore.getState().parts;
+          const moving = parts.find((part: { id: string }) => part.id === 'mitre-turn');
+          return {
+            position: moving.position,
+            rotation: moving.rotation,
+            overlap: window.__carvdE2E?.partsOverlap('mitre-horizontal', 'mitre-turn')
+          };
+        });
+        expect(result.position.x, JSON.stringify(drag.debugLogs)).toBeCloseTo(scenario.assembled.x, 3);
+        expect(result.position.y).toBeCloseTo(scenario.assembled.y, 3);
+        expect(result.position.z, JSON.stringify(drag.debugLogs)).toBeCloseTo(scenario.assembled.z, 3);
+        expect(result.rotation.y).toBe(scenario.expectedRotation);
+        expect(result.overlap).toBe(false);
+        await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);
+
+        if (!scenario.firstFlip) {
+          await editFirstMitreAngle(running.window, 'mitre-horizontal', 30);
+          await expect
+            .poll(() =>
+              running.window.evaluate(() => {
+                const part = window.useProjectStore
+                  .getState()
+                  .parts.find((candidate: { id: string }) => candidate.id === 'mitre-horizontal');
+                return part.features[0].parameters.horizontalAngle;
+              })
+            )
+            .toBe(30);
+        }
+      });
+    }
+  });
+
+  test('authors a paired 3/8 inch dowel joint, diagnoses movement, and rejects a 1/4 to 1/2 mismatch', async () => {
+    await seedFixture(
+      running.window,
+      [
+        {
+          id: 'dowel-lower',
+          name: 'Dowel Lower',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        },
+        {
+          id: 'dowel-upper',
+          name: 'Dowel Upper',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        }
+      ],
+      'dowel-lower'
+    );
+    await createDefaultDowelJoint(running.window, 'dowel-lower');
+
+    const authored = await running.window.evaluate(() => {
+      const parts = window.useProjectStore.getState().parts;
+      return {
+        members: parts.map((part: { features?: unknown[] }) => part.features ?? []),
+        visuals: window.__carvdE2E?.getDowelVisualizations() ?? []
+      };
+    });
+    expect(authored.members.map((features: unknown[]) => features.length)).toEqual([2, 2]);
+    expect(authored.visuals, JSON.stringify(authored.members)).toHaveLength(2);
+    expect(authored.visuals).toEqual([
+      expect.objectContaining({
+        memberIndex: 0,
+        center: { x: -4, y: 0.5, z: 0 },
+        axis: { x: 0, y: -1, z: 0 },
+        diameter: 0.375,
+        length: 0.75,
+        aligned: true
+      }),
+      expect.objectContaining({
+        memberIndex: 1,
+        center: { x: -2, y: 0.5, z: 0 },
+        axis: { x: 0, y: -1, z: 0 },
+        diameter: 0.375,
+        length: 0.75,
+        aligned: true
+      })
+    ]);
+    const pairedGeometry = authored.members.flatMap((features: any[]) =>
+      features.map((feature) => ({
+        diameter: feature.parameters.diameter,
+        depth: feature.parameters.depth,
+        metadataDiameter: feature.metadata.dowelJoint.dowelDiameter,
+        embedment: feature.metadata.dowelJoint.embedmentDepth,
+        length: feature.metadata.dowelJoint.dowelLength
+      }))
+    );
+    expect(pairedGeometry).toEqual(
+      Array.from({ length: 4 }, () => ({
+        diameter: 0.375,
+        depth: 0.375,
+        metadataDiameter: 0.375,
+        embedment: 0.375,
+        length: 0.75
+      }))
+    );
+
+    await selectFixturePart(running.window, 'dowel-upper');
+    await setCamera(running.window, 'top');
+    const upperFeaturesBeforeMove = await running.window.evaluate(() => {
+      const upper = window.useProjectStore.getState().parts.find((part: { id: string }) => part.id === 'dowel-upper');
+      return JSON.stringify(upper.features);
+    });
+    await dragSelectedToWorld(running.window, { x: 1.5, y: 1, z: 0 }, 0.65, { x: -2.5, y: 0, z: -0.5 });
+    await expect
+      .poll(() =>
+        running.window.evaluate(() => window.__carvdE2E?.getDowelVisualizations().map((visual) => visual.aligned))
+      )
+      .toEqual([false, false]);
+    expect(
+      await running.window.evaluate(() => {
+        const upper = window.useProjectStore.getState().parts.find((part: { id: string }) => part.id === 'dowel-upper');
+        return JSON.stringify(upper.features);
+      })
+    ).toBe(upperFeaturesBeforeMove);
+
+    await dragSelectedToWorld(running.window, { x: 0, y: 1, z: 0 }, 0.65, { x: -2.5, y: 0, z: -0.5 });
+    await expect
+      .poll(() =>
+        running.window.evaluate(() => window.__carvdE2E?.getDowelVisualizations().map((visual) => visual.aligned))
+      )
+      .toEqual([true, true]);
+    expect(
+      await running.window.evaluate(() => {
+        const upper = window.useProjectStore.getState().parts.find((part: { id: string }) => part.id === 'dowel-upper');
+        return JSON.stringify(upper.features);
+      })
+    ).toBe(upperFeaturesBeforeMove);
+
+    await editFirstHoleDiameter(running.window, 'dowel-lower', 0.25);
+    await editFirstHoleDiameter(running.window, 'dowel-upper', 0.5);
+    const mismatch = await running.window.evaluate(() => {
+      const parts = window.useProjectStore.getState().parts;
+      return {
+        diameters: parts.map(
+          (part: { features: Array<{ parameters: { diameter: number } }> }) => part.features[0].parameters.diameter
+        ),
+        metadata: parts.map((part: { features: Array<{ metadata?: unknown }> }) => part.features[0].metadata),
+        visuals: window.__carvdE2E?.getDowelVisualizations() ?? []
+      };
+    });
+    expect(mismatch.diameters).toEqual([0.25, 0.5]);
+    expect(mismatch.metadata.every(Boolean)).toBe(true);
+    expect(
+      mismatch.visuals.find((visual) => visual.memberIndex === 0)?.aligned,
+      JSON.stringify(mismatch.metadata)
+    ).toBe(false);
+  });
+
+  test('copies and deletes paired dowel members through project UI without corrupting relationships', async () => {
+    await seedFixture(
+      running.window,
+      [
+        {
+          id: 'copy-dowel-lower',
+          name: 'Copy Dowel Lower',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        },
+        {
+          id: 'copy-dowel-upper',
+          name: 'Copy Dowel Upper',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        }
+      ],
+      'copy-dowel-lower'
+    );
+    await createDefaultDowelJoint(running.window, 'copy-dowel-lower');
+    const original = await running.window.evaluate(() => {
+      const parts = window.useProjectStore.getState().parts;
+      return {
+        featureIds: parts.flatMap((part: { features: Array<{ id: string }> }) =>
+          part.features.map((feature) => feature.id)
+        ),
+        jointId: parts[0].features[0].metadata.dowelJoint.jointId
+      };
+    });
+
+    await selectFixturePart(running.window, 'copy-dowel-lower');
+    await running.window.keyboard.press(`${MODIFIER}+C`);
+    await running.window.keyboard.press(`${MODIFIER}+V`);
+    const loneCopyId = await running.window.evaluate(() => window.useSelectionStore.getState().selectedPartIds[0]);
+    const loneCopy = await running.window.evaluate((id) => {
+      const part = window.useProjectStore.getState().parts.find((candidate: { id: string }) => candidate.id === id);
+      return part.features;
+    }, loneCopyId);
+    expect(loneCopy).toHaveLength(2);
+    expect(loneCopy.every((feature: any) => feature.metadata?.dowelJoint === undefined)).toBe(true);
+
+    await running.window.evaluate(() =>
+      window.useSelectionStore.getState().selectParts(['copy-dowel-lower', 'copy-dowel-upper'])
+    );
+    const idsBeforePairPaste = await running.window.evaluate(() =>
+      window.useProjectStore.getState().parts.map((part: { id: string }) => part.id)
+    );
+    await running.window.keyboard.press(`${MODIFIER}+C`);
+    await running.window.keyboard.press(`${MODIFIER}+V`);
+    const pairedCopy = await running.window.evaluate((beforeIds) => {
+      const copied = window.useProjectStore
+        .getState()
+        .parts.filter((part: { id: string }) => !beforeIds.includes(part.id));
+      return copied.map((part: any) => ({
+        id: part.id,
+        featureIds: part.features.map((feature: any) => feature.id),
+        joints: part.features.map((feature: any) => feature.metadata.dowelJoint)
+      }));
+    }, idsBeforePairPaste);
+    expect(pairedCopy).toHaveLength(2);
+    expect(pairedCopy.flatMap((part) => part.featureIds).every((id) => !original.featureIds.includes(id))).toBe(true);
+    expect(pairedCopy[0].joints.map((joint) => joint.jointId)).toEqual([
+      pairedCopy[1].joints[0].jointId,
+      pairedCopy[1].joints[1].jointId
+    ]);
+    expect(pairedCopy[0].joints[0].jointId).not.toBe(original.jointId);
+    expect(pairedCopy[0].joints.every((joint) => joint.matePartId === pairedCopy[1].id)).toBe(true);
+    expect(pairedCopy[1].joints.every((joint) => joint.matePartId === pairedCopy[0].id)).toBe(true);
+
+    await openSelectedPartCuts(running.window, 'copy-dowel-lower');
+    await running.window.getByRole('button', { name: 'Actions for cut 1' }).click();
+    await running.window.getByRole('menuitem', { name: 'Delete' }).click();
+    await running.window.getByRole('button', { name: 'Save Part' }).click();
+    await expect
+      .poll(() => running.window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
+      .toBe(false);
+    await running.window.waitForFunction(() => typeof window.__carvdE2E?.getDowelVisualizations === 'function');
+    const afterDelete = await running.window.evaluate(() => {
+      const parts = window.useProjectStore.getState().parts;
+      const lower = parts.find((part: { id: string }) => part.id === 'copy-dowel-lower');
+      const upper = parts.find((part: { id: string }) => part.id === 'copy-dowel-upper');
+      return {
+        lowerFeatures: lower.features,
+        upperFeatures: upper.features,
+        visualCount: window.__carvdE2E?.getDowelVisualizations().length
+      };
+    });
+    expect(afterDelete.lowerFeatures).toHaveLength(1);
+    expect(afterDelete.upperFeatures).toHaveLength(2);
+    expect(afterDelete.upperFeatures[0].metadata?.dowelJoint).toBeUndefined();
+    expect(afterDelete.upperFeatures[0]).toMatchObject({
+      kind: 'circular_cut',
+      cutType: 'round_hole',
+      parameters: { diameter: 0.375, depthMode: 'blind', depth: 0.375 }
+    });
+    expect(afterDelete.visualCount).toBe(3);
+
+    await running.window.keyboard.press(`${MODIFIER}+Z`);
+    await expect
+      .poll(() =>
+        running.window.evaluate(() => {
+          const parts = window.useProjectStore.getState().parts;
+          return parts
+            .filter((part: { id: string }) => ['copy-dowel-lower', 'copy-dowel-upper'].includes(part.id))
+            .map((part: { features: unknown[] }) => part.features.length);
+        })
+      )
+      .toEqual([2, 2]);
+    const restored = await running.window.evaluate(() => {
+      const parts = window.useProjectStore.getState().parts;
+      return parts
+        .filter((part: { id: string }) => ['copy-dowel-lower', 'copy-dowel-upper'].includes(part.id))
+        .flatMap((part: any) => part.features.map((feature: any) => feature.metadata?.dowelJoint));
+    });
+    expect(restored).toHaveLength(4);
+    expect(restored.every(Boolean)).toBe(true);
   });
 });
