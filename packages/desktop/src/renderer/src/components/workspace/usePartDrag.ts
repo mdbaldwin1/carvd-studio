@@ -14,7 +14,7 @@ import {
   calculateGroupReferenceDistances
 } from '../../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
-import { LiveDimensions, snapToGrid } from './partTypes';
+import { LiveDimensions, resolveLiveGridReleasePosition, snapToGrid } from './partTypes';
 import {
   bindWindowPointerSession,
   createPointerRafQueue,
@@ -712,9 +712,14 @@ export function usePartDrag(
         const rawY = lastDragPosition.current.y;
         const rawZ = lastDragPosition.current.z;
 
-        let newX = wasSnappedByParts.current.x || !liveGridSnap ? rawX : snapToGrid(rawX);
-        let newY = wasSnappedByParts.current.y || !liveGridSnap ? rawY : snapToGrid(rawY);
-        let newZ = wasSnappedByParts.current.z || !liveGridSnap ? rawZ : snapToGrid(rawZ);
+        const gridReleasePosition = resolveLiveGridReleasePosition(
+          { x: rawX, y: rawY, z: rawZ },
+          wasSnappedByParts.current,
+          liveGridSnap
+        );
+        let newX = gridReleasePosition.x;
+        let newY = gridReleasePosition.y;
+        let newZ = gridReleasePosition.z;
 
         const currentSelectedIds = useSelectionStore.getState().selectedPartIds;
         const currentSelectedGroupIds = useSelectionStore.getState().selectedGroupIds;

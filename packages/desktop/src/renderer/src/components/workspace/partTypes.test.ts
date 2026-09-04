@@ -7,6 +7,7 @@ import {
   ROTATION_RING_THICKNESS,
   ROTATION_COLORS,
   GRAIN_ARROW_MAX_DISTANCE_SQ,
+  resolveLiveGridReleasePosition,
   snapToGrid
 } from './partTypes';
 
@@ -50,6 +51,20 @@ describe('partTypes', () => {
     it('handles large values', () => {
       expect(snapToGrid(100)).toBe(100);
       expect(snapToGrid(99.97)).toBeCloseTo(100); // 99.97 rounds to nearest 1/16
+    });
+  });
+
+  describe('resolveLiveGridReleasePosition', () => {
+    it('preserves part-snapped axes and rounds only unsnapped axes', () => {
+      expect(
+        resolveLiveGridReleasePosition({ x: 4.03, y: 2.41, z: 4.07 }, { x: true, y: false, z: true }, true)
+      ).toEqual({ x: 4.03, y: 2.4375, z: 4.07 });
+    });
+
+    it('preserves every axis when live grid snapping is disabled', () => {
+      expect(
+        resolveLiveGridReleasePosition({ x: 4.03, y: 2.41, z: 4.07 }, { x: false, y: false, z: false }, false)
+      ).toEqual({ x: 4.03, y: 2.41, z: 4.07 });
     });
   });
 

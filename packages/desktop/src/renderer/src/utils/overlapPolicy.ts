@@ -10,6 +10,7 @@ import {
   convexShapesOverlap,
   detectFeatureMateSnaps,
   getPartConvexShape,
+  getPartMaterialOBBs,
   getPartOBB,
   getPartSubOBBs,
   obbsOverlap,
@@ -175,10 +176,16 @@ export function wouldTranslationCauseOverlap(
 function isCompatibleSocketMate(movedPart: Part, hostPart: Part): boolean {
   const mate = detectFeatureMateSnaps(movedPart, movedPart.position, [hostPart], [movedPart.id], 0.03);
   if (mate.mateHostPartId !== hostPart.id) return false;
-  return (
+  const isExactMate =
     Math.abs(mate.adjustedPosition.x - movedPart.position.x) <= OBB_EPSILON &&
     Math.abs(mate.adjustedPosition.y - movedPart.position.y) <= OBB_EPSILON &&
-    Math.abs(mate.adjustedPosition.z - movedPart.position.z) <= OBB_EPSILON
+    Math.abs(mate.adjustedPosition.z - movedPart.position.z) <= OBB_EPSILON;
+  if (!isExactMate) return false;
+
+  const movingMaterial = getPartMaterialOBBs(movedPart);
+  const hostMaterial = getPartMaterialOBBs(hostPart);
+  return !movingMaterial.some((movingCell) =>
+    hostMaterial.some((hostCell) => obbsOverlap(movingCell, hostCell, OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false))
   );
 }
 

@@ -149,7 +149,19 @@ export function solvePartMoveSnapPreview(params: {
             applyAxisPosition,
             detectors: {
               mate: () => {
-                mateResult = getSnapContext().advancedDetectors.mate();
+                // Group release/store collision solving does not carry a
+                // single host identity. Suppress holistic socket mating for
+                // multi-selection so preview and commit cannot disagree.
+                mateResult =
+                  movingPartIds.length === 1
+                    ? getSnapContext().advancedDetectors.mate()
+                    : {
+                        adjustedPosition: nextPosition,
+                        snappedX: false,
+                        snappedY: false,
+                        snappedZ: false,
+                        snapLines: []
+                      };
                 return mateResult;
               },
               surface: () => getSnapContext().advancedDetectors.surface(),
@@ -205,7 +217,14 @@ export function solvePartMoveSnapPreview(params: {
     position: nextPosition,
     nextLatchedFaceSnap,
     snapLines,
-    snappedAxes: getSnappedAxes(snapLines),
+    // Holistic mates may accept axes without a dedicated visual line. Release
+    // must preserve every accepted winner so live grid snapping cannot move a
+    // valid fit away from the socket.
+    snappedAxes: {
+      x: winners.x !== null,
+      y: winners.y !== null,
+      z: winners.z !== null
+    },
     mateHostPartId: mateHostPartId && !mateWasRejectedOnAnyAxis ? mateHostPartId : undefined
   };
 }

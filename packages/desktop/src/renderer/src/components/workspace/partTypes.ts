@@ -89,3 +89,13 @@ export const GRAIN_ARROW_MAX_DISTANCE_SQ = 150 * 150;
 export const snapToGrid = (value: number): number => {
   return Math.round(value / GRID_SIZE) * GRID_SIZE;
 };
+
+export const resolveLiveGridReleasePosition = (
+  position: { x: number; y: number; z: number },
+  snappedAxes: { x: boolean; y: boolean; z: boolean },
+  liveGridSnap: boolean
+): { x: number; y: number; z: number } => ({
+  x: snappedAxes.x || !liveGridSnap ? position.x : snapToGrid(position.x),
+  y: snappedAxes.y || !liveGridSnap ? position.y : snapToGrid(position.y),
+  z: snappedAxes.z || !liveGridSnap ? position.z : snapToGrid(position.z)
+});

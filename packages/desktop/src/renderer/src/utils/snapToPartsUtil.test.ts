@@ -1906,7 +1906,7 @@ describe('snapToPartsUtil', () => {
       if (shouldFit) expect(result.adjustedPosition.y).toBeCloseTo(2.375);
     });
 
-    it('does not mate a stopped groove beyond its termination', () => {
+    it('keeps a shorter mate contained within both stopped-groove terminations', () => {
       const hostPart = createTestPart({
         id: 'host',
         length: 12,
@@ -1927,11 +1927,19 @@ describe('snapToPartsUtil', () => {
           }
         ]
       });
-      const mate = createTestPart({ id: 'mate', length: 4, width: 0.75, thickness: 2 });
+      const mate = createTestPart({ id: 'mate', length: 2, width: 0.75, thickness: 2 });
 
-      const beyondTermination = detectFeatureMateSnaps(mate, { x: 0.6, y: 1.85, z: 0 }, [hostPart], [mate.id], 0.5);
-
-      expect(beyondTermination.mateHostPartId).toBeUndefined();
+      for (const [label, x, shouldMate] of [
+        ['inside', 0, true],
+        ['at left edge', -1, true],
+        ['at right edge', 1, true],
+        ['beyond left termination', -1.04, false],
+        ['beyond right termination', 1.04, false]
+      ] as const) {
+        const result = detectFeatureMateSnaps(mate, { x, y: 1.85, z: 0 }, [hostPart], [mate.id], 0.5);
+        expect(result.mateHostPartId === hostPart.id, label).toBe(shouldMate);
+        if (shouldMate) expect(result.adjustedPosition.x, label).toBeCloseTo(x);
+      }
     });
 
     it('mates an authored tenon solid to a matching mortise and rejects a depth mismatch', () => {

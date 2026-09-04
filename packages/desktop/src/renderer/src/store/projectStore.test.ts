@@ -226,6 +226,50 @@ describe('projectStore', () => {
           false
         );
       });
+
+      it('does not validate a combined move and resize against stale mate geometry', () => {
+        const store = useProjectStore.getState();
+        const hostId = store.addPart({
+          name: 'Dado host',
+          length: 12,
+          width: 6,
+          thickness: 0.75,
+          position: { x: 0, y: 0.375, z: 0 },
+          features: [
+            {
+              id: 'dado',
+              kind: 'rect_cut',
+              version: 1,
+              enabled: true,
+              cutType: 'dado',
+              target: { type: 'face', face: 'top_face' },
+              reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+              parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 },
+              placement: { x: 5.6225, z: 0 }
+            }
+          ]
+        });
+        const dividerId = store.addPart({
+          name: 'Divider',
+          length: 4,
+          width: 6,
+          thickness: 0.75,
+          position: { x: 0, y: 2.8, z: 0 },
+          rotation: { x: 0, y: 0, z: 90 }
+        });
+
+        expect(
+          store.updatePart(
+            dividerId,
+            { position: { x: 0, y: 2.375, z: 0 }, thickness: 0.8 },
+            { mateHostPartId: hostId }
+          )
+        ).toBe(false);
+        expect(useProjectStore.getState().parts.find((part) => part.id === dividerId)).toMatchObject({
+          thickness: 0.75,
+          position: { x: 0, y: 2.8, z: 0 }
+        });
+      });
     });
 
     describe('updateParts', () => {

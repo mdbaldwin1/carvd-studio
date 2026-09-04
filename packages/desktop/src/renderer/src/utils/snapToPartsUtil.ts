@@ -321,6 +321,134 @@ export function getPartSubOBBs(part: Part, position: { x: number; y: number; z: 
   }));
 }
 
+/**
+ * Tile the rectangular material volume used by socket-mate validation.
+ *
+ * Unlike the broad interaction OBB, these cells exclude supported top/bottom
+ * rectangular cuts and tenon shoulders. This is intentionally used only
+ * after a mate candidate has been identified: a host-wide collision exemption
+ * is safe only when no material cell of the mover intersects a host cell.
+ */
+export function getPartMaterialOBBs(
+  part: Part,
+  position: { x: number; y: number; z: number } = part.position
+): PartOBB[] {
+  const resolvedRectCuts = (part.features ?? [])
+    .filter((feature): feature is RectCutFeature => feature.enabled && feature.kind === 'rect_cut')
+    .map((feature) => getResolvedRectCutFeature(feature, part));
+  const tenons = resolvedRectCuts.filter((feature) => feature.cutType === 'tenon');
+  const cutVolumes = resolvedRectCuts
+    .filter(
+      (feature) =>
+        feature.cutType !== 'tenon' &&
+        (isTopTarget(feature) || isBottomTarget(feature)) &&
+        (feature.parameters.depthMode === 'through' || (feature.parameters.depth ?? 0) > 0)
+    )
+    .map((feature) => {
+      const halfLength = part.length / 2;
+      const halfWidth = part.width / 2;
+      const halfThickness = part.thickness / 2;
+      const depth = getRectCutDepth(feature, part.thickness);
+      const rawXMin = -halfLength + feature.placement.x;
+      const rawZMin = -halfWidth + feature.placement.z;
+      const xMin = Math.max(-halfLength, rawXMin);
+      const xMax = Math.min(halfLength, rawXMin + feature.parameters.size.length);
+      const zMin = Math.max(-halfWidth, rawZMin);
+      const zMax = Math.min(halfWidth, rawZMin + feature.parameters.size.width);
+      const yMin = isBottomTarget(feature) ? -halfThickness : halfThickness - depth;
+      const yMax = isBottomTarget(feature) ? -halfThickness + depth : halfThickness;
+      return { xMin, xMax, yMin, yMax, zMin, zMax };
+    })
+    .filter(
+      (volume) =>
+        volume.xMax - volume.xMin > 1e-6 && volume.yMax - volume.yMin > 1e-6 && volume.zMax - volume.zMin > 1e-6
+    );
+
+  if (tenons.length === 0 && cutVolumes.length === 0) return getPartSubOBBs(part, position);
+
+  const halfLength = part.length / 2;
+  const halfWidth = part.width / 2;
+  const halfThickness = part.thickness / 2;
+  const xs = new Set<number>([-halfLength, halfLength]);
+  const ys = new Set<number>([-halfThickness, halfThickness]);
+  const zs = new Set<number>([-halfWidth, halfWidth]);
+  for (const volume of cutVolumes) {
+    xs.add(volume.xMin);
+    xs.add(volume.xMax);
+    ys.add(volume.yMin);
+    ys.add(volume.yMax);
+    zs.add(volume.zMin);
+    zs.add(volume.zMax);
+  }
+
+  const tenonRegions = tenons.map((tenon) => {
+    const isLeft = tenon.target.type === 'face' && tenon.target.face === 'left_end';
+    const length = Math.min(part.length, Math.max(0, tenon.parameters.size.length));
+    const xMin = isLeft ? -halfLength : halfLength - length;
+    const xMax = isLeft ? -halfLength + length : halfLength;
+    const tongueHalfThickness = Math.min(halfThickness, Math.max(0, tenon.parameters.depth ?? 0) / 2);
+    const zMin = Math.max(-halfWidth, -halfWidth + tenon.placement.z);
+    const zMax = Math.min(halfWidth, zMin + tenon.parameters.size.width);
+    xs.add(xMin);
+    xs.add(xMax);
+    ys.add(-tongueHalfThickness);
+    ys.add(tongueHalfThickness);
+    zs.add(zMin);
+    zs.add(zMax);
+    return { xMin, xMax, yMin: -tongueHalfThickness, yMax: tongueHalfThickness, zMin, zMax };
+  });
+
+  const sorted = (values: Set<number>) => Array.from(values).sort((a, b) => a - b);
+  const xValues = sorted(xs);
+  const yValues = sorted(ys);
+  const zValues = sorted(zs);
+  const base = getPartOBB({ ...part, features: [] }, position);
+  const [axisX, axisY, axisZ] = base.axes;
+  const cells: PartOBB[] = [];
+  const inside = (value: number, min: number, max: number) => value > min - 1e-8 && value < max + 1e-8;
+
+  for (let xi = 0; xi < xValues.length - 1; xi += 1) {
+    for (let yi = 0; yi < yValues.length - 1; yi += 1) {
+      for (let zi = 0; zi < zValues.length - 1; zi += 1) {
+        const xMin = xValues[xi];
+        const xMax = xValues[xi + 1];
+        const yMin = yValues[yi];
+        const yMax = yValues[yi + 1];
+        const zMin = zValues[zi];
+        const zMax = zValues[zi + 1];
+        if (xMax - xMin <= 1e-6 || yMax - yMin <= 1e-6 || zMax - zMin <= 1e-6) continue;
+
+        const localCenter = { x: (xMin + xMax) / 2, y: (yMin + yMax) / 2, z: (zMin + zMax) / 2 };
+        const removedByCut = cutVolumes.some(
+          (volume) =>
+            inside(localCenter.x, volume.xMin, volume.xMax) &&
+            inside(localCenter.y, volume.yMin, volume.yMax) &&
+            inside(localCenter.z, volume.zMin, volume.zMax)
+        );
+        if (removedByCut) continue;
+
+        const removedByTenonShoulder = tenonRegions.some(
+          (region) =>
+            inside(localCenter.x, region.xMin, region.xMax) &&
+            (!inside(localCenter.y, region.yMin, region.yMax) || !inside(localCenter.z, region.zMin, region.zMax))
+        );
+        if (removedByTenonShoulder) continue;
+
+        cells.push({
+          center: addVec(
+            position,
+            addVec(addVec(mulVec(axisX, localCenter.x), mulVec(axisY, localCenter.y)), mulVec(axisZ, localCenter.z))
+          ),
+          axes: base.axes,
+          halfExtents: [(xMax - xMin) / 2, (yMax - yMin) / 2, (zMax - zMin) / 2]
+        });
+      }
+    }
+  }
+
+  return cells;
+}
+
 export function obbsOverlap(
   a: PartOBB,
   b: PartOBB,
@@ -3554,6 +3682,8 @@ type MateShape = {
   obb: PartOBB;
   /** Shoulder-to-tip length for an authored tenon. */
   insertionDepth?: number;
+  /** Blind-cut mates must present the opposite opening face to the host. */
+  complementaryOpeningNormal?: Vec3;
 };
 
 function getMateShapes(part: Part, position: Vec3): MateShape[] {
@@ -3607,7 +3737,8 @@ function getMateShapes(part: Part, position: Vec3): MateShape[] {
         axes: [axisY, axisX, axisZ],
         halfExtents: [remainingThickness / 2, cut.parameters.size.length / 2, cut.parameters.size.width / 2]
       },
-      insertionDepth: remainingThickness
+      insertionDepth: remainingThickness,
+      complementaryOpeningNormal: isBottomTarget(cut) ? mulVec(axisY, -1) : axisY
     });
   }
 
@@ -3644,6 +3775,12 @@ export function detectFeatureMateSnaps(
 
     for (const socket of sockets) {
       for (const mateShape of mateShapes) {
+        if (
+          mateShape.complementaryOpeningNormal &&
+          dotVec(mateShape.complementaryOpeningNormal, socket.openingNormal) > -MATE_ALIGN_THRESHOLD
+        ) {
+          continue;
+        }
         if (
           mateShape.insertionDepth !== undefined &&
           Math.abs(mateShape.insertionDepth - socket.depth) >= MATE_DIM_TOLERANCE
@@ -3777,6 +3914,19 @@ function findBestMateMatch(
     const tight2 = Math.abs(2 * csHalf2 - 2 * socketHE2) < MATE_DIM_TOLERANCE;
     if (!tight1 && !tight2) continue;
 
+    const partAlongT1 = dotVec(draggingOBB.center, snapT1);
+    const socketAlongT1 = dotVec(socket.openingCenter, snapT1);
+    const dt1 = socketAlongT1 - partAlongT1;
+    const partAlongT2 = dotVec(draggingOBB.center, snapT2);
+    const socketAlongT2 = dotVec(socket.openingCenter, snapT2);
+    const dt2 = socketAlongT2 - partAlongT2;
+
+    // A loose dimension may slide within a stopped socket, but it must remain
+    // wholly contained. Tight dimensions are centered below; containment is
+    // therefore evaluated at their centered final position.
+    if (!tight1 && Math.abs(dt1) + csHalf1 > socketHE1 + MATE_DIM_TOLERANCE) continue;
+    if (!tight2 && Math.abs(dt2) + csHalf2 > socketHE2 + MATE_DIM_TOLERANCE) continue;
+
     // --- Insertion axis delta ---
     // The entering face of the dragged part should sit at the socket floor.
     const n = socket.openingNormal;
@@ -3796,16 +3946,10 @@ function findBestMateMatch(
 
     // --- Cross-section centering for tight-fit dimensions ---
     if (tight1) {
-      const partAlongT1 = dotVec(draggingOBB.center, snapT1);
-      const socketAlongT1 = dotVec(socket.openingCenter, snapT1);
-      const dt1 = socketAlongT1 - partAlongT1;
       if (Math.abs(dt1) > snapThreshold) continue;
       delta = addVec(delta, mulVec(snapT1, dt1));
     }
     if (tight2) {
-      const partAlongT2 = dotVec(draggingOBB.center, snapT2);
-      const socketAlongT2 = dotVec(socket.openingCenter, snapT2);
-      const dt2 = socketAlongT2 - partAlongT2;
       if (Math.abs(dt2) > snapThreshold) continue;
       delta = addVec(delta, mulVec(snapT2, dt2));
     }

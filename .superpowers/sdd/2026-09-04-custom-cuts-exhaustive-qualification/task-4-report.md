@@ -47,4 +47,27 @@ Electron tracing found one additional interface edge: a holistic mortise mate ca
 
 ## Concerns
 
-No known Task 4 functional blocker. The socket exception intentionally remains detector-based because the current collision model uses host material OBBs rather than subtractive void solids; future boolean collision geometry could replace this narrow policy path. The independently reproducible countersink lifecycle E2E failure above remains outside this joinery-fit change.
+No known Task 4 functional blocker. The socket exception intentionally remains detector-based because the ordinary collision model uses broad host OBBs rather than subtractive void solids; review-round material-cell validation now guards that narrow policy path. Future boolean collision geometry could replace the exception. The independently reproducible countersink lifecycle E2E failure above remains outside this joinery-fit change.
+
+## Review round 1 — exhaustive mate safety
+
+The first review identified five gaps in the initial narrow exemption. Each was reproduced before implementation and closed with a regression at the affected production boundary:
+
+- Shorter members now must remain laterally contained on both socket tangents. Tight dimensions are still centered, while loose dimensions can slide only between the stopped channel's exact ends (within the existing dimensional tolerance). Tests cover an interior position, exact contact at each end, and positions beyond both ends.
+- A detected mate no longer exempts its whole host immediately. Rectangular blind/through cuts and tenon shoulders are decomposed into material OBB cells, and every mover cell is checked against every host cell before the identity is accepted. Blind-cut remaining-solid mates must also present the opposite opening face. Exact complementary half laps seat; wrong-face, partial-length, partial-width, offset, and depth-mismatched laps remain blocked. The partial and offset cases explicitly prove that the narrow synthetic shape still matches, so the whole-material check is the defense.
+- Store fallback is now restricted to an actual position-only update. A combined move plus resize from `.75 in` to `.80 in` is rejected rather than validating stale `.75 in` geometry and committing the oversized part.
+- Preview reports snapped axes from accepted arbitration winners, including holistic mate axes with no visual line. Pointer-up uses a tested release helper that preserves all accepted axes before applying Live Grid Snapping. An off-grid socket regression proves the exact three-axis mate survives release.
+- Holistic socket mating is deliberately suppressed for multi-selection. This is the smallest safe behavior because group release and batch store updates do not carry one host identity; preview and commit therefore remain consistent while ordinary group snapping/collision protection stays active.
+
+### Review-round verification
+
+- Review-focused Vitest suites: 5 files, 301 tests passed.
+- Full desktop renderer tests: 173 files, 3,716 tests passed.
+- Full desktop main-process tests: 9 files, 213 tests passed.
+- Desktop lint and typecheck: passed.
+- Fresh production Electron build: passed.
+- `custom-cuts-assembly.spec.ts`: 4/4 passed, including complementary half laps and the real mortise/tenon gesture.
+- Full Electron run: all 4 assembly tests passed; overall 122/123 passed. The sole failure is the same unrelated countersink lifecycle case documented above (`Save Cut` disabled at `part-cuts-lifecycle.spec.ts:935`).
+- Prettier and `git diff --check`: passed for all changed files.
+
+The material-cell proof is intentionally conservative outside supported rectangular top/bottom operations and tenon shoulders: unsupported removed geometry is treated as solid, which may decline a future exotic mate but cannot create a collision bypass. There is no known Task 4 blocker.

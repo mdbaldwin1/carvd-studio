@@ -4,6 +4,7 @@ import { detectFeatureSnaps, detectFractionalFaceSnaps, detectSurfaceAnchorSnaps
 import { createAxisSnapWinners, tryApplyAxisSnap } from './snapPriority';
 import { solvePartMoveSnapPreview } from './interactionMovePreview';
 import { resolveSafeTranslationDelta } from './overlapPolicy';
+import { resolveLiveGridReleasePosition } from '../components/workspace/partTypes';
 
 function createPart(overrides: Partial<Part> = {}): Part {
   return {
@@ -187,6 +188,105 @@ describe('drag snap flow integration', () => {
     expect(preview.position.y).toBeCloseTo(2.375, 8);
     expect(preview.position.z).toBeCloseTo(4, 8);
     expect(preview.mateHostPartId).toBe(host.id);
+  });
+
+  it('preserves every off-grid holistic mate axis when live grid snapping is enabled', () => {
+    const host = createPart({
+      id: 'off-grid-dado-host',
+      length: 12,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 4.03, y: 0.375, z: 4.07 },
+      features: [
+        {
+          id: 'off-grid-dado-socket',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'dado',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          placement: { x: 5.6225, z: 0 },
+          parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 }
+        }
+      ]
+    });
+    const divider = createPart({
+      id: 'off-grid-divider',
+      length: 4,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 5, y: 2.8, z: 5 },
+      rotation: { x: 0, y: 0, z: 90 }
+    });
+
+    const preview = solvePartMoveSnapPreview({
+      part: divider,
+      position: { x: 4.04, y: 2.8, z: 4.08 },
+      axes: { x: true, y: true, z: true },
+      worldHalfHeight: 2,
+      referenceParts: [host],
+      movingPartIds: [divider.id],
+      snapGuides: [],
+      settings: { ...socketSettings, liveGridSnap: true },
+      snapThreshold: 0.5,
+      latchedFaceSnap: null,
+      resolveFeatureStage: () => 'feature'
+    });
+
+    expect(preview.position).toEqual({ x: 4.03, y: 2.375, z: 4.07 });
+    expect(preview.snappedAxes).toEqual({ x: true, y: true, z: true });
+    expect(preview.mateHostPartId).toBe(host.id);
+    expect(resolveLiveGridReleasePosition(preview.position, preview.snappedAxes, true)).toEqual(preview.position);
+  });
+
+  it('suppresses socket mating for a multi-selection preview', () => {
+    const host = createPart({
+      id: 'multi-dado-host',
+      length: 12,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [
+        {
+          id: 'multi-dado-socket',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'dado',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          placement: { x: 5.6225, z: 0 },
+          parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 }
+        }
+      ]
+    });
+    const divider = createPart({
+      id: 'multi-divider',
+      length: 4,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 2, y: 2.8, z: 0 },
+      rotation: { x: 0, y: 0, z: 90 }
+    });
+    const companion = createPart({ id: 'multi-companion', position: { x: 20, y: 0.5, z: 0 } });
+
+    const preview = solvePartMoveSnapPreview({
+      part: divider,
+      position: { x: 0.01, y: 2.8, z: 0 },
+      axes: { x: true, y: true, z: true },
+      worldHalfHeight: 2,
+      referenceParts: [host],
+      movingPartIds: [divider.id, companion.id],
+      snapGuides: [],
+      settings: socketSettings,
+      snapThreshold: 0.5,
+      latchedFaceSnap: null,
+      resolveFeatureStage: () => 'feature'
+    });
+
+    expect(preview.mateHostPartId).toBeUndefined();
+    expect(preview.position.y).not.toBeCloseTo(2.375);
   });
 
   it('centers a holistic mortise mate across locked axes and axes that return to the drag origin', () => {

@@ -8,7 +8,7 @@ import {
   wouldTranslationCauseOverlap
 } from './overlapPolicy';
 import { getPartContourSubBoxes } from './partFeatureGeometry';
-import { getPartSubOBBs } from './snapToPartsUtil';
+import { detectFeatureMateSnaps, getPartSubOBBs } from './snapToPartsUtil';
 
 function createPart(overrides: Partial<Part> = {}): Part {
   return {
@@ -387,6 +387,97 @@ describe('overlapPolicy', () => {
 
     const plainHost = createPart({ ...host, features: [] });
     expect(wouldTranslationCauseOverlap([plainHost, moving], movingIds, proposed, undefined, plainHost.id)).toBe(true);
+  });
+
+  it('exempts only a fully complementary half-lap from same-host collision', () => {
+    const halfLap = (
+      id: string,
+      face: 'top_face' | 'bottom_face',
+      depth = 0.375,
+      length = 2,
+      width = 2,
+      x = (6 - length) / 2,
+      z = (2 - width) / 2
+    ): NonNullable<Part['features']>[number] => ({
+      id,
+      kind: 'rect_cut',
+      version: 1,
+      enabled: true,
+      cutType: 'dado',
+      target: { type: 'face', face },
+      reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+      parameters: { size: { length, width }, depthMode: 'blind', depth },
+      placement: { x, z }
+    });
+    const host = createPart({
+      id: 'half-lap-host',
+      length: 6,
+      width: 2,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [halfLap('host-cut', 'top_face')]
+    });
+    const crossing = createPart({
+      id: 'half-lap-crossing',
+      length: 6,
+      width: 2,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      rotation: { x: 0, y: 90, z: 0 },
+      features: [halfLap('crossing-cut', 'bottom_face')]
+    });
+    const overlapsAtCurrentPosition = (candidate: Part) =>
+      wouldTranslationCauseOverlap(
+        [host, candidate],
+        new Set([candidate.id]),
+        { x: 0, y: 0, z: 0 },
+        undefined,
+        host.id
+      );
+
+    expect(overlapsAtCurrentPosition(crossing)).toBe(false);
+
+    const wrongFace = createPart({
+      ...crossing,
+      id: 'wrong-face',
+      position: { x: 0, y: 0.75, z: 0 },
+      features: [halfLap('wrong-face-cut', 'top_face')]
+    });
+    const partialLength = createPart({
+      ...crossing,
+      id: 'partial-length',
+      features: [halfLap('partial-length-cut', 'bottom_face', 0.375, 1, 2)]
+    });
+    const partialWidth = createPart({
+      ...crossing,
+      id: 'partial-width',
+      features: [{ ...halfLap('partial-width-cut', 'bottom_face', 0.375, 2, 1), cutType: 'cutout' }]
+    });
+    const offsetCut = createPart({
+      ...crossing,
+      id: 'offset-cut',
+      position: { x: -0.25, y: 0.375, z: 0 },
+      features: [{ ...halfLap('offset-cut-feature', 'bottom_face', 0.375, 2, 2, 2, 0.25), cutType: 'cutout' }]
+    });
+    const depthMismatch = createPart({
+      ...crossing,
+      id: 'depth-mismatch',
+      features: [halfLap('depth-mismatch-cut', 'bottom_face', 0.25)]
+    });
+
+    // These candidates satisfy the narrow synthetic mate-shape check; the
+    // whole-material validation is what must prevent the host-wide exemption.
+    for (const candidate of [partialLength, partialWidth, offsetCut]) {
+      const mate = detectFeatureMateSnaps(candidate, candidate.position, [host], [candidate.id], 0.03);
+      expect(mate.mateHostPartId, candidate.id).toBe(host.id);
+      expect(mate.adjustedPosition.x, candidate.id).toBeCloseTo(candidate.position.x);
+      expect(mate.adjustedPosition.y, candidate.id).toBeCloseTo(candidate.position.y);
+      expect(mate.adjustedPosition.z, candidate.id).toBeCloseTo(candidate.position.z);
+    }
+
+    for (const candidate of [wrongFace, partialLength, partialWidth, offsetCut, depthMismatch]) {
+      expect(overlapsAtCurrentPosition(candidate), candidate.id).toBe(true);
+    }
   });
 
   it('decomposes corner notch contour into correct sub-boxes', () => {

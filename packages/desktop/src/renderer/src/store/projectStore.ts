@@ -492,7 +492,7 @@ export const useProjectStore = create<ProjectState>()(
             const transformed = new Map<string, Part>([[id, nextPart]]);
             if (wouldTransformedPartsOverlap(state.parts, transformed)) {
               const isPositionOnlyMove =
-                updates.position !== undefined && updates.rotation === undefined && updates.ignoreOverlap === undefined;
+                updates.position !== undefined && Object.keys(updates).every((key) => key === 'position');
               if (!isPositionOnlyMove) {
                 dragDebug('projectStore:updatePart:rejectOverlap', { id, updates });
                 return state;
