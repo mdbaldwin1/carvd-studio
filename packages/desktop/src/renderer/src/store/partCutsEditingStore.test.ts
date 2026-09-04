@@ -279,14 +279,27 @@ describe('partCutsEditingStore', () => {
       const store = usePartCutsEditingStore.getState();
       store.startEditingPartCuts('p1', 'Panel', [round, rounded]);
       const duplicate = duplicateFeature(round);
+      const roundCircular = round as Extract<PartFeature, { kind: 'circular_cut' }>;
+      const duplicateRound = duplicate as Extract<PartFeature, { kind: 'circular_cut' }>;
       const mirrored = mirrorFeature(rounded, 'across_width', { length: 24, width: 12, thickness: 0.75 });
-      const finalFeatures = [mirrored, { ...round, enabled: false }, duplicate, rounded];
-      store.setDraftFeatures(finalFeatures);
+      store.setDraftFeatures([round, rounded, duplicate]);
+      store.setDraftFeatures([duplicate, round, rounded]);
+      store.setDraftFeatures([duplicate, { ...round, enabled: false }, rounded]);
+      store.setDraftFeatures([mirrored, duplicate, { ...round, enabled: false }, rounded]);
+      const editedDuplicate = {
+        ...duplicate,
+        pattern: { ...duplicateRound.pattern!, rotation: 45 },
+        parameters: {
+          ...duplicateRound.parameters,
+          counterbore: { ...duplicateRound.parameters.counterbore!, depth: 0.2 }
+        }
+      };
+      store.setDraftFeatures([mirrored, editedDuplicate, { ...round, enabled: false }, rounded]);
 
       expect(usePartCutsEditingStore.getState().draftFeatures.map((feature) => feature.id)).toEqual([
         mirrored.id,
-        'round',
         duplicate.id,
+        'round',
         'rounded'
       ]);
       expect(usePartCutsEditingStore.getState().draftFeatures).toEqual(
@@ -305,7 +318,8 @@ describe('partCutsEditingStore', () => {
           }),
           expect.objectContaining({
             id: duplicate.id,
-            parameters: expect.objectContaining({ counterbore: { diameter: 0.5, depth: 0.125 } })
+            pattern: expect.objectContaining({ rotation: 45 }),
+            parameters: expect.objectContaining({ counterbore: { diameter: 0.5, depth: 0.2 } })
           }),
           expect.objectContaining({
             id: mirrored.id,
@@ -313,18 +327,21 @@ describe('partCutsEditingStore', () => {
           })
         ])
       );
-      expect((duplicate as Extract<PartFeature, { kind: 'circular_cut' }>).pattern).not.toBe(round.pattern);
+      expect(roundCircular.pattern).toMatchObject({ rotation: 15 });
+      expect(roundCircular.parameters.counterbore).toMatchObject({ depth: 0.125 });
 
       usePartCutsEditingStore.getState().undoDraft();
       expect(usePartCutsEditingStore.getState().draftFeatures.map((feature) => feature.id)).toEqual([
+        mirrored.id,
+        duplicate.id,
         'round',
         'rounded'
       ]);
       usePartCutsEditingStore.getState().redoDraft();
       expect(usePartCutsEditingStore.getState().draftFeatures.map((feature) => feature.id)).toEqual([
         mirrored.id,
-        'round',
         duplicate.id,
+        'round',
         'rounded'
       ]);
     });

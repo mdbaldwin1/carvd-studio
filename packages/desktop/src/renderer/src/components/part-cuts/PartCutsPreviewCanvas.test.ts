@@ -447,6 +447,15 @@ describe('applyHandleDelta', () => {
     expect(overlay?.lengthHandle?.[2]).toBeCloseTo(-rotated.length / 2);
   });
 
+  it('clamps rounded moves and resizes at the exact physical edge', () => {
+    const rounded = createRoundedDraft('rounded_rectangle');
+    const moved = applyHandleDelta(part, rounded, 'move', 100, 0);
+    expect(moved.placementPrimary).toBeCloseTo(10.5);
+    expect(applyHandleDelta(part, moved, 'move', 1, 0).placementPrimary).toBeCloseTo(10.5);
+    const resized = applyHandleDelta(part, rounded, 'length', 100, 0);
+    expect(resized.length).toBeCloseTo(part.length);
+  });
+
   it('moves the pocket and clamps to the part bounds', () => {
     const draft = createRectDraft('mortise', { placementX: 4, placementZ: 3 });
 
@@ -529,6 +538,12 @@ describe('nudgeDraft', () => {
     expect(nudgeDraft(part, draft, 'length', 1).sizeLength).toBeCloseTo(draft.sizeLength + 0.25);
     expect(nudgeDraft(part, draft, 'length', -1).sizeLength).toBeCloseTo(draft.sizeLength - 0.25);
     expect(nudgeDraft(part, draft, 'width', 1).sizeWidth).toBeCloseTo(draft.sizeWidth + 0.25);
+  });
+
+  it.each([90, 37])('nudges rotated rounded dimensions by the full local step at %i°', (rotation) => {
+    const draft = createRoundedDraft('rounded_rectangle', { rotation });
+    expect(nudgeDraft(part, draft, 'length', 1).length).toBeCloseTo(draft.length + 0.25);
+    expect(nudgeDraft(part, draft, 'width', 1).width).toBeCloseTo(draft.width + 0.25);
   });
 });
 

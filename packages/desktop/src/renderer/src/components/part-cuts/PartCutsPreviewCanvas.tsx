@@ -656,6 +656,16 @@ export function applyHandleDelta(
 
 export function nudgeDraft(part: Part, draft: FeatureDraft, kind: HandleKind, direction: 1 | -1): FeatureDraft {
   const step = 0.25 * direction;
+  if (draft.mode === 'rounded_cut' && kind !== 'move') {
+    const angle = (draft.rotation * Math.PI) / 180;
+    return applyHandleDelta(
+      part,
+      draft,
+      kind,
+      kind === 'length' ? step * Math.cos(angle) : -step * Math.sin(angle),
+      kind === 'length' ? step * Math.sin(angle) : step * Math.cos(angle)
+    );
+  }
   return applyHandleDelta(
     part,
     draft,
