@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Custom Cut joinery seating** — Compatible dados, grooves, stopped grooves, rabbets, half laps, mortises, and tenons now seat in their visibly rendered sockets through Prevent Overlap while oversized, depth-mismatched, past-termination, mirrored, partial/noncomplementary, and unrelated overlaps remain blocked. Selected groups keep ordinary snapping and collision behavior instead of receiving single-part socket mates.
+- **Custom Cut joinery seating** — Compatible dados, grooves, stopped grooves, rabbets, half laps, mortises, and tenons now seat in their visibly rendered sockets through Prevent Overlap while oversized, depth-mismatched, past-termination, mirrored, partial/noncomplementary, and unrelated overlaps remain blocked. Selected groups, including their first drag from an unselected state, keep ordinary snapping and collision behavior instead of receiving single-part socket mates.
 - **Pattern orientation in fabrication output** — Cut List, CSV, and PDF fabrication instructions now retain the authored direction, grid rotation, or circular start angle for patterned holes.
 - **Featured-part fabrication validation** — Cut List generation now reports invalid authored operations even when the part also needs a stock assignment, so a resized copy cannot hide an out-of-bounds cut behind a generic stock error.
 - **Featured-part rotation history** — X/Y/Z shortcut rotations now commit their ground adjustment with the rotation, keeping real undo/redo steps stable for cut-bearing parts.

@@ -20,6 +20,7 @@ describe('interactionStore', () => {
 
     expect(useInteractionStore.getState().activeSession).toEqual({
       kind: 'move',
+      moveOwner: 'part',
       affectedPartIds: ['p1', 'p2'],
       primaryPartId: 'p1',
       delta: { x: 0, y: 0, z: 0 },
@@ -31,6 +32,20 @@ describe('interactionStore', () => {
         hoveredRelationId: null,
         latchedAxis: null
       }
+    });
+  });
+
+  it('records an explicitly claimed group move owner', () => {
+    useInteractionStore.getState().beginMoveSession({
+      affectedPartIds: ['p1'],
+      primaryPartId: 'p1',
+      moveOwner: 'group'
+    });
+
+    expect(useInteractionStore.getState().activeSession).toMatchObject({
+      kind: 'move',
+      moveOwner: 'group',
+      affectedPartIds: ['p1']
     });
   });
 
@@ -146,6 +161,7 @@ describe('interactionStore', () => {
 
     expect(useInteractionStore.getState().activeSession).toEqual({
       kind: 'move',
+      moveOwner: 'part',
       affectedPartIds: ['p1'],
       primaryPartId: null,
       delta: { x: 2, y: 0, z: 0 },

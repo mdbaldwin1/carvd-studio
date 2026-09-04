@@ -73,7 +73,7 @@ export function usePartDrag(
   toggleGroupSelection: (id: string) => void,
   updatePart: (id: string, updates: Partial<PartType>, options?: { mateHostPartId?: string }) => boolean,
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void,
-  startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number) => void
+  startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number, primaryPartId?: string) => boolean
 ) {
   const [isDragging, setIsDragging] = useState(false);
   const dragIntentForPart = useSelectionStore((s) => (s.dragIntent?.partId === part.id ? s.dragIntent : null));
@@ -957,7 +957,7 @@ export function usePartDrag(
     // Group-selected part drag should use the thresholded group-drag path (same as InstancedParts).
     if (isInSelectedGroup) {
       if (e.point) {
-        startGroupDrag(e.point, e.nativeEvent.clientX, e.nativeEvent.clientY);
+        startGroupDrag(e.point, e.nativeEvent.clientX, e.nativeEvent.clientY, part.id);
       }
       return;
     }

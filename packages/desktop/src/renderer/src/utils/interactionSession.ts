@@ -11,6 +11,7 @@ type Delta3D = { x: number; y: number; z: number };
 export function beginMoveInteractionSession(params: {
   affectedPartIds: string[];
   primaryPartId?: string | null;
+  moveOwner?: 'part' | 'group';
   initialDelta?: Delta3D;
   referenceState?: {
     selectionEntities?: InteractionSelectionEntity[];

@@ -51,6 +51,16 @@ export interface RotateBatchGroundingResult {
   updates: Array<{ partId: string; position: TranslationDelta; rotation: Rotation3D }>;
 }
 
+export type CanvasPartDragFallback = 'keep-group-owner' | 'start-group-owner' | 'start-part-owner';
+
+export function resolveCanvasPartDragFallback(params: {
+  isSelectedGroupHit: boolean;
+  activeMoveOwner: 'part' | 'group' | null;
+}): CanvasPartDragFallback {
+  if (!params.isSelectedGroupHit) return 'start-part-owner';
+  return params.activeMoveOwner === 'group' ? 'keep-group-owner' : 'start-group-owner';
+}
+
 // `calculatePartWorldHalfHeight` retired in §8b-group — the rotation-aware
 // world half-height math is now inside `groundConstraint` via `getPartAABB`.
 // Pre-allocated three.js objects (`_upVector` etc.) likewise removed.

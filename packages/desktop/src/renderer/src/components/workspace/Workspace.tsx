@@ -12,6 +12,7 @@ import { useCameraStore } from '../../store/cameraStore';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { CameraState } from '../../types';
 import { getPartLocalCorners } from '../../utils/partFeatureGeometry';
+import { resolveCanvasPartDragFallback } from '../../utils/interactionMovement';
 import { getPartGroupContext } from './partClickHandler';
 import { AxisIndicator } from './AxisIndicator';
 import { CameraController } from './CameraController';
@@ -26,6 +27,7 @@ import { SceneBackground } from './SceneBackground';
 import { SnapAlignmentLines } from './SnapAlignmentLines';
 import { SnapGuides } from './SnapGuides';
 import { ThumbnailCaptureHandler } from './ThumbnailCaptureHandler';
+import { useGroupDrag } from './useGroupDrag';
 import { installDragDebugTools } from '../../utils/dragDebug';
 import { hasInteractiveHitAt as resolveHasInteractiveHitAt } from '../../interaction/hitTest';
 import { useCanvasPointerSession } from '../../interaction/useCanvasPointerSession';
@@ -174,6 +176,7 @@ export function Workspace() {
   );
 
   const { camera, gl, controls, scene } = useThree();
+  const { startGroupDrag: startCanvasFallbackGroupDrag } = useGroupDrag(camera, gl, controls);
 
   useEffect(() => {
     const isTestMode =
@@ -605,10 +608,26 @@ export function Workspace() {
         const isSelectedGroupDrag = hitContext.ancestorGroupIds.some((groupId) =>
           selectionState.selectedGroupIds.includes(groupId)
         );
-        if (isSelectedGroupDrag) {
-          debugSelection('session:dragstart:part-fallback:skipped-selected-group', {
+        const fallback = resolveCanvasPartDragFallback({
+          isSelectedGroupHit: isSelectedGroupDrag,
+          activeMoveOwner: activeSession?.kind === 'move' ? activeSession.moveOwner : null
+        });
+        if (fallback === 'keep-group-owner') {
+          debugSelection('session:dragstart:part-fallback:kept-group-owner', {
             partId: action.hit.partId
           });
+          return;
+        }
+        if (fallback === 'start-group-owner') {
+          debugSelection('session:dragstart:part-fallback:restored-group-owner', {
+            partId: action.hit.partId
+          });
+          startCanvasFallbackGroupDrag(
+            new THREE.Vector3(action.hit.worldPoint.x, action.hit.worldPoint.y, action.hit.worldPoint.z),
+            action.downAt.clientX,
+            action.downAt.clientY,
+            action.hit.partId
+          );
           return;
         }
         const isDirectPartDragAlreadyActive =

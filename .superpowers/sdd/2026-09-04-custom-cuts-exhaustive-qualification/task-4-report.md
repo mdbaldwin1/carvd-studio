@@ -93,3 +93,23 @@ The second review found that feature mating and collision material used authored
 - Prettier and `git diff --check`: passed for all changed files.
 
 There is no known Task 4 blocker. The selected-group fallback guard is deliberately narrow: it changes ownership only for a part already contained by the active selected group and leaves direct-part and ordinary multi-part fallback behavior unchanged.
+
+## Review round 3 — first-drag group ownership
+
+The third review identified an event-ordering gap on the first drag of an initially unselected group. The instanced member selected its group but still published a direct-part drag intent; at canvas drag-start, the selected-group guard could then suppress the fallback even when no group owner had claimed the gesture. Preview could therefore run single-part mate logic before group release took over.
+
+- Move interaction sessions now identify their owner as `part` or `group`. Group drag claims that ownership synchronously at pointer-down, before the movement threshold and before any direct-part mate preview can begin.
+- An initially unselected instanced group member selects its group and starts the group gesture directly; it never publishes a direct-part drag intent. The clicked member is retained as the primary fallback so a valid group hit cannot resolve to an empty mover set.
+- The canvas fallback now distinguishes an existing group owner from a missing or incorrect owner. It keeps the former and starts a group fallback for the latter, while ungrouped hits retain the direct-part path. Unit coverage includes a missing claim and an accidental direct-part claim.
+- The real first-drag Electron RED also exposed a camera-plane jump: the mesh hit point was used as the origin after the group drag plane moved to the group anchor. The original pointer is now projected onto that plane at threshold crossing, keeping preview and release stable without changing ordinary snap or collision policy.
+- A fresh Electron scenario begins with a singleton group unselected, clicks its rendered member, and inspects the live gesture before and after threshold. It proves group-only selection and ownership from pointer-down, no mate-host identity or mate-only snap lines, ordinary face snapping, a collision-consistent preview/release position, and no overlap warning.
+
+### Review-round-3 verification
+
+- Ownership and interaction-focused Vitest suites: 5 files, 43 tests passed.
+- Desktop lint and typecheck: passed.
+- Fresh production Electron build: passed.
+- `custom-cuts-assembly.spec.ts`: 6/6 passed, including selected and initially-unselected singleton-group gestures.
+- Prettier and `git diff --check`: passed for all changed files.
+
+There is no known Task 4 blocker. Group mating remains deliberately suppressed; the new owner field only routes the gesture to the already-established ordinary group snap/collision path.

@@ -44,11 +44,12 @@ async function seedFixture(
   window: Page,
   parts: FixturePart[],
   selectedPartId: string,
-  singletonGroupMemberId?: string
+  singletonGroupMemberId?: string,
+  selectSingletonGroup = true
 ): Promise<void> {
   await seedProject(window, 'empty');
   await window.evaluate(
-    ({ fixtureParts, selectedId, groupMemberId }) => {
+    ({ fixtureParts, selectedId, groupMemberId, selectGroup }) => {
       const project = window.useProjectStore.getState();
       project.setStockConstraints({ ...project.stockConstraints, preventOverlap: true });
       window.useSnapStore.getState().setSnapToPartsEnabled(true);
@@ -64,11 +65,17 @@ async function seedFixture(
       }
       if (groupMemberId) {
         project.createGroup('Singleton Mate Group', [{ id: groupMemberId, type: 'part' }]);
+        if (!selectGroup) window.useSelectionStore.getState().clearSelection();
       } else {
         window.useSelectionStore.getState().selectPart(selectedId);
       }
     },
-    { fixtureParts: parts, selectedId: selectedPartId, groupMemberId: singletonGroupMemberId }
+    {
+      fixtureParts: parts,
+      selectedId: selectedPartId,
+      groupMemberId: singletonGroupMemberId,
+      selectGroup: selectSingletonGroup
+    }
   );
   await window.waitForTimeout(300);
 }
@@ -149,6 +156,15 @@ async function dragSelectedGroupOnFace(window: Page, partId: string, delta: { x:
   await window.mouse.down();
   try {
     await window.waitForTimeout(250);
+    const pointerDown = await window.evaluate(() => {
+      const session = window.useInteractionStore.getState().activeSession;
+      const selection = window.useSelectionStore.getState();
+      return {
+        moveOwner: session?.kind === 'move' ? (session.moveOwner ?? null) : null,
+        selectedPartIds: selection.selectedPartIds,
+        selectedGroupIds: selection.selectedGroupIds
+      };
+    });
     for (let i = 1; i <= 12; i += 1) {
       await window.mouse.move(start.x + (delta.x * i) / 12, start.y + (delta.y * i) / 12);
       await window.waitForTimeout(20);
@@ -161,18 +177,21 @@ async function dragSelectedGroupOnFace(window: Page, partId: string, delta: { x:
         })
       )
       .not.toBeNull();
-    return await window.evaluate(() => {
+    return await window.evaluate((pointerDownState) => {
       const session = window.useInteractionStore.getState().activeSession;
       const selection = window.useSelectionStore.getState();
       return session?.kind === 'move'
         ? {
             delta: session.delta,
+            moveOwner: session.moveOwner ?? null,
+            hasMateHostPartId: Object.prototype.hasOwnProperty.call(session, 'mateHostPartId'),
             snapLines: window.useSnapStore.getState().activeSnapLines,
             selectedPartIds: selection.selectedPartIds,
-            selectedGroupIds: selection.selectedGroupIds
+            selectedGroupIds: selection.selectedGroupIds,
+            pointerDown: pointerDownState
           }
         : null;
-    });
+    }, pointerDown);
   } finally {
     await window.mouse.up();
     await window.waitForTimeout(500);
@@ -326,6 +345,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
     });
 
     expect(previewDelta).not.toBeNull();
+    expect(previewDelta!.moveOwner).toBe('group');
     expect(previewDelta!.selectedPartIds).toEqual([]);
     expect(previewDelta!.selectedGroupIds).toHaveLength(1);
     expect(previewDelta!.snapLines).not.toHaveLength(0);
@@ -334,6 +354,79 @@ test.describe.serial('custom cuts assembly qualification', () => {
     expect(2.8 + previewDelta!.delta.y).toBeCloseTo(2.75, 3);
     expect(state.position.y).toBeCloseTo(2.75, 3);
     expect(state.position.y).not.toBeCloseTo(2.375, 2);
+    expect(state.selectedPartIds).toEqual([]);
+    expect(state.selectedGroupIds).toHaveLength(1);
+    await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);
+  });
+
+  test('claims an initially unselected singleton group before its first drag preview', async () => {
+    await seedFixture(
+      running.window,
+      [
+        {
+          id: 'first-drag-group-host',
+          name: 'First Drag Group Host',
+          length: 12,
+          width: 6,
+          thickness: 0.75,
+          position: { x: 4, y: 0.375, z: 4 },
+          features: [
+            rectCut(
+              'first-drag-group-slot',
+              'dado',
+              { type: 'face', face: 'top_face' },
+              { length: 0.755, width: 6 },
+              0.375,
+              { x: 5.6225, z: 0 }
+            )
+          ]
+        },
+        {
+          id: 'first-drag-group-divider',
+          name: 'First Drag Group Divider',
+          length: 0.75,
+          width: 6,
+          thickness: 4,
+          position: { x: 4.1, y: 2.8, z: 4 }
+        }
+      ],
+      'first-drag-group-divider',
+      'first-drag-group-divider',
+      false
+    );
+    await enablePrecisionSnapping(running.window);
+    await setCamera(running.window, 'front');
+    await expect
+      .poll(() => running.window.evaluate(() => window.useSelectionStore.getState().selectedGroupIds))
+      .toEqual([]);
+
+    const preview = await dragSelectedGroupOnFace(running.window, 'first-drag-group-divider', { x: 7, y: 0 });
+    const state = await running.window.evaluate(() => {
+      const selection = window.useSelectionStore.getState();
+      const part = window.useProjectStore
+        .getState()
+        .parts.find((candidate: { id: string }) => candidate.id === 'first-drag-group-divider');
+      return {
+        position: part.position,
+        selectedPartIds: selection.selectedPartIds,
+        selectedGroupIds: selection.selectedGroupIds
+      };
+    });
+
+    expect(preview).not.toBeNull();
+    expect(preview!.moveOwner).toBe('group');
+    expect(preview!.pointerDown.moveOwner).toBe('group');
+    expect(preview!.pointerDown.selectedPartIds).toEqual([]);
+    expect(preview!.pointerDown.selectedGroupIds).toHaveLength(1);
+    expect(preview!.selectedPartIds).toEqual([]);
+    expect(preview!.selectedGroupIds).toHaveLength(1);
+    expect(preview!.hasMateHostPartId).toBe(false);
+    expect(preview!.snapLines).not.toHaveLength(0);
+    expect(preview!.snapLines.every((line: { family?: string }) => line.family !== undefined)).toBe(true);
+    expect(preview!.snapLines.map((line: { family?: string }) => line.family)).toContain('face');
+    expect(2.8 + preview!.delta.y).toBeCloseTo(2.75, 3);
+    expect(state.position.y).toBeCloseTo(2.75, 3);
+    expect(state.position.y).toBeCloseTo(2.8 + preview!.delta.y, 3);
     expect(state.selectedPartIds).toEqual([]);
     expect(state.selectedGroupIds).toHaveLength(1);
     await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);

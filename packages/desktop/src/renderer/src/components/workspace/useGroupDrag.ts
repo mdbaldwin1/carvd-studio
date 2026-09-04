@@ -64,7 +64,7 @@ export function useGroupDrag(
   gl: THREE.WebGLRenderer,
   controls: THREE.EventDispatcher<object> | null
 ): {
-  startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number) => void;
+  startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number, primaryPartId?: string) => boolean;
 } {
   // Drag state refs (not React state — no re-renders needed during drag)
   const dragActiveRef = useRef(false);
@@ -149,7 +149,31 @@ export function useGroupDrag(
   );
 
   const startGroupDrag = useCallback(
-    (worldPoint: THREE.Vector3, screenX: number, screenY: number) => {
+    (worldPoint: THREE.Vector3, screenX: number, screenY: number, primaryPartId?: string) => {
+      // Clean up any previous gesture before publishing this ownership claim.
+      if (cleanupRef.current) {
+        cleanupRef.current();
+      }
+
+      // Claim the selected-group gesture synchronously. The canvas drag-start
+      // fallback can then distinguish a working per-mesh owner from a missed
+      // pointer-down without briefly routing through direct-part mate logic.
+      const { selectedGroupIds, selectedPartIds, editingGroupId } = useSelectionStore.getState();
+      const { groupMembers, parts } = useProjectStore.getState();
+      const pointerDownSelection = resolveMoveSelection(
+        { selectedPartIds, selectedGroupIds, editingGroupId },
+        parts,
+        groupMembers,
+        primaryPartId
+      );
+      if (pointerDownSelection.affectedParts.length === 0) return false;
+
+      beginMoveInteractionSession({
+        affectedPartIds: pointerDownSelection.affectedPartIds,
+        primaryPartId: primaryPartId ?? pointerDownSelection.affectedParts[0]?.id ?? null,
+        moveOwner: 'group'
+      });
+
       // If a selected group is being dragged, immediately pause orbit controls so
       // camera orbit doesn't steal the gesture before drag threshold is crossed.
       pauseOrbitControls(controls);
@@ -197,10 +221,10 @@ export function useGroupDrag(
           movingPartIdsRef.current = new Set(moveSelection.affectedPartIds);
           beginMoveInteractionSession({
             affectedPartIds: moveSelection.affectedPartIds,
-            primaryPartId: groupParts[0]?.id ?? null
+            primaryPartId: primaryPartId ?? groupParts[0]?.id ?? null,
+            moveOwner: 'group'
           });
           wasSnappedByPartsRef.current = { x: false, y: false, z: false };
-          startPointRef.current = startPoint;
           dragDebug('groupDrag:start', {
             anchorPos: { x: anchor.x, y: anchor.y, z: anchor.z },
             movingPartIds: moveSelection.affectedPartIds
@@ -229,6 +253,18 @@ export function useGroupDrag(
           } else {
             setupDragPlane(anchor);
           }
+          // The mesh hit point can lie on a face several world units away
+          // from the camera-facing drag plane. Project the original pointer
+          // onto that plane so selecting a group on this pointer-down cannot
+          // create a first-frame jump.
+          const rect = gl.domElement.getBoundingClientRect();
+          _raycaster.setFromCamera(
+            _vec2.set(((screenX - rect.left) / rect.width) * 2 - 1, -((screenY - rect.top) / rect.height) * 2 + 1),
+            camera
+          );
+          startPointRef.current = _raycaster.ray.intersectPlane(_plane, _intersection)
+            ? _intersection.clone()
+            : startPoint;
         }
 
         // Drag active — process move
@@ -509,11 +545,6 @@ export function useGroupDrag(
         pointerRafQueue.cancel();
       };
 
-      // Clean up any previous drag (safety)
-      if (cleanupRef.current) {
-        cleanupRef.current();
-      }
-
       const unbindPointerSession = bindWindowPointerSession(window, {
         onMove: handleMove,
         onEnd: handleUp
@@ -527,8 +558,9 @@ export function useGroupDrag(
       };
 
       cleanupRef.current = cleanup;
+      return true;
     },
-    [camera.position, controls, getWorldPoint, setupDragPlane]
+    [camera, controls, getWorldPoint, gl.domElement, setupDragPlane]
   );
 
   return { startGroupDrag };
