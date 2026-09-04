@@ -490,7 +490,7 @@ const CUSTOM_CUT_LIFECYCLE_SCENARIOS: OperationScenario[] = [
       parameters: {
         diameter: 0.25,
         depthMode: 'blind',
-        depth: 0.25,
+        depth: 0.375,
         tilt: 4,
         direction: 20,
         countersink: { majorDiameter: 0.75, includedAngle: 82 }
