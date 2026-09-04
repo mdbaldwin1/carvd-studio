@@ -125,6 +125,10 @@ export function createDowelJoint(input: CreateDowelJointInput): DowelJointResult
   const firstNormal = worldDirection(input.firstPart, firstFrame.inwardNormal);
   const secondNormal = worldDirection(input.secondPart, secondFrame.inwardNormal);
   if (firstNormal.dot(secondNormal) > -0.999) throw new Error('Selected faces must be parallel and opposing.');
+  const firstFaceOrigin = worldPoint(input.firstPart, firstFrame.origin);
+  const secondFaceOrigin = worldPoint(input.secondPart, secondFrame.origin);
+  if (Math.abs(secondFaceOrigin.clone().sub(firstFaceOrigin).dot(firstNormal)) > 1e-4)
+    throw new Error('Selected faces must be touching to create a dowel joint.');
 
   const jointId = id('dowel-joint');
   const firstFeatures: CircularCutFeature[] = [];
@@ -177,6 +181,34 @@ export function createDowelJoint(input: CreateDowelJointInput): DowelJointResult
   }
 
   return { jointId, firstFeatures, secondFeatures };
+}
+
+export function validateDowelRelationships(parts: Part[]): string[] {
+  const errors: string[] = [];
+  const entries = new Map<string, Array<{ part: Part; metadata: DowelJointMetadata }>>();
+  for (const part of parts) {
+    for (const feature of part.features ?? []) {
+      const dowel = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
+      if (!dowel) continue;
+      const key = `${dowel.jointId}:${dowel.memberIndex}`;
+      const members = entries.get(key) ?? [];
+      members.push({ part, metadata: dowel });
+      entries.set(key, members);
+    }
+  }
+  for (const [key, members] of entries) {
+    if (members.length !== 2) {
+      errors.push(`Dowel joint member ${key} is missing its matching hole.`);
+      continue;
+    }
+    const [first, second] = members;
+    const reciprocal = first.metadata.matePartId === second.part.id && second.metadata.matePartId === first.part.id;
+    const matching =
+      first.metadata.dowelDiameter === second.metadata.dowelDiameter &&
+      first.metadata.dowelLength === second.metadata.dowelLength;
+    if (!reciprocal || !matching) errors.push(`Dowel joint member ${key} has mismatched relationship data.`);
+  }
+  return errors;
 }
 
 export function getDowelJointAlignment(

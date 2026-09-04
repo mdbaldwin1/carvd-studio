@@ -1,10 +1,65 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
-import { createDowelJoint, getDowelJointAlignment, getDowelVisualizations } from './dowelJointUtils';
+import {
+  createDowelJoint,
+  getDowelJointAlignment,
+  getDowelVisualizations,
+  validateDowelRelationships
+} from './dowelJointUtils';
 
 vi.unmock('three');
 
 describe('dowelJointUtils', () => {
+  it('rejects separated opposing faces', () => {
+    const firstPart = createTestPart({ position: { x: 0, y: 0, z: 0 } });
+    const secondPart = createTestPart({ position: { x: 0, y: 10, z: 0 } });
+    expect(() =>
+      createDowelJoint({
+        firstPart,
+        firstFace: 'top_face',
+        secondPart,
+        secondFace: 'bottom_face',
+        diameter: 0.375,
+        dowelLength: 2,
+        firstEmbedmentDepth: 1,
+        secondEmbedmentDepth: 1,
+        count: 1,
+        spacing: 2,
+        firstPrimary: 0,
+        firstSecondary: 0
+      })
+    ).toThrow(/touching/i);
+  });
+
+  it('reports a dangling relationship before save', () => {
+    const part = createTestPart({
+      id: 'first',
+      features: [
+        {
+          id: 'hole-1',
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          metadata: {
+            dowelJoint: {
+              jointId: 'joint-1',
+              matePartId: 'missing',
+              memberIndex: 0,
+              dowelDiameter: 0.375,
+              dowelLength: 2,
+              embedmentDepth: 1
+            }
+          },
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          cutType: 'round_hole',
+          placement: { primary: 0, secondary: 0, rotation: 0 },
+          parameters: { diameter: 0.375, depthMode: 'blind', depth: 1, tilt: 0, direction: 0 }
+        }
+      ]
+    });
+    expect(validateDowelRelationships([part])).toEqual([expect.stringMatching(/missing its matching hole/i)]);
+  });
   it('creates matching part-local holes on opposing mating faces', () => {
     const firstPart = createTestPart({
       id: 'first',

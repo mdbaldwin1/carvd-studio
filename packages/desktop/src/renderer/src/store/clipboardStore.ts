@@ -10,6 +10,39 @@ import { clonePartFeature, clonePartFeatures, normalizePart } from '../utils/par
 import { resolveSelectedGroupIdsWithDescendants } from '../utils/interactionSelection';
 import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
 
+function cloneFeaturesForPartPaste(
+  features: PartFeature[] | undefined,
+  partIdMap: Map<string, string>,
+  jointIdMap: Map<string, string>
+): PartFeature[] | undefined {
+  if (!features) return undefined;
+  return features.map((feature) => {
+    const cloned = clonePartFeature(feature);
+    cloned.id = uuidv4();
+    const dowel = cloned.metadata?.dowelJoint as
+      | { jointId: string; matePartId: string; [key: string]: unknown }
+      | undefined;
+    if (!dowel) return cloned;
+    const mappedMateId = partIdMap.get(dowel.matePartId);
+    if (!mappedMateId) {
+      const metadata = { ...cloned.metadata };
+      delete metadata.dowelJoint;
+      cloned.metadata = Object.keys(metadata).length > 0 ? metadata : undefined;
+      return cloned;
+    }
+    let mappedJointId = jointIdMap.get(dowel.jointId);
+    if (!mappedJointId) {
+      mappedJointId = uuidv4();
+      jointIdMap.set(dowel.jointId, mappedJointId);
+    }
+    cloned.metadata = {
+      ...cloned.metadata,
+      dowelJoint: { ...dowel, jointId: mappedJointId, matePartId: mappedMateId }
+    };
+    return cloned;
+  });
+}
+
 interface ClipboardStoreState {
   clipboard: Clipboard;
   cutsClipboard: PartFeature[] | null;
@@ -50,6 +83,11 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
           features: cutsClipboard.map((feature) => {
             const cloned = clonePartFeature(feature);
             cloned.id = uuidv4();
+            if (cloned.metadata?.dowelJoint !== undefined) {
+              const metadata = { ...cloned.metadata };
+              delete metadata.dowelJoint;
+              cloned.metadata = Object.keys(metadata).length > 0 ? metadata : undefined;
+            }
             return cloned;
           })
         }
@@ -131,14 +169,14 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
     );
 
     // Create ID mapping for parts and groups
-    const partIdMap = new Map<string, string>(); // oldId -> newId
+    const partIdMap = new Map(clipboard.parts.map((part) => [part.id, uuidv4()])); // oldId -> newId
     const groupIdMap = new Map<string, string>(); // oldId -> newId
+    const jointIdMap = new Map<string, string>();
 
     // Create new parts with new IDs and offset positions
     // Only top-level parts (not in any group) get "(copy)" appended
     const newParts = clipboard.parts.map((part) => {
-      const newId = uuidv4();
-      partIdMap.set(part.id, newId);
+      const newId = partIdMap.get(part.id)!;
       const isChild = childPartIds.has(part.id);
       return normalizePart({
         ...part,
@@ -149,7 +187,7 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
           y: part.position.y,
           z: part.position.z + 2
         },
-        features: clonePartFeatures(part.features)
+        features: cloneFeaturesForPartPaste(part.features, partIdMap, jointIdMap)
       });
     });
 
@@ -250,14 +288,14 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
     const centerZ = (minZ + maxZ) / 2;
 
     // Create ID mapping for parts and groups
-    const partIdMap = new Map<string, string>();
+    const partIdMap = new Map(clipboard.parts.map((part) => [part.id, uuidv4()]));
     const groupIdMap = new Map<string, string>();
+    const jointIdMap = new Map<string, string>();
 
     // Create new parts centered at the clicked position
     // Only top-level parts (not in any group) get "(copy)" appended
     const newParts = clipboard.parts.map((part) => {
-      const newId = uuidv4();
-      partIdMap.set(part.id, newId);
+      const newId = partIdMap.get(part.id)!;
       const isChild = childPartIds.has(part.id);
       return normalizePart({
         ...part,
@@ -268,7 +306,7 @@ export const useClipboardStore = create<ClipboardStoreState>((set, get) => ({
           y: part.position.y,
           z: position.z + (part.position.z - centerZ)
         },
-        features: clonePartFeatures(part.features)
+        features: cloneFeaturesForPartPaste(part.features, partIdMap, jointIdMap)
       });
     });
 

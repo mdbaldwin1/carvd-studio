@@ -901,18 +901,20 @@ export function PartCutsWorkspace({
 
                   {(inspectorDraft.mode === 'circular_cut' || inspectorDraft.mode === 'rounded_cut') && (
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      {FACE_TARGETS.map((target) => (
-                        <Button
-                          key={target}
-                          type="button"
-                          size="xs"
-                          variant="outline"
-                          active={inspectorDraft.faceTarget === target}
-                          onClick={() => setDraft({ ...inspectorDraft, faceTarget: target })}
-                        >
-                          {FACE_LABELS[target]}
-                        </Button>
-                      ))}
+                      {(inspectorDraft.mode === 'rounded_cut' ? ['top_face', 'bottom_face'] : FACE_TARGETS).map(
+                        (target) => (
+                          <Button
+                            key={target}
+                            type="button"
+                            size="xs"
+                            variant="outline"
+                            active={inspectorDraft.faceTarget === target}
+                            onClick={() => setDraft({ ...inspectorDraft, faceTarget: target })}
+                          >
+                            {FACE_LABELS[target]}
+                          </Button>
+                        )
+                      )}
                     </div>
                   )}
 

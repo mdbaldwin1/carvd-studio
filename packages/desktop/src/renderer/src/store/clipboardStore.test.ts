@@ -206,6 +206,85 @@ describe('clipboardStore', () => {
       expect(pasted?.features?.[0].kind).toBe('rect_cut');
       expect(pasted?.features).not.toBe(useClipboardStore.getState().clipboard.parts[0].features);
     });
+
+    it('removes a stale dowel relationship when only one mate is pasted', () => {
+      const part = createTestPart({
+        id: 'first',
+        features: [
+          {
+            id: 'hole-1',
+            kind: 'circular_cut',
+            version: 1,
+            enabled: true,
+            metadata: {
+              dowelJoint: {
+                jointId: 'joint-1',
+                matePartId: 'second',
+                memberIndex: 0,
+                dowelDiameter: 0.375,
+                dowelLength: 2,
+                embedmentDepth: 1
+              }
+            },
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+            cutType: 'round_hole',
+            placement: { primary: 0, secondary: 0, rotation: 0 },
+            parameters: { diameter: 0.375, depthMode: 'blind', depth: 1, tilt: 0, direction: 0 }
+          }
+        ]
+      });
+      useProjectStore.setState({ parts: [part] });
+      useSelectionStore.getState().selectPart(part.id);
+      useClipboardStore.getState().copySelectedParts();
+
+      const [pastedId] = useClipboardStore.getState().pasteClipboard();
+      const pasted = useProjectStore.getState().parts.find((candidate) => candidate.id === pastedId)!;
+      expect(pasted.features?.[0].id).not.toBe('hole-1');
+      expect(pasted.features?.[0].metadata?.dowelJoint).toBeUndefined();
+    });
+
+    it('remaps both mates and the joint id when a complete dowel pair is pasted', () => {
+      const makePart = (id: string, matePartId: string) =>
+        createTestPart({
+          id,
+          features: [
+            {
+              id: `hole-${id}`,
+              kind: 'circular_cut',
+              version: 1,
+              enabled: true,
+              metadata: {
+                dowelJoint: {
+                  jointId: 'joint-1',
+                  matePartId,
+                  memberIndex: 0,
+                  dowelDiameter: 0.375,
+                  dowelLength: 2,
+                  embedmentDepth: 1
+                }
+              },
+              target: { type: 'face', face: id === 'first' ? 'top_face' : 'bottom_face' },
+              reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+              cutType: 'round_hole',
+              placement: { primary: 0, secondary: 0, rotation: 0 },
+              parameters: { diameter: 0.375, depthMode: 'blind', depth: 1, tilt: 0, direction: 0 }
+            }
+          ]
+        });
+      useProjectStore.setState({ parts: [makePart('first', 'second'), makePart('second', 'first')] });
+      useSelectionStore.getState().selectParts(['first', 'second']);
+      useClipboardStore.getState().copySelectedParts();
+
+      const pastedIds = useClipboardStore.getState().pasteClipboard();
+      const pasted = useProjectStore.getState().parts.filter((part) => pastedIds.includes(part.id));
+      const firstDowel = pasted[0].features?.[0].metadata?.dowelJoint as { jointId: string; matePartId: string };
+      const secondDowel = pasted[1].features?.[0].metadata?.dowelJoint as { jointId: string; matePartId: string };
+      expect(firstDowel.jointId).toBe(secondDowel.jointId);
+      expect(firstDowel.jointId).not.toBe('joint-1');
+      expect(firstDowel.matePartId).toBe(pasted[1].id);
+      expect(secondDowel.matePartId).toBe(pasted[0].id);
+    });
   });
 
   // ============================================================
