@@ -39,6 +39,22 @@ async function fillMeasurement(window: Page, label: string, value: string): Prom
   await input.press('Enter');
 }
 
+function parseImperialMeasurement(value: string): number {
+  const [whole, fraction] = value.trim().split(/\s+/, 2);
+  if (!fraction) {
+    if (!whole.includes('/')) return Number(whole);
+    const [numerator, denominator] = whole.split('/').map(Number);
+    return numerator / denominator;
+  }
+  const [numerator, denominator] = fraction.split('/').map(Number);
+  return Number(whole) + numerator / denominator;
+}
+
+async function expectImperialMeasurement(window: Page, label: string, value: number): Promise<void> {
+  const input = window.getByLabel(label, { exact: true });
+  await expect.poll(async () => parseImperialMeasurement(await input.inputValue())).toBeCloseTo(value, 8);
+}
+
 async function saveCut(window: Page): Promise<void> {
   const button = window.getByRole('button', { name: 'Save Cut' });
   await expect(button).toBeEnabled();
@@ -62,12 +78,33 @@ async function reopenProject(window: Page, filePath: string): Promise<void> {
 }
 
 async function generateCutList(window: Page): Promise<ReturnType<Page['getByRole']>> {
-  await window.getByRole('button', { name: /Generate Cut List|View Cut List/ }).click();
+  await window.getByRole('button', { name: /Generate Cut List|Regenerate Cut List|View Cut List/ }).click();
   const dialog = window.getByRole('dialog').filter({ has: window.getByRole('heading', { name: 'Cut List' }) });
-  const generate = dialog.getByRole('button', { name: 'Generate Cut List' });
+  const generate = dialog.getByRole('button', { name: /Generate Cut List|Regenerate/ });
   await generate.click();
   await expect(dialog.locator('.cut-list-tabs')).toBeVisible();
   return dialog;
+}
+
+function expectFiniteNondegenerateGeometrySignature(signature: string | null): void {
+  expect(signature).not.toBeNull();
+  expect(signature).not.toBe('empty');
+  const [positionCountText, indexCountText, hashText, boundaryText] = signature!.split(':');
+  const positionCount = Number(positionCountText);
+  const indexCount = Number(indexCountText);
+  const hash = Number(hashText);
+  expect(Number.isFinite(positionCount)).toBe(true);
+  expect(Number.isFinite(indexCount)).toBe(true);
+  expect(Number.isFinite(hash)).toBe(true);
+  expect(positionCount).toBeGreaterThan(0);
+  expect(indexCount).toBeGreaterThan(0);
+  expect(boundaryText).not.toBe('unbounded');
+  const bounds = boundaryText.split(',').map(Number);
+  expect(bounds).toHaveLength(6);
+  expect(bounds.every(Number.isFinite)).toBe(true);
+  expect(bounds[3]).toBeGreaterThan(bounds[0]);
+  expect(bounds[4]).toBeGreaterThan(bounds[1]);
+  expect(bounds[5]).toBeGreaterThan(bounds[2]);
 }
 
 function extractJsPdfLiteralText(pdfPath: string): string {
@@ -192,6 +229,29 @@ function buildStressFeatures() {
 
   return features;
 }
+
+const STRESS_FABRICATION_LINES = [
+  '1. Stress left mitre — Mitre 12.5° on Left End · Long point on Front',
+  '2. Stress right compound — Compound 15° / 5° bevel on Right End · Long point on Back · High point on Top',
+  '3. Stress cutout 1 — Cutout on Top Face · 2" × 2" × 1/4" deep',
+  '4. Stress cutout 2 — Cutout on Top Face · 2" × 2" × 1/4" deep',
+  '5. Stress cutout 3 — Cutout on Top Face · 2" × 2" × 1/4" deep',
+  '6. Stress cutout 4 — Cutout on Top Face · 2" × 2" × 1/4" deep',
+  '7. Stress cutout 5 — Cutout on Top Face · 2" × 2" × 1/4" deep',
+  '8. Stress cutout 6 — Cutout on Top Face · 2" × 2" × 1/4" deep',
+  '9. Stress round 1 — Round Hole on Top Face · 1/4" diameter × 1/2" deep',
+  '10. Stress round 2 — Countersink on Top Face · 1/4" hole × 1/2" major · 90° · 1/2" deep · 1° tilt toward 15°',
+  '11. Stress round 3 — Counterbore on Top Face · 1/4" hole · 1/2" × 1/8" recess · 1/2" deep · 2° tilt toward 30°',
+  '12. Stress round 4 — Round Hole on Top Face · 1/4" diameter × 1/2" deep · 3° tilt toward 45°',
+  '13. Stress round 5 — 3-hole Linear Countersink Pattern on Top Face · 1/4" hole × 1/2" major · 90° · 1" spacing · 0° direction · 1/2" deep · 4° tilt toward 60°',
+  '14. Stress round 6 — 4-hole Circular Counterbore Pattern on Top Face · 1/4" hole · 1/2" × 1/8" recess · 1" radius · 30° start angle · 1/2" deep · 5° tilt toward 75°',
+  '15. Stress rounded 1 — Rounded Slot on Top Face · 4" × 1" × 3/8" deep',
+  '16. Stress rounded 2 — Rounded Rectangle on Top Face · 4" × 1" · 1/4" radius × 3/8" deep',
+  '17. Stress rounded 3 — Rounded Slot on Top Face · 4" × 1" × 3/8" deep',
+  '18. Stress rounded 4 — Rounded Rectangle on Top Face · 4" × 1" · 1/4" radius × 3/8" deep',
+  '19. Stress rounded 6 edited — Rounded Rectangle on Top Face · 5" × 1" · 1/4" radius × 3/8" deep',
+  '20. Stress rounded 5 — Rounded Slot on Top Face · 4" × 1" × 3/8" deep'
+];
 
 test.describe('hands-on custom cuts qualification', () => {
   let running: RunningElectronApp;
@@ -459,7 +519,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await openSelectedPartCuts(window);
     const preview = window.getByRole('img', { name: 'Part cuts geometry preview' });
     const initialGeometry = await preview.getAttribute('data-geometry-signature');
-    expect(initialGeometry).toBeTruthy();
+    expectFiniteNondegenerateGeometrySignature(initialGeometry);
     await expect(window.getByRole('checkbox', { name: /^Enable cut / })).toHaveCount(20);
 
     await window.getByRole('button', { name: /^20\. Stress rounded 6/ }).click();
@@ -467,6 +527,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await fillMeasurement(window, 'Opening Length', '5');
     await saveCut(window);
     const editedGeometry = await preview.getAttribute('data-geometry-signature');
+    expectFiniteNondegenerateGeometrySignature(editedGeometry);
     expect(editedGeometry).not.toBe(initialGeometry);
 
     await window.getByRole('button', { name: 'Actions for cut 20' }).click();
@@ -490,6 +551,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await expect(window.getByText('Temporary stress duplicate')).toHaveCount(0);
 
     const savedGeometry = await preview.getAttribute('data-geometry-signature');
+    expectFiniteNondegenerateGeometrySignature(savedGeometry);
     await window.getByRole('button', { name: 'Save Part' }).click();
     const expected = await window.evaluate(() => JSON.stringify(window.useProjectStore.getState().parts[0].features));
     await saveProjectTo(window, projectPath);
@@ -512,21 +574,143 @@ test.describe('hands-on custom cuts qualification', () => {
       .toEqual([reopenedPartId]);
     await openSelectedPartCuts(window);
     await expect.poll(() => preview.getAttribute('data-geometry-signature'), { timeout: 15000 }).toBe(savedGeometry);
+    expectFiniteNondegenerateGeometrySignature(await preview.getAttribute('data-geometry-signature'));
     await expect(window.getByRole('checkbox', { name: /^Enable cut / })).toHaveCount(20);
     await window.getByRole('button', { name: 'Back to Project' }).click();
 
     const dialog = await generateCutList(window);
     await expect(dialog.getByRole('tab', { name: 'Parts List (1)' })).toBeVisible();
-    for (const label of [
-      'Stress left mitre',
-      'Stress right compound',
-      'Stress cutout 1',
-      'Stress round 5',
-      'Stress rounded 6 edited',
-      'Stress rounded 5'
-    ]) {
-      await expect(dialog.getByText(new RegExp(label))).toBeVisible();
-    }
+    const operationSummary = dialog
+      .locator('.cut-list-parts-tab tbody tr')
+      .first()
+      .locator('td')
+      .last()
+      .locator('span.italic');
+    await expect(operationSummary).toHaveText(STRESS_FABRICATION_LINES.join('; '));
     await expect(dialog.getByText('Temporary stress duplicate')).toHaveCount(0);
+  });
+
+  test('qualifies a stopped shelf dado and edge and corner notches on a realistic cabinet panel', async () => {
+    test.setTimeout(150000);
+    const { window, userDataDir } = running;
+    const projectPath = path.join(userDataDir, 'realistic-cabinet-panel-cuts.carvd');
+    await seedProject(window, 'stocked-one-part');
+    await window.evaluate(() => {
+      const project = window.useProjectStore.getState();
+      const part = project.parts[0];
+      project.updatePart(part.id, {
+        name: 'Base cabinet side panel',
+        length: 36,
+        width: 12,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 }
+      });
+    });
+    await openSelectedPartCuts(window);
+
+    await startPreset(window, 'Stopped Dado');
+    await window.getByRole('button', { name: 'Top Face', exact: true }).click();
+    await window.getByLabel('Label (optional)', { exact: true }).fill('Stopped shelf divider dado');
+    await fillMeasurement(window, 'Run Along Blank', '8');
+    await fillMeasurement(window, 'Blind Depth', '1/4');
+    await fillMeasurement(window, 'Offset Along Length', '30');
+    await expect(window.getByText('Stopped dado run extends past the blank.')).toBeVisible();
+    await expect(window.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    await fillMeasurement(window, 'Offset Along Length', '6');
+    const preview = window.getByRole('img', { name: 'Part cuts geometry preview' });
+    const stoppedDadoBeforeMove = await preview.getAttribute('data-geometry-signature');
+    expectFiniteNondegenerateGeometrySignature(stoppedDadoBeforeMove);
+    await window.getByRole('button', { name: 'Move Right' }).click();
+    await window.getByRole('button', { name: 'Extend Run' }).click();
+    await expectImperialMeasurement(window, 'Offset Along Length', 6.25);
+    await expectImperialMeasurement(window, 'Run Along Blank', 8.25);
+    const stoppedDadoAfterMove = await preview.getAttribute('data-geometry-signature');
+    expectFiniteNondegenerateGeometrySignature(stoppedDadoAfterMove);
+    expect(stoppedDadoAfterMove).not.toBe(stoppedDadoBeforeMove);
+    await saveCut(window);
+
+    await startPreset(window, 'Edge Notch');
+    await window.getByRole('button', { name: 'Front', exact: true }).click();
+    await window.getByLabel('Label (optional)', { exact: true }).fill('Cable chase edge notch');
+    await fillMeasurement(window, 'Run Along Blank', '4');
+    await fillMeasurement(window, 'Cross-Cut Width', '1 1/2');
+    await fillMeasurement(window, 'Offset Along Length', '33');
+    await expect(window.getByText('Edge notch length runs past the blank.')).toBeVisible();
+    await expect(window.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    await fillMeasurement(window, 'Offset Along Length', '8');
+    await saveCut(window);
+    await window.getByRole('button', { name: /^2\. Cable chase edge notch/ }).click();
+    await fillMeasurement(window, 'Cross-Cut Width', '1 3/4');
+    await saveCut(window);
+
+    await startPreset(window, 'Corner Notch');
+    await window.getByRole('button', { name: 'Back-Right Corner', exact: true }).click();
+    await window.getByLabel('Label (optional)', { exact: true }).fill('Post corner clearance');
+    await fillMeasurement(window, 'Run Along Blank', '40');
+    await fillMeasurement(window, 'Cross-Cut Width', '2');
+    await expect(window.getByText('Corner notch size runs past the blank.')).toBeVisible();
+    await expect(window.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    await fillMeasurement(window, 'Run Along Blank', '2 1/2');
+    await saveCut(window);
+    await window.getByRole('button', { name: /^3\. Post corner clearance/ }).click();
+    await fillMeasurement(window, 'Cross-Cut Width', '2 1/4');
+    await saveCut(window);
+    await window.getByRole('button', { name: 'Save Part' }).click();
+
+    const expectedFeatures = [
+      {
+        kind: 'rect_cut',
+        cutType: 'stopped_dado',
+        target: { type: 'face', face: 'top_face' },
+        label: 'Stopped shelf divider dado',
+        parameters: { size: { length: 8.25, width: 12 }, depthMode: 'blind', depth: 0.25 },
+        placement: { x: 6.25, z: 0 }
+      },
+      {
+        kind: 'rect_cut',
+        cutType: 'edge_notch',
+        target: { type: 'edge', edge: 'top_front_edge' },
+        label: 'Cable chase edge notch',
+        parameters: { size: { length: 4, width: 1.75 }, depthMode: 'through' },
+        placement: { x: 8, z: 0 }
+      },
+      {
+        kind: 'rect_cut',
+        cutType: 'corner_notch',
+        target: { type: 'corner', corner: 'back_right_corner' },
+        label: 'Post corner clearance',
+        parameters: { size: { length: 2.5, width: 2.25 }, depthMode: 'through' },
+        placement: { x: 0, z: 0 }
+      }
+    ];
+    const featureSnapshot = () =>
+      window.evaluate(() =>
+        (window.useProjectStore.getState().parts[0].features ?? []).map((feature) => ({
+          kind: feature.kind,
+          cutType: feature.cutType,
+          target: feature.target,
+          label: feature.label,
+          parameters: feature.parameters,
+          placement: feature.kind === 'end_cut' ? undefined : feature.placement
+        }))
+      );
+    await expect.poll(featureSnapshot).toEqual(expectedFeatures);
+    await saveProjectTo(window, projectPath);
+    await reopenProject(window, projectPath);
+    await expect.poll(featureSnapshot).toEqual(expectedFeatures);
+
+    const dialog = await generateCutList(window);
+    const fabricationLines = [
+      '1. Stopped shelf divider dado — Stopped Dado on Top Face · 8 1/4" run × 1/4" deep',
+      '2. Cable chase edge notch — Edge Notch on Front Side · 4" × 1 3/4" · Through',
+      '3. Post corner clearance — Corner Notch on Back-Right Corner · 2 1/2" × 2 1/4" · Through'
+    ];
+    const operationSummary = dialog
+      .locator('.cut-list-parts-tab tbody tr')
+      .first()
+      .locator('td')
+      .last()
+      .locator('span.italic');
+    await expect(operationSummary).toHaveText(fabricationLines.join('; '));
   });
 });

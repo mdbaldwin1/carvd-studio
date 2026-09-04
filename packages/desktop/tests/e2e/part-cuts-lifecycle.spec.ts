@@ -598,6 +598,35 @@ const CUSTOM_CUT_LIFECYCLE_SCENARIOS: OperationScenario[] = [
   }
 ];
 
+const CUSTOM_CUT_FABRICATION_LINES: Record<string, string> = {
+  'mitre end cut': '1. Mitre lifecycle revised — Mitre 37° on Right End · Long point on Front',
+  'bevel end cut': '1. Bevel lifecycle revised — Bevel 23° bevel on Right End · High point on Top',
+  'compound end cut':
+    '1. Compound lifecycle revised — Compound 33° / 19° bevel on Right End · Long point on Front · High point on Top',
+  'edge bevel': '1. Edge bevel lifecycle revised — Edge Bevel 28° on Back Edge · High point on Bottom',
+  tenon: '1. Tenon lifecycle revised — Tenon on Left End · 3" long × 5" wide × 1/2" thick',
+  'half lap': '1. Half Lap lifecycle revised — Dado on Bottom Face · 4" wide × 1/2" deep',
+  'corner notch': '1. Corner notch lifecycle revised — Corner Notch on Back-Right Corner · 3" × 1 1/2" · Through',
+  'edge notch': '1. Edge notch lifecycle revised — Edge Notch on Back Side · 3" × 1 1/2" · Through',
+  cutout: '1. Cutout lifecycle revised — Cutout on Bottom Face · 4" × 2 1/2" · Through',
+  dado: '1. Dado lifecycle revised — Dado on Bottom Face · 3" wide × 1/2" deep',
+  'stopped dado': '1. Stopped dado lifecycle revised — Stopped Dado on Bottom Face · 6" run × 1/2" deep',
+  rabbet: '1. Rabbet lifecycle revised — Rabbet on Bottom-Back Edge · 1 1/2" shoulder × 1/2" deep',
+  groove: '1. Groove lifecycle revised — Groove on Bottom Face · 1 1/2" wide × 1/2" deep',
+  'stopped groove':
+    '1. Stopped groove lifecycle revised — Stopped Groove on Bottom Face · 7" run × 1 1/2" wide × 1/2" deep',
+  mortise: '1. Mortise lifecycle revised — Mortise on Bottom Face · 5" × 2 1/2" × 1/2" deep',
+  'round hole':
+    '1. Round hole lifecycle revised — 4-hole Linear Pattern on Bottom Face · 1/2" diameter · 1 1/4" spacing · 25° direction · Through · 12° tilt toward 45°',
+  countersink:
+    '1. Countersink lifecycle revised — 6-hole Grid Countersink Pattern on Bottom Face · 3/8" hole × 7/8" major · 90° · 1 1/2" × 1 1/4" spacing · 0° rotation · Through · 9° tilt toward 35°',
+  counterbore:
+    '1. Counterbore lifecycle revised — 4-hole Circular Counterbore Pattern on Bottom Face · 3/8" hole · 7/8" × 1/4" recess · 1 1/4" radius · 30° start angle · Through · 10° tilt toward 40°',
+  'rounded slot': '1. Rounded slot lifecycle revised — Rounded Slot on Bottom Face · 4" × 1 1/2" · Through',
+  'rounded rectangle':
+    '1. Rounded rectangle lifecycle revised — Rounded Rectangle on Bottom Face · 4" × 2 1/2" · 3/4" radius · Through'
+};
+
 const TARGET_LABELS: Record<string, string> = {
   left_end: 'Left End',
   right_end: 'Right End',
@@ -934,7 +963,60 @@ async function savePartAndReopen(window: Page): Promise<void> {
   await openPartCutsFromProperties(window);
 }
 
-async function qualifyOperationLifecycle(window: Page, scenario: OperationScenario): Promise<void> {
+async function prepareLifecycleStockedPart(window: Page): Promise<void> {
+  await seedProject(window, 'stocked-one-part');
+  await window.evaluate(async () => {
+    const project = window.useProjectStore.getState();
+    const part = project.parts[0];
+    project.updatePart(part.id, { width: 12 });
+    await window.electronAPI.setPreference('stockLibrary', project.stocks);
+  });
+}
+
+async function saveAndNativeReopen(window: Page, projectPath: string, expectedFeature: unknown): Promise<void> {
+  if (!fs.existsSync(projectPath)) await queueSavePath(window, projectPath);
+  await pressSaveShortcut(window);
+  await expect
+    .poll(() => {
+      try {
+        const saved = JSON.parse(fs.readFileSync(projectPath, 'utf8')) as { parts: Array<{ features?: unknown[] }> };
+        return saved.parts[0].features;
+      } catch {
+        return null;
+      }
+    })
+    .toEqual([expectedFeature]);
+
+  await window.getByRole('button', { name: 'Carvd Studio home' }).click();
+  await expect(window.locator('.start-screen')).toBeVisible();
+  await queueOpenPaths(window, [projectPath]);
+  await window.getByRole('button', { name: 'Open file...' }).click();
+  await expect(window.locator('canvas')).toBeVisible();
+  await expect.poll(() => firstPartFeatureSnapshot(window)).toEqual(expectedFeature);
+}
+
+async function expectSingleFabricationLine(window: Page, scenario: OperationScenario): Promise<void> {
+  const expectedLine = CUSTOM_CUT_FABRICATION_LINES[scenario.title];
+  if (!expectedLine) throw new Error(`Missing fabrication oracle for ${scenario.title}.`);
+
+  await window.getByRole('button', { name: /Generate Cut List|Regenerate Cut List|View Cut List/ }).click();
+  const dialog = window.getByRole('dialog').filter({ has: window.getByRole('heading', { name: 'Cut List' }) });
+  await dialog.getByRole('button', { name: /Generate Cut List|Regenerate/ }).click();
+  const operationSummary = dialog
+    .locator('.cut-list-parts-tab tbody tr')
+    .first()
+    .locator('td')
+    .last()
+    .locator('span.italic');
+  await expect(operationSummary).toHaveText(expectedLine);
+  await dialog.getByRole('button', { name: 'Done' }).click();
+}
+
+async function qualifyOperationLifecycle(
+  window: Page,
+  scenario: OperationScenario,
+  projectPath: string
+): Promise<void> {
   await window.getByRole('button', { name: '+ Add Cut' }).click();
   await window.getByRole('button', { name: new RegExp(`^${scenario.preset}\\b`) }).click();
   if (scenario.blindOnly) await expect(window.getByLabel('Depth', { exact: true })).toHaveCount(0);
@@ -960,15 +1042,20 @@ async function qualifyOperationLifecycle(window: Page, scenario: OperationScenar
   await applyFeatureControls(window, scenario.edited);
   await expectFeatureControls(window, scenario.edited);
   await window.getByRole('button', { name: 'Save Cut' }).click();
-  await savePartAndReopen(window);
+  await window.getByRole('button', { name: 'Save Part' }).click();
+  await expect.poll(() => isEditingPartCuts(window)).toBe(false);
   await expect.poll(() => persistedFirstFeature(window)).toEqual(scenario.edited);
   await expect.poll(() => getFirstPartFeatureCount(window)).toBe(1);
+  const editedFeature = await firstPartFeatureSnapshot(window);
+  expect(editedFeature).not.toBeNull();
+  await saveAndNativeReopen(window, projectPath, editedFeature);
+  await expect.poll(() => persistedFirstFeature(window)).toEqual(scenario.edited);
+  await expectSingleFabricationLine(window, scenario);
+  await openPartCutsFromProperties(window);
 
   await window.getByRole('button', { name: new RegExp(`^1\\. ${scenario.edited.label}`) }).click();
   await expectFeatureControls(window, scenario.edited);
   await window.getByRole('button', { name: 'Back to Cuts' }).click();
-  const editedFeature = await firstPartFeatureSnapshot(window);
-  expect(editedFeature).not.toBeNull();
   await expect.poll(() => firstDraftFeatureSnapshot(window)).toEqual(editedFeature);
   const geometryBeforeDelete = await previewGeometrySignature(window);
 
@@ -1036,14 +1123,16 @@ test.describe('part cuts editing lifecycle', () => {
     for (const [group, includes] of scenarioGroups) {
       test(`qualifies ${group} through real Part Cuts controls`, async () => {
         // A group deliberately covers every operation in its family through
-        // an Electron save/reopen cycle; the default single-test timeout is
-        // shorter than the qualification work itself.
-        test.setTimeout(180000);
-        const { window } = running;
+        // its own native project save/close/reopen and fabrication-output
+        // cycle. The rectangular family performs eleven such round trips.
+        test.setTimeout(600000);
+        const { window, userDataDir } = running;
+        await prepareLifecycleStockedPart(window);
+        const projectPath = path.join(userDataDir, `${group.replaceAll(' ', '-')}-lifecycle.carvd`);
         await openPartCutsFromProperties(window);
         const scenarios = CUSTOM_CUT_LIFECYCLE_SCENARIOS.filter(includes);
         for (const [index, scenario] of scenarios.entries()) {
-          await test.step(scenario.title, () => qualifyOperationLifecycle(window, scenario));
+          await test.step(scenario.title, () => qualifyOperationLifecycle(window, scenario, projectPath));
           // The save above returns to the project. Each scenario starts from a
           // fresh Part Cuts session so its undo/redo assertion is one logical operation.
           if (index < scenarios.length - 1) {
