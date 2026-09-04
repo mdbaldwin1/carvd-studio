@@ -290,6 +290,93 @@ describe('dowelJointUtils', () => {
     expect(getDowelVisualizations(parts)).toEqual([expect.objectContaining({ aligned: false })]);
   });
 
+  it.each([
+    { label: 'one disabled member', firstEnabled: false, secondEnabled: true },
+    { label: 'both disabled members', firstEnabled: false, secondEnabled: false }
+  ])('keeps $label diagnosable and never renders it aligned', ({ firstEnabled, secondEnabled }) => {
+    const firstPart = createTestPart({ id: 'first', thickness: 1, position: { x: 0, y: 0, z: 0 } });
+    const secondPart = createTestPart({ id: 'second', thickness: 1, position: { x: 0, y: 1, z: 0 } });
+    const joint = createDowelJoint({
+      firstPart,
+      firstFace: 'top_face',
+      secondPart,
+      secondFace: 'bottom_face',
+      diameter: 0.375,
+      dowelLength: 0.75,
+      firstEmbedmentDepth: 0.375,
+      secondEmbedmentDepth: 0.375,
+      count: 1,
+      spacing: 1,
+      firstPrimary: 0,
+      firstSecondary: 0
+    });
+    joint.firstFeatures[0].enabled = firstEnabled;
+    joint.secondFeatures[0].enabled = secondEnabled;
+    const parts = [
+      { ...firstPart, features: joint.firstFeatures },
+      { ...secondPart, features: joint.secondFeatures }
+    ];
+
+    expect(validateDowelRelationships(parts)).toEqual([expect.stringMatching(/mismatched or misaligned/i)]);
+    expect(getDowelVisualizations(parts)).toEqual([expect.objectContaining({ aligned: false })]);
+  });
+
+  it.each([
+    {
+      label: 'placement after a length resize',
+      firstPrimary: 4,
+      resize: (part: ReturnType<typeof createTestPart>) => ({ ...part, length: 8 })
+    },
+    {
+      label: 'depth after a thickness resize',
+      firstPrimary: 0,
+      resize: (part: ReturnType<typeof createTestPart>) => ({
+        ...part,
+        thickness: 0.25,
+        position: { ...part.position, y: part.id === 'first' ? 0.375 : 0.625 }
+      })
+    }
+  ])('revalidates current host $label and renders the retained relationship invalid', ({ firstPrimary, resize }) => {
+    const firstPart = createTestPart({
+      id: 'first',
+      length: 10,
+      width: 4,
+      thickness: 1,
+      position: { x: 0, y: 0, z: 0 }
+    });
+    const secondPart = createTestPart({
+      id: 'second',
+      length: 10,
+      width: 4,
+      thickness: 1,
+      position: { x: 0, y: 1, z: 0 }
+    });
+    const joint = createDowelJoint({
+      firstPart,
+      firstFace: 'top_face',
+      secondPart,
+      secondFace: 'bottom_face',
+      diameter: 0.375,
+      dowelLength: 0.75,
+      firstEmbedmentDepth: 0.375,
+      secondEmbedmentDepth: 0.375,
+      count: 1,
+      spacing: 1,
+      firstPrimary,
+      firstSecondary: 0
+    });
+    const resizedParts = [
+      { ...resize(firstPart), features: joint.firstFeatures },
+      { ...resize(secondPart), features: joint.secondFeatures }
+    ];
+
+    expect(
+      getDowelJointAlignment(resizedParts[0], joint.firstFeatures[0], resizedParts[1], joint.secondFeatures[0])
+    ).toMatchObject({ aligned: true });
+    expect(validateDowelRelationships(resizedParts)).toEqual([expect.stringMatching(/mismatched or misaligned/i)]);
+    expect(getDowelVisualizations(resizedParts)).toEqual([expect.objectContaining({ aligned: false })]);
+  });
+
   it('keeps authored holes part-local while move diagnostics change and restore', () => {
     const firstPart = createTestPart({ id: 'first', thickness: 1, position: { x: 0, y: 0, z: 0 } });
     const secondPart = createTestPart({ id: 'second', thickness: 1, position: { x: 0, y: 1, z: 0 } });

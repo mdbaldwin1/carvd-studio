@@ -56,3 +56,25 @@ Electron debugging also found a qualification-only gesture race: re-clicking an 
 ## Concerns
 
 No known Task 5 functional blocker. Exact contour collision is deliberately limited to flat horizontal end cuts; vertical/compound cuts continue through the conservative convex-volume path. This preserves safety for 3D material while avoiding the proven 2D ghost-corner rejection. The paired-dowel validator intentionally rejects patterns, countersinks, and counterbores as joint members even if their centers happen to coincide, because those are no longer the authored ordinary dowel holes. The independently reproducible countersink lifecycle E2E failure above remains outside this change.
+
+## Review round 1 hardening
+
+The Task 5 review identified two Critical and two Important gaps. Each was reproduced with a failing regression before its product fix:
+
+1. Direct one-member duplication retained the source relationship, while direct two-member duplication reused its joint and mate identities. Both `duplicatePart` and `duplicateSelectedParts` now use the same canonical feature-copy helper as clipboard paste: every feature receives a new ID, a relationship whose mate is outside the copy set is removed, and a copied pair receives one fresh joint ID with reciprocal remapped part IDs.
+2. Dowel creation remained active over an unsaved Part Cuts draft. The approved safety ruling was to require the draft to be resolved rather than silently commit or replace user work. The action is disabled while dirty and displays `Save or discard part changes first`; no project transaction or draft-history divergence occurs.
+3. Disabled holes and holes invalidated by current host dimensions were accepted as aligned. Shared relationship/visualization validity now requires both members to be enabled and each circular cut to pass validation against its current part. Metadata remains attached so disabled, out-of-bounds, and over-depth states stay diagnosable and render invalid rather than disappearing.
+4. Mate cleanup applied only to a single-feature update path. A centralized previous-to-next reconciliation now covers `updatePart`, multi-part feature replacement, batch replacement/cut paste, direct/selected/confirmed part deletion, and recursive group deletion. It dissolves a relationship only when an existing member identity is removed; geometry-only edits remain attached for diagnostics. The surviving physical cut is renamed to an ordinary round hole within the same temporal-store transaction.
+
+Real Electron coverage now performs the sidebar Duplicate action for one member and Shift+D for both members, proving fresh feature identities, one-member metadata removal, and paired joint/mate remapping. A separate real Part Cuts flow adds, edits, disables, reorders, and deletes draft operations, verifies the joint action is blocked, uses Cmd+Z to restore the draft-only deletion without consuming project history, then discards and proves persisted features are unchanged.
+
+### Review round 1 verification
+
+- Focused renderer suites: 4 files, 272 tests passed, including the direct cut-paste reconciliation path.
+- Full desktop renderer suite: 174 files, 3,754 tests passed.
+- Desktop main-process suite: 9 files, 213 tests passed.
+- Desktop lint and typecheck: passed.
+- Fresh production Electron build: passed.
+- New Electron scenarios: 2/2 passed.
+- Full `custom-cuts-assembly.spec.ts`: 12/12 passed from the fresh build.
+- Full desktop Electron suite: 130/131 passed; every Task 5 and review-round scenario passed. The sole failure remains the independently reproducible pre-existing countersink `Save Cut` failure at `part-cuts-lifecycle.spec.ts:935` documented above.

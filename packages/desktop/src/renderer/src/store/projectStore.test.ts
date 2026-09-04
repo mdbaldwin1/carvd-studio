@@ -56,6 +56,39 @@ const resetStore = () => {
   useLicenseStore.setState({ licenseMode: 'trial' });
 };
 
+function addPairedDowelFixture(): { firstPartId: string; secondPartId: string } {
+  const store = useProjectStore.getState();
+  const firstPartId = store.addPart({
+    name: 'Lower rail',
+    length: 10,
+    width: 4,
+    thickness: 1,
+    position: { x: 0, y: 0, z: 0 }
+  })!;
+  const secondPartId = store.addPart({
+    name: 'Upper rail',
+    length: 10,
+    width: 4,
+    thickness: 1,
+    position: { x: 0, y: 1, z: 0 }
+  })!;
+  store.addDowelJoint({
+    firstPartId,
+    firstFace: 'top_face',
+    secondPartId,
+    secondFace: 'bottom_face',
+    diameter: 0.375,
+    dowelLength: 0.75,
+    firstEmbedmentDepth: 0.375,
+    secondEmbedmentDepth: 0.375,
+    count: 1,
+    spacing: 1,
+    firstPrimary: 0,
+    firstSecondary: 0
+  });
+  return { firstPartId, secondPartId };
+}
+
 describe('projectStore', () => {
   beforeEach(() => {
     resetStore();
@@ -370,6 +403,39 @@ describe('projectStore', () => {
         const partA = state.parts.find((p) => p.id === partAId);
         expect(partA?.length).toBe(10);
       });
+
+      it('atomically detaches a mate when bulk cut replacement removes its paired feature', () => {
+        const store = useProjectStore.getState();
+        const { firstPartId, secondPartId } = addPairedDowelFixture();
+        useProjectStore.temporal.getState().clear();
+        const replacement: PartFeature = {
+          id: 'replacement-mitre',
+          kind: 'end_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mitre',
+          lengthMode: 'long_point',
+          parameters: { horizontalAngle: 45 }
+        };
+
+        store.batchUpdateParts([{ id: firstPartId, changes: { features: [replacement] } }]);
+
+        let state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features).toEqual([replacement]);
+        expect(state.parts.find((part) => part.id === secondPartId)?.features?.[0]).toMatchObject({
+          label: 'Round hole 1',
+          metadata: undefined
+        });
+        expect(validateDowelRelationships(state.parts)).toEqual([]);
+        expect(useProjectStore.temporal.getState().pastStates).toHaveLength(1);
+
+        useProjectStore.temporal.getState().undo();
+        state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features?.[0].metadata?.dowelJoint).toBeDefined();
+        expect(state.parts.find((part) => part.id === secondPartId)?.features?.[0].metadata?.dowelJoint).toBeDefined();
+      });
     });
 
     describe('addDowelJoint', () => {
@@ -546,6 +612,30 @@ describe('projectStore', () => {
 
         expect(useProjectStore.getState().groupMembers).toHaveLength(0);
       });
+
+      it('atomically detaches the surviving hole when its paired part is deleted', () => {
+        const store = useProjectStore.getState();
+        const { firstPartId, secondPartId } = addPairedDowelFixture();
+        useProjectStore.temporal.getState().clear();
+
+        store.deletePart(firstPartId);
+
+        let state = useProjectStore.getState();
+        expect(state.parts.some((part) => part.id === firstPartId)).toBe(false);
+        expect(state.parts.find((part) => part.id === secondPartId)?.features?.[0]).toMatchObject({
+          label: 'Round hole 1',
+          kind: 'circular_cut',
+          cutType: 'round_hole',
+          metadata: undefined
+        });
+        expect(validateDowelRelationships(state.parts)).toEqual([]);
+        expect(useProjectStore.temporal.getState().pastStates).toHaveLength(1);
+
+        useProjectStore.temporal.getState().undo();
+        state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features?.[0].metadata?.dowelJoint).toBeDefined();
+        expect(state.parts.find((part) => part.id === secondPartId)?.features?.[0].metadata?.dowelJoint).toBeDefined();
+      });
     });
 
     describe('deleteSelectedParts', () => {
@@ -662,6 +752,47 @@ describe('projectStore', () => {
         expect(duplicate?.features).not.toBe(
           useProjectStore.getState().parts.find((p) => p.id === originalId)?.features
         );
+      });
+
+      it('turns a one-member dowel duplicate into ordinary holes', () => {
+        const store = useProjectStore.getState();
+        const firstPartId = store.addPart({
+          name: 'Lower rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        })!;
+        const secondPartId = store.addPart({
+          name: 'Upper rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        })!;
+        store.addDowelJoint({
+          firstPartId,
+          firstFace: 'top_face',
+          secondPartId,
+          secondFace: 'bottom_face',
+          diameter: 0.375,
+          dowelLength: 0.75,
+          firstEmbedmentDepth: 0.375,
+          secondEmbedmentDepth: 0.375,
+          count: 1,
+          spacing: 1,
+          firstPrimary: 0,
+          firstSecondary: 0
+        });
+        const sourceFeatureId = useProjectStore.getState().parts.find((part) => part.id === firstPartId)!.features![0]
+          .id;
+
+        const duplicateId = store.duplicatePart(firstPartId)!;
+        const duplicateFeature = useProjectStore.getState().parts.find((part) => part.id === duplicateId)!.features![0];
+
+        expect(duplicateFeature.id).not.toBe(sourceFeatureId);
+        expect(duplicateFeature.metadata?.dowelJoint).toBeUndefined();
+        expect(validateDowelRelationships(useProjectStore.getState().parts)).toEqual([]);
       });
 
       it('gives every featured copy fresh, deeply independent feature identities', () => {
@@ -782,6 +913,56 @@ describe('projectStore', () => {
         const state = useProjectStore.getState();
         expect(state.parts).toHaveLength(4);
         expect(newIds).toHaveLength(2);
+      });
+
+      it('remaps a two-member dowel duplicate to a fresh reciprocal joint', () => {
+        const store = useProjectStore.getState();
+        const firstPartId = store.addPart({
+          name: 'Lower rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        })!;
+        const secondPartId = store.addPart({
+          name: 'Upper rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        })!;
+        store.addDowelJoint({
+          firstPartId,
+          firstFace: 'top_face',
+          secondPartId,
+          secondFace: 'bottom_face',
+          diameter: 0.375,
+          dowelLength: 0.75,
+          firstEmbedmentDepth: 0.375,
+          secondEmbedmentDepth: 0.375,
+          count: 1,
+          spacing: 1,
+          firstPrimary: 0,
+          firstSecondary: 0
+        });
+        const originalParts = useProjectStore.getState().parts;
+        const originalFeatureIds = originalParts.flatMap((part) => part.features?.map((feature) => feature.id) ?? []);
+        const originalJointId = originalParts[0].features![0].metadata!.dowelJoint!.jointId;
+        useSelectionStore.getState().selectParts([firstPartId, secondPartId]);
+
+        const duplicateIds = store.duplicateSelectedParts();
+        const duplicates = useProjectStore.getState().parts.filter((part) => duplicateIds.includes(part.id));
+        const firstMetadata = duplicates[0].features![0].metadata!.dowelJoint!;
+        const secondMetadata = duplicates[1].features![0].metadata!.dowelJoint!;
+
+        expect(duplicates.flatMap((part) => part.features!.map((feature) => feature.id))).not.toEqual(
+          expect.arrayContaining(originalFeatureIds)
+        );
+        expect(firstMetadata.jointId).toBe(secondMetadata.jointId);
+        expect(firstMetadata.jointId).not.toBe(originalJointId);
+        expect(firstMetadata.matePartId).toBe(duplicates[1].id);
+        expect(secondMetadata.matePartId).toBe(duplicates[0].id);
+        expect(validateDowelRelationships(useProjectStore.getState().parts)).toEqual([]);
       });
     });
   });

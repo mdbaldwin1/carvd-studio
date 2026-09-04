@@ -195,47 +195,80 @@ function dowelKey(metadata: DowelJointMetadata): string {
   return `${metadata.jointId}:${metadata.memberIndex}`;
 }
 
+function dowelMemberIdentity(partId: string, featureId: string): string {
+  return `${partId}:${featureId}`;
+}
+
+function detachDowelMetadata(feature: NonNullable<Part['features']>[number], metadata: DowelJointMetadata) {
+  const detached = clonePartFeature(feature);
+  if (detached.label === `Dowel hole ${metadata.memberIndex + 1}`) {
+    detached.label = `Round hole ${metadata.memberIndex + 1}`;
+  }
+  const remainingMetadata = { ...detached.metadata };
+  delete remainingMetadata.dowelJoint;
+  detached.metadata = Object.keys(remainingMetadata).length > 0 ? remainingMetadata : undefined;
+  return detached;
+}
+
+/**
+ * Dissolve relationships whose existing member was removed by a part or
+ * feature-array replacement. Geometry-only edits, including invalid or
+ * disabled holes, retain their metadata so validation can diagnose them.
+ */
+export function reconcileDowelRelationshipRemovals(previousParts: Part[], nextParts: Part[]): Part[] {
+  const previousMembers = new Map<string, Set<string>>();
+  for (const part of previousParts) {
+    for (const feature of part.features ?? []) {
+      const metadata = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
+      if (!metadata) continue;
+      const key = dowelKey(metadata);
+      const identities = previousMembers.get(key) ?? new Set<string>();
+      identities.add(dowelMemberIdentity(part.id, feature.id));
+      previousMembers.set(key, identities);
+    }
+  }
+
+  const nextMembers = new Map<string, Set<string>>();
+  for (const part of nextParts) {
+    for (const feature of part.features ?? []) {
+      const metadata = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
+      if (!metadata) continue;
+      const key = dowelKey(metadata);
+      const identities = nextMembers.get(key) ?? new Set<string>();
+      identities.add(dowelMemberIdentity(part.id, feature.id));
+      nextMembers.set(key, identities);
+    }
+  }
+
+  const removedKeys = new Set<string>();
+  for (const [key, previousIdentities] of previousMembers) {
+    const nextIdentities = nextMembers.get(key);
+    if ([...previousIdentities].some((identity) => !nextIdentities?.has(identity))) removedKeys.add(key);
+  }
+  if (removedKeys.size === 0) return nextParts;
+
+  return nextParts.map((part) => {
+    if (!part.features) return part;
+    let changed = false;
+    const features = part.features.map((feature) => {
+      const metadata = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
+      if (!metadata || !removedKeys.has(dowelKey(metadata))) return feature;
+      changed = true;
+      return detachDowelMetadata(feature, metadata);
+    });
+    return changed ? { ...part, features } : part;
+  });
+}
+
 /**
  * Apply a part's edited feature list and dissolve only relationships whose
  * feature was deleted. The physical hole on the other member remains as an
  * ordinary, independently editable drilling operation.
  */
 export function detachDeletedDowelMates(parts: Part[], partId: string, nextFeatures: Part['features']): Part[] {
-  const source = parts.find((part) => part.id === partId);
-  if (!source) return parts;
-
-  const retained = new Map(
-    (nextFeatures ?? []).map((feature) => {
-      const metadata = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
-      return [feature.id, metadata ? dowelKey(metadata) : null] as const;
-    })
-  );
-  const removedKeys = new Set<string>();
-  for (const feature of source.features ?? []) {
-    const metadata = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
-    if (!metadata) continue;
-    if (retained.get(feature.id) !== dowelKey(metadata)) removedKeys.add(dowelKey(metadata));
-  }
-
-  return parts.map((part) => {
-    if (part.id === partId) return { ...part, features: nextFeatures ?? [] };
-    if (removedKeys.size === 0 || !part.features) return part;
-    let changed = false;
-    const features = part.features.map((feature) => {
-      const metadata = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
-      if (!metadata || metadata.matePartId !== partId || !removedKeys.has(dowelKey(metadata))) return feature;
-      const detached = clonePartFeature(feature);
-      if (detached.label === `Dowel hole ${metadata.memberIndex + 1}`) {
-        detached.label = `Round hole ${metadata.memberIndex + 1}`;
-      }
-      const remainingMetadata = { ...detached.metadata };
-      delete remainingMetadata.dowelJoint;
-      detached.metadata = Object.keys(remainingMetadata).length > 0 ? remainingMetadata : undefined;
-      changed = true;
-      return detached;
-    });
-    return changed ? { ...part, features } : part;
-  });
+  if (!parts.some((part) => part.id === partId)) return parts;
+  const nextParts = parts.map((part) => (part.id === partId ? { ...part, features: nextFeatures ?? [] } : part));
+  return reconcileDowelRelationshipRemovals(parts, nextParts);
 }
 
 function isValidDowelPair(
@@ -247,6 +280,8 @@ function isValidDowelPair(
     first.metadata.dowelDiameter === second.metadata.dowelDiameter &&
     first.metadata.dowelLength === second.metadata.dowelLength;
   const matchingFeatures =
+    first.feature.enabled &&
+    second.feature.enabled &&
     first.feature.cutType === 'round_hole' &&
     second.feature.cutType === 'round_hole' &&
     first.feature.pattern === undefined &&
@@ -261,6 +296,8 @@ function isValidDowelPair(
     second.feature.parameters.depthMode === 'blind' &&
     first.feature.parameters.depth === first.metadata.embedmentDepth &&
     second.feature.parameters.depth === second.metadata.embedmentDepth &&
+    validateCircularCut(first.feature, first.part) === null &&
+    validateCircularCut(second.feature, second.part) === null &&
     first.metadata.embedmentDepth + second.metadata.embedmentDepth <= first.metadata.dowelLength + 1e-9;
   return (
     reciprocal &&

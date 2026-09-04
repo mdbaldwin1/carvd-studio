@@ -806,6 +806,57 @@ describe('clipboardStore', () => {
       expect(t1Features[0].id).not.toBe(t2Features[0].id);
     });
 
+    it('atomically detaches a paired mate when pasted cuts replace its member', () => {
+      const lowerId = 'lower';
+      const upperId = 'upper';
+      const pairedHole = (id: string, matePartId: string, face: 'top_face' | 'bottom_face'): PartFeature => ({
+        id,
+        kind: 'circular_cut',
+        version: 1,
+        enabled: true,
+        label: 'Dowel hole 1',
+        metadata: {
+          dowelJoint: {
+            jointId: 'joint',
+            matePartId,
+            memberIndex: 0,
+            dowelDiameter: 0.375,
+            dowelLength: 0.75,
+            embedmentDepth: 0.375
+          }
+        },
+        target: { type: 'face', face },
+        reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+        cutType: 'round_hole',
+        placement: { primary: 0, secondary: 0, rotation: 0 },
+        parameters: { diameter: 0.375, depthMode: 'blind', depth: 0.375, tilt: 0, direction: 0 }
+      });
+      useProjectStore.setState({
+        parts: [
+          createTestPart({ id: lowerId, features: [pairedHole('lower-hole', upperId, 'top_face')] }),
+          createTestPart({ id: upperId, features: [pairedHole('upper-hole', lowerId, 'bottom_face')] }),
+          createTestPart({ id: 'source', name: 'Cut source', features: [dado] })
+        ]
+      });
+      expect(useClipboardStore.getState().copyPartCuts('source')).toBe(true);
+      useProjectStore.temporal.getState().clear();
+
+      expect(useClipboardStore.getState().pastePartCutsToParts([lowerId])).toBe(1);
+
+      let parts = useProjectStore.getState().parts;
+      expect(parts.find((part) => part.id === lowerId)?.features?.[0]).toMatchObject({ cutType: 'dado' });
+      expect(parts.find((part) => part.id === upperId)?.features?.[0]).toMatchObject({
+        label: 'Round hole 1',
+        metadata: undefined
+      });
+      expect(useProjectStore.temporal.getState().pastStates).toHaveLength(1);
+
+      useProjectStore.temporal.getState().undo();
+      parts = useProjectStore.getState().parts;
+      expect(parts.find((part) => part.id === lowerId)?.features?.[0].metadata?.dowelJoint).toBeDefined();
+      expect(parts.find((part) => part.id === upperId)?.features?.[0].metadata?.dowelJoint).toBeDefined();
+    });
+
     it('refuses to copy from parts without cuts and paste without a clipboard', () => {
       const bare = createTestPart({ id: 'bare' });
       useProjectStore.setState({ parts: [bare] });

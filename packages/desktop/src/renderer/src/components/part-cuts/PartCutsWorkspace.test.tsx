@@ -117,6 +117,20 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByLabelText('Mating Part')).toHaveValue('second');
   });
 
+  it('requires a dirty cuts draft to be saved or discarded before creating a dowel joint', () => {
+    const part = createTestPart({ id: 'first', name: 'Lower rail' });
+    const mate = createTestPart({ id: 'second', name: 'Upper rail', position: { x: 0, y: 1, z: 0 } });
+    useProjectStore.setState({ parts: [part, mate] });
+    renderWorkspace({ part, draftFeatures: [createMortiseFeature()], hasUnsavedChanges: true });
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+
+    expect(screen.getByText('Save or discard part changes first')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Create Dowel Joint/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /^Create Dowel Joint/ }));
+    expect(screen.queryByRole('dialog', { name: 'Create Dowel Joint' })).not.toBeInTheDocument();
+  });
+
   it('returns to the project with both dowel parts selected for alignment', () => {
     const part = createTestPart({ id: 'first', name: 'Lower rail' });
     const mate = createTestPart({ id: 'second', name: 'Upper rail', position: { x: 20, y: 10, z: 0 } });

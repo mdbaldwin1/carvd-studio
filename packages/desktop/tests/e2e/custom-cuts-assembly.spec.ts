@@ -40,6 +40,19 @@ const rectCut = (
   parameters: { size, depthMode: 'blind', depth }
 });
 
+const roundHole = (id: string, label: string, primary: number) => ({
+  id,
+  kind: 'circular_cut',
+  version: 1,
+  enabled: true,
+  label,
+  target: { type: 'face', face: 'top_face' },
+  reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+  cutType: 'round_hole',
+  placement: { primary, secondary: 0, rotation: 0 },
+  parameters: { diameter: 0.25, depthMode: 'blind', depth: 0.25, tilt: 0, direction: 0 }
+});
+
 async function seedFixture(
   window: Page,
   parts: FixturePart[],
@@ -1316,6 +1329,212 @@ test.describe.serial('custom cuts assembly qualification', () => {
       mismatch.visuals.find((visual) => visual.memberIndex === 0)?.aligned,
       JSON.stringify(mismatch.metadata)
     ).toBe(false);
+  });
+
+  test('blocks dowel creation until a dirty add, edit, delete, disable, and reorder draft is resolved', async () => {
+    await seedFixture(
+      running.window,
+      [
+        {
+          id: 'dirty-draft-lower',
+          name: 'Dirty Draft Lower',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 },
+          features: [
+            roundHole('dirty-hole-1', 'Dirty Hole One', -3),
+            roundHole('dirty-hole-2', 'Dirty Hole Two', -1),
+            roundHole('dirty-hole-3', 'Dirty Hole Three', 1)
+          ]
+        },
+        {
+          id: 'dirty-draft-upper',
+          name: 'Dirty Draft Upper',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        }
+      ],
+      'dirty-draft-lower'
+    );
+    const before = await running.window.evaluate(() => ({
+      persisted: JSON.stringify(
+        window.useProjectStore.getState().parts.find((part: { id: string }) => part.id === 'dirty-draft-lower').features
+      ),
+      projectHistory: window.useProjectStore.temporal.getState().pastStates.length
+    }));
+
+    await openSelectedPartCuts(running.window, 'dirty-draft-lower');
+
+    await running.window.getByRole('button', { name: '+ Add Cut' }).click();
+    await running.window.getByRole('button', { name: /^Round Hole\b/ }).click();
+    await running.window.getByLabel('Label (optional)', { exact: true }).fill('Dirty Added Hole');
+    const addedOffset = running.window.getByLabel('Offset Along Face', { exact: true });
+    await addedOffset.fill('3');
+    await addedOffset.press('Enter');
+    await running.window.getByRole('button', { name: 'Save Cut' }).click();
+
+    await running.window.getByRole('button', { name: /^1\. Dirty Hole One/ }).click();
+    await running.window.getByLabel('Label (optional)', { exact: true }).fill('Dirty Hole One Edited');
+    await running.window.getByRole('button', { name: 'Save Cut' }).click();
+    await running.window.getByRole('checkbox', { name: 'Enable cut 2' }).uncheck();
+    await running.window.getByRole('button', { name: 'Actions for cut 3' }).click();
+    await running.window.getByRole('menuitem', { name: 'Move Up' }).click();
+    await running.window.getByRole('button', { name: 'Actions for cut 4' }).click();
+    await running.window.getByRole('menuitem', { name: 'Delete' }).click();
+
+    await expect
+      .poll(() =>
+        running.window.evaluate(() =>
+          window.usePartCutsEditingStore.getState().draftFeatures.map((feature) => ({
+            id: feature.id,
+            label: feature.label,
+            enabled: feature.enabled
+          }))
+        )
+      )
+      .toEqual([
+        { id: 'dirty-hole-1', label: 'Dirty Hole One Edited', enabled: true },
+        { id: 'dirty-hole-3', label: 'Dirty Hole Three', enabled: true },
+        { id: 'dirty-hole-2', label: 'Dirty Hole Two', enabled: false }
+      ]);
+
+    await running.window.getByRole('button', { name: '+ Add Cut' }).click();
+    const createJoint = running.window.getByRole('button', { name: /^Create Dowel Joint/ });
+    await expect(createJoint).toBeDisabled();
+    await expect(running.window.getByText('Save or discard part changes first')).toBeVisible();
+    await createJoint.click({ force: true });
+    await expect(running.window.getByRole('dialog', { name: 'Create Dowel Joint' })).toHaveCount(0);
+
+    await running.window.getByRole('button', { name: 'Back to Cuts' }).click();
+    await running.window.keyboard.press(`${MODIFIER}+Z`);
+    await expect
+      .poll(() => running.window.evaluate(() => window.usePartCutsEditingStore.getState().draftFeatures.length))
+      .toBe(4);
+    const afterDraftUndo = await running.window.evaluate(() => ({
+      persisted: JSON.stringify(
+        window.useProjectStore.getState().parts.find((part: { id: string }) => part.id === 'dirty-draft-lower').features
+      ),
+      projectHistory: window.useProjectStore.temporal.getState().pastStates.length,
+      draft: window.usePartCutsEditingStore.getState().draftFeatures.map((feature) => ({
+        id: feature.id,
+        label: feature.label,
+        enabled: feature.enabled
+      }))
+    }));
+    expect(afterDraftUndo.persisted).toBe(before.persisted);
+    expect(afterDraftUndo.projectHistory).toBe(before.projectHistory);
+    expect(afterDraftUndo.draft.slice(0, 3)).toEqual([
+      { id: 'dirty-hole-1', label: 'Dirty Hole One Edited', enabled: true },
+      { id: 'dirty-hole-3', label: 'Dirty Hole Three', enabled: true },
+      { id: 'dirty-hole-2', label: 'Dirty Hole Two', enabled: false }
+    ]);
+    expect(afterDraftUndo.draft[3]).toMatchObject({ label: 'Dirty Added Hole', enabled: true });
+
+    await running.window.getByRole('button', { name: 'Back to Project' }).click();
+    const exitDialog = running.window.getByRole('alertdialog', { name: 'Save Part Cuts?' });
+    await exitDialog.getByRole('button', { name: 'Discard' }).click();
+    await expect
+      .poll(() => running.window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
+      .toBe(false);
+    expect(
+      await running.window.evaluate(() =>
+        JSON.stringify(
+          window.useProjectStore.getState().parts.find((part: { id: string }) => part.id === 'dirty-draft-lower')
+            .features
+        )
+      )
+    ).toBe(before.persisted);
+  });
+
+  test('duplicates dowel members through the sidebar Duplicate action and Shift+D shortcut', async () => {
+    await seedFixture(
+      running.window,
+      [
+        {
+          id: 'duplicate-dowel-lower',
+          name: 'Duplicate Dowel Lower',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        },
+        {
+          id: 'duplicate-dowel-upper',
+          name: 'Duplicate Dowel Upper',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        }
+      ],
+      'duplicate-dowel-lower'
+    );
+    await createDefaultDowelJoint(running.window, 'duplicate-dowel-lower');
+    const original = await running.window.evaluate(() => {
+      const originals = window.useProjectStore
+        .getState()
+        .parts.filter((part: { id: string }) => ['duplicate-dowel-lower', 'duplicate-dowel-upper'].includes(part.id));
+      return {
+        featureIds: originals.flatMap((part: any) => part.features.map((feature: any) => feature.id)),
+        jointId: originals[0].features[0].metadata.dowelJoint.jointId
+      };
+    });
+
+    const lowerName = running.window.locator('.part-name').filter({ hasText: /^Duplicate Dowel Lower$/ });
+    await lowerName.hover();
+    await running.window.getByRole('button', { name: 'Duplicate Duplicate Dowel Lower' }).click();
+    const loneCopy = await running.window.evaluate(() => {
+      const selectedId = window.useSelectionStore.getState().selectedPartIds[0];
+      const part = window.useProjectStore
+        .getState()
+        .parts.find((candidate: { id: string }) => candidate.id === selectedId);
+      return { id: selectedId, features: part.features };
+    });
+    expect(loneCopy.features).toHaveLength(2);
+    expect(loneCopy.features.every((feature: any) => feature.metadata?.dowelJoint === undefined)).toBe(true);
+    expect(loneCopy.features.every((feature: any) => !original.featureIds.includes(feature.id))).toBe(true);
+
+    await lowerName.click();
+    await running.window.keyboard.down(MODIFIER);
+    try {
+      await running.window
+        .locator('.part-name')
+        .filter({ hasText: /^Duplicate Dowel Upper$/ })
+        .click();
+    } finally {
+      await running.window.keyboard.up(MODIFIER);
+    }
+    await expect
+      .poll(() => running.window.evaluate(() => [...window.useSelectionStore.getState().selectedPartIds].sort()))
+      .toEqual(['duplicate-dowel-lower', 'duplicate-dowel-upper']);
+    const idsBeforeShortcut = await running.window.evaluate(() =>
+      window.useProjectStore.getState().parts.map((part: { id: string }) => part.id)
+    );
+    await running.window.keyboard.press('Shift+D');
+    const pairedCopy = await running.window.evaluate((beforeIds) => {
+      const copies = window.useProjectStore
+        .getState()
+        .parts.filter((part: { id: string }) => !beforeIds.includes(part.id));
+      return copies.map((part: any) => ({
+        id: part.id,
+        featureIds: part.features.map((feature: any) => feature.id),
+        joints: part.features.map((feature: any) => feature.metadata?.dowelJoint)
+      }));
+    }, idsBeforeShortcut);
+    expect(pairedCopy).toHaveLength(2);
+    expect(pairedCopy.flatMap((part) => part.featureIds).every((id) => !original.featureIds.includes(id))).toBe(true);
+    expect(pairedCopy[0].joints.every(Boolean)).toBe(true);
+    expect(pairedCopy[1].joints.every(Boolean)).toBe(true);
+    expect(pairedCopy[0].joints.map((joint) => joint.jointId)).toEqual(
+      pairedCopy[1].joints.map((joint) => joint.jointId)
+    );
+    expect(pairedCopy[0].joints[0].jointId).not.toBe(original.jointId);
+    expect(pairedCopy[0].joints.every((joint) => joint.matePartId === pairedCopy[1].id)).toBe(true);
+    expect(pairedCopy[1].joints.every((joint) => joint.matePartId === pairedCopy[0].id)).toBe(true);
+    await expect.poll(() => running.window.evaluate(() => window.__carvdE2E?.getDowelVisualizations().length)).toBe(4);
   });
 
   test('copies and deletes paired dowel members through project UI without corrupting relationships', async () => {

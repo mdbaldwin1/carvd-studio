@@ -773,12 +773,19 @@ export function PartCutsWorkspace({
                     </div>
                     <button
                       type="button"
-                      className="w-full rounded-md border border-border bg-bg px-3 py-2 text-left transition-colors hover:border-accent hover:bg-accent/5"
+                      className="w-full rounded-md border border-border bg-bg px-3 py-2 text-left transition-colors hover:enabled:border-accent hover:enabled:bg-accent/5 disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={() => setShowDowelDialog(true)}
+                      disabled={hasUnsavedChanges}
+                      aria-describedby={hasUnsavedChanges ? 'dowel-joint-dirty-draft-message' : undefined}
                     >
                       <div className="text-sm font-semibold text-text">Create Dowel Joint</div>
-                      <div className="mt-0.5 text-[11px] leading-snug text-text-muted">
-                        Add matching holes to this part and a mating part in one step.
+                      <div
+                        id={hasUnsavedChanges ? 'dowel-joint-dirty-draft-message' : undefined}
+                        className="mt-0.5 text-[11px] leading-snug text-text-muted"
+                      >
+                        {hasUnsavedChanges
+                          ? 'Save or discard part changes first'
+                          : 'Add matching holes to this part and a mating part in one step.'}
                       </div>
                     </button>
                   </div>

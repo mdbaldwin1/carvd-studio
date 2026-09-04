@@ -29,7 +29,12 @@ import { useClipboardStore } from './clipboardStore';
 import { useLicenseStore } from './licenseStore';
 import { getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
-import { clonePartFeatures, normalizeAssemblyPart, normalizePart } from '../utils/partFeatures';
+import {
+  clonePartFeatures,
+  clonePartFeaturesForCopy,
+  normalizeAssemblyPart,
+  normalizePart
+} from '../utils/partFeatures';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
 import { getPartFeatureConflicts } from '../utils/partFeatureConflicts';
 import { getFeatureTargetLabel } from '../utils/partFeatureSummary';
@@ -37,7 +42,11 @@ import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
 import { rotationTool } from '../interaction/tools/rotationTool';
 import { resolveSelectedGroupIdsWithDescendants, resolveTransformSelectedPartIds } from '../utils/interactionSelection';
 import { dragDebug } from '../utils/dragDebug';
-import { createDowelJoint, detachDeletedDowelMates, type CreateDowelJointInput } from '../utils/dowelJointUtils';
+import {
+  createDowelJoint,
+  reconcileDowelRelationshipRemovals,
+  type CreateDowelJointInput
+} from '../utils/dowelJointUtils';
 
 export type AddDowelJointInput = Omit<CreateDowelJointInput, 'firstPart' | 'secondPart'> & {
   firstPartId: string;
@@ -185,13 +194,6 @@ const createDefaultPart = (overrides?: Partial<Part>): Part =>
     color: STOCK_COLORS[0],
     ...overrides
   });
-
-/**
- * Features are part-local authored operations. A copied part receives an
- * equivalent operation payload, but never reuses the source feature identity.
- */
-const cloneFeaturesForDuplicate = (features?: Part['features']): Part['features'] =>
-  clonePartFeatures(features).map((feature) => ({ ...feature, id: uuidv4() }));
 
 const createDefaultStock = (overrides?: Partial<Stock>): Stock => ({
   id: uuidv4(),
@@ -541,10 +543,12 @@ export const useProjectStore = create<ProjectState>()(
           }
 
           didUpdate = true;
-          const relationshipSafeParts =
-            updates.features === undefined ? state.parts : detachDeletedDowelMates(state.parts, id, nextPart.features);
+          const proposedParts = state.parts.map((part) => (part.id === id ? nextPart : part));
           return {
-            parts: relationshipSafeParts.map((p) => (p.id === id ? nextPart : p)),
+            parts:
+              updates.features === undefined
+                ? proposedParts
+                : reconcileDowelRelationshipRemovals(state.parts, proposedParts),
             isDirty: true
           };
         });
@@ -566,10 +570,16 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       updateParts: (ids, updates) => {
-        set((state) => ({
-          parts: state.parts.map((p) => (ids.includes(p.id) ? { ...p, ...updates } : p)),
-          isDirty: true
-        }));
+        set((state) => {
+          const proposedParts = state.parts.map((part) => (ids.includes(part.id) ? { ...part, ...updates } : part));
+          return {
+            parts:
+              updates.features === undefined
+                ? proposedParts
+                : reconcileDowelRelationshipRemovals(state.parts, proposedParts),
+            isDirty: true
+          };
+        });
         get().markCutListStale();
       },
 
@@ -606,8 +616,12 @@ export const useProjectStore = create<ProjectState>()(
           }
 
           didUpdate = true;
+          const proposedParts = state.parts.map((part) => transformed.get(part.id) ?? part);
+          const replacesFeatures = [...transformed.entries()].some(
+            ([partId]) => updateMap.get(partId)?.features !== undefined
+          );
           return {
-            parts: state.parts.map((p) => transformed.get(p.id) ?? p),
+            parts: replacesFeatures ? reconcileDowelRelationshipRemovals(state.parts, proposedParts) : proposedParts,
             isDirty: true
           };
         });
@@ -766,12 +780,15 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       deletePart: (id) => {
-        set((state) => ({
-          parts: state.parts.filter((p) => p.id !== id),
-          // Remove from any groups
-          groupMembers: state.groupMembers.filter((gm) => !(gm.memberType === 'part' && gm.memberId === id)),
-          isDirty: true
-        }));
+        set((state) => {
+          const survivingParts = state.parts.filter((part) => part.id !== id);
+          return {
+            parts: reconcileDowelRelationshipRemovals(state.parts, survivingParts),
+            // Remove from any groups
+            groupMembers: state.groupMembers.filter((gm) => !(gm.memberType === 'part' && gm.memberId === id)),
+            isDirty: true
+          };
+        });
         useSelectionStore.setState((state) => ({
           selectedPartIds: state.selectedPartIds.filter((pid) => pid !== id)
         }));
@@ -784,14 +801,17 @@ export const useProjectStore = create<ProjectState>()(
       deleteSelectedParts: () => {
         const { selectedPartIds } = useSelectionStore.getState();
         if (selectedPartIds.length === 0) return;
-        set((state) => ({
-          parts: state.parts.filter((p) => !selectedPartIds.includes(p.id)),
-          // Remove from any groups
-          groupMembers: state.groupMembers.filter(
-            (gm) => !(gm.memberType === 'part' && selectedPartIds.includes(gm.memberId))
-          ),
-          isDirty: true
-        }));
+        set((state) => {
+          const survivingParts = state.parts.filter((part) => !selectedPartIds.includes(part.id));
+          return {
+            parts: reconcileDowelRelationshipRemovals(state.parts, survivingParts),
+            // Remove from any groups
+            groupMembers: state.groupMembers.filter(
+              (gm) => !(gm.memberType === 'part' && selectedPartIds.includes(gm.memberId))
+            ),
+            isDirty: true
+          };
+        });
         useSelectionStore.setState({ selectedPartIds: [] });
         useSnapStore.setState((state) => ({
           referencePartIds: state.referencePartIds.filter((id) => !selectedPartIds.includes(id))
@@ -802,14 +822,17 @@ export const useProjectStore = create<ProjectState>()(
       confirmDeleteParts: () => {
         const { pendingDeletePartIds } = useUIStore.getState();
         if (!pendingDeletePartIds || pendingDeletePartIds.length === 0) return;
-        set((state) => ({
-          parts: state.parts.filter((p) => !pendingDeletePartIds.includes(p.id)),
-          // Remove from any groups
-          groupMembers: state.groupMembers.filter(
-            (gm) => !(gm.memberType === 'part' && pendingDeletePartIds.includes(gm.memberId))
-          ),
-          isDirty: true
-        }));
+        set((state) => {
+          const survivingParts = state.parts.filter((part) => !pendingDeletePartIds.includes(part.id));
+          return {
+            parts: reconcileDowelRelationshipRemovals(state.parts, survivingParts),
+            // Remove from any groups
+            groupMembers: state.groupMembers.filter(
+              (gm) => !(gm.memberType === 'part' && pendingDeletePartIds.includes(gm.memberId))
+            ),
+            isDirty: true
+          };
+        });
         useSelectionStore.setState((state) => ({
           selectedPartIds: state.selectedPartIds.filter((id) => !pendingDeletePartIds.includes(id))
         }));
@@ -833,19 +856,19 @@ export const useProjectStore = create<ProjectState>()(
         const part = parts.find((p) => p.id === id);
         if (!part) return null;
         const duplicateOffset = getDuplicateOffset([part]);
+        const newPartId = uuidv4();
+        const partIdMap = new Map([[part.id, newPartId]]);
 
-        // Destructure to exclude `id` so createDefaultPart generates a new one
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { id: _oldId, ...partWithoutId } = part;
         const newPart = createDefaultPart({
-          ...partWithoutId,
+          ...part,
+          id: newPartId,
           name: generateCopyName(part.name),
           position: {
             x: part.position.x + duplicateOffset.x,
             y: part.position.y + duplicateOffset.y,
             z: part.position.z + duplicateOffset.z
           },
-          features: cloneFeaturesForDuplicate(part.features)
+          features: clonePartFeaturesForCopy(part.features, partIdMap, new Map())
         });
 
         set((state) => ({
@@ -896,8 +919,10 @@ export const useProjectStore = create<ProjectState>()(
         }
 
         // Create ID mappings
-        const partIdMap = new Map<string, string>();
+        const selectedParts = parts.filter((p) => partIdsToDupe.has(p.id));
+        const partIdMap = new Map(selectedParts.map((part) => [part.id, uuidv4()]));
         const groupIdMap = new Map<string, string>();
+        const jointIdMap = new Map<string, string>();
 
         // Get group members that will be duplicated to identify child items
         const selectedGroupMembers = groupMembers.filter((gm) => groupIdsToDupe.has(gm.groupId));
@@ -913,11 +938,9 @@ export const useProjectStore = create<ProjectState>()(
 
         // Duplicate parts with offset
         // Only top-level parts (not in any group being duplicated) get "(copy)" appended
-        const selectedParts = parts.filter((p) => partIdsToDupe.has(p.id));
         const duplicateOffset = getDuplicateOffset(selectedParts);
         const newParts = selectedParts.map((part) => {
-          const newId = uuidv4();
-          partIdMap.set(part.id, newId);
+          const newId = partIdMap.get(part.id)!;
           const isChild = childPartIds.has(part.id);
           return normalizePart({
             ...part,
@@ -928,7 +951,7 @@ export const useProjectStore = create<ProjectState>()(
               y: part.position.y + duplicateOffset.y,
               z: part.position.z + duplicateOffset.z
             },
-            features: cloneFeaturesForDuplicate(part.features)
+            features: clonePartFeaturesForCopy(part.features, partIdMap, jointIdMap)
           });
         });
 
@@ -1672,17 +1695,20 @@ export const useProjectStore = create<ProjectState>()(
           }));
         } else {
           // 'recursive' - delete group AND all member parts
-          set((state) => ({
-            groups: state.groups.filter((g) => !descendantGroupIds.includes(g.id)),
-            // Remove memberships inside deleted groups AND memberships that reference deleted groups as members
-            groupMembers: state.groupMembers.filter((gm) => {
-              if (descendantGroupIds.includes(gm.groupId)) return false;
-              if (gm.memberType === 'group' && descendantGroupIds.includes(gm.memberId)) return false;
-              return true;
-            }),
-            parts: state.parts.filter((p) => !descendantPartIds.includes(p.id)),
-            isDirty: true
-          }));
+          set((state) => {
+            const survivingParts = state.parts.filter((part) => !descendantPartIds.includes(part.id));
+            return {
+              groups: state.groups.filter((g) => !descendantGroupIds.includes(g.id)),
+              // Remove memberships inside deleted groups AND memberships that reference deleted groups as members
+              groupMembers: state.groupMembers.filter((gm) => {
+                if (descendantGroupIds.includes(gm.groupId)) return false;
+                if (gm.memberType === 'group' && descendantGroupIds.includes(gm.memberId)) return false;
+                return true;
+              }),
+              parts: reconcileDowelRelationshipRemovals(state.parts, survivingParts),
+              isDirty: true
+            };
+          });
           useSelectionStore.setState((state) => ({
             selectedPartIds: state.selectedPartIds.filter((id) => !descendantPartIds.includes(id)),
             selectedGroupIds: state.selectedGroupIds.filter((id) => !descendantGroupIds.includes(id)),

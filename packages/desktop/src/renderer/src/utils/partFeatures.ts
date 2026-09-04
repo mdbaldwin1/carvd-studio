@@ -1,4 +1,5 @@
 import { AssemblyPart, Part, PartFeature, PartFeatureReference, PartFeatureTarget } from '../types';
+import { v4 as uuidv4 } from 'uuid';
 
 const FACE_TARGETS = new Set(['left_end', 'right_end', 'top_face', 'bottom_face', 'front_face', 'back_face']);
 const EDGE_TARGETS = new Set([
@@ -358,6 +359,43 @@ export function clonePartFeature(feature: PartFeature): PartFeature {
 
 export function clonePartFeatures(features?: PartFeature[]): PartFeature[] {
   return features?.map((feature) => clonePartFeature(feature)) ?? [];
+}
+
+/**
+ * Clone features for a part-copy operation while preserving only dowel
+ * relationships whose mate is included in the same copy set.
+ */
+export function clonePartFeaturesForCopy(
+  features: PartFeature[] | undefined,
+  partIdMap: ReadonlyMap<string, string>,
+  jointIdMap: Map<string, string>
+): PartFeature[] | undefined {
+  if (!features) return undefined;
+  return features.map((feature) => {
+    const cloned = clonePartFeature(feature);
+    cloned.id = uuidv4();
+    const dowel = cloned.metadata?.dowelJoint;
+    if (!dowel) return cloned;
+
+    const mappedMatePartId = partIdMap.get(dowel.matePartId);
+    if (!mappedMatePartId) {
+      const metadata = { ...cloned.metadata };
+      delete metadata.dowelJoint;
+      cloned.metadata = Object.keys(metadata).length > 0 ? metadata : undefined;
+      return cloned;
+    }
+
+    let mappedJointId = jointIdMap.get(dowel.jointId);
+    if (!mappedJointId) {
+      mappedJointId = uuidv4();
+      jointIdMap.set(dowel.jointId, mappedJointId);
+    }
+    cloned.metadata = {
+      ...cloned.metadata,
+      dowelJoint: { ...dowel, jointId: mappedJointId, matePartId: mappedMatePartId }
+    };
+    return cloned;
+  });
 }
 
 export function normalizePart(part: Part): Part {
