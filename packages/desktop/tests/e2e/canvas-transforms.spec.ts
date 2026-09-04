@@ -170,7 +170,8 @@ test.describe('Canvas transform workflows', () => {
         sourcePayload: JSON.stringify(source.features),
         copyPayloadWithoutIds: (copy.features ?? []).map(({ id, ...feature }: { id: string }) => feature),
         sourcePayloadWithoutIds: (source.features ?? []).map(({ id, ...feature }: { id: string }) => feature),
-        circularParametersAliased: source.features?.[2]?.parameters === copy.features?.[2]?.parameters
+        circularParametersAliased: source.features?.[2]?.parameters === copy.features?.[2]?.parameters,
+        rectangularSizeAliased: source.features?.[1]?.parameters.size === copy.features?.[1]?.parameters.size
       };
     });
 
@@ -180,6 +181,7 @@ test.describe('Canvas transform workflows', () => {
     expect(duplicated.copyFeatureIds?.every((id) => !duplicated.sourceFeatureIds?.includes(id))).toBe(true);
     expect(duplicated.copyPayloadWithoutIds).toEqual(duplicated.sourcePayloadWithoutIds);
     expect(duplicated.circularParametersAliased).toBe(false);
+    expect(duplicated.rectangularSizeAliased).toBe(false);
     expect(duplicated.sourcePayload).toBe(sourceBefore);
   });
 
@@ -210,6 +212,12 @@ test.describe('Canvas transform workflows', () => {
     await running.window.getByRole('button', { name: /^3\./ }).click();
     await running.window.getByLabel('Hole Diameter').fill('0.375');
     await running.window.getByRole('button', { name: 'Save Cut' }).click();
+    // Edit the pasted rectangular operation through the same inspector rather
+    // than mutating store data. Its nested size object must remain independent
+    // from the original feature after the real copy/paste command.
+    await running.window.getByRole('button', { name: /^2\./ }).click();
+    await running.window.getByLabel('Run Along Blank').fill('1.25');
+    await running.window.getByRole('button', { name: 'Save Cut' }).click();
     await running.window.getByRole('button', { name: 'Save Part' }).click();
     expect(
       await running.window.evaluate(() => JSON.stringify(window.useProjectStore.getState().parts[0].features))
@@ -217,6 +225,9 @@ test.describe('Canvas transform workflows', () => {
     expect(
       await running.window.evaluate(() => window.useProjectStore.getState().parts[1].features?.[2].parameters.diameter)
     ).toBe(0.375);
+    expect(
+      await running.window.evaluate(() => window.useProjectStore.getState().parts[1].features?.[1].parameters.size)
+    ).toEqual({ length: 1.25, width: 10 });
   });
 
   test('resizes a copied featured part through properties without changing its source', async () => {
@@ -228,6 +239,9 @@ test.describe('Canvas transform workflows', () => {
     await running.window.locator('canvas').click({ force: true });
     await running.window.keyboard.press('Shift+D');
     await expect.poll(async () => (await getProjectSnapshot(running.window)).parts).toHaveLength(2);
+    const copiedFeaturesBeforeResize = await running.window.evaluate(() =>
+      JSON.stringify(window.useProjectStore.getState().parts[1].features)
+    );
     const dims = running.window.locator('.dimension-inputs input');
     await dims.nth(0).fill('1');
     await dims.nth(0).press('Tab');
@@ -237,12 +251,31 @@ test.describe('Canvas transform workflows', () => {
         return JSON.stringify({ length: part.length, width: part.width, features: part.features });
       })
     ).toBe(source);
+    expect(
+      await running.window.evaluate(() => {
+        const part = window.useProjectStore.getState().parts[1];
+        return {
+          length: part.length,
+          width: part.width,
+          thickness: part.thickness,
+          features: JSON.stringify(part.features)
+        };
+      })
+    ).toEqual({ length: 1, width: 10, thickness: 2, features: copiedFeaturesBeforeResize });
     await running.window.getByRole('button', { name: /Generate Cut List|View Cut List/ }).click();
     const dialog = running.window
       .getByRole('dialog')
       .filter({ has: running.window.getByRole('heading', { name: 'Cut List' }) });
     await dialog.getByRole('button', { name: 'Generate Cut List' }).click();
-    await expect(dialog.getByText(/Canvas dado|invalid|exceeds|outside/i)).toBeVisible();
+    await expect(dialog.getByText('Operation "Canvas dado" is invalid: Dado width runs past the blank.')).toBeVisible();
+    await expect(
+      dialog.getByText(
+        'Fix the errors below before generating. Blank dimensions, stock assignments, and authored operations must all be valid.'
+      )
+    ).toBeVisible();
+    await expect(dialog.locator('.cut-list-tabs')).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Generate Cut List' })).toBeEnabled();
+    expect((await getProjectSnapshot(running.window)).cutList).toBeNull();
   });
 
   test('keeps featured geometry local and pickable through real canvas transforms and shortcut history', async () => {

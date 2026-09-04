@@ -206,6 +206,16 @@ describe('clipboardStore', () => {
       expect(pasted?.features).toHaveLength(1);
       expect(pasted?.features?.[0].kind).toBe('rect_cut');
       expect(pasted?.features).not.toBe(useClipboardStore.getState().clipboard.parts[0].features);
+
+      const originalRect = useProjectStore.getState().parts.find((part) => part.id === partId)!.features![0] as Extract<
+        PartFeature,
+        { kind: 'rect_cut' }
+      >;
+      const pastedRect = pasted!.features![0] as Extract<PartFeature, { kind: 'rect_cut' }>;
+      expect(pastedRect.parameters.size).not.toBe(originalRect.parameters.size);
+
+      pastedRect.parameters.size.length = 1.25;
+      expect(originalRect.parameters.size).toEqual({ length: 0.75, width: 0.75 });
     });
 
     it('pastes circular and rounded operations with fresh IDs and independent nested values', () => {

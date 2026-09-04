@@ -8,7 +8,6 @@ import type {
 } from '../../src/renderer/src/types';
 import fs from 'fs';
 import path from 'path';
-import { execFileSync } from 'child_process';
 import {
   addPartFromSidebar,
   clickMenuItem,
@@ -68,6 +67,30 @@ async function getFirstPartFeatures(window: Page): Promise<Array<{ id: string; c
 
 async function pressSaveShortcut(window: Page): Promise<void> {
   await window.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+S`);
+}
+
+/**
+ * Extracts literal text from the uncompressed `(...) Tj` operators emitted by
+ * jsPDF.  In particular, a long instruction may be continued in a second Tj
+ * operator after `T*`; joining those operands reflects the text a reader sees
+ * without depending on the host's `strings` binary or PDF layout wrapping.
+ */
+function extractJsPdfLiteralText(pdfPath: string): string {
+  const pdf = fs.readFileSync(pdfPath, 'latin1');
+  const literals = [...pdf.matchAll(/\((?:\\.|[^\\)])*\)\s*Tj/g)].map((match) =>
+    match[0].slice(1, match[0].lastIndexOf(')'))
+  );
+  return literals
+    .map((literal) =>
+      literal
+        .replace(/\\([0-7]{1,3})/g, (_escape, octal: string) => String.fromCharCode(Number.parseInt(octal, 8)))
+        .replace(
+          /\\([nrtbf])/g,
+          (_escape, character: string) => ({ n: '\n', r: '\r', t: '\t', b: '\b', f: '\f' })[character]
+        )
+        .replace(/\\([\\()])/g, '$1')
+    )
+    .join('');
 }
 
 type EndFeatureExpectation = Pick<EndCutFeature, 'kind' | 'cutType' | 'target' | 'parameters'> & {
@@ -1284,7 +1307,7 @@ test.describe('part cuts editing lifecycle', () => {
     const fabricationLines = [
       '1. Angled left end — Mitre 33° on Left End · Long point on Back',
       '2. Shelf dado — Dado on Top Face · 3/4" wide × 3/8" deep',
-      '3. Three patterned holes — 3-hole Linear Pattern on Top Face · 1/4" diameter · 3/4" spacing · 1/2" deep',
+      '3. Three patterned holes — 3-hole Linear Pattern on Top Face · 1/4" diameter · 3/4" spacing · 20° direction · 1/2" deep',
       '4. Rounded relief — Rounded Slot on Top Face · 3" × 1/2" · Through'
     ];
     for (const line of fabricationLines) {
@@ -1308,14 +1331,17 @@ test.describe('part cuts editing lifecycle', () => {
     await expect
       .poll(() => (fs.existsSync(pdfPath) ? fs.statSync(pdfPath).size : 0), { timeout: 5000 })
       .toBeGreaterThan(0);
-    // jsPDF's supported uncompressed text streams are inspectable with the
-    // platform `strings` reader; this proves the exported artifact carries
-    // fabrication details rather than merely existing as a non-empty file.
-    const pdfText = execFileSync('/usr/bin/strings', [pdfPath], { encoding: 'utf8' });
+    // Extract the actual jsPDF text operators. This proves the exported
+    // artifact carries complete fabrication details, even when jsPDF wraps a
+    // long operation onto multiple text operators.
+    const pdfText = extractJsPdfLiteralText(pdfPath);
     const pdfFabricationLines = fabricationLines.map((line) =>
       line.replaceAll('—', ' - ').replaceAll('·', ' | ').replaceAll('°', ' deg').replaceAll('×', ' x ')
     );
-    for (const line of pdfFabricationLines) expect(pdfText).toContain(line);
+    // jsPDF may wrap immediately before a separator, so normalize whitespace
+    // introduced by layout without loosening the ordered fabrication content.
+    const normalizedPdfText = pdfText.replace(/\s+/g, ' ');
+    for (const line of pdfFabricationLines) expect(normalizedPdfText).toContain(line.replace(/\s+/g, ' '));
   });
 
   test('persists round and rounded operations through save and reopen', async () => {

@@ -44,8 +44,63 @@ describe('cutListInstructions', () => {
     };
 
     expect(getInstructionFabricationLines(instruction, 'imperial')[0]).toBe(
-      '1. 4-hole Linear Pattern on Top Face · 1/4" diameter · 2" spacing · 1/2" deep · 15° tilt toward 90°'
+      '1. 4-hole Linear Pattern on Top Face · 1/4" diameter · 2" spacing · 0° direction · 1/2" deep · 15° tilt toward 90°'
     );
+  });
+
+  it('includes grid rotation and circular start angle in fabrication lines', () => {
+    const part = createTestPart({
+      features: [
+        {
+          id: 'grid-holes',
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          cutType: 'round_hole',
+          placement: { primary: 2, secondary: 1, rotation: 0 },
+          pattern: { type: 'grid', rows: 2, columns: 3, rowSpacing: 1, columnSpacing: 2, rotation: 15 },
+          parameters: { diameter: 0.375, depthMode: 'through', tilt: 0, direction: 0 }
+        },
+        {
+          id: 'radial-holes',
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          cutType: 'round_hole',
+          placement: { primary: 2, secondary: 1, rotation: 0 },
+          pattern: { type: 'circular', count: 4, radius: 2, startAngle: 30 },
+          parameters: { diameter: 0.375, depthMode: 'through', tilt: 0, direction: 0 }
+        }
+      ]
+    });
+
+    expect(
+      getInstructionFabricationLines(
+        {
+          partId: part.id,
+          partName: part.name,
+          cutLength: part.length,
+          cutWidth: part.width,
+          thickness: part.thickness,
+          stockId: 'stock-1',
+          stockName: 'Maple',
+          grainSensitive: false,
+          grainDirection: 'length',
+          isGlueUp: false,
+          quantity: 1,
+          features: part.features,
+          notes: ''
+        },
+        'imperial'
+      )
+    ).toEqual([
+      '1. 6-hole Grid Pattern on Top Face · 3/8" diameter · 2" × 1" spacing · 15° rotation · Through',
+      '2. 4-hole Circular Pattern on Top Face · 3/8" diameter · 2" radius · 30° start angle · Through'
+    ]);
   });
 
   it('collapses paired dowel holes into one unit-aware fabrication line', () => {

@@ -124,10 +124,10 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
         feature.pattern.type === 'grid' ? feature.pattern.rows * feature.pattern.columns : feature.pattern.count;
       const spacing =
         feature.pattern.type === 'linear'
-          ? ` · ${formatMeasurementWithUnit(feature.pattern.spacing, units)} spacing`
+          ? ` · ${formatMeasurementWithUnit(feature.pattern.spacing, units)} spacing · ${feature.pattern.direction}° direction`
           : feature.pattern.type === 'grid'
-            ? ` · ${formatMeasurementWithUnit(feature.pattern.columnSpacing, units)} × ${formatMeasurementWithUnit(feature.pattern.rowSpacing, units)} spacing`
-            : ` · ${formatMeasurementWithUnit(feature.pattern.radius, units)} radius`;
+            ? ` · ${formatMeasurementWithUnit(feature.pattern.columnSpacing, units)} × ${formatMeasurementWithUnit(feature.pattern.rowSpacing, units)} spacing · ${feature.pattern.rotation}° rotation`
+            : ` · ${formatMeasurementWithUnit(feature.pattern.radius, units)} radius · ${feature.pattern.startAngle}° start angle`;
       return `${count}-hole ${toTitleCase(feature.pattern.type)} Pattern on ${target} · ${holeDiameter} diameter${spacing} · ${termination}${angle}`;
     }
     if (feature.cutType === 'countersink' && feature.parameters.countersink) {

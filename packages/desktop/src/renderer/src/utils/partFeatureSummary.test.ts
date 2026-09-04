@@ -345,10 +345,24 @@ describe('partFeatureSummary', () => {
     it('summarizes patterns and rounded profiles as one authored operation', () => {
       expect(
         getFeatureSummary(
-          createCircularCut({ pattern: { type: 'linear', count: 4, spacing: 2, direction: 0 } }),
+          createCircularCut({ pattern: { type: 'linear', count: 4, spacing: 2, direction: 20 } }),
           'imperial'
         )
-      ).toBe('4-hole Linear Pattern on Top Face · 3/8" diameter · 2" spacing · Through');
+      ).toBe('4-hole Linear Pattern on Top Face · 3/8" diameter · 2" spacing · 20° direction · Through');
+      expect(
+        getFeatureSummary(
+          createCircularCut({
+            pattern: { type: 'grid', rows: 2, columns: 3, rowSpacing: 1, columnSpacing: 2, rotation: 15 }
+          }),
+          'imperial'
+        )
+      ).toBe('6-hole Grid Pattern on Top Face · 3/8" diameter · 2" × 1" spacing · 15° rotation · Through');
+      expect(
+        getFeatureSummary(
+          createCircularCut({ pattern: { type: 'circular', count: 4, radius: 2, startAngle: 30 } }),
+          'imperial'
+        )
+      ).toBe('4-hole Circular Pattern on Top Face · 3/8" diameter · 2" radius · 30° start angle · Through');
       expect(getFeatureSummary(createRoundedCut(), 'imperial')).toBe('Rounded Slot on Top Face · 3" × 1" · Through');
       expect(
         getFeatureSummary(
