@@ -63,6 +63,8 @@ export interface MoveToolPreview {
   snappedAxes: { x: boolean; y: boolean; z: boolean };
   /** Latched face-snap state after this update. */
   nextLatchedFaceSnap: LatchedFaceSnapState | null;
+  /** Socket host whose validated mate snap produced this preview. */
+  mateHostPartId?: string;
   /** Constraint-pipeline input that exactly matches this preview. */
   candidate: Extract<CandidateTransform, { kind: 'move' }>;
 }
@@ -104,18 +106,26 @@ function buildPreviewFromSolve(
     snapLines: solverResult.snapLines,
     snappedAxes: solverResult.snappedAxes,
     nextLatchedFaceSnap,
-    candidate: { kind: 'move', delta, positions }
+    mateHostPartId: solverResult.mateHostPartId,
+    candidate: {
+      kind: 'move',
+      delta,
+      positions,
+      ...(solverResult.mateHostPartId ? { mateHostPartId: solverResult.mateHostPartId } : {})
+    }
   };
 }
 
 export function createMoveCommitPreview({
   partId,
   position,
-  state
+  state,
+  mateHostPartId
 }: {
   partId: string;
   position: Vec3;
   state: MoveToolState;
+  mateHostPartId?: string;
 }): MoveToolPreview {
   const delta = {
     x: position.x - state.initialPrimaryPosition.x,
@@ -130,7 +140,8 @@ export function createMoveCommitPreview({
     snapLines: [],
     snappedAxes: { x: false, y: false, z: false },
     nextLatchedFaceSnap: state.latchedFaceSnap,
-    candidate: { kind: 'move', delta, positions }
+    mateHostPartId,
+    candidate: { kind: 'move', delta, positions, ...(mateHostPartId ? { mateHostPartId } : {}) }
   };
 }
 
@@ -182,7 +193,12 @@ export const moveTool: ToolSolver<MoveToolInput, MoveToolState, MoveToolPreview>
   commit(_state, preview): CommitInstruction[] {
     const instructions: CommitInstruction[] = [];
     for (const [partId, position] of preview.positions) {
-      instructions.push({ kind: 'updatePartPosition', partId, position });
+      instructions.push({
+        kind: 'updatePartPosition',
+        partId,
+        position,
+        ...(preview.mateHostPartId ? { mateHostPartId: preview.mateHostPartId } : {})
+      });
     }
     return instructions;
   },

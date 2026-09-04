@@ -1816,6 +1816,36 @@ describe('snapToPartsUtil', () => {
       expect(socket.halfExtent2).toBeCloseTo(3);
     });
 
+    it('returns a top-opening socket for a rabbet edge', () => {
+      const part = createTestPart({
+        id: 'rabbet-host',
+        length: 12,
+        width: 6,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [
+          {
+            id: 'rabbet-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'rabbet',
+            target: { type: 'edge', edge: 'top_front_edge' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 12, width: 0.755 }, depthMode: 'blind', depth: 0.375 },
+            placement: { x: 0, z: 0 }
+          }
+        ]
+      });
+
+      const sockets = getPartFeatureSockets(part);
+      expect(sockets).toHaveLength(1);
+      expect(sockets[0]).toMatchObject({ hostPartId: 'rabbet-host', featureId: 'rabbet-1' });
+      expect(sockets[0].openingNormal.y).toBeCloseTo(1);
+      expect(sockets[0].halfExtent1).toBeCloseTo(6);
+      expect(sockets[0].halfExtent2).toBeCloseTo(0.3775);
+    });
+
     it('ignores disabled features', () => {
       const part = createTestPart({
         features: [
@@ -1837,6 +1867,184 @@ describe('snapToPartsUtil', () => {
   });
 
   describe('detectFeatureMateSnaps', () => {
+    it.each([
+      ['nominal', 0.75, true],
+      ['clearance', 0.74, true],
+      ['oversized', 0.8, false]
+    ] as const)('%s divider fit against a .755 dado', (_label, dividerThickness, shouldFit) => {
+      const hostPart = createTestPart({
+        id: 'host',
+        length: 12,
+        width: 6,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [
+          {
+            id: 'dado',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'dado',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 },
+            placement: { x: 5.6225, z: 0 }
+          }
+        ]
+      });
+      const divider = createTestPart({
+        id: 'divider',
+        length: 4,
+        width: 6,
+        thickness: dividerThickness,
+        rotation: { x: 0, y: 0, z: 90 }
+      });
+
+      const result = detectFeatureMateSnaps(divider, { x: 0.01, y: 2.8, z: 0 }, [hostPart], [divider.id], 0.5);
+
+      expect(result.mateHostPartId === hostPart.id).toBe(shouldFit);
+      if (shouldFit) expect(result.adjustedPosition.y).toBeCloseTo(2.375);
+    });
+
+    it('does not mate a stopped groove beyond its termination', () => {
+      const hostPart = createTestPart({
+        id: 'host',
+        length: 12,
+        width: 6,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [
+          {
+            id: 'stopped-groove',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'stopped_groove',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 4, width: 0.755 }, depthMode: 'blind', depth: 0.375 },
+            placement: { x: 4, z: 2.6225 }
+          }
+        ]
+      });
+      const mate = createTestPart({ id: 'mate', length: 4, width: 0.75, thickness: 2 });
+
+      const beyondTermination = detectFeatureMateSnaps(mate, { x: 0.6, y: 1.85, z: 0 }, [hostPart], [mate.id], 0.5);
+
+      expect(beyondTermination.mateHostPartId).toBeUndefined();
+    });
+
+    it('mates an authored tenon solid to a matching mortise and rejects a depth mismatch', () => {
+      const hostPart = createTestPart({
+        id: 'mortise-host',
+        length: 12,
+        width: 6,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [
+          {
+            id: 'mortise',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'mortise',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.51, width: 1.01 }, depthMode: 'blind', depth: 0.75 },
+            placement: { x: 5.745, z: 2.495 }
+          }
+        ]
+      });
+      const tenonedRail = createTestPart({
+        id: 'tenoned-rail',
+        length: 4,
+        width: 2,
+        thickness: 1,
+        rotation: { x: 0, y: 0, z: 90 },
+        features: [
+          {
+            id: 'tenon',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'tenon',
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.75, width: 1 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 0, z: 0.5 }
+          }
+        ]
+      });
+
+      const matched = detectFeatureMateSnaps(
+        tenonedRail,
+        { x: 0.01, y: 3.2, z: 0.01 },
+        [hostPart],
+        [tenonedRail.id],
+        0.5
+      );
+      expect(matched.mateHostPartId).toBe(hostPart.id);
+      expect(matched.adjustedPosition.y).toBeCloseTo(2.25);
+
+      const shallowMortise = createTestPart({
+        ...hostPart,
+        features: hostPart.features?.map((feature) => ({
+          ...feature,
+          parameters: { ...feature.parameters, depth: 0.5 }
+        }))
+      });
+      expect(
+        detectFeatureMateSnaps(tenonedRail, { x: 0.01, y: 3.2, z: 0.01 }, [shallowMortise], [tenonedRail.id], 0.5)
+          .mateHostPartId
+      ).toBeUndefined();
+    });
+
+    it('mates complementary half-lap solids and rejects a depth mismatch', () => {
+      const halfLap = (id: string, face: 'top_face' | 'bottom_face', depth: number) => ({
+        id,
+        kind: 'rect_cut' as const,
+        version: 1,
+        enabled: true,
+        cutType: 'dado' as const,
+        target: { type: 'face' as const, face },
+        reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+        parameters: { size: { length: 2, width: 2 }, depthMode: 'blind' as const, depth },
+        placement: { x: 2, z: 0 }
+      });
+      const hostPart = createTestPart({
+        id: 'half-lap-host',
+        length: 6,
+        width: 2,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [halfLap('host-cut', 'top_face', 0.375)]
+      });
+      const crossingPart = createTestPart({
+        id: 'half-lap-crossing',
+        length: 6,
+        width: 2,
+        thickness: 0.75,
+        position: { x: 0.2, y: 0.375, z: 0.1 },
+        rotation: { x: 0, y: 90, z: 0 },
+        features: [halfLap('crossing-cut', 'bottom_face', 0.375)]
+      });
+
+      const matched = detectFeatureMateSnaps(crossingPart, crossingPart.position, [hostPart], [crossingPart.id], 0.5);
+      expect(matched.mateHostPartId).toBe(hostPart.id);
+      expect(matched.adjustedPosition.x).toBeCloseTo(0);
+      expect(matched.adjustedPosition.y).toBeCloseTo(0.375);
+      expect(matched.adjustedPosition.z).toBeCloseTo(0);
+
+      const mismatchedPart = createTestPart({
+        ...crossingPart,
+        features: [halfLap('crossing-cut', 'bottom_face', 0.25)]
+      });
+      expect(
+        detectFeatureMateSnaps(mismatchedPart, mismatchedPart.position, [hostPart], [mismatchedPart.id], 0.5)
+          .mateHostPartId
+      ).toBeUndefined();
+    });
+
     it('snaps part into a matching cutout pocket', () => {
       // Host part lying flat with a cutout pocket on top face
       const hostPart = createTestPart({

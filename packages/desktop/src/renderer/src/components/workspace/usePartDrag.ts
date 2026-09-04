@@ -71,7 +71,7 @@ export function usePartDrag(
   togglePartSelection: (id: string) => void,
   selectGroup: (id: string) => void,
   toggleGroupSelection: (id: string) => void,
-  updatePart: (id: string, updates: Partial<PartType>) => boolean,
+  updatePart: (id: string, updates: Partial<PartType>, options?: { mateHostPartId?: string }) => boolean,
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void,
   startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number) => void
 ) {
@@ -93,6 +93,7 @@ export function usePartDrag(
     snapLines: import('../../types').SnapLine[];
   } | null>(null);
   const moveToolStateRef = useRef<MoveToolState | null>(null);
+  const mateHostPartIdRef = useRef<string | null>(null);
 
   const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const raycaster = useRef(new THREE.Raycaster());
@@ -125,6 +126,7 @@ export function usePartDrag(
     lastDragPosition.current = null;
     latchedFaceSnapRef.current = null;
     moveToolStateRef.current = null;
+    mateHostPartIdRef.current = null;
     wasSnappedByParts.current = { x: false, y: false, z: false };
   };
 
@@ -523,6 +525,7 @@ export function usePartDrag(
           newY = preview.primaryPosition.y;
           newZ = preview.primaryPosition.z;
           latchedFaceSnapRef.current = preview.nextLatchedFaceSnap;
+          mateHostPartIdRef.current = preview.mateHostPartId ?? null;
           snapLines.push(...preview.snapLines);
           wasSnappedByParts.current = preview.snappedAxes;
           if (dragFrameCounterRef.current % 10 === 0) {
@@ -541,6 +544,7 @@ export function usePartDrag(
         } else {
           wasSnappedByParts.current = { x: false, y: false, z: false };
           moveToolStateRef.current = null;
+          mateHostPartIdRef.current = null;
         }
 
         const previewDelta = {
@@ -627,7 +631,13 @@ export function usePartDrag(
         const proposedDelta = { ...previewDelta };
 
         if (stockConstraints.preventOverlap) {
-          const safeDelta = resolveSafeTranslationDelta(allParts, new Set(effectiveDraggingIds), proposedDelta);
+          const safeDelta = resolveSafeTranslationDelta(
+            allParts,
+            new Set(effectiveDraggingIds),
+            proposedDelta,
+            geometryCacheRef.current,
+            mateHostPartIdRef.current ?? undefined
+          );
           if (!safeDelta) {
             dragDebug('partDrag:move:overlapBlocked', {
               partId: part.id,
@@ -744,7 +754,12 @@ export function usePartDrag(
             createMoveCommitState({
               primaryPosition: dragStart.current!.partPos
             });
-          const commitPreview = createMoveCommitPreview({ partId: part.id, position, state: commitState });
+          const commitPreview = createMoveCommitPreview({
+            partId: part.id,
+            position,
+            state: commitState,
+            mateHostPartId: mateHostPartIdRef.current ?? undefined
+          });
           applyCommitInstructions(moveTool.commit(commitState, commitPreview), { updatePart });
         };
 
@@ -806,7 +821,8 @@ export function usePartDrag(
             projectParts: allParts,
             proposedPosition: { x: newX, y: newY, z: newZ },
             preventOverlap: stockConstraints.preventOverlap,
-            geometryCache: geometryCacheRef.current
+            geometryCache: geometryCacheRef.current,
+            mateHostPartId: mateHostPartIdRef.current ?? undefined
           });
 
           if (releaseResult.collisionBlocked) {

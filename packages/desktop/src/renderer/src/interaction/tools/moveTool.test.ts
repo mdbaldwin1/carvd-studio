@@ -156,6 +156,26 @@ describe('moveTool', () => {
       expect(preview.candidate).toEqual({ kind: 'move', delta: preview.delta, positions: preview.positions });
     });
 
+    it('preserves a socket mate host in the release commit instruction', () => {
+      const part = makePart({ id: 'a', position: { x: 0, y: 2.8, z: 0 } });
+      const state = moveTool.begin(makeInput({ part }));
+      const preview = createMoveCommitPreview({
+        partId: part.id,
+        position: { x: 0, y: 2.375, z: 0 },
+        state,
+        mateHostPartId: 'dado-host'
+      });
+
+      expect(moveTool.commit(state, preview)).toEqual([
+        {
+          kind: 'updatePartPosition',
+          partId: part.id,
+          position: { x: 0, y: 2.375, z: 0 },
+          mateHostPartId: 'dado-host'
+        }
+      ]);
+    });
+
     it('createMoveCommitState falls back to the drag start primary position', () => {
       const state = createMoveCommitState({ primaryPosition: { x: 2, y: 0.375, z: -3 } });
 

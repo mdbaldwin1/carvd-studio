@@ -10,6 +10,7 @@ import {
   detectSnaps,
   detectSurfaceAnchorSnaps,
   getPartBoundsAtPosition,
+  type MateSnapResult,
   type PartBounds,
   type SnapResult
 } from './snapToPartsUtil';
@@ -26,7 +27,7 @@ export interface InteractionSnapContext {
   guideSnaps?: ReturnType<typeof detectGuideSnaps>;
   originSnaps?: ReturnType<typeof detectOriginSnaps>;
   advancedDetectors: {
-    mate: () => SnapResult;
+    mate: () => MateSnapResult;
     surface: () => SnapResult;
     fraction: () => SnapResult;
     feature: () => SnapResult | { result: SnapResult; stage: SnapStage };

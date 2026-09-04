@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { Part, SnapLine } from '../types';
+import type { AppSettings, Part, SnapLine } from '../types';
 import { detectFeatureSnaps, detectFractionalFaceSnaps, detectSurfaceAnchorSnaps, getPartOBB } from './snapToPartsUtil';
 import { createAxisSnapWinners, tryApplyAxisSnap } from './snapPriority';
+import { solvePartMoveSnapPreview } from './interactionMovePreview';
+import { resolveSafeTranslationDelta } from './overlapPolicy';
 
 function createPart(overrides: Partial<Part> = {}): Part {
   return {
@@ -16,11 +18,262 @@ function createPart(overrides: Partial<Part> = {}): Part {
     grainSensitive: overrides.grainSensitive ?? false,
     grainDirection: overrides.grainDirection ?? 'length',
     color: overrides.color ?? '#ffffff',
-    ignoreOverlap: overrides.ignoreOverlap
+    ignoreOverlap: overrides.ignoreOverlap,
+    features: overrides.features
   };
 }
 
+const socketSettings: AppSettings = {
+  defaultUnits: 'imperial',
+  defaultGridSize: 0.0625,
+  theme: 'system',
+  confirmBeforeDelete: true,
+  showHotkeyHints: true,
+  stockConstraints: {
+    constrainDimensions: true,
+    constrainGrain: true,
+    constrainColor: true,
+    preventOverlap: true
+  },
+  liveGridSnap: false,
+  snapSensitivity: 'normal',
+  snapToOrigin: false,
+  dimensionSnapSameTypeOnly: false,
+  enableSurfaceAnchors: false,
+  enableFractionalAnchors: false,
+  enableGoldenRatioAnchors: false,
+  enableFeatureAnchors: true,
+  enableAxisLegacySnaps: false
+};
+
 describe('drag snap flow integration', () => {
+  it('keeps a compatible dado mate seated through overlap prevention without exempting unrelated solids', () => {
+    const host = createPart({
+      id: 'dado-host',
+      length: 12,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [
+        {
+          id: 'dado-socket',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'dado',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          placement: { x: 5.6225, z: 0 },
+          parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 }
+        }
+      ]
+    });
+    const divider = createPart({
+      id: 'divider',
+      length: 4,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 2, y: 2.8, z: 0 },
+      rotation: { x: 0, y: 0, z: 90 }
+    });
+
+    const snapPreview = solvePartMoveSnapPreview({
+      part: divider,
+      position: { x: 0.01, y: 2.8, z: 0 },
+      axes: { x: true, y: true, z: true },
+      worldHalfHeight: 2,
+      referenceParts: [host],
+      movingPartIds: [divider.id],
+      snapGuides: [],
+      settings: socketSettings,
+      snapThreshold: 0.5,
+      latchedFaceSnap: null,
+      resolveFeatureStage: () => 'feature'
+    });
+
+    expect(snapPreview.position.x).toBeCloseTo(0, 8);
+    expect(snapPreview.position.y).toBeCloseTo(2.375, 8);
+    expect(snapPreview.position.z).toBeCloseTo(0, 8);
+    const proposedDelta = {
+      x: snapPreview.position.x - divider.position.x,
+      y: snapPreview.position.y - divider.position.y,
+      z: snapPreview.position.z - divider.position.z
+    };
+    const clampedWithoutMateIdentity = resolveSafeTranslationDelta(
+      [host, divider],
+      new Set([divider.id]),
+      proposedDelta
+    );
+    expect(clampedWithoutMateIdentity).not.toEqual(proposedDelta);
+    expect(snapPreview.mateHostPartId).toBe(host.id);
+
+    const seated = resolveSafeTranslationDelta(
+      [host, divider],
+      new Set([divider.id]),
+      proposedDelta,
+      undefined,
+      snapPreview.mateHostPartId
+    );
+    expect(seated).toEqual(proposedDelta);
+
+    const unrelatedSolid = createPart({
+      id: 'unrelated-solid',
+      length: 1,
+      width: 6,
+      thickness: 1,
+      position: { x: 0, y: 2, z: 0 }
+    });
+    expect(
+      resolveSafeTranslationDelta(
+        [host, divider, unrelatedSolid],
+        new Set([divider.id]),
+        proposedDelta,
+        undefined,
+        snapPreview.mateHostPartId
+      )
+    ).not.toEqual(proposedDelta);
+  });
+
+  it('keeps the socket mate selectable with the production snap families enabled', () => {
+    const host = createPart({
+      id: 'offset-dado-host',
+      length: 12,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 4, y: 0.375, z: 4 },
+      features: [
+        {
+          id: 'offset-dado-socket',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'dado',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          placement: { x: 5.6225, z: 0 },
+          parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 }
+        }
+      ]
+    });
+    const divider = createPart({
+      id: 'offset-divider',
+      length: 4,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 4.1, y: 2.8, z: 4.1 },
+      rotation: { x: 0, y: 0, z: 90 }
+    });
+    const preview = solvePartMoveSnapPreview({
+      part: divider,
+      position: { x: 4.086, y: 2.8, z: 4.086 },
+      axes: { x: true, y: true, z: true },
+      worldHalfHeight: 2,
+      referenceParts: [host],
+      movingPartIds: [divider.id],
+      snapGuides: [],
+      settings: {
+        ...socketSettings,
+        snapToOrigin: true,
+        enableSurfaceAnchors: true,
+        enableFractionalAnchors: true,
+        enableAxisLegacySnaps: true
+      },
+      snapThreshold: 0.55,
+      latchedFaceSnap: null,
+      resolveFeatureStage: () => 'feature'
+    });
+
+    expect(preview.position.x).toBeCloseTo(4, 8);
+    expect(preview.position.y).toBeCloseTo(2.375, 8);
+    expect(preview.position.z).toBeCloseTo(4, 8);
+    expect(preview.mateHostPartId).toBe(host.id);
+  });
+
+  it('centers a holistic mortise mate across locked axes and axes that return to the drag origin', () => {
+    const host = createPart({
+      id: 'mortise-host',
+      length: 12,
+      width: 6,
+      thickness: 1,
+      position: { x: 4, y: 0.5, z: 4 },
+      features: [
+        {
+          id: 'mortise-socket',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'mortise',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          placement: { x: 5.745, z: 2.495 },
+          parameters: { size: { length: 0.51, width: 1.01 }, depthMode: 'blind', depth: 0.75 }
+        }
+      ]
+    });
+    const rail = createPart({
+      id: 'tenon-rail',
+      length: 4,
+      width: 2,
+      thickness: 1,
+      position: { x: 4, y: 3.0625, z: 4 },
+      rotation: { x: 0, y: 0, z: 90 },
+      features: [
+        {
+          id: 'rail-tenon',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'tenon',
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          placement: { x: 0, z: 0.5 },
+          parameters: { size: { length: 0.75, width: 1 }, depthMode: 'blind', depth: 0.5 }
+        }
+      ]
+    });
+
+    const preview = solvePartMoveSnapPreview({
+      part: rail,
+      position: { x: 4.02, y: 2.75, z: 4.1 },
+      axes: { x: false, y: true, z: false },
+      worldHalfHeight: 2,
+      referenceParts: [host],
+      movingPartIds: [rail.id],
+      snapGuides: [],
+      settings: socketSettings,
+      snapThreshold: 0.5,
+      latchedFaceSnap: null,
+      resolveFeatureStage: () => 'feature'
+    });
+
+    expect(preview.position).toEqual({ x: 4, y: 2.25, z: 4 });
+    expect(preview.mateHostPartId).toBe(host.id);
+    const seatedDelta = {
+      x: preview.position.x - rail.position.x,
+      y: preview.position.y - rail.position.y,
+      z: preview.position.z - rail.position.z
+    };
+    expect(
+      resolveSafeTranslationDelta([host, rail], new Set([rail.id]), seatedDelta, undefined, preview.mateHostPartId)
+    ).toEqual(seatedDelta);
+
+    const allAxesPreview = solvePartMoveSnapPreview({
+      part: rail,
+      position: { x: 4.02, y: 2.75, z: 4.1 },
+      axes: { x: true, y: true, z: true },
+      worldHalfHeight: 2,
+      referenceParts: [host],
+      movingPartIds: [rail.id],
+      snapGuides: [],
+      settings: socketSettings,
+      snapThreshold: 0.5,
+      latchedFaceSnap: null,
+      resolveFeatureStage: () => 'feature'
+    });
+    expect(allAxesPreview.position).toEqual({ x: 4, y: 2.25, z: 4 });
+    expect(allAxesPreview.mateHostPartId).toBe(host.id);
+  });
+
   it('keeps face winner on contact axis while allowing tangential surface winner', () => {
     const winners = createAxisSnapWinners();
     const lines: SnapLine[] = [];

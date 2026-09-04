@@ -338,24 +338,55 @@ describe('overlapPolicy', () => {
     expect(finalX).toBeCloseTo(6, 1);
   });
 
-  it('exempts specified part IDs from overlap checking', () => {
-    const moving = createPart({ id: 'moving', length: 4, position: { x: 0, y: 0.5, z: 0 } });
-    const target = createPart({ id: 'target', length: 4, position: { x: 6, y: 0.5, z: 0 } });
-    const parts = [moving, target];
-    const movingIds = new Set<string>(['moving']);
+  it('exempts only a validated socket mate while retaining unrelated overlap checks', () => {
+    const host = createPart({
+      id: 'host',
+      length: 12,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [
+        {
+          id: 'dado',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'dado',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          placement: { x: 5.6225, z: 0 },
+          parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 }
+        }
+      ]
+    });
+    const moving = createPart({
+      id: 'moving',
+      length: 4,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 0, y: 2.8, z: 0 },
+      rotation: { x: 0, y: 0, z: 90 }
+    });
+    const movingIds = new Set([moving.id]);
+    const proposed = { x: 0, y: -0.425, z: 0 };
 
-    // Without exemption, moving into the target area causes overlap
-    const proposed = { x: 6, y: 0, z: 0 };
-    expect(wouldTranslationCauseOverlap(parts, movingIds, proposed)).toBe(true);
+    expect(wouldTranslationCauseOverlap([host, moving], movingIds, proposed)).toBe(true);
+    expect(wouldTranslationCauseOverlap([host, moving], movingIds, proposed, undefined, host.id)).toBe(false);
+    expect(resolveSafeTranslationDelta([host, moving], movingIds, proposed, undefined, host.id)).toEqual(proposed);
 
-    // With exemption for the target, overlap is ignored for that pair
-    const exempt = new Set(['target']);
-    expect(wouldTranslationCauseOverlap(parts, movingIds, proposed, undefined, exempt)).toBe(false);
+    const unrelatedSolid = createPart({
+      id: 'solid',
+      length: 1,
+      width: 6,
+      thickness: 0.5,
+      position: { x: 0, y: 0.5, z: 0 }
+    });
+    expect(wouldTranslationCauseOverlap([host, moving, unrelatedSolid], movingIds, proposed, undefined, host.id)).toBe(
+      true
+    );
 
-    // resolveSafeTranslationDelta also allows the full delta with exemption
-    const safe = resolveSafeTranslationDelta(parts, movingIds, proposed, undefined, exempt);
-    expect(safe).not.toBeNull();
-    expect(safe!.x).toBeCloseTo(6);
+    const plainHost = createPart({ ...host, features: [] });
+    expect(wouldTranslationCauseOverlap([plainHost, moving], movingIds, proposed, undefined, plainHost.id)).toBe(true);
   });
 
   it('decomposes corner notch contour into correct sub-boxes', () => {

@@ -8,6 +8,7 @@ import {
 } from './partFeatureGeometry';
 import {
   convexShapesOverlap,
+  detectFeatureMateSnaps,
   getPartConvexShape,
   getPartOBB,
   getPartSubOBBs,
@@ -142,7 +143,7 @@ export function wouldTranslationCauseOverlap(
   movingIds: Set<string>,
   delta: TranslationDelta,
   geometryCache?: GeometryCache,
-  exemptIds?: Set<string>
+  mateHostPartId?: string
 ): boolean {
   for (const p of parts) {
     if (!movingIds.has(p.id)) continue;
@@ -158,7 +159,7 @@ export function wouldTranslationCauseOverlap(
 
     for (const other of parts) {
       if (movingIds.has(other.id)) continue;
-      if (exemptIds && exemptIds.has(other.id)) continue;
+      if (other.id === mateHostPartId && isCompatibleSocketMate(movedPart, other)) continue;
       if (existingOverlapDoesNotWorsen(p, movedPart, other, geometryCache)) {
         continue;
       }
@@ -169,6 +170,16 @@ export function wouldTranslationCauseOverlap(
   }
 
   return false;
+}
+
+function isCompatibleSocketMate(movedPart: Part, hostPart: Part): boolean {
+  const mate = detectFeatureMateSnaps(movedPart, movedPart.position, [hostPart], [movedPart.id], 0.03);
+  if (mate.mateHostPartId !== hostPart.id) return false;
+  return (
+    Math.abs(mate.adjustedPosition.x - movedPart.position.x) <= OBB_EPSILON &&
+    Math.abs(mate.adjustedPosition.y - movedPart.position.y) <= OBB_EPSILON &&
+    Math.abs(mate.adjustedPosition.z - movedPart.position.z) <= OBB_EPSILON
+  );
 }
 
 function existingOverlapDoesNotWorsen(
@@ -264,9 +275,9 @@ export function resolveSafeTranslationDelta(
   movingIds: Set<string>,
   proposedDelta: TranslationDelta,
   geometryCache?: GeometryCache,
-  exemptIds?: Set<string>
+  mateHostPartId?: string
 ): TranslationDelta | null {
-  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta, geometryCache, exemptIds)) {
+  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta, geometryCache, mateHostPartId)) {
     return proposedDelta;
   }
 
@@ -281,7 +292,7 @@ export function resolveSafeTranslationDelta(
       y: proposedDelta.y * mid,
       z: proposedDelta.z * mid
     };
-    if (wouldTranslationCauseOverlap(parts, movingIds, candidate, geometryCache, exemptIds)) {
+    if (wouldTranslationCauseOverlap(parts, movingIds, candidate, geometryCache, mateHostPartId)) {
       high = mid;
     } else {
       low = mid;

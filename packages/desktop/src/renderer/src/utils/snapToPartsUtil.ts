@@ -8,7 +8,7 @@ import {
   getPartWorldAABB,
   hasRenderablePartFeatures
 } from './partFeatureGeometry';
-import { getRectCutDepth, getResolvedRectCutFeature, isTopTarget } from './rectCutUtils';
+import { getRectCutDepth, getResolvedRectCutFeature, isBottomTarget, isTopTarget } from './rectCutUtils';
 import type { GeometryCache } from '../interaction/geometry/cache';
 
 // Module-level reusable objects for getPartBounds calculations.
@@ -3502,10 +3502,10 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
     const rectFeature = feature as RectCutFeature;
     const resolved = getResolvedRectCutFeature(rectFeature, part);
 
-    // Currently only support top/bottom face targets
-    if (resolved.target.type !== 'face') continue;
+    // Sockets currently open through the top or bottom surface. This includes
+    // rabbets authored against a supported top/bottom edge.
     const isTop = isTopTarget(resolved);
-    const isBottom = !isTop && resolved.target.face === 'bottom_face';
+    const isBottom = !isTop && isBottomTarget(resolved);
     if (!isTop && !isBottom) continue;
 
     const depth = getRectCutDepth(resolved, part.thickness);
@@ -3550,6 +3550,70 @@ export interface MateSnapResult extends SnapResult {
   mateHostPartId?: string;
 }
 
+type MateShape = {
+  obb: PartOBB;
+  /** Shoulder-to-tip length for an authored tenon. */
+  insertionDepth?: number;
+};
+
+function getMateShapes(part: Part, position: Vec3): MateShape[] {
+  const resolvedRectCuts = (part.features ?? [])
+    .filter((feature): feature is RectCutFeature => feature.enabled && feature.kind === 'rect_cut')
+    .map((feature) => getResolvedRectCutFeature(feature, part));
+  const tenons = resolvedRectCuts.filter((feature) => feature.cutType === 'tenon');
+
+  const base = getPartOBB({ ...part, features: [] }, position);
+  const [axisX, axisY, axisZ] = base.axes;
+  const halfLength = part.length / 2;
+  const halfWidth = part.width / 2;
+
+  if (tenons.length > 0) {
+    return tenons.map((tenon) => {
+      const leftEnd = tenon.target.type === 'face' && tenon.target.face === 'left_end';
+      const tenonLength = tenon.parameters.size.length;
+      const tongueWidth = tenon.parameters.size.width;
+      const tongueThickness = tenon.parameters.depth ?? 0;
+      const localCenterX = leftEnd ? -halfLength + tenonLength / 2 : halfLength - tenonLength / 2;
+      const localCenterZ = -halfWidth + tenon.placement.z + tongueWidth / 2;
+      const insertionAxis = leftEnd ? axisX : mulVec(axisX, -1);
+
+      return {
+        obb: {
+          center: addVec(position, addVec(mulVec(axisX, localCenterX), mulVec(axisZ, localCenterZ))),
+          axes: [insertionAxis, axisY, axisZ],
+          halfExtents: [tenonLength / 2, tongueThickness / 2, tongueWidth / 2]
+        },
+        insertionDepth: tenonLength
+      };
+    });
+  }
+
+  const shapes: MateShape[] = [{ obb: getPartOBB(part, position) }];
+  for (const cut of resolvedRectCuts) {
+    if (cut.parameters.depthMode !== 'blind' || (!isTopTarget(cut) && !isBottomTarget(cut))) continue;
+    const cutDepth = getRectCutDepth(cut, part.thickness);
+    const remainingThickness = part.thickness - cutDepth;
+    if (cutDepth <= 0 || remainingThickness <= 0) continue;
+
+    const localCenterX = -halfLength + cut.placement.x + cut.parameters.size.length / 2;
+    const localCenterZ = -halfWidth + cut.placement.z + cut.parameters.size.width / 2;
+    const localCenterY = isBottomTarget(cut) ? cutDepth / 2 : -cutDepth / 2;
+    shapes.push({
+      obb: {
+        center: addVec(
+          position,
+          addVec(addVec(mulVec(axisX, localCenterX), mulVec(axisY, localCenterY)), mulVec(axisZ, localCenterZ))
+        ),
+        axes: [axisY, axisX, axisZ],
+        halfExtents: [remainingThickness / 2, cut.parameters.size.length / 2, cut.parameters.size.width / 2]
+      },
+      insertionDepth: remainingThickness
+    });
+  }
+
+  return shapes;
+}
+
 /**
  * Detect feature-mating snaps: when a dragged part's cross-section fits
  * inside the socket of a nearby part's rect cut feature (dado, groove,
@@ -3566,7 +3630,7 @@ export function detectFeatureMateSnaps(
   draggingPartIds: string[],
   snapThreshold: number
 ): MateSnapResult {
-  const draggingOBB = getPartOBB(draggingPart, currentPosition);
+  const mateShapes = getMateShapes(draggingPart, currentPosition);
   const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
   const nearParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
 
@@ -3579,11 +3643,19 @@ export function detectFeatureMateSnaps(
     if (sockets.length === 0) continue;
 
     for (const socket of sockets) {
-      const match = findBestMateMatch(draggingOBB, socket, snapThreshold);
-      if (!match || match.distance >= bestDistance) continue;
-      bestDistance = match.distance;
-      bestDelta = match.delta;
-      bestHostPartId = hostPart.id;
+      for (const mateShape of mateShapes) {
+        if (
+          mateShape.insertionDepth !== undefined &&
+          Math.abs(mateShape.insertionDepth - socket.depth) >= MATE_DIM_TOLERANCE
+        ) {
+          continue;
+        }
+        const match = findBestMateMatch(mateShape.obb, socket, snapThreshold);
+        if (!match || match.distance >= bestDistance) continue;
+        bestDistance = match.distance;
+        bestDelta = match.delta;
+        bestHostPartId = hostPart.id;
+      }
     }
   }
 
@@ -3727,17 +3799,15 @@ function findBestMateMatch(
       const partAlongT1 = dotVec(draggingOBB.center, snapT1);
       const socketAlongT1 = dotVec(socket.openingCenter, snapT1);
       const dt1 = socketAlongT1 - partAlongT1;
-      if (Math.abs(dt1) <= snapThreshold) {
-        delta = addVec(delta, mulVec(snapT1, dt1));
-      }
+      if (Math.abs(dt1) > snapThreshold) continue;
+      delta = addVec(delta, mulVec(snapT1, dt1));
     }
     if (tight2) {
       const partAlongT2 = dotVec(draggingOBB.center, snapT2);
       const socketAlongT2 = dotVec(socket.openingCenter, snapT2);
       const dt2 = socketAlongT2 - partAlongT2;
-      if (Math.abs(dt2) <= snapThreshold) {
-        delta = addVec(delta, mulVec(snapT2, dt2));
-      }
+      if (Math.abs(dt2) > snapThreshold) continue;
+      delta = addVec(delta, mulVec(snapT2, dt2));
     }
 
     const distance = lenVec(delta);

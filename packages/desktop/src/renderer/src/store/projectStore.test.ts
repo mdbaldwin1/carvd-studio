@@ -178,6 +178,54 @@ describe('projectStore', () => {
         const partA = state.parts.find((p) => p.id === partAId);
         expect(partA?.length).toBe(10);
       });
+
+      it('commits a validated feature mate host without disabling other overlap checks', () => {
+        const store = useProjectStore.getState();
+        const hostId = store.addPart({
+          name: 'Dado host',
+          length: 12,
+          width: 6,
+          thickness: 0.75,
+          position: { x: 0, y: 0.375, z: 0 },
+          features: [
+            {
+              id: 'dado',
+              kind: 'rect_cut',
+              version: 1,
+              enabled: true,
+              cutType: 'dado',
+              target: { type: 'face', face: 'top_face' },
+              reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+              parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 },
+              placement: { x: 5.6225, z: 0 }
+            }
+          ]
+        });
+        const dividerId = store.addPart({
+          name: 'Divider',
+          length: 4,
+          width: 6,
+          thickness: 0.75,
+          position: { x: 0, y: 2.8, z: 0 },
+          rotation: { x: 0, y: 0, z: 90 }
+        });
+
+        expect(store.updatePart(dividerId, { position: { x: 0, y: 2.375, z: 0 } }, { mateHostPartId: hostId })).toBe(
+          true
+        );
+        expect(useProjectStore.getState().parts.find((part) => part.id === dividerId)?.position.y).toBeCloseTo(2.375);
+
+        store.addPart({
+          name: 'Unrelated blocker',
+          length: 1,
+          width: 6,
+          thickness: 0.5,
+          position: { x: 0, y: 0.5, z: 0 }
+        });
+        expect(store.updatePart(dividerId, { position: { x: 0, y: 2.3, z: 0 } }, { mateHostPartId: hostId })).toBe(
+          false
+        );
+      });
     });
 
     describe('updateParts', () => {

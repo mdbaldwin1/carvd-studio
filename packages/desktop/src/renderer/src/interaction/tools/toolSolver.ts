@@ -29,7 +29,7 @@ export interface PartDimensions {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type CommitInstruction =
-  | { kind: 'updatePartPosition'; partId: string; position: Vec3 }
+  | { kind: 'updatePartPosition'; partId: string; position: Vec3; mateHostPartId?: string }
   | { kind: 'updatePartRotation'; partId: string; rotation: Rotation3D }
   | {
       kind: 'updatePartDimensions';
@@ -92,7 +92,8 @@ export interface CommitTarget {
       length: number;
       width: number;
       thickness: number;
-    }>
+    }>,
+    options?: { mateHostPartId?: string }
   ) => void;
   batchUpdateParts?: (updates: Array<{ id: string; changes: Partial<{ position: Vec3 }> }>) => void;
   moveSelectedParts?: (delta: Vec3) => void;
@@ -102,7 +103,7 @@ export function applyCommitInstructions(instructions: ReadonlyArray<CommitInstru
   for (const ins of instructions) {
     switch (ins.kind) {
       case 'updatePartPosition':
-        target.updatePart(ins.partId, { position: ins.position });
+        target.updatePart(ins.partId, { position: ins.position }, { mateHostPartId: ins.mateHostPartId });
         break;
       case 'updatePartRotation':
         target.updatePart(ins.partId, { rotation: ins.rotation });

@@ -232,13 +232,15 @@ export function resolveSinglePartReleaseMove({
   projectParts,
   proposedPosition,
   preventOverlap,
-  geometryCache
+  geometryCache,
+  mateHostPartId
 }: {
   part: Part;
   projectParts: Part[];
   proposedPosition: TranslationDelta;
   preventOverlap: boolean;
   geometryCache?: GeometryCache;
+  mateHostPartId?: string;
 }): SinglePartReleaseMoveResult {
   const proposedDelta = {
     x: proposedPosition.x - part.position.x,
@@ -250,14 +252,16 @@ export function resolveSinglePartReleaseMove({
       candidate: {
         kind: 'move',
         delta: proposedDelta,
-        positions: new Map([[part.id, proposedPosition]])
+        positions: new Map([[part.id, proposedPosition]]),
+        mateHostPartId
       },
       startingParts: [part],
       project: {
         parts: projectParts,
         stocks: [],
         groupMembers: [],
-        preventOverlap
+        preventOverlap,
+        mateHostPartId
       },
       geometryCache: geometryCache ?? createGeometryCache()
     },

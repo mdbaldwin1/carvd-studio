@@ -77,7 +77,7 @@ interface ProjectState {
 
   // Actions - Parts
   addPart: (part?: Partial<Part>) => string | null;
-  updatePart: (id: string, updates: Partial<Part>) => boolean;
+  updatePart: (id: string, updates: Partial<Part>, options?: { mateHostPartId?: string }) => boolean;
   updateParts: (ids: string[], updates: Partial<Part>) => void;
   batchUpdateParts: (updates: Array<{ id: string; changes: Partial<Part> }>) => void;
   addDowelJoint: (input: AddDowelJointInput) => string | null;
@@ -473,7 +473,7 @@ export const useProjectStore = create<ProjectState>()(
         return newPart.id;
       },
 
-      updatePart: (id, updates) => {
+      updatePart: (id, updates, options) => {
         let didUpdate = false;
         set((state) => {
           const existingPart = state.parts.find((p) => p.id === id);
@@ -503,7 +503,13 @@ export const useProjectStore = create<ProjectState>()(
                 y: updates.position!.y - existingPart.position.y,
                 z: updates.position!.z - existingPart.position.z
               };
-              const safeDelta = resolveSafeTranslationDelta(state.parts, new Set([id]), proposedDelta);
+              const safeDelta = resolveSafeTranslationDelta(
+                state.parts,
+                new Set([id]),
+                proposedDelta,
+                undefined,
+                options?.mateHostPartId
+              );
               if (!safeDelta) {
                 dragDebug('projectStore:updatePart:noSafeDelta', { id, proposedDelta });
                 return state;
