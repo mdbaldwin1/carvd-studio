@@ -185,14 +185,18 @@ export function createDowelJoint(input: CreateDowelJointInput): DowelJointResult
 
 export function validateDowelRelationships(parts: Part[]): string[] {
   const errors: string[] = [];
-  const entries = new Map<string, Array<{ part: Part; metadata: DowelJointMetadata }>>();
+  const entries = new Map<string, Array<{ part: Part; feature: CircularCutFeature; metadata: DowelJointMetadata }>>();
   for (const part of parts) {
     for (const feature of part.features ?? []) {
       const dowel = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
       if (!dowel) continue;
       const key = `${dowel.jointId}:${dowel.memberIndex}`;
+      if (feature.kind !== 'circular_cut') {
+        errors.push(`Dowel joint member ${key} is not a round hole.`);
+        continue;
+      }
       const members = entries.get(key) ?? [];
-      members.push({ part, metadata: dowel });
+      members.push({ part, feature, metadata: dowel });
       entries.set(key, members);
     }
   }
@@ -203,10 +207,20 @@ export function validateDowelRelationships(parts: Part[]): string[] {
     }
     const [first, second] = members;
     const reciprocal = first.metadata.matePartId === second.part.id && second.metadata.matePartId === first.part.id;
-    const matching =
+    const matchingMetadata =
       first.metadata.dowelDiameter === second.metadata.dowelDiameter &&
       first.metadata.dowelLength === second.metadata.dowelLength;
-    if (!reciprocal || !matching) errors.push(`Dowel joint member ${key} has mismatched relationship data.`);
+    const matchingFeatures =
+      first.feature.parameters.diameter === first.metadata.dowelDiameter &&
+      second.feature.parameters.diameter === second.metadata.dowelDiameter &&
+      first.feature.parameters.depthMode === 'blind' &&
+      second.feature.parameters.depthMode === 'blind' &&
+      first.feature.parameters.depth === first.metadata.embedmentDepth &&
+      second.feature.parameters.depth === second.metadata.embedmentDepth &&
+      first.metadata.embedmentDepth + second.metadata.embedmentDepth <= first.metadata.dowelLength + 1e-9;
+    const aligned = getDowelJointAlignment(first.part, first.feature, second.part, second.feature).aligned;
+    if (!reciprocal || !matchingMetadata || !matchingFeatures || !aligned)
+      errors.push(`Dowel joint member ${key} has mismatched or misaligned hole geometry.`);
   }
   return errors;
 }

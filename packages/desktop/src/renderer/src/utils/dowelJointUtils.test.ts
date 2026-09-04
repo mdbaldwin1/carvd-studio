@@ -60,6 +60,36 @@ describe('dowelJointUtils', () => {
     });
     expect(validateDowelRelationships([part])).toEqual([expect.stringMatching(/missing its matching hole/i)]);
   });
+
+  it('reports edited or moved paired holes before save', () => {
+    const firstPart = createTestPart({ id: 'first', thickness: 1, position: { x: 0, y: 0, z: 0 } });
+    const secondPart = createTestPart({ id: 'second', thickness: 1, position: { x: 0, y: 1, z: 0 } });
+    const joint = createDowelJoint({
+      firstPart,
+      firstFace: 'top_face',
+      secondPart,
+      secondFace: 'bottom_face',
+      diameter: 0.375,
+      dowelLength: 1,
+      firstEmbedmentDepth: 0.5,
+      secondEmbedmentDepth: 0.5,
+      count: 1,
+      spacing: 2,
+      firstPrimary: 0,
+      firstSecondary: 0
+    });
+    const paired = [
+      { ...firstPart, features: joint.firstFeatures },
+      { ...secondPart, features: joint.secondFeatures }
+    ];
+    expect(validateDowelRelationships(paired)).toEqual([]);
+
+    joint.secondFeatures[0].parameters.diameter = 0.5;
+    expect(validateDowelRelationships(paired)).toEqual([expect.stringMatching(/mismatched or misaligned/i)]);
+    joint.secondFeatures[0].parameters.diameter = 0.375;
+    paired[1] = { ...paired[1], position: { x: 1, y: 1, z: 0 } };
+    expect(validateDowelRelationships(paired)).toEqual([expect.stringMatching(/mismatched or misaligned/i)]);
+  });
   it('creates matching part-local holes on opposing mating faces', () => {
     const firstPart = createTestPart({
       id: 'first',
