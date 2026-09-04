@@ -198,7 +198,13 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
     return `Mortise on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)} × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
   }
 
-  return `${toTitleCase(feature.cutType)} on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)}`;
+  const size = `${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)}`;
+  const termination =
+    feature.parameters.depthMode === 'through'
+      ? 'Through'
+      : `${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+  const depthSeparator = feature.parameters.depthMode === 'through' ? ' · ' : ' × ';
+  return `${toTitleCase(feature.cutType)} on ${getFeatureTargetLabel(feature)} · ${size}${depthSeparator}${termination}`;
 }
 
 export function getAuthoredFeatureCount(features?: PartFeature[]): number {

@@ -283,10 +283,10 @@ describe('partFeatureSummary', () => {
       ).toBe('Dado on Top Face · 3/4" wide × 0" deep');
     });
 
-    it('falls back to a generic size summary for cutouts and notches', () => {
-      expect(getFeatureSummary(createRectCut({ size: { length: 3, width: 2 } }), 'imperial')).toBe(
-        'Cutout on Top Face · 3" × 2"'
-      );
+    it('includes through and blind termination in cutout and notch fabrication summaries', () => {
+      expect(
+        getFeatureSummary(createRectCut({ size: { length: 3, width: 2 }, depthMode: 'blind', depth: 0.25 }), 'imperial')
+      ).toBe('Cutout on Top Face · 3" × 2" × 1/4" deep');
       expect(
         getFeatureSummary(
           createRectCut({
@@ -296,7 +296,7 @@ describe('partFeatureSummary', () => {
           }),
           'imperial'
         )
-      ).toBe('Corner Notch on Front-Left Corner · 2" × 2"');
+      ).toBe('Corner Notch on Front-Left Corner · 2" × 2" · Through');
       expect(
         getFeatureSummary(
           createRectCut({
@@ -306,7 +306,7 @@ describe('partFeatureSummary', () => {
           }),
           'metric'
         )
-      ).toBe('Edge Notch on Front Side · 50.8mm × 25.4mm');
+      ).toBe('Edge Notch on Front Side · 50.8mm × 25.4mm · Through');
     });
   });
 
