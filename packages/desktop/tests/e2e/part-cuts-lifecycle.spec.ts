@@ -8,6 +8,7 @@ import type {
 } from '../../src/renderer/src/types';
 import fs from 'fs';
 import path from 'path';
+import { execFileSync } from 'child_process';
 import {
   addPartFromSidebar,
   clickMenuItem,
@@ -1307,6 +1308,13 @@ test.describe('part cuts editing lifecycle', () => {
     await expect
       .poll(() => (fs.existsSync(pdfPath) ? fs.statSync(pdfPath).size : 0), { timeout: 5000 })
       .toBeGreaterThan(0);
+    // jsPDF's supported uncompressed text streams are inspectable with the
+    // platform `strings` reader; this proves the exported artifact carries
+    // fabrication details rather than merely existing as a non-empty file.
+    const pdfText = execFileSync('/usr/bin/strings', [pdfPath], { encoding: 'utf8' });
+    for (const detail of ['Angled left end', 'Shelf dado', 'Three patterned holes', 'Rounded relief']) {
+      expect(pdfText).toContain(detail);
+    }
   });
 
   test('persists round and rounded operations through save and reopen', async () => {

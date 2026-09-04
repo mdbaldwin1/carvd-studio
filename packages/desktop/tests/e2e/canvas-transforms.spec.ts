@@ -137,6 +137,42 @@ test.describe('Canvas transform workflows', () => {
     expect(duplicated.sourcePayload).toBe(sourceBefore);
   });
 
+  test('copies and pastes all featured families through the real keyboard commands without aliasing the source', async () => {
+    await seedFeaturedPart(running.window);
+    const sourceBefore = await getSelectedFeaturePayload(running.window);
+    const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+    await running.window.locator('canvas').click({ force: true });
+    await running.window.keyboard.press(`${mod}+C`);
+    await running.window.keyboard.press(`${mod}+V`);
+    await expect.poll(async () => (await getProjectSnapshot(running.window)).parts).toHaveLength(2);
+    const copied = await running.window.evaluate(() => {
+      const [source, copy] = window.useProjectStore.getState().parts;
+      return {
+        sourceIds: source.features?.map((feature: { id: string }) => feature.id) ?? [],
+        copyIds: copy.features?.map((feature: { id: string }) => feature.id) ?? [],
+        sourcePayload: JSON.stringify(source.features),
+        copyPayload: (copy.features ?? []).map(({ id, ...feature }: { id: string }) => feature),
+        sourceComparable: (source.features ?? []).map(({ id, ...feature }: { id: string }) => feature)
+      };
+    });
+    expect(new Set(copied.copyIds).size).toBe(4);
+    expect(copied.copyIds.every((id) => !copied.sourceIds.includes(id))).toBe(true);
+    expect(copied.copyPayload).toEqual(copied.sourceComparable);
+
+    await running.window.getByRole('button', { name: 'Edit Part Cuts' }).click();
+    await running.window.getByRole('button', { name: /^3\./ }).click();
+    await running.window.getByLabel('Hole Diameter').fill('0.375');
+    await running.window.getByRole('button', { name: 'Save Cut' }).click();
+    await running.window.getByRole('button', { name: 'Save Part' }).click();
+    expect(
+      await running.window.evaluate(() => JSON.stringify(window.useProjectStore.getState().parts[0].features))
+    ).toBe(sourceBefore);
+    expect(
+      await running.window.evaluate(() => window.useProjectStore.getState().parts[1].features?.[2].parameters.diameter)
+    ).toBe(0.375);
+  });
+
   test('keeps featured geometry local and pickable across canvas movement, all-axis rotation, and history', async () => {
     await seedFeaturedPart(running.window);
     await running.window.evaluate(() => window.useProjectStore.temporal.getState().clear());
