@@ -133,3 +133,24 @@ The fourth review found two qualification gaps in the ownership and Electron evi
 - `git diff --check`: passed.
 
 There is no known Task 4 blocker. The ownership guard is deliberately scoped to the existing `part`/`group` session boundary; it does not introduce a second gesture coordinator or expose mate identity in application state.
+
+## Review round 5 — rendered takeover ownership
+
+The fifth review found that fallback takeover was exclusive in the interaction store but not at the primary part's render boundary. The displaced `usePartDrag` hook retained its local `isDragging` flag until pointer-up, so `Part` ignored the replacement group session and continued rendering its stale direct-part/mate position and local dimensions.
+
+- `Part` now treats local drag or resize state as render-authoritative only while the matching active interaction session still owns that operation. Once a group move replaces the part move, the affected mesh immediately renders the group session's position and canonical dimensions even though the old hook's local flag has not yet reset. The same render dimensions feed geometry, grain direction, handles, and dimension placement/value paths, so no stale local visual survives ownership displacement.
+- A component RED injects a stale direct-part preview (`90,80,70`, dimensions `99,77,88`) under an affected group session and proves the rendered mesh instead uses the group position (`11,7,1`) and stored dimensions (`10,1,4`).
+- The Electron takeover case now reads the actual Three.js member mesh world position after two animation frames while the pointer remains down. It compares all three in-flight axes with the group session preview, then compares the released project-store position with that captured render transform. The RED observed the stale socket-mate Y (`2.375`) while the group session preview was `2.7501`; the fixed path renders and commits the group value. Family-tagged ordinary face lines and the existing post-takeover callback trace continue to prove that no stale mate visual or direct-part callback survives.
+
+### Review-round-5 verification
+
+- TDD component regression: 1/1 passed after reproducing the stale position and dimensions.
+- Ownership-focused Vitest suites: 5 files, 35 tests passed.
+- Desktop lint: passed with zero warnings.
+- Desktop typecheck: passed.
+- Prettier: passed for every changed TypeScript, TSX, and Markdown file.
+- Fresh desktop production build: passed.
+- `custom-cuts-assembly.spec.ts`: 7/7 passed from that fresh build, including actual in-flight rendered XYZ equality before pointer-up and released-store equality afterward.
+- `git diff --check`: passed.
+
+There is no known Task 4 blocker. Render ownership now follows the same active `part`/`group` session boundary as preview publication, cleanup, release, and commit.

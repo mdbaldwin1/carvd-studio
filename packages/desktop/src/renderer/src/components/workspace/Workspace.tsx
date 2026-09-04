@@ -45,6 +45,7 @@ declare global {
     __selectionDebugLogs?: Array<{ ts: string; args: unknown[] }>;
     __carvdE2E?: {
       getPartScreenPoint: (partId?: string) => { x: number; y: number } | null;
+      getPartRenderedWorldPosition: (partId: string) => { x: number; y: number; z: number } | null;
       getResizeHandleScreenPoint: (
         handle: { x: -1 | 0 | 1; y: -1 | 0 | 1; z: -1 | 0 | 1 },
         partId?: string
@@ -226,6 +227,18 @@ export function Workspace() {
         if (!part) return null;
         return projectWorld(world.set(part.position.x, part.position.y, part.position.z));
       },
+      getPartRenderedWorldPosition: (partId: string) => {
+        let renderedPart: THREE.Object3D | null = null;
+        scene.traverse((object) => {
+          if (!renderedPart && object.userData.partId === partId) {
+            renderedPart = object;
+          }
+        });
+        if (!renderedPart) return null;
+        scene.updateMatrixWorld(true);
+        renderedPart.getWorldPosition(world);
+        return { x: world.x, y: world.y, z: world.z };
+      },
       getResizeHandleScreenPoint: (handle, partId?: string) => {
         const part = resolvePart(partId);
         if (!part) return null;
@@ -289,7 +302,7 @@ export function Workspace() {
     return () => {
       delete window.__carvdE2E;
     };
-  }, [camera, controls, gl.domElement]);
+  }, [camera, controls, gl.domElement, scene]);
 
   // Drag-box selection state
   const [isBoxSelecting, setIsBoxSelecting] = useState(false);

@@ -233,20 +233,30 @@ async function dragSelectedGroupOnFace(
         })
       )
       .not.toBeNull();
-    return await window.evaluate((pointerDownState) => {
-      const session = window.useInteractionStore.getState().activeSession;
-      const selection = window.useSelectionStore.getState();
-      return session?.kind === 'move'
-        ? {
-            delta: session.delta,
-            moveOwner: session.moveOwner ?? null,
-            snapLines: window.useSnapStore.getState().activeSnapLines,
-            selectedPartIds: selection.selectedPartIds,
-            selectedGroupIds: selection.selectedGroupIds,
-            pointerDown: pointerDownState
-          }
-        : null;
-    }, pointerDown);
+    await window.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        })
+    );
+    return await window.evaluate(
+      ({ pointerDownState, id }) => {
+        const session = window.useInteractionStore.getState().activeSession;
+        const selection = window.useSelectionStore.getState();
+        return session?.kind === 'move'
+          ? {
+              delta: session.delta,
+              inFlightRenderedPosition: window.__carvdE2E?.getPartRenderedWorldPosition(id) ?? null,
+              moveOwner: session.moveOwner ?? null,
+              snapLines: window.useSnapStore.getState().activeSnapLines,
+              selectedPartIds: selection.selectedPartIds,
+              selectedGroupIds: selection.selectedGroupIds,
+              pointerDown: pointerDownState
+            }
+          : null;
+      },
+      { pointerDownState: pointerDown, id: partId }
+    );
   } finally {
     await window.mouse.up();
     await window.waitForTimeout(500);
@@ -518,10 +528,14 @@ test.describe.serial('custom cuts assembly qualification', () => {
     expect(preview!.moveOwner).toBe('group');
     expect(preview!.selectedPartIds).toEqual([]);
     expect(preview!.selectedGroupIds).toHaveLength(1);
+    expect(preview!.snapLines.every((line: { family?: string }) => line.family !== undefined)).toBe(true);
     expect(preview!.snapLines.map((line: { family?: string }) => line.family)).toContain('face');
+    expect(preview!.inFlightRenderedPosition).not.toBeNull();
     for (const axis of ['x', 'y', 'z'] as const) {
       const startPosition = { x: 4.1, y: 2.8, z: 4 };
-      expect(result.position[axis]).toBeCloseTo(startPosition[axis] + preview!.delta[axis], 3);
+      const groupPreviewPosition = startPosition[axis] + preview!.delta[axis];
+      expect(preview!.inFlightRenderedPosition![axis]).toBeCloseTo(groupPreviewPosition, 3);
+      expect(result.position[axis]).toBeCloseTo(preview!.inFlightRenderedPosition![axis], 3);
     }
     expect(result.position.y).toBeCloseTo(2.75, 3);
     expect(result.position.y).not.toBeCloseTo(2.375, 2);
