@@ -317,7 +317,9 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
   const issues: PartValidationIssue[] = [];
 
   for (const part of parts) {
-    // Check for unassigned stock
+    // Stock availability and authored-operation validity are independent. Keep
+    // checking operations even when a part has not yet been assigned stock.
+    const stock = part.stockId ? stocks.find((candidate) => candidate.id === part.stockId) : undefined;
     if (!part.stockId) {
       issues.push({
         partId: part.id,
@@ -326,11 +328,7 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
         message: 'No stock assigned',
         severity: 'error'
       });
-      continue;
-    }
-
-    const stock = stocks.find((s) => s.id === part.stockId);
-    if (!stock) {
+    } else if (!stock) {
       issues.push({
         partId: part.id,
         partName: part.name,
@@ -338,53 +336,54 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
         message: 'Assigned stock not found',
         severity: 'error'
       });
-      continue;
     }
 
-    const cutLength = part.length + (part.extraLength || 0);
-    const cutWidth = part.width + (part.extraWidth || 0);
+    if (stock) {
+      const cutLength = part.length + (part.extraLength || 0);
+      const cutWidth = part.width + (part.extraWidth || 0);
 
-    // Check thickness
-    if (part.thickness > stock.thickness) {
-      issues.push({
-        partId: part.id,
-        partName: part.name,
-        type: 'exceeds_thickness',
-        message: `Thickness (${part.thickness}") exceeds stock (${stock.thickness}")`,
-        severity: 'error'
-      });
-    }
-
-    // Check dimensions (considering rotation possibility)
-    const fitsNormal = cutLength <= stock.length && cutWidth <= stock.width;
-    const fitsRotated = !part.grainSensitive && cutLength <= stock.width && cutWidth <= stock.length;
-
-    if (!fitsNormal && !fitsRotated) {
-      // Check if it's a glue-up panel that only exceeds width
-      if (part.glueUpPanel && cutLength <= stock.length) {
-        // Glue-up panel that only exceeds width is acceptable - no issue to report
-        // The boards needed calculation is shown in the Properties panel
-      } else {
+      // Check thickness
+      if (part.thickness > stock.thickness) {
         issues.push({
           partId: part.id,
           partName: part.name,
-          type: 'exceeds_dimensions',
-          message: `Dimensions (${cutLength}" × ${cutWidth}") exceed stock (${stock.length}" × ${stock.width}")`,
+          type: 'exceeds_thickness',
+          message: `Thickness (${part.thickness}") exceeds stock (${stock.thickness}")`,
           severity: 'error'
         });
       }
-    }
 
-    // Check grain mismatch (warning only)
-    if (part.grainSensitive && stock.grainDirection !== 'none') {
-      if (part.grainDirection !== stock.grainDirection) {
-        issues.push({
-          partId: part.id,
-          partName: part.name,
-          type: 'grain_mismatch',
-          message: `Grain direction (${part.grainDirection}) doesn't match stock (${stock.grainDirection})`,
-          severity: 'warning'
-        });
+      // Check dimensions (considering rotation possibility)
+      const fitsNormal = cutLength <= stock.length && cutWidth <= stock.width;
+      const fitsRotated = !part.grainSensitive && cutLength <= stock.width && cutWidth <= stock.length;
+
+      if (!fitsNormal && !fitsRotated) {
+        // Check if it's a glue-up panel that only exceeds width
+        if (part.glueUpPanel && cutLength <= stock.length) {
+          // Glue-up panel that only exceeds width is acceptable - no issue to report
+          // The boards needed calculation is shown in the Properties panel
+        } else {
+          issues.push({
+            partId: part.id,
+            partName: part.name,
+            type: 'exceeds_dimensions',
+            message: `Dimensions (${cutLength}" × ${cutWidth}") exceed stock (${stock.length}" × ${stock.width}")`,
+            severity: 'error'
+          });
+        }
+      }
+
+      // Check grain mismatch (warning only)
+      if (part.grainSensitive && stock.grainDirection !== 'none') {
+        if (part.grainDirection !== stock.grainDirection) {
+          issues.push({
+            partId: part.id,
+            partName: part.name,
+            type: 'grain_mismatch',
+            message: `Grain direction (${part.grainDirection}) doesn't match stock (${stock.grainDirection})`,
+            severity: 'warning'
+          });
+        }
       }
     }
 

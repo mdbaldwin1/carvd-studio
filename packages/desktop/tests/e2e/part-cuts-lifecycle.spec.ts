@@ -1312,9 +1312,10 @@ test.describe('part cuts editing lifecycle', () => {
     // platform `strings` reader; this proves the exported artifact carries
     // fabrication details rather than merely existing as a non-empty file.
     const pdfText = execFileSync('/usr/bin/strings', [pdfPath], { encoding: 'utf8' });
-    for (const detail of ['Angled left end', 'Shelf dado', 'Three patterned holes', 'Rounded relief']) {
-      expect(pdfText).toContain(detail);
-    }
+    const pdfFabricationLines = fabricationLines.map((line) =>
+      line.replaceAll('—', ' - ').replaceAll('·', ' | ').replaceAll('°', ' deg').replaceAll('×', ' x ')
+    );
+    for (const line of pdfFabricationLines) expect(pdfText).toContain(line);
   });
 
   test('persists round and rounded operations through save and reopen', async () => {

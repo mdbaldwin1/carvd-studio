@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Featured-part fabrication validation** — Cut List generation now reports invalid authored operations even when the part also needs a stock assignment, so a resized copy cannot hide an out-of-bounds cut behind a generic stock error.
+- **Featured-part rotation history** — X/Y/Z shortcut rotations now commit their ground adjustment with the rotation, keeping real undo/redo steps stable for cut-bearing parts.
+- **Complete PDF fabrication operations** — Cut List PDFs now include an untruncated, searchable fabrication-operations section with the full ordered instructions for every enabled cut.
 - **Featured-part duplication identities** — Duplicated parts now receive fresh IDs for every Custom Cut while preserving independent operation parameters, preventing copied boards from sharing feature identities with their source.
 - **Round-cut validation and preview editing** — Round holes and rounded openings now have accessible move/resize controls in the cuts preview. Invalid patterns, near-vertical bores, incomplete blind/recess settings, and oversized countersink or counterbore profiles are blocked with visible, actionable feedback before they can be saved.
 - **Bounded cut geometry cache** — Live cut editing now evicts old generated geometry instead of allowing preview memory use to grow without limit during long editing sessions.

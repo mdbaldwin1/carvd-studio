@@ -2463,6 +2463,42 @@ describe('validatePartsForCutList', () => {
       );
     });
 
+    it('reports an invalid authored operation even when the part also lacks stock', () => {
+      const parts = [
+        createTestPart({
+          name: 'Unstocked resized copy',
+          stockId: null,
+          length: 6,
+          width: 12,
+          thickness: 0.75,
+          features: [
+            {
+              id: 'unstocked-edge-cutout',
+              kind: 'rect_cut',
+              version: 1,
+              enabled: true,
+              label: 'Copied edge cutout',
+              target: { type: 'face', face: 'top_face' },
+              reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+              cutType: 'cutout',
+              parameters: { size: { length: 4, width: 2 }, depthMode: 'through' },
+              placement: { x: 8, z: 0 }
+            }
+          ]
+        })
+      ];
+
+      expect(validatePartsForCutList(parts, [])).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'no_stock' }),
+          expect.objectContaining({
+            type: 'feature_validation',
+            message: expect.stringContaining('Copied edge cutout')
+          })
+        ])
+      );
+    });
+
     it('returns feature validation errors for duplicate enabled end cuts on the same end', () => {
       const stock = createTestStock({
         id: 'stock-1',

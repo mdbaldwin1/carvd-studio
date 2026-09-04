@@ -11,7 +11,6 @@ import { useCameraStore } from '../store/cameraStore';
 import { getContainingGroupId } from '../utils/interactionSelection';
 import { Rotation3D } from '../types';
 import { rotationTool } from '../interaction/tools/rotationTool';
-import { applyCommitInstructions } from '../interaction/tools/toolSolver';
 import { resolveRotateBatchGrounding } from '../utils/interactionMovement';
 
 export function useKeyboardShortcuts() {
@@ -89,8 +88,16 @@ export function useKeyboardShortcuts() {
           const input = { part, axis, degrees: 90, space: 'world' as const };
           const state = rotationTool.begin(input);
           const { preview } = rotationTool.update(input, state);
-
-          applyCommitInstructions(rotationTool.commit(state, preview), { updatePart });
+          const grounded = resolveRotateBatchGrounding({
+            startingParts: [part],
+            projectParts: parts,
+            groupMembers,
+            updates: [{ partId: part.id, position: part.position, rotation: preview.rotation }]
+          });
+          const update = grounded.updates[0];
+          if (update) {
+            updatePart(part.id, { position: update.position, rotation: update.rotation });
+          }
           return;
         }
 

@@ -5,7 +5,11 @@
 
 import jsPDF from 'jspdf';
 import { CutList, StockBoard, CustomShoppingItem } from '../types';
-import { getInstructionFabricationSummary, groupCutInstructions } from './cutListInstructions';
+import {
+  getInstructionFabricationLines,
+  getInstructionFabricationSummary,
+  groupCutInstructions
+} from './cutListInstructions';
 import { formatMeasurementWithUnit } from './fractions';
 import { logger } from './logger';
 
@@ -27,6 +31,12 @@ let watermarkLogoPromise: Promise<string | null> | null = null;
 
 function setPdfFontSize(doc: jsPDF, size: number): void {
   doc.setFontSize(Math.round(size * PDF_FONT_SCALE * 10) / 10);
+}
+
+function toPdfFabricationText(text: string): string {
+  // The built-in PDF fonts use WinAnsi encoding. Keep the operational record
+  // searchable and legible when the source summary uses typographic symbols.
+  return text.replaceAll('—', ' - ').replaceAll('·', ' | ').replaceAll('°', ' deg').replaceAll('×', ' x ');
 }
 
 async function loadSvgAsPngDataUrl(path: string, targetHeight: number): Promise<string | null> {
@@ -598,6 +608,40 @@ export async function exportCutListToPdf(
     doc.text(displayOps, colX[7], y);
 
     y += 16;
+  }
+
+  // The compact table intentionally abbreviates its final column. Preserve
+  // the full, shop-actionable operation details in an untruncated section of
+  // the exported artifact.
+  const fabricationGroups = grouped.filter((group) => getInstructionFabricationLines(group.items[0], units).length > 0);
+  if (fabricationGroups.length > 0) {
+    if (y > pageHeight - 100) {
+      addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
+      doc.addPage();
+      y = margin + 24;
+    }
+    setPdfFontSize(doc, 11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('Fabrication Operations', margin, y);
+    y += 16;
+
+    setPdfFontSize(doc, 9);
+    doc.setFont('helvetica', 'normal');
+    for (const group of fabricationGroups) {
+      const lines = getInstructionFabricationLines(group.items[0], units);
+      for (const line of lines) {
+        const wrappedLines = doc.splitTextToSize(toPdfFabricationText(line), contentWidth - 12) as string[];
+        if (y + wrappedLines.length * 12 > pageHeight - 45) {
+          addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
+          doc.addPage();
+          y = margin + 24;
+        }
+        doc.text(wrappedLines, margin + 12, y);
+        y += wrappedLines.length * 12;
+      }
+      y += 4;
+    }
   }
 
   addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);

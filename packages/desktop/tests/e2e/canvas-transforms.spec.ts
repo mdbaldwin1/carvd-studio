@@ -80,6 +80,52 @@ async function getSelectedFeaturePayload(window: RunningElectronApp['window']): 
   });
 }
 
+async function getSelectedTransform(window: RunningElectronApp['window']): Promise<{
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+}> {
+  return window.evaluate(() => {
+    const selectedId = window.useSelectionStore.getState().selectedPartIds[0];
+    const part = window.useProjectStore
+      .getState()
+      .parts.find((candidate: { id: string }) => candidate.id === selectedId);
+    if (!part) throw new Error('Selected part was not found');
+    return { position: part.position, rotation: part.rotation };
+  });
+}
+
+async function getHistoryCounts(window: RunningElectronApp['window']): Promise<{ past: number; future: number }> {
+  return window.evaluate(() => {
+    const temporal = window.useProjectStore.temporal.getState();
+    return { past: temporal.pastStates.length, future: temporal.futureStates.length };
+  });
+}
+
+async function getHistoricalPartStates(window: RunningElectronApp['window']): Promise<
+  Array<{
+    transform: { position: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number } };
+    features: string;
+  }>
+> {
+  return window.evaluate(() => {
+    const selectedId = window.useSelectionStore.getState().selectedPartIds[0];
+    return window.useProjectStore.temporal
+      .getState()
+      .pastStates.map((state: { parts: Array<{ id: string; position: unknown; rotation: unknown }> }) => {
+        const part = state.parts.find((candidate) => candidate.id === selectedId);
+        if (!part) throw new Error('Selected part was not found in history');
+        return {
+          transform: { position: part.position, rotation: part.rotation },
+          features: JSON.stringify(part.features ?? [])
+        };
+      });
+  });
+}
+
+function transformDigest(transform: { position: object; rotation: object }): string {
+  return JSON.stringify(transform, (_key, value) => (typeof value === 'number' ? Number(value.toFixed(6)) : value));
+}
+
 test.describe('Canvas transform workflows', () => {
   let running: RunningElectronApp;
 
@@ -173,45 +219,125 @@ test.describe('Canvas transform workflows', () => {
     ).toBe(0.375);
   });
 
-  test('keeps featured geometry local and pickable across canvas movement, all-axis rotation, and history', async () => {
+  test('resizes a copied featured part through properties without changing its source', async () => {
     await seedFeaturedPart(running.window);
-    await running.window.evaluate(() => window.useProjectStore.temporal.getState().clear());
-    const featuresBefore = await getSelectedFeaturePayload(running.window);
-    const before = await getProjectSnapshot(running.window);
-
+    const source = await running.window.evaluate(() => {
+      const part = window.useProjectStore.getState().parts[0];
+      return JSON.stringify({ length: part.length, width: part.width, features: part.features });
+    });
     await running.window.locator('canvas').click({ force: true });
-    for (const [key, axis] of [
-      ['X', 'x'],
-      ['Y', 'y'],
-      ['Z', 'z']
-    ] as const) {
+    await running.window.keyboard.press('Shift+D');
+    await expect.poll(async () => (await getProjectSnapshot(running.window)).parts).toHaveLength(2);
+    const dims = running.window.locator('.dimension-inputs input');
+    await dims.nth(0).fill('1');
+    await dims.nth(0).press('Tab');
+    expect(
       await running.window.evaluate(() => {
-        const project = window.useProjectStore.getState();
-        const part = project.parts[0];
-        project.updatePart(part.id, { rotation: { x: 0, y: 0, z: 0 } });
-        window.useSelectionStore.getState().selectPart(part.id);
-      });
-      await running.window.keyboard.press(key);
-      await expect.poll(async () => (await getProjectSnapshot(running.window)).parts[0].rotation[axis]).toBe(90);
+        const part = window.useProjectStore.getState().parts[0];
+        return JSON.stringify({ length: part.length, width: part.width, features: part.features });
+      })
+    ).toBe(source);
+    await running.window.getByRole('button', { name: /Generate Cut List|View Cut List/ }).click();
+    const dialog = running.window
+      .getByRole('dialog')
+      .filter({ has: running.window.getByRole('heading', { name: 'Cut List' }) });
+    await dialog.getByRole('button', { name: 'Generate Cut List' }).click();
+    await expect(dialog.getByText(/Canvas dado|invalid|exceeds|outside/i)).toBeVisible();
+  });
+
+  test('keeps featured geometry local and pickable through real canvas transforms and shortcut history', async () => {
+    await seedFeaturedPart(running.window);
+    const featuresBefore = await getSelectedFeaturePayload(running.window);
+    const before = await getSelectedTransform(running.window);
+    const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+    // The canvas drag is the user action that moves this feature-bearing part.
+    const startPoint = await getSelectedPartCanvasPoint(running.window);
+    await dragCanvas(running.window, startPoint, { x: 90, y: -55 });
+    const afterMove = await getSelectedTransform(running.window);
+    expect(afterMove.position).not.toEqual(before.position);
+    expect(afterMove.rotation).toEqual(before.rotation);
+    expect(await getSelectedFeaturePayload(running.window)).toBe(featuresBefore);
+
+    // X/Y/Z all dispatch through the real global workspace shortcuts. Capture
+    // each persisted state because world-axis quaternion composition is not
+    // equivalent to independently setting Euler fields.
+    await running.window.keyboard.press('X');
+    await running.window.waitForTimeout(300);
+    await expect
+      .poll(async () => transformDigest(await getSelectedTransform(running.window)))
+      .not.toBe(transformDigest(afterMove));
+    const afterX = await getSelectedTransform(running.window);
+    expect(afterX.rotation).not.toEqual(afterMove.rotation);
+
+    await running.window.keyboard.press('Y');
+    await running.window.waitForTimeout(300);
+    await expect
+      .poll(async () => transformDigest(await getSelectedTransform(running.window)))
+      .not.toBe(transformDigest(afterX));
+    const afterY = await getSelectedTransform(running.window);
+    expect(afterY.rotation).not.toEqual(afterX.rotation);
+
+    await running.window.keyboard.press('Z');
+    await running.window.waitForTimeout(300);
+    await expect
+      .poll(async () => transformDigest(await getSelectedTransform(running.window)))
+      .not.toBe(transformDigest(afterY));
+    const afterZ = await getSelectedTransform(running.window);
+    expect(afterZ.rotation).not.toEqual(afterY.rotation);
+    expect(await getSelectedFeaturePayload(running.window)).toBe(featuresBefore);
+
+    // Its rotated mesh remains available to the real canvas picker.
+    await expect
+      .poll(async () => running.window.evaluate(() => window.__carvdE2E?.getPartScreenPoint() ?? null))
+      .not.toBeNull();
+
+    // Undo and redo use the same user shortcuts, proving each canvas action
+    // remains an independent history entry without directly manipulating time.
+    const historyBeforeUndo = await getHistoryCounts(running.window);
+    const historicalPartStates = await getHistoricalPartStates(running.window);
+    const beforeHistoryIndex = historicalPartStates.findIndex(
+      (state) => state.features === featuresBefore && transformDigest(state.transform) === transformDigest(before)
+    );
+    expect(beforeHistoryIndex).toBeGreaterThanOrEqual(0);
+    const undoExpected = historicalPartStates
+      .slice(beforeHistoryIndex)
+      .map((state) => state.transform)
+      .reverse();
+    expect(undoExpected).toContainEqual(before);
+    expect(undoExpected).toContainEqual(afterMove);
+    expect(undoExpected).toContainEqual(afterX);
+    expect(undoExpected).toContainEqual(afterY);
+
+    for (const [index, expected] of undoExpected.entries()) {
+      await running.window.keyboard.press(`${mod}+Z`);
+      await expect
+        .poll(async () => getHistoryCounts(running.window))
+        .toEqual({
+          past: historyBeforeUndo.past - index - 1,
+          future: historyBeforeUndo.future + index + 1
+        });
+      await expect
+        .poll(async () => transformDigest(await getSelectedTransform(running.window)))
+        .toBe(transformDigest(expected));
+      expect(await getSelectedFeaturePayload(running.window)).toBe(featuresBefore);
+    }
+    const redoExpected = [...undoExpected.slice(0, -1).reverse(), afterZ];
+    for (const [index, expected] of redoExpected.entries()) {
+      await running.window.keyboard.press(`${mod}+Shift+Z`);
+      await expect
+        .poll(async () => getHistoryCounts(running.window))
+        .toEqual({
+          past: historyBeforeUndo.past - undoExpected.length + index + 1,
+          future: historyBeforeUndo.future + undoExpected.length - index - 1
+        });
+      await expect
+        .poll(async () => transformDigest(await getSelectedTransform(running.window)))
+        .toBe(transformDigest(expected));
       expect(await getSelectedFeaturePayload(running.window)).toBe(featuresBefore);
     }
 
-    expect(
-      await running.window.evaluate(() => window.useProjectStore.temporal.getState().pastStates.length)
-    ).toBeGreaterThan(0);
-    await running.window.evaluate(() => window.useProjectStore.temporal.getState().undo());
-    await expect.poll(async () => (await getProjectSnapshot(running.window)).parts[0].rotation.z).toBe(0);
-    await running.window.evaluate(() => window.useProjectStore.temporal.getState().redo());
-    await expect.poll(async () => (await getProjectSnapshot(running.window)).parts[0].rotation.z).toBe(90);
-    expect(await getSelectedFeaturePayload(running.window)).toBe(featuresBefore);
-
-    // The selected feature-bearing mesh remains available to the real canvas
-    // picker and can still be moved after its local operations are rotated.
-    const startPoint = await getSelectedPartCanvasPoint(running.window);
-    await dragCanvas(running.window, startPoint, { x: 90, y: -55 });
-    const afterMove = await getProjectSnapshot(running.window);
-    expect(afterMove.parts[0].position).not.toEqual(before.parts[0].position);
-    expect(afterMove.activeSession).toBeNull();
+    expect(await getSelectedPartCanvasPoint(running.window)).toBeTruthy();
     expect(await getSelectedFeaturePayload(running.window)).toBe(featuresBefore);
   });
 
