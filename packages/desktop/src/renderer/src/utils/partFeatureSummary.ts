@@ -122,13 +122,21 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
     if (feature.pattern) {
       const count =
         feature.pattern.type === 'grid' ? feature.pattern.rows * feature.pattern.columns : feature.pattern.count;
+      const operation =
+        feature.cutType === 'countersink' ? ' Countersink' : feature.cutType === 'counterbore' ? ' Counterbore' : '';
+      const profile =
+        feature.cutType === 'countersink' && feature.parameters.countersink
+          ? `${holeDiameter} hole × ${formatMeasurementWithUnit(feature.parameters.countersink.majorDiameter, units)} major · ${feature.parameters.countersink.includedAngle}°`
+          : feature.cutType === 'counterbore' && feature.parameters.counterbore
+            ? `${holeDiameter} hole · ${formatMeasurementWithUnit(feature.parameters.counterbore.diameter, units)} × ${formatMeasurementWithUnit(feature.parameters.counterbore.depth, units)} recess`
+            : `${holeDiameter} diameter`;
       const spacing =
         feature.pattern.type === 'linear'
           ? ` · ${formatMeasurementWithUnit(feature.pattern.spacing, units)} spacing · ${feature.pattern.direction}° direction`
           : feature.pattern.type === 'grid'
             ? ` · ${formatMeasurementWithUnit(feature.pattern.columnSpacing, units)} × ${formatMeasurementWithUnit(feature.pattern.rowSpacing, units)} spacing · ${feature.pattern.rotation}° rotation`
             : ` · ${formatMeasurementWithUnit(feature.pattern.radius, units)} radius · ${feature.pattern.startAngle}° start angle`;
-      return `${count}-hole ${toTitleCase(feature.pattern.type)} Pattern on ${target} · ${holeDiameter} diameter${spacing} · ${termination}${angle}`;
+      return `${count}-hole ${toTitleCase(feature.pattern.type)}${operation} Pattern on ${target} · ${profile}${spacing} · ${termination}${angle}`;
     }
     if (feature.cutType === 'countersink' && feature.parameters.countersink) {
       return `Countersink on ${target} · ${holeDiameter} hole × ${formatMeasurementWithUnit(feature.parameters.countersink.majorDiameter, units)} major · ${feature.parameters.countersink.includedAngle}° · ${termination}${angle}`;

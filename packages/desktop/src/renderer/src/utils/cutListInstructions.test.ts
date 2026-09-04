@@ -91,8 +91,56 @@ describe('cutListInstructions', () => {
     };
 
     expect(getInstructionFabricationLines(instruction, 'imperial')[0]).toBe(
-      '1. 4-hole Linear Pattern on Top Face · 1/4" diameter · 2" spacing · 0° direction · 1/2" deep · 15° tilt toward 90°'
+      '1. 4-hole Linear Countersink Pattern on Top Face · 1/4" hole × 1/2" major · 82° · 2" spacing · 0° direction · 1/2" deep · 15° tilt toward 90°'
     );
+  });
+
+  it('retains counterbore recess dimensions in patterned fabrication output', () => {
+    const part = createTestPart({
+      features: [
+        {
+          id: 'patterned-counterbores',
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'bottom_face' },
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          cutType: 'counterbore',
+          placement: { primary: 6, secondary: 4, rotation: 0 },
+          parameters: {
+            diameter: 0.375,
+            depthMode: 'through',
+            tilt: 10,
+            direction: 40,
+            counterbore: { diameter: 0.875, depth: 0.25 }
+          },
+          pattern: { type: 'circular', count: 4, radius: 1.25, startAngle: 30 }
+        }
+      ]
+    });
+
+    expect(
+      getInstructionFabricationLines(
+        {
+          partId: part.id,
+          partName: part.name,
+          cutLength: part.length,
+          cutWidth: part.width,
+          thickness: part.thickness,
+          stockId: 'stock-1',
+          stockName: 'Maple',
+          grainSensitive: false,
+          grainDirection: 'length',
+          isGlueUp: false,
+          quantity: 1,
+          features: part.features,
+          notes: ''
+        },
+        'imperial'
+      )
+    ).toEqual([
+      '1. 4-hole Circular Counterbore Pattern on Bottom Face · 3/8" hole · 7/8" × 1/4" recess · 1 1/4" radius · 30° start angle · Through · 10° tilt toward 40°'
+    ]);
   });
 
   it('includes grid rotation and circular start angle in fabrication lines', () => {
