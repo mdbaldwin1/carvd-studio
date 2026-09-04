@@ -17,6 +17,7 @@ import {
 } from '@renderer/utils/partCutPicking';
 import { getPartRenderGeometry } from '@renderer/utils/partFeatureGeometry';
 import { getRectCutDepth, getResolvedRectCutFeature } from '@renderer/utils/rectCutUtils';
+import { getFaceFrame, validateCircularCut, validateRoundedCut } from '@renderer/utils/roundCutUtils';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -107,7 +108,7 @@ interface DepthInfo {
 }
 
 interface EditableHandleOverlay {
-  mode: 'rect';
+  mode: 'rect' | 'round' | 'rounded';
   operationLabel: string;
   center?: [number, number, number];
   lengthHandle?: [number, number, number];
@@ -147,9 +148,118 @@ export function clamp(value: number, min: number, max: number): number {
 export function supportsPreviewHandles(draft: FeatureDraft | null): boolean {
   if (!draft) return false;
   if (draft.mode === 'end_cut') return false;
+  if (draft.mode === 'circular_cut' || draft.mode === 'rounded_cut')
+    return draft.faceTarget === 'top_face' || draft.faceTarget === 'bottom_face';
   return (
     SUPPORTED_HANDLE_TYPES.has(draft.cutType) && (draft.faceTarget === 'top_face' || draft.faceTarget === 'bottom_face')
   );
+}
+
+function referencedOffset(value: number, size: number, from: 'min' | 'center' | 'max' | undefined): number {
+  if (from === 'min') return -size / 2 + value;
+  if (from === 'max') return size / 2 - value;
+  return value;
+}
+
+function isHandleDraftValid(part: Part, draft: FeatureDraft): boolean {
+  const feature = buildFeatureFromDraft(draft);
+  if (feature.kind === 'circular_cut') return validateCircularCut(feature, part) === null;
+  if (feature.kind === 'rounded_cut') return validateRoundedCut(feature, part) === null;
+  return true;
+}
+
+function PreviewHandleControls({
+  part,
+  draft,
+  handleOverlay,
+  onDraftChange
+}: {
+  part: Part;
+  draft: FeatureDraft;
+  handleOverlay: EditableHandleOverlay;
+  onDraftChange: (draft: FeatureDraft) => void;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-bg px-3 py-3 text-left">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Preview Handles</div>
+      <div className="mb-2 text-sm text-text">{handleOverlay.operationLabel}</div>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="xs"
+          variant="outline"
+          onClick={() => onDraftChange(nudgeDraft(part, draft, 'move', -1))}
+        >
+          Move Left
+        </Button>
+        <Button
+          type="button"
+          size="xs"
+          variant="outline"
+          onClick={() => onDraftChange(nudgeDraft(part, draft, 'move', 1))}
+        >
+          Move Right
+        </Button>
+        {draft.mode === 'rect_cut' || draft.mode === 'rounded_cut' ? (
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            onClick={() => onDraftChange(nudgeDraft(part, draft, 'length', 1))}
+          >
+            {draft.mode === 'rounded_cut' ? 'Extend Length' : 'Extend Run'}
+          </Button>
+        ) : draft.mode === 'circular_cut' ? (
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            onClick={() => onDraftChange(nudgeDraft(part, draft, 'length', 1))}
+          >
+            Enlarge Hole
+          </Button>
+        ) : null}
+        {(draft.mode === 'rounded_cut' || (draft.mode === 'rect_cut' && draft.cutType !== 'stopped_dado')) && (
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            onClick={() => onDraftChange(nudgeDraft(part, draft, 'width', 1))}
+          >
+            Widen
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function buildRoundHandleOverlay(
+  part: Part,
+  draft: Extract<FeatureDraft, { mode: 'circular_cut' | 'rounded_cut' }>
+): EditableHandleOverlay {
+  const feature = buildFeatureFromDraft(draft);
+  const frame = getFaceFrame(part, draft.faceTarget);
+  const primary = referencedOffset(draft.placementPrimary, frame.primarySize, feature.reference.primaryFrom);
+  const secondary = referencedOffset(draft.placementSecondary, frame.secondarySize, feature.reference.secondaryFrom);
+  const point = {
+    x: frame.origin.x + frame.primaryAxis.x * primary + frame.secondaryAxis.x * secondary,
+    y: frame.origin.y + frame.primaryAxis.y * primary + frame.secondaryAxis.y * secondary,
+    z: frame.origin.z + frame.primaryAxis.z * primary + frame.secondaryAxis.z * secondary
+  };
+  const y = point.y + (draft.faceTarget === 'top_face' ? HANDLE_EPSILON : -HANDLE_EPSILON);
+  const length = draft.mode === 'circular_cut' ? draft.diameter : draft.length;
+  const width = draft.mode === 'circular_cut' ? draft.diameter : draft.width;
+  return {
+    mode: draft.mode === 'circular_cut' ? 'round' : 'rounded',
+    center: [point.x, y, -point.z],
+    lengthHandle: [point.x + length / 2, y, -point.z],
+    widthHandle: draft.mode === 'circular_cut' ? null : [point.x, y, -point.z - width / 2],
+    operationLabel:
+      draft.mode === 'circular_cut' && draft.pattern
+        ? `${draft.cutType.replace('_', ' ')} pattern origin`
+        : draft.cutType.replace('_', ' ')
+  };
 }
 
 /**
@@ -425,6 +535,11 @@ export function getEditableHandleOverlay(
     };
   }
 
+  if (draft.mode === 'circular_cut' || draft.mode === 'rounded_cut') {
+    if (!supportsPreviewHandles(draft)) return null;
+    return buildRoundHandleOverlay(part, draft);
+  }
+
   // Side-face pockets recess along Z; the top-down overlay math doesn't
   // apply, so fall back to inspector-only editing for them.
   if (draft.mode === 'rect_cut' && (draft.faceTarget === 'front_face' || draft.faceTarget === 'back_face')) {
@@ -462,6 +577,25 @@ export function applyHandleDelta(
   deltaZ: number
 ): FeatureDraft {
   if (!supportsPreviewHandles(startDraft)) return startDraft;
+
+  if (startDraft.mode === 'circular_cut' || startDraft.mode === 'rounded_cut') {
+    const feature = buildFeatureFromDraft(startDraft);
+    const frame = getFaceFrame(part, startDraft.faceTarget);
+    const primarySign = feature.reference.primaryFrom === 'max' ? -1 : 1;
+    const secondarySign = (feature.reference.secondaryFrom === 'max' ? -1 : 1) * frame.secondaryAxis.z;
+    const nextDraft = { ...startDraft };
+    if (kind === 'move') {
+      nextDraft.placementPrimary += deltaX * primarySign;
+      nextDraft.placementSecondary += deltaZ * secondarySign;
+    } else if (startDraft.mode === 'circular_cut' && kind === 'length') {
+      nextDraft.diameter = Math.max(MIN_DIMENSION, startDraft.diameter + deltaX);
+    } else if (startDraft.mode === 'rounded_cut' && kind === 'length') {
+      nextDraft.length = Math.max(MIN_DIMENSION, startDraft.length + deltaX);
+    } else if (startDraft.mode === 'rounded_cut' && kind === 'width') {
+      nextDraft.width = Math.max(MIN_DIMENSION, startDraft.width + deltaZ);
+    }
+    return isHandleDraftValid(part, nextDraft) ? nextDraft : startDraft;
+  }
 
   const nextDraft: FeatureDraft = { ...startDraft };
   const maxLength = Math.max(MIN_DIMENSION, part.length - startDraft.placementX);
@@ -684,13 +818,13 @@ function PartCutsPreviewScene({
                 <meshBasicMaterial color={AREA_COLOR} transparent opacity={0.18} depthWrite={false} />
               </mesh>
             )}
-            {handleOverlay.mode === 'rect' && handleOverlay.center && (
+            {handleOverlay.center && (
               <mesh position={handleOverlay.center} renderOrder={7} onPointerDown={(event) => beginDrag('move', event)}>
                 <sphereGeometry args={[HANDLE_SIZE * 0.55, 18, 18]} />
                 <meshBasicMaterial color={HANDLE_COLOR} />
               </mesh>
             )}
-            {handleOverlay.mode === 'rect' && handleOverlay.lengthHandle && (
+            {handleOverlay.lengthHandle && (
               <mesh
                 position={handleOverlay.lengthHandle}
                 renderOrder={7}
@@ -700,7 +834,7 @@ function PartCutsPreviewScene({
                 <meshBasicMaterial color={HANDLE_COLOR} />
               </mesh>
             )}
-            {handleOverlay.mode === 'rect' && handleOverlay.widthHandle && (
+            {handleOverlay.widthHandle && (
               <mesh
                 position={handleOverlay.widthHandle}
                 renderOrder={7}
@@ -961,48 +1095,12 @@ export function PartCutsPreviewCanvas({
             </div>
           )}
           {supportsHandles && draft && handleOverlay && (
-            <div className="rounded-md border border-border bg-bg px-3 py-3 text-left">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Preview Handles</div>
-              <div className="mb-2 text-sm text-text">{handleOverlay.operationLabel}</div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="outline"
-                  onClick={() => onDraftChange(nudgeDraft(part, draft, 'move', -1))}
-                >
-                  Move Left
-                </Button>
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="outline"
-                  onClick={() => onDraftChange(nudgeDraft(part, draft, 'move', 1))}
-                >
-                  Move Right
-                </Button>
-                {draft.mode === 'rect_cut' && (
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    onClick={() => onDraftChange(nudgeDraft(part, draft, 'length', 1))}
-                  >
-                    Extend Run
-                  </Button>
-                )}
-                {draft.mode === 'rect_cut' && draft.cutType !== 'stopped_dado' && (
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    onClick={() => onDraftChange(nudgeDraft(part, draft, 'width', 1))}
-                  >
-                    Widen
-                  </Button>
-                )}
-              </div>
-            </div>
+            <PreviewHandleControls
+              part={part}
+              draft={draft}
+              handleOverlay={handleOverlay}
+              onDraftChange={onDraftChange}
+            />
           )}
           {draft && !supportsHandles && (
             <div className="rounded-md border border-border bg-bg px-3 py-3 text-left text-sm text-text-muted">
@@ -1033,6 +1131,17 @@ export function PartCutsPreviewCanvas({
           onDraftChange={onDraftChange}
         />
       </Canvas>
+
+      {supportsHandles && draft && handleOverlay && (
+        <div className="absolute bottom-3 right-3 max-w-[min(88%,24rem)]">
+          <PreviewHandleControls
+            part={part}
+            draft={draft}
+            handleOverlay={handleOverlay}
+            onDraftChange={onDraftChange}
+          />
+        </div>
+      )}
 
       {(selectedFeatureSummary || draft) && (
         <div className="pointer-events-none absolute left-3 top-3 max-w-[min(88%,26rem)] rounded-md border border-accent/30 bg-bg/90 px-3 py-2 text-left text-sm text-text shadow-sm backdrop-blur">

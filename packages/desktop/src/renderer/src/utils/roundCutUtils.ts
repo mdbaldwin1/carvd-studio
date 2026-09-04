@@ -196,6 +196,12 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
   if (!Number.isFinite(feature.parameters.tilt) || feature.parameters.tilt < 0 || feature.parameters.tilt >= 90)
     return 'Hole tilt must be at least 0° and less than 90°.';
   if (!Number.isFinite(feature.parameters.direction)) return 'Hole tilt direction must be a finite angle.';
+  if (
+    !Number.isFinite(feature.placement.primary) ||
+    !Number.isFinite(feature.placement.secondary) ||
+    !Number.isFinite(feature.placement.rotation)
+  )
+    return 'Hole placement and rotation must be finite values.';
 
   const pattern = feature.pattern;
   if (pattern?.type === 'linear') {
@@ -256,6 +262,18 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
   )
     return 'Counterbore diameter must exceed the hole diameter and its recess depth must be greater than zero.';
   const frame = getFaceFrame(part, feature.target.face);
+  const recessDepth =
+    feature.cutType === 'countersink'
+      ? (feature.parameters.countersink!.majorDiameter - feature.parameters.diameter) /
+        (2 * Math.tan(degrees(feature.parameters.countersink!.includedAngle) / 2))
+      : feature.cutType === 'counterbore'
+        ? feature.parameters.counterbore!.depth
+        : 0;
+  const recessAvailable = distanceToExit(frame.origin, frame.inwardNormal, part);
+  if (!Number.isFinite(recessDepth) || recessDepth >= recessAvailable - 1e-9)
+    return 'Recess depth exceeds the available material.';
+  if (feature.parameters.depthMode === 'blind' && recessDepth > Number(feature.parameters.depth) + 1e-9)
+    return 'Recess depth cannot exceed the blind-hole depth.';
   const profileDiameter =
     feature.cutType === 'countersink'
       ? feature.parameters.countersink!.majorDiameter
@@ -285,13 +303,25 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
 export function validateRoundedCut(feature: RoundedCutFeature, part: Part): string | null {
   if (feature.target.face !== 'top_face' && feature.target.face !== 'bottom_face')
     return 'Rounded openings currently support only the top and bottom faces.';
-  if (feature.parameters.length <= 0 || feature.parameters.width <= 0)
+  if (
+    !Number.isFinite(feature.parameters.length) ||
+    !Number.isFinite(feature.parameters.width) ||
+    feature.parameters.length <= 0 ||
+    feature.parameters.width <= 0
+  )
     return 'Rounded-cut length and width must be greater than zero.';
   if (
+    !Number.isFinite(feature.parameters.cornerRadius) ||
     feature.parameters.cornerRadius <= 0 ||
     feature.parameters.cornerRadius > Math.min(feature.parameters.length, feature.parameters.width) / 2
   )
     return 'Corner radius must fit within half the opening width and length.';
+  if (
+    !Number.isFinite(feature.placement.primary) ||
+    !Number.isFinite(feature.placement.secondary) ||
+    !Number.isFinite(feature.placement.rotation)
+  )
+    return 'Rounded-cut placement and rotation must be finite values.';
   const frame = getFaceFrame(part, feature.target.face);
   const primary = referencedOffset(feature.placement.primary, frame.primarySize, feature.reference.primaryFrom);
   const secondary = referencedOffset(feature.placement.secondary, frame.secondarySize, feature.reference.secondaryFrom);
@@ -306,11 +336,12 @@ export function validateRoundedCut(feature: RoundedCutFeature, part: Part): stri
   ) {
     return 'Rounded cut extends beyond the selected face.';
   }
-  if (
-    feature.parameters.depthMode === 'blind' &&
-    Number(feature.parameters.depth) >= distanceToExit(frame.origin, frame.inwardNormal, part) - 1e-9
-  ) {
-    return 'Rounded-cut depth exceeds the available material.';
+  if (feature.parameters.depthMode === 'blind') {
+    const depth = feature.parameters.depth;
+    const available = distanceToExit(frame.origin, frame.inwardNormal, part);
+    if (!Number.isFinite(depth) || depth === undefined || depth <= 0)
+      return 'Rounded-cut depth must be greater than zero.';
+    if (depth >= available - 1e-9) return 'Rounded-cut depth exceeds the available material.';
   }
   return null;
 }

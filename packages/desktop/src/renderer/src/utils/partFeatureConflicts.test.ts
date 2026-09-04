@@ -3,6 +3,64 @@ import { createTestPart } from '../../../../tests/helpers/factories';
 import { getPartFeatureConflicts } from './partFeatureConflicts';
 
 describe('getPartFeatureConflicts', () => {
+  it('reports a deterministic actionable conflict for intersecting dado, hole, and cutout removals', () => {
+    const part = createTestPart({
+      features: [
+        {
+          id: 'dado',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'dado',
+          parameters: { size: { length: 6, width: 8 }, depthMode: 'blind', depth: 0.25 },
+          placement: { x: 8, z: 0 }
+        },
+        {
+          id: 'hole',
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          cutType: 'round_hole',
+          parameters: { diameter: 0.5, depthMode: 'blind', depth: 0.25, tilt: 0, direction: 0 },
+          placement: { primary: 0, secondary: 0, rotation: 0 }
+        },
+        {
+          id: 'cutout',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'cutout',
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' },
+          placement: { x: 11, z: 3 }
+        }
+      ]
+    });
+
+    const conflicts = getPartFeatureConflicts(part.features ?? [], part);
+    expect(conflicts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          featureId: 'dado',
+          relatedFeatureId: 'hole',
+          code: 'round_rect_overlap',
+          severity: 'warning'
+        }),
+        expect.objectContaining({
+          featureId: 'hole',
+          relatedFeatureId: 'dado',
+          code: 'round_rect_overlap',
+          severity: 'warning'
+        })
+      ])
+    );
+  });
+
   it('flags duplicate coaxial circular cuts on the same face', () => {
     const part = createTestPart({
       features: [

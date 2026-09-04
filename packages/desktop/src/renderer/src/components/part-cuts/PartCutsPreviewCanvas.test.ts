@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { createElement, forwardRef, type ReactNode } from 'react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { createElement, forwardRef, useState, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 import {
@@ -45,6 +45,8 @@ vi.mock('@react-three/fiber', () => ({
 
 type RectDraft = Extract<FeatureDraft, { mode: 'rect_cut' }>;
 type EndCutDraft = Extract<FeatureDraft, { mode: 'end_cut' }>;
+type CircularDraft = Extract<FeatureDraft, { mode: 'circular_cut' }>;
+type RoundedDraft = Extract<FeatureDraft, { mode: 'rounded_cut' }>;
 
 const PART_DEFAULTS = { partLength: 24, partWidth: 12, partThickness: 0.75 };
 
@@ -60,6 +62,17 @@ function createEndCutDraft(overrides: Partial<EndCutDraft> = {}): EndCutDraft {
     ...(buildDraftFromPreset('end_cut') as EndCutDraft),
     ...overrides
   };
+}
+
+function createCircularDraft(overrides: Partial<CircularDraft> = {}): CircularDraft {
+  return { ...(buildDraftFromPreset('round_hole', PART_DEFAULTS) as CircularDraft), ...overrides };
+}
+
+function createRoundedDraft(
+  preset: 'rounded_slot' | 'rounded_rectangle',
+  overrides: Partial<RoundedDraft> = {}
+): RoundedDraft {
+  return { ...(buildDraftFromPreset(preset, PART_DEFAULTS) as RoundedDraft), ...overrides };
 }
 
 describe('buildPreviewPart', () => {
@@ -181,6 +194,21 @@ describe('getPreviewGeometrySignature', () => {
       clearPartGeometryCache();
     }
   });
+
+  it('renders an intersecting dado, hole, and cutout stack deterministically without empty geometry', () => {
+    const part = createTestPart({ length: 24, width: 12, thickness: 0.75 });
+    const features = [
+      buildFeatureFromDraft(createRectDraft('dado', { placementX: 8, sizeLength: 6, depth: 0.25 })),
+      buildFeatureFromDraft(createCircularDraft({ depthMode: 'blind', depth: 0.25 })),
+      buildFeatureFromDraft(createRectDraft('cutout', { placementX: 11, placementZ: 5, sizeLength: 2, sizeWidth: 2 }))
+    ];
+    const stacked = buildPreviewPart(part, features, null);
+
+    const signature = getPreviewGeometrySignature(stacked);
+    expect(signature).not.toBe('empty');
+    expect(signature).not.toBe(getPreviewGeometrySignature(part));
+    expect(getPreviewGeometrySignature(stacked)).toBe(signature);
+  });
 });
 
 describe('clamp', () => {
@@ -206,6 +234,9 @@ describe('supportsPreviewHandles', () => {
     expect(supportsPreviewHandles(createRectDraft('cutout'))).toBe(true);
     expect(supportsPreviewHandles(createRectDraft('stopped_dado'))).toBe(true);
     expect(supportsPreviewHandles(createRectDraft('stopped_groove'))).toBe(true);
+    expect(supportsPreviewHandles(createCircularDraft())).toBe(true);
+    expect(supportsPreviewHandles(createRoundedDraft('rounded_slot'))).toBe(true);
+    expect(supportsPreviewHandles(createRoundedDraft('rounded_rectangle'))).toBe(true);
   });
 
   it('rejects unsupported cut types and side faces', () => {
@@ -385,6 +416,23 @@ describe('applyHandleDelta', () => {
     expect(applyHandleDelta(part, draft, 'move', 1, 1)).toBe(draft);
   });
 
+  it.each([
+    [
+      'round-hole pattern origin',
+      createCircularDraft({ pattern: { type: 'linear', count: 2, spacing: 1, direction: 0 } })
+    ],
+    ['rounded slot', createRoundedDraft('rounded_slot')],
+    ['rounded rectangle', createRoundedDraft('rounded_rectangle')]
+  ] as const)('moves and resizes the %s through preview handles', (_label, draft) => {
+    const moved = applyHandleDelta(part, draft, 'move', 1, 0.5);
+    const resized = applyHandleDelta(part, moved, 'length', 0.5, 0);
+
+    expect(moved.placementPrimary).toBeCloseTo(draft.placementPrimary + 1);
+    expect(moved.placementSecondary).toBeCloseTo(draft.placementSecondary + 0.5);
+    if (resized.mode === 'circular_cut') expect(resized.diameter).toBeCloseTo(draft.diameter + 0.5);
+    else expect(resized.length).toBeCloseTo(draft.length + 0.5);
+  });
+
   it('moves the pocket and clamps to the part bounds', () => {
     const draft = createRectDraft('mortise', { placementX: 4, placementZ: 3 });
 
@@ -509,6 +557,36 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
 
     return { ...utils, onHoverTarget, onActivateTarget, onDraftChange };
   }
+
+  function StatefulCanvas({ initialDraft }: { initialDraft: FeatureDraft }) {
+    const [draft, setDraft] = useState(initialDraft);
+    return createElement(PartCutsPreviewCanvas, {
+      part: createTestPart({ name: 'Panel', length: 24, width: 12, thickness: 0.75 }),
+      draftFeatures: [],
+      draft,
+      selectedFeatureSummary: null,
+      selectedFeatureTargetLabel: 'Top Face',
+      hoveredTarget: null,
+      pendingTarget: null,
+      onHoverTarget: () => {},
+      onActivateTarget: () => {},
+      onDraftChange: setDraft
+    });
+  }
+
+  it.each([
+    ['round hole', createCircularDraft(), 'Enlarge Hole'],
+    ['rounded slot', createRoundedDraft('rounded_slot'), 'Extend Length'],
+    ['rounded rectangle', createRoundedDraft('rounded_rectangle'), 'Extend Length']
+  ] as const)('updates rendered %s geometry through its accessible preview affordance', (_label, draft, resize) => {
+    render(createElement(StatefulCanvas, { initialDraft: draft }));
+
+    const preview = screen.getByRole('img', { name: 'Part cuts geometry preview' });
+    const before = preview.getAttribute('data-geometry-signature');
+    fireEvent.click(within(preview).getByRole('button', { name: resize }));
+
+    expect(preview.getAttribute('data-geometry-signature')).not.toBe(before);
+  });
 
   it('renders the scene with interactive handles for supported pockets', () => {
     const draft = createRectDraft('mortise', { placementX: 4, placementZ: 3 });

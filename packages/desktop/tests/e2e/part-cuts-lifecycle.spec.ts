@@ -1170,6 +1170,12 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByLabel('Tilt From Square (degrees)').fill('15');
     await window.getByLabel('Repeating Pattern').selectOption('linear');
     await window.getByLabel('Hole Count').fill('3');
+    await window.getByLabel('Direction').fill('37');
+    const roundPreview = window.getByRole('img', { name: 'Part cuts geometry preview' });
+    const roundGeometryBefore = await roundPreview.getAttribute('data-geometry-signature');
+    await window.getByRole('button', { name: 'Move Right' }).click();
+    await window.getByRole('button', { name: 'Enlarge Hole' }).click();
+    await expect.poll(() => roundPreview.getAttribute('data-geometry-signature')).not.toBe(roundGeometryBefore);
     await window.getByRole('button', { name: 'Save Cut' }).click();
 
     await window.getByRole('button', { name: '+ Add Cut' }).click();
@@ -1179,6 +1185,7 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByLabel('Columns').fill('2');
     await fillFraction(window, 'Row Spacing', 0.25);
     await fillFraction(window, 'Column Spacing', 0.5);
+    await window.getByLabel('Grid Rotation').fill('23');
     await window.getByRole('button', { name: 'Save Cut' }).click();
 
     await window.getByRole('button', { name: '+ Add Cut' }).click();
@@ -1191,6 +1198,18 @@ test.describe('part cuts editing lifecycle', () => {
 
     await window.getByRole('button', { name: '+ Add Cut' }).click();
     await window.getByRole('button', { name: /^Rounded Rectangle\b/ }).click();
+    const rectanglePreview = window.getByRole('img', { name: 'Part cuts geometry preview' });
+    const rectangleGeometryBefore = await rectanglePreview.getAttribute('data-geometry-signature');
+    await window.getByRole('button', { name: 'Move Right' }).click();
+    await window.getByRole('button', { name: 'Extend Length' }).click();
+    await window.getByRole('button', { name: 'Widen' }).click();
+    await expect.poll(() => rectanglePreview.getAttribute('data-geometry-signature')).not.toBe(rectangleGeometryBefore);
+    await window.getByRole('button', { name: 'Save Cut' }).click();
+
+    await window.getByRole('button', { name: '+ Add Cut' }).click();
+    await window.getByRole('button', { name: /^Rounded Slot\b/ }).click();
+    await window.getByRole('button', { name: 'Move Right' }).click();
+    await window.getByRole('button', { name: 'Extend Length' }).click();
     await window.getByRole('button', { name: 'Save Cut' }).click();
     await window.getByRole('button', { name: 'Save Part' }).click();
 
@@ -1201,22 +1220,52 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByRole('button', { name: 'Carvd Studio home' }).click();
     await queueOpenPaths(window, [projectPath]);
     await window.getByRole('button', { name: 'Open file...' }).click();
-    await expect.poll(() => getFirstPartFeatureCount(window), { timeout: 5000 }).toBe(4);
+    await expect.poll(() => getFirstPartFeatureCount(window), { timeout: 5000 }).toBe(5);
 
     const savedFeatures = await window.evaluate(() =>
       (window.useProjectStore.getState().parts[0].features ?? []).map((feature) => ({
         kind: feature.kind,
-        pattern: feature.kind === 'circular_cut' ? feature.pattern : undefined
+        pattern: feature.kind === 'circular_cut' ? feature.pattern : undefined,
+        placement: feature.kind === 'end_cut' ? undefined : feature.placement,
+        parameters:
+          feature.kind === 'circular_cut'
+            ? { diameter: feature.parameters.diameter }
+            : feature.kind === 'rounded_cut'
+              ? { length: feature.parameters.length, width: feature.parameters.width }
+              : undefined
       }))
     );
     expect(savedFeatures).toEqual([
-      { kind: 'circular_cut', pattern: { type: 'linear', count: 3, spacing: 1, direction: 0 } },
       {
         kind: 'circular_cut',
-        pattern: { type: 'grid', rows: 3, columns: 2, rowSpacing: 0.25, columnSpacing: 0.5, rotation: 0 }
+        pattern: { type: 'linear', count: 3, spacing: 1, direction: 37 },
+        placement: { primary: 0.25, secondary: 0.25, rotation: 0 },
+        parameters: { diameter: 0.5 }
       },
-      { kind: 'circular_cut', pattern: { type: 'circular', count: 4, radius: 0.5, startAngle: 30 } },
-      { kind: 'rounded_cut', pattern: undefined }
+      {
+        kind: 'circular_cut',
+        pattern: { type: 'grid', rows: 3, columns: 2, rowSpacing: 0.25, columnSpacing: 0.5, rotation: 23 },
+        placement: { primary: 0, secondary: 0, rotation: 0 },
+        parameters: { diameter: 0.25 }
+      },
+      {
+        kind: 'circular_cut',
+        pattern: { type: 'circular', count: 4, radius: 0.5, startAngle: 30 },
+        placement: { primary: 0, secondary: 0, rotation: 0 },
+        parameters: { diameter: 0.25 }
+      },
+      {
+        kind: 'rounded_cut',
+        pattern: undefined,
+        placement: { primary: 0.25, secondary: 0.25, rotation: 0 },
+        parameters: { length: 3.25, width: 1.25 }
+      },
+      {
+        kind: 'rounded_cut',
+        pattern: undefined,
+        placement: { primary: 0.25, secondary: 0.25, rotation: 0 },
+        parameters: { length: 3.25, width: 1 }
+      }
     ]);
   });
 

@@ -217,6 +217,36 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByRole('button', { name: 'Save Cut' })).toBeEnabled();
   });
 
+  it.each([
+    ['Round Hole', 'Enlarge Hole', 'Hole Diameter', 'diameter'],
+    ['Rounded Slot', 'Extend Length', 'Opening Length', 'length'],
+    ['Rounded Rectangle', 'Extend Length', 'Opening Length', 'length']
+  ])(
+    'keeps %s preview-handle edits aligned with inspector values and saved placement',
+    (preset, resize, field, parameter) => {
+      const onDraftFeaturesChange = vi.fn();
+      renderWorkspace({ onDraftFeaturesChange });
+      startCut(preset);
+
+      const preview = screen.getByRole('img', { name: 'Part cuts geometry preview' });
+      expect(within(preview).getByText('Preview Handles')).toBeInTheDocument();
+      fireEvent.click(within(preview).getByRole('button', { name: 'Move Right' }));
+      fireEvent.click(within(preview).getByRole('button', { name: resize }));
+
+      expect(screen.getByLabelText('Offset Along Face')).toHaveValue('1/4');
+      expect(screen.getByLabelText('Offset Across Face')).toHaveValue('1/4');
+      expect(screen.getByLabelText(field)).toHaveValue(parameter === 'diameter' ? '1/2' : '3 1/4');
+      fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
+
+      expect(lastFeatures(onDraftFeaturesChange)[0]).toEqual(
+        expect.objectContaining({
+          placement: expect.objectContaining({ primary: 0.25, secondary: 0.25 }),
+          parameters: expect.objectContaining({ [parameter]: parameter === 'diameter' ? 0.5 : 3.25 })
+        })
+      );
+    }
+  );
+
   it('rejects an externally supplied zero-spacing linear pattern', () => {
     const invalid = {
       id: 'invalid-round-pattern',
@@ -234,6 +264,146 @@ describe('PartCutsWorkspace', () => {
     expect(validateCircularCut(invalid, createTestPart({ length: 24, width: 12, thickness: 0.75 }))).toMatch(
       /spacing must be greater than zero/i
     );
+  });
+
+  it.each([
+    [
+      'zero-member grid',
+      () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'grid' } });
+        fireEvent.change(screen.getByLabelText('Rows'), { target: { value: '0' } });
+      }
+    ],
+    [
+      '129-member grid',
+      () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'grid' } });
+        fireEvent.change(screen.getByLabelText('Rows'), { target: { value: '129' } });
+        fireEvent.change(screen.getByLabelText('Columns'), { target: { value: '1' } });
+      }
+    ],
+    [
+      'zero-member circular pattern',
+      () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'circular' } });
+        fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '0' } });
+      }
+    ],
+    [
+      '129-member circular pattern',
+      () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'circular' } });
+        fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '129' } });
+      }
+    ],
+    [
+      'linear members extending beyond the blank',
+      () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'linear' } });
+        setMeasurementField('Spacing', '24');
+      }
+    ],
+    [
+      'circular members extending beyond the blank',
+      () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'circular' } });
+        setMeasurementField('Pattern Radius', '12');
+      }
+    ]
+  ])('disables Save Cut for %s in the real inspector', async (_title, configure) => {
+    renderWorkspace();
+    startCut('Round Hole');
+    configure();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled());
+  });
+
+  it.each([
+    [
+      'linear',
+      () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'linear' } });
+        fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '1' } });
+      }
+    ],
+    [
+      'linear maximum',
+      () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'linear' } });
+        fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '128' } });
+        setMeasurementField('Spacing', '0.01');
+      }
+    ],
+    [
+      'grid',
+      () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'grid' } });
+        fireEvent.change(screen.getByLabelText('Rows'), { target: { value: '1' } });
+        fireEvent.change(screen.getByLabelText('Columns'), { target: { value: '1' } });
+      }
+    ],
+    [
+      'grid maximum',
+      () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'grid' } });
+        fireEvent.change(screen.getByLabelText('Rows'), { target: { value: '1' } });
+        fireEvent.change(screen.getByLabelText('Columns'), { target: { value: '128' } });
+        setMeasurementField('Column Spacing', '0.01');
+      }
+    ],
+    [
+      'circular',
+      () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'circular' } });
+        fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '1' } });
+      }
+    ],
+    [
+      'circular maximum',
+      () => {
+        fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'circular' } });
+        fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '128' } });
+      }
+    ]
+  ])('accepts the %s pattern boundary in the real inspector', (_title, configure) => {
+    renderWorkspace();
+    startCut('Round Hole');
+    configure();
+
+    expect(screen.getByRole('button', { name: 'Save Cut' })).toBeEnabled();
+  });
+
+  it.each([
+    [
+      'a countersink whose derived recess exceeds stock depth',
+      'Countersink',
+      () => {
+        setMeasurementField('Countersink Major Diameter', '1');
+        fireEvent.change(screen.getByLabelText('Included Angle'), { target: { value: '30' } });
+      }
+    ],
+    [
+      'a counterbore as deep as the material',
+      'Counterbore',
+      () => {
+        setMeasurementField('Counterbore Depth', '3/4');
+      }
+    ],
+    [
+      'a counterbore deeper than its blind pilot',
+      'Counterbore',
+      () => {
+        fireEvent.change(screen.getByLabelText('Depth'), { target: { value: 'blind' } });
+        setMeasurementField('Hole Depth', '1/4');
+        setMeasurementField('Counterbore Depth', '1/2');
+      }
+    ]
+  ])('disables Save Cut for %s', async (_title, preset, configure) => {
+    renderWorkspace();
+    startCut(preset);
+    configure();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled());
   });
 
   it('shows dedicated rounded opening controls', () => {

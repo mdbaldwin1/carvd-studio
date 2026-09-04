@@ -60,6 +60,99 @@ describe('roundCutUtils', () => {
       )
     ).toMatch(/Corner radius/);
   });
+
+  it.each([
+    ['zero rounded length', { length: 0, width: 2, cornerRadius: 0.25, depthMode: 'through' as const }],
+    ['non-finite rounded width', { length: 4, width: Number.NaN, cornerRadius: 0.25, depthMode: 'through' as const }],
+    [
+      'non-finite rounded rotation',
+      { length: 4, width: 2, cornerRadius: 0.25, depthMode: 'through' as const },
+      { rotation: Number.NaN }
+    ],
+    ['zero blind rounded depth', { length: 4, width: 2, cornerRadius: 0.25, depthMode: 'blind' as const, depth: 0 }],
+    [
+      'negative blind rounded depth',
+      { length: 4, width: 2, cornerRadius: 0.25, depthMode: 'blind' as const, depth: -0.25 }
+    ]
+  ] as const)('rejects %s', (_label, parameters, placement = {}) => {
+    expect(
+      validateRoundedCut(
+        rounded({ parameters, placement: { primary: 0, secondary: 0, rotation: 0, ...placement } }),
+        part
+      )
+    ).not.toBeNull();
+  });
+
+  it.each([
+    ['a countersink recess deeper than the material', 'countersink', { majorDiameter: 2, includedAngle: 30 }],
+    ['a through counterbore recess as deep as the material', 'counterbore', { diameter: 1, depth: 2 }],
+    ['a blind counterbore deeper than its pilot', 'counterbore', { diameter: 1, depth: 0.75 }]
+  ] as const)('rejects %s', (_label, cutType, recess) => {
+    const parameters =
+      cutType === 'countersink'
+        ? { diameter: 0.5, depthMode: 'through' as const, tilt: 0, direction: 0, countersink: recess }
+        : { diameter: 0.5, depthMode: 'blind' as const, depth: 0.5, tilt: 0, direction: 0, counterbore: recess };
+    expect(validateCircularCut(hole({ cutType, parameters }), part)).not.toBeNull();
+  });
+
+  it('rejects a rounded slot whose run is shorter than its diameter', () => {
+    expect(
+      validateRoundedCut(
+        rounded({
+          cutType: 'rounded_slot',
+          parameters: { length: 0.5, width: 1, cornerRadius: 0.5, depthMode: 'through' }
+        }),
+        part
+      )
+    ).not.toBeNull();
+  });
+
+  it.each([
+    ['linear', { type: 'linear' as const, count: 1, spacing: 0.01, direction: 23 }],
+    ['linear maximum', { type: 'linear' as const, count: 128, spacing: 0.01, direction: 23 }],
+    ['grid', { type: 'grid' as const, rows: 1, columns: 1, rowSpacing: 0.01, columnSpacing: 0.01, rotation: 17 }],
+    [
+      'grid maximum',
+      { type: 'grid' as const, rows: 1, columns: 128, rowSpacing: 0.01, columnSpacing: 0.01, rotation: 17 }
+    ],
+    ['circular', { type: 'circular' as const, count: 1, radius: 0.1, startAngle: 31 }],
+    ['circular maximum', { type: 'circular' as const, count: 128, radius: 0.1, startAngle: 31 }]
+  ])('accepts an in-bounds %s pattern with authored orientation', (_label, pattern) => {
+    expect(validateCircularCut(hole({ pattern }), part)).toBeNull();
+    expect(expandCircularCut(hole({ pattern }), part)).toHaveLength(
+      pattern.type === 'grid' ? pattern.rows * pattern.columns : pattern.count
+    );
+  });
+
+  it.each([
+    ['linear zero', { type: 'linear' as const, count: 0, spacing: 1, direction: 0 }],
+    ['linear over-limit', { type: 'linear' as const, count: 129, spacing: 0.01, direction: 0 }],
+    [
+      'grid over-limit',
+      { type: 'grid' as const, rows: 129, columns: 1, rowSpacing: 0.01, columnSpacing: 0.01, rotation: 0 }
+    ],
+    ['circular zero', { type: 'circular' as const, count: 0, radius: 1, startAngle: 0 }],
+    ['circular over-limit', { type: 'circular' as const, count: 129, radius: 0.1, startAngle: 0 }]
+  ])('rejects a %s pattern', (_label, pattern) => {
+    expect(validateCircularCut(hole({ pattern }), part)).not.toBeNull();
+  });
+
+  it('accepts exact profile edges but rejects over-edge circular and rounded placement', () => {
+    expect(validateCircularCut(hole({ placement: { primary: 11.75, secondary: 0, rotation: 0 } }), part)).toBeNull();
+    expect(
+      validateCircularCut(hole({ placement: { primary: 11.751, secondary: 0, rotation: 0 } }), part)
+    ).not.toBeNull();
+    expect(validateRoundedCut(rounded({ placement: { primary: 10, secondary: 0, rotation: 0 } }), part)).toBeNull();
+    expect(
+      validateRoundedCut(rounded({ placement: { primary: 10.001, secondary: 0, rotation: 0 } }), part)
+    ).not.toBeNull();
+  });
+
+  it('rejects non-finite circular placement before expanding members', () => {
+    expect(
+      validateCircularCut(hole({ placement: { primary: Number.NaN, secondary: 0, rotation: 0 } }), part)
+    ).not.toBeNull();
+  });
   it.each([
     ['top_face', { origin: { x: 0, y: 1, z: 0 }, inwardNormal: { x: 0, y: -1, z: 0 }, sizes: [24, 8] }],
     ['bottom_face', { origin: { x: 0, y: -1, z: 0 }, inwardNormal: { x: 0, y: 1, z: 0 }, sizes: [24, 8] }],

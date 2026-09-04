@@ -1344,6 +1344,23 @@ export function PartCutsWorkspace({
                                 min={0.001}
                               />
                             </div>
+                            <div>
+                              <Label htmlFor="grid-rotation">Grid Rotation</Label>
+                              <Input
+                                id="grid-rotation"
+                                type="number"
+                                value={inspectorDraft.pattern.rotation}
+                                onChange={(event) =>
+                                  setDraft({
+                                    ...inspectorDraft,
+                                    pattern: {
+                                      ...inspectorDraft.pattern!,
+                                      rotation: Number(event.target.value)
+                                    } as never
+                                  })
+                                }
+                              />
+                            </div>
                           </div>
                         )}
                         {inspectorDraft.pattern?.type === 'circular' && (

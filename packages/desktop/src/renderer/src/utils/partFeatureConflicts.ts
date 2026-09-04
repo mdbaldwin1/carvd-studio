@@ -12,6 +12,7 @@ export interface PartFeatureConflict {
     | 'duplicate_end_cut'
     | 'duplicate_round_cut'
     | 'round_overlap'
+    | 'round_rect_overlap'
     | 'rect_overlap'
     | 'rect_consumed'
     | 'rect_anchor_removed'
@@ -263,6 +264,53 @@ function circularMembersOverlap(
   return { overlaps: memberOverlap, duplicate: coaxial && sameShape };
 }
 
+function circularOverlapsRect(
+  circular: CircularCutFeature,
+  rect: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): boolean {
+  if (circular.target.face !== 'top_face' && circular.target.face !== 'bottom_face') return false;
+  if (rect.target.type !== 'face' || rect.target.face !== circular.target.face) return false;
+  const bounds = getRectFeatureBounds(rect, part);
+  if (!bounds) return false;
+  const radius = circular.parameters.diameter / 2;
+  return expandCircularCut(circular, part as Part).some(({ entryPoint }) => {
+    const x = entryPoint.x + part.length / 2;
+    const z = entryPoint.z + part.width / 2;
+    const nearestX = Math.max(bounds.minX, Math.min(x, bounds.maxX));
+    const nearestZ = Math.max(bounds.minZ, Math.min(z, bounds.maxZ));
+    return Math.hypot(x - nearestX, z - nearestZ) < radius - 1e-9;
+  });
+}
+
+function addRoundRectOverlapConflict(
+  conflicts: PartFeatureConflict[],
+  circular: { feature: CircularCutFeature; index: number },
+  rect: { feature: RectCutFeature; index: number }
+) {
+  const message = `Operation ${circular.index + 1} overlaps Operation ${rect.index + 1}. The resulting removal stack is allowed, but order now matters.`;
+  conflicts.push(
+    {
+      featureId: circular.feature.id,
+      featureIndex: circular.index,
+      relatedFeatureId: rect.feature.id,
+      relatedFeatureIndex: rect.index,
+      code: 'round_rect_overlap',
+      severity: 'warning',
+      message
+    },
+    {
+      featureId: rect.feature.id,
+      featureIndex: rect.index,
+      relatedFeatureId: circular.feature.id,
+      relatedFeatureIndex: circular.index,
+      code: 'round_rect_overlap',
+      severity: 'warning',
+      message
+    }
+  );
+}
+
 export function getPartFeatureConflicts(
   features: PartFeature[],
   part: Pick<Part, 'length' | 'width' | 'thickness'>
@@ -311,6 +359,10 @@ export function getPartFeatureConflicts(
     }
 
     if (feature.kind === 'circular_cut') {
+      for (const prior of priorRectCuts) {
+        if (circularOverlapsRect(feature, prior.feature, part))
+          addRoundRectOverlapConflict(conflicts, { feature, index }, prior);
+      }
       for (const prior of priorCircularCuts) {
         const result = circularMembersOverlap(prior.feature, feature, part as Part);
         if (!result.overlaps) continue;
@@ -343,6 +395,10 @@ export function getPartFeatureConflicts(
     }
 
     if (feature.kind !== 'rect_cut') continue;
+    for (const prior of priorCircularCuts) {
+      if (circularOverlapsRect(prior.feature, feature, part))
+        addRoundRectOverlapConflict(conflicts, prior, { feature, index });
+    }
     const currentBounds = getRectFeatureBounds(feature, part);
     if (!currentBounds) {
       priorRectCuts.push({ feature, index });

@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Round-cut validation feedback and limits** — Invalid round-hole patterns, near-vertical bores, incomplete blind/recess settings, and oversized countersink or counterbore profiles are now blocked with visible, actionable feedback before they can be saved.
+- **Round-cut validation and preview editing** — Round holes and rounded openings now have accessible move/resize controls in the cuts preview. Invalid patterns, near-vertical bores, incomplete blind/recess settings, and oversized countersink or counterbore profiles are blocked with visible, actionable feedback before they can be saved.
 - **Bounded cut geometry cache** — Live cut editing now evicts old generated geometry instead of allowing preview memory use to grow without limit during long editing sessions.
 - **Defensive Custom Cuts file loading** — Version 2 project files now validate all saved cut payloads before migration, reporting malformed or unsupported operations instead of crashing while opening a project.
 
