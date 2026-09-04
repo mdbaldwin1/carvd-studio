@@ -87,6 +87,14 @@ describe('dowelJointUtils', () => {
     joint.secondFeatures[0].parameters.diameter = 0.5;
     expect(validateDowelRelationships(paired)).toEqual([expect.stringMatching(/mismatched or misaligned/i)]);
     joint.secondFeatures[0].parameters.diameter = 0.375;
+    joint.secondFeatures[0].pattern = { type: 'linear', count: 2, spacing: 1, direction: 0 };
+    expect(validateDowelRelationships(paired)).toEqual([expect.stringMatching(/mismatched or misaligned/i)]);
+    joint.secondFeatures[0].pattern = undefined;
+    joint.secondFeatures[0].cutType = 'countersink';
+    joint.secondFeatures[0].parameters.countersink = { majorDiameter: 0.75, includedAngle: 82 };
+    expect(validateDowelRelationships(paired)).toEqual([expect.stringMatching(/mismatched or misaligned/i)]);
+    joint.secondFeatures[0].cutType = 'round_hole';
+    joint.secondFeatures[0].parameters.countersink = undefined;
     paired[1] = { ...paired[1], position: { x: 1, y: 1, z: 0 } };
     expect(validateDowelRelationships(paired)).toEqual([expect.stringMatching(/mismatched or misaligned/i)]);
   });

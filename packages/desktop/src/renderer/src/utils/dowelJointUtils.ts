@@ -211,6 +211,14 @@ export function validateDowelRelationships(parts: Part[]): string[] {
       first.metadata.dowelDiameter === second.metadata.dowelDiameter &&
       first.metadata.dowelLength === second.metadata.dowelLength;
     const matchingFeatures =
+      first.feature.cutType === 'round_hole' &&
+      second.feature.cutType === 'round_hole' &&
+      first.feature.pattern === undefined &&
+      second.feature.pattern === undefined &&
+      first.feature.parameters.countersink === undefined &&
+      second.feature.parameters.countersink === undefined &&
+      first.feature.parameters.counterbore === undefined &&
+      second.feature.parameters.counterbore === undefined &&
       first.feature.parameters.diameter === first.metadata.dowelDiameter &&
       second.feature.parameters.diameter === second.metadata.dowelDiameter &&
       first.feature.parameters.depthMode === 'blind' &&
