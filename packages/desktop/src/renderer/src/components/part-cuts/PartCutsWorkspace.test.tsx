@@ -92,6 +92,42 @@ function lastFeatures(onDraftFeaturesChange: WorkspaceProps['onDraftFeaturesChan
 }
 
 describe('PartCutsWorkspace', () => {
+  it('creates an angled patterned round hole from the Round Cuts group', () => {
+    const onDraftFeaturesChange = vi.fn();
+    renderWorkspace({ onDraftFeaturesChange });
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    expect(screen.getByText('Round Cuts')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Round Hole'));
+    expect(screen.getByText('Step 2: Pick a face and place the hole')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Depth'), { target: { value: 'blind' } });
+    fireEvent.change(screen.getByLabelText('Tilt From Square (degrees)'), { target: { value: '15' } });
+    fireEvent.change(screen.getByLabelText('Tilt Toward (degrees)'), { target: { value: '90' } });
+    fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'linear' } });
+    fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
+
+    expect(onDraftFeaturesChange).toHaveBeenCalledWith([
+      expect.objectContaining({
+        kind: 'circular_cut',
+        cutType: 'round_hole',
+        parameters: expect.objectContaining({ depthMode: 'blind', tilt: 15, direction: 90 }),
+        pattern: expect.objectContaining({ type: 'linear', count: 3 })
+      })
+    ]);
+  });
+
+  it('shows dedicated rounded opening controls', () => {
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    expect(screen.getByText('Rounded Openings')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Rounded Rectangle'));
+    expect(screen.getByText('Opening Length')).toBeInTheDocument();
+    expect(screen.getByText('Opening Width')).toBeInTheDocument();
+    expect(screen.getByText('Corner Radius')).toBeInTheDocument();
+    expect(screen.getByLabelText('Rotation (degrees)')).toBeInTheDocument();
+  });
+
   it('shows the cuts list with an add button by default', () => {
     render(
       <PartCutsWorkspace

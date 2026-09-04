@@ -1,11 +1,14 @@
 import {
   CornerTarget,
+  CircularCutFeature,
+  CircularPattern,
   EdgeTarget,
   EndCutFeature,
   FaceTarget,
   PartFeature,
   PartFeatureTarget,
-  RectCutFeature
+  RectCutFeature,
+  RoundedCutFeature
 } from '@renderer/types';
 import { clonePartFeature } from '@renderer/utils/partFeatures';
 
@@ -82,7 +85,12 @@ export type OperationPreset =
   | 'rabbet'
   | 'groove'
   | 'stopped_groove'
-  | 'mortise';
+  | 'mortise'
+  | 'round_hole'
+  | 'countersink'
+  | 'counterbore'
+  | 'rounded_slot'
+  | 'rounded_rectangle';
 
 type EndCutReference = NonNullable<EndCutFeature['parameters']['reference']>;
 
@@ -117,6 +125,43 @@ export type FeatureDraft =
       depth: number;
       placementX: number;
       placementZ: number;
+    }
+  | {
+      mode: 'circular_cut';
+      featureId: string | null;
+      label: string;
+      enabled: boolean;
+      cutType: CircularCutFeature['cutType'];
+      faceTarget: FaceTarget;
+      diameter: number;
+      depthMode: CircularCutFeature['parameters']['depthMode'];
+      depth: number;
+      tilt: number;
+      direction: number;
+      placementPrimary: number;
+      placementSecondary: number;
+      rotation: number;
+      countersinkMajorDiameter: number;
+      countersinkIncludedAngle: number;
+      counterboreDiameter: number;
+      counterboreDepth: number;
+      pattern?: CircularPattern;
+    }
+  | {
+      mode: 'rounded_cut';
+      featureId: string | null;
+      label: string;
+      enabled: boolean;
+      cutType: RoundedCutFeature['cutType'];
+      faceTarget: FaceTarget;
+      length: number;
+      width: number;
+      cornerRadius: number;
+      depthMode: RoundedCutFeature['parameters']['depthMode'];
+      depth: number;
+      placementPrimary: number;
+      placementSecondary: number;
+      rotation: number;
     };
 
 type DraftPartDefaults = { partLength?: number; partWidth?: number; partThickness?: number };
@@ -375,6 +420,48 @@ export function buildDraftFromPreset(preset: OperationPreset, defaults?: DraftPa
     };
   }
 
+  if (preset === 'round_hole' || preset === 'countersink' || preset === 'counterbore') {
+    return {
+      mode: 'circular_cut',
+      featureId: null,
+      label: '',
+      enabled: true,
+      cutType: preset,
+      faceTarget: 'top_face',
+      diameter: 0.25,
+      depthMode: 'through',
+      depth: Math.min(0.5, (defaults?.partThickness ?? 0.75) / 2),
+      tilt: 0,
+      direction: 0,
+      placementPrimary: 0,
+      placementSecondary: 0,
+      rotation: 0,
+      countersinkMajorDiameter: 0.5,
+      countersinkIncludedAngle: 82,
+      counterboreDiameter: 0.5,
+      counterboreDepth: 0.125
+    };
+  }
+
+  if (preset === 'rounded_slot' || preset === 'rounded_rectangle') {
+    return {
+      mode: 'rounded_cut',
+      featureId: null,
+      label: '',
+      enabled: true,
+      cutType: preset,
+      faceTarget: 'top_face',
+      length: 3,
+      width: 1,
+      cornerRadius: preset === 'rounded_slot' ? 0.5 : 0.25,
+      depthMode: 'through',
+      depth: Math.min(0.25, (defaults?.partThickness ?? 0.75) / 2),
+      placementPrimary: 0,
+      placementSecondary: 0,
+      rotation: 0
+    };
+  }
+
   if (preset === 'half_lap') {
     // A half lap is a blind dado at half the board thickness. Default to an
     // end lap (channel at the left end); the maker adjusts run and position
@@ -415,6 +502,49 @@ export function buildDraftFromFeature(
       horizontalFlip: feature.parameters.horizontalFlip ?? false,
       verticalAngle: feature.parameters.verticalAngle ?? 0,
       verticalFlip: feature.parameters.verticalFlip ?? false
+    };
+  }
+
+  if (feature.kind === 'circular_cut') {
+    return {
+      mode: 'circular_cut',
+      featureId: feature.id,
+      label: feature.label ?? '',
+      enabled: feature.enabled,
+      cutType: feature.cutType,
+      faceTarget: feature.target.face,
+      diameter: feature.parameters.diameter,
+      depthMode: feature.parameters.depthMode,
+      depth: feature.parameters.depth ?? 0.25,
+      tilt: feature.parameters.tilt,
+      direction: feature.parameters.direction,
+      placementPrimary: feature.placement.primary,
+      placementSecondary: feature.placement.secondary,
+      rotation: feature.placement.rotation,
+      countersinkMajorDiameter: feature.parameters.countersink?.majorDiameter ?? feature.parameters.diameter * 2,
+      countersinkIncludedAngle: feature.parameters.countersink?.includedAngle ?? 82,
+      counterboreDiameter: feature.parameters.counterbore?.diameter ?? feature.parameters.diameter * 2,
+      counterboreDepth: feature.parameters.counterbore?.depth ?? 0.125,
+      pattern: feature.pattern ? structuredClone(feature.pattern) : undefined
+    };
+  }
+
+  if (feature.kind === 'rounded_cut') {
+    return {
+      mode: 'rounded_cut',
+      featureId: feature.id,
+      label: feature.label ?? '',
+      enabled: feature.enabled,
+      cutType: feature.cutType,
+      faceTarget: feature.target.face,
+      length: feature.parameters.length,
+      width: feature.parameters.width,
+      cornerRadius: feature.parameters.cornerRadius,
+      depthMode: feature.parameters.depthMode,
+      depth: feature.parameters.depth ?? 0.25,
+      placementPrimary: feature.placement.primary,
+      placementSecondary: feature.placement.secondary,
+      rotation: feature.placement.rotation
     };
   }
 
@@ -489,6 +619,65 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
     };
   }
 
+  if (draft.mode === 'circular_cut') {
+    return {
+      id: draft.featureId ?? generateFeatureId(),
+      kind: 'circular_cut',
+      version: 1,
+      enabled: draft.enabled,
+      label: draft.label || undefined,
+      target: { type: 'face', face: draft.faceTarget },
+      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      cutType: draft.cutType,
+      parameters: {
+        diameter: draft.diameter,
+        depthMode: draft.depthMode,
+        depth: draft.depthMode === 'blind' ? draft.depth : undefined,
+        tilt: draft.tilt,
+        direction: draft.direction,
+        countersink:
+          draft.cutType === 'countersink'
+            ? { majorDiameter: draft.countersinkMajorDiameter, includedAngle: draft.countersinkIncludedAngle }
+            : undefined,
+        counterbore:
+          draft.cutType === 'counterbore'
+            ? { diameter: draft.counterboreDiameter, depth: draft.counterboreDepth }
+            : undefined
+      },
+      placement: {
+        primary: draft.placementPrimary,
+        secondary: draft.placementSecondary,
+        rotation: draft.rotation
+      },
+      pattern: draft.pattern ? structuredClone(draft.pattern) : undefined
+    };
+  }
+
+  if (draft.mode === 'rounded_cut') {
+    return {
+      id: draft.featureId ?? generateFeatureId(),
+      kind: 'rounded_cut',
+      version: 1,
+      enabled: draft.enabled,
+      label: draft.label || undefined,
+      target: { type: 'face', face: draft.faceTarget },
+      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      cutType: draft.cutType,
+      parameters: {
+        length: draft.length,
+        width: draft.width,
+        cornerRadius: draft.cutType === 'rounded_slot' ? draft.width / 2 : draft.cornerRadius,
+        depthMode: draft.depthMode,
+        depth: draft.depthMode === 'blind' ? draft.depth : undefined
+      },
+      placement: {
+        primary: draft.placementPrimary,
+        secondary: draft.placementSecondary,
+        rotation: draft.rotation
+      }
+    };
+  }
+
   const target =
     draft.cutType === 'corner_notch'
       ? { type: 'corner' as const, corner: draft.cornerTarget }
@@ -531,6 +720,10 @@ export function getFeatureDraftTarget(draft: FeatureDraft): PartFeatureTarget {
     return { type: 'face', face: draft.targetFace };
   }
 
+  if (draft.mode === 'circular_cut' || draft.mode === 'rounded_cut') {
+    return { type: 'face', face: draft.faceTarget };
+  }
+
   if (draft.cutType === 'corner_notch') {
     return { type: 'corner', corner: draft.cornerTarget };
   }
@@ -547,6 +740,10 @@ export function applyTargetToFeatureDraft(draft: FeatureDraft, target: PartFeatu
     return target.type === 'face' && (target.face === 'left_end' || target.face === 'right_end')
       ? { ...draft, targetFace: target.face }
       : draft;
+  }
+
+  if (draft.mode === 'circular_cut' || draft.mode === 'rounded_cut') {
+    return target.type === 'face' ? { ...draft, faceTarget: target.face } : draft;
   }
 
   if (draft.cutType === 'corner_notch') {
@@ -596,6 +793,16 @@ export function getPresetLabel(preset: OperationPreset): string {
       return 'Stopped Groove';
     case 'mortise':
       return 'Mortise';
+    case 'round_hole':
+      return 'Round Hole';
+    case 'countersink':
+      return 'Countersink';
+    case 'counterbore':
+      return 'Counterbore';
+    case 'rounded_slot':
+      return 'Rounded Slot';
+    case 'rounded_rectangle':
+      return 'Rounded Rectangle';
   }
 }
 
@@ -627,5 +834,15 @@ export function getPresetHint(preset: OperationPreset): string {
       return 'Blind groove along the length, stopping short.';
     case 'mortise':
       return 'Blind pocket for a tenon to seat into.';
+    case 'round_hole':
+      return 'Straight or angled round hole, blind or through.';
+    case 'countersink':
+      return 'Round hole with a tapered recess for a flat-head fastener.';
+    case 'counterbore':
+      return 'Round hole with a flat-bottomed larger recess.';
+    case 'rounded_slot':
+      return 'Oblong opening with fully rounded ends.';
+    case 'rounded_rectangle':
+      return 'Rectangular opening with a controlled corner radius.';
   }
 }

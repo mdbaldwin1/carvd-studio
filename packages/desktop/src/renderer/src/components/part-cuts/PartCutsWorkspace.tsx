@@ -52,6 +52,7 @@ import {
   TOP_BOTTOM_FACE_TARGETS,
   validateRectCutFeature
 } from '@renderer/utils/rectCutUtils';
+import { validateCircularCut, validateRoundedCut } from '@renderer/utils/roundCutUtils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -101,6 +102,8 @@ function getDraftStepTitle(draft: FeatureDraft): string {
     return isEdgeBevelTarget(draft.targetFace)
       ? 'Step 2: Pick the edge and set the bevel angle'
       : 'Step 2: Pick the end and set the angle';
+  if (draft.mode === 'circular_cut') return 'Step 2: Pick a face and place the hole';
+  if (draft.mode === 'rounded_cut') return 'Step 2: Pick a face and size the rounded opening';
 
   switch (draft.cutType) {
     case 'tenon':
@@ -127,6 +130,12 @@ function getDraftStepTitle(draft: FeatureDraft): string {
 function getDraftStepDescription(draft: FeatureDraft): string {
   if (draft.mode === 'end_cut') {
     return 'Choose the end first, then set the cut style, angle, and direction. The part length stays fixed for the cut list.';
+  }
+  if (draft.mode === 'circular_cut') {
+    return 'Choose any face, then set diameter, depth, angle, placement, and an optional repeating pattern.';
+  }
+  if (draft.mode === 'rounded_cut') {
+    return 'Choose any face, then set the profile size, corner shape, depth, placement, and rotation.';
   }
 
   switch (draft.cutType) {
@@ -241,8 +250,12 @@ export function PartCutsWorkspace({
   }, [draft]);
 
   const draftValidationMessage = useMemo(() => {
-    if (!draft || draft.mode !== 'rect_cut') return null;
-    return validateRectCutFeature(buildFeatureFromDraft(draft), part);
+    if (!draft) return null;
+    const feature = buildFeatureFromDraft(draft);
+    if (feature.kind === 'rect_cut') return validateRectCutFeature(feature, part);
+    if (feature.kind === 'circular_cut') return validateCircularCut(feature, part);
+    if (feature.kind === 'rounded_cut') return validateRoundedCut(feature, part);
+    return null;
   }, [draft, part]);
 
   const endCutPreviewMeasurements = useMemo(() => {
@@ -324,7 +337,7 @@ export function PartCutsWorkspace({
 
   const handleSaveDraft = () => {
     if (!draft) return;
-    if (draft.mode === 'rect_cut' && draftValidationMessage) return;
+    if (draftValidationMessage) return;
 
     const nextFeature = buildFeatureFromDraft(draft.mode === 'end_cut' ? normalizeEndCutDraft(draft) : draft);
     const nextFeatures = draft.featureId
@@ -709,7 +722,9 @@ export function PartCutsWorkspace({
                         presets: ['dado', 'stopped_dado', 'groove', 'stopped_groove', 'half_lap']
                       },
                       { group: 'Edges & Corners', presets: ['rabbet', 'edge_notch', 'corner_notch'] },
-                      { group: 'Pockets & Openings', presets: ['mortise', 'cutout'] }
+                      { group: 'Pockets & Openings', presets: ['mortise', 'cutout'] },
+                      { group: 'Round Cuts', presets: ['round_hole', 'countersink', 'counterbore'] },
+                      { group: 'Rounded Openings', presets: ['rounded_slot', 'rounded_rectangle'] }
                     ] as Array<{ group: string; presets: OperationPreset[] }>
                   ).map(({ group, presets }) => (
                     <div key={group}>
@@ -863,6 +878,23 @@ export function PartCutsWorkspace({
                         ))}
                       </div>
                     )}
+
+                  {(inspectorDraft.mode === 'circular_cut' || inspectorDraft.mode === 'rounded_cut') && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {FACE_TARGETS.map((target) => (
+                        <Button
+                          key={target}
+                          type="button"
+                          size="xs"
+                          variant="outline"
+                          active={inspectorDraft.faceTarget === target}
+                          onClick={() => setDraft({ ...inspectorDraft, faceTarget: target })}
+                        >
+                          {FACE_LABELS[target]}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="mt-4 space-y-3">
                     <div>
@@ -1020,6 +1052,404 @@ export function PartCutsWorkspace({
                             </div>
                           </div>
                         )}
+                      </>
+                    )}
+
+                    {inspectorDraft.mode === 'circular_cut' && (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Hole Diameter</Label>
+                            <FractionInput
+                              value={inspectorDraft.diameter}
+                              onChange={(diameter) => setDraft({ ...inspectorDraft, diameter })}
+                              min={0.001}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="round-depth-mode">Depth</Label>
+                            <Select
+                              id="round-depth-mode"
+                              value={inspectorDraft.depthMode}
+                              onChange={(event) =>
+                                setDraft({
+                                  ...inspectorDraft,
+                                  depthMode: event.target.value as 'through' | 'blind'
+                                })
+                              }
+                            >
+                              <option value="through">Through</option>
+                              <option value="blind">Blind</option>
+                            </Select>
+                          </div>
+                        </div>
+                        {inspectorDraft.depthMode === 'blind' && (
+                          <div>
+                            <Label>Hole Depth</Label>
+                            <FractionInput
+                              value={inspectorDraft.depth}
+                              onChange={(depth) => setDraft({ ...inspectorDraft, depth })}
+                              min={0.001}
+                            />
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="hole-tilt">Tilt From Square (degrees)</Label>
+                            <Input
+                              id="hole-tilt"
+                              type="number"
+                              min={0}
+                              max={89}
+                              value={inspectorDraft.tilt}
+                              onChange={(event) => setDraft({ ...inspectorDraft, tilt: Number(event.target.value) })}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="hole-direction">Tilt Toward (degrees)</Label>
+                            <Input
+                              id="hole-direction"
+                              type="number"
+                              value={inspectorDraft.direction}
+                              onChange={(event) =>
+                                setDraft({ ...inspectorDraft, direction: Number(event.target.value) })
+                              }
+                            />
+                          </div>
+                        </div>
+                        {inspectorDraft.cutType === 'countersink' && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label>Countersink Major Diameter</Label>
+                              <FractionInput
+                                value={inspectorDraft.countersinkMajorDiameter}
+                                onChange={(countersinkMajorDiameter) =>
+                                  setDraft({ ...inspectorDraft, countersinkMajorDiameter })
+                                }
+                                min={inspectorDraft.diameter}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="countersink-angle">Included Angle</Label>
+                              <Input
+                                id="countersink-angle"
+                                type="number"
+                                value={inspectorDraft.countersinkIncludedAngle}
+                                onChange={(event) =>
+                                  setDraft({ ...inspectorDraft, countersinkIncludedAngle: Number(event.target.value) })
+                                }
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {inspectorDraft.cutType === 'counterbore' && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label>Counterbore Diameter</Label>
+                              <FractionInput
+                                value={inspectorDraft.counterboreDiameter}
+                                onChange={(counterboreDiameter) => setDraft({ ...inspectorDraft, counterboreDiameter })}
+                                min={inspectorDraft.diameter}
+                              />
+                            </div>
+                            <div>
+                              <Label>Counterbore Depth</Label>
+                              <FractionInput
+                                value={inspectorDraft.counterboreDepth}
+                                onChange={(counterboreDepth) => setDraft({ ...inspectorDraft, counterboreDepth })}
+                                min={0.001}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Offset Along Face</Label>
+                            <FractionInput
+                              value={inspectorDraft.placementPrimary}
+                              onChange={(placementPrimary) => setDraft({ ...inspectorDraft, placementPrimary })}
+                            />
+                          </div>
+                          <div>
+                            <Label>Offset Across Face</Label>
+                            <FractionInput
+                              value={inspectorDraft.placementSecondary}
+                              onChange={(placementSecondary) => setDraft({ ...inspectorDraft, placementSecondary })}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="hole-pattern">Repeating Pattern</Label>
+                          <Select
+                            id="hole-pattern"
+                            value={inspectorDraft.pattern?.type ?? 'none'}
+                            onChange={(event) => {
+                              const type = event.target.value;
+                              setDraft({
+                                ...inspectorDraft,
+                                pattern:
+                                  type === 'linear'
+                                    ? { type: 'linear', count: 2, spacing: 1, direction: 0 }
+                                    : type === 'grid'
+                                      ? {
+                                          type: 'grid',
+                                          rows: 2,
+                                          columns: 2,
+                                          rowSpacing: 1,
+                                          columnSpacing: 1,
+                                          rotation: 0
+                                        }
+                                      : type === 'circular'
+                                        ? { type: 'circular', count: 4, radius: 1, startAngle: 0 }
+                                        : undefined
+                              });
+                            }}
+                          >
+                            <option value="none">Single hole</option>
+                            <option value="linear">Linear</option>
+                            <option value="grid">Grid</option>
+                            <option value="circular">Around a circle</option>
+                          </Select>
+                        </div>
+                        {inspectorDraft.pattern?.type === 'linear' && (
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <Label htmlFor="linear-count">Hole Count</Label>
+                              <Input
+                                id="linear-count"
+                                type="number"
+                                min={1}
+                                max={128}
+                                value={inspectorDraft.pattern.count}
+                                onChange={(event) =>
+                                  setDraft({
+                                    ...inspectorDraft,
+                                    pattern: { ...inspectorDraft.pattern!, count: Number(event.target.value) } as never
+                                  })
+                                }
+                              />
+                            </div>
+                            <div>
+                              <Label>Spacing</Label>
+                              <FractionInput
+                                value={inspectorDraft.pattern.spacing}
+                                onChange={(spacing) =>
+                                  setDraft({
+                                    ...inspectorDraft,
+                                    pattern: { ...inspectorDraft.pattern!, spacing } as never
+                                  })
+                                }
+                                min={0.001}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="linear-direction">Direction</Label>
+                              <Input
+                                id="linear-direction"
+                                type="number"
+                                value={inspectorDraft.pattern.direction}
+                                onChange={(event) =>
+                                  setDraft({
+                                    ...inspectorDraft,
+                                    pattern: {
+                                      ...inspectorDraft.pattern!,
+                                      direction: Number(event.target.value)
+                                    } as never
+                                  })
+                                }
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {inspectorDraft.pattern?.type === 'grid' && (
+                          <div className="grid grid-cols-2 gap-3">
+                            {(['rows', 'columns'] as const).map((field) => (
+                              <div key={field}>
+                                <Label htmlFor={`grid-${field}`}>{field === 'rows' ? 'Rows' : 'Columns'}</Label>
+                                <Input
+                                  id={`grid-${field}`}
+                                  type="number"
+                                  min={1}
+                                  max={128}
+                                  value={inspectorDraft.pattern![field]}
+                                  onChange={(event) =>
+                                    setDraft({
+                                      ...inspectorDraft,
+                                      pattern: {
+                                        ...inspectorDraft.pattern!,
+                                        [field]: Number(event.target.value)
+                                      } as never
+                                    })
+                                  }
+                                />
+                              </div>
+                            ))}
+                            <div>
+                              <Label>Row Spacing</Label>
+                              <FractionInput
+                                value={inspectorDraft.pattern.rowSpacing}
+                                onChange={(rowSpacing) =>
+                                  setDraft({
+                                    ...inspectorDraft,
+                                    pattern: { ...inspectorDraft.pattern!, rowSpacing } as never
+                                  })
+                                }
+                                min={0.001}
+                              />
+                            </div>
+                            <div>
+                              <Label>Column Spacing</Label>
+                              <FractionInput
+                                value={inspectorDraft.pattern.columnSpacing}
+                                onChange={(columnSpacing) =>
+                                  setDraft({
+                                    ...inspectorDraft,
+                                    pattern: { ...inspectorDraft.pattern!, columnSpacing } as never
+                                  })
+                                }
+                                min={0.001}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {inspectorDraft.pattern?.type === 'circular' && (
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <Label htmlFor="circular-count">Hole Count</Label>
+                              <Input
+                                id="circular-count"
+                                type="number"
+                                min={1}
+                                max={128}
+                                value={inspectorDraft.pattern.count}
+                                onChange={(event) =>
+                                  setDraft({
+                                    ...inspectorDraft,
+                                    pattern: { ...inspectorDraft.pattern!, count: Number(event.target.value) } as never
+                                  })
+                                }
+                              />
+                            </div>
+                            <div>
+                              <Label>Pattern Radius</Label>
+                              <FractionInput
+                                value={inspectorDraft.pattern.radius}
+                                onChange={(radius) =>
+                                  setDraft({
+                                    ...inspectorDraft,
+                                    pattern: { ...inspectorDraft.pattern!, radius } as never
+                                  })
+                                }
+                                min={0.001}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="circular-start-angle">Start Angle</Label>
+                              <Input
+                                id="circular-start-angle"
+                                type="number"
+                                value={inspectorDraft.pattern.startAngle}
+                                onChange={(event) =>
+                                  setDraft({
+                                    ...inspectorDraft,
+                                    pattern: {
+                                      ...inspectorDraft.pattern!,
+                                      startAngle: Number(event.target.value)
+                                    } as never
+                                  })
+                                }
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {inspectorDraft.mode === 'rounded_cut' && (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Opening Length</Label>
+                            <FractionInput
+                              value={inspectorDraft.length}
+                              onChange={(length) => setDraft({ ...inspectorDraft, length })}
+                              min={0.001}
+                            />
+                          </div>
+                          <div>
+                            <Label>Opening Width</Label>
+                            <FractionInput
+                              value={inspectorDraft.width}
+                              onChange={(width) => setDraft({ ...inspectorDraft, width })}
+                              min={0.001}
+                            />
+                          </div>
+                        </div>
+                        {inspectorDraft.cutType === 'rounded_rectangle' && (
+                          <div>
+                            <Label>Corner Radius</Label>
+                            <FractionInput
+                              value={inspectorDraft.cornerRadius}
+                              onChange={(cornerRadius) => setDraft({ ...inspectorDraft, cornerRadius })}
+                              min={0.001}
+                            />
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label htmlFor="rounded-depth-mode">Depth</Label>
+                            <Select
+                              id="rounded-depth-mode"
+                              value={inspectorDraft.depthMode}
+                              onChange={(event) =>
+                                setDraft({
+                                  ...inspectorDraft,
+                                  depthMode: event.target.value as 'through' | 'blind'
+                                })
+                              }
+                            >
+                              <option value="through">Through</option>
+                              <option value="blind">Blind</option>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label htmlFor="rounded-rotation">Rotation (degrees)</Label>
+                            <Input
+                              id="rounded-rotation"
+                              type="number"
+                              value={inspectorDraft.rotation}
+                              onChange={(event) =>
+                                setDraft({ ...inspectorDraft, rotation: Number(event.target.value) })
+                              }
+                            />
+                          </div>
+                        </div>
+                        {inspectorDraft.depthMode === 'blind' && (
+                          <div>
+                            <Label>Opening Depth</Label>
+                            <FractionInput
+                              value={inspectorDraft.depth}
+                              onChange={(depth) => setDraft({ ...inspectorDraft, depth })}
+                              min={0.001}
+                            />
+                          </div>
+                        )}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label>Offset Along Face</Label>
+                            <FractionInput
+                              value={inspectorDraft.placementPrimary}
+                              onChange={(placementPrimary) => setDraft({ ...inspectorDraft, placementPrimary })}
+                            />
+                          </div>
+                          <div>
+                            <Label>Offset Across Face</Label>
+                            <FractionInput
+                              value={inspectorDraft.placementSecondary}
+                              onChange={(placementSecondary) => setDraft({ ...inspectorDraft, placementSecondary })}
+                            />
+                          </div>
+                        </div>
                       </>
                     )}
 

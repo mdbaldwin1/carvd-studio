@@ -63,6 +63,23 @@ function createEndCutDraft(overrides?: Partial<EndCutDraft>): EndCutDraft {
 }
 
 describe('partFeatureEditorState', () => {
+  it('builds and round-trips every round-cut preset', () => {
+    for (const preset of ['round_hole', 'countersink', 'counterbore'] as const) {
+      const draft = buildDraftFromPreset(preset, PART_DEFAULTS);
+      expect(draft.mode).toBe('circular_cut');
+      const feature = buildFeatureFromDraft(draft);
+      expect(feature).toMatchObject({ kind: 'circular_cut', cutType: preset, target: { face: 'top_face' } });
+      expect(buildFeatureFromDraft(buildDraftFromFeature(feature))).toEqual(feature);
+    }
+  });
+
+  it('builds and round-trips rounded profiles', () => {
+    for (const preset of ['rounded_slot', 'rounded_rectangle'] as const) {
+      const feature = buildFeatureFromDraft(buildDraftFromPreset(preset, PART_DEFAULTS));
+      expect(feature).toMatchObject({ kind: 'rounded_cut', cutType: preset });
+      expect(buildFeatureFromDraft(buildDraftFromFeature(feature))).toEqual(feature);
+    }
+  });
   it('preserves end-cut length semantics when round-tripping through the draft model', () => {
     const feature = {
       id: 'feature-1',

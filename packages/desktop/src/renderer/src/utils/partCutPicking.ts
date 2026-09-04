@@ -332,6 +332,10 @@ export function isTargetValidForDraft(target: PartFeatureTarget, draft: FeatureD
     return target.type === 'face' && (target.face === 'left_end' || target.face === 'right_end');
   }
 
+  if (draft.mode === 'circular_cut' || draft.mode === 'rounded_cut') {
+    return target.type === 'face';
+  }
+
   if (draft.cutType === 'corner_notch') {
     if (target.type !== 'corner') return false;
     if (draft.depthMode === 'through') return true;

@@ -191,6 +191,23 @@ function distanceToExit(point: Point3, axis: Point3, part: Part): number {
 }
 
 export function validateCircularCut(feature: CircularCutFeature, part: Part): string | null {
+  if (!Number.isFinite(feature.parameters.diameter) || feature.parameters.diameter <= 0)
+    return 'Hole diameter must be greater than zero.';
+  if (
+    feature.cutType === 'countersink' &&
+    (!feature.parameters.countersink ||
+      feature.parameters.countersink.majorDiameter <= feature.parameters.diameter ||
+      feature.parameters.countersink.includedAngle <= 0 ||
+      feature.parameters.countersink.includedAngle >= 180)
+  )
+    return 'Countersink diameter must exceed the hole diameter and its angle must be between 0° and 180°.';
+  if (
+    feature.cutType === 'counterbore' &&
+    (!feature.parameters.counterbore ||
+      feature.parameters.counterbore.diameter <= feature.parameters.diameter ||
+      feature.parameters.counterbore.depth <= 0)
+  )
+    return 'Counterbore diameter must exceed the hole diameter and its recess depth must be greater than zero.';
   const frame = getFaceFrame(part, feature.target.face);
   const radius = feature.parameters.diameter / 2;
   const expanded = expandCircularCut(feature, part);
@@ -213,6 +230,13 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
 }
 
 export function validateRoundedCut(feature: RoundedCutFeature, part: Part): string | null {
+  if (feature.parameters.length <= 0 || feature.parameters.width <= 0)
+    return 'Rounded-cut length and width must be greater than zero.';
+  if (
+    feature.parameters.cornerRadius <= 0 ||
+    feature.parameters.cornerRadius > Math.min(feature.parameters.length, feature.parameters.width) / 2
+  )
+    return 'Corner radius must fit within half the opening width and length.';
   const frame = getFaceFrame(part, feature.target.face);
   const primary = referencedOffset(feature.placement.primary, frame.primarySize, feature.reference.primaryFrom);
   const secondary = referencedOffset(feature.placement.secondary, frame.secondarySize, feature.reference.secondaryFrom);

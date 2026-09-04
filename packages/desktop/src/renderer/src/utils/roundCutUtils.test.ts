@@ -36,6 +36,30 @@ function rounded(overrides: Partial<RoundedCutFeature> = {}): RoundedCutFeature 
 }
 
 describe('roundCutUtils', () => {
+  it('rejects invalid recess and rounded-profile dimensions', () => {
+    const part = createTestPart({ length: 12, width: 6, thickness: 1 });
+    expect(
+      validateCircularCut(
+        hole({
+          cutType: 'countersink',
+          parameters: {
+            diameter: 0.5,
+            depthMode: 'through',
+            tilt: 0,
+            direction: 0,
+            countersink: { majorDiameter: 0.4, includedAngle: 82 }
+          }
+        }),
+        part
+      )
+    ).toMatch(/Countersink diameter/);
+    expect(
+      validateRoundedCut(
+        rounded({ parameters: { length: 4, width: 2, cornerRadius: 1.25, depthMode: 'through' } }),
+        part
+      )
+    ).toMatch(/Corner radius/);
+  });
   it.each([
     ['top_face', { origin: { x: 0, y: 1, z: 0 }, inwardNormal: { x: 0, y: -1, z: 0 }, sizes: [24, 8] }],
     ['bottom_face', { origin: { x: 0, y: -1, z: 0 }, inwardNormal: { x: 0, y: 1, z: 0 }, sizes: [24, 8] }],
