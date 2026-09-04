@@ -1,8 +1,93 @@
 import { describe, expect, it } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
-import { getInstructionFabricationLines } from './cutListInstructions';
+import { getInstructionFabricationLines, groupCutInstructions } from './cutListInstructions';
 
 describe('cutListInstructions', () => {
+  it('includes round-cut fabrication details and pattern spacing', () => {
+    const part = createTestPart({
+      features: [
+        {
+          id: 'feature-1',
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          cutType: 'countersink',
+          placement: { primary: 2, secondary: 1, rotation: 0 },
+          parameters: {
+            diameter: 0.25,
+            depthMode: 'blind',
+            depth: 0.5,
+            tilt: 15,
+            direction: 90,
+            countersink: { majorDiameter: 0.5, includedAngle: 82 }
+          },
+          pattern: { type: 'linear', count: 4, spacing: 2, direction: 0 }
+        }
+      ]
+    });
+    const instruction = {
+      partId: part.id,
+      partName: part.name,
+      cutLength: part.length,
+      cutWidth: part.width,
+      thickness: part.thickness,
+      stockId: 'stock-1',
+      stockName: 'Maple',
+      grainSensitive: false,
+      grainDirection: 'length' as const,
+      isGlueUp: false,
+      quantity: 1,
+      features: part.features,
+      notes: ''
+    };
+
+    expect(getInstructionFabricationLines(instruction, 'imperial')[0]).toBe(
+      '1. 4-hole Linear Pattern on Top Face · 1/4" diameter · 2" spacing · 1/2" deep · 15° tilt toward 90°'
+    );
+  });
+
+  it('does not group instructions whose circular patterns differ', () => {
+    const base = {
+      partId: 'part-1',
+      partName: 'Rail',
+      cutLength: 24,
+      cutWidth: 4,
+      thickness: 0.75,
+      stockId: 'stock-1',
+      stockName: 'Maple',
+      grainSensitive: false,
+      grainDirection: 'length' as const,
+      isGlueUp: false,
+      quantity: 1,
+      notes: ''
+    };
+    const feature = {
+      id: 'feature-1',
+      kind: 'circular_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      target: { type: 'face' as const, face: 'top_face' as const },
+      reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+      cutType: 'round_hole' as const,
+      placement: { primary: 1, secondary: 1, rotation: 0 },
+      parameters: { diameter: 0.25, depthMode: 'through' as const, tilt: 0, direction: 0 }
+    };
+
+    const groups = groupCutInstructions([
+      { ...base, features: [{ ...feature, pattern: { type: 'linear' as const, count: 2, spacing: 2, direction: 0 } }] },
+      {
+        ...base,
+        partId: 'part-2',
+        features: [
+          { ...feature, id: 'feature-2', pattern: { type: 'linear' as const, count: 3, spacing: 2, direction: 0 } }
+        ]
+      }
+    ]);
+    expect(groups).toHaveLength(2);
+  });
+
   it('preserves enabled feature order in numbered fabrication lines', () => {
     const part = createTestPart({
       features: [

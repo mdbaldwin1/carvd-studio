@@ -39,7 +39,8 @@ function getFeatureGroupingKey(feature: PartFeature): string {
     reference: feature.reference,
     cutType: feature.cutType,
     parameters: feature.parameters,
-    placement: feature.placement
+    placement: feature.placement,
+    pattern: feature.kind === 'circular_cut' ? feature.pattern : undefined
   });
 }
 

@@ -1,13 +1,21 @@
-import { Part, PartFeature, RectCutFeature } from '@renderer/types';
+import { CircularCutFeature, Part, PartFeature, RectCutFeature } from '@renderer/types';
 import { getFeatureTargetLabel } from '@renderer/utils/partFeatureSummary';
 import { getResolvedRectCutFeature, isBottomTarget, isSideFaceTarget, isTopTarget } from '@renderer/utils/rectCutUtils';
+import { expandCircularCut } from '@renderer/utils/roundCutUtils';
 
 export interface PartFeatureConflict {
   featureId: string;
   featureIndex: number;
   relatedFeatureId?: string;
   relatedFeatureIndex?: number;
-  code: 'duplicate_end_cut' | 'rect_overlap' | 'rect_consumed' | 'rect_anchor_removed' | 'rect_depth_intersection';
+  code:
+    | 'duplicate_end_cut'
+    | 'duplicate_round_cut'
+    | 'round_overlap'
+    | 'rect_overlap'
+    | 'rect_consumed'
+    | 'rect_anchor_removed'
+    | 'rect_depth_intersection';
   severity: 'warning' | 'error';
   message: string;
 }
@@ -218,6 +226,43 @@ function isAnchorDependent(feature: RectCutFeature): boolean {
   return feature.cutType === 'rabbet' || feature.cutType === 'edge_notch' || feature.cutType === 'corner_notch';
 }
 
+function circularMembersOverlap(
+  first: CircularCutFeature,
+  second: CircularCutFeature,
+  part: Part
+): { overlaps: boolean; duplicate: boolean } {
+  if (first.target.face !== second.target.face) return { overlaps: false, duplicate: false };
+
+  const firstMembers = expandCircularCut(first, part);
+  const secondMembers = expandCircularCut(second, part);
+  const radiusSum = (first.parameters.diameter + second.parameters.diameter) / 2;
+  let memberOverlap = false;
+  let coaxial = false;
+
+  for (const firstMember of firstMembers) {
+    for (const secondMember of secondMembers) {
+      const dx = firstMember.entryPoint.x - secondMember.entryPoint.x;
+      const dy = firstMember.entryPoint.y - secondMember.entryPoint.y;
+      const dz = firstMember.entryPoint.z - secondMember.entryPoint.z;
+      const distance = Math.hypot(dx, dy, dz);
+      if (distance < radiusSum - 1e-9) memberOverlap = true;
+      const axisDot =
+        firstMember.axis.x * secondMember.axis.x +
+        firstMember.axis.y * secondMember.axis.y +
+        firstMember.axis.z * secondMember.axis.z;
+      if (distance < 1e-9 && Math.abs(axisDot - 1) < 1e-9) coaxial = true;
+    }
+  }
+
+  const sameShape =
+    first.cutType === second.cutType &&
+    Math.abs(first.parameters.diameter - second.parameters.diameter) < 1e-9 &&
+    first.parameters.depthMode === second.parameters.depthMode &&
+    (first.parameters.depthMode === 'through' ||
+      Math.abs(Number(first.parameters.depth) - Number(second.parameters.depth)) < 1e-9);
+  return { overlaps: memberOverlap, duplicate: coaxial && sameShape };
+}
+
 export function getPartFeatureConflicts(
   features: PartFeature[],
   part: Pick<Part, 'length' | 'width' | 'thickness'>
@@ -228,6 +273,7 @@ export function getPartFeatureConflicts(
     .filter(({ feature }) => feature.enabled);
   const endCutsByFace = new Map<'left_end' | 'right_end', { featureId: string; featureIndex: number; label: string }>();
   const priorRectCuts: Array<{ feature: RectCutFeature; index: number }> = [];
+  const priorCircularCuts: Array<{ feature: CircularCutFeature; index: number }> = [];
 
   for (const { feature, index } of enabledFeatures) {
     if (feature.kind === 'end_cut') {
@@ -264,6 +310,39 @@ export function getPartFeatureConflicts(
       continue;
     }
 
+    if (feature.kind === 'circular_cut') {
+      for (const prior of priorCircularCuts) {
+        const result = circularMembersOverlap(prior.feature, feature, part as Part);
+        if (!result.overlaps) continue;
+        const code: PartFeatureConflict['code'] = result.duplicate ? 'duplicate_round_cut' : 'round_overlap';
+        const severity: PartFeatureConflict['severity'] = result.duplicate ? 'error' : 'warning';
+        const message = result.duplicate
+          ? `Operation ${index + 1} duplicates the axis and removal of Operation ${prior.index + 1}.`
+          : `Operation ${index + 1} overlaps Operation ${prior.index + 1}. The resulting round-cut stack is allowed, but order now matters.`;
+        conflicts.push({
+          featureId: prior.feature.id,
+          featureIndex: prior.index,
+          relatedFeatureId: feature.id,
+          relatedFeatureIndex: index,
+          code,
+          severity,
+          message
+        });
+        conflicts.push({
+          featureId: feature.id,
+          featureIndex: index,
+          relatedFeatureId: prior.feature.id,
+          relatedFeatureIndex: prior.index,
+          code,
+          severity,
+          message
+        });
+      }
+      priorCircularCuts.push({ feature, index });
+      continue;
+    }
+
+    if (feature.kind !== 'rect_cut') continue;
     const currentBounds = getRectFeatureBounds(feature, part);
     if (!currentBounds) {
       priorRectCuts.push({ feature, index });

@@ -110,6 +110,53 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
     return `${toTitleCase(feature.cutType)}${angleText} on ${getFeatureTargetLabel(feature)}${directionText}`;
   }
 
+  if (feature.kind === 'circular_cut') {
+    const target = getFeatureTargetLabel(feature);
+    const holeDiameter = formatMeasurementWithUnit(feature.parameters.diameter, units);
+    const termination =
+      feature.parameters.depthMode === 'through'
+        ? 'Through'
+        : `${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+    const angle =
+      feature.parameters.tilt > 0 ? ` · ${feature.parameters.tilt}° tilt toward ${feature.parameters.direction}°` : '';
+    if (feature.pattern) {
+      const count =
+        feature.pattern.type === 'grid' ? feature.pattern.rows * feature.pattern.columns : feature.pattern.count;
+      const spacing =
+        feature.pattern.type === 'linear'
+          ? ` · ${formatMeasurementWithUnit(feature.pattern.spacing, units)} spacing`
+          : feature.pattern.type === 'grid'
+            ? ` · ${formatMeasurementWithUnit(feature.pattern.columnSpacing, units)} × ${formatMeasurementWithUnit(feature.pattern.rowSpacing, units)} spacing`
+            : ` · ${formatMeasurementWithUnit(feature.pattern.radius, units)} radius`;
+      return `${count}-hole ${toTitleCase(feature.pattern.type)} Pattern on ${target} · ${holeDiameter} diameter${spacing} · ${termination}${angle}`;
+    }
+    if (feature.cutType === 'countersink' && feature.parameters.countersink) {
+      return `Countersink on ${target} · ${holeDiameter} hole × ${formatMeasurementWithUnit(feature.parameters.countersink.majorDiameter, units)} major · ${feature.parameters.countersink.includedAngle}° · ${termination}${angle}`;
+    }
+    if (feature.cutType === 'counterbore' && feature.parameters.counterbore) {
+      return `Counterbore on ${target} · ${holeDiameter} hole · ${formatMeasurementWithUnit(feature.parameters.counterbore.diameter, units)} × ${formatMeasurementWithUnit(feature.parameters.counterbore.depth, units)} recess · ${termination}${angle}`;
+    }
+    const depthSeparator = feature.parameters.depthMode === 'through' ? ' · ' : ' × ';
+    return `Round Hole on ${target} · ${holeDiameter} diameter${depthSeparator}${termination}${angle}`;
+  }
+
+  if (feature.kind === 'rounded_cut') {
+    const target = getFeatureTargetLabel(feature);
+    const size = `${formatMeasurementWithUnit(feature.parameters.length, units)} × ${formatMeasurementWithUnit(feature.parameters.width, units)}`;
+    const termination =
+      feature.parameters.depthMode === 'through'
+        ? 'Through'
+        : `${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+    const radius =
+      feature.cutType === 'rounded_rectangle'
+        ? ` · ${formatMeasurementWithUnit(feature.parameters.cornerRadius, units)} radius`
+        : '';
+    return `${toTitleCase(feature.cutType)} on ${target} · ${size}${radius} × ${termination}`.replace(
+      ` × Through`,
+      ` · Through`
+    );
+  }
+
   if (feature.cutType === 'tenon') {
     const tongueThickness = feature.parameters.depth ?? 0;
     return `Tenon on ${getFeatureTargetLabel(feature)} \u00b7 ${formatMeasurementWithUnit(feature.parameters.size.length, units)} long \u00d7 ${formatMeasurementWithUnit(feature.parameters.size.width, units)} wide \u00d7 ${formatMeasurementWithUnit(tongueThickness, units)} thick`;

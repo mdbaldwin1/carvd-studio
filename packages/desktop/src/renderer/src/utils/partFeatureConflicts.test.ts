@@ -3,6 +3,81 @@ import { createTestPart } from '../../../../tests/helpers/factories';
 import { getPartFeatureConflicts } from './partFeatureConflicts';
 
 describe('getPartFeatureConflicts', () => {
+  it('flags duplicate coaxial circular cuts on the same face', () => {
+    const part = createTestPart({
+      features: [
+        {
+          id: 'hole-1',
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          cutType: 'round_hole',
+          placement: { primary: 0, secondary: 0, rotation: 0 },
+          parameters: { diameter: 0.5, depthMode: 'through', tilt: 0, direction: 0 }
+        },
+        {
+          id: 'hole-2',
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          cutType: 'round_hole',
+          placement: { primary: 0, secondary: 0, rotation: 0 },
+          parameters: { diameter: 0.5, depthMode: 'through', tilt: 0, direction: 0 }
+        }
+      ]
+    });
+
+    const conflicts = getPartFeatureConflicts(part.features ?? [], part);
+    expect(conflicts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ featureId: 'hole-1', code: 'duplicate_round_cut', severity: 'error' }),
+        expect.objectContaining({ featureId: 'hole-2', code: 'duplicate_round_cut', severity: 'error' })
+      ])
+    );
+  });
+
+  it('flags overlapping members from separate circular patterns', () => {
+    const part = createTestPart({
+      features: [
+        {
+          id: 'pattern-1',
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          cutType: 'round_hole',
+          placement: { primary: 0, secondary: 0, rotation: 0 },
+          parameters: { diameter: 0.5, depthMode: 'blind', depth: 0.25, tilt: 0, direction: 0 },
+          pattern: { type: 'linear', count: 2, spacing: 1, direction: 0 }
+        },
+        {
+          id: 'pattern-2',
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          cutType: 'round_hole',
+          placement: { primary: 1.2, secondary: 0, rotation: 0 },
+          parameters: { diameter: 0.5, depthMode: 'blind', depth: 0.25, tilt: 0, direction: 0 }
+        }
+      ]
+    });
+
+    const conflicts = getPartFeatureConflicts(part.features ?? [], part);
+    expect(conflicts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ featureId: 'pattern-1', code: 'round_overlap', severity: 'warning' }),
+        expect.objectContaining({ featureId: 'pattern-2', code: 'round_overlap', severity: 'warning' })
+      ])
+    );
+  });
+
   it('flags duplicate enabled end cuts on the same end', () => {
     const part = createTestPart({
       features: [

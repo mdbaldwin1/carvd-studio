@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { EndCutFeature, PartFeature, RectCutFeature } from '../types';
+import type { CircularCutFeature, EndCutFeature, PartFeature, RectCutFeature, RoundedCutFeature } from '../types';
 import {
   getAuthoredFeatureCount,
   getEnabledFeatureCount,
@@ -54,6 +54,36 @@ function createRectCut(overrides?: {
       depth: overrides?.depth
     },
     placement: { x: 1, z: 1 }
+  };
+}
+
+function createCircularCut(overrides: Partial<CircularCutFeature> = {}): CircularCutFeature {
+  return {
+    id: 'hole-1',
+    kind: 'circular_cut',
+    version: 1,
+    enabled: true,
+    target: { type: 'face', face: 'top_face' },
+    reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+    cutType: 'round_hole',
+    placement: { primary: 2, secondary: 1, rotation: 0 },
+    parameters: { diameter: 0.375, depthMode: 'through', tilt: 0, direction: 0 },
+    ...overrides
+  };
+}
+
+function createRoundedCut(overrides: Partial<RoundedCutFeature> = {}): RoundedCutFeature {
+  return {
+    id: 'slot-1',
+    kind: 'rounded_cut',
+    version: 1,
+    enabled: true,
+    target: { type: 'face', face: 'top_face' },
+    reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+    cutType: 'rounded_slot',
+    placement: { primary: 0, secondary: 0, rotation: 0 },
+    parameters: { length: 3, width: 1, cornerRadius: 0.5, depthMode: 'through' },
+    ...overrides
   };
 }
 
@@ -264,6 +294,71 @@ describe('partFeatureSummary', () => {
           'metric'
         )
       ).toBe('Edge Notch on Front Side · 50.8mm × 25.4mm');
+    });
+  });
+
+  describe('getFeatureSummary — round and rounded cuts', () => {
+    it('summarizes through, angled blind, countersunk, and counterbored holes', () => {
+      expect(getFeatureSummary(createCircularCut(), 'imperial')).toBe(
+        'Round Hole on Top Face · 3/8" diameter · Through'
+      );
+      expect(
+        getFeatureSummary(
+          createCircularCut({
+            parameters: { diameter: 0.25, depthMode: 'blind', depth: 1, tilt: 15, direction: 90 }
+          }),
+          'imperial'
+        )
+      ).toBe('Round Hole on Top Face · 1/4" diameter × 1" deep · 15° tilt toward 90°');
+      expect(
+        getFeatureSummary(
+          createCircularCut({
+            cutType: 'countersink',
+            parameters: {
+              diameter: 0.25,
+              depthMode: 'through',
+              tilt: 0,
+              direction: 0,
+              countersink: { majorDiameter: 0.5, includedAngle: 82 }
+            }
+          }),
+          'imperial'
+        )
+      ).toBe('Countersink on Top Face · 1/4" hole × 1/2" major · 82° · Through');
+      expect(
+        getFeatureSummary(
+          createCircularCut({
+            cutType: 'counterbore',
+            parameters: {
+              diameter: 0.25,
+              depthMode: 'through',
+              tilt: 0,
+              direction: 0,
+              counterbore: { diameter: 0.5, depth: 0.25 }
+            }
+          }),
+          'imperial'
+        )
+      ).toBe('Counterbore on Top Face · 1/4" hole · 1/2" × 1/4" recess · Through');
+    });
+
+    it('summarizes patterns and rounded profiles as one authored operation', () => {
+      expect(
+        getFeatureSummary(
+          createCircularCut({ pattern: { type: 'linear', count: 4, spacing: 2, direction: 0 } }),
+          'imperial'
+        )
+      ).toBe('4-hole Linear Pattern on Top Face · 3/8" diameter · 2" spacing · Through');
+      expect(getFeatureSummary(createRoundedCut(), 'imperial')).toBe('Rounded Slot on Top Face · 3" × 1" · Through');
+      expect(
+        getFeatureSummary(
+          createRoundedCut({
+            cutType: 'rounded_rectangle',
+            parameters: { length: 4, width: 2, cornerRadius: 0.25, depthMode: 'blind', depth: 0.5 }
+          }),
+          'metric'
+        )
+      ).toBe('Rounded Rectangle on Top Face · 101.6mm × 50.8mm · 6.4mm radius × 12.7mm deep');
     });
   });
 
