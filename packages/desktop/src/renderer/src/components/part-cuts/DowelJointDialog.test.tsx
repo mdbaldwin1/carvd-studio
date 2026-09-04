@@ -6,7 +6,14 @@ import { DowelJointDialog } from './DowelJointDialog';
 vi.unmock('three');
 
 describe('DowelJointDialog', () => {
-  const firstPart = createTestPart({ id: 'first', name: 'Lower rail', length: 10, width: 4, thickness: 1 });
+  const firstPart = createTestPart({
+    id: 'first',
+    name: 'Lower rail',
+    length: 10,
+    width: 4,
+    thickness: 1,
+    position: { x: 0, y: 0, z: 0 }
+  });
   const secondPart = createTestPart({
     id: 'second',
     name: 'Upper rail',
