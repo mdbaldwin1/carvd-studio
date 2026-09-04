@@ -74,6 +74,19 @@ function mirrorCornerTarget(
   return action === 'across_length' ? LENGTH_CORNER_MAP[corner] : WIDTH_CORNER_MAP[corner];
 }
 
+function normalizeAngle(angle: number): number {
+  const normalized = angle % 360;
+  return normalized > 180 ? normalized - 360 : normalized <= -180 ? normalized + 360 : normalized;
+}
+
+function mirrorReferencedCoordinate(value: number, size: number, from: 'min' | 'center' | 'max' | undefined): number {
+  return from === 'center' || from === undefined ? -value : size - value;
+}
+
+function mirrorPlanarAngle(angle: number, action: Extract<MirrorAction, 'across_length' | 'across_width'>): number {
+  return normalizeAngle(action === 'across_length' ? 180 - angle : -angle);
+}
+
 export function getAvailableMirrorActions(feature: PartFeature): MirrorAction[] {
   if (feature.kind === 'end_cut') return ['opposite_end'];
   switch (feature.cutType) {
@@ -132,7 +145,49 @@ export function mirrorFeature(
   }
 
   if (!part) {
-    throw new Error('Part dimensions are required to mirror rectangular removals');
+    throw new Error('Part dimensions are required to mirror removal operations');
+  }
+
+  if (feature.kind === 'circular_cut' || feature.kind === 'rounded_cut') {
+    const face = feature.target.face;
+    const primaryUsesLength =
+      face === 'top_face' || face === 'bottom_face' || face === 'front_face' || face === 'back_face';
+    const primaryUsesWidth = face === 'left_end' || face === 'right_end';
+    const secondaryUsesWidth = face === 'top_face' || face === 'bottom_face';
+    const reflectPrimary =
+      (action === 'across_length' && primaryUsesLength) || (action === 'across_width' && primaryUsesWidth);
+    const reflectSecondary = action === 'across_width' && secondaryUsesWidth;
+    const primarySize = primaryUsesLength ? part.length : primaryUsesWidth ? part.width : part.thickness;
+    const secondarySize = secondaryUsesWidth ? part.width : part.thickness;
+
+    mirrored.placement = {
+      ...mirrored.placement,
+      primary: reflectPrimary
+        ? mirrorReferencedCoordinate(feature.placement.primary, primarySize, feature.reference.primaryFrom)
+        : feature.placement.primary,
+      secondary: reflectSecondary
+        ? mirrorReferencedCoordinate(feature.placement.secondary, secondarySize, feature.reference.secondaryFrom)
+        : feature.placement.secondary,
+      rotation:
+        reflectPrimary || reflectSecondary
+          ? mirrorPlanarAngle(feature.placement.rotation, reflectPrimary ? 'across_length' : 'across_width')
+          : feature.placement.rotation
+    };
+
+    if (feature.kind === 'circular_cut') {
+      const angleAction = reflectPrimary ? 'across_length' : reflectSecondary ? 'across_width' : null;
+      if (angleAction) {
+        mirrored.parameters.direction = mirrorPlanarAngle(feature.parameters.direction, angleAction);
+        if (mirrored.pattern?.type === 'linear') {
+          mirrored.pattern.direction = mirrorPlanarAngle(mirrored.pattern.direction, angleAction);
+        } else if (mirrored.pattern?.type === 'grid') {
+          mirrored.pattern.rotation = mirrorPlanarAngle(mirrored.pattern.rotation, angleAction);
+        } else if (mirrored.pattern?.type === 'circular') {
+          mirrored.pattern.startAngle = mirrorPlanarAngle(mirrored.pattern.startAngle, angleAction);
+        }
+      }
+    }
+    return mirrored;
   }
 
   const resolved = getResolvedRectCutFeature(feature, part);

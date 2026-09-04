@@ -53,6 +53,62 @@ describe('partFeatureActions', () => {
       placement: { x: 18, z: 1 }
     });
   });
+
+  it('mirrors a patterned round cut across the part length', () => {
+    const mirrored = mirrorFeature(
+      {
+        id: 'round-1',
+        kind: 'circular_cut',
+        version: 1,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        cutType: 'round_hole',
+        placement: { primary: 3, secondary: 2, rotation: 0 },
+        parameters: { diameter: 0.5, depthMode: 'through', tilt: 12, direction: 30 },
+        pattern: { type: 'linear', count: 3, spacing: 2, direction: 30 }
+      },
+      'across_length',
+      { length: 24, width: 8, thickness: 0.75 }
+    );
+
+    expect(mirrored).toMatchObject({
+      kind: 'circular_cut',
+      placement: { primary: 21, secondary: 2 },
+      parameters: { direction: 150 },
+      pattern: { type: 'linear', direction: 150 }
+    });
+    expect(mirrored.id).not.toBe('round-1');
+  });
+
+  it('mirrors a rounded rectangle across the part width', () => {
+    const mirrored = mirrorFeature(
+      {
+        id: 'rounded-1',
+        kind: 'rounded_cut',
+        version: 1,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'center', secondaryFrom: 'min' },
+        cutType: 'rounded_rectangle',
+        placement: { primary: 4, secondary: 1, rotation: 25 },
+        parameters: {
+          length: 4,
+          width: 2,
+          cornerRadius: 0.25,
+          depthMode: 'blind',
+          depth: 0.25
+        }
+      },
+      'across_width',
+      { length: 24, width: 8, thickness: 0.75 }
+    );
+
+    expect(mirrored).toMatchObject({
+      kind: 'rounded_cut',
+      placement: { primary: 4, secondary: 7, rotation: -25 }
+    });
+  });
   const rectCut = (overrides: Record<string, unknown>) =>
     ({
       id: 'rc-1',

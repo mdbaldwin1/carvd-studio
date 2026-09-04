@@ -209,5 +209,38 @@ describe('partCutsEditingStore', () => {
       store.startEditingPartCuts('p2', 'Part 2', []);
       expect(usePartCutsEditingStore.getState().canUndoDraft()).toBe(false);
     });
+
+    it('preserves nested round-pattern edits across undo and redo', () => {
+      const roundFeature = (spacing: number): PartFeature => ({
+        id: 'round-1',
+        kind: 'circular_cut',
+        version: 1,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        cutType: 'counterbore',
+        placement: { primary: 2, secondary: 1, rotation: 0 },
+        parameters: {
+          diameter: 0.25,
+          depthMode: 'blind',
+          depth: 0.5,
+          tilt: 0,
+          direction: 0,
+          counterbore: { diameter: 0.5, depth: 0.125 }
+        },
+        pattern: { type: 'linear', count: 3, spacing, direction: 0 }
+      });
+      const store = usePartCutsEditingStore.getState();
+      store.startEditingPartCuts('p1', 'Part 1', [roundFeature(2)]);
+      store.setDraftFeatures([roundFeature(3)]);
+
+      usePartCutsEditingStore.getState().undoDraft();
+      expect(usePartCutsEditingStore.getState().draftFeatures[0]).toMatchObject({
+        pattern: { spacing: 2 },
+        parameters: { counterbore: { diameter: 0.5, depth: 0.125 } }
+      });
+      usePartCutsEditingStore.getState().redoDraft();
+      expect(usePartCutsEditingStore.getState().draftFeatures[0]).toMatchObject({ pattern: { spacing: 3 } });
+    });
   });
 });
