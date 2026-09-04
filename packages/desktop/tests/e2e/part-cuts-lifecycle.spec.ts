@@ -1280,8 +1280,14 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByRole('button', { name: /Generate Cut List|View Cut List/ }).click();
     const dialog = window.getByRole('dialog').filter({ has: window.getByRole('heading', { name: 'Cut List' }) });
     await dialog.getByRole('button', { name: 'Generate Cut List' }).click();
-    for (const label of ['Angled left end', 'Shelf dado', 'Three patterned holes', 'Rounded relief']) {
-      await expect(dialog.getByText(label)).toBeVisible();
+    const fabricationLines = [
+      '1. Angled left end — Mitre 33° on Left End · Long point on Back',
+      '2. Shelf dado — Dado on Top Face · 3/4" wide × 3/8" deep',
+      '3. Three patterned holes — 3-hole Linear Pattern on Top Face · 1/4" diameter · 3/4" spacing · 1/2" deep',
+      '4. Rounded relief — Rounded Slot on Top Face · 3" × 1/2" · Through'
+    ];
+    for (const line of fabricationLines) {
+      await expect(dialog.getByText(line)).toBeVisible();
     }
     await expect(dialog.getByText('Disabled cutout')).toHaveCount(0);
 
@@ -1292,10 +1298,7 @@ test.describe('part cuts editing lifecycle', () => {
       .poll(() => (fs.existsSync(csvPath) ? fs.statSync(csvPath).size : 0), { timeout: 5000 })
       .toBeGreaterThan(0);
     const csv = fs.readFileSync(csvPath, 'utf8');
-    expect(csv).toContain('Angled left end');
-    expect(csv).toContain('Shelf dado');
-    expect(csv).toContain('Three patterned holes');
-    expect(csv).toContain('Rounded relief');
+    for (const line of fabricationLines) expect(csv).toContain(line.replaceAll('"', '""'));
     expect(csv).not.toContain('Disabled cutout');
 
     await queueSavePath(window, pdfPath);

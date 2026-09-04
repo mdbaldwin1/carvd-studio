@@ -66,7 +66,9 @@ export function getInstructionFabricationLines(instruction: CutInstruction, unit
       );
       continue;
     }
-    descriptions.push(feature.label?.trim() || getFeatureSummary(feature, units));
+    const summary = getFeatureSummary(feature, units);
+    const label = feature.label?.trim();
+    descriptions.push(label ? `${label} — ${summary}` : summary);
   }
   const lines = descriptions.map((description, index) => `${index + 1}. ${description}`);
   const note = instruction.notes?.trim();

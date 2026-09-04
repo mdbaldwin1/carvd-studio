@@ -130,7 +130,8 @@ test.describe('Canvas transform workflows', () => {
 
     expect(duplicated.copyId).not.toBe(duplicated.sourceId);
     expect(duplicated.copyFeatureIds).toHaveLength(4);
-    expect(duplicated.copyFeatureIds).not.toEqual(duplicated.sourceFeatureIds);
+    expect(new Set(duplicated.copyFeatureIds).size).toBe(duplicated.copyFeatureIds.length);
+    expect(duplicated.copyFeatureIds?.every((id) => !duplicated.sourceFeatureIds?.includes(id))).toBe(true);
     expect(duplicated.copyPayloadWithoutIds).toEqual(duplicated.sourcePayloadWithoutIds);
     expect(duplicated.circularParametersAliased).toBe(false);
     expect(duplicated.sourcePayload).toBe(sourceBefore);

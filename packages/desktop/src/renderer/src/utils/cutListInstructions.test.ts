@@ -188,7 +188,10 @@ describe('cutListInstructions', () => {
       'imperial'
     );
 
-    expect(lines).toEqual(['1. Left mitre', '2. Top cutout']);
+    expect(lines).toEqual([
+      '1. Left mitre — Mitre 45° on Left End · Long point on Front',
+      '2. Top cutout — Cutout on Top Face · 2" × 1"'
+    ]);
   });
 
   it('uses woodworking labels for dado and rabbet fabrication lines', () => {
