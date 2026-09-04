@@ -1119,6 +1119,9 @@ test.describe('part cuts editing lifecycle', () => {
       const source = window.useProjectStore.getState().parts[0];
       window.useSelectionStore.getState().selectPart(source.id);
     });
+    const sourceBefore = await window.evaluate(() =>
+      JSON.stringify(window.useProjectStore.getState().parts[0].features)
+    );
     await openSelectionContextMenu(window);
     await clickMenuItem(window, 'Copy Cuts');
     await window.evaluate(() => {
@@ -1143,6 +1146,21 @@ test.describe('part cuts editing lifecycle', () => {
     expect(result.targetTypes).toEqual(['dado']);
     expect(result.targetIds).toHaveLength(1);
     expect(result.targetIds[0]).not.toBe(result.sourceIds[0]);
+
+    // Edit the pasted operation through its real Part Cuts inspector. The
+    // source payload is serialized before the clipboard action and must stay
+    // byte-for-byte unchanged after the target is edited and saved.
+    await window.getByRole('button', { name: 'Edit Part Cuts' }).click();
+    await window.getByRole('button', { name: /^1\./ }).click();
+    await window.getByLabel('Label (optional)').fill('Pasted dado only');
+    await window.getByRole('button', { name: 'Save Cut' }).click();
+    await window.getByRole('button', { name: 'Save Part' }).click();
+    expect(await window.evaluate(() => JSON.stringify(window.useProjectStore.getState().parts[0].features))).toBe(
+      sourceBefore
+    );
+    expect(await window.evaluate(() => window.useProjectStore.getState().parts[1].features?.[0].label)).toBe(
+      'Pasted dado only'
+    );
   });
 
   test('shows saved operations in fabrication output', async () => {
@@ -1157,6 +1175,135 @@ test.describe('part cuts editing lifecycle', () => {
     await dialog.getByRole('button', { name: 'Generate Cut List' }).click();
     await expect(dialog.getByText(/Cut blanks first/i)).toBeVisible();
     await expect(dialog.getByText(/Dado/i)).toBeVisible();
+  });
+
+  test('round-trips mixed featured-part state and exports its enabled fabrication operations', async () => {
+    const { window, userDataDir } = running;
+    const projectPath = path.join(userDataDir, 'mixed-featured-part.carvd');
+    const csvPath = path.join(userDataDir, 'mixed-featured-part.csv');
+    const pdfPath = path.join(userDataDir, 'mixed-featured-part.pdf');
+    await seedProject(window, 'stocked-one-part');
+
+    await window.evaluate(() => {
+      const project = window.useProjectStore.getState();
+      const part = project.parts[0];
+      project.updatePart(part.id, {
+        name: 'Mixed featured rail',
+        rotation: { x: 15, y: 30, z: 45 },
+        features: [
+          {
+            id: 'mixed-mitre',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            label: 'Angled left end',
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 33, horizontalFlip: true }
+          },
+          {
+            id: 'mixed-dado',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            label: 'Shelf dado',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'dado',
+            placement: { x: 6, z: 0 },
+            parameters: { size: { length: 0.75, width: 4 }, depthMode: 'blind', depth: 0.375 }
+          },
+          {
+            id: 'mixed-holes',
+            kind: 'circular_cut',
+            version: 1,
+            enabled: true,
+            label: 'Three patterned holes',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+            cutType: 'round_hole',
+            placement: { primary: -8, secondary: -3, rotation: 0 },
+            pattern: { type: 'linear', count: 3, spacing: 0.75, direction: 20 },
+            parameters: { diameter: 0.25, depthMode: 'blind', depth: 0.5, tilt: 0, direction: 0 }
+          },
+          {
+            id: 'mixed-slot',
+            kind: 'rounded_cut',
+            version: 1,
+            enabled: true,
+            label: 'Rounded relief',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+            cutType: 'rounded_slot',
+            placement: { primary: 8, secondary: 3, rotation: 30 },
+            parameters: { length: 3, width: 0.5, cornerRadius: 0.25, depthMode: 'through' }
+          },
+          {
+            id: 'mixed-disabled',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: false,
+            label: 'Disabled cutout',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'cutout',
+            placement: { x: 18, z: 0 },
+            parameters: { size: { length: 1, width: 1 }, depthMode: 'through' }
+          }
+        ]
+      });
+    });
+    const expected = await window.evaluate(() => {
+      const part = window.useProjectStore.getState().parts[0];
+      return JSON.stringify({ name: part.name, rotation: part.rotation, features: part.features });
+    });
+
+    await queueSavePath(window, projectPath);
+    await pressSaveShortcut(window);
+    await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
+    await window.getByRole('button', { name: 'Carvd Studio home' }).click();
+    await queueOpenPaths(window, [projectPath]);
+    await window.getByRole('button', { name: 'Open file...' }).click();
+    const importDialog = window.getByRole('dialog', { name: 'Import to Library' });
+    await importDialog.getByRole('button', { name: 'Skip' }).click();
+    await expect
+      .poll(async () =>
+        window.evaluate(() => {
+          const part = window.useProjectStore.getState().parts[0];
+          return JSON.stringify({ name: part.name, rotation: part.rotation, features: part.features });
+        })
+      )
+      .toBe(expected);
+
+    await window.getByRole('button', { name: /Generate Cut List|View Cut List/ }).click();
+    const dialog = window.getByRole('dialog').filter({ has: window.getByRole('heading', { name: 'Cut List' }) });
+    await dialog.getByRole('button', { name: 'Generate Cut List' }).click();
+    for (const label of ['Angled left end', 'Shelf dado', 'Three patterned holes', 'Rounded relief']) {
+      await expect(dialog.getByText(label)).toBeVisible();
+    }
+    await expect(dialog.getByText('Disabled cutout')).toHaveCount(0);
+
+    await queueSavePath(window, csvPath);
+    await dialog.locator('.cut-list-parts-tab').getByRole('button', { name: 'Download' }).click();
+    await window.getByRole('menuitem', { name: 'Download CSV' }).click();
+    await expect
+      .poll(() => (fs.existsSync(csvPath) ? fs.statSync(csvPath).size : 0), { timeout: 5000 })
+      .toBeGreaterThan(0);
+    const csv = fs.readFileSync(csvPath, 'utf8');
+    expect(csv).toContain('Angled left end');
+    expect(csv).toContain('Shelf dado');
+    expect(csv).toContain('Three patterned holes');
+    expect(csv).toContain('Rounded relief');
+    expect(csv).not.toContain('Disabled cutout');
+
+    await queueSavePath(window, pdfPath);
+    await dialog.locator('.cut-list-parts-tab').getByRole('button', { name: 'Download' }).click();
+    await window.getByRole('menuitem', { name: 'Download PDF' }).click();
+    await expect
+      .poll(() => (fs.existsSync(pdfPath) ? fs.statSync(pdfPath).size : 0), { timeout: 5000 })
+      .toBeGreaterThan(0);
   });
 
   test('persists round and rounded operations through save and reopen', async () => {

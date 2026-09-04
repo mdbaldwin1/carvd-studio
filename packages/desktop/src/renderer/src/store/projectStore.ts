@@ -186,6 +186,13 @@ const createDefaultPart = (overrides?: Partial<Part>): Part =>
     ...overrides
   });
 
+/**
+ * Features are part-local authored operations. A copied part receives an
+ * equivalent operation payload, but never reuses the source feature identity.
+ */
+const cloneFeaturesForDuplicate = (features?: Part['features']): Part['features'] =>
+  clonePartFeatures(features).map((feature) => ({ ...feature, id: uuidv4() }));
+
 const createDefaultStock = (overrides?: Partial<Stock>): Stock => ({
   id: uuidv4(),
   name: 'New Stock',
@@ -830,7 +837,8 @@ export const useProjectStore = create<ProjectState>()(
             x: part.position.x + duplicateOffset.x,
             y: part.position.y + duplicateOffset.y,
             z: part.position.z + duplicateOffset.z
-          }
+          },
+          features: cloneFeaturesForDuplicate(part.features)
         });
 
         set((state) => ({
@@ -913,7 +921,7 @@ export const useProjectStore = create<ProjectState>()(
               y: part.position.y + duplicateOffset.y,
               z: part.position.z + duplicateOffset.z
             },
-            features: clonePartFeatures(part.features)
+            features: cloneFeaturesForDuplicate(part.features)
           });
         });
 

@@ -5,7 +5,7 @@ import {
   createTestProject,
   createTestStock
 } from '../../../../tests/helpers/factories';
-import type { CutList, Stock } from '../types';
+import type { CutList, PartFeature, Stock } from '../types';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
 import { useLicenseStore } from './licenseStore';
 import { useProjectStore, validatePartsForCutList } from './projectStore';
@@ -485,12 +485,99 @@ describe('projectStore', () => {
         const duplicateId = store.duplicatePart(originalId);
         const duplicate = useProjectStore.getState().parts.find((p) => p.id === duplicateId);
 
-        expect(duplicate?.features).toEqual(
-          useProjectStore.getState().parts.find((p) => p.id === originalId)?.features
+        const originalFeatures = useProjectStore.getState().parts.find((p) => p.id === originalId)?.features;
+        expect(duplicate?.features?.map(({ id: _id, ...feature }) => feature)).toEqual(
+          originalFeatures?.map(({ id: _id, ...feature }) => feature)
         );
+        expect(duplicate?.features?.[0].id).not.toBe(originalFeatures?.[0].id);
         expect(duplicate?.features).not.toBe(
           useProjectStore.getState().parts.find((p) => p.id === originalId)?.features
         );
+      });
+
+      it('gives every featured copy fresh, deeply independent feature identities', () => {
+        const features: PartFeature[] = [
+          {
+            id: 'mitre-1',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            label: 'Angled end',
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 33, horizontalFlip: true }
+          },
+          {
+            id: 'dado-1',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'dado',
+            parameters: { size: { length: 0.75, width: 4 }, depthMode: 'blind', depth: 0.375 },
+            placement: { x: 6, z: 0 }
+          },
+          {
+            id: 'holes-1',
+            kind: 'circular_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+            cutType: 'counterbore',
+            placement: { primary: 2, secondary: 3, rotation: 15 },
+            pattern: { type: 'linear', count: 3, spacing: 0.75, direction: 30 },
+            parameters: {
+              diameter: 0.25,
+              depthMode: 'blind',
+              depth: 0.5,
+              tilt: 0,
+              direction: 0,
+              counterbore: { diameter: 0.5, depth: 0.125 }
+            }
+          },
+          {
+            id: 'slot-1',
+            kind: 'rounded_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+            cutType: 'rounded_slot',
+            placement: { primary: 4, secondary: 2, rotation: 45 },
+            parameters: { length: 3, width: 0.5, cornerRadius: 0.25, depthMode: 'through' }
+          }
+        ];
+        const store = useProjectStore.getState();
+        const originalId = store.addPart({ name: 'All feature families', features });
+
+        const duplicateId = store.duplicatePart(originalId)!;
+        const [original, duplicate] = useProjectStore
+          .getState()
+          .parts.filter((part) => [originalId, duplicateId].includes(part.id));
+
+        expect(duplicate.features?.map(({ id: _id, ...feature }) => feature)).toEqual(
+          original.features?.map(({ id: _id, ...feature }) => feature)
+        );
+        expect(duplicate.features?.map((feature) => feature.id)).not.toEqual(
+          original.features?.map((feature) => feature.id)
+        );
+        expect(duplicate.features?.every((feature, index) => feature !== original.features?.[index])).toBe(true);
+        expect(
+          (duplicate.features?.[2] as Extract<PartFeature, { kind: 'circular_cut' }>).parameters.counterbore
+        ).not.toBe((original.features?.[2] as Extract<PartFeature, { kind: 'circular_cut' }>).parameters.counterbore);
+        expect((duplicate.features?.[2] as Extract<PartFeature, { kind: 'circular_cut' }>).pattern).not.toBe(
+          (original.features?.[2] as Extract<PartFeature, { kind: 'circular_cut' }>).pattern
+        );
+
+        (duplicate.features?.[2] as Extract<PartFeature, { kind: 'circular_cut' }>).parameters.counterbore!.depth =
+          0.25;
+        expect(
+          (original.features?.[2] as Extract<PartFeature, { kind: 'circular_cut' }>).parameters.counterbore?.depth
+        ).toBe(0.125);
       });
 
       it('generates smart copy names', () => {
@@ -2331,6 +2418,49 @@ describe('validatePartsForCutList', () => {
       expect(issues).toHaveLength(1);
       expect(issues[0].type).toBe('feature_validation');
       expect(issues[0].message).toContain('Bad cutout');
+    });
+
+    it('keeps the source intact and identifies the copied cut after a resize makes it no longer fit', () => {
+      const store = useProjectStore.getState();
+      const stockId = store.addStock({ name: 'Feature stock', length: 96, width: 48, thickness: 0.75 });
+      const sourceId = store.addPart({
+        name: 'Cutout source',
+        length: 24,
+        width: 12,
+        thickness: 0.75,
+        stockId,
+        features: [
+          {
+            id: 'edge-cutout',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            label: 'Copied edge cutout',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'cutout',
+            parameters: { size: { length: 4, width: 2 }, depthMode: 'through' },
+            placement: { x: 8, z: 0 }
+          }
+        ]
+      });
+      const sourceBefore = JSON.stringify(
+        useProjectStore.getState().parts.find((part) => part.id === sourceId)?.features
+      );
+      const copyId = store.duplicatePart(sourceId)!;
+
+      store.updatePart(copyId, { length: 6 });
+      const state = useProjectStore.getState();
+      const issues = validatePartsForCutList(state.parts, state.stocks);
+
+      expect(JSON.stringify(state.parts.find((part) => part.id === sourceId)?.features)).toBe(sourceBefore);
+      expect(issues).toContainEqual(
+        expect.objectContaining({
+          partId: copyId,
+          type: 'feature_validation',
+          message: expect.stringContaining('Copied edge cutout')
+        })
+      );
     });
 
     it('returns feature validation errors for duplicate enabled end cuts on the same end', () => {

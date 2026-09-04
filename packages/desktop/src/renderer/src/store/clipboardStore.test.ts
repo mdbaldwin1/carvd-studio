@@ -6,6 +6,7 @@ import { useProjectStore } from './projectStore';
 import { useSelectionStore } from './selectionStore';
 import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
+import type { PartFeature } from '../types';
 
 // Helper to reset store state before each test
 const resetStores = () => {
@@ -205,6 +206,66 @@ describe('clipboardStore', () => {
       expect(pasted?.features).toHaveLength(1);
       expect(pasted?.features?.[0].kind).toBe('rect_cut');
       expect(pasted?.features).not.toBe(useClipboardStore.getState().clipboard.parts[0].features);
+    });
+
+    it('pastes circular and rounded operations with fresh IDs and independent nested values', () => {
+      const source = createTestPart({
+        id: 'featured-source',
+        features: [
+          {
+            id: 'counterbore-1',
+            kind: 'circular_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+            cutType: 'counterbore',
+            placement: { primary: 2, secondary: 3, rotation: 10 },
+            pattern: { type: 'grid', rows: 2, columns: 2, rowSpacing: 0.75, columnSpacing: 0.5, rotation: 15 },
+            parameters: {
+              diameter: 0.25,
+              depthMode: 'blind',
+              depth: 0.5,
+              tilt: 0,
+              direction: 0,
+              counterbore: { diameter: 0.5, depth: 0.125 }
+            }
+          },
+          {
+            id: 'slot-1',
+            kind: 'rounded_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+            cutType: 'rounded_slot',
+            placement: { primary: 4, secondary: 2, rotation: 45 },
+            parameters: { length: 3, width: 0.5, cornerRadius: 0.25, depthMode: 'through' }
+          }
+        ]
+      });
+      useProjectStore.setState({ parts: [source] });
+      useSelectionStore.getState().selectPart(source.id);
+      useClipboardStore.getState().copySelectedParts();
+
+      const [pastedId] = useClipboardStore.getState().pasteClipboard();
+      const [original, pasted] = useProjectStore
+        .getState()
+        .parts.filter((part) => [source.id, pastedId].includes(part.id));
+      const originalCircular = original.features?.[0] as Extract<PartFeature, { kind: 'circular_cut' }>;
+      const pastedCircular = pasted.features?.[0] as Extract<PartFeature, { kind: 'circular_cut' }>;
+
+      expect(pasted.features?.map(({ id: _id, ...feature }) => feature)).toEqual(
+        original.features?.map(({ id: _id, ...feature }) => feature)
+      );
+      expect(pasted.features?.map((feature) => feature.id)).not.toEqual(
+        original.features?.map((feature) => feature.id)
+      );
+      expect(pastedCircular.pattern).not.toBe(originalCircular.pattern);
+      expect(pastedCircular.parameters.counterbore).not.toBe(originalCircular.parameters.counterbore);
+
+      pastedCircular.parameters.counterbore!.depth = 0.25;
+      expect(originalCircular.parameters.counterbore?.depth).toBe(0.125);
     });
 
     it('removes a stale dowel relationship when only one mate is pasted', () => {
