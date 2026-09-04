@@ -525,7 +525,7 @@ export function buildDraftFromFeature(
       countersinkIncludedAngle: feature.parameters.countersink?.includedAngle ?? 82,
       counterboreDiameter: feature.parameters.counterbore?.diameter ?? feature.parameters.diameter * 2,
       counterboreDepth: feature.parameters.counterbore?.depth ?? 0.125,
-      pattern: feature.pattern ? structuredClone(feature.pattern) : undefined
+      pattern: feature.pattern ? { ...feature.pattern } : undefined
     };
   }
 
@@ -649,7 +649,7 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
         secondary: draft.placementSecondary,
         rotation: draft.rotation
       },
-      pattern: draft.pattern ? structuredClone(draft.pattern) : undefined
+      pattern: draft.pattern ? { ...draft.pattern } : undefined
     };
   }
 

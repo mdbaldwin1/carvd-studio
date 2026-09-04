@@ -296,6 +296,15 @@ function cloneFeatureReference(reference: PartFeatureReference): PartFeatureRefe
   };
 }
 
+function cloneFeatureMetadata(metadata: PartFeature['metadata']): PartFeature['metadata'] {
+  if (!metadata) return undefined;
+  const dowelJoint = metadata.dowelJoint;
+  return {
+    ...metadata,
+    ...(typeof dowelJoint === 'object' && dowelJoint !== null ? { dowelJoint: { ...dowelJoint } } : {})
+  };
+}
+
 export function clonePartFeature(feature: PartFeature): PartFeature {
   if (feature.kind === 'end_cut') {
     return {
@@ -312,7 +321,7 @@ export function clonePartFeature(feature: PartFeature): PartFeature {
       ...feature,
       target: cloneFeatureTarget(feature.target) as typeof feature.target,
       reference: cloneFeatureReference(feature.reference),
-      metadata: feature.metadata ? structuredClone(feature.metadata) : undefined,
+      metadata: cloneFeatureMetadata(feature.metadata),
       parameters: {
         ...feature.parameters,
         countersink: feature.parameters.countersink ? { ...feature.parameters.countersink } : undefined,
@@ -328,7 +337,7 @@ export function clonePartFeature(feature: PartFeature): PartFeature {
       ...feature,
       target: cloneFeatureTarget(feature.target) as typeof feature.target,
       reference: cloneFeatureReference(feature.reference),
-      metadata: feature.metadata ? structuredClone(feature.metadata) : undefined,
+      metadata: cloneFeatureMetadata(feature.metadata),
       parameters: { ...feature.parameters },
       placement: { ...feature.placement }
     };
