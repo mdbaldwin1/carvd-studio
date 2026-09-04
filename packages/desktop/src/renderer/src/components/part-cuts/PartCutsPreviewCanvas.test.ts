@@ -16,6 +16,7 @@ import {
   clamp,
   computePreviewCameraFit,
   getEditableHandleOverlay,
+  getPreviewGeometrySignature,
   nudgeDraft,
   PartCutsPreviewCanvas,
   supportsPreviewHandles
@@ -147,6 +148,16 @@ describe('buildPreviewPart', () => {
     const previewPart = buildPreviewPart(part, undefined, null);
 
     expect(previewPart.features).toEqual([]);
+  });
+});
+
+describe('getPreviewGeometrySignature', () => {
+  it('changes when an enabled cut changes the rendered blank geometry', () => {
+    const part = createTestPart({ length: 24, width: 12, thickness: 0.75 });
+    const uncutSignature = getPreviewGeometrySignature(part);
+    const cutPart = buildPreviewPart(part, [], createRectDraft('mortise', { sizeLength: 3, sizeWidth: 2 }));
+
+    expect(getPreviewGeometrySignature(cutPart)).not.toBe(uncutSignature);
   });
 });
 

@@ -94,6 +94,12 @@ function lastFeatures(onDraftFeaturesChange: WorkspaceProps['onDraftFeaturesChan
 }
 
 describe('PartCutsWorkspace', () => {
+  it('gives each feature enabled control an accessible name', () => {
+    renderWorkspace({ draftFeatures: [createMortiseFeature()] });
+
+    expect(screen.getByRole('checkbox', { name: 'Enable cut 1' })).toBeChecked();
+  });
+
   it('opens paired dowel joinery from the Joinery group', () => {
     const part = createTestPart({ id: 'first', name: 'Lower rail' });
     const mate = createTestPart({ id: 'second', name: 'Upper rail', position: { x: 0, y: 1, z: 0 } });

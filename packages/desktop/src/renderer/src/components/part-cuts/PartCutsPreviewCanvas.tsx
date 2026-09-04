@@ -53,6 +53,36 @@ export function buildPreviewPart(part: Part, draftFeatures: Part['features'], dr
   };
 }
 
+/**
+ * A compact deterministic fingerprint of the exact BufferGeometry rendered in
+ * the Part Cuts preview. It gives UI automation a render-level assertion
+ * without relying on screenshots or implementation-only feature state.
+ */
+export function getPreviewGeometrySignature(part: Part): string {
+  const geometry = getPartRenderGeometry(part);
+  try {
+    const position = geometry.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!position) return 'empty';
+    geometry.computeBoundingBox();
+    const bounds = geometry.boundingBox;
+    const values = position.array as Float32Array;
+    const step = Math.max(1, Math.floor(values.length / 2048));
+    let hash = 2166136261;
+    for (let index = 0; index < values.length; index += step) {
+      hash ^= Math.round(values[index] * 10000);
+      hash = Math.imul(hash, 16777619);
+    }
+    const boundary = bounds
+      ? [bounds.min.x, bounds.min.y, bounds.min.z, bounds.max.x, bounds.max.y, bounds.max.z]
+          .map((value) => value.toFixed(4))
+          .join(',')
+      : 'unbounded';
+    return `${position.count}:${geometry.index?.count ?? 0}:${hash >>> 0}:${boundary}`;
+  } finally {
+    if (typeof geometry.dispose === 'function') geometry.dispose();
+  }
+}
+
 type HandleKind = 'move' | 'length' | 'width';
 
 interface DimensionLine {
@@ -869,9 +899,16 @@ export function PartCutsPreviewCanvas({
   onDraftChange
 }: PartCutsPreviewCanvasProps) {
   const previewPart = useMemo(() => buildPreviewPart(part, draftFeatures, draft), [draft, draftFeatures, part]);
+  const fallback = shouldUseFallbackPreview();
+  const previewGeometrySignature = useMemo(
+    () =>
+      fallback
+        ? `fallback:${previewPart.features?.map((feature) => feature.id).join(',') ?? 'none'}`
+        : getPreviewGeometrySignature(previewPart),
+    [fallback, previewPart]
+  );
   const maxDimension = Math.max(part.length, part.width, part.thickness, 1);
   const activeTargetLabel = getPickableTargetLabel(hoveredTarget) ?? getPickableTargetLabel(pendingTarget);
-  const fallback = shouldUseFallbackPreview();
   const validTargets = useMemo(() => getValidPickableTargets(previewPart, draft), [draft, previewPart]);
   const draftTarget = draft ? getFeatureDraftTarget(draft) : null;
   const handleOverlay = useMemo(
@@ -882,7 +919,12 @@ export function PartCutsPreviewCanvas({
 
   if (fallback) {
     return (
-      <div className="flex min-h-[320px] flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-gradient-to-br from-bg-secondary to-bg px-6 py-8 text-center">
+      <div
+        role="img"
+        aria-label="Part cuts geometry preview"
+        data-geometry-signature={previewGeometrySignature}
+        className="flex min-h-[320px] flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-gradient-to-br from-bg-secondary to-bg px-6 py-8 text-center"
+      >
         <div className="max-w-xl space-y-4">
           <div className="text-lg font-semibold text-text">{part.name}</div>
           <CardDescription>
@@ -978,7 +1020,12 @@ export function PartCutsPreviewCanvas({
   }
 
   return (
-    <div className="relative min-h-[320px] flex-1 overflow-hidden rounded-lg border border-border bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),_transparent_40%),linear-gradient(180deg,_rgba(24,24,27,0.12),_rgba(12,12,14,0.02))]">
+    <div
+      role="img"
+      aria-label="Part cuts geometry preview"
+      data-geometry-signature={previewGeometrySignature}
+      className="relative min-h-[320px] flex-1 overflow-hidden rounded-lg border border-border bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),_transparent_40%),linear-gradient(180deg,_rgba(24,24,27,0.12),_rgba(12,12,14,0.02))]"
+    >
       <Canvas camera={{ position: [maxDimension * 2.2, maxDimension * 1.6, maxDimension * 2.4], fov: 38 }}>
         <PartCutsPreviewScene
           previewPart={previewPart}

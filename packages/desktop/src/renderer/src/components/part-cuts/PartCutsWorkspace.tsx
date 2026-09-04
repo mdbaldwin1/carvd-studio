@@ -608,6 +608,7 @@ export function PartCutsWorkspace({
                           >
                             <div className="pt-0.5">
                               <Checkbox
+                                aria-label={`Enable cut ${index + 1}`}
                                 checked={feature.enabled}
                                 onChange={(e) => {
                                   e.stopPropagation();
@@ -1084,6 +1085,7 @@ export function PartCutsWorkspace({
                           <div>
                             <Label>Hole Diameter</Label>
                             <FractionInput
+                              ariaLabel="Hole Diameter"
                               value={inspectorDraft.diameter}
                               onChange={(diameter) => setDraft({ ...inspectorDraft, diameter })}
                               min={0.001}
@@ -1110,6 +1112,7 @@ export function PartCutsWorkspace({
                           <div>
                             <Label>Hole Depth</Label>
                             <FractionInput
+                              ariaLabel="Hole Depth"
                               value={inspectorDraft.depth}
                               onChange={(depth) => setDraft({ ...inspectorDraft, depth })}
                               min={0.001}
@@ -1145,6 +1148,7 @@ export function PartCutsWorkspace({
                             <div>
                               <Label>Countersink Major Diameter</Label>
                               <FractionInput
+                                ariaLabel="Countersink Major Diameter"
                                 value={inspectorDraft.countersinkMajorDiameter}
                                 onChange={(countersinkMajorDiameter) =>
                                   setDraft({ ...inspectorDraft, countersinkMajorDiameter })
@@ -1170,6 +1174,7 @@ export function PartCutsWorkspace({
                             <div>
                               <Label>Counterbore Diameter</Label>
                               <FractionInput
+                                ariaLabel="Counterbore Diameter"
                                 value={inspectorDraft.counterboreDiameter}
                                 onChange={(counterboreDiameter) => setDraft({ ...inspectorDraft, counterboreDiameter })}
                                 min={inspectorDraft.diameter}
@@ -1178,6 +1183,7 @@ export function PartCutsWorkspace({
                             <div>
                               <Label>Counterbore Depth</Label>
                               <FractionInput
+                                ariaLabel="Counterbore Depth"
                                 value={inspectorDraft.counterboreDepth}
                                 onChange={(counterboreDepth) => setDraft({ ...inspectorDraft, counterboreDepth })}
                                 min={0.001}
@@ -1189,6 +1195,7 @@ export function PartCutsWorkspace({
                           <div>
                             <Label>Offset Along Face</Label>
                             <FractionInput
+                              ariaLabel="Offset Along Face"
                               value={inspectorDraft.placementPrimary}
                               onChange={(placementPrimary) => setDraft({ ...inspectorDraft, placementPrimary })}
                             />
@@ -1196,6 +1203,7 @@ export function PartCutsWorkspace({
                           <div>
                             <Label>Offset Across Face</Label>
                             <FractionInput
+                              ariaLabel="Offset Across Face"
                               value={inspectorDraft.placementSecondary}
                               onChange={(placementSecondary) => setDraft({ ...inspectorDraft, placementSecondary })}
                             />
@@ -1255,6 +1263,7 @@ export function PartCutsWorkspace({
                             <div>
                               <Label>Spacing</Label>
                               <FractionInput
+                                ariaLabel="Spacing"
                                 value={inspectorDraft.pattern.spacing}
                                 onChange={(spacing) =>
                                   setDraft({
@@ -1310,6 +1319,7 @@ export function PartCutsWorkspace({
                             <div>
                               <Label>Row Spacing</Label>
                               <FractionInput
+                                ariaLabel="Row Spacing"
                                 value={inspectorDraft.pattern.rowSpacing}
                                 onChange={(rowSpacing) =>
                                   setDraft({
@@ -1323,6 +1333,7 @@ export function PartCutsWorkspace({
                             <div>
                               <Label>Column Spacing</Label>
                               <FractionInput
+                                ariaLabel="Column Spacing"
                                 value={inspectorDraft.pattern.columnSpacing}
                                 onChange={(columnSpacing) =>
                                   setDraft({
@@ -1356,6 +1367,7 @@ export function PartCutsWorkspace({
                             <div>
                               <Label>Pattern Radius</Label>
                               <FractionInput
+                                ariaLabel="Pattern Radius"
                                 value={inspectorDraft.pattern.radius}
                                 onChange={(radius) =>
                                   setDraft({
@@ -1394,6 +1406,7 @@ export function PartCutsWorkspace({
                           <div>
                             <Label>Opening Length</Label>
                             <FractionInput
+                              ariaLabel="Opening Length"
                               value={inspectorDraft.length}
                               onChange={(length) => setDraft({ ...inspectorDraft, length })}
                               min={0.001}
@@ -1402,6 +1415,7 @@ export function PartCutsWorkspace({
                           <div>
                             <Label>Opening Width</Label>
                             <FractionInput
+                              ariaLabel="Opening Width"
                               value={inspectorDraft.width}
                               onChange={(width) => setDraft({ ...inspectorDraft, width })}
                               min={0.001}
@@ -1412,6 +1426,7 @@ export function PartCutsWorkspace({
                           <div>
                             <Label>Corner Radius</Label>
                             <FractionInput
+                              ariaLabel="Corner Radius"
                               value={inspectorDraft.cornerRadius}
                               onChange={(cornerRadius) => setDraft({ ...inspectorDraft, cornerRadius })}
                               min={0.001}
@@ -1451,6 +1466,7 @@ export function PartCutsWorkspace({
                           <div>
                             <Label>Opening Depth</Label>
                             <FractionInput
+                              ariaLabel="Opening Depth"
                               value={inspectorDraft.depth}
                               onChange={(depth) => setDraft({ ...inspectorDraft, depth })}
                               min={0.001}
@@ -1461,6 +1477,7 @@ export function PartCutsWorkspace({
                           <div>
                             <Label>Offset Along Face</Label>
                             <FractionInput
+                              ariaLabel="Offset Along Face"
                               value={inspectorDraft.placementPrimary}
                               onChange={(placementPrimary) => setDraft({ ...inspectorDraft, placementPrimary })}
                             />
@@ -1468,6 +1485,7 @@ export function PartCutsWorkspace({
                           <div>
                             <Label>Offset Across Face</Label>
                             <FractionInput
+                              ariaLabel="Offset Across Face"
                               value={inspectorDraft.placementSecondary}
                               onChange={(placementSecondary) => setDraft({ ...inspectorDraft, placementSecondary })}
                             />
@@ -1565,6 +1583,17 @@ export function PartCutsWorkspace({
                                       : 'Run Along Blank'}
                             </Label>
                             <FractionInput
+                              ariaLabel={
+                                inspectorDraft.cutType === 'tenon'
+                                  ? 'Tenon Length'
+                                  : inspectorDraft.cutType === 'rabbet'
+                                    ? 'Shoulder Width'
+                                    : inspectorDraft.cutType === 'stopped_dado'
+                                      ? 'Run Along Blank'
+                                      : inspectorDraft.cutType === 'groove'
+                                        ? 'Full Board Run'
+                                        : 'Run Along Blank'
+                              }
                               value={
                                 inspectorDraft.cutType === 'rabbet'
                                   ? (rabbetShoulderValue ?? 0.5)
@@ -1628,6 +1657,16 @@ export function PartCutsWorkspace({
                               </div>
                             ) : (
                               <FractionInput
+                                ariaLabel={
+                                  inspectorDraft.cutType === 'tenon'
+                                    ? 'Tenon Width'
+                                    : inspectorDraft.faceTarget === 'front_face' ||
+                                        inspectorDraft.faceTarget === 'back_face'
+                                      ? 'Height Across Thickness'
+                                      : inspectorDraft.cutType === 'groove'
+                                        ? 'Groove Width'
+                                        : 'Cross-Cut Width'
+                                }
                                 value={inspectorDraft.sizeWidth}
                                 onChange={(value) => updateRectDraft({ sizeWidth: value })}
                                 min={0.125}
@@ -1658,6 +1697,14 @@ export function PartCutsWorkspace({
                                   : 'Blind Depth'}
                             </Label>
                             <FractionInput
+                              ariaLabel={
+                                inspectorDraft.cutType === 'tenon'
+                                  ? 'Tenon Thickness'
+                                  : inspectorDraft.faceTarget === 'front_face' ||
+                                      inspectorDraft.faceTarget === 'back_face'
+                                    ? 'Depth Into Width'
+                                    : 'Blind Depth'
+                              }
                               value={inspectorDraft.depth}
                               onChange={(value) => updateRectDraft({ depth: value })}
                               min={0.125}
@@ -1674,6 +1721,12 @@ export function PartCutsWorkspace({
                                 : 'Offset Across Width'}
                             </Label>
                             <FractionInput
+                              ariaLabel={
+                                edgeTargetToSide(inspectorDraft.edgeTarget) === 'front' ||
+                                edgeTargetToSide(inspectorDraft.edgeTarget) === 'back'
+                                  ? 'Offset Along Length'
+                                  : 'Offset Across Width'
+                              }
                               value={
                                 edgeTargetToSide(inspectorDraft.edgeTarget) === 'front' ||
                                 edgeTargetToSide(inspectorDraft.edgeTarget) === 'back'
@@ -1703,6 +1756,7 @@ export function PartCutsWorkspace({
                                 <div>
                                   <Label>Offset Along Length</Label>
                                   <FractionInput
+                                    ariaLabel="Offset Along Length"
                                     value={inspectorDraft.placementX}
                                     onChange={(value) => updateRectDraft({ placementX: value })}
                                     min={0}
@@ -1719,6 +1773,14 @@ export function PartCutsWorkspace({
                                       : 'Offset Across Width'}
                                 </Label>
                                 <FractionInput
+                                  ariaLabel={
+                                    inspectorDraft.cutType === 'tenon'
+                                      ? 'Shoulder Offset'
+                                      : inspectorDraft.faceTarget === 'front_face' ||
+                                          inspectorDraft.faceTarget === 'back_face'
+                                        ? 'Offset Up From Bottom'
+                                        : 'Offset Across Width'
+                                  }
                                   value={inspectorDraft.placementZ}
                                   onChange={(value) => updateRectDraft({ placementZ: value })}
                                   min={0}

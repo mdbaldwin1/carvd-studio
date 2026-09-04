@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from 'playwright';
+import type {
+  CircularCutFeature,
+  EndCutFeature,
+  RectCutFeature,
+  RoundedCutFeature
+} from '../../src/renderer/src/types';
 import fs from 'fs';
 import path from 'path';
 import {
@@ -63,16 +69,27 @@ async function pressSaveShortcut(window: Page): Promise<void> {
   await window.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+S`);
 }
 
-type PersistedFeature = {
-  kind: 'end_cut' | 'rect_cut' | 'circular_cut' | 'rounded_cut';
-  cutType: string;
-  target: Record<string, string>;
-  parameters: Record<string, unknown>;
+type EndFeatureExpectation = Pick<EndCutFeature, 'kind' | 'cutType' | 'target' | 'parameters'> & {
   label: string;
   enabled: boolean;
-  placement?: Record<string, number>;
-  pattern?: Record<string, number | string>;
 };
+type RectFeatureExpectation = Pick<RectCutFeature, 'kind' | 'cutType' | 'target' | 'parameters' | 'placement'> & {
+  label: string;
+  enabled: boolean;
+};
+type CircularFeatureExpectation = Pick<
+  CircularCutFeature,
+  'kind' | 'cutType' | 'target' | 'parameters' | 'placement' | 'pattern'
+> & { label: string; enabled: boolean };
+type RoundedFeatureExpectation = Pick<RoundedCutFeature, 'kind' | 'cutType' | 'target' | 'parameters' | 'placement'> & {
+  label: string;
+  enabled: boolean;
+};
+type PersistedFeature =
+  | EndFeatureExpectation
+  | RectFeatureExpectation
+  | CircularFeatureExpectation
+  | RoundedFeatureExpectation;
 
 type OperationScenario = {
   title: string;
@@ -573,68 +590,203 @@ const TARGET_LABELS: Record<string, string> = {
   bottom_back_edge: 'Bottom-Back Edge'
 };
 
-async function fillFraction(window: Page, label: string, value: number, index = 0): Promise<void> {
-  const input = window
-    .locator('label')
-    .filter({ hasText: new RegExp(`^${label}$`) })
-    .nth(index)
-    .locator('xpath=following-sibling::input');
+async function fillFraction(window: Page, label: string, value: number): Promise<void> {
+  const input = window.getByLabel(label, { exact: true });
   await input.fill(String(value));
   await expect(input).toHaveValue(String(value));
   await input.press('Enter');
 }
 
 async function selectFeatureTarget(window: Page, feature: PersistedFeature): Promise<void> {
+  const label = featureTargetLabel(feature);
+  const button = window.getByRole('button', { name: label, exact: true });
+  await button.click();
+  await expect(button).toHaveAttribute('aria-pressed', 'true');
+}
+
+function featureTargetLabel(feature: PersistedFeature): string {
   const target = feature.target.face ?? feature.target.edge ?? feature.target.corner;
-  const label =
-    feature.kind === 'end_cut' && target === 'front_face'
-      ? 'Front Edge'
-      : feature.kind === 'end_cut' && target === 'back_face'
-        ? 'Back Edge'
-        : feature.kind === 'rect_cut' && feature.cutType === 'edge_notch'
-          ? target.includes('front')
-            ? 'Front'
-            : target.includes('back')
-              ? 'Back'
-              : target.includes('left')
-                ? 'Left'
-                : 'Right'
-          : TARGET_LABELS[target];
-  await window.getByRole('button', { name: label, exact: true }).click();
+  return feature.kind === 'end_cut' && target === 'front_face'
+    ? 'Front Edge'
+    : feature.kind === 'end_cut' && target === 'back_face'
+      ? 'Back Edge'
+      : feature.kind === 'rect_cut' && feature.cutType === 'edge_notch'
+        ? target.includes('front')
+          ? 'Front'
+          : target.includes('back')
+            ? 'Back'
+            : target.includes('left')
+              ? 'Left'
+              : 'Right'
+        : TARGET_LABELS[target];
+}
+
+function parseImperialMeasurement(value: string): number {
+  const [whole, fraction] = value.trim().split(/\s+/, 2);
+  if (!fraction) {
+    if (!whole.includes('/')) return Number(whole);
+    const [numerator, denominator] = whole.split('/').map(Number);
+    return numerator / denominator;
+  }
+  const [numerator, denominator] = fraction.split('/').map(Number);
+  return Number(whole) + numerator / denominator;
+}
+
+async function expectFractionControl(window: Page, label: string, value: number): Promise<void> {
+  const input = window.getByLabel(label, { exact: true });
+  await expect.poll(async () => parseImperialMeasurement(await input.inputValue())).toBeCloseTo(value, 6);
+}
+
+async function expectFeatureControls(window: Page, feature: PersistedFeature): Promise<void> {
+  await expect(window.getByLabel('Label (optional)', { exact: true })).toHaveValue(feature.label);
+  await expect(window.getByRole('button', { name: featureTargetLabel(feature), exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+
+  if (feature.kind === 'end_cut') {
+    if (feature.target.face === 'left_end' || feature.target.face === 'right_end')
+      await expect(window.getByLabel('Cut Style', { exact: true })).toHaveValue(feature.cutType);
+    if (feature.cutType === 'mitre' || feature.cutType === 'compound') {
+      await expect(window.getByLabel('Mitre Angle', { exact: true })).toHaveValue(
+        String(feature.parameters.horizontalAngle)
+      );
+      await expect(window.getByLabel('Long Point On', { exact: true })).toHaveValue(
+        feature.parameters.horizontalFlip ? 'back' : 'front'
+      );
+    }
+    if (feature.cutType === 'bevel' || feature.cutType === 'compound') {
+      await expect(window.getByLabel('Bevel Angle', { exact: true })).toHaveValue(
+        String(feature.parameters.verticalAngle)
+      );
+      const highPointOnTop =
+        feature.target.face === 'right_end' ? !feature.parameters.verticalFlip : !!feature.parameters.verticalFlip;
+      await expect(window.getByLabel('High Point On', { exact: true })).toHaveValue(highPointOnTop ? 'top' : 'bottom');
+    }
+    return;
+  }
+
+  if (feature.kind === 'circular_cut') {
+    await expectFractionControl(window, 'Hole Diameter', feature.parameters.diameter as number);
+    await expect(window.getByLabel('Depth', { exact: true })).toHaveValue(feature.parameters.depthMode as string);
+    if (feature.parameters.depthMode === 'blind')
+      await expectFractionControl(window, 'Hole Depth', feature.parameters.depth as number);
+    await expect(window.getByLabel('Tilt From Square (degrees)', { exact: true })).toHaveValue(
+      String(feature.parameters.tilt)
+    );
+    await expect(window.getByLabel('Tilt Toward (degrees)', { exact: true })).toHaveValue(
+      String(feature.parameters.direction)
+    );
+    if (feature.cutType === 'countersink') {
+      const countersink = feature.parameters.countersink as { majorDiameter: number; includedAngle: number };
+      await expectFractionControl(window, 'Countersink Major Diameter', countersink.majorDiameter);
+      await expect(window.getByLabel('Included Angle', { exact: true })).toHaveValue(String(countersink.includedAngle));
+    }
+    if (feature.cutType === 'counterbore') {
+      const counterbore = feature.parameters.counterbore as { diameter: number; depth: number };
+      await expectFractionControl(window, 'Counterbore Diameter', counterbore.diameter);
+      await expectFractionControl(window, 'Counterbore Depth', counterbore.depth);
+    }
+    await expectFractionControl(window, 'Offset Along Face', feature.placement!.primary);
+    await expectFractionControl(window, 'Offset Across Face', feature.placement!.secondary);
+    await expect(window.getByLabel('Repeating Pattern', { exact: true })).toHaveValue(
+      (feature.pattern?.type as string) ?? 'none'
+    );
+    if (feature.pattern?.type === 'linear') {
+      await expect(window.getByLabel('Hole Count', { exact: true })).toHaveValue(String(feature.pattern.count));
+      await expectFractionControl(window, 'Spacing', feature.pattern.spacing as number);
+      await expect(window.getByLabel('Direction', { exact: true })).toHaveValue(String(feature.pattern.direction));
+    } else if (feature.pattern?.type === 'grid') {
+      await expect(window.getByLabel('Rows', { exact: true })).toHaveValue(String(feature.pattern.rows));
+      await expect(window.getByLabel('Columns', { exact: true })).toHaveValue(String(feature.pattern.columns));
+      await expectFractionControl(window, 'Row Spacing', feature.pattern.rowSpacing as number);
+      await expectFractionControl(window, 'Column Spacing', feature.pattern.columnSpacing as number);
+    } else if (feature.pattern?.type === 'circular') {
+      await expect(window.getByLabel('Hole Count', { exact: true })).toHaveValue(String(feature.pattern.count));
+      await expectFractionControl(window, 'Pattern Radius', feature.pattern.radius as number);
+      await expect(window.getByLabel('Start Angle', { exact: true })).toHaveValue(String(feature.pattern.startAngle));
+    }
+    return;
+  }
+
+  if (feature.kind === 'rounded_cut') {
+    await expectFractionControl(window, 'Opening Length', feature.parameters.length as number);
+    await expectFractionControl(window, 'Opening Width', feature.parameters.width as number);
+    if (feature.cutType === 'rounded_rectangle')
+      await expectFractionControl(window, 'Corner Radius', feature.parameters.cornerRadius as number);
+    await expect(window.getByLabel('Depth', { exact: true })).toHaveValue(feature.parameters.depthMode as string);
+    if (feature.parameters.depthMode === 'blind')
+      await expectFractionControl(window, 'Opening Depth', feature.parameters.depth as number);
+    await expect(window.getByLabel('Rotation (degrees)', { exact: true })).toHaveValue(
+      String(feature.placement!.rotation)
+    );
+    await expectFractionControl(window, 'Offset Along Face', feature.placement!.primary);
+    await expectFractionControl(window, 'Offset Across Face', feature.placement!.secondary);
+    return;
+  }
+
+  const size = feature.parameters.size as { length: number; width: number };
+  if (feature.cutType === 'tenon') {
+    await expectFractionControl(window, 'Tenon Length', size.length);
+    await expectFractionControl(window, 'Tenon Width', size.width);
+    await expectFractionControl(window, 'Tenon Thickness', feature.parameters.depth as number);
+    await expectFractionControl(window, 'Shoulder Offset', feature.placement!.z);
+  } else if (feature.cutType === 'rabbet') {
+    await expectFractionControl(window, 'Shoulder Width', size.width);
+    await expectFractionControl(window, 'Blind Depth', feature.parameters.depth as number);
+  } else if (feature.cutType === 'groove') {
+    await expectFractionControl(window, 'Groove Width', size.width);
+    await expectFractionControl(window, 'Blind Depth', feature.parameters.depth as number);
+  } else {
+    await expectFractionControl(window, 'Run Along Blank', size.length);
+    if (!['dado', 'stopped_dado'].includes(feature.cutType))
+      await expectFractionControl(window, 'Cross-Cut Width', size.width);
+    if (feature.parameters.depthMode === 'blind')
+      await expectFractionControl(window, 'Blind Depth', feature.parameters.depth as number);
+    if (feature.cutType === 'edge_notch')
+      await expectFractionControl(window, 'Offset Along Length', feature.placement!.x);
+    if (['cutout', 'stopped_dado', 'stopped_groove', 'mortise'].includes(feature.cutType)) {
+      await expectFractionControl(window, 'Offset Along Length', feature.placement!.x);
+      if (feature.cutType !== 'stopped_dado')
+        await expectFractionControl(window, 'Offset Across Width', feature.placement!.z);
+    }
+  }
 }
 
 async function applyFeatureControls(window: Page, feature: PersistedFeature): Promise<void> {
   await selectFeatureTarget(window, feature);
-  await window.locator('#feature-label').fill(feature.label);
+  await window.getByLabel('Label (optional)', { exact: true }).fill(feature.label);
 
   if (feature.kind === 'end_cut') {
     if (feature.target.face === 'left_end' || feature.target.face === 'right_end')
-      await window.locator('#end-cut-type').selectOption(feature.cutType);
+      await window.getByLabel('Cut Style', { exact: true }).selectOption(feature.cutType);
     if (feature.cutType === 'mitre' || feature.cutType === 'compound') {
-      await window.locator('#horizontal-angle').fill(String(feature.parameters.horizontalAngle));
-      await window.locator('#horizontal-flip').selectOption(feature.parameters.horizontalFlip ? 'back' : 'front');
+      await window.getByLabel('Mitre Angle', { exact: true }).fill(String(feature.parameters.horizontalAngle));
+      await window
+        .getByLabel('Long Point On', { exact: true })
+        .selectOption(feature.parameters.horizontalFlip ? 'back' : 'front');
     }
     if (feature.cutType === 'bevel' || feature.cutType === 'compound') {
-      await window.locator('#vertical-angle').fill(String(feature.parameters.verticalAngle));
+      await window.getByLabel('Bevel Angle', { exact: true }).fill(String(feature.parameters.verticalAngle));
       const face = feature.target.face!;
       const highPointOnTop =
         face === 'right_end' ? !feature.parameters.verticalFlip : !!feature.parameters.verticalFlip;
-      await window.locator('#vertical-flip').selectOption(highPointOnTop ? 'top' : 'bottom');
+      await window.getByLabel('High Point On', { exact: true }).selectOption(highPointOnTop ? 'top' : 'bottom');
     }
     return;
   }
 
   if (feature.kind === 'circular_cut') {
     await fillFraction(window, 'Hole Diameter', feature.parameters.diameter as number);
-    await window.locator('#round-depth-mode').selectOption(feature.parameters.depthMode as string);
+    await window.getByLabel('Depth', { exact: true }).selectOption(feature.parameters.depthMode as string);
     if (feature.parameters.depthMode === 'blind')
       await fillFraction(window, 'Hole Depth', feature.parameters.depth as number);
-    await window.locator('#hole-tilt').fill(String(feature.parameters.tilt));
-    await window.locator('#hole-direction').fill(String(feature.parameters.direction));
+    await window.getByLabel('Tilt From Square (degrees)', { exact: true }).fill(String(feature.parameters.tilt));
+    await window.getByLabel('Tilt Toward (degrees)', { exact: true }).fill(String(feature.parameters.direction));
     if (feature.cutType === 'countersink') {
       const countersink = feature.parameters.countersink as { majorDiameter: number; includedAngle: number };
       await fillFraction(window, 'Countersink Major Diameter', countersink.majorDiameter);
-      await window.locator('#countersink-angle').fill(String(countersink.includedAngle));
+      await window.getByLabel('Included Angle', { exact: true }).fill(String(countersink.includedAngle));
     }
     if (feature.cutType === 'counterbore') {
       const counterbore = feature.parameters.counterbore as { diameter: number; depth: number };
@@ -643,20 +795,22 @@ async function applyFeatureControls(window: Page, feature: PersistedFeature): Pr
     }
     await fillFraction(window, 'Offset Along Face', feature.placement!.primary);
     await fillFraction(window, 'Offset Across Face', feature.placement!.secondary);
-    await window.locator('#hole-pattern').selectOption((feature.pattern?.type as string) ?? 'none');
+    await window
+      .getByLabel('Repeating Pattern', { exact: true })
+      .selectOption((feature.pattern?.type as string) ?? 'none');
     if (feature.pattern?.type === 'linear') {
-      await window.locator('#linear-count').fill(String(feature.pattern.count));
+      await window.getByLabel('Hole Count', { exact: true }).fill(String(feature.pattern.count));
       await fillFraction(window, 'Spacing', feature.pattern.spacing as number);
-      await window.locator('#linear-direction').fill(String(feature.pattern.direction));
+      await window.getByLabel('Direction', { exact: true }).fill(String(feature.pattern.direction));
     } else if (feature.pattern?.type === 'grid') {
-      await window.locator('#grid-rows').fill(String(feature.pattern.rows));
-      await window.locator('#grid-columns').fill(String(feature.pattern.columns));
+      await window.getByLabel('Rows', { exact: true }).fill(String(feature.pattern.rows));
+      await window.getByLabel('Columns', { exact: true }).fill(String(feature.pattern.columns));
       await fillFraction(window, 'Row Spacing', feature.pattern.rowSpacing as number);
       await fillFraction(window, 'Column Spacing', feature.pattern.columnSpacing as number);
     } else if (feature.pattern?.type === 'circular') {
-      await window.locator('#circular-count').fill(String(feature.pattern.count));
+      await window.getByLabel('Hole Count', { exact: true }).fill(String(feature.pattern.count));
       await fillFraction(window, 'Pattern Radius', feature.pattern.radius as number);
-      await window.locator('#circular-start-angle').fill(String(feature.pattern.startAngle));
+      await window.getByLabel('Start Angle', { exact: true }).fill(String(feature.pattern.startAngle));
     }
     return;
   }
@@ -666,10 +820,10 @@ async function applyFeatureControls(window: Page, feature: PersistedFeature): Pr
     await fillFraction(window, 'Opening Width', feature.parameters.width as number);
     if (feature.cutType === 'rounded_rectangle')
       await fillFraction(window, 'Corner Radius', feature.parameters.cornerRadius as number);
-    await window.locator('#rounded-depth-mode').selectOption(feature.parameters.depthMode as string);
+    await window.getByLabel('Depth', { exact: true }).selectOption(feature.parameters.depthMode as string);
     if (feature.parameters.depthMode === 'blind')
       await fillFraction(window, 'Opening Depth', feature.parameters.depth as number);
-    await window.locator('#rounded-rotation').fill(String(feature.placement!.rotation));
+    await window.getByLabel('Rotation (degrees)', { exact: true }).fill(String(feature.placement!.rotation));
     await fillFraction(window, 'Offset Along Face', feature.placement!.primary);
     await fillFraction(window, 'Offset Across Face', feature.placement!.secondary);
     return;
@@ -677,7 +831,8 @@ async function applyFeatureControls(window: Page, feature: PersistedFeature): Pr
 
   const size = feature.parameters.size as { length: number; width: number };
   const depthMode = feature.parameters.depthMode as string;
-  if (await window.locator('#depth-mode').count()) await window.locator('#depth-mode').selectOption(depthMode);
+  if (await window.getByLabel('Depth', { exact: true }).count())
+    await window.getByLabel('Depth', { exact: true }).selectOption(depthMode);
   if (feature.cutType === 'tenon') {
     await fillFraction(window, 'Tenon Length', size.length);
     await fillFraction(window, 'Tenon Width', size.width);
@@ -719,6 +874,28 @@ async function persistedFirstFeature(window: Page): Promise<PersistedFeature | n
   });
 }
 
+async function firstPartFeatureSnapshot(window: Page): Promise<unknown | null> {
+  return window.evaluate(() => {
+    const feature = window.useProjectStore.getState().parts[0]?.features?.[0];
+    return feature ? JSON.parse(JSON.stringify(feature)) : null;
+  });
+}
+
+async function firstDraftFeatureSnapshot(window: Page): Promise<unknown | null> {
+  return window.evaluate(() => {
+    const feature = window.usePartCutsEditingStore.getState().draftFeatures?.[0];
+    return feature ? JSON.parse(JSON.stringify(feature)) : null;
+  });
+}
+
+async function previewGeometrySignature(window: Page): Promise<string> {
+  const signature = await window
+    .getByRole('img', { name: 'Part cuts geometry preview' })
+    .getAttribute('data-geometry-signature');
+  if (!signature) throw new Error('Part Cuts preview did not expose a geometry signature.');
+  return signature;
+}
+
 async function savePartAndReopen(window: Page): Promise<void> {
   await window.getByRole('button', { name: 'Save Part' }).click();
   await expect.poll(() => isEditingPartCuts(window)).toBe(false);
@@ -728,35 +905,58 @@ async function savePartAndReopen(window: Page): Promise<void> {
 async function qualifyOperationLifecycle(window: Page, scenario: OperationScenario): Promise<void> {
   await window.getByRole('button', { name: '+ Add Cut' }).click();
   await window.getByRole('button', { name: new RegExp(`^${scenario.preset}\\b`) }).click();
-  if (scenario.blindOnly) await expect(window.locator('#depth-mode')).toHaveCount(0);
+  if (scenario.blindOnly) await expect(window.getByLabel('Depth', { exact: true })).toHaveCount(0);
   await applyFeatureControls(window, scenario.initial);
-  await expect(window.locator('#feature-label')).toHaveValue(scenario.initial.label);
+  await expectFeatureControls(window, scenario.initial);
   await window.getByRole('button', { name: 'Save Cut' }).click();
 
-  // Enabled is an authored state too: toggle it through the list and leave it enabled before persistence.
-  const enabledToggle = window.locator('input[type="checkbox"]').first();
+  // Persist disabled state, then restore enabled state as part of the edited lifecycle.
+  const enabledToggle = window.getByRole('checkbox', { name: 'Enable cut 1' });
   await enabledToggle.uncheck();
-  await enabledToggle.check();
+  await expect(enabledToggle).not.toBeChecked();
   await savePartAndReopen(window);
-  await expect.poll(() => persistedFirstFeature(window)).toEqual(scenario.initial);
+  const initiallyDisabled = { ...scenario.initial, enabled: false };
+  await expect.poll(() => persistedFirstFeature(window)).toEqual(initiallyDisabled);
+  await expect(enabledToggle).not.toBeChecked();
 
   await window.getByRole('button', { name: new RegExp(`^1\\. ${scenario.initial.label}`) }).click();
+  await expectFeatureControls(window, initiallyDisabled);
+  await window.getByRole('button', { name: 'Back to Cuts' }).click();
+  await enabledToggle.check();
+  await expect(enabledToggle).toBeChecked();
+  await window.getByRole('button', { name: new RegExp(`^1\\. ${scenario.initial.label}`) }).click();
   await applyFeatureControls(window, scenario.edited);
-  await expect(window.locator('#feature-label')).toHaveValue(scenario.edited.label);
+  await expectFeatureControls(window, scenario.edited);
   await window.getByRole('button', { name: 'Save Cut' }).click();
   await savePartAndReopen(window);
   await expect.poll(() => persistedFirstFeature(window)).toEqual(scenario.edited);
   await expect.poll(() => getFirstPartFeatureCount(window)).toBe(1);
 
+  await window.getByRole('button', { name: new RegExp(`^1\\. ${scenario.edited.label}`) }).click();
+  await expectFeatureControls(window, scenario.edited);
+  await window.getByRole('button', { name: 'Back to Cuts' }).click();
+  const editedFeature = await firstPartFeatureSnapshot(window);
+  expect(editedFeature).not.toBeNull();
+  await expect.poll(() => firstDraftFeatureSnapshot(window)).toEqual(editedFeature);
+  const geometryBeforeDelete = await previewGeometrySignature(window);
+
   await window.getByRole('button', { name: 'Actions for cut 1' }).click();
   await window.getByRole('menuitem', { name: 'Delete' }).click();
   await expect(window.getByText(scenario.edited.label)).toHaveCount(0);
+  await expect.poll(() => firstDraftFeatureSnapshot(window)).toBeNull();
+  const geometryAfterDelete = await previewGeometrySignature(window);
+  expect(geometryAfterDelete).not.toBe(geometryBeforeDelete);
   await window.getByRole('button', { name: 'Undo cut change' }).click();
   await expect(window.getByText(scenario.edited.label)).toBeVisible();
+  await expect.poll(() => firstDraftFeatureSnapshot(window)).toEqual(editedFeature);
+  await expect.poll(() => previewGeometrySignature(window)).toBe(geometryBeforeDelete);
   await window.getByRole('button', { name: 'Redo cut change' }).click();
   await expect(window.getByText(scenario.edited.label)).toHaveCount(0);
+  await expect.poll(() => firstDraftFeatureSnapshot(window)).toBeNull();
+  await expect.poll(() => previewGeometrySignature(window)).toBe(geometryAfterDelete);
   await window.getByRole('button', { name: 'Save Part' }).click();
   await expect.poll(() => getFirstPartFeatureCount(window)).toBe(0);
+  await expect.poll(() => firstPartFeatureSnapshot(window)).toBeNull();
 }
 
 test.describe('part cuts editing lifecycle', () => {
