@@ -30,12 +30,13 @@ import { useLicenseStore } from './licenseStore';
 import { getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
 import {
-  clonePartFeatures,
   clonePartFeaturesForCopy,
+  getAssemblyPartCopyMap,
   normalizeAssemblyPart,
   normalizePart
 } from '../utils/partFeatures';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
+import { validateEndCutFeature } from '../utils/endCutUtils';
 import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
 import { getPartFeatureConflicts } from '../utils/partFeatureConflicts';
 import { getFeatureTargetLabel } from '../utils/partFeatureSummary';
@@ -400,7 +401,7 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
             ? validateCircularCut(feature, part)
             : feature.kind === 'rounded_cut'
               ? validateRoundedCut(feature, part)
-              : null;
+              : validateEndCutFeature(feature, part);
       if (!featureIssue) continue;
 
       const featureLabel =
@@ -1208,6 +1209,8 @@ export const useProjectStore = create<ProjectState>()(
 
         // Create part index map for group member references
         const partIdToIndex = new Map<string, number>();
+        const assemblyPartIds = new Map(selectedParts.map((part, index) => [part.id, `part:${index}`]));
+        const assemblyJointIds = new Map<string, string>();
         const assemblyParts: AssemblyPart[] = selectedParts.map((part, index) => {
           partIdToIndex.set(part.id, index);
 
@@ -1238,7 +1241,8 @@ export const useProjectStore = create<ProjectState>()(
             notes: part.notes,
             extraLength: part.extraLength,
             extraWidth: part.extraWidth,
-            features: clonePartFeatures(part.features),
+            localId: assemblyPartIds.get(part.id),
+            features: clonePartFeaturesForCopy(part.features, assemblyPartIds, assemblyJointIds),
             embeddedStock
           };
         });
@@ -1382,10 +1386,13 @@ export const useProjectStore = create<ProjectState>()(
         // Create ID mappings
         const partIdMap = new Map<number, string>(); // index -> new ID
         const groupIdMap = new Map<number, string>(); // index -> new ID
+        const newPartIdentities = assembly.parts.map(() => uuidv4());
+        const assemblyCopyMap = getAssemblyPartCopyMap(assembly.parts, newPartIdentities);
+        const placedJointIds = new Map<string, string>();
 
         // Create new parts with resolved stock IDs
         const newParts: Part[] = assembly.parts.map((cp, index) => {
-          const newId = uuidv4();
+          const newId = newPartIdentities[index];
           partIdMap.set(index, newId);
 
           // Resolve the stockId
@@ -1414,7 +1421,7 @@ export const useProjectStore = create<ProjectState>()(
             notes: cp.notes,
             extraLength: cp.extraLength,
             extraWidth: cp.extraWidth,
-            features: clonePartFeatures(cp.features)
+            features: clonePartFeaturesForCopy(cp.features, assemblyCopyMap, placedJointIds)
           });
         });
 

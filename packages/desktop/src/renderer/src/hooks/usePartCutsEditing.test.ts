@@ -18,6 +18,30 @@ const openPartOne = () => {
 };
 
 describe('usePartCutsEditing', () => {
+  it('R5 blocks final saving of an end cut whose angle exceeds stock length', () => {
+    const cut: PartFeature = {
+      id: 'end',
+      kind: 'end_cut',
+      version: 1,
+      enabled: true,
+      target: { type: 'face', face: 'left_end' },
+      reference: { primaryFrom: 'min' },
+      cutType: 'mitre',
+      lengthMode: 'long_point',
+      parameters: { horizontalAngle: 80 }
+    };
+    useProjectStore.setState({
+      parts: [createTestPart({ id: 'part-1', length: 10, width: 4, thickness: 1, features: [cut] })]
+    });
+    const { result } = renderHook(() => usePartCutsEditing());
+    act(openPartOne);
+    let saved = true;
+    act(() => {
+      saved = result.current.saveAndExit();
+    });
+    expect(saved).toBe(false);
+    expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
+  });
   beforeEach(() => {
     captureAnalytics.mockClear();
     usePartCutsEditingStore.getState().finishEditing();

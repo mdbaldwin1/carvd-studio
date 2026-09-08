@@ -18,7 +18,7 @@ import { useProjectStore } from './projectStore';
 import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useCameraStore } from './cameraStore';
-import { clonePartFeatures, normalizeAssemblyPart, normalizePart } from '../utils/partFeatures';
+import { clonePartFeaturesForCopy, normalizeAssemblyPart, normalizePart } from '../utils/partFeatures';
 
 export interface ProjectSnapshot {
   projectName: string;
@@ -170,6 +170,8 @@ export const useAssemblyEditingStore = create<AssemblyEditingStoreState>((set, g
     });
 
     // Create assembly from current parts (normalized to center)
+    const localIds = new Map(projectState.parts.map((part, index) => [part.id, `part:${index}`]));
+    const jointIds = new Map<string, string>();
     const assemblyParts: AssemblyPart[] = projectState.parts.map((part) => {
       // Look up and embed stock data if part has a stock assigned
       let embeddedStock: EmbeddedStock | undefined;
@@ -198,7 +200,8 @@ export const useAssemblyEditingStore = create<AssemblyEditingStoreState>((set, g
         notes: part.notes,
         extraLength: part.extraLength,
         extraWidth: part.extraWidth,
-        features: clonePartFeatures(part.features),
+        localId: localIds.get(part.id),
+        features: clonePartFeaturesForCopy(part.features, localIds, jointIds),
         embeddedStock
       });
     });

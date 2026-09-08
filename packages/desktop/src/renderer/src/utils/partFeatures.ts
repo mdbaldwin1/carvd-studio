@@ -313,7 +313,10 @@ export function clonePartFeature(feature: PartFeature): PartFeature {
       target: cloneFeatureTarget(feature.target) as PartFeature['target'],
       reference: cloneFeatureReference(feature.reference),
       metadata: feature.metadata ? { ...feature.metadata } : undefined,
-      parameters: { ...feature.parameters }
+      parameters: {
+        ...feature.parameters,
+        reference: feature.parameters.reference ? { ...feature.parameters.reference } : undefined
+      }
     };
   }
 
@@ -416,4 +419,29 @@ export function normalizeAssemblyPart(part: AssemblyPart): AssemblyPart {
     grainDirection: part.grainDirection ?? 'length',
     features: clonePartFeatures(part.features)
   };
+}
+
+/** Map assembly-local identities, recovering reciprocal legacy pairs when possible. */
+export function getAssemblyPartCopyMap(parts: AssemblyPart[], newIds: string[]): Map<string, string> {
+  const result = new Map<string, string>();
+  parts.forEach((part, index) => {
+    if (part.localId) result.set(part.localId, newIds[index]);
+    else {
+      for (const feature of part.features ?? []) {
+        const joint = feature.metadata?.dowelJoint;
+        if (!joint) continue;
+        const mates = parts.flatMap((candidate, candidateIndex) =>
+          candidateIndex === index
+            ? []
+            : (candidate.features ?? []).filter(
+                (other) =>
+                  other.metadata?.dowelJoint?.jointId === joint.jointId &&
+                  other.metadata.dowelJoint.memberIndex === joint.memberIndex
+              )
+        );
+        if (mates.length === 1) result.set(mates[0].metadata!.dowelJoint!.matePartId, newIds[index]);
+      }
+    }
+  });
+  return result;
 }

@@ -156,8 +156,8 @@ describe('roundCutUtils', () => {
   it.each([
     ['top_face', { origin: { x: 0, y: 1, z: 0 }, inwardNormal: { x: 0, y: -1, z: 0 }, sizes: [24, 8] }],
     ['bottom_face', { origin: { x: 0, y: -1, z: 0 }, inwardNormal: { x: 0, y: 1, z: 0 }, sizes: [24, 8] }],
-    ['front_face', { origin: { x: 0, y: 0, z: -4 }, inwardNormal: { x: 0, y: 0, z: 1 }, sizes: [24, 2] }],
-    ['back_face', { origin: { x: 0, y: 0, z: 4 }, inwardNormal: { x: 0, y: 0, z: -1 }, sizes: [24, 2] }],
+    ['front_face', { origin: { x: 0, y: 0, z: 4 }, inwardNormal: { x: 0, y: 0, z: -1 }, sizes: [24, 2] }],
+    ['back_face', { origin: { x: 0, y: 0, z: -4 }, inwardNormal: { x: 0, y: 0, z: 1 }, sizes: [24, 2] }],
     ['left_end', { origin: { x: -12, y: 0, z: 0 }, inwardNormal: { x: 1, y: 0, z: 0 }, sizes: [8, 2] }],
     ['right_end', { origin: { x: 12, y: 0, z: 0 }, inwardNormal: { x: -1, y: 0, z: 0 }, sizes: [8, 2] }]
   ] as const)('maps %s into a woodworking face frame', (face, expected) => {

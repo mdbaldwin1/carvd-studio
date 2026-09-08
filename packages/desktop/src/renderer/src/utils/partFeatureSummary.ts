@@ -1,5 +1,5 @@
 import { CornerTarget, EdgeTarget, FaceTarget, PartFeature } from '@renderer/types';
-import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
+import { formatFabricationMeasurement as formatMeasurementWithUnit } from '@renderer/utils/fractions';
 
 export const FACE_LABELS: Record<FaceTarget, string> = {
   left_end: 'Left End',
@@ -209,6 +209,56 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
 
 export function getAuthoredFeatureCount(features?: PartFeature[]): number {
   return features?.length ?? 0;
+}
+
+export function getFeaturePlacementSummary(feature: PartFeature, units: 'imperial' | 'metric'): string | null {
+  const measure = (value: number) => formatMeasurementWithUnit(value, units);
+  if (feature.kind === 'end_cut') return null;
+  if (feature.kind === 'rect_cut') {
+    if (feature.cutType === 'rabbet') return 'Full run along the selected edge';
+    if (feature.target.type === 'edge') {
+      const alongLength = feature.target.edge.includes('front') || feature.target.edge.includes('back');
+      return `${measure(alongLength ? feature.placement.x : feature.placement.z)} from ${alongLength ? 'Left' : 'Front'} along the selected edge`;
+    }
+    if (feature.cutType === 'corner_notch')
+      return feature.parameters.depthMode === 'blind' ? 'Enter from Top Face at the selected corner' : null;
+    if (feature.cutType === 'tenon')
+      return `Tongue starts ${measure(feature.placement.z)} from Front; centered through thickness`;
+    if (feature.cutType === 'dado' || feature.cutType === 'stopped_dado')
+      return `${measure(feature.placement.x)} from Left; full width`;
+    if (feature.cutType === 'groove') return `${measure(feature.placement.z)} from Front; full length`;
+    const secondaryEdge =
+      feature.target.type === 'face' && (feature.target.face === 'front_face' || feature.target.face === 'back_face')
+        ? 'Bottom'
+        : 'Front';
+    return `${measure(feature.placement.x)} from Left · ${measure(feature.placement.z)} from ${secondaryEdge}`;
+  }
+  const face = feature.target.face;
+  const primaryEdges =
+    face === 'back_face'
+      ? ['Right', 'Left']
+      : face === 'left_end'
+        ? ['Back', 'Front']
+        : face === 'right_end'
+          ? ['Front', 'Back']
+          : ['Left', 'Right'];
+  const secondaryEdges =
+    face === 'top_face' ? ['Back', 'Front'] : face === 'bottom_face' ? ['Front', 'Back'] : ['Bottom', 'Top'];
+  const coordinate = (name: string, value: number, origin: 'min' | 'center' | 'max' | undefined, edges: string[]) =>
+    `${name} ${measure(value)} from ${origin === 'min' ? edges[0] : origin === 'max' ? edges[1] : `center (+${edges[1]})`}`;
+  const details = [
+    coordinate('Primary', feature.placement.primary, feature.reference.primaryFrom, primaryEdges),
+    coordinate('Secondary', feature.placement.secondary, feature.reference.secondaryFrom, secondaryEdges)
+  ];
+  if (feature.kind === 'rounded_cut') details.push(`${feature.placement.rotation}° rotation`);
+  if (feature.kind === 'circular_cut' && feature.pattern?.type === 'grid')
+    details.push(`${feature.pattern.rows} rows × ${feature.pattern.columns} columns`);
+  if (
+    feature.kind === 'rounded_cut' ||
+    (feature.kind === 'circular_cut' && (feature.pattern || feature.parameters.tilt))
+  )
+    details.push(`Angles: 0° toward ${primaryEdges[1]}, 90° toward ${secondaryEdges[1]}`);
+  return details.join(' · ');
 }
 
 export function getEnabledFeatureCount(features?: PartFeature[]): number {

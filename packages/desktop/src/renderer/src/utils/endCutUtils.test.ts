@@ -173,7 +173,7 @@ describe('endCutUtils', () => {
       expect(profiles.left.horizontalInset).toBeCloseTo(4);
     });
 
-    it('scales insets down when combined cuts exceed the available length', () => {
+    it('preserves authored slopes even when combined cuts exceed the available length', () => {
       const profiles = getPartEndCutProfiles({
         length: 2,
         width: 4,
@@ -185,9 +185,9 @@ describe('endCutUtils', () => {
       });
 
       const total = profiles.left.maxInset + profiles.right.maxInset;
-      expect(total).toBeCloseTo(1.99);
-      expect(profiles.left.maxInset).toBeCloseTo(0.995);
-      expect(profiles.right.maxInset).toBeCloseTo(0.995);
+      expect(total).toBeCloseTo(8);
+      expect(profiles.left.maxInset).toBeCloseTo(4);
+      expect(profiles.right.maxInset).toBeCloseTo(4);
     });
   });
 
@@ -364,14 +364,14 @@ describe('endCutUtils', () => {
       expect(getEdgeBevelInsetAt('front', flipped, { thickness: 1 }, { y: -0.5 })).toBeCloseTo(1);
     });
 
-    it('clamps opposing bevels so they cannot consume the full width', () => {
+    it('preserves opposing bevel slopes without silently changing the angles', () => {
       const back = {
         ...(frontBevel(80) as { target: { type: string; face: string } }),
         id: 'eb-2',
         target: { type: 'face', face: 'back_face' }
       } as never;
       const profiles = getPartEdgeBevelProfiles({ width: 2, thickness: 1, features: [frontBevel(80), back] });
-      expect(profiles.front.inset + profiles.back.inset).toBeLessThanOrEqual(1.99);
+      expect(profiles.front.inset + profiles.back.inset).toBeCloseTo(11.3425636392);
     });
 
     it('derives long/short point widths', () => {

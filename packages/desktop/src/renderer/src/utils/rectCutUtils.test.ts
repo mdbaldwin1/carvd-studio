@@ -254,7 +254,7 @@ describe('rectCutUtils', () => {
       expect(isTopTarget(createRectCut({ target: { type: 'face', face: 'top_face' } }))).toBe(true);
       expect(isTopTarget(createRectCut({ target: { type: 'edge', edge: 'top_front_edge' } }))).toBe(true);
       expect(isTopTarget(createRectCut({ target: { type: 'edge', edge: 'bottom_front_edge' } }))).toBe(false);
-      expect(isTopTarget(createRectCut({ target: { type: 'corner', corner: 'front_left_corner' } }))).toBe(false);
+      expect(isTopTarget(createRectCut({ target: { type: 'corner', corner: 'front_left_corner' } }))).toBe(true);
     });
 
     it('classifies bottom targets across face, edge, and corner targets', () => {

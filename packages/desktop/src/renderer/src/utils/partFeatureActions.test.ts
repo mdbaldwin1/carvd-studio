@@ -1,7 +1,52 @@
 import { describe, expect, it } from 'vitest';
 import { getAvailableMirrorActions, getMirrorActionLabel, mirrorFeature } from './partFeatureActions';
+import { expandCircularCut } from './roundCutUtils';
+import { createTestPart } from '../../../../tests/helpers/factories';
+import type { CircularCutFeature, FaceTarget } from '../types';
 
 describe('partFeatureActions', () => {
+  it.each(
+    (['top_face', 'bottom_face', 'front_face', 'back_face', 'left_end', 'right_end'] as FaceTarget[]).flatMap((face) =>
+      (['across_length', 'across_width'] as const).flatMap((action) =>
+        (['center', 'min', 'max'] as const).map((reference) => ({ face, action, reference }))
+      )
+    )
+  )('R9 reflects every grid point and bore axis on $face / $action / $reference', ({ face, action, reference }) => {
+    const part = createTestPart({ length: 20, width: 12, thickness: 8 });
+    const cut: CircularCutFeature = {
+      id: 'grid',
+      kind: 'circular_cut',
+      version: 1,
+      enabled: true,
+      target: { type: 'face', face },
+      reference: { primaryFrom: reference, secondaryFrom: reference },
+      cutType: 'round_hole',
+      placement: { primary: 2, secondary: 1, rotation: 0 },
+      parameters: { diameter: 0.25, depthMode: 'blind', depth: 0.5, tilt: 20, direction: 35 },
+      pattern: { type: 'grid', columns: 3, rows: 2, columnSpacing: 1, rowSpacing: 0.5, rotation: 25 }
+    };
+    const actual = expandCircularCut(mirrorFeature(cut, action, part) as CircularCutFeature, part);
+    const source = expandCircularCut(cut, part);
+    const reflected = source.map(({ entryPoint, axis }) => ({
+      entryPoint: {
+        x: entryPoint.x * (action === 'across_length' ? -1 : 1),
+        y: entryPoint.y,
+        z: entryPoint.z * (action === 'across_width' ? -1 : 1)
+      },
+      axis: {
+        x: axis.x * (action === 'across_length' ? -1 : 1),
+        y: axis.y,
+        z: axis.z * (action === 'across_width' ? -1 : 1)
+      }
+    }));
+    const pointSet = (entries: typeof reflected) =>
+      entries
+        .map(({ entryPoint, axis }) =>
+          [...Object.values(entryPoint), ...Object.values(axis)].map((value) => Number(value.toFixed(8))).join(',')
+        )
+        .sort();
+    expect(pointSet(actual)).toEqual(pointSet(reflected));
+  });
   it('mirrors an end cut to the opposite end', () => {
     const mirrored = mirrorFeature(
       {

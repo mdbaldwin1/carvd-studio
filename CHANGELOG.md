@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Combined custom-cut geometry** — Multiple edge/corner notches, flush cutouts, and overlapping rectangular removals now preserve the stock contour and remove shared regions only once. Imported blind corner notches consistently enter from the top face.
+- **Exact cut faces and physical fit** — Front/Back round holes and Bottom rounded openings now match their handles and named faces; rabbet snapping uses the same edge bounds as the rendered recess. Oversized mitres/bevels and tilted cutters that break out of the blank are rejected without silently changing the requested angle.
+- **Independent joinery copies and mirrors** — Dowel joints now require enough combined drilling depth for the dowel, survive assembly capture/edit/repeated placement with fresh identities, and detach excluded mates. Mirroring preserves operation targets, hole-pattern coordinates, and drilling angles without creating hidden dowel links.
+- **Shop-ready fabrication detail** — Fabrication instructions retain exact authored dimensions, placement references, rounded rotation, grid dimensions, and every dowel-hole coordinate. Both PDF exports include full, identified, paginated operation blocks for each part.
+
 - **Round and rounded cut final validation** — Saving Part Cuts and generating a Cut List now revalidate round holes, countersinks, counterbores, and rounded openings after a part resize, preventing out-of-bounds operations from reaching fabrication output.
 - **Layered compound end geometry** — Compound end cuts now retain both their horizontal mitre and vertical bevel in rendered geometry when the same board also has dados, holes, rounded openings, or other cuts, keeping the visible part aligned with snapping and collision contours.
 - **Right-end mitre long-point direction** — Right-end mitre and compound-cut rendered geometry, snapping and collision contours, summaries, Cut Lists, CSV files, and PDF reports now all follow the front or back long point selected in Part Cuts.

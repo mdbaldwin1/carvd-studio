@@ -7,6 +7,7 @@ import { getPartFeatureConflicts } from '../utils/partFeatureConflicts';
 import { clonePartFeatures } from '../utils/partFeatures';
 import { getFeatureTargetLabel } from '../utils/partFeatureSummary';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
+import { validateEndCutFeature } from '../utils/endCutUtils';
 import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
 import { analytics } from '../utils/analytics';
 import { bucketCount } from '../../../shared/analytics';
@@ -57,7 +58,7 @@ export function usePartCutsEditing() {
             ? validateCircularCut(feature, currentPart)
             : feature.kind === 'rounded_cut'
               ? validateRoundedCut(feature, currentPart)
-              : null;
+              : validateEndCutFeature(feature, { ...currentPart, features: draftFeatures });
       if (!featureIssue) continue;
       const featureLabel =
         feature.label?.trim() || `${feature.cutType.replace(/_/g, ' ')} on ${getFeatureTargetLabel(feature)}`;

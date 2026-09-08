@@ -38,7 +38,7 @@ function addScaled(
   };
 }
 
-export function getFaceFrame(part: Part, face: FaceTarget): FaceFrame {
+export function getFaceFrame(part: Pick<Part, 'length' | 'width' | 'thickness'>, face: FaceTarget): FaceFrame {
   const halfLength = part.length / 2;
   const halfThickness = part.thickness / 2;
   const halfWidth = part.width / 2;
@@ -63,19 +63,19 @@ export function getFaceFrame(part: Part, face: FaceTarget): FaceFrame {
       };
     case 'front_face':
       return {
-        origin: { x: 0, y: 0, z: -halfWidth },
+        origin: { x: 0, y: 0, z: halfWidth },
         primaryAxis: { x: 1, y: 0, z: 0 },
         secondaryAxis: { x: 0, y: 1, z: 0 },
-        inwardNormal: { x: 0, y: 0, z: 1 },
+        inwardNormal: { x: 0, y: 0, z: -1 },
         primarySize: part.length,
         secondarySize: part.thickness
       };
     case 'back_face':
       return {
-        origin: { x: 0, y: 0, z: halfWidth },
+        origin: { x: 0, y: 0, z: -halfWidth },
         primaryAxis: { x: -1, y: 0, z: 0 },
         secondaryAxis: { x: 0, y: 1, z: 0 },
-        inwardNormal: { x: 0, y: 0, z: -1 },
+        inwardNormal: { x: 0, y: 0, z: 1 },
         primarySize: part.length,
         secondarySize: part.thickness
       };
@@ -291,11 +291,44 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
     const primary = delta.x * frame.primaryAxis.x + delta.y * frame.primaryAxis.y + delta.z * frame.primaryAxis.z;
     const secondary =
       delta.x * frame.secondaryAxis.x + delta.y * frame.secondaryAxis.y + delta.z * frame.secondaryAxis.z;
-    if (Math.abs(primary) + radius > frame.primarySize / 2 || Math.abs(secondary) + radius > frame.secondarySize / 2)
+    // The entry intersection is an ellipse, not the perpendicular cutter disk.
+    const tangent = Math.tan(degrees(feature.parameters.tilt));
+    const direction = degrees(feature.parameters.direction);
+    const primaryRadius = radius * Math.hypot(1, tangent * Math.cos(direction));
+    const secondaryRadius = radius * Math.hypot(1, tangent * Math.sin(direction));
+    if (
+      Math.abs(primary) + primaryRadius > frame.primarySize / 2 + 1e-9 ||
+      Math.abs(secondary) + secondaryRadius > frame.secondarySize / 2 + 1e-9
+    )
       return 'Hole profile extends beyond the selected face.';
     const available = distanceToExit(member.entryPoint, member.axis, part);
     if (feature.parameters.depthMode === 'blind' && Number(feature.parameters.depth) >= available - 1e-9)
       return 'Blind-hole depth exceeds the available material.';
+    const ends = [
+      ...(feature.parameters.depthMode === 'blind'
+        ? [{ depth: Number(feature.parameters.depth), radius: feature.parameters.diameter / 2 }]
+        : []),
+      ...(recessDepth > 0
+        ? [{ depth: recessDepth, radius: feature.cutType === 'counterbore' ? radius : feature.parameters.diameter / 2 }]
+        : [])
+    ];
+    for (const end of ends) {
+      for (const [coordinate, axis, inward, halfSize] of [
+        [member.entryPoint.x, member.axis.x, frame.inwardNormal.x, part.length / 2],
+        [member.entryPoint.y, member.axis.y, frame.inwardNormal.y, part.thickness / 2],
+        [member.entryPoint.z, member.axis.z, frame.inwardNormal.z, part.width / 2]
+      ]) {
+        const center = coordinate + axis * end.depth;
+        const radialExtent = end.radius * Math.sqrt(Math.max(0, 1 - axis * axis));
+        // The selected entry plane deliberately clips the cutter; all other
+        // stock faces must contain its complete end disk.
+        if (
+          (inward <= 0 && center - radialExtent < -halfSize - 1e-9) ||
+          (inward >= 0 && center + radialExtent > halfSize + 1e-9)
+        )
+          return 'Blind-hole or recess depth exceeds the available material.';
+      }
+    }
   }
   return null;
 }

@@ -100,7 +100,7 @@ Pattern controls appear beneath the seed-hole controls and expose pattern type p
 3. set dowel diameter, count, spacing, embedment depths, and first-hole position;
 4. review alignment and save.
 
-The action is refused when the faces are not sufficiently parallel and opposing, when requested holes leave either blank, or when the two embedment depths exceed the selected dowel length. The user may change the dowel length or depths without losing face selections.
+The action is refused when the faces are not sufficiently parallel, opposing, and touching, when requested holes leave either blank, or when the combined drilling depths are shorter than the selected dowel length. Exact depth fits are accepted; extra drilling depth provides explicit end clearance, distributed proportionally between the two holes in the derived visualization. A gap between selected faces is not supported by the initial joint model. The user may change the dowel length or depths without losing face selections.
 
 ## Data model and file compatibility
 
@@ -173,6 +173,10 @@ Runtime parsing validates every field and rejects unknown or malformed round fea
 ### IDs and copy behavior
 
 Copy/paste and duplicate actions always mint new feature IDs. Copying one part of a dowel relationship removes the relationship metadata, leaving ordinary editable holes; it never creates a hidden link to the source project part. Duplicating or copying both related parts in one action mints a new shared joint ID and remaps mate part IDs.
+
+Assembly capture and edit-save persist optional assembly-local part identities. Placement and entry into assembly editing remap these identities, feature IDs, and joint IDs together; excluded mates are detached. Older assemblies without local identities remain readable and reciprocal pairs are recovered from their joint/member references when unambiguous.
+
+The shared face frame uses Front at positive local Z and Back at negative local Z. Bottom secondary coordinates run toward negative Z, including rounded-opening rotations. Legacy canonical corner targets have no vertical selector: blind corner notches enter from Top Face. Fabrication instructions state the physical reference edges, preserve authored numeric precision, and list individual hole coordinates after any consolidated dowel-joint summary.
 
 ## Geometry architecture
 

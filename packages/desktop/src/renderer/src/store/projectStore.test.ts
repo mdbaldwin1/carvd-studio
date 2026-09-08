@@ -13,7 +13,7 @@ import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
-import { validateDowelRelationships } from '../utils/dowelJointUtils';
+import { createDowelJoint, validateDowelRelationships } from '../utils/dowelJointUtils';
 import { getInstructionFabricationLines } from '../utils/cutListInstructions';
 
 vi.unmock('three');
@@ -554,7 +554,7 @@ describe('projectStore', () => {
             'imperial'
           )
         ).toEqual([
-          expect.stringMatching(/^1\. Round hole 1 — Round Hole on Bottom Face · 3\/8" diameter × 3\/8" deep$/)
+          '1. Round hole 1 — Round Hole on Bottom Face · 3/8" diameter × 3/8" deep · Primary 0" from center (+Right) · Secondary 0" from center (+Back)'
         ]);
         expect(useProjectStore.temporal.getState().pastStates).toHaveLength(1);
 
@@ -1751,6 +1751,71 @@ describe('projectStore', () => {
     });
 
     describe('createAssemblyFromSelection', () => {
+      it('R8 remaps paired dowels on assembly capture, repeated placement, and edit save; detaches excluded mates', () => {
+        const first = createTestPart({
+          id: 'first',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        });
+        const second = createTestPart({
+          id: 'second',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        });
+        const joint = createDowelJoint({
+          firstPart: first,
+          secondPart: second,
+          firstFace: 'top_face',
+          secondFace: 'bottom_face',
+          diameter: 0.25,
+          dowelLength: 0.5,
+          firstEmbedmentDepth: 0.25,
+          secondEmbedmentDepth: 0.25,
+          count: 1,
+          spacing: 1,
+          firstPrimary: 0,
+          firstSecondary: 0
+        });
+        first.features = joint.firstFeatures;
+        second.features = joint.secondFeatures;
+        useProjectStore.setState({ parts: [first, second] });
+        useSelectionStore.getState().selectParts(['first', 'second']);
+        const assembly = useProjectStore.getState().createAssemblyFromSelection('Dowel pair')!;
+        useProjectStore.getState().addAssembly(assembly);
+        const placed = useProjectStore.getState().placeAssembly(assembly.id, { x: 20, y: 0, z: 0 });
+        const again = useProjectStore.getState().placeAssembly(assembly.id, { x: 40, y: 0, z: 0 });
+        const parts = useProjectStore.getState().parts;
+        expect.soft(validateDowelRelationships(parts.filter((part) => placed.includes(part.id)))).toEqual([]);
+        expect.soft(validateDowelRelationships(parts.filter((part) => again.includes(part.id)))).toEqual([]);
+        expect.soft(new Set(parts.flatMap((part) => part.features!.map((feature) => feature.id))).size).toBe(6);
+        expect.soft(new Set(parts.map((part) => part.features![0].metadata!.dowelJoint!.jointId)).size).toBe(3);
+        useSelectionStore.getState().selectParts(['first']);
+        const single = useProjectStore.getState().createAssemblyFromSelection('Single')!;
+        expect.soft(single.parts[0].features![0].metadata?.dowelJoint).toBeUndefined();
+        useAssemblyEditingStore.getState().startEditingAssembly(assembly.id, assembly.name, [first, second]);
+        const edited = useAssemblyEditingStore.getState().saveEditingAssembly()!;
+        useProjectStore.setState({ assemblies: [edited] });
+        const editedIds = useProjectStore.getState().placeAssembly(edited.id, { x: 60, y: 0, z: 0 });
+        expect(
+          validateDowelRelationships(useProjectStore.getState().parts.filter((part) => editedIds.includes(part.id)))
+        ).toEqual([]);
+        // Old assembly files have no localId; reciprocal relationship members
+        // still provide enough identity to recover and detach missing mates.
+        const legacy = {
+          ...assembly,
+          id: 'legacy',
+          parts: assembly.parts.map(({ localId: _localId, ...part }) => part)
+        };
+        useProjectStore.setState({ assemblies: [legacy] });
+        const legacyIds = useProjectStore.getState().placeAssembly('legacy', { x: 80, y: 0, z: 0 });
+        const legacyParts = useProjectStore.getState().parts.filter((part) => legacyIds.includes(part.id));
+        expect(validateDowelRelationships(legacyParts)).toEqual([]);
+        expect(legacyParts.every((part) => part.features![0].metadata?.dowelJoint)).toBe(true);
+      });
       it('creates assembly from selected parts', () => {
         const store = useProjectStore.getState();
         const part1Id = store.addPart({

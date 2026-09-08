@@ -125,8 +125,12 @@ describe('partFeatureGeometry', () => {
       feature.target = { type: 'face', face: 'front_face' };
       feature.parameters.tilt = 25;
       feature.parameters.direction = 0;
-      const axis = new THREE.Vector3(Math.sin(THREE.MathUtils.degToRad(25)), 0, Math.cos(THREE.MathUtils.degToRad(25)));
-      const entry = new THREE.Vector3(0, 0, -3);
+      const axis = new THREE.Vector3(
+        Math.sin(THREE.MathUtils.degToRad(25)),
+        0,
+        -Math.cos(THREE.MathUtils.degToRad(25))
+      );
+      const entry = new THREE.Vector3(0, 0, 3);
       const origin = entry.clone().addScaledVector(axis, -2);
       const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
       mesh.updateMatrixWorld(true);
@@ -143,8 +147,8 @@ describe('partFeatureGeometry', () => {
       feature.parameters.counterbore = { diameter: 1, depth: 0.25 };
       const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
       mesh.updateMatrixWorld(true);
-      const hits = new THREE.Raycaster(new THREE.Vector3(0.4, 0, -4), new THREE.Vector3(0, 0, 1)).intersectObject(mesh);
-      expect(hits[0].point.z).toBeCloseTo(-2.75, 4);
+      const hits = new THREE.Raycaster(new THREE.Vector3(0.4, 0, 4), new THREE.Vector3(0, 0, -1)).intersectObject(mesh);
+      expect(hits[0].point.z).toBeCloseTo(2.75, 4);
     });
 
     it('cuts a tapered countersink from an end face', () => {

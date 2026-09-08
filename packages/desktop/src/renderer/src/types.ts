@@ -26,6 +26,8 @@ export interface EmbeddedStock {
 
 // A part template within an assembly (position relative to assembly origin)
 export interface AssemblyPart {
+  /** Stable identity within this assembly; absent in legacy templates. */
+  localId?: string;
   // All Part fields except id (will be generated on placement) and position (stored as relative)
   name: string;
   length: number;

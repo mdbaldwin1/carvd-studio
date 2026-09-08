@@ -3,11 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { ComponentProps } from 'react';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { createTestPart } from '../../../../../tests/helpers/factories';
-import type { EndCutFeature, RectCutFeature } from '@renderer/types';
+import type { CircularCutFeature, EndCutFeature, RectCutFeature } from '@renderer/types';
 import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { useProjectStore } from '@renderer/store/projectStore';
 import { useSelectionStore } from '@renderer/store/selectionStore';
 import { validateCircularCut } from '@renderer/utils/roundCutUtils';
+import { expandCircularCut } from '@renderer/utils/roundCutUtils';
 import { buildDraftFromFeature } from '@renderer/components/part-features/partFeatureEditorState';
 import { getEditableHandleOverlay } from './PartCutsPreviewCanvas';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
@@ -97,6 +98,76 @@ function lastFeatures(onDraftFeaturesChange: WorkspaceProps['onDraftFeaturesChan
 }
 
 describe('PartCutsWorkspace', () => {
+  it('R9 mirrors an edge bevel to the opposite long edge through its menu', async () => {
+    const user = userEvent.setup();
+    const cut = createEndCutFeature({
+      target: { type: 'face', face: 'front_face' },
+      cutType: 'bevel',
+      parameters: { horizontalAngle: 0, verticalAngle: 20 }
+    });
+    const { props } = renderWorkspace({ draftFeatures: [cut] });
+    await user.click(screen.getByRole('button', { name: 'Actions for cut 1' }));
+    await user.click(screen.getByRole('menuitem', { name: /Mirror/ }));
+    expect(lastFeatures(props.onDraftFeaturesChange)[1].target).toEqual({ type: 'face', face: 'back_face' });
+  });
+  it('R9 mirrors a right-end tenon to the left end through its menu', async () => {
+    const user = userEvent.setup();
+    const cut = createMortiseFeature({ cutType: 'tenon', target: { type: 'face', face: 'right_end' } });
+    const { props } = renderWorkspace({ draftFeatures: [cut] });
+    await user.click(screen.getByRole('button', { name: 'Actions for cut 1' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Mirror Across Length' }));
+    expect(lastFeatures(props.onDraftFeaturesChange)[1].target).toEqual({ type: 'face', face: 'left_end' });
+  });
+  it('R9 mirrors both grid axes geometrically and detaches individual paired-hole metadata', async () => {
+    const user = userEvent.setup();
+    const cut: CircularCutFeature = {
+      id: 'grid',
+      kind: 'circular_cut',
+      version: 1,
+      enabled: true,
+      target: { type: 'face', face: 'top_face' },
+      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      cutType: 'round_hole',
+      placement: { primary: 1, secondary: 0.5, rotation: 0 },
+      parameters: { diameter: 0.25, depthMode: 'through', tilt: 0, direction: 0 },
+      pattern: { type: 'grid', columns: 2, rows: 2, columnSpacing: 1, rowSpacing: 1, rotation: 0 },
+      metadata: {
+        dowelJoint: {
+          jointId: 'j',
+          matePartId: 'mate',
+          memberIndex: 0,
+          dowelDiameter: 0.25,
+          dowelLength: 0.5,
+          embedmentDepth: 0.25
+        }
+      }
+    };
+    const { props } = renderWorkspace({ draftFeatures: [cut] });
+    await user.click(screen.getByRole('button', { name: 'Actions for cut 1' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Mirror Across Length' }));
+    const clone = (props.onDraftFeaturesChange as Mock).mock.calls.at(-1)![0][1] as CircularCutFeature;
+    expect
+      .soft(
+        expandCircularCut(clone, props.part)
+          .map((member) => [member.entryPoint.x, member.entryPoint.z])
+          .sort()
+      )
+      .toEqual(
+        [
+          [-2, 0.5],
+          [-2, 1.5],
+          [-1, 0.5],
+          [-1, 1.5]
+        ].sort()
+      );
+    expect(clone.metadata?.dowelJoint).toBeUndefined();
+  });
+  it('R5 disables saving an end-cut angle that cannot fit the blank', async () => {
+    renderWorkspace({ part: createTestPart({ length: 10, width: 4, thickness: 1 }) });
+    startCut('End Cut');
+    fireEvent.change(screen.getByLabelText('Mitre Angle'), { target: { value: '80' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled());
+  });
   it('gives each feature enabled control an accessible name', () => {
     renderWorkspace({ draftFeatures: [createMortiseFeature()] });
 

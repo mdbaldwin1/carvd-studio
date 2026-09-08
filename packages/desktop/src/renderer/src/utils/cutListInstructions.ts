@@ -1,7 +1,7 @@
 import { CutInstruction, DowelJointMetadata, PartFeature } from '../types';
 import { getReferenceMode } from './endCutUtils';
-import { formatMeasurementWithUnit } from './fractions';
-import { getFeatureSummary } from './partFeatureSummary';
+import { formatFabricationMeasurement as formatMeasurementWithUnit } from './fractions';
+import { getFeaturePlacementSummary, getFeatureSummary } from './partFeatureSummary';
 
 export interface GroupedCutInstruction {
   key: string;
@@ -55,8 +55,7 @@ export function getInstructionFabricationLines(instruction: CutInstruction, unit
   const describedDowelJoints = new Set<string>();
   for (const feature of enabledFeatures) {
     const dowel = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
-    if (dowel?.jointId) {
-      if (describedDowelJoints.has(dowel.jointId)) continue;
+    if (dowel?.jointId && !describedDowelJoints.has(dowel.jointId)) {
       describedDowelJoints.add(dowel.jointId);
       const count = enabledFeatures.filter(
         (candidate) => (candidate.metadata?.dowelJoint as DowelJointMetadata | undefined)?.jointId === dowel.jointId
@@ -64,9 +63,10 @@ export function getInstructionFabricationLines(instruction: CutInstruction, unit
       descriptions.push(
         `Dowel joint: ${count} × ${formatMeasurementWithUnit(dowel.dowelDiameter, units)} dowels, ${formatMeasurementWithUnit(dowel.dowelLength, units)} long; drill ${formatMeasurementWithUnit(dowel.embedmentDepth, units)} into this part.`
       );
-      continue;
     }
-    const summary = getFeatureSummary(feature, units);
+    const summary = [getFeatureSummary(feature, units), getFeaturePlacementSummary(feature, units)]
+      .filter(Boolean)
+      .join(' · ');
     const label = feature.label?.trim();
     descriptions.push(label ? `${label} — ${summary}` : summary);
   }

@@ -1,17 +1,19 @@
 import * as THREE from 'three';
+import polygonClipping from 'polygon-clipping';
 import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CircularCutFeature, Part, PartFeature, RectCutFeature, RoundedCutFeature } from '../types';
 import { getEdgeBevelInsetAt, getEndCutInsetAt, getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
 import {
   getRectCutDepth,
+  getRectCutPlanBounds,
   getRectCutPreviewSupport,
   getResolvedRectCutFeature,
   isBottomTarget,
   isSideFaceTarget,
   isTopTarget
 } from './rectCutUtils';
-import { expandCircularCut } from './roundCutUtils';
+import { expandCircularCut, getFaceFrame } from './roundCutUtils';
 
 type Point2 = { x: number; z: number };
 
@@ -33,19 +35,6 @@ function featureKey(part: Part): string {
 
 function clonePoint(point: Point2): Point2 {
   return { x: point.x, z: point.z };
-}
-
-function linePointAtZ(start: Point2, end: Point2, z: number): Point2 {
-  if (Math.abs(end.z - start.z) < 1e-9) return { x: start.x, z };
-  const t = (z - start.z) / (end.z - start.z);
-  return {
-    x: start.x + (end.x - start.x) * t,
-    z
-  };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 function getEnabledFeatures(part: Part): PartFeature[] {
@@ -78,127 +67,11 @@ function buildOuterContour(part: Part): Point2[] {
   ];
 }
 
-function getCornerKey(feature: RectCutFeature): 'left_front' | 'right_front' | 'right_back' | 'left_back' {
-  const target = feature.target.type === 'corner' ? feature.target.corner : 'front_left_corner';
-  const left = target.includes('left');
-  const front = target.includes('front');
-  if (left && front) return 'left_front';
-  if (!left && front) return 'right_front';
-  if (!left && !front) return 'right_back';
-  return 'left_back';
-}
-
-function mapEdgeFamily(feature: RectCutFeature): 'front' | 'back' | 'left' | 'right' {
-  const edge = feature.target.type === 'edge' ? feature.target.edge : 'top_front_edge';
-  if (edge.includes('front')) return 'front';
-  if (edge.includes('back')) return 'back';
-  if (edge.includes('left')) return 'left';
-  return 'right';
-}
-
-function applyCornerNotch(contour: Point2[], feature: RectCutFeature): Point2[] {
-  const sizeX = feature.parameters.size.length;
-  const sizeZ = feature.parameters.size.width;
-  const [lf, rf, rb, lb] = contour.map(clonePoint);
-  const halfWidth = Math.abs(rf.z - rb.z) / 2;
-
-  switch (getCornerKey(feature)) {
-    case 'left_front': {
-      const z = clamp(-halfWidth + sizeZ, lf.z, lb.z);
-      const leftIn = linePointAtZ(lf, lb, z);
-      return [{ x: lf.x + sizeX, z: lf.z }, rf, rb, lb, leftIn, { x: lf.x + sizeX, z }];
-    }
-    case 'right_front': {
-      const z = clamp(-halfWidth + sizeZ, rf.z, rb.z);
-      const rightIn = linePointAtZ(rf, rb, z);
-      return [lf, { x: rf.x - sizeX, z: rf.z }, { x: rf.x - sizeX, z }, rightIn, rb, lb];
-    }
-    case 'right_back': {
-      const z = clamp(halfWidth - sizeZ, rf.z, rb.z);
-      const rightIn = linePointAtZ(rf, rb, z);
-      return [lf, rf, rightIn, { x: rb.x - sizeX, z }, { x: rb.x - sizeX, z: rb.z }, lb];
-    }
-    case 'left_back':
-    default: {
-      const z = clamp(halfWidth - sizeZ, lf.z, lb.z);
-      const leftIn = linePointAtZ(lf, lb, z);
-      return [lf, rf, rb, { x: lb.x + sizeX, z: lb.z }, { x: lb.x + sizeX, z }, leftIn];
-    }
-  }
-}
-
-function applyEdgeNotch(contour: Point2[], feature: RectCutFeature): Point2[] {
-  const sizeX = feature.parameters.size.length;
-  const sizeZ = feature.parameters.size.width;
-  const [lf, rf, rb, lb] = contour.map(clonePoint);
-  const minX = Math.min(lf.x, lb.x);
-  const halfWidth = Math.abs(rf.z - rb.z) / 2;
-  const family = mapEdgeFamily(feature);
-
-  // Threshold for considering the notch flush with a corner.
-  // When flush, the corner vertex is omitted so the extruded wall
-  // correctly shows the cutout (like a corner notch).
-  const flush = 0.001;
-
-  if (family === 'front') {
-    const startX = clamp(minX + feature.placement.x, lf.x, rf.x - sizeX);
-    const endX = clamp(startX + sizeX, startX, rf.x);
-    const flushLeft = startX <= lf.x + flush;
-    const flushRight = endX >= rf.x - flush;
-    const pts: Point2[] = [];
-    if (!flushLeft) pts.push(lf, { x: startX, z: lf.z });
-    pts.push({ x: startX, z: lf.z + sizeZ }, { x: endX, z: lf.z + sizeZ });
-    if (!flushRight) pts.push({ x: endX, z: lf.z }, rf);
-    pts.push(rb, lb);
-    return pts;
-  }
-
-  if (family === 'back') {
-    const startX = clamp(minX + feature.placement.x, lb.x, rb.x - sizeX);
-    const endX = clamp(startX + sizeX, startX, rb.x);
-    const flushLeft = startX <= lb.x + flush;
-    const flushRight = endX >= rb.x - flush;
-    const pts: Point2[] = [];
-    pts.push(lf, rf);
-    if (!flushRight) pts.push(rb, { x: endX, z: rb.z });
-    pts.push({ x: endX, z: rb.z - sizeZ }, { x: startX, z: rb.z - sizeZ });
-    if (!flushLeft) pts.push({ x: startX, z: rb.z }, lb);
-    // When flushLeft, omit lb — closing edge goes directly from notch interior to lf
-    return pts;
-  }
-
-  if (family === 'left') {
-    const startZ = clamp(-halfWidth + feature.placement.z, lf.z, lb.z - sizeZ);
-    const endZ = clamp(startZ + sizeZ, startZ, lb.z);
-    const flushFront = startZ <= lf.z + flush;
-    const flushBack = endZ >= lb.z - flush;
-    const pStart = linePointAtZ(lf, lb, startZ);
-    const pEnd = linePointAtZ(lf, lb, endZ);
-    const pts: Point2[] = [];
-    if (!flushFront) pts.push(lf);
-    pts.push(rf, rb);
-    if (!flushBack) pts.push(lb, { x: pEnd.x, z: endZ });
-    // When flushBack, omit lb — closing edge goes directly from rb to notch interior
-    pts.push({ x: pEnd.x + sizeX, z: endZ }, { x: pStart.x + sizeX, z: startZ });
-    if (!flushFront) pts.push({ x: pStart.x, z: startZ });
-    return pts;
-  }
-
-  // right
-  const startZ = clamp(-halfWidth + feature.placement.z, rf.z, rb.z - sizeZ);
-  const endZ = clamp(startZ + sizeZ, startZ, rb.z);
-  const flushFront = startZ <= rf.z + flush;
-  const flushBack = endZ >= rb.z - flush;
-  const pStart = linePointAtZ(rf, rb, startZ);
-  const pEnd = linePointAtZ(rf, rb, endZ);
-  const pts: Point2[] = [];
-  pts.push(lf);
-  if (!flushFront) pts.push(rf, { x: pStart.x, z: startZ });
-  pts.push({ x: pStart.x - sizeX, z: startZ }, { x: pEnd.x - sizeX, z: endZ });
-  if (!flushBack) pts.push({ x: pEnd.x, z: endZ }, rb);
-  // When flushBack, omit rb — closing edge connects notch interior to lb directly
-  pts.push(lb);
-  return pts;
+function differenceContours(contour: Point2[], removals: Point2[][]): polygonClipping.MultiPolygon {
+  const polygon = (points: Point2[]): polygonClipping.Polygon => [points.map((p) => [p.x, p.z])];
+  return removals.length
+    ? polygonClipping.difference(polygon(contour), ...removals.map(polygon))
+    : polygonClipping.union(polygon(contour));
 }
 
 function shapeFromContour(contour: Point2[], holes: Point2[][]): THREE.Shape {
@@ -222,36 +95,17 @@ function shapeFromContour(contour: Point2[], holes: Point2[][]): THREE.Shape {
   return shape;
 }
 
-function getRectCutHole(feature: RectCutFeature, part: Part): Point2[] | null {
-  const halfLength = part.length / 2;
-  const halfWidth = part.width / 2;
-  const margin = 0.001;
-
-  const rawSX = -halfLength + feature.placement.x;
-  const rawSZ = -halfWidth + feature.placement.z;
-  const rawEX = rawSX + feature.parameters.size.length;
-  const rawEZ = rawSZ + feature.parameters.size.width;
-
-  // When an edge of the cut is flush with the part boundary, extend it to
-  // the boundary instead of clamping inward — this eliminates the thin
-  // sliver of material that would otherwise remain.
-  const flushL = rawSX <= -halfLength + margin;
-  const flushR = rawEX >= halfLength - margin;
-  const flushF = rawSZ <= -halfWidth + margin;
-  const flushB = rawEZ >= halfWidth - margin;
-
-  const startX = flushL ? -halfLength : clamp(rawSX, -halfLength + margin, halfLength - margin);
-  const startZ = flushF ? -halfWidth : clamp(rawSZ, -halfWidth + margin, halfWidth - margin);
-  const endX = flushR ? halfLength : clamp(rawEX, startX + margin, halfLength - margin);
-  const endZ = flushB ? halfWidth : clamp(rawEZ, startZ + margin, halfWidth - margin);
-
-  if (endX <= startX || endZ <= startZ) return null;
-
+function getRectCutHole(feature: RectCutFeature, part: Part): Point2[] {
+  const bounds = getRectCutPlanBounds(feature, part);
+  const minX = bounds.minX - part.length / 2;
+  const maxX = bounds.maxX - part.length / 2;
+  const minZ = bounds.minZ - part.width / 2;
+  const maxZ = bounds.maxZ - part.width / 2;
   return [
-    { x: startX, z: startZ },
-    { x: startX, z: endZ },
-    { x: endX, z: endZ },
-    { x: endX, z: startZ }
+    { x: minX, z: minZ },
+    { x: maxX, z: minZ },
+    { x: maxX, z: maxZ },
+    { x: minX, z: maxZ }
   ];
 }
 
@@ -293,6 +147,7 @@ function referencedFeatureOffset(value: number, size: number, from: 'min' | 'cen
 }
 
 function getRoundedCutHole(feature: RoundedCutFeature, part: Part): Point2[] {
+  const frame = getFaceFrame(part, feature.target.face);
   const centerX = referencedFeatureOffset(feature.placement.primary, part.length, feature.reference.primaryFrom);
   const centerZ = referencedFeatureOffset(feature.placement.secondary, part.width, feature.reference.secondaryFrom);
   const halfLength = feature.parameters.length / 2;
@@ -315,136 +170,26 @@ function getRoundedCutHole(feature: RoundedCutFeature, part: Part): Point2[] {
       const localZ = cz + Math.sin(angle) * radius;
       const worldX = centerX + localX * Math.cos(rotation) - localZ * Math.sin(rotation);
       const worldZ = centerZ + localX * Math.sin(rotation) + localZ * Math.cos(rotation);
-      points.push({ x: worldX, z: -worldZ });
+      points.push({
+        x: frame.origin.x + frame.primaryAxis.x * worldX + frame.secondaryAxis.x * worldZ,
+        z: -(frame.origin.z + frame.primaryAxis.z * worldX + frame.secondaryAxis.z * worldZ)
+      });
     }
   }
   return points;
 }
 
-/**
- * Apply a through-depth cutout as a contour modification when it's flush
- * with one or more edges. Returns the modified contour, or null if the
- * cutout is fully interior (should be kept as a hole instead).
- */
-function applyCutoutToContour(contour: Point2[], feature: RectCutFeature, part: Part): Point2[] | null {
-  const halfLength = part.length / 2;
-  const halfWidth = part.width / 2;
-  const flush = 0.001;
-
-  const rawSX = -halfLength + feature.placement.x;
-  const rawSZ = -halfWidth + feature.placement.z;
-  const rawEX = rawSX + feature.parameters.size.length;
-  const rawEZ = rawSZ + feature.parameters.size.width;
-
-  const fl = rawSX <= -halfLength + flush;
-  const fr = rawEX >= halfLength - flush;
-  const ff = rawSZ <= -halfWidth + flush;
-  const fb = rawEZ >= halfWidth - flush;
-
-  if (!fl && !fr && !ff && !fb) return null; // fully interior → use hole
-
-  const flushCount = [fl, fr, ff, fb].filter(Boolean).length;
-
-  // 3-edge flush (e.g. dado at one end spanning full width): clip the contour
-  // by clamping points inside the cut zone to the cut boundary. The remaining
-  // material is a single connected region.
-  if (flushCount >= 3) {
-    const sx = Math.max(-halfLength, rawSX);
-    const sz = Math.max(-halfWidth, rawSZ);
-    const ex = Math.min(halfLength, rawEX);
-    const ez = Math.min(halfWidth, rawEZ);
-
-    // Only clamp along axes where the cut is flush on ONE side (not both).
-    // When flush on both sides of an axis, the cut spans the full dimension
-    // and there's nothing to clip along that axis.
-    const clampX = fl !== fr; // exactly one of left/right is flush
-    const clampZ = ff !== fb; // exactly one of front/back is flush
-
-    const clipped = contour.map((p) => ({
-      x: clampX ? (fl ? Math.max(p.x, ex) : Math.min(p.x, sx)) : p.x,
-      z: clampZ ? (ff ? Math.max(p.z, ez) : Math.min(p.z, sz)) : p.z
-    }));
-
-    // Remove consecutive duplicate points
-    const deduped = clipped.filter(
-      (p, i) => i === 0 || Math.abs(p.x - clipped[i - 1].x) > 1e-6 || Math.abs(p.z - clipped[i - 1].z) > 1e-6
-    );
-    // Also check wrap-around duplicate
-    if (
-      deduped.length > 1 &&
-      Math.abs(deduped[0].x - deduped[deduped.length - 1].x) < 1e-6 &&
-      Math.abs(deduped[0].z - deduped[deduped.length - 1].z) < 1e-6
-    ) {
-      deduped.pop();
-    }
-
-    return deduped.length >= 3 ? deduped : null;
-  }
-
-  // Opposite-edge flush without a third creates disconnected regions — keep as hole
-  if (flushCount === 2 && ((fl && fr) || (ff && fb))) return null;
-
-  const sx = Math.max(-halfLength, rawSX);
-  const sz = Math.max(-halfWidth, rawSZ);
-  const ex = Math.min(halfLength, rawEX);
-  const ez = Math.min(halfWidth, rawEZ);
-
-  const lf = contour[0] ?? { x: -halfLength, z: -halfWidth };
-  const rf = contour[1] ?? { x: halfLength, z: -halfWidth };
-  const rb = contour[2] ?? { x: halfLength, z: halfWidth };
-  const lb = contour[3] ?? { x: -halfLength, z: halfWidth };
-
-  const pts: Point2[] = [];
-
-  // Walk CCW around the outer rect: lf → rf → rb → lb.
-  // At each edge, if the cutout is flush, route inward through the cutout.
-  // At each corner, skip it if the cutout covers both adjacent edges.
-  // When two adjacent edges are both flush (corner cutout), only the FIRST
-  // edge (in CCW order) emits the routing — the second just continues past.
-
-  // --- Front edge (lf → rf) ---
-  if (!(fl && ff)) pts.push(lf);
-  if (ff && !fl) {
-    // Route through cutout on front edge (left edge didn't already route)
-    pts.push({ x: sx, z: lf.z }, { x: sx, z: ez }, { x: ex, z: ez });
-    if (!fr) pts.push({ x: ex, z: lf.z });
-  }
-
-  // --- Right edge (rf → rb) ---
-  if (!(ff && fr)) pts.push(rf);
-  if (fr && !ff) {
-    // Route through cutout on right edge (front edge didn't already route)
-    pts.push({ x: rf.x, z: sz }, { x: sx, z: sz }, { x: sx, z: ez });
-    if (!fb) pts.push({ x: rf.x, z: ez });
-  }
-
-  // --- Back edge (rb → lb) ---
-  if (!(fr && fb)) pts.push(rb);
-  if (fb && !fr) {
-    // Route through cutout on back edge (right edge didn't already route)
-    pts.push({ x: ex, z: rb.z }, { x: ex, z: sz }, { x: sx, z: sz });
-    if (!fl) pts.push({ x: sx, z: rb.z });
-  }
-
-  // --- Left edge (lb → lf) ---
-  if (!(fb && fl)) pts.push(lb);
-  if (fl && !fb) {
-    // Route through cutout on left edge (back edge didn't already route)
-    pts.push({ x: lf.x, z: ez }, { x: ex, z: ez }, { x: ex, z: sz });
-    if (!ff) pts.push({ x: lf.x, z: sz });
-  }
-
-  return pts.length >= 3 ? pts : null;
-}
-
 function getLayerGeometry(contour: Point2[], holes: Point2[][], depth: number, yMin: number): THREE.BufferGeometry {
-  const shape = shapeFromContour(contour, holes);
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth,
-    bevelEnabled: false,
-    steps: 1,
-    curveSegments: 1
-  });
+  // Subtract the union of removals before triangulation: independent Shape
+  // holes cannot represent overlapping or boundary-touching cutters.
+  const polygons = differenceContours(contour, holes);
+  const shapes = polygons.map((rings) =>
+    shapeFromContour(
+      rings[0].slice(0, -1).map(([x, z]) => ({ x, z })),
+      rings.slice(1).map((ring) => ring.slice(0, -1).map(([x, z]) => ({ x, z })))
+    )
+  );
+  const geometry = new THREE.ExtrudeGeometry(shapes, { depth, bevelEnabled: false, steps: 1, curveSegments: 1 });
   geometry.rotateX(-Math.PI / 2);
   geometry.translate(0, yMin, 0);
   return geometry;
@@ -538,7 +283,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     return createEndCutOnlyGeometry(part);
   }
 
-  let contour = buildOuterContour(part);
+  const contour = buildOuterContour(part);
   const rectCuts = getEnabledFeatures(part)
     .filter((feature): feature is RectCutFeature => feature.kind === 'rect_cut')
     .map((feature) => getResolvedRectCutFeature(feature, part));
@@ -630,7 +375,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     const yMid = yMin + layerDepth / 2;
 
     const tenons = supportedRectCuts.filter((feature) => feature.cutType === 'tenon');
-    let layerContour = tenons.length > 0 ? buildTenonLayerContour(part, tenons, yMid) : contour.map(clonePoint);
+    const layerContour = tenons.length > 0 ? buildTenonLayerContour(part, tenons, yMid) : contour.map(clonePoint);
     const layerHoles: Point2[][] = [];
 
     for (const feature of supportedRectCuts) {
@@ -657,7 +402,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
           },
           placement: { x: feature.placement.x, z: 0 }
         };
-        layerContour = applyEdgeNotch(layerContour, pseudoNotch);
+        layerHoles.push(getRectCutHole(pseudoNotch, part));
         continue;
       }
 
@@ -670,27 +415,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
 
       if (!active) continue;
 
-      if (feature.cutType === 'corner_notch') {
-        layerContour = applyCornerNotch(layerContour, feature);
-        continue;
-      }
-
-      if (feature.cutType === 'edge_notch' || feature.cutType === 'rabbet') {
-        layerContour = applyEdgeNotch(layerContour, feature);
-        continue;
-      }
-
-      // Cutouts flush with an edge become contour modifications so the
-      // extruded sidewall correctly shows the opening (no sliver of material).
-      // This applies to both through and blind cuts in their active layers.
-      const flushed = applyCutoutToContour(layerContour, feature, part);
-      if (flushed) {
-        layerContour = flushed;
-        continue;
-      }
-
-      const hole = getRectCutHole(feature, part);
-      if (hole) layerHoles.push(hole);
+      layerHoles.push(getRectCutHole(feature, part));
     }
 
     for (const feature of circularCuts) {
@@ -955,24 +680,17 @@ function buildTenonLayerContour(part: Part, tenons: RectCutFeature[], yMid: numb
 }
 
 function getFeatureContour(part: Part): Point2[] {
-  let contour = buildOuterContour(part);
-  const rectCuts = getEnabledFeatures(part).filter((feature): feature is RectCutFeature => feature.kind === 'rect_cut');
-  const resolvedRectCuts = rectCuts.map((feature) => getResolvedRectCutFeature(feature, part));
-
-  for (const feature of resolvedRectCuts) {
-    if (feature.parameters.depthMode !== 'through') continue;
-    if (feature.cutType === 'corner_notch') {
-      contour = applyCornerNotch(contour, feature);
-    } else if (feature.cutType === 'edge_notch' || feature.cutType === 'rabbet') {
-      contour = applyEdgeNotch(contour, feature);
-    } else {
-      // Through cutouts flush with an edge modify the contour
-      const flushed = applyCutoutToContour(contour, feature, part);
-      if (flushed) contour = flushed;
-    }
-  }
-
-  return contour;
+  const contour = buildOuterContour(part);
+  const removals = getEnabledFeatures(part)
+    .filter(
+      (feature): feature is RectCutFeature => feature.kind === 'rect_cut' && feature.parameters.depthMode === 'through'
+    )
+    .map((feature) => getRectCutHole(feature, part));
+  if (!removals.length) return contour;
+  const polygons = differenceContours(contour, removals);
+  // The flat-outline interface accepts one contour. Bound disconnected stock
+  // conservatively; layer rendering retains every connected component.
+  return polygons.length === 1 ? polygons[0][0].slice(0, -1).map(([x, z]) => ({ x, z })) : contour;
 }
 
 export function getPartRenderGeometry(part: Part): THREE.BufferGeometry {

@@ -216,10 +216,29 @@ export function isSideFaceTarget(feature: RectCutFeature): boolean {
   );
 }
 
+/** Rectangle in blank coordinates: X from Left and Z from Front. */
+export function getRectCutPlanBounds(feature: RectCutFeature, part: Pick<Part, 'length' | 'width' | 'thickness'>) {
+  const resolved = getResolvedRectCutFeature(feature, part);
+  const { length, width } = resolved.parameters.size;
+  let x = resolved.placement.x;
+  let z = resolved.placement.z;
+  if (resolved.target.type === 'corner') {
+    x = resolved.target.corner.includes('right') ? part.length - length : 0;
+    z = resolved.target.corner.includes('back') ? part.width - width : 0;
+  } else if (resolved.target.type === 'edge') {
+    const edge = resolved.target.edge;
+    if (edge.includes('front') || edge.includes('back')) z = edge.includes('back') ? part.width - width : 0;
+    else x = edge.includes('right') ? part.length - length : 0;
+  }
+  return { minX: x, maxX: x + length, minZ: z, maxZ: z + width };
+}
+
 export function isTopTarget(feature: RectCutFeature): boolean {
   if (feature.target.type === 'face') return feature.target.face === 'top_face';
   if (feature.target.type === 'edge') return feature.target.edge.startsWith('top_');
-  return feature.target.corner.includes('_top_');
+  // Version-1 corner targets omit an entry-face field. Their blind removal
+  // is defined from Top, preserving valid legacy/imported feature objects.
+  return TOP_BOTTOM_CORNER_TARGETS.includes(feature.target.corner);
 }
 
 export function isBottomTarget(feature: RectCutFeature): boolean {

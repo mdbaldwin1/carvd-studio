@@ -90,7 +90,7 @@ function extractJsPdfLiteralText(pdfPath: string): string {
         )
         .replace(/\\([\\()])/g, '$1')
     )
-    .join('');
+    .join(' ');
 }
 
 type EndFeatureExpectation = Pick<EndCutFeature, 'kind' | 'cutType' | 'target' | 'parameters'> & {
@@ -604,27 +604,33 @@ const CUSTOM_CUT_FABRICATION_LINES: Record<string, string> = {
   'compound end cut':
     '1. Compound lifecycle revised — Compound 33° / 19° bevel on Right End · Long point on Front · High point on Top',
   'edge bevel': '1. Edge bevel lifecycle revised — Edge Bevel 28° on Back Edge · High point on Bottom',
-  tenon: '1. Tenon lifecycle revised — Tenon on Left End · 3" long × 5" wide × 1/2" thick',
-  'half lap': '1. Half Lap lifecycle revised — Dado on Bottom Face · 4" wide × 1/2" deep',
+  tenon:
+    '1. Tenon lifecycle revised — Tenon on Left End · 3" long × 5" wide × 1/2" thick · Tongue starts 2" from Front; centered through thickness',
+  'half lap': '1. Half Lap lifecycle revised — Dado on Bottom Face · 4" wide × 1/2" deep · 0" from Left; full width',
   'corner notch': '1. Corner notch lifecycle revised — Corner Notch on Back-Right Corner · 3" × 1 1/2" · Through',
-  'edge notch': '1. Edge notch lifecycle revised — Edge Notch on Back Side · 3" × 1 1/2" · Through',
-  cutout: '1. Cutout lifecycle revised — Cutout on Bottom Face · 4" × 2 1/2" · Through',
-  dado: '1. Dado lifecycle revised — Dado on Bottom Face · 3" wide × 1/2" deep',
-  'stopped dado': '1. Stopped dado lifecycle revised — Stopped Dado on Bottom Face · 6" run × 1/2" deep',
-  rabbet: '1. Rabbet lifecycle revised — Rabbet on Bottom-Back Edge · 1 1/2" shoulder × 1/2" deep',
-  groove: '1. Groove lifecycle revised — Groove on Bottom Face · 1 1/2" wide × 1/2" deep',
+  'edge notch':
+    '1. Edge notch lifecycle revised — Edge Notch on Back Side · 3" × 1 1/2" · Through · 5" from Left along the selected edge',
+  cutout: '1. Cutout lifecycle revised — Cutout on Bottom Face · 4" × 2 1/2" · Through · 4" from Left · 4" from Front',
+  dado: '1. Dado lifecycle revised — Dado on Bottom Face · 3" wide × 1/2" deep · 0" from Left; full width',
+  'stopped dado':
+    '1. Stopped dado lifecycle revised — Stopped Dado on Bottom Face · 6" run × 1/2" deep · 4" from Left; full width',
+  rabbet:
+    '1. Rabbet lifecycle revised — Rabbet on Bottom-Back Edge · 1 1/2" shoulder × 1/2" deep · Full run along the selected edge',
+  groove: '1. Groove lifecycle revised — Groove on Bottom Face · 1 1/2" wide × 1/2" deep · 0" from Front; full length',
   'stopped groove':
-    '1. Stopped groove lifecycle revised — Stopped Groove on Bottom Face · 7" run × 1 1/2" wide × 1/2" deep',
-  mortise: '1. Mortise lifecycle revised — Mortise on Bottom Face · 5" × 2 1/2" × 1/2" deep',
+    '1. Stopped groove lifecycle revised — Stopped Groove on Bottom Face · 7" run × 1 1/2" wide × 1/2" deep · 4" from Left · 5" from Front',
+  mortise:
+    '1. Mortise lifecycle revised — Mortise on Bottom Face · 5" × 2 1/2" × 1/2" deep · 5" from Left · 5" from Front',
   'round hole':
-    '1. Round hole lifecycle revised — 4-hole Linear Pattern on Bottom Face · 1/2" diameter · 1 1/4" spacing · 25° direction · Through · 12° tilt toward 45°',
+    '1. Round hole lifecycle revised — 4-hole Linear Pattern on Bottom Face · 1/2" diameter · 1 1/4" spacing · 25° direction · Through · 12° tilt toward 45° · Primary 5" from center (+Right) · Secondary 4" from center (+Back) · Angles: 0° toward Right, 90° toward Back',
   countersink:
-    '1. Countersink lifecycle revised — 6-hole Grid Countersink Pattern on Bottom Face · 3/8" hole × 7/8" major · 90° · 1 1/2" × 1 1/4" spacing · 0° rotation · Through · 9° tilt toward 35°',
+    '1. Countersink lifecycle revised — 6-hole Grid Countersink Pattern on Bottom Face · 3/8" hole × 7/8" major · 90° · 1 1/2" × 1 1/4" spacing · 0° rotation · Through · 9° tilt toward 35° · Primary 5" from center (+Right) · Secondary 2" from center (+Back) · 3 rows × 2 columns · Angles: 0° toward Right, 90° toward Back',
   counterbore:
-    '1. Counterbore lifecycle revised — 4-hole Circular Counterbore Pattern on Bottom Face · 3/8" hole · 7/8" × 1/4" recess · 1 1/4" radius · 30° start angle · Through · 10° tilt toward 40°',
-  'rounded slot': '1. Rounded slot lifecycle revised — Rounded Slot on Bottom Face · 4" × 1 1/2" · Through',
+    '1. Counterbore lifecycle revised — 4-hole Circular Counterbore Pattern on Bottom Face · 3/8" hole · 7/8" × 1/4" recess · 1 1/4" radius · 30° start angle · Through · 10° tilt toward 40° · Primary 6" from center (+Right) · Secondary 4" from center (+Back) · Angles: 0° toward Right, 90° toward Back',
+  'rounded slot':
+    '1. Rounded slot lifecycle revised — Rounded Slot on Bottom Face · 4" × 1 1/2" · Through · Primary 5" from center (+Right) · Secondary 4" from center (+Back) · 20° rotation · Angles: 0° toward Right, 90° toward Back',
   'rounded rectangle':
-    '1. Rounded rectangle lifecycle revised — Rounded Rectangle on Bottom Face · 4" × 2 1/2" · 3/4" radius · Through'
+    '1. Rounded rectangle lifecycle revised — Rounded Rectangle on Bottom Face · 4" × 2 1/2" · 3/4" radius · Through · Primary 5" from center (+Right) · Secondary 4" from center (+Back) · 20° rotation · Angles: 0° toward Right, 90° toward Back'
 };
 
 const TARGET_LABELS: Record<string, string> = {
@@ -1424,9 +1430,9 @@ test.describe('part cuts editing lifecycle', () => {
     await dialog.getByRole('button', { name: 'Generate Cut List' }).click();
     const fabricationLines = [
       '1. Angled left end — Mitre 33° on Left End · Long point on Back',
-      '2. Shelf dado — Dado on Top Face · 3/4" wide × 3/8" deep',
-      '3. Three patterned holes — 3-hole Linear Pattern on Top Face · 1/4" diameter · 3/4" spacing · 20° direction · 1/2" deep',
-      '4. Rounded relief — Rounded Slot on Top Face · 3" × 1/2" · Through'
+      '2. Shelf dado — Dado on Top Face · 3/4" wide × 3/8" deep · 6" from Left; full width',
+      '3. Three patterned holes — 3-hole Linear Pattern on Top Face · 1/4" diameter · 3/4" spacing · 20° direction · 1/2" deep · Primary -8" from center (+Right) · Secondary -3" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
+      '4. Rounded relief — Rounded Slot on Top Face · 3" × 1/2" · Through · Primary 8" from center (+Right) · Secondary 3" from center (+Front) · 30° rotation · Angles: 0° toward Right, 90° toward Front'
     ];
     for (const line of fabricationLines) {
       await expect(dialog.getByText(line)).toBeVisible();

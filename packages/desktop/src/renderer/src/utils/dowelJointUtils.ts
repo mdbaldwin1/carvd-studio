@@ -132,8 +132,8 @@ export function createDowelJoint(input: CreateDowelJointInput): DowelJointResult
     input.secondEmbedmentDepth <= 0
   )
     throw new Error('Dowel dimensions and embedment depths must be greater than zero.');
-  if (input.firstEmbedmentDepth + input.secondEmbedmentDepth > input.dowelLength + 1e-9)
-    throw new Error('Combined embedment depths cannot exceed the dowel length.');
+  if (input.firstEmbedmentDepth + input.secondEmbedmentDepth < input.dowelLength - 1e-9)
+    throw new Error('Combined hole depths must accommodate the full dowel length.');
 
   validateDowelJointFaces(input);
   const secondFrame = getFaceFrame(input.secondPart, input.secondFace);
@@ -298,7 +298,7 @@ function isValidDowelPair(
     second.feature.parameters.depth === second.metadata.embedmentDepth &&
     validateCircularCut(first.feature, first.part) === null &&
     validateCircularCut(second.feature, second.part) === null &&
-    first.metadata.embedmentDepth + second.metadata.embedmentDepth <= first.metadata.dowelLength + 1e-9;
+    first.metadata.embedmentDepth + second.metadata.embedmentDepth >= first.metadata.dowelLength - 1e-9;
   return (
     reciprocal &&
     matchingMetadata &&
@@ -385,7 +385,9 @@ export function getDowelVisualizations(parts: Part[]): DowelVisualization[] {
     const member = expandCircularCut(first.feature, first.part)[0];
     const entry = worldPoint(first.part, member.entryPoint);
     const axis = worldDirection(first.part, member.axis);
-    const center = entry.clone().addScaledVector(axis, first.metadata.embedmentDepth - first.metadata.dowelLength / 2);
+    const totalDepth = first.metadata.embedmentDepth + second.metadata.embedmentDepth;
+    const firstInsertion = (first.metadata.dowelLength * first.metadata.embedmentDepth) / totalDepth;
+    const center = entry.clone().addScaledVector(axis, firstInsertion - first.metadata.dowelLength / 2);
     visuals.push({
       jointId: first.metadata.jointId,
       memberIndex: first.metadata.memberIndex,

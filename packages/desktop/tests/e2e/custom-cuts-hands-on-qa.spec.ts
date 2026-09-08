@@ -123,7 +123,7 @@ function extractJsPdfLiteralText(pdfPath: string): string {
         )
         .replace(/\\([\\()])/g, '$1')
     )
-    .join('');
+    .join(' ');
 }
 
 function buildStressFeatures() {
@@ -234,24 +234,24 @@ function buildStressFeatures() {
 const STRESS_FABRICATION_LINES = [
   '1. Stress left mitre — Mitre 12.5° on Left End · Long point on Front',
   '2. Stress right compound — Compound 15° / 5° bevel on Right End · Long point on Back · High point on Top',
-  '3. Stress cutout 1 — Cutout on Top Face · 2" × 2" × 1/4" deep',
-  '4. Stress cutout 2 — Cutout on Top Face · 2" × 2" × 1/4" deep',
-  '5. Stress cutout 3 — Cutout on Top Face · 2" × 2" × 1/4" deep',
-  '6. Stress cutout 4 — Cutout on Top Face · 2" × 2" × 1/4" deep',
-  '7. Stress cutout 5 — Cutout on Top Face · 2" × 2" × 1/4" deep',
-  '8. Stress cutout 6 — Cutout on Top Face · 2" × 2" × 1/4" deep',
-  '9. Stress round 1 — Round Hole on Top Face · 1/4" diameter × 1/2" deep',
-  '10. Stress round 2 — Countersink on Top Face · 1/4" hole × 1/2" major · 90° · 1/2" deep · 1° tilt toward 15°',
-  '11. Stress round 3 — Counterbore on Top Face · 1/4" hole · 1/2" × 1/8" recess · 1/2" deep · 2° tilt toward 30°',
-  '12. Stress round 4 — Round Hole on Top Face · 1/4" diameter × 1/2" deep · 3° tilt toward 45°',
-  '13. Stress round 5 — 3-hole Linear Countersink Pattern on Top Face · 1/4" hole × 1/2" major · 90° · 1" spacing · 0° direction · 1/2" deep · 4° tilt toward 60°',
-  '14. Stress round 6 — 4-hole Circular Counterbore Pattern on Top Face · 1/4" hole · 1/2" × 1/8" recess · 1" radius · 30° start angle · 1/2" deep · 5° tilt toward 75°',
-  '15. Stress rounded 1 — Rounded Slot on Top Face · 4" × 1" × 3/8" deep',
-  '16. Stress rounded 2 — Rounded Rectangle on Top Face · 4" × 1" · 1/4" radius × 3/8" deep',
-  '17. Stress rounded 3 — Rounded Slot on Top Face · 4" × 1" × 3/8" deep',
-  '18. Stress rounded 4 — Rounded Rectangle on Top Face · 4" × 1" · 1/4" radius × 3/8" deep',
-  '19. Stress rounded 6 edited — Rounded Rectangle on Top Face · 5" × 1" · 1/4" radius × 3/8" deep',
-  '20. Stress rounded 5 — Rounded Slot on Top Face · 4" × 1" × 3/8" deep'
+  '3. Stress cutout 1 — Cutout on Top Face · 2" × 2" × 1/4" deep · 5" from Left · 2" from Front',
+  '4. Stress cutout 2 — Cutout on Top Face · 2" × 2" × 1/4" deep · 17" from Left · 2" from Front',
+  '5. Stress cutout 3 — Cutout on Top Face · 2" × 2" × 1/4" deep · 29" from Left · 2" from Front',
+  '6. Stress cutout 4 — Cutout on Top Face · 2" × 2" × 1/4" deep · 41" from Left · 2" from Front',
+  '7. Stress cutout 5 — Cutout on Top Face · 2" × 2" × 1/4" deep · 53" from Left · 2" from Front',
+  '8. Stress cutout 6 — Cutout on Top Face · 2" × 2" × 1/4" deep · 65" from Left · 2" from Front',
+  '9. Stress round 1 — Round Hole on Top Face · 1/4" diameter × 1/2" deep · Primary -30" from center (+Right) · Secondary 10" from center (+Front)',
+  '10. Stress round 2 — Countersink on Top Face · 1/4" hole × 1/2" major · 90° · 1/2" deep · 1° tilt toward 15° · Primary -18" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
+  '11. Stress round 3 — Counterbore on Top Face · 1/4" hole · 1/2" × 1/8" recess · 1/2" deep · 2° tilt toward 30° · Primary -6" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
+  '12. Stress round 4 — Round Hole on Top Face · 1/4" diameter × 1/2" deep · 3° tilt toward 45° · Primary 6" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
+  '13. Stress round 5 — 3-hole Linear Countersink Pattern on Top Face · 1/4" hole × 1/2" major · 90° · 1" spacing · 0° direction · 1/2" deep · 4° tilt toward 60° · Primary 18" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
+  '14. Stress round 6 — 4-hole Circular Counterbore Pattern on Top Face · 1/4" hole · 1/2" × 1/8" recess · 1" radius · 30° start angle · 1/2" deep · 5° tilt toward 75° · Primary 30" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
+  '15. Stress rounded 1 — Rounded Slot on Top Face · 4" × 1" × 3/8" deep · Primary -30" from center (+Right) · Secondary -5" from center (+Front) · 0° rotation · Angles: 0° toward Right, 90° toward Front',
+  '16. Stress rounded 2 — Rounded Rectangle on Top Face · 4" × 1" · 1/4" radius × 3/8" deep · Primary -18" from center (+Right) · Secondary -5" from center (+Front) · 5° rotation · Angles: 0° toward Right, 90° toward Front',
+  '17. Stress rounded 3 — Rounded Slot on Top Face · 4" × 1" × 3/8" deep · Primary -6" from center (+Right) · Secondary -5" from center (+Front) · 10° rotation · Angles: 0° toward Right, 90° toward Front',
+  '18. Stress rounded 4 — Rounded Rectangle on Top Face · 4" × 1" · 1/4" radius × 3/8" deep · Primary 6" from center (+Right) · Secondary -5" from center (+Front) · 15° rotation · Angles: 0° toward Right, 90° toward Front',
+  '19. Stress rounded 6 edited — Rounded Rectangle on Top Face · 5" × 1" · 1/4" radius × 3/8" deep · Primary 30" from center (+Right) · Secondary -5" from center (+Front) · 25° rotation · Angles: 0° toward Right, 90° toward Front',
+  '20. Stress rounded 5 — Rounded Slot on Top Face · 4" × 1" × 3/8" deep · Primary 18" from center (+Right) · Secondary -5" from center (+Front) · 20° rotation · Angles: 0° toward Right, 90° toward Front'
 ];
 
 test.describe('hands-on custom cuts qualification', () => {
@@ -439,9 +439,9 @@ test.describe('hands-on custom cuts qualification', () => {
     const dialog = await generateCutList(window);
     const fabricationLines = [
       '1. Fractional frame mitre — Mitre 22.5° on Right End · Long point on Front',
-      '2. Fractional shelf dado — Dado on Top Face · 13/16" wide × 5/16" deep',
-      '3. Fractional rail mortise — Mortise on Bottom Face · 2 3/8" × 1 1/8" × 7/16" deep',
-      '4. Fractional face hole — Round Hole on Front Face · 5/16" diameter × 9/16" deep'
+      '2. Fractional shelf dado — Dado on Top Face · 13/16" wide × 5/16" deep · 0" from Left; full width',
+      '3. Fractional rail mortise — Mortise on Bottom Face · 2 3/8" × 1 1/8" × 7/16" deep · 6 1/4" from Left · 2 1/4" from Front',
+      '4. Fractional face hole — Round Hole on Front Face · 5/16" diameter × 9/16" deep · Primary 8 1/2" from center (+Right) · Secondary 3/8" from center (+Top)'
     ];
     const operationSummary = dialog
       .locator('.cut-list-parts-tab tbody tr')
@@ -795,8 +795,8 @@ test.describe('hands-on custom cuts qualification', () => {
 
     const dialog = await generateCutList(window);
     const fabricationLines = [
-      '1. Stopped shelf divider dado — Stopped Dado on Top Face · 8 1/4" run × 1/4" deep',
-      '2. Cable chase edge notch — Edge Notch on Front Side · 4" × 1 3/4" · Through',
+      '1. Stopped shelf divider dado — Stopped Dado on Top Face · 8 1/4" run × 1/4" deep · 6 1/4" from Left; full width',
+      '2. Cable chase edge notch — Edge Notch on Front Side · 4" × 1 3/4" · Through · 20" from Left along the selected edge',
       '3. Post corner clearance — Corner Notch on Back-Right Corner · 2 1/2" × 2 1/4" · Through'
     ];
     const operationSummary = dialog

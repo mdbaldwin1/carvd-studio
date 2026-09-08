@@ -37,7 +37,11 @@ import { Label } from '@renderer/components/ui/label';
 import { ScrollArea } from '@renderer/components/ui/scroll-area';
 import { Select } from '@renderer/components/ui/select';
 import { EndCutFeature, Part, PartFeature, PartFeatureTarget, RectCutFeature } from '@renderer/types';
-import { getDerivedLengthMeasurements, getDerivedWidthMeasurements } from '@renderer/utils/endCutUtils';
+import {
+  getDerivedLengthMeasurements,
+  getDerivedWidthMeasurements,
+  validateEndCutFeature
+} from '@renderer/utils/endCutUtils';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import { isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
 import { getAvailableMirrorActions, getMirrorActionLabel, mirrorFeature } from '@renderer/utils/partFeatureActions';
@@ -262,8 +266,8 @@ export function PartCutsWorkspace({
     if (feature.kind === 'rect_cut') return validateRectCutFeature(feature, part);
     if (feature.kind === 'circular_cut') return validateCircularCut(feature, part);
     if (feature.kind === 'rounded_cut') return validateRoundedCut(feature, part);
-    return null;
-  }, [draft, part]);
+    return validateEndCutFeature(feature, { ...part, features: draftFeatures });
+  }, [draft, part, draftFeatures]);
 
   const endCutPreviewMeasurements = useMemo(() => {
     if (!draftPreviewFeature || draftPreviewFeature.kind !== 'end_cut') return null;

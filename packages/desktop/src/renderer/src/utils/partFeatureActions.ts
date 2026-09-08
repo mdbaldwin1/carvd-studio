@@ -1,6 +1,7 @@
 import { CornerTarget, EdgeTarget, FaceTarget, PartFeature } from '@renderer/types';
 import { clonePartFeature } from '@renderer/utils/partFeatures';
 import { getResolvedRectCutFeature } from '@renderer/utils/rectCutUtils';
+import { getFaceFrame } from '@renderer/utils/roundCutUtils';
 
 export type MirrorAction = 'opposite_end' | 'across_length' | 'across_width';
 
@@ -88,7 +89,10 @@ function mirrorPlanarAngle(angle: number, action: Extract<MirrorAction, 'across_
 }
 
 export function getAvailableMirrorActions(feature: PartFeature): MirrorAction[] {
-  if (feature.kind === 'end_cut') return ['opposite_end'];
+  if (feature.kind === 'end_cut')
+    return feature.target.face === 'front_face' || feature.target.face === 'back_face'
+      ? ['across_width']
+      : ['opposite_end'];
   switch (feature.cutType) {
     case 'dado':
     case 'stopped_dado':
@@ -124,8 +128,17 @@ export function mirrorFeature(
   const mirrored = clonePartFeature(feature);
   mirrored.id = generateFeatureId();
   mirrored.label = getMirroredLabel(feature.label, action);
+  if (mirrored.metadata?.dowelJoint) {
+    delete mirrored.metadata.dowelJoint;
+    if (Object.keys(mirrored.metadata).length === 0) mirrored.metadata = undefined;
+  }
 
   if (feature.kind === 'end_cut') {
+    if (feature.target.face === 'front_face' || feature.target.face === 'back_face') {
+      if (action !== 'across_width') throw new Error('Edge bevels mirror across width.');
+      mirrored.target = { type: 'face', face: feature.target.face === 'front_face' ? 'back_face' : 'front_face' };
+      return mirrored;
+    }
     if (action !== 'opposite_end') {
       throw new Error(`Unsupported mirror action for end cut: ${action}`);
     }
@@ -150,15 +163,28 @@ export function mirrorFeature(
 
   if (feature.kind === 'circular_cut' || feature.kind === 'rounded_cut') {
     const face = feature.target.face;
-    const primaryUsesLength =
-      face === 'top_face' || face === 'bottom_face' || face === 'front_face' || face === 'back_face';
-    const primaryUsesWidth = face === 'left_end' || face === 'right_end';
-    const secondaryUsesWidth = face === 'top_face' || face === 'bottom_face';
-    const reflectPrimary =
-      (action === 'across_length' && primaryUsesLength) || (action === 'across_width' && primaryUsesWidth);
-    const reflectSecondary = action === 'across_width' && secondaryUsesWidth;
-    const primarySize = primaryUsesLength ? part.length : primaryUsesWidth ? part.width : part.thickness;
-    const secondarySize = secondaryUsesWidth ? part.width : part.thickness;
+    const targetFace =
+      action === 'across_length'
+        ? face === 'left_end'
+          ? 'right_end'
+          : face === 'right_end'
+            ? 'left_end'
+            : face
+        : face === 'front_face'
+          ? 'back_face'
+          : face === 'back_face'
+            ? 'front_face'
+            : face;
+    mirrored.target = { type: 'face', face: targetFace };
+    const sourceFrame = getFaceFrame(part, face);
+    const targetFrame = getFaceFrame(part, targetFace);
+    const reflectionSign = (source: typeof sourceFrame.primaryAxis, target: typeof sourceFrame.primaryAxis) =>
+      source.x * target.x * (action === 'across_length' ? -1 : 1) +
+      source.y * target.y +
+      source.z * target.z * (action === 'across_width' ? -1 : 1);
+    const reflectPrimary = reflectionSign(sourceFrame.primaryAxis, targetFrame.primaryAxis) < 0;
+    const reflectSecondary = reflectionSign(sourceFrame.secondaryAxis, targetFrame.secondaryAxis) < 0;
+    const { primarySize, secondarySize } = sourceFrame;
 
     mirrored.placement = {
       ...mirrored.placement,
@@ -181,6 +207,14 @@ export function mirrorFeature(
         if (mirrored.pattern?.type === 'linear') {
           mirrored.pattern.direction = mirrorPlanarAngle(mirrored.pattern.direction, angleAction);
         } else if (mirrored.pattern?.type === 'grid') {
+          // A reflection reverses handedness. Rebase at the reflected final
+          // row so the positive row spacing traverses the same set of holes.
+          const radians = (mirrored.pattern.rotation * Math.PI) / 180;
+          const rowRun = (mirrored.pattern.rows - 1) * mirrored.pattern.rowSpacing;
+          const shiftPrimary = -Math.sin(radians) * rowRun * (reflectPrimary ? -1 : 1);
+          const shiftSecondary = Math.cos(radians) * rowRun * (reflectSecondary ? -1 : 1);
+          mirrored.placement.primary += shiftPrimary * (feature.reference.primaryFrom === 'max' ? -1 : 1);
+          mirrored.placement.secondary += shiftSecondary * (feature.reference.secondaryFrom === 'max' ? -1 : 1);
           mirrored.pattern.rotation = mirrorPlanarAngle(mirrored.pattern.rotation, angleAction);
         } else if (mirrored.pattern?.type === 'circular') {
           mirrored.pattern.startAngle = mirrorPlanarAngle(mirrored.pattern.startAngle, angleAction);
@@ -235,7 +269,12 @@ export function mirrorFeature(
 
   mirrored.target = {
     type: 'face',
-    face: feature.target.face as FaceTarget
+    face:
+      action === 'across_length' && feature.target.face === 'right_end'
+        ? 'left_end'
+        : action === 'across_length' && feature.target.face === 'left_end'
+          ? 'right_end'
+          : (feature.target.face as FaceTarget)
   };
   return mirrored;
 }

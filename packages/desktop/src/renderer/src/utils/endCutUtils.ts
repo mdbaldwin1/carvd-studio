@@ -1,4 +1,36 @@
-import { EndCutFeature, PartFeature } from '../types';
+import { EndCutFeature, Part, PartFeature } from '../types';
+
+export function validateEndCutFeature(
+  feature: EndCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness' | 'features'>
+): string | null {
+  const angles = [feature.parameters.horizontalAngle, feature.parameters.verticalAngle ?? 0];
+  if (angles.some((angle) => !Number.isFinite(angle) || Math.abs(angle) >= 90))
+    return 'Cut angles must be finite and less than 90°.';
+  const candidate = {
+    ...part,
+    features: [...(part.features ?? []).filter((existing) => existing.id !== feature.id), feature]
+  };
+  const profiles = getPartEndCutProfiles(candidate);
+  for (const y of [-part.thickness / 2, part.thickness / 2]) {
+    for (const z of [-part.width / 2, part.width / 2]) {
+      if (
+        getEndCutInsetAt('left', profiles, part, { y, z }) + getEndCutInsetAt('right', profiles, part, { y, z }) >=
+        part.length - 1e-9
+      )
+        return 'Cut angles exceed the available blank length. Reduce the angle or increase the blank length.';
+    }
+  }
+  const edges = getPartEdgeBevelProfiles(candidate);
+  for (const y of [-part.thickness / 2, part.thickness / 2]) {
+    if (
+      getEdgeBevelInsetAt('front', edges, part, { y }) + getEdgeBevelInsetAt('back', edges, part, { y }) >=
+      part.width - 1e-9
+    )
+      return 'Bevel angles exceed the available blank width. Reduce the angle or increase the blank width.';
+  }
+  return null;
+}
 
 export interface EndCutSideProfile {
   baseInset: number;
@@ -85,26 +117,6 @@ export function getPartEndCutProfiles(input: {
     profile.baseInset = 0;
     profile.horizontalFlip = getHorizontalFlip(feature);
     profile.verticalFlip = getVerticalFlip(feature);
-  }
-
-  const allowedMaxInset = Math.max(0, input.length - 0.01);
-  const totalMaxInset = left.maxInset + right.maxInset;
-
-  if (totalMaxInset > allowedMaxInset && totalMaxInset > 0) {
-    const scale = allowedMaxInset / totalMaxInset;
-    for (const profile of [left, right]) {
-      profile.horizontalInset *= scale;
-      profile.verticalInset *= scale;
-      profile.maxInset = profile.horizontalInset + profile.verticalInset;
-    }
-  }
-
-  const remainingForBaseInset = Math.max(0, allowedMaxInset - left.maxInset - right.maxInset);
-  const totalBaseInset = left.baseInset + right.baseInset;
-  if (totalBaseInset > remainingForBaseInset && totalBaseInset > 0) {
-    const scale = remainingForBaseInset / totalBaseInset;
-    left.baseInset *= scale;
-    right.baseInset *= scale;
   }
 
   return { left, right };
@@ -198,15 +210,6 @@ export function getPartEdgeBevelProfiles(input: {
     const angle = Math.abs(feature.parameters.verticalAngle || 0);
     profile.inset = input.thickness > 0 ? Math.max(0, Math.tan((angle * Math.PI) / 180) * input.thickness) : 0;
     profile.flip = feature.parameters.verticalFlip ?? false;
-  }
-
-  // Keep at least a sliver of width so opposing bevels can't invert the part.
-  const allowedMaxInset = Math.max(0, input.width - 0.01);
-  const total = front.inset + back.inset;
-  if (total > allowedMaxInset && total > 0) {
-    const scale = allowedMaxInset / total;
-    front.inset *= scale;
-    back.inset *= scale;
   }
 
   return { front, back };

@@ -8,7 +8,13 @@ import {
   getPartWorldAABB,
   hasRenderablePartFeatures
 } from './partFeatureGeometry';
-import { getRectCutDepth, getResolvedRectCutFeature, isBottomTarget, isTopTarget } from './rectCutUtils';
+import {
+  getRectCutDepth,
+  getRectCutPlanBounds,
+  getResolvedRectCutFeature,
+  isBottomTarget,
+  isTopTarget
+} from './rectCutUtils';
 import type { GeometryCache } from '../interaction/geometry/cache';
 
 // Module-level reusable objects for getPartBounds calculations.
@@ -361,8 +367,9 @@ export function getPartMaterialOBBs(
       const halfWidth = part.width / 2;
       const halfThickness = part.thickness / 2;
       const depth = getRectCutDepth(feature, part.thickness);
-      const rawXMin = -halfLength + feature.placement.x;
-      const renderedZ = getRenderedLocalZRange(part.width, feature.placement.z, feature.parameters.size.width);
+      const bounds = getRectCutPlanBounds(feature, part);
+      const rawXMin = -halfLength + bounds.minX;
+      const renderedZ = getRenderedLocalZRange(part.width, bounds.minZ, feature.parameters.size.width);
       const xMin = Math.max(-halfLength, rawXMin);
       const xMax = Math.min(halfLength, rawXMin + feature.parameters.size.length);
       const zMin = Math.max(-halfWidth, renderedZ.min);
@@ -3633,9 +3640,10 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
     if (depth <= 0) continue;
 
     // Local-space opening rectangle
-    const startX = -halfLength + resolved.placement.x;
+    const bounds = getRectCutPlanBounds(resolved, part);
+    const startX = -halfLength + bounds.minX;
     const endX = startX + resolved.parameters.size.length;
-    const renderedZ = getRenderedLocalZRange(part.width, resolved.placement.z, resolved.parameters.size.width);
+    const renderedZ = getRenderedLocalZRange(part.width, bounds.minZ, resolved.parameters.size.width);
     const localCenterX = (startX + endX) / 2;
     const localCenterZ = renderedZ.center;
     const localCenterY = isTop ? halfThick : -halfThick;
@@ -3716,8 +3724,9 @@ function getMateShapes(part: Part, position: Vec3): MateShape[] {
     const remainingThickness = part.thickness - cutDepth;
     if (cutDepth <= 0 || remainingThickness <= 0) continue;
 
-    const localCenterX = -halfLength + cut.placement.x + cut.parameters.size.length / 2;
-    const localCenterZ = getRenderedLocalZRange(part.width, cut.placement.z, cut.parameters.size.width).center;
+    const bounds = getRectCutPlanBounds(cut, part);
+    const localCenterX = -halfLength + bounds.minX + cut.parameters.size.length / 2;
+    const localCenterZ = getRenderedLocalZRange(part.width, bounds.minZ, cut.parameters.size.width).center;
     const localCenterY = isBottomTarget(cut) ? cutDepth / 2 : -cutDepth / 2;
     shapes.push({
       obb: {

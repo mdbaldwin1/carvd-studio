@@ -215,7 +215,7 @@ describe('partFeatureSummary', () => {
           createRectCut({ cutType: 'stopped_dado', size: { length: 3, width: 8 }, depthMode: 'blind', depth: 0.25 }),
           'metric'
         )
-      ).toBe('Stopped Dado on Top Face · 76.2mm run × 6.4mm deep');
+      ).toBe('Stopped Dado on Top Face · 76.2mm run × 6.35mm deep');
     });
 
     it('uses the width as the rabbet shoulder on front/back edges', () => {
@@ -385,7 +385,7 @@ describe('partFeatureSummary', () => {
           }),
           'metric'
         )
-      ).toBe('Rounded Rectangle on Top Face · 101.6mm × 50.8mm · 6.4mm radius × 12.7mm deep');
+      ).toBe('Rounded Rectangle on Top Face · 101.6mm × 50.8mm · 6.35mm radius × 12.7mm deep');
     });
   });
 

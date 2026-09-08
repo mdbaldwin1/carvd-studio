@@ -91,7 +91,7 @@ describe('cutListInstructions', () => {
     };
 
     expect(getInstructionFabricationLines(instruction, 'imperial')[0]).toBe(
-      '1. 4-hole Linear Countersink Pattern on Top Face · 1/4" hole × 1/2" major · 82° · 2" spacing · 0° direction · 1/2" deep · 15° tilt toward 90°'
+      '1. 4-hole Linear Countersink Pattern on Top Face · 1/4" hole × 1/2" major · 82° · 2" spacing · 0° direction · 1/2" deep · 15° tilt toward 90° · Primary 2" from Left · Secondary 1" from Back · Angles: 0° toward Right, 90° toward Front'
     );
   });
 
@@ -139,7 +139,7 @@ describe('cutListInstructions', () => {
         'imperial'
       )
     ).toEqual([
-      '1. 4-hole Circular Counterbore Pattern on Bottom Face · 3/8" hole · 7/8" × 1/4" recess · 1 1/4" radius · 30° start angle · Through · 10° tilt toward 40°'
+      '1. 4-hole Circular Counterbore Pattern on Bottom Face · 3/8" hole · 7/8" × 1/4" recess · 1 1/4" radius · 30° start angle · Through · 10° tilt toward 40° · Primary 6" from center (+Right) · Secondary 4" from center (+Back) · Angles: 0° toward Right, 90° toward Back'
     ]);
   });
 
@@ -193,12 +193,12 @@ describe('cutListInstructions', () => {
         'imperial'
       )
     ).toEqual([
-      '1. 6-hole Grid Pattern on Top Face · 3/8" diameter · 2" × 1" spacing · 15° rotation · Through',
-      '2. 4-hole Circular Pattern on Top Face · 3/8" diameter · 2" radius · 30° start angle · Through'
+      '1. 6-hole Grid Pattern on Top Face · 3/8" diameter · 2" × 1" spacing · 15° rotation · Through · Primary 2" from Left · Secondary 1" from Back · 2 rows × 3 columns · Angles: 0° toward Right, 90° toward Front',
+      '2. 4-hole Circular Pattern on Top Face · 3/8" diameter · 2" radius · 30° start angle · Through · Primary 2" from Left · Secondary 1" from Back · Angles: 0° toward Right, 90° toward Front'
     ]);
   });
 
-  it('collapses paired dowel holes into one unit-aware fabrication line', () => {
+  it('summarizes a dowel joint once and retains every hole coordinate in both units', () => {
     const dowelMetadata = (memberIndex: number) => ({
       dowelJoint: {
         jointId: 'joint-1',
@@ -239,10 +239,16 @@ describe('cutListInstructions', () => {
     };
 
     expect(getInstructionFabricationLines(instruction, 'imperial')).toEqual([
-      '1. Dowel joint: 3 × 3/8" dowels, 2" long; drill 1" into this part.'
+      '1. Dowel joint: 3 × 3/8" dowels, 2" long; drill 1" into this part.',
+      '2. Dowel hole 1 — Round Hole on Right End · 3/8" diameter × 1" deep · Primary 0" from center (+Back) · Secondary 0" from center (+Top)',
+      '3. Dowel hole 2 — Round Hole on Right End · 3/8" diameter × 1" deep · Primary 2" from center (+Back) · Secondary 0" from center (+Top)',
+      '4. Dowel hole 3 — Round Hole on Right End · 3/8" diameter × 1" deep · Primary 4" from center (+Back) · Secondary 0" from center (+Top)'
     ]);
     expect(getInstructionFabricationLines(instruction, 'metric')).toEqual([
-      '1. Dowel joint: 3 × 9.5mm dowels, 50.8mm long; drill 25.4mm into this part.'
+      '1. Dowel joint: 3 × 9.525mm dowels, 50.8mm long; drill 25.4mm into this part.',
+      '2. Dowel hole 1 — Round Hole on Right End · 9.525mm diameter × 25.4mm deep · Primary 0mm from center (+Back) · Secondary 0mm from center (+Top)',
+      '3. Dowel hole 2 — Round Hole on Right End · 9.525mm diameter × 25.4mm deep · Primary 50.8mm from center (+Back) · Secondary 0mm from center (+Top)',
+      '4. Dowel hole 3 — Round Hole on Right End · 9.525mm diameter × 25.4mm deep · Primary 101.6mm from center (+Back) · Secondary 0mm from center (+Top)'
     ]);
   });
 
@@ -340,7 +346,7 @@ describe('cutListInstructions', () => {
 
     expect(lines).toEqual([
       '1. Left mitre — Mitre 45° on Left End · Long point on Front',
-      '2. Top cutout — Cutout on Top Face · 2" × 1" · Through'
+      '2. Top cutout — Cutout on Top Face · 2" × 1" · Through · 2" from Left · 1" from Front'
     ]);
   });
 
