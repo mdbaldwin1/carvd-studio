@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Right-end mitre fabrication direction** — Right-end mitre and compound-cut summaries, Cut Lists, CSV files, and PDF reports now name the same front or back long point selected in Part Cuts and shown by the rendered board.
+- **Right-end mitre long-point direction** — Right-end mitre and compound-cut rendered geometry, snapping and collision contours, summaries, Cut Lists, CSV files, and PDF reports now all follow the front or back long point selected in Part Cuts.
 - **Patterned recess fabrication details** — Patterned countersink and counterbore instructions now retain the major diameter and included angle or bore diameter and recess depth instead of reporting only the pilot-hole pattern.
 - **Cutout and notch fabrication depth** — Cutout, edge-notch, and corner-notch instructions now state whether the removal is through or give its blind depth, preventing dimensionally identical pockets and openings from sharing an ambiguous shop instruction.
 - **Mitre and paired-dowel assemblies** — Complementary mitres now snap at their actual cut faces without ghost overlap, including flipped, shallow-angle, bevel, and compound ends. Paired dowels now validate enabled holes against their current host parts, retain their relationship through edits, copy or duplicate with fresh relationship identities, become ordinary holes when a mate or host is removed, and reconcile bulk cut replacement atomically with undo. Creating a joint now requires any pending Part Cuts draft to be saved or discarded first.

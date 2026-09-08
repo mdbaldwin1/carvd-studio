@@ -122,12 +122,7 @@ export function getEndCutInsetAt(
   const halfWidth = dimensions.width / 2;
   const halfThickness = dimensions.thickness / 2;
 
-  const defaultHorizontalRatio =
-    dimensions.width <= 0
-      ? 0
-      : side === 'left'
-        ? clamp((point.z + halfWidth) / dimensions.width, 0, 1)
-        : clamp((halfWidth - point.z) / dimensions.width, 0, 1);
+  const defaultHorizontalRatio = dimensions.width <= 0 ? 0 : clamp((point.z + halfWidth) / dimensions.width, 0, 1);
   const horizontalRatio = profile.horizontalFlip ? 1 - defaultHorizontalRatio : defaultHorizontalRatio;
 
   const defaultVerticalRatio =

@@ -58,15 +58,15 @@ describe('overlapPolicy', () => {
 
   it.each([
     {
-      firstFlip: false,
-      secondFlip: true,
+      firstFlip: true,
+      secondFlip: false,
       rotationY: 90,
       assembled: { x: 4, z: 4 },
       intrusion: { x: -0.01, z: -0.01 }
     },
     {
-      firstFlip: true,
-      secondFlip: false,
+      firstFlip: false,
+      secondFlip: true,
       rotationY: -90,
       assembled: { x: 4, z: -4 },
       intrusion: { x: -0.01, z: 0.01 }

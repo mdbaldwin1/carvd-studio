@@ -220,15 +220,27 @@ describe('endCutUtils', () => {
       expect(getEndCutInsetAt('left', profiles, dimensions, { y: 0, z: 2 })).toBeCloseTo(0);
     });
 
-    it('mirrors the horizontal gradient on the right end', () => {
-      const profiles = getPartEndCutProfiles({
-        length: 24,
-        ...dimensions,
-        features: [createEndCut({ face: 'right_end', cutType: 'mitre', parameters: { horizontalAngle: 45 } })]
-      });
-      expect(getEndCutInsetAt('right', profiles, dimensions, { y: 0, z: -2 })).toBeCloseTo(4);
-      expect(getEndCutInsetAt('right', profiles, dimensions, { y: 0, z: 2 })).toBeCloseTo(0);
-    });
+    it.each([
+      { horizontalFlip: false, expectedFrontInset: 0, expectedBackInset: 4 },
+      { horizontalFlip: true, expectedFrontInset: 4, expectedBackInset: 0 }
+    ])(
+      'keeps the selected long-point edge on the right end (horizontalFlip=$horizontalFlip)',
+      ({ horizontalFlip, expectedFrontInset, expectedBackInset }) => {
+        const profiles = getPartEndCutProfiles({
+          length: 24,
+          ...dimensions,
+          features: [
+            createEndCut({
+              face: 'right_end',
+              cutType: 'mitre',
+              parameters: { horizontalAngle: 45, horizontalFlip }
+            })
+          ]
+        });
+        expect(getEndCutInsetAt('right', profiles, dimensions, { y: 0, z: -2 })).toBeCloseTo(expectedFrontInset);
+        expect(getEndCutInsetAt('right', profiles, dimensions, { y: 0, z: 2 })).toBeCloseTo(expectedBackInset);
+      }
+    );
 
     it('interpolates vertical insets across the thickness for bevels', () => {
       const profiles = getPartEndCutProfiles({

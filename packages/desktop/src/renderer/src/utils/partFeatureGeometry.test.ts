@@ -308,6 +308,127 @@ describe('partFeatureGeometry', () => {
     expect(geometry.boundingBox!.min.x).toBeCloseTo(-12);
   });
 
+  it.each([
+    {
+      title: 'left-end 45 degree mitre with Front selected',
+      face: 'left_end',
+      cutType: 'mitre',
+      horizontalAngle: 45,
+      horizontalFlip: false,
+      expectedFrontX: -12,
+      expectedBackX: -8
+    },
+    {
+      title: 'left-end 45 degree mitre with Back selected',
+      face: 'left_end',
+      cutType: 'mitre',
+      horizontalAngle: 45,
+      horizontalFlip: true,
+      expectedFrontX: -8,
+      expectedBackX: -12
+    },
+    {
+      title: 'right-end 45 degree mitre with Front selected',
+      face: 'right_end',
+      cutType: 'mitre',
+      horizontalAngle: 45,
+      horizontalFlip: false,
+      expectedFrontX: 12,
+      expectedBackX: 8
+    },
+    {
+      title: 'right-end 45 degree mitre with Back selected',
+      face: 'right_end',
+      cutType: 'mitre',
+      horizontalAngle: 45,
+      horizontalFlip: true,
+      expectedFrontX: 8,
+      expectedBackX: 12
+    },
+    {
+      title: 'left-end 30 degree compound cut with Front selected',
+      face: 'left_end',
+      cutType: 'compound',
+      horizontalAngle: 30,
+      horizontalFlip: false,
+      expectedFrontX: -12,
+      expectedBackX: -9.690598923
+    },
+    {
+      title: 'left-end 30 degree compound cut with Back selected',
+      face: 'left_end',
+      cutType: 'compound',
+      horizontalAngle: 30,
+      horizontalFlip: true,
+      expectedFrontX: -9.690598923,
+      expectedBackX: -12
+    },
+    {
+      title: 'right-end 30 degree compound cut with Front selected',
+      face: 'right_end',
+      cutType: 'compound',
+      horizontalAngle: 30,
+      horizontalFlip: false,
+      expectedFrontX: 12,
+      expectedBackX: 9.690598923
+    },
+    {
+      title: 'right-end 30 degree compound cut with Back selected',
+      face: 'right_end',
+      cutType: 'compound',
+      horizontalAngle: 30,
+      horizontalFlip: true,
+      expectedFrontX: 9.690598923,
+      expectedBackX: 12
+    }
+  ] as const)(
+    'keeps the selected long-point edge at full length in the mesh and collision contours: $title',
+    ({ face, cutType, horizontalAngle, horizontalFlip, expectedFrontX, expectedBackX }) => {
+      const part = createTestPart({
+        length: 24,
+        width: 4,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [
+          {
+            id: `long-point-${face}-${cutType}-${horizontalAngle}-${horizontalFlip}`,
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face },
+            reference: { primaryFrom: face === 'left_end' ? 'min' : 'max' },
+            cutType,
+            lengthMode: 'long_point',
+            parameters: {
+              horizontalAngle,
+              horizontalFlip,
+              ...(cutType === 'compound' ? { verticalAngle: 12, verticalFlip: false } : {})
+            }
+          }
+        ]
+      });
+      const endExtreme = (points: Array<{ x: number; z: number }>, renderedZ: number): number => {
+        const xs = points.filter((point) => Math.abs(point.z - renderedZ) < 1e-3).map((point) => point.x);
+        expect(xs.length).toBeGreaterThan(0);
+        return face === 'left_end' ? Math.min(...xs) : Math.max(...xs);
+      };
+
+      const geometry = getPartRenderGeometry(part);
+      const positions = geometry.getAttribute('position');
+      const meshPoints = Array.from({ length: positions.count }, (_, index) => ({
+        x: positions.getX(index),
+        z: positions.getZ(index)
+      }));
+      const overlapContour = getPartWorldContour(part);
+      const convexSnapAndCollisionHull = getPartLocalConvexVertices(part);
+
+      for (const points of [meshPoints, overlapContour, convexSnapAndCollisionHull]) {
+        expect(endExtreme(points, 2)).toBeCloseTo(expectedFrontX, 3);
+        expect(endExtreme(points, -2)).toBeCloseTo(expectedBackX, 3);
+      }
+    }
+  );
+
   it('keeps a mitred end anchored to the board length even if legacy reference data differs', () => {
     const anchoredReference = getPartRenderGeometry(
       createTestPart({
@@ -1541,14 +1662,14 @@ describe('partFeatureGeometry', () => {
       // Only assert the mitre component (top-face extents), which is stable in
       // the layered path; the vertical component is exercised for coverage.
       const extremes = scanRightEnd(getPartRenderGeometry(createCompoundPart(false)));
-      expect(extremes.frontTopMaxX).toBeCloseTo(8, 3);
-      expect(extremes.backTopMaxX).toBeCloseTo(12, 3);
+      expect(extremes.frontTopMaxX).toBeCloseTo(12, 3);
+      expect(extremes.backTopMaxX).toBeCloseTo(8, 3);
     });
 
     it('keeps the compound mitre plane intact with verticalFlip in the layered path', () => {
       const extremes = scanRightEnd(getPartRenderGeometry(createCompoundPart(true)));
-      expect(extremes.frontBottomMaxX).toBeCloseTo(8, 3);
-      expect(extremes.backBottomMaxX).toBeCloseTo(12, 3);
+      expect(extremes.frontBottomMaxX).toBeCloseTo(12, 3);
+      expect(extremes.backBottomMaxX).toBeCloseTo(8, 3);
     });
   });
 
@@ -1611,12 +1732,12 @@ describe('partFeatureGeometry', () => {
       );
 
       // The hull is world space: the front face is at +Z, the back at -Z.
-      // Front (z=2): full horizontal inset; bottom additionally gets the vertical inset
-      expect(verts).toContainEqual(expect.objectContaining({ x: 8, y: 0.5, z: 2 }));
-      expect(verts.some((v) => Math.abs(v.x - 7) < 1e-6 && v.y === -0.5 && v.z === 2)).toBe(true);
-      // Back (z=-2): no horizontal inset; bottom gets the vertical inset only
-      expect(verts.some((v) => Math.abs(v.x - 12) < 1e-6 && v.y === 0.5 && v.z === -2)).toBe(true);
-      expect(verts.some((v) => Math.abs(v.x - 11) < 1e-6 && v.y === -0.5 && v.z === -2)).toBe(true);
+      // Front (z=2): the selected long point; bottom gets only the vertical inset.
+      expect(verts).toContainEqual(expect.objectContaining({ x: 12, y: 0.5, z: 2 }));
+      expect(verts.some((v) => Math.abs(v.x - 11) < 1e-6 && v.y === -0.5 && v.z === 2)).toBe(true);
+      // Back (z=-2): the horizontal inset; bottom also gets the vertical inset.
+      expect(verts.some((v) => Math.abs(v.x - 8) < 1e-6 && v.y === 0.5 && v.z === -2)).toBe(true);
+      expect(verts.some((v) => Math.abs(v.x - 7) < 1e-6 && v.y === -0.5 && v.z === -2)).toBe(true);
     });
   });
   describe('getPartLocalCorners', () => {

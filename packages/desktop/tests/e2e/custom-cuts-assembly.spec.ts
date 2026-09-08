@@ -1106,18 +1106,18 @@ test.describe.serial('custom cuts assembly qualification', () => {
     let configuredSnapping = false;
     for (const scenario of [
       {
-        title: 'front long point',
-        firstFlip: false,
-        secondFlip: true,
+        title: 'Back/Front long points at the positive-Z corner',
+        firstFlip: true,
+        secondFlip: false,
         start: { x: 8, y: 0.5, z: 8 },
         assembled: { x: 4, y: 0.5, z: 4 },
         turns: 1,
         expectedRotation: 90
       },
       {
-        title: 'back long point',
-        firstFlip: true,
-        secondFlip: false,
+        title: 'Front/Back long points at the negative-Z corner',
+        firstFlip: false,
+        secondFlip: true,
         start: { x: 8, y: 0.5, z: -8 },
         assembled: { x: 4, y: 0.5, z: -4 },
         turns: 3,

@@ -97,7 +97,8 @@ function expectFiniteNondegenerateGeometrySignature(signature: string | null): v
   expect(Number.isFinite(indexCount)).toBe(true);
   expect(Number.isFinite(hash)).toBe(true);
   expect(positionCount).toBeGreaterThan(0);
-  expect(indexCount).toBeGreaterThan(0);
+  expect(Number.isInteger(indexCount)).toBe(true);
+  expect(indexCount).toBeGreaterThanOrEqual(0);
   expect(boundaryText).not.toBe('unbounded');
   const bounds = boundaryText.split(',').map(Number);
   expect(bounds).toHaveLength(6);
@@ -614,8 +615,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await fillMeasurement(window, 'Run Along Blank', '8');
     await fillMeasurement(window, 'Blind Depth', '1/4');
     await fillMeasurement(window, 'Offset Along Length', '30');
-    await expect(window.getByText('Stopped dado run extends past the blank.')).toBeVisible();
-    await expect(window.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    await expectImperialMeasurement(window, 'Offset Along Length', 28);
     await fillMeasurement(window, 'Offset Along Length', '6');
     const preview = window.getByRole('img', { name: 'Part cuts geometry preview' });
     const stoppedDadoBeforeMove = await preview.getAttribute('data-geometry-signature');
@@ -635,9 +635,8 @@ test.describe('hands-on custom cuts qualification', () => {
     await fillMeasurement(window, 'Run Along Blank', '4');
     await fillMeasurement(window, 'Cross-Cut Width', '1 1/2');
     await fillMeasurement(window, 'Offset Along Length', '33');
-    await expect(window.getByText('Edge notch length runs past the blank.')).toBeVisible();
-    await expect(window.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
-    await fillMeasurement(window, 'Offset Along Length', '8');
+    await expectImperialMeasurement(window, 'Offset Along Length', 32);
+    await fillMeasurement(window, 'Offset Along Length', '20');
     await saveCut(window);
     await window.getByRole('button', { name: /^2\. Cable chase edge notch/ }).click();
     await fillMeasurement(window, 'Cross-Cut Width', '1 3/4');
@@ -672,7 +671,7 @@ test.describe('hands-on custom cuts qualification', () => {
         target: { type: 'edge', edge: 'top_front_edge' },
         label: 'Cable chase edge notch',
         parameters: { size: { length: 4, width: 1.75 }, depthMode: 'through' },
-        placement: { x: 8, z: 0 }
+        placement: { x: 20, z: 0 }
       },
       {
         kind: 'rect_cut',

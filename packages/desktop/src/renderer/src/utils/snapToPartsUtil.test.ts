@@ -1549,15 +1549,15 @@ describe('snapToPartsUtil', () => {
     it.each([
       {
         title: 'default 45 degree frame corner',
-        firstFlip: false,
-        secondFlip: true,
+        firstFlip: true,
+        secondFlip: false,
         separatedPosition: { x: 4.2, y: 0.5, z: 4.2 },
         assembledPosition: { x: 4, y: 0.5, z: 4 }
       },
       {
         title: 'oppositely flipped 45 degree frame corner',
-        firstFlip: true,
-        secondFlip: false,
+        firstFlip: false,
+        secondFlip: true,
         rotationY: -90,
         separatedPosition: { x: 4.2, y: 0.5, z: -4.2 },
         assembledPosition: { x: 4, y: 0.5, z: -4 }
@@ -1600,7 +1600,7 @@ describe('snapToPartsUtil', () => {
         width: 2,
         thickness: 1,
         position: { x: 0, y: 0.5, z: 0 },
-        features: [endCut('right_end', 'mitre', { horizontalAngle: 22.5 })]
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 22.5, horizontalFlip: true })]
       });
       const assembledPosition = { x: 7.82842712, y: 0.5, z: 3.24264069 };
       const separatedPosition = { x: 8.01320303, y: 0.5, z: 3.31917738 };
@@ -1611,7 +1611,7 @@ describe('snapToPartsUtil', () => {
         thickness: 1,
         position: separatedPosition,
         rotation: { x: 0, y: 135, z: 0 },
-        features: [endCut('right_end', 'mitre', { horizontalAngle: 22.5, horizontalFlip: true })]
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 22.5, horizontalFlip: false })]
       });
 
       const result = detectFaceSnaps(diagonal, separatedPosition, [horizontal, diagonal], [diagonal.id], 0.5);
@@ -1629,7 +1629,7 @@ describe('snapToPartsUtil', () => {
         width: 2,
         thickness: 1,
         position: { x: 0, y: 0.5, z: 0 },
-        features: [endCut('right_end', 'mitre', { horizontalAngle: 30 })]
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 30, horizontalFlip: true })]
       });
       const stale45Mate = createTestPart({
         id: 'stale-45-mate',
@@ -1638,7 +1638,7 @@ describe('snapToPartsUtil', () => {
         thickness: 1,
         position: { x: 4.2, y: 0.5, z: 4.2 },
         rotation: { x: 0, y: 90, z: 0 },
-        features: [endCut('right_end', 'mitre', { horizontalAngle: 45, horizontalFlip: true })]
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 45, horizontalFlip: false })]
       });
 
       const staleResult = detectFaceSnaps(
@@ -1666,7 +1666,7 @@ describe('snapToPartsUtil', () => {
         id: 'edited-mate',
         position: separatedPosition,
         rotation: { x: 0, y: 120, z: 0 },
-        features: [endCut('right_end', 'mitre', { horizontalAngle: 30, horizontalFlip: true })]
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 30, horizontalFlip: false })]
       });
       const refreshedResult = detectFaceSnaps(
         editedMate,
@@ -1721,7 +1721,7 @@ describe('snapToPartsUtil', () => {
         width: 2,
         thickness: 1,
         position: { x: 0, y: 0.5, z: 0 },
-        features: [endCut('right_end', 'compound', { horizontalAngle: 22.5, verticalAngle: 15 })]
+        features: [endCut('right_end', 'compound', { horizontalAngle: 22.5, horizontalFlip: true, verticalAngle: 15 })]
       });
       const compoundAssembled = { x: compoundCenter * 2, y: 0.5, z: 0 };
       const normalLength = Math.sqrt(1 + Math.tan(Math.PI / 12) ** 2 + Math.tan(Math.PI / 8) ** 2);
