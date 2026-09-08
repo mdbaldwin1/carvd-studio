@@ -478,6 +478,101 @@ test.describe('hands-on custom cuts qualification', () => {
     }
   });
 
+  test('keeps both mitre and bevel changes visible for a compound end layered with a dado', async () => {
+    test.setTimeout(120000);
+    const { window, userDataDir } = running;
+    const projectPath = path.join(userDataDir, 'layered-compound-preview.carvd');
+    await seedProject(window, 'stocked-one-part');
+    await window.evaluate(() => {
+      const project = window.useProjectStore.getState();
+      const part = project.parts[0];
+      project.updatePart(part.id, {
+        name: 'Layered compound test board',
+        length: 24,
+        width: 4,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 }
+      });
+    });
+    await openSelectedPartCuts(window);
+
+    await startPreset(window, 'Dado');
+    await window.getByRole('button', { name: 'Top Face', exact: true }).click();
+    await window.getByLabel('Label (optional)', { exact: true }).fill('Layered shelf dado');
+    await fillMeasurement(window, 'Run Along Blank', '3/4');
+    await fillMeasurement(window, 'Blind Depth', '1/4');
+    await saveCut(window);
+
+    await startPreset(window, 'End Cut');
+    await window.getByRole('button', { name: 'Right End', exact: true }).click();
+    await window.getByLabel('Label (optional)', { exact: true }).fill('Layered compound end');
+    await window.getByLabel('Cut Style', { exact: true }).selectOption('compound');
+    await window.getByLabel('Mitre Angle', { exact: true }).fill('45');
+    await window.getByLabel('Long Point On', { exact: true }).selectOption('front');
+    await window.getByLabel('Bevel Angle', { exact: true }).fill('45');
+    await window.getByLabel('High Point On', { exact: true }).selectOption('top');
+    await saveCut(window);
+
+    const preview = window.getByRole('img', { name: 'Part cuts geometry preview' });
+    const topFrontGeometry = await preview.getAttribute('data-geometry-signature');
+    expectFiniteNondegenerateGeometrySignature(topFrontGeometry);
+
+    await window.getByRole('button', { name: /^2\. Layered compound end/ }).click();
+    await window.getByLabel('High Point On', { exact: true }).selectOption('bottom');
+    await expect.poll(() => preview.getAttribute('data-geometry-signature')).not.toBe(topFrontGeometry);
+    const bottomFrontGeometry = await preview.getAttribute('data-geometry-signature');
+    expectFiniteNondegenerateGeometrySignature(bottomFrontGeometry);
+    await saveCut(window);
+
+    await window.getByRole('button', { name: /^2\. Layered compound end/ }).click();
+    await window.getByLabel('Long Point On', { exact: true }).selectOption('back');
+    await expect.poll(() => preview.getAttribute('data-geometry-signature')).not.toBe(bottomFrontGeometry);
+    const bottomBackGeometry = await preview.getAttribute('data-geometry-signature');
+    expectFiniteNondegenerateGeometrySignature(bottomBackGeometry);
+    await saveCut(window);
+    await window.getByRole('button', { name: 'Save Part' }).click();
+
+    await expect
+      .poll(() =>
+        window.evaluate(() => {
+          const compound = window.useProjectStore.getState().parts[0].features[1];
+          return {
+            kind: compound.kind,
+            target: compound.target,
+            cutType: compound.cutType,
+            horizontalAngle: compound.parameters.horizontalAngle,
+            horizontalFlip: compound.parameters.horizontalFlip,
+            verticalAngle: compound.parameters.verticalAngle,
+            verticalFlip: compound.parameters.verticalFlip
+          };
+        })
+      )
+      .toEqual({
+        kind: 'end_cut',
+        target: { type: 'face', face: 'right_end' },
+        cutType: 'compound',
+        horizontalAngle: 45,
+        horizontalFlip: true,
+        verticalAngle: 45,
+        verticalFlip: true
+      });
+
+    await saveProjectTo(window, projectPath);
+    await reopenProject(window, projectPath);
+    await window.evaluate(() => {
+      const part = window.useProjectStore.getState().parts[0];
+      window.useSelectionStore.getState().selectPart(part.id);
+    });
+    await openSelectedPartCuts(window);
+    await expect
+      .poll(() => preview.getAttribute('data-geometry-signature'), { timeout: 15000 })
+      .toBe(bottomBackGeometry);
+    expectFiniteNondegenerateGeometrySignature(await preview.getAttribute('data-geometry-signature'));
+    await window.getByRole('button', { name: /^2\. Layered compound end/ }).click();
+    await expect(window.getByLabel('Long Point On', { exact: true })).toHaveValue('back');
+    await expect(window.getByLabel('High Point On', { exact: true })).toHaveValue('bottom');
+  });
+
   test('keeps a 20-feature part pickable through orbit, edit, reorder, history, save, reopen, and output', async () => {
     test.setTimeout(120000);
     const { window, userDataDir } = running;

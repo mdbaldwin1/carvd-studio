@@ -1562,53 +1562,6 @@ describe('partFeatureGeometry', () => {
       expect(topLeftMinX).toBeCloseTo(-12, 3);
     });
 
-    function createCompoundPart(verticalFlip: boolean) {
-      return createTestPart({
-        length: 24,
-        width: 4,
-        thickness: 1,
-        features: [
-          middleDado,
-          {
-            id: 'compound-1',
-            kind: 'end_cut',
-            version: 1,
-            enabled: true,
-            target: { type: 'face', face: 'right_end' },
-            reference: { primaryFrom: 'max' },
-            cutType: 'compound',
-            lengthMode: 'long_point',
-            parameters: { horizontalAngle: 45, verticalAngle: 45, verticalFlip }
-          }
-        ]
-      });
-    }
-
-    function scanRightEnd(geometry: ReturnType<typeof getPartRenderGeometry>) {
-      // The layered path negates contour Z, so the contour front appears at
-      // geometry z > 0 and the contour back at geometry z < 0.
-      const positions = geometry.getAttribute('position');
-      let frontTopMaxX = -Infinity;
-      let frontBottomMaxX = -Infinity;
-      let backTopMaxX = -Infinity;
-      let backBottomMaxX = -Infinity;
-      for (let i = 0; i < positions.count; i += 1) {
-        const x = positions.getX(i);
-        const y = positions.getY(i);
-        const z = positions.getZ(i);
-        if (x < 0) continue;
-        if (z > 1.9) {
-          if (y > 0.49) frontTopMaxX = Math.max(frontTopMaxX, x);
-          if (y < -0.49) frontBottomMaxX = Math.max(frontBottomMaxX, x);
-        }
-        if (z < -1.9) {
-          if (y > 0.49) backTopMaxX = Math.max(backTopMaxX, x);
-          if (y < -0.49) backBottomMaxX = Math.max(backBottomMaxX, x);
-        }
-      }
-      return { frontTopMaxX, frontBottomMaxX, backTopMaxX, backBottomMaxX };
-    }
-
     function createRightBevelPart(verticalFlip: boolean) {
       return createTestPart({
         length: 24,
@@ -1658,19 +1611,142 @@ describe('partFeatureGeometry', () => {
       expect(bottomRightMaxX).toBeCloseTo(12, 3);
     });
 
-    it('keeps the compound mitre plane intact in the layered path', () => {
-      // Only assert the mitre component (top-face extents), which is stable in
-      // the layered path; the vertical component is exercised for coverage.
-      const extremes = scanRightEnd(getPartRenderGeometry(createCompoundPart(false)));
-      expect(extremes.frontTopMaxX).toBeCloseTo(12, 3);
-      expect(extremes.backTopMaxX).toBeCloseTo(8, 3);
-    });
+    const secondaryFeatures = {
+      rect: middleDado,
+      circular: {
+        id: 'hole-1',
+        kind: 'circular_cut',
+        version: 1,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+        cutType: 'round_hole',
+        placement: { primary: 0, secondary: 0, rotation: 0 },
+        parameters: { diameter: 1, depthMode: 'through', tilt: 0, direction: 0 }
+      },
+      rounded: {
+        id: 'slot-1',
+        kind: 'rounded_cut',
+        version: 1,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+        cutType: 'rounded_slot',
+        placement: { primary: 0, secondary: 0, rotation: 0 },
+        parameters: { length: 3, width: 1, cornerRadius: 0.5, depthMode: 'through' }
+      }
+    } satisfies Record<'rect' | 'circular' | 'rounded', PartFeature>;
 
-    it('keeps the compound mitre plane intact with verticalFlip in the layered path', () => {
-      const extremes = scanRightEnd(getPartRenderGeometry(createCompoundPart(true)));
-      expect(extremes.frontBottomMaxX).toBeCloseTo(12, 3);
-      expect(extremes.backBottomMaxX).toBeCloseTo(8, 3);
-    });
+    const compoundEndCases = [
+      {
+        face: 'left_end',
+        horizontalFlip: false,
+        verticalFlip: false,
+        expected: { frontTop: -11, frontBottom: -12, backTop: -7, backBottom: -8 }
+      },
+      {
+        face: 'left_end',
+        horizontalFlip: true,
+        verticalFlip: false,
+        expected: { frontTop: -7, frontBottom: -8, backTop: -11, backBottom: -12 }
+      },
+      {
+        face: 'right_end',
+        horizontalFlip: false,
+        verticalFlip: false,
+        expected: { frontTop: 12, frontBottom: 11, backTop: 8, backBottom: 7 }
+      },
+      {
+        face: 'right_end',
+        horizontalFlip: true,
+        verticalFlip: false,
+        expected: { frontTop: 8, frontBottom: 7, backTop: 12, backBottom: 11 }
+      },
+      {
+        face: 'left_end',
+        horizontalFlip: false,
+        verticalFlip: true,
+        expected: { frontTop: -12, frontBottom: -11, backTop: -8, backBottom: -7 }
+      },
+      {
+        face: 'left_end',
+        horizontalFlip: true,
+        verticalFlip: true,
+        expected: { frontTop: -8, frontBottom: -7, backTop: -12, backBottom: -11 }
+      },
+      {
+        face: 'right_end',
+        horizontalFlip: false,
+        verticalFlip: true,
+        expected: { frontTop: 11, frontBottom: 12, backTop: 7, backBottom: 8 }
+      },
+      {
+        face: 'right_end',
+        horizontalFlip: true,
+        verticalFlip: true,
+        expected: { frontTop: 7, frontBottom: 8, backTop: 11, backBottom: 12 }
+      }
+    ] as const;
+    const layeredCompoundCases = compoundEndCases.flatMap((compound) =>
+      (['rect', 'circular', 'rounded'] as const).map((secondary) => ({ ...compound, secondary }))
+    );
+
+    it.each(layeredCompoundCases)(
+      'preserves the full compound plane for $face with horizontalFlip=$horizontalFlip, verticalFlip=$verticalFlip, and a $secondary cut',
+      ({ face, horizontalFlip, verticalFlip, secondary, expected }) => {
+        const part = createTestPart({
+          length: 24,
+          width: 4,
+          thickness: 1,
+          features: [
+            secondaryFeatures[secondary],
+            {
+              id: `compound-${face}-${horizontalFlip}-${verticalFlip}-${secondary}`,
+              kind: 'end_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face },
+              reference: { primaryFrom: face === 'left_end' ? 'min' : 'max' },
+              cutType: 'compound',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 45, horizontalFlip, verticalAngle: 45, verticalFlip }
+            }
+          ]
+        });
+        const readEndPlane = (points: Array<{ x: number; y: number; z: number }>) => {
+          const endXAt = (renderedZ: number, y: number): number => {
+            const xs = points
+              .filter((point) => Math.abs(point.z - renderedZ) < 1e-3 && Math.abs(point.y - y) < 1e-3)
+              .map((point) => point.x);
+            expect(xs.length).toBeGreaterThan(0);
+            return face === 'left_end' ? Math.min(...xs) : Math.max(...xs);
+          };
+          return {
+            frontTop: endXAt(2, 0.5),
+            frontBottom: endXAt(2, -0.5),
+            backTop: endXAt(-2, 0.5),
+            backBottom: endXAt(-2, -0.5)
+          };
+        };
+
+        const geometry = getPartRenderGeometry(part);
+        const positions = geometry.getAttribute('position');
+        const renderedPlane = readEndPlane(
+          Array.from({ length: positions.count }, (_, index) => ({
+            x: positions.getX(index),
+            y: positions.getY(index),
+            z: positions.getZ(index)
+          }))
+        );
+        const snapAndCollisionPlane = readEndPlane(getPartLocalConvexVertices(part));
+
+        for (const coordinate of ['frontTop', 'frontBottom', 'backTop', 'backBottom'] as const) {
+          expect(renderedPlane[coordinate]).toBeCloseTo(expected[coordinate], 3);
+          expect(snapAndCollisionPlane[coordinate]).toBeCloseTo(expected[coordinate], 3);
+          expect(renderedPlane[coordinate]).toBeCloseTo(snapAndCollisionPlane[coordinate], 3);
+        }
+      }
+    );
   });
 
   describe('getPartLocalConvexVertices', () => {
