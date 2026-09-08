@@ -2,16 +2,14 @@
 
 ## Release qualification
 
-**PASS — Task 6 qualification is complete for this candidate.**
+**PASS — Task 7 final qualification is complete for this unreleased candidate.**
 
-Review-driven remediation is complete at
-`15c7034d90a7bcaaf1bc908f0872e0164db5f79c`. Five production P0s found or
-confirmed by Task 6 are fixed: right-end long-point output, right-end long-point
-geometry, layered compound bevel geometry, patterned recess details, and
-cutout/notch termination details. The expanded qualification contains literal
-independent oracles for every operation, and the recovered host completed the
-full desktop gate: 3,788 renderer tests, 213 main-process tests, and 135
-real-Electron tests all passed.
+Final review and remediation are complete at
+`bd62e061d46180232d278deb8f8695fa6c12e3c0`. Task 7 found and fixed one
+additional production P0: the final Part Cuts save and Cut List boundaries
+revalidated rectangular cuts but skipped circular and rounded cuts. The full
+post-fix desktop gate passed: 3,791 renderer tests, 213 main-process tests, and
+135 real-Electron tests.
 
 P0 means any crash, lost/corrupted feature, wrong face or removal direction, false
 valid/invalid geometry, copy/undo/save corruption, valid joinery blocked by
@@ -25,24 +23,46 @@ collision handling, or fabrication output that could cause a bad cut.
 
 ## Build stamp
 
-| Field                            | Qualified/candidate value                                           |
-| -------------------------------- | ------------------------------------------------------------------- |
-| Qualification date               | 2026-09-08, America/New_York                                        |
-| Starting Task 6 commit           | `e33717b` (`fix: harden paired dowel lifecycle`)                    |
-| Last fully green Task 6 baseline | `c472a72912a63ce3ead371602c4558f15ef53e7a`; 133/133 Electron tests  |
-| Current candidate                | `15c7034d90a7bcaaf1bc908f0872e0164db5f79c`                          |
-| OS                               | macOS 26.6.2, build 25G83                                           |
-| Architecture                     | arm64                                                               |
-| Node / npm                       | v23.10.0 / 10.9.2                                                   |
-| Desktop / Electron / Playwright  | 1.3.0 / 41.1.1 / 1.59.1                                             |
-| Electron viewport                | 1400 × 900                                                          |
-| Candidate static verification    | desktop lint/typecheck/build exit 0; Prettier and diff checks clean |
-| Candidate runtime verification   | 3,788 renderer + 213 main + 135 real-Electron tests passed          |
+| Field                           | Qualified/candidate value                                           |
+| ------------------------------- | ------------------------------------------------------------------- |
+| Qualification date              | 2026-09-08, America/New_York                                        |
+| Starting Task 7 commit          | `6b9898897c14089d72291c3874211e97328f6b87`                          |
+| Qualified code candidate        | `bd62e061d46180232d278deb8f8695fa6c12e3c0`                          |
+| Comparison base                 | `origin/develop` at `459b6a5177b9`; local `develop` was stale       |
+| OS                              | macOS 26.6.2, build 25G83                                           |
+| Architecture                    | arm64                                                               |
+| Node / npm                      | v23.10.0 / 10.9.2                                                   |
+| Desktop / Electron / Playwright | 1.3.0 / 41.1.1 / 1.59.1                                             |
+| Electron viewport               | 1400 × 900                                                          |
+| Candidate static verification   | desktop lint/typecheck/build exit 0; Prettier and diff checks clean |
+| Candidate runtime verification  | 3,791 renderer + 213 main + 135 real-Electron tests passed          |
 
 The requested `/tmp/carvd-manual-qa-matrix.md` was absent at Task 6 start and
-again at review remediation time. The checked-in Task 6 brief, master plan,
-progress ledger, Task 1–5 reports, previous report, and review were used as the
-binding matrix.
+again at review remediation time. The checked-in task briefs, master plan,
+progress ledger, Task 1–6 reports, previous report, and review were used as the
+binding matrix. Task 7 independently reviewed the complete branch diff and
+re-ran every configured desktop gate.
+
+## Task 7 final audit rulings
+
+- The comparison base is the merge-base/current remote-tracking
+  `origin/develop` commit `459b6a5177b9feb0904b73c7df18d5103cb8e3a6`;
+  the local `develop` ref was stale and was not used.
+- At Task 7 entry commit `6b9898897c14089d72291c3874211e97328f6b87`,
+  `git diff --shortstat origin/develop...HEAD` reported 174 files, 38,491
+  insertions, and 1,118 deletions across 151 commits. The qualification-only
+  Tasks 1–6 range, `64907aac..6b989889`, reported 67 files, 10,585 insertions,
+  and 613 deletions.
+- The full branch and the qualification-only range were reviewed for scope,
+  unexpected file modes, generated artifacts, focused/skipped tests, debug
+  residue, sensitive filenames, and common secret signatures. No secret,
+  generated-output, or unrelated Task 1–6 change was found. Historical Beads,
+  `.codex`, dependency, website, and version changes all predated Task 1 and were
+  not modified by Task 7.
+- QAF-007 was the only new Critical/Important review finding. It was fixed
+  test-first, and no Critical/Important finding remains open or deferred.
+- The application version remains 1.3.0. Task 7 did not bump a version, change
+  release state, merge, push, open a PR, tag, package, publish, or release.
 
 ## Evidence standard
 
@@ -312,6 +332,30 @@ Candidate result: **passed in the final 135/135 Electron run**.
   3,788/3,788, 213/213, and 135/135 respectively.
 - Commit: `15c7034`.
 
+### QAF-007 — final round-cut validation gap (P0, fixed)
+
+- Reproduction: validate a 4 × 4 part after loading or resizing it with either a
+  5-inch-diameter circular cut or a 5 × 2 rounded rectangle, then save Part Cuts
+  or generate a Cut List.
+- Expected: both final boundaries reject the out-of-bounds operation with the
+  existing circular/rounded validation message and keep Part Cuts open.
+- Actual before the fix: both boundaries validated enabled `rect_cut` features
+  only, so the invalid circular or rounded feature was accepted.
+- Root cause: `usePartCutsEditing.saveAndExit` and
+  `validatePartsForCutList` explicitly skipped every feature kind except
+  `rect_cut`, although the authoring workspace already dispatched all three
+  feature families to their validators.
+- Resolution: both final boundaries now dispatch enabled rectangular, circular,
+  and rounded features to the existing family-specific validators.
+- Regression location: `usePartCutsEditing.test.ts` proves an invalid circular
+  draft cannot be saved; `projectStore.test.ts` proves oversized circular and
+  rounded features block Cut List generation.
+- TDD evidence: the new focused cases were RED at exactly 3 failed / 149 passed /
+  152 total. After the production fix and one expected-message literal
+  correction, the focused suite passed 152/152. The final full desktop gate
+  passed 3,791/3,791 renderer, 213/213 main, and 135/135 Electron tests.
+- Commit: `bd62e06`.
+
 ### QAH-001 — asynchronous import/generate controls (harness only)
 
 - Reproduction: initial Task 6 hands-on run before locator waits, using
@@ -417,6 +461,15 @@ worker to respond`; Playwright timed out in `beforeEach` at
 | round-3 full real-Electron Playwright                                                                  | 135/135 passed in 2.3m                                                 |
 | round-3 desktop lint / typecheck / build                                                               | all exited 0                                                           |
 | direct Prettier on changed production/test/CHANGELOG files; pre-commit staged-file checks; diff checks | exit 0                                                                 |
+| QAF-007 focused final-boundary regression before production change                                     | RED: 3 failed / 149 passed / 152 total                                 |
+| QAF-007 focused final-boundary regression after production change                                      | GREEN: 152/152 passed                                                  |
+| Task 7 `npm run lint --workspace=@carvd/desktop`                                                       | exit 0                                                                 |
+| Task 7 `npm run typecheck --workspace=@carvd/desktop`                                                  | exit 0                                                                 |
+| Task 7 `npm run format:check --workspace=@carvd/desktop`                                               | exit 0                                                                 |
+| Task 7 `npm test --workspace=@carvd/desktop`                                                           | renderer 3,791/3,791; main 213/213; Electron 135/135; exit 0           |
+| Task 7 `npm run build --workspace=@carvd/desktop`                                                      | 465 main + 2 preload + 2,931 renderer modules; exit 0                  |
+| Task 7 working-tree and complete-branch `git diff --check`                                             | exit 0                                                                 |
+| Task 7 changed-file secret, sensitive-filename, focused-test, and debug-marker scans                   | no secret/sensitive/focused-test findings; expected diagnostics only   |
 
 ## Commits
 
@@ -431,14 +484,19 @@ worker to respond`; Playwright timed out in `beforeEach` at
 | `5e45484` | Add native per-operation output/persistence, strict stress, and realistic cabinet-panel qualification |
 | `753d7d9` | Align actual right-end long-point geometry and collision contours with editor/output semantics        |
 | `15c7034` | Preserve both compound-cut mitre and bevel geometry on boards with other cuts                         |
+| `bd62e06` | Revalidate circular and rounded cuts at final save and Cut List boundaries                            |
 
-`CHANGELOG.md` records all five user-visible production corrections.
+`CHANGELOG.md` records all six user-visible production corrections.
 
 ## Residual ruling
 
 - No known production P0 or P1 remains in the candidate code.
 - P1 deferral count is zero.
-- Release qualification is **PASS** for the tested candidate: unit, lint,
-  typecheck, build, focused Electron, and the full Electron suite are green.
+- Final qualification is **PASS** for the tested candidate: unit, lint,
+  typecheck, build, formatting/diff checks, and the full Electron suite are
+  green.
 - The missing temporary matrix and resolved host blocker remain disclosed.
+- Qualification was performed on macOS arm64. Windows/Linux, packaged installer,
+  signing, notarization, update-channel, and distribution checks were not in
+  scope and were not run.
 - This report is not authorization to merge, release, tag, or publish.
