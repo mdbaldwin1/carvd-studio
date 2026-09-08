@@ -1,5 +1,12 @@
 # Task 7 Report: Final Qualification and Independent Review
 
+> Superseded by the subsequent whole-branch review and
+> [Task 7 remediation report](task-7-remediation-report.md). That review found
+> 14 additional Important findings and one Minor finding. All were fixed
+> test-first at `622bced74b871cb706d410bac89bab02afe22573`; fresh gates pass
+> 3,863 renderer, 213 main, and 135 real-Electron tests. The historical outcome
+> below describes the earlier checkpoint, not the current independent review.
+
 ## Outcome
 
 **PASS, unreleased.** Task 7 reviewed the complete branch, fixed one newly

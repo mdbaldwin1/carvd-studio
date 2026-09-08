@@ -2,14 +2,16 @@
 
 ## Release qualification
 
-**PASS — Task 7 final qualification is complete for this unreleased candidate.**
+**Remediation gates PASS — unreleased; independent re-review is the next checkpoint.**
 
-Final review and remediation are complete at
-`bd62e061d46180232d278deb8f8695fa6c12e3c0`. Task 7 found and fixed one
-additional production P0: the final Part Cuts save and Cut List boundaries
-revalidated rectangular cuts but skipped circular and rounded cuts. The full
-post-fix desktop gate passed: 3,791 renderer tests, 213 main-process tests, and
-135 real-Electron tests.
+The subsequent whole-branch review identified 14 Important findings and one
+Minor finding beyond the earlier Task 7 checkpoint. All 15 now have failing-first
+regressions and root-cause fixes at
+`622bced74b871cb706d410bac89bab02afe22573`. The fresh aggregate desktop gate
+passed **3,863 renderer tests, 213 main-process tests, and all 135 real-Electron
+tests**. No requested finding is deferred. See the complete finding-to-test,
+implementation, RED/GREEN, and gate mapping in
+[Task 7 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-report.md).
 
 P0 means any crash, lost/corrupted feature, wrong face or removal direction, false
 valid/invalid geometry, copy/undo/save corruption, valid joinery blocked by
@@ -27,7 +29,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | ------------------------------- | ------------------------------------------------------------------- |
 | Qualification date              | 2026-09-08, America/New_York                                        |
 | Starting Task 7 commit          | `6b9898897c14089d72291c3874211e97328f6b87`                          |
-| Qualified code candidate        | `bd62e061d46180232d278deb8f8695fa6c12e3c0`                          |
+| Qualified code candidate        | `622bced74b871cb706d410bac89bab02afe22573`                          |
 | Comparison base                 | `origin/develop` at `459b6a5177b9`; local `develop` was stale       |
 | OS                              | macOS 26.6.2, build 25G83                                           |
 | Architecture                    | arm64                                                               |
@@ -35,7 +37,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | Desktop / Electron / Playwright | 1.3.0 / 41.1.1 / 1.59.1                                             |
 | Electron viewport               | 1400 × 900                                                          |
 | Candidate static verification   | desktop lint/typecheck/build exit 0; Prettier and diff checks clean |
-| Candidate runtime verification  | 3,791 renderer + 213 main + 135 real-Electron tests passed          |
+| Candidate runtime verification  | 3,863 renderer + 213 main + 135 real-Electron tests passed          |
 
 The requested `/tmp/carvd-manual-qa-matrix.md` was absent at Task 6 start and
 again at review remediation time. The checked-in task briefs, master plan,
@@ -59,12 +61,25 @@ re-ran every configured desktop gate.
   generated-output, or unrelated Task 1–6 change was found. Historical Beads,
   `.codex`, dependency, website, and version changes all predated Task 1 and were
   not modified by Task 7.
-- QAF-007 was the only new Critical/Important review finding. It was fixed
-  test-first, and no Critical/Important finding remains open or deferred.
+- QAF-007 was the only finding at the initial Task 7 checkpoint. The later
+  whole-branch review added R1–R14 Important and R15 Minor findings. All 15
+  were subsequently reproduced and fixed test-first; no requested finding
+  remains open or deferred. Independent re-review follows remediation.
 - The application version remains 1.3.0. Task 7 did not bump a version, change
   release state, merge, push, open a PR, tag, package, publish, or release.
 
 ## Evidence standard
+
+The whole-branch remediation adds numeric solid-volume and real ray-hit
+regressions (38 in³ for two exterior removals; 34 in³ for intersecting interior
+removals; 39.75 in³ for the imported blind corner), all-six-face reflected grid
+and bore-axis checks, assembly-local identity/legacy recovery, exact-size dowel
+fit with explicit end clearance, and full precision/placement output. Expected
+fabrication lines in the existing Electron lifecycle and hands-on tests now
+include physical reference edges and coordinates. Both PDF variants are tested
+with two separately identified 35-operation parts and their continuation pages
+were rendered and visually inspected. The remediation report records each
+original failure, file mapping, final gate, and the scope/security audit.
 
 - Playwright drives the built Electron app, real accessible controls, native file
   dialogs, canvas pointer gestures, keyboard shortcuts, and visible Cut List UI.
