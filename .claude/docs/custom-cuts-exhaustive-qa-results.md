@@ -5,12 +5,13 @@
 **PASS — Task 6 qualification is complete for this candidate.**
 
 Review-driven remediation is complete at
-`753d7d9c675ff00f61ac5890e7de7d797023e6a6`. Four production P0s found or
+`15c7034d90a7bcaaf1bc908f0872e0164db5f79c`. Five production P0s found or
 confirmed by Task 6 are fixed: right-end long-point output, right-end long-point
-geometry, patterned recess details, and cutout/notch termination details. The
-expanded qualification contains literal independent oracles for every operation,
-and the recovered host completed the full desktop gate: 3,766 renderer tests,
-213 main-process tests, and 134 real-Electron tests all passed.
+geometry, layered compound bevel geometry, patterned recess details, and
+cutout/notch termination details. The expanded qualification contains literal
+independent oracles for every operation, and the recovered host completed the
+full desktop gate: 3,788 renderer tests, 213 main-process tests, and 135
+real-Electron tests all passed.
 
 P0 means any crash, lost/corrupted feature, wrong face or removal direction, false
 valid/invalid geometry, copy/undo/save corruption, valid joinery blocked by
@@ -29,14 +30,14 @@ collision handling, or fabrication output that could cause a bad cut.
 | Qualification date               | 2026-09-08, America/New_York                                        |
 | Starting Task 6 commit           | `e33717b` (`fix: harden paired dowel lifecycle`)                    |
 | Last fully green Task 6 baseline | `c472a72912a63ce3ead371602c4558f15ef53e7a`; 133/133 Electron tests  |
-| Current candidate                | `753d7d9c675ff00f61ac5890e7de7d797023e6a6`                          |
+| Current candidate                | `15c7034d90a7bcaaf1bc908f0872e0164db5f79c`                          |
 | OS                               | macOS 26.6.2, build 25G83                                           |
 | Architecture                     | arm64                                                               |
 | Node / npm                       | v23.10.0 / 10.9.2                                                   |
 | Desktop / Electron / Playwright  | 1.3.0 / 41.1.1 / 1.59.1                                             |
 | Electron viewport                | 1400 × 900                                                          |
 | Candidate static verification    | desktop lint/typecheck/build exit 0; Prettier and diff checks clean |
-| Candidate runtime verification   | 3,766 renderer + 213 main + 134 real-Electron tests passed          |
+| Candidate runtime verification   | 3,788 renderer + 213 main + 135 real-Electron tests passed          |
 
 The requested `/tmp/carvd-manual-qa-matrix.md` was absent at Task 6 start and
 again at review remediation time. The checked-in Task 6 brief, master plan,
@@ -179,7 +180,7 @@ The strengthened oracle:
   the 19/20 reorder;
 - excludes the temporary duplicate.
 
-Candidate result: **passed in the final 134/134 Electron run**.
+Candidate result: **passed in the final 135/135 Electron run**.
 
 ## Failure and disposition ledger
 
@@ -271,6 +272,45 @@ Candidate result: **passed in the final 134/134 Electron run**.
   focused geometry/end-cut/snap/overlap passed 260/260; summary/Cut List/preview
   passed 98/98; the final full desktop gate passed.
 - Commit: `753d7d9`.
+
+### QAF-006 — layered compound cuts lost their vertical bevel (P0, fixed)
+
+- Reproduction: render a 24 × 4 × 1 board with a right-end 45° mitre / 45°
+  bevel compound cut (`horizontalFlip=false`, `verticalFlip=false`) plus any
+  enabled rectangular, circular, or rounded feature, which selects the layered
+  geometry path.
+- Expected: the rendered Front top/bottom endpoints are x=12/11 and the Back
+  endpoints are x=8/7, exactly matching the compound snap/collision hull.
+- Actual before the fix: the rendered Front endpoints were x=12/12 and Back
+  endpoints were x=8/8. The horizontal mitre remained visible, but the vertical
+  bevel was absent; editing `High Point On` in the real Electron preview left its
+  geometry signature unchanged.
+- Root cause: layer extrusion uses `rotateX(-π/2)`, which mirrors contour Z into
+  rendered Z. `applyVerticalEndCuts` passed that rendered Z unchanged to
+  `getEndCutInsetAt`, whose Front/Back interpolation contract is contour-space Z.
+  With a nonzero mitre, its boundary match therefore looked at the opposite edge
+  and did not displace the bevel vertices.
+- Resolution: convert rendered Z back to contour Z once in
+  `applyVerticalEndCuts` and use that coordinate for all left/right base-boundary
+  and vertex-inset calculations.
+- Regression location: 24 literal coordinate cases cover both ends, both
+  horizontal directions, both vertical directions, and rectangular, circular,
+  and rounded secondary families. Every case compares actual mesh top/bottom
+  Front/Back endpoints to hand-derived literals and to the convex snap/collision
+  plane. The real-Electron test
+  `keeps both mitre and bevel changes visible for a compound end layered with a dado`
+  authors both cuts, proves High Point and Long Point edits each change the
+  nondegenerate preview geometry, then native-saves, closes, reopens, and verifies
+  the exact retained controls and geometry.
+- TDD evidence: before production changed, all 24 coordinate rows failed on the
+  missing bevel displacement and the Electron preview retained the exact
+  unchanged signature
+  `72:0:4062615477:-12.0000,-0.5000,-2.0000,12.0000,0.5000,2.0000` after Top →
+  Bottom. After the fix, 24/24 coordinate rows and the Electron scenario passed.
+  Focused geometry/bundle/snap/overlap passed 324/324; the 20-feature stress and
+  new scenario passed 2/2; full renderer, main, and Electron suites passed
+  3,788/3,788, 213/213, and 135/135 respectively.
+- Commit: `15c7034`.
 
 ### QAH-001 — asynchronous import/generate controls (harness only)
 
@@ -366,7 +406,16 @@ worker to respond`; Playwright timed out in `beforeEach` at
 | corrected realistic cabinet-panel scenario                                                             | 1/1 passed in 5.6s                                                     |
 | `npm run lint --workspace=@carvd/desktop`                                                              | exit 0                                                                 |
 | `npm run typecheck --workspace=@carvd/desktop`                                                         | exit 0                                                                 |
-| final `npm test --workspace=@carvd/desktop`                                                            | 3,766/3,766 renderer + 213/213 main + 134/134 Electron passed; exit 0  |
+| round-2 `npm test --workspace=@carvd/desktop`                                                          | 3,766/3,766 renderer + 213/213 main + 134/134 Electron passed; exit 0  |
+| QAF-006 layered compound coordinate table before production change                                     | RED: 24/24 failed on rendered bevel coordinates; hull literals passed  |
+| QAF-006 real-Electron scenario before production change                                                | RED: High Point edit left the exact geometry signature unchanged       |
+| QAF-006 layered compound coordinate table after production change                                      | GREEN: 24/24 passed                                                    |
+| focused `endCutUtils` + geometry + box bundle + snap + overlap Vitest                                  | 324/324 passed                                                         |
+| focused layered compound + 20-feature stress real Electron                                             | 2/2 passed in 5.1s                                                     |
+| round-3 full renderer Vitest                                                                           | 3,788/3,788 passed                                                     |
+| round-3 full main-process Vitest                                                                       | 213/213 passed                                                         |
+| round-3 full real-Electron Playwright                                                                  | 135/135 passed in 2.3m                                                 |
+| round-3 desktop lint / typecheck / build                                                               | all exited 0                                                           |
 | direct Prettier on changed production/test/CHANGELOG files; pre-commit staged-file checks; diff checks | exit 0                                                                 |
 
 ## Commits
@@ -381,8 +430,9 @@ worker to respond`; Playwright timed out in `beforeEach` at
 | `92d0f04` | Add cutout/notch through or blind-depth instructions                                                  |
 | `5e45484` | Add native per-operation output/persistence, strict stress, and realistic cabinet-panel qualification |
 | `753d7d9` | Align actual right-end long-point geometry and collision contours with editor/output semantics        |
+| `15c7034` | Preserve both compound-cut mitre and bevel geometry on boards with other cuts                         |
 
-`CHANGELOG.md` records all four user-visible production corrections.
+`CHANGELOG.md` records all five user-visible production corrections.
 
 ## Residual ruling
 
