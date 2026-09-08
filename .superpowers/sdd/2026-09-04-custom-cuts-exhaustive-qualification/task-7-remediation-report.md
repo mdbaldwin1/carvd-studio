@@ -7,8 +7,10 @@ Date: 2026-09-08. Worktree: `.worktrees/custom-cuts-release`; branch:
 that the initial review had found every Important issue. The subsequent
 whole-branch review identified 14 Important findings and one Minor finding.
 All were reproduced with failing-first regressions and root-cause fixes.
-All final gates pass at code commit `622bced74b871cb706d410bac89bab02afe22573`.
-Independent re-review remains the next checkpoint, not a release action.
+The first-round gates passed at code commit
+`622bced74b871cb706d410bac89bab02afe22573`. Independent re-review then identified
+four further Important issues. The scoped follow-up below records their fixes
+and supersedes the first-round candidate's qualification; no release is implied.
 
 No release, merge, push, PR modification, tag, version bump, packaging,
 signing, notarization, or distribution action is authorized or performed.
@@ -128,3 +130,126 @@ not self-embedded.
   warnings; no unrelated dependency upgrade or audit-fix was attempted.
 - Temporary test logs and diagnostic PDFs are local under
   `/tmp/carvd-review-remediation.CZihMw`, not tracked or distributed.
+
+## Scoped re-review follow-up (2026-09-08)
+
+The independent re-review of the first remediation found four further Important
+issues. This section supersedes the earlier next-checkpoint and no-open-finding
+statements for that candidate. The original evidence above is historical, not
+removed or represented as evidence for the new changes. Follow-up gates: **PASS**
+at code commit `db9dcd7e63b5e2776ade65db5f089b48387e53c8`. All original and scoped
+review findings are addressed; none is deferred. This follow-up used no additional
+reviewer or subagent; the explicit self-audit below is not labeled independent review.
+
+| Finding                                                                          | Independent RED evidence                                                                                                                                                                                                   | Root cause, fix, and focused verification                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A / R9: side-face rectangular mirrors and end bevel/compound orientation         | `followup-a-red.log`: 12 failed, 4 passed, 28 skipped. Front/Back cutout and mortise width reflections produced invalid height/target; all eight end bevel/compound reflections changed physical height.                   | `partFeatureActions.ts` reflects side-face pockets in physical X/Z while preserving Bottom-referenced height. End reflection toggles the end-relative vertical parameter so physical Y is preserved. `customCutsReview.test.ts` checks both side families, faces, mirror axes, and actual recess ray hits; bevel/compound × both ends × both vertical settings use 3×3 physical reflection rays, including literal right-top X=4.4226497308. `followup-a-green.log`: 91/91 across review and action suites.                                                                                                                                                                                       |
+| B / R6: axial recess falsely compared with face-normal stock thickness           | `followup-b-red.log`: both contained 1.5-inch axial counterbore/countersink cases fail. Additional self-audit REDs: two entry-cap rays, two asymmetric/unbounded cone-envelope cases, and one pilot-envelope case.         | `roundCutUtils.ts` measures recess and blind depth along each expanded bore axis, checks full end disks, and validates the union of the true offset cone entry ellipse and pilot ellipse. `partFeatureGeometry.ts` sends tilted Top/Bottom bores through oriented solid subtraction, extends the entire entry cap outside stock, and extends tapered cutters without changing cone angle. Tests use literal recess-floor/cone-wall rays, both sides of the entry tessellation seam, far-face breakout, bounded entry, asymmetric edge breakout, and pilot breakout. Initial six-case GREEN is `followup-b-off-seam.log`; final combined verification below includes the seventh pilot regression. |
+| C / R12–R13: grouped PDF operations lose different dowel lengths/joint structure | `followup-c-red.log`: 3 failures; consolidated `followup-cd-red.log`: 5 failed, 2 skipped. Two otherwise identical holes with 3/8-inch versus 1/2-inch dowels collapsed, dropping the latter length from both actual PDFs. | `cutListInstructions.ts` grouping includes dowel diameter, length, embedment, and a first-encounter joint partition. It excludes UUIDs/mate-part identities, so equivalent copies still group. `pdfFabricationReview.test.ts` checks copied-identity equivalence, one versus two joint structures, and both names plus both literal lengths in actual Cut List and Project Report PDF bytes. `followup-c-green.log`: 3/3 selected pass.                                                                                                                                                                                                                                                           |
+| D / R12: blind edge notch entry face omitted                                     | The two actual-PDF/precise-fabrication cases in `followup-cd-red.log` fail with identical Front Side labels.                                                                                                               | `partFeatureSummary.ts` retains Top/Bottom in blind edge-notch targets and simplifies only through cuts. `pdfFabricationReview.test.ts` checks exact Top-Front/Bottom-Front shop lines and both actual PDFs, then confirms through operations retain the same simplified Front Side wording. `followup-d-green.log`: 2/2 selected pass.                                                                                                                                                                                                                                                                                                                                                           |
+
+The additional B probes did not weaken numerical geometry expectations. A ray
+exactly on the shared tessellation edge missed a triangle in THREE's intersection
+test; moving to Z=±0.00001 inches changes the independently calculated wall height
+by less than 0.000003 inches. Both rays retain five-decimal-place checks against
+the literal cylinder/cone heights 0.4711324865405 and 0.4636730439511. The bore-axis
+rays independently check the 1.5-inch floor and 0.75-inch cone half-depth. A
+separate steep-cone case independently proves why validating only the cone's
+major diameter is insufficient: the cone rim fits but its pilot reaches X=5.05
+on a blank ending at X=5.
+
+### Follow-up gates and self-audit
+
+The combined focused command ran `customCutsReview`, `roundCutUtils`,
+`partFeatureGeometry`, `partFeatureActions`, `pdfFabricationReview`,
+`cutListInstructions`, and `partFeatureSummary` with Vitest's thread pool and one
+worker: **282/282 tests across seven files**, exit 0, in 266.24 seconds
+(`followup-focused.log`). This includes all seven B cases after the pilot-union
+fix and both off-seam entry rays. The independent real-PDF artifact run passes
+**7/7**, exit 0 (`followup-pdf-visual.log`).
+
+Visual QA rendered and inspected all four changed fabrication pages with
+Poppler: Cut List page 1 and Project Report page 2 for both the two-length dowel
+and two-entry-face notch fixtures. Both dowel lengths and both part names are
+separate and readable; both Top-Front and Bottom-Front blind labels are present.
+There is no clipping, overlap, or unreadable text. Cut List exports have one
+page each, Project Reports three pages each. Files and preview PNGs remain in
+the local evidence directory; no diagnostic artifact is tracked.
+
+The first follow-up scope/security scan covers ten changed files (nine
+implementation/design/changelog files plus this report): zero out-of-scope
+paths, secret-signature matches, focused/skipped/todo tests, debugger statements,
+or file-mode changes. Both working-tree and complete-branch whitespace checks
+exit 0. Typecheck and configured desktop Prettier checks exit 0.
+
+| Follow-up command                                                         | Exit | Result                                                                                         |
+| ------------------------------------------------------------------------- | ---: | ---------------------------------------------------------------------------------------------- |
+| `npm run lint --workspace=@carvd/desktop`                                 |    0 | ESLint, zero warnings                                                                          |
+| `npm run typecheck --workspace=@carvd/desktop`                            |    0 | TypeScript clean                                                                               |
+| `npm run format:check --workspace=@carvd/desktop`                         |    0 | All configured desktop files pass                                                              |
+| `npm test --workspace=@carvd/desktop` (standard login runtime rerun)      |    0 | **3,891 renderer / 176 files; 213 main / 9 files; 135 Electron in 2.3 minutes**                |
+| `npm run verify:production-analytics-boundary --workspace=@carvd/desktop` |    0 | Clean production build: 465 main, 2 preload, 2,932 renderer modules; no analytics E2E controls |
+| Working/staged and complete-branch `git diff --check`                     |    0 | No whitespace errors                                                                           |
+| Configured staged-file Prettier hook at implementation commit             |    0 | All nine implementation/design/changelog files pass                                            |
+
+Fresh aggregate evidence is `followup-full-tests-verified.log`; renderer duration
+was 29.14 seconds, main 555 ms, with no omitted files or tests. The follow-up adds
+**28 renderer regressions** (23 physical/validation and five grouping/fabrication
+tests). Production evidence is `followup-production-verified.log`. An earlier
+manual analytics-boundary invocation used the monorepo root and found no
+`out/main` there; the configured workspace command above rebuilt and checked the
+correct desktop output successfully. This was a command-directory mistake, not
+a production failure or changed product setting.
+
+Implementation commit: `db9dcd7e63b5e2776ade65db5f089b48387e53c8`
+(`fix: close custom cuts scoped review gaps`): nine files, 403 insertions,
+21 deletions. Evidence is committed separately; its exact hash and post-commit
+clean status are recorded in the handoff rather than self-embedded here.
+
+Final follow-up scope/security audit against the prior evidence commit covers
+**11 tracked files**: the nine code/test/design/changelog files and these two
+qualification documents. It reports zero out-of-scope paths, secret signatures,
+focused/skipped/todo tests, debugger statements, and file-mode changes. The
+ignored local progress ledger is updated but is not introduced as a new tracked
+artifact. No build, PDF, PNG, test result, dependency, version, or distribution
+file is part of either follow-up commit.
+
+The first configured aggregate attempt used the non-login Node 22.23.1/npm
+10.9.8 runtime during substantial host slowdown. It passed 3,708 renderer tests
+in 170 files, but six fork workers timed out before test execution (six pool
+errors, no assertion failures; 436.11 seconds). Therefore main/Electron did not
+run in that attempt. The unmodified configured aggregate was restarted with the
+standard login runtime used by the prior successful qualification. No test
+timeout, assertion, skip, or production setting was changed for the rerun.
+
+Self-audit checklist against all original and follow-up findings:
+
+- R1/R2: preserve complete polygon regions and overlap unions in either order;
+  numeric volume and untouched/removed-point rays remain in the review suite.
+- R3/R4: shared physical Front/Back and reversed Bottom axes; real mesh floor
+  rays and rotated rounded openings remain covered.
+- R5: authored angles are not rescaled; authoring, final save, and Cut List
+  validation remain enforced, with physical reflected end planes added in A.
+- R6/B: pilot/recess entry envelopes, full blind/recess end disks, true axial
+  depths, bounded cone intersections, and physical oriented rendering are tested.
+- R7: combined hole depth accommodates the dowel plus explicit clearance;
+  too-long, exact-fit, and clearance fixtures remain in the suite.
+- R8: assembly capture/place/edit remaps local identities, joint IDs, and mate
+  part IDs; omitted mates detach and legacy loading remains supported.
+- R9/A: actual Actions menu coverage remains; face-family mirrors now also
+  compare physical side-pocket/end-plane geometry, not parameters alone.
+- R10: all four rabbet edges use shared removal bounds for mesh, sockets, and
+  collision cells; four literal socket/floor tests remain.
+- R11: 0.755 and 0.74 retain authored precision; exact fractions remain exact.
+- R12/C/D: every placement/pattern/rotation and individual dowel hole is retained;
+  grouped fabrication preserves dowel dimensions/structure and blind entry face.
+- R13/C: both PDF variants retain identified full operation blocks and long-list
+  continuation pages, now additionally tested with different dowel lengths.
+- R14: imported canonical blind corner notches retain documented Top entry and
+  actual 39.75-cubic-inch stock volume.
+- R15: nested end reference cloning remains independent.
+
+No new dependency, schema/version bump, website, telemetry, licensing, remote
+service, or distribution change is included in the follow-up. The design and
+Unreleased changelog now explain physical mirror height, axial recess depth,
+blind notch entry face, and fabrication-aware grouping.

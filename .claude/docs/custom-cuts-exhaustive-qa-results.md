@@ -2,14 +2,18 @@
 
 ## Release qualification
 
-**Remediation gates PASS — unreleased; independent re-review is the next checkpoint.**
+**Scoped re-review remediation gates PASS — unreleased.**
 
 The subsequent whole-branch review identified 14 Important findings and one
-Minor finding beyond the earlier Task 7 checkpoint. All 15 now have failing-first
-regressions and root-cause fixes at
-`622bced74b871cb706d410bac89bab02afe22573`. The fresh aggregate desktop gate
-passed **3,863 renderer tests, 213 main-process tests, and all 135 real-Electron
-tests**. No requested finding is deferred. See the complete finding-to-test,
+Minor finding beyond the earlier Task 7 checkpoint. After their first remediation,
+the independent scoped re-review found four remaining Important issues in mirrors,
+angled recesses, dowel PDF grouping, and blind-notch entry labels. All original
+and follow-up findings now have failing-first regressions and root-cause fixes at
+`db9dcd7e63b5e2776ade65db5f089b48387e53c8`. The fresh aggregate desktop gate
+passed **3,891 renderer tests, 213 main-process tests, and all 135 real-Electron
+tests**. No requested finding is deferred. The follow-up adds 28 renderer tests,
+and includes an explicit self-audit, not another independent-review claim.
+See the complete finding-to-test,
 implementation, RED/GREEN, and gate mapping in
 [Task 7 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-report.md).
 
@@ -29,7 +33,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | ------------------------------- | ------------------------------------------------------------------- |
 | Qualification date              | 2026-09-08, America/New_York                                        |
 | Starting Task 7 commit          | `6b9898897c14089d72291c3874211e97328f6b87`                          |
-| Qualified code candidate        | `622bced74b871cb706d410bac89bab02afe22573`                          |
+| Qualified code candidate        | `db9dcd7e63b5e2776ade65db5f089b48387e53c8`                          |
 | Comparison base                 | `origin/develop` at `459b6a5177b9`; local `develop` was stale       |
 | OS                              | macOS 26.6.2, build 25G83                                           |
 | Architecture                    | arm64                                                               |
@@ -37,7 +41,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | Desktop / Electron / Playwright | 1.3.0 / 41.1.1 / 1.59.1                                             |
 | Electron viewport               | 1400 × 900                                                          |
 | Candidate static verification   | desktop lint/typecheck/build exit 0; Prettier and diff checks clean |
-| Candidate runtime verification  | 3,863 renderer + 213 main + 135 real-Electron tests passed          |
+| Candidate runtime verification  | 3,891 renderer + 213 main + 135 real-Electron tests passed          |
 
 The requested `/tmp/carvd-manual-qa-matrix.md` was absent at Task 6 start and
 again at review remediation time. The checked-in task briefs, master plan,
@@ -63,8 +67,11 @@ re-ran every configured desktop gate.
   not modified by Task 7.
 - QAF-007 was the only finding at the initial Task 7 checkpoint. The later
   whole-branch review added R1–R14 Important and R15 Minor findings. All 15
-  were subsequently reproduced and fixed test-first; no requested finding
-  remains open or deferred. Independent re-review follows remediation.
+  were subsequently reproduced and fixed test-first. The scoped re-review then
+  found four residual Important issues; all four were fixed test-first at
+  `db9dcd7`, including extended bore-envelope probes. No requested finding
+  remains open or deferred. The follow-up explicitly self-audits all R1–R15 and
+  A–D findings; no additional reviewer seat was used.
 - The application version remains 1.3.0. Task 7 did not bump a version, change
   release state, merge, push, open a PR, tag, package, publish, or release.
 
@@ -80,6 +87,22 @@ include physical reference edges and coordinates. Both PDF variants are tested
 with two separately identified 35-operation parts and their continuation pages
 were rendered and visually inspected. The remediation report records each
 original failure, file mapping, final gate, and the scope/security audit.
+
+The scoped follow-up additionally checks literal reflected side-pocket/end-plane
+coordinates, axial recess floor and cone-wall ray hits, complete pilot/cone entry
+envelopes, physical dowel grouping without UUID dependence, and exact blind-notch
+entry-face text. All four changed fabrication pages (Cut List page 1 and Project
+Report page 2 for dowels/notches) were rendered and inspected: separate 3/8-inch
+and 1/2-inch dowel instructions, distinct Top-Front/Bottom-Front blind notches,
+readable complete text, and no clipping or overlap.
+
+Follow-up focused gate: 282/282 tests across seven suites. The first aggregate
+attempt during host slowdown passed 3,708 tests but had six worker-startup
+timeouts; no assertion failed. The unchanged configured aggregate rerun on the
+standard login runtime passed 3,891 renderer, 213 main, and all 135 Electron
+tests (2.3 minutes). Desktop lint/typecheck/configured formatting and clean
+production build/analytics-boundary verification pass. No timeout, skip, or
+assertion was weakened to recover the run.
 
 - Playwright drives the built Electron app, real accessible controls, native file
   dialogs, canvas pointer gestures, keyboard shortcuts, and visible Cut List UI.
