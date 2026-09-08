@@ -42,8 +42,9 @@ const EDGE_NOTCH_SIDE_DISPLAY: Record<string, string> = {
 export function getFeatureTargetLabel(feature: PartFeature): string {
   if (feature.target.type === 'face') return FACE_LABELS[feature.target.face];
   if (feature.target.type === 'edge') {
-    // Edge notches show simplified side labels
-    if (feature.kind === 'rect_cut' && feature.cutType === 'edge_notch') {
+    // A through notch has no distinct entry face; blind notches must preserve
+    // Top/Bottom so fabrication identifies the face to machine.
+    if (feature.kind === 'rect_cut' && feature.cutType === 'edge_notch' && feature.parameters.depthMode === 'through') {
       const edge = feature.target.edge;
       const side = edge.includes('front')
         ? 'front'

@@ -269,9 +269,7 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
       : feature.cutType === 'counterbore'
         ? feature.parameters.counterbore!.depth
         : 0;
-  const recessAvailable = distanceToExit(frame.origin, frame.inwardNormal, part);
-  if (!Number.isFinite(recessDepth) || recessDepth >= recessAvailable - 1e-9)
-    return 'Recess depth exceeds the available material.';
+  if (!Number.isFinite(recessDepth)) return 'Recess depth must be finite.';
   if (feature.parameters.depthMode === 'blind' && recessDepth > Number(feature.parameters.depth) + 1e-9)
     return 'Recess depth cannot exceed the blind-hole depth.';
   const profileDiameter =
@@ -291,17 +289,36 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
     const primary = delta.x * frame.primaryAxis.x + delta.y * frame.primaryAxis.y + delta.z * frame.primaryAxis.z;
     const secondary =
       delta.x * frame.secondaryAxis.x + delta.y * frame.secondaryAxis.y + delta.z * frame.secondaryAxis.z;
-    // The entry intersection is an ellipse, not the perpendicular cutter disk.
-    const tangent = Math.tan(degrees(feature.parameters.tilt));
+    // Intersect the cylinder/cone with the entry plane. A tilted cone's
+    // ellipse is offset from the authored axis point, unlike a cylinder's.
+    const tilt = degrees(feature.parameters.tilt);
+    const sine = Math.sin(tilt);
+    const cosine = Math.cos(tilt);
+    const taper =
+      feature.cutType === 'countersink' ? Math.tan(degrees(feature.parameters.countersink!.includedAngle) / 2) : 0;
+    const ellipseDenominator = cosine * cosine - taper * taper * sine * sine;
+    if (ellipseDenominator <= 1e-12)
+      return 'Countersink tilt and angle must form a bounded entry on the selected face.';
+    const centerShift = (-radius * taper * sine) / ellipseDenominator;
+    const alongRadius = (radius * cosine) / ellipseDenominator;
+    const acrossRadius = (radius * cosine) / Math.sqrt(ellipseDenominator);
     const direction = degrees(feature.parameters.direction);
-    const primaryRadius = radius * Math.hypot(1, tangent * Math.cos(direction));
-    const secondaryRadius = radius * Math.hypot(1, tangent * Math.sin(direction));
+    const primaryRadius = Math.hypot(alongRadius * Math.cos(direction), acrossRadius * Math.sin(direction));
+    const secondaryRadius = Math.hypot(alongRadius * Math.sin(direction), acrossRadius * Math.cos(direction));
+    // At steep tilts the asymmetric cone can expose less of its forward rim
+    // than the through pilot. Validate the union, not just the larger diameter.
+    const pilotRadius = feature.parameters.diameter / 2;
+    const pilotPrimaryRadius = pilotRadius * Math.hypot(Math.cos(direction) / cosine, Math.sin(direction));
+    const pilotSecondaryRadius = pilotRadius * Math.hypot(Math.sin(direction) / cosine, Math.cos(direction));
     if (
-      Math.abs(primary) + primaryRadius > frame.primarySize / 2 + 1e-9 ||
-      Math.abs(secondary) + secondaryRadius > frame.secondarySize / 2 + 1e-9
+      Math.abs(primary + centerShift * Math.cos(direction)) + primaryRadius > frame.primarySize / 2 + 1e-9 ||
+      Math.abs(secondary + centerShift * Math.sin(direction)) + secondaryRadius > frame.secondarySize / 2 + 1e-9 ||
+      Math.abs(primary) + pilotPrimaryRadius > frame.primarySize / 2 + 1e-9 ||
+      Math.abs(secondary) + pilotSecondaryRadius > frame.secondarySize / 2 + 1e-9
     )
       return 'Hole profile extends beyond the selected face.';
     const available = distanceToExit(member.entryPoint, member.axis, part);
+    if (recessDepth > 0 && recessDepth >= available - 1e-9) return 'Recess depth exceeds the available material.';
     if (feature.parameters.depthMode === 'blind' && Number(feature.parameters.depth) >= available - 1e-9)
       return 'Blind-hole depth exceeds the available material.';
     const ends = [

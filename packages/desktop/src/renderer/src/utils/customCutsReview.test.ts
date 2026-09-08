@@ -11,6 +11,8 @@ import { validatePartsForCutList } from '../store/projectStore';
 import { createDowelJoint, getDowelVisualizations, validateDowelRelationships } from './dowelJointUtils';
 import { getFeatureSummary } from './partFeatureSummary';
 import { getInstructionFabricationLines } from './cutListInstructions';
+import { mirrorFeature } from './partFeatureActions';
+import { validateRectCutFeature } from './rectCutUtils';
 
 vi.unmock('three');
 
@@ -76,6 +78,159 @@ function volume(part: ReturnType<typeof blank>): number {
 
 describe('whole-branch custom cut regression findings', () => {
   afterEach(clearPartGeometryCache);
+
+  it('B checks the pilot entry as well as the asymmetric countersink opening', () => {
+    const cut = circular();
+    cut.cutType = 'countersink';
+    cut.placement.primary = 4.8;
+    cut.parameters = {
+      diameter: 0.25,
+      depthMode: 'through',
+      tilt: 60,
+      direction: 0,
+      countersink: { majorDiameter: 0.252, includedAngle: (2 * Math.atan(0.5) * 180) / Math.PI }
+    };
+    // The cone's forward rim is inside x=5, but the pilot ellipse reaches x=5.05.
+    expect(validateCircularCut(cut, blank())).toMatch(/profile extends beyond/);
+  });
+
+  it('B rejects the asymmetric countersink entry envelope near the stock edge', () => {
+    const cut = circular();
+    cut.cutType = 'countersink';
+    cut.placement.primary = -4.74;
+    cut.parameters = {
+      diameter: 0.125,
+      depthMode: 'through',
+      tilt: 60,
+      direction: 0,
+      countersink: { majorDiameter: 0.25, includedAngle: (2 * Math.atan(0.0625 / 1.5) * 180) / Math.PI }
+    };
+    expect(validateCircularCut(cut, blank())).toMatch(/profile extends beyond/);
+  });
+  it('B rejects a countersink whose cone cannot form a bounded entry on the selected face', () => {
+    const cut = circular();
+    cut.cutType = 'countersink';
+    cut.parameters = {
+      diameter: 0.125,
+      depthMode: 'through',
+      tilt: 60,
+      direction: 0,
+      countersink: { majorDiameter: 0.25, includedAngle: 90 }
+    };
+    expect(validateCircularCut(cut, blank())).toMatch(/bounded entry/);
+  });
+
+  it.each([
+    ['counterbore', 0.4711324865405],
+    ['countersink', 0.4636730439511]
+  ] as const)('B opens the complete tilted %s entry profile without an internal cutter cap', (cutType, expectedY) => {
+    const cut = circular();
+    cut.cutType = cutType;
+    cut.parameters = {
+      diameter: 0.125,
+      depthMode: 'through',
+      tilt: 60,
+      direction: 0,
+      ...(cutType === 'counterbore'
+        ? { counterbore: { diameter: 0.25, depth: 1.5 } }
+        : { countersink: { majorDiameter: 0.25, includedAngle: (2 * Math.atan(0.0625 / 1.5) * 180) / Math.PI } })
+    };
+    // Offset from the shared cylinder tessellation edge; the analytic wall
+    // height changes by less than 0.000003 inches at this offset.
+    for (const z of [-0.00001, 0.00001]) {
+      expect(firstHit({ ...blank(), features: [cut] }, [-0.2, 2, z], [0, -1, 0])?.y).toBeCloseTo(expectedY, 5);
+    }
+  });
+
+  it.each(['counterbore', 'countersink'] as const)(
+    'B accepts a contained 1.5-inch axial %s at 60 degrees and renders its authored profile',
+    (cutType) => {
+      const cut = circular();
+      cut.cutType = cutType;
+      cut.parameters = {
+        diameter: 0.125,
+        depthMode: 'through',
+        tilt: 60,
+        direction: 0,
+        ...(cutType === 'counterbore'
+          ? { counterbore: { diameter: 0.25, depth: 1.5 } }
+          : { countersink: { majorDiameter: 0.25, includedAngle: (2 * Math.atan(0.0625 / 1.5) * 180) / Math.PI } })
+      };
+      expect.soft(validateCircularCut(cut, blank())).toBeNull();
+      // A ray parallel to the bore, outside the pilot radius, hits either the
+      // flat recess floor (1.5 axial inches) or the cone's half-depth (.75).
+      const depth = cutType === 'counterbore' ? 1.5 : 0.75;
+      const z = cutType === 'counterbore' ? 0.1 : 0.09375;
+      const hit = firstHit({ ...blank(), features: [cut] }, [-0.866025403784, 1, z], [0.866025403784, -0.5, 0]);
+      expect.soft(hit?.x).toBeCloseTo(depth * 0.866025403784, 5);
+      expect.soft(hit?.y).toBeCloseTo(0.5 - depth * 0.5, 5);
+      // Increasing the same axial recess to 1.9 inches breaks the far-face
+      // radial envelope even though the centerline has not exited the stock.
+      if (cutType === 'counterbore') cut.parameters.counterbore!.depth = 1.9;
+      else cut.parameters.countersink!.includedAngle = (2 * Math.atan(0.0625 / 1.9) * 180) / Math.PI;
+      expect(validateCircularCut(cut, blank())).toMatch(/available material/);
+    }
+  );
+
+  it.each(
+    (['cutout', 'mortise'] as const).flatMap((cutType) =>
+      (['front_face', 'back_face'] as const).flatMap((face) =>
+        (['across_length', 'across_width'] as const).map((action) => ({ cutType, face, action }))
+      )
+    )
+  )('A reflects side-face $cutType / $face / $action without moving height', ({ cutType, face, action }) => {
+    const cut = rect();
+    cut.cutType = cutType;
+    cut.target = { type: 'face', face };
+    cut.placement = { x: 2, z: 0.25 };
+    cut.parameters = { size: { length: 2, width: 0.5 }, depthMode: 'blind', depth: 0.25 };
+    const mirrored = mirrorFeature(cut, action, blank()) as RectCutFeature;
+    expect.soft(validateRectCutFeature(mirrored, blank())).toBeNull();
+    expect.soft(mirrored.placement.z).toBe(0.25);
+    const targetFace = action === 'across_width' ? (face === 'front_face' ? 'back_face' : 'front_face') : face;
+    expect.soft(mirrored.target).toEqual({ type: 'face', face: targetFace });
+    const zSign = targetFace === 'front_face' ? 1 : -1;
+    const x = action === 'across_length' ? 2 : -2;
+    expect(firstHit({ ...blank(), features: [mirrored] }, [x, 0, 3 * zSign], [0, 0, -zSign])?.z).toBeCloseTo(
+      1.75 * zSign,
+      5
+    );
+  });
+
+  it.each(
+    (['bevel', 'compound'] as const).flatMap((cutType) =>
+      (['left_end', 'right_end'] as const).flatMap((face) =>
+        [false, true].map((verticalFlip) => ({ cutType, face, verticalFlip }))
+      )
+    )
+  )('A physically reflects $cutType on $face (verticalFlip=$verticalFlip)', ({ cutType, face, verticalFlip }) => {
+    const cut: EndCutFeature = {
+      id: 'end-reflection',
+      kind: 'end_cut',
+      version: 1,
+      enabled: true,
+      target: { type: 'face', face },
+      reference: { primaryFrom: 'min' },
+      cutType,
+      lengthMode: 'long_point',
+      parameters: { horizontalAngle: cutType === 'compound' ? 20 : 0, verticalAngle: 30, verticalFlip }
+    };
+    const mirrored = mirrorFeature(cut, 'opposite_end', blank()) as EndCutFeature;
+    const sourceSign = face === 'left_end' ? -1 : 1;
+    for (const y of [-0.49, 0, 0.49])
+      for (const z of [-1.5, 0, 1.5]) {
+        const sourcePoint = firstHit({ ...blank(), features: [cut] }, [6 * sourceSign, y, z], [-sourceSign, 0, 0]);
+        const targetPoint = firstHit({ ...blank(), features: [mirrored] }, [-6 * sourceSign, y, z], [sourceSign, 0, 0]);
+        expect.soft(sourcePoint).toBeDefined();
+        expect.soft(targetPoint?.x).toBeCloseTo(-sourcePoint!.x, 5);
+      }
+    if (cutType === 'bevel' && face === 'left_end' && !verticalFlip) {
+      expect
+        .soft(firstHit({ ...blank(), features: [mirrored] }, [6, 0.5, 0], [-1, 0, 0])?.x)
+        .toBeCloseTo(4.4226497308, 5);
+      expect(getFeatureSummary(mirrored, 'imperial')).toContain('High point on Bottom');
+    }
+  });
 
   it.each([
     [0.755, '0.755"'],

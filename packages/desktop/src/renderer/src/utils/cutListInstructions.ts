@@ -16,7 +16,7 @@ export interface GroupedCutInstruction {
   items: CutInstruction[];
 }
 
-function getFeatureGroupingKey(feature: PartFeature): string {
+function getFeatureGroupingKey(feature: PartFeature, jointGroups: Map<string, number>): string {
   if (feature.kind === 'end_cut') {
     return JSON.stringify({
       kind: feature.kind,
@@ -32,6 +32,8 @@ function getFeatureGroupingKey(feature: PartFeature): string {
     });
   }
 
+  const dowel = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
+  if (dowel?.jointId && !jointGroups.has(dowel.jointId)) jointGroups.set(dowel.jointId, jointGroups.size);
   return JSON.stringify({
     kind: feature.kind,
     enabled: feature.enabled,
@@ -41,7 +43,17 @@ function getFeatureGroupingKey(feature: PartFeature): string {
     cutType: feature.cutType,
     parameters: feature.parameters,
     placement: feature.placement,
-    pattern: feature.kind === 'circular_cut' ? feature.pattern : undefined
+    pattern: feature.kind === 'circular_cut' ? feature.pattern : undefined,
+    // Joint partition and physical dimensions affect shop instructions; copied
+    // UUIDs and mate part identities do not affect fabrication equivalence.
+    dowelJoint: dowel?.jointId
+      ? {
+          group: jointGroups.get(dowel.jointId),
+          dowelDiameter: dowel.dowelDiameter,
+          dowelLength: dowel.dowelLength,
+          embedmentDepth: dowel.embedmentDepth
+        }
+      : undefined
   });
 }
 
@@ -88,7 +100,10 @@ export function groupCutInstructions(instructions: CutInstruction[]): GroupedCut
   const groups = new Map<string, GroupedCutInstruction>();
 
   for (const inst of instructions) {
-    const featureKey = getInstructionEnabledFeatures(inst).map(getFeatureGroupingKey).join('|');
+    const jointGroups = new Map<string, number>();
+    const featureKey = getInstructionEnabledFeatures(inst)
+      .map((feature) => getFeatureGroupingKey(feature, jointGroups))
+      .join('|');
     const noteKey = inst.notes?.trim() ?? '';
     const key = `${inst.cutLength}-${inst.cutWidth}-${inst.thickness}-${inst.stockId}-${inst.grainSensitive}-${inst.isGlueUp}-${featureKey}-${noteKey}`;
 

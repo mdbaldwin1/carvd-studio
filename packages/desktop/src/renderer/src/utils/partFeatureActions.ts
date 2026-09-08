@@ -1,6 +1,6 @@
 import { CornerTarget, EdgeTarget, FaceTarget, PartFeature } from '@renderer/types';
 import { clonePartFeature } from '@renderer/utils/partFeatures';
-import { getResolvedRectCutFeature } from '@renderer/utils/rectCutUtils';
+import { getResolvedRectCutFeature, isSideFaceTarget } from '@renderer/utils/rectCutUtils';
 import { getFaceFrame } from '@renderer/utils/roundCutUtils';
 
 export type MirrorAction = 'opposite_end' | 'across_length' | 'across_width';
@@ -150,6 +150,11 @@ export function mirrorFeature(
       ...mirrored.reference,
       primaryFrom: feature.target.face === 'left_end' ? 'max' : 'min'
     };
+    // End faces use opposite vertical parameter conventions. An X reflection
+    // preserves physical height, so the parameter flip must change with the end.
+    if (feature.parameters.verticalAngle) {
+      mirrored.parameters.verticalFlip = !(feature.parameters.verticalFlip ?? false);
+    }
     return mirrored;
   }
 
@@ -225,6 +230,22 @@ export function mirrorFeature(
   }
 
   const resolved = getResolvedRectCutFeature(feature, part);
+  if (isSideFaceTarget(resolved)) {
+    const face = resolved.target.type === 'face' ? resolved.target.face : 'front_face';
+    mirrored.target = {
+      type: 'face',
+      face: action === 'across_width' ? (face === 'front_face' ? 'back_face' : 'front_face') : face
+    };
+    // Side-pocket z is height from Bottom, not distance across the board width.
+    mirrored.placement = {
+      x:
+        action === 'across_length'
+          ? part.length - resolved.placement.x - resolved.parameters.size.length
+          : resolved.placement.x,
+      z: resolved.placement.z
+    };
+    return mirrored;
+  }
   const alongLength =
     feature.target.type === 'edge' && (feature.target.edge.includes('front') || feature.target.edge.includes('back'));
   const mirroredX =

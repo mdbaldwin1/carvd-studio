@@ -178,6 +178,8 @@ Assembly capture and edit-save persist optional assembly-local part identities. 
 
 The shared face frame uses Front at positive local Z and Back at negative local Z. Bottom secondary coordinates run toward negative Z, including rounded-opening rotations. Legacy canonical corner targets have no vertical selector: blind corner notches enter from Top Face. Fabrication instructions state the physical reference edges, preserve authored numeric precision, and list individual hole coordinates after any consolidated dowel-joint summary.
 
+Blind edge notches retain their Top/Bottom edge identity in fabrication instructions; only through notches use simplified side labels. Mirroring preserves physical coordinates, including side-pocket height and the high point of an end bevel or compound cut. Hole and recess depths are axial drilling distances, not distances along the face normal. Tilted cuts use oriented solid cutters so a counterbore floor is perpendicular to its axis and a countersink retains its included angle. Fabrication grouping compares dowel dimensions and the partition of holes into joints while ignoring instance UUIDs; differing valid dowel lengths must remain distinct in both PDF exports.
+
 ## Geometry architecture
 
 ### Exact representation

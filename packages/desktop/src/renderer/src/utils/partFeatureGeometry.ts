@@ -294,6 +294,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     (feature): feature is CircularCutFeature =>
       feature.kind === 'circular_cut' &&
       feature.target.type === 'face' &&
+      feature.parameters.tilt === 0 &&
       (feature.target.face === 'top_face' || feature.target.face === 'bottom_face')
   );
   const roundedCuts = getEnabledFeatures(part).filter(
@@ -478,8 +479,7 @@ function subtractNonVerticalCircularCuts(baseGeometry: THREE.BufferGeometry, par
     (feature): feature is CircularCutFeature =>
       feature.kind === 'circular_cut' &&
       feature.target.type === 'face' &&
-      feature.target.face !== 'top_face' &&
-      feature.target.face !== 'bottom_face'
+      ((feature.target.face !== 'top_face' && feature.target.face !== 'bottom_face') || feature.parameters.tilt !== 0)
   );
   if (features.length === 0) return baseGeometry;
 
@@ -493,10 +493,20 @@ function subtractNonVerticalCircularCuts(baseGeometry: THREE.BufferGeometry, par
     for (const member of expandCircularCut(feature, part)) {
       const axis = new THREE.Vector3(member.axis.x, member.axis.y, member.axis.z).normalize();
       const subtractCutter = (entryRadius: number, endRadius: number, length: number, startOffset: number): void => {
-        const cutterLength = length + 0.002;
+        if (!(length > 0)) return;
+        const taper = (entryRadius - endRadius) / length;
+        const tilt = (feature.parameters.tilt * Math.PI) / 180;
+        const entryDenominator = Math.cos(tilt) - taper * Math.sin(tilt);
+        if (entryDenominator <= 1e-9) return; // Invalid, unbounded entry; authoring/fabrication validation explains why.
+        // The whole start cap must lie outside the tilted entry face. Extend
+        // along the original cone slope; padding must not change its angle.
+        const start = Math.min(startOffset, (-entryRadius * Math.sin(tilt)) / entryDenominator - 0.002);
+        const end = startOffset + length + 0.002;
+        const cutterLength = end - start;
+        const extendedEntryRadius = endRadius + taper * cutterLength;
         const cutterGeometry = new THREE.CylinderGeometry(
           endRadius,
-          entryRadius,
+          extendedEntryRadius,
           cutterLength,
           Math.min(64, Math.max(16, Math.ceil(Math.max(entryRadius, endRadius) * 24))),
           1,
@@ -506,7 +516,7 @@ function subtractNonVerticalCircularCuts(baseGeometry: THREE.BufferGeometry, par
         cutter.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
         cutter.position
           .set(member.entryPoint.x, member.entryPoint.y, member.entryPoint.z)
-          .addScaledVector(axis, startOffset + cutterLength / 2);
+          .addScaledVector(axis, start + cutterLength / 2);
         cutter.updateMatrixWorld(true);
         const result = evaluator.evaluate(current, cutter, SUBTRACTION) as Brush;
         result.geometry.computeVertexNormals();

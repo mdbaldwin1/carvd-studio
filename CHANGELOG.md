@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Mirrored pocket and bevel orientation** — Mirroring a Front/Back pocket across width now changes its entry face while preserving its height. Opposite-end bevels and compound cuts retain their physical high-point orientation.
+- **Angled recess depth** — Angled counterbores and countersinks use depth along the drilling axis for validation and rendered geometry, allowing deep angled recesses that fit while still blocking cutter-edge breakout.
+- **Dowel and notch fabrication identity** — Cut List grouping and both PDF exports preserve distinct dowel lengths and joint groupings without depending on copied UUIDs. Blind edge-notch instructions identify Top or Bottom entry; through-notch side labels stay simple.
+
 - **Combined custom-cut geometry** — Multiple edge/corner notches, flush cutouts, and overlapping rectangular removals now preserve the stock contour and remove shared regions only once. Imported blind corner notches consistently enter from the top face.
 - **Exact cut faces and physical fit** — Front/Back round holes and Bottom rounded openings now match their handles and named faces; rabbet snapping uses the same edge bounds as the rendered recess. Oversized mitres/bevels and tilted cutters that break out of the blank are rejected without silently changing the requested angle.
 - **Independent joinery copies and mirrors** — Dowel joints now require enough combined drilling depth for the dowel, survive assembly capture/edit/repeated placement with fresh identities, and detach excluded mates. Mirroring preserves operation targets, hole-pattern coordinates, and drilling angles without creating hidden dowel links.
