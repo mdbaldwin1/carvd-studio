@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Round and rounded cut final validation** — Saving Part Cuts and generating a Cut List now revalidate round holes, countersinks, counterbores, and rounded openings after a part resize, preventing out-of-bounds operations from reaching fabrication output.
 - **Layered compound end geometry** — Compound end cuts now retain both their horizontal mitre and vertical bevel in rendered geometry when the same board also has dados, holes, rounded openings, or other cuts, keeping the visible part aligned with snapping and collision contours.
 - **Right-end mitre long-point direction** — Right-end mitre and compound-cut rendered geometry, snapping and collision contours, summaries, Cut Lists, CSV files, and PDF reports now all follow the front or back long point selected in Part Cuts.
 - **Patterned recess fabrication details** — Patterned countersink and counterbore instructions now retain the major diameter and included angle or bore diameter and recess depth instead of reporting only the pilot-hole pattern.

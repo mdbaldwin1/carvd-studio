@@ -6,6 +6,7 @@ import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 import { useProjectStore } from '../store/projectStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useUIStore } from '../store/uiStore';
+import type { PartFeature } from '../types';
 
 const { captureAnalytics } = vi.hoisted(() => ({ captureAnalytics: vi.fn() }));
 vi.mock('../utils/analytics', () => ({ analytics: { capture: captureAnalytics } }));
@@ -167,6 +168,41 @@ describe('usePartCutsEditing', () => {
 
     expect(updatePart).not.toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith(expect.stringContaining('Only one enabled cut per end or edge'), 'error');
+    expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
+  });
+
+  it('blocks saving an invalid circular cut already present in the draft', () => {
+    const updatePart = vi.fn(() => true);
+    const showToast = vi.fn();
+    useProjectStore.setState({ updatePart });
+    useUIStore.setState({ showToast });
+    const { result } = renderHook(() => usePartCutsEditing());
+    const oversizedHole: PartFeature = {
+      id: 'oversized-hole',
+      kind: 'circular_cut',
+      version: 1,
+      enabled: true,
+      label: 'Oversized hole',
+      target: { type: 'face', face: 'top_face' },
+      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      cutType: 'round_hole',
+      parameters: { diameter: 50, depthMode: 'through', tilt: 0, direction: 0 },
+      placement: { primary: 0, secondary: 0, rotation: 0 }
+    };
+
+    act(() => {
+      openPartOne();
+      result.current.setDraftFeatures([oversizedHole]);
+    });
+
+    let saved = true;
+    act(() => {
+      saved = result.current.saveAndExit();
+    });
+
+    expect(saved).toBe(false);
+    expect(updatePart).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith('Resolve "Oversized hole" before saving part cuts', 'error');
     expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
   });
 

@@ -2770,6 +2770,60 @@ describe('validatePartsForCutList', () => {
       expect(issues[0].message).toContain('Bad cutout');
     });
 
+    it.each([
+      {
+        label: 'Oversized hole',
+        expectedMessage: 'Hole profile extends beyond the selected face.',
+        feature: {
+          id: 'oversized-hole',
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          label: 'Oversized hole',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          cutType: 'round_hole',
+          parameters: { diameter: 5, depthMode: 'through', tilt: 0, direction: 0 },
+          placement: { primary: 0, secondary: 0, rotation: 0 }
+        } satisfies PartFeature
+      },
+      {
+        label: 'Oversized rounded opening',
+        expectedMessage: 'Rounded cut extends beyond the selected face.',
+        feature: {
+          id: 'oversized-rounded-opening',
+          kind: 'rounded_cut',
+          version: 1,
+          enabled: true,
+          label: 'Oversized rounded opening',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          cutType: 'rounded_rectangle',
+          parameters: { length: 5, width: 2, cornerRadius: 0.5, depthMode: 'through' },
+          placement: { primary: 0, secondary: 0, rotation: 0 }
+        } satisfies PartFeature
+      }
+    ])('returns an error for an invalid $label loaded from part data', ({ feature, expectedMessage }) => {
+      const stock = createTestStock({ id: 'stock-1', length: 96, width: 48, thickness: 0.75 });
+      const part = createTestPart({
+        name: 'Feature Part',
+        stockId: stock.id,
+        length: 4,
+        width: 4,
+        thickness: 0.75,
+        features: [feature]
+      });
+
+      expect(validatePartsForCutList([part], [stock])).toContainEqual(
+        expect.objectContaining({
+          partId: part.id,
+          type: 'feature_validation',
+          severity: 'error',
+          message: `Operation "${feature.label}" is invalid: ${expectedMessage}`
+        })
+      );
+    });
+
     it('keeps the source intact and identifies the copied cut after a resize makes it no longer fit', () => {
       const store = useProjectStore.getState();
       const stockId = store.addStock({ name: 'Feature stock', length: 96, width: 48, thickness: 0.75 });

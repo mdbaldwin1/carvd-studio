@@ -7,6 +7,7 @@ import { getPartFeatureConflicts } from '../utils/partFeatureConflicts';
 import { clonePartFeatures } from '../utils/partFeatures';
 import { getFeatureTargetLabel } from '../utils/partFeatureSummary';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
+import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
 import { analytics } from '../utils/analytics';
 import { bucketCount } from '../../../shared/analytics';
 
@@ -48,9 +49,16 @@ export function usePartCutsEditing() {
     }
 
     for (const feature of draftFeatures) {
-      if (!feature.enabled || feature.kind !== 'rect_cut') continue;
-      const rectCutIssue = validateRectCutFeature(feature, currentPart);
-      if (!rectCutIssue) continue;
+      if (!feature.enabled) continue;
+      const featureIssue =
+        feature.kind === 'rect_cut'
+          ? validateRectCutFeature(feature, currentPart)
+          : feature.kind === 'circular_cut'
+            ? validateCircularCut(feature, currentPart)
+            : feature.kind === 'rounded_cut'
+              ? validateRoundedCut(feature, currentPart)
+              : null;
+      if (!featureIssue) continue;
       const featureLabel =
         feature.label?.trim() || `${feature.cutType.replace(/_/g, ' ')} on ${getFeatureTargetLabel(feature)}`;
       showToast(`Resolve "${featureLabel}" before saving part cuts`, 'error');

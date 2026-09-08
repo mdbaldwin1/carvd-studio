@@ -36,6 +36,7 @@ import {
   normalizePart
 } from '../utils/partFeatures';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
+import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
 import { getPartFeatureConflicts } from '../utils/partFeatureConflicts';
 import { getFeatureTargetLabel } from '../utils/partFeatureSummary';
 import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
@@ -391,10 +392,16 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
 
     for (const feature of part.features ?? []) {
       if (!feature.enabled) continue;
-      if (feature.kind !== 'rect_cut') continue;
 
-      const rectCutIssue = validateRectCutFeature(feature, part);
-      if (!rectCutIssue) continue;
+      const featureIssue =
+        feature.kind === 'rect_cut'
+          ? validateRectCutFeature(feature, part)
+          : feature.kind === 'circular_cut'
+            ? validateCircularCut(feature, part)
+            : feature.kind === 'rounded_cut'
+              ? validateRoundedCut(feature, part)
+              : null;
+      if (!featureIssue) continue;
 
       const featureLabel =
         feature.label?.trim() || `${feature.cutType.replace(/_/g, ' ')} on ${getFeatureTargetLabel(feature)}`;
@@ -402,7 +409,7 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
         partId: part.id,
         partName: part.name,
         type: 'feature_validation',
-        message: `Operation "${featureLabel}" is invalid: ${rectCutIssue}`,
+        message: `Operation "${featureLabel}" is invalid: ${featureIssue}`,
         severity: 'error'
       });
     }
