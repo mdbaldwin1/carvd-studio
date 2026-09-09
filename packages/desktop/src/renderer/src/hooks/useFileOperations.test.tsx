@@ -11,8 +11,11 @@ vi.mock('../utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 vi.mock('../utils/fileOperations', () => ({
   saveProject: vi.fn(),
   saveProjectAs: vi.fn(),
+  hasPendingProjectSaves: vi.fn().mockReturnValue(false),
+  waitForPendingProjectSaves: vi.fn().mockResolvedValue(undefined),
   openProject: vi.fn(),
   openProjectFromPath: vi.fn(),
+  beginProjectReplacement: vi.fn().mockReturnValue({ request: 1 }),
   newProject: vi.fn(),
   hasUnsavedChanges: vi.fn().mockReturnValue(false),
   updateWindowTitle: vi.fn(),
@@ -38,6 +41,9 @@ import { useFileOperations } from './useFileOperations';
 import {
   saveProject,
   saveProjectAs,
+  beginProjectReplacement,
+  hasPendingProjectSaves,
+  waitForPendingProjectSaves,
   openProject,
   openProjectFromPath,
   newProject,
@@ -88,6 +94,9 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(beginProjectReplacement).mockReturnValue({ request: 1 } as ReturnType<typeof beginProjectReplacement>);
+  vi.mocked(hasPendingProjectSaves).mockReturnValue(false);
+  vi.mocked(waitForPendingProjectSaves).mockResolvedValue(undefined);
   usePartCutsEditingStore.getState().finishEditing();
   onOpenProjectCallback = null;
   onBeforeCloseCallback = null;
@@ -976,7 +985,7 @@ describe('useFileOperations', () => {
         '/old/path/project.carvd',
         '/new/location/project.carvd'
       );
-      expect(openProjectFromPath).toHaveBeenCalledWith('/new/location/project.carvd');
+      expect(openProjectFromPath).toHaveBeenCalledWith('/new/location/project.carvd', { request: 1 });
     });
 
     it('does nothing when dialog is canceled', async () => {

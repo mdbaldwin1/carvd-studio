@@ -4,6 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createTestElectronRuntime, removeTestElectronRuntime, type TestElectronRuntime } from './electron-runtime';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,6 +61,8 @@ export interface RunningElectronApp {
   window: Page;
   userDataDir: string;
   consoleMessages: string[];
+  runtime?: TestElectronRuntime;
+  processHandle?: ReturnType<ElectronApplication['process']>;
 }
 
 export interface LaunchElectronAppOptions {
@@ -139,10 +142,15 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
     args.unshift('--no-sandbox');
   }
 
+  const runtime = createTestElectronRuntime();
+  if (runtime) args.unshift('-r', runtime.loaderPath);
   let electronApp: ElectronApplication | undefined;
+  let processHandle: ReturnType<ElectronApplication['process']> | undefined;
+  const consoleMessages: string[] = [];
   try {
     electronApp = await electron.launch({
       args,
+      ...(runtime ? { executablePath: runtime.executablePath } : {}),
       env: {
         ...process.env,
         NODE_ENV: 'test',
@@ -150,11 +158,15 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
       }
     });
 
+    processHandle = electronApp.process();
+    processHandle.stderr?.on('data', (chunk: Buffer) => {
+      consoleMessages.push(`[main] ${chunk.toString()}`);
+    });
+
     const window = await getMainWindow(electronApp);
     await window.setViewportSize({ width: 1400, height: 900 });
     await waitForAutomationHooks(window);
 
-    const consoleMessages: string[] = [];
     window.on('console', (msg) => {
       const text = `[${msg.type()}] ${msg.text()}`;
       consoleMessages.push(text);
@@ -168,9 +180,17 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
       console.log(`[E2E] ${text}`);
     });
 
-    return { electronApp, window, userDataDir, consoleMessages };
+    return { electronApp, window, userDataDir, consoleMessages, runtime, processHandle };
   } catch (error) {
-    await closeElectronProcess(electronApp);
+    try {
+      await closeElectronProcess(electronApp, processHandle);
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [error, cleanupError],
+        `Electron launch and graceful cleanup failed: ${String(error)}; ${String(cleanupError)}. Recent main output: ${consoleMessages.slice(-20).join('').slice(-8000)}`
+      );
+    }
+    await removeTestElectronRuntime(runtime);
     if (isNewProfile) {
       try {
         await fs.promises.rm(userDataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
@@ -201,45 +221,8 @@ export async function closeElectronApp(
   options: { removeUserData?: boolean } = {}
 ): Promise<void> {
   if (!running) return;
-  let proc: ReturnType<ElectronApplication['process']> | undefined;
-  try {
-    proc = running.electronApp.process();
-  } catch {
-    // A failed launch can leave Playwright's ElectronApplication wrapper unusable.
-  }
-  try {
-    // Teardown is not a user close: bypass dialogs here, not in the production
-    // BrowserWindow close listener, so tests can exercise the real close guard.
-    await running.electronApp.evaluate(({ BrowserWindow }) => {
-      for (const window of BrowserWindow.getAllWindows()) window.destroy();
-    });
-    await Promise.race([
-      running.electronApp.close(),
-      new Promise<void>((_, reject) => setTimeout(() => reject(new Error('close timeout')), 5000))
-    ]);
-  } catch {
-    try {
-      const signal = process.platform === 'win32' ? undefined : 'SIGKILL';
-      proc?.kill(signal);
-    } catch {
-      // Process may already be gone.
-    }
-  }
-  // Wait for the process to fully exit before removing the temp profile —
-  // Chromium releases its file locks (e.g. cache journals on Windows, which
-  // otherwise surface as EBUSY) only after exit, not when close() resolves.
-  if (proc)
-    await new Promise<void>((resolve) => {
-      if (proc.exitCode !== null || proc.signalCode !== null) {
-        resolve();
-        return;
-      }
-      const timer = setTimeout(resolve, 5000);
-      proc.once('exit', () => {
-        clearTimeout(timer);
-        resolve();
-      });
-    });
+  await closeElectronProcess(running.electronApp, running.processHandle);
+  await removeTestElectronRuntime(running.runtime);
   if (options.removeUserData === false) return;
   try {
     await fs.promises.rm(running.userDataDir, {
@@ -254,35 +237,43 @@ export async function closeElectronApp(
   }
 }
 
-async function closeElectronProcess(electronApp: ElectronApplication | undefined): Promise<void> {
+async function closeElectronProcess(
+  electronApp: ElectronApplication | undefined,
+  processHandle?: ReturnType<ElectronApplication['process']>
+): Promise<void> {
   if (!electronApp) return;
-  let proc: ReturnType<ElectronApplication['process']> | undefined;
-  try {
-    proc = electronApp.process();
-  } catch {
-    // The wrapper may be only partially initialized.
-  }
+  // app.quit can dispose Playwright's channel before afterEach. Its original
+  // ChildProcess still owns the authoritative exit status and exit event.
+  const proc = processHandle ?? electronApp.process();
+  if (proc.exitCode !== null || proc.signalCode !== null) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const exited = new Promise<void>((resolve) => proc.once('exit', () => resolve()));
   try {
     await Promise.race([
-      electronApp.close(),
-      new Promise<void>((_, reject) => setTimeout(() => reject(new Error('close timeout')), 5000))
+      (async () => {
+        // Teardown approves discarding this synthetic test session. Leave the
+        // production close/quit behavior intact during the test itself. Normal
+        // app.quit closes windows and lets AppKit finish its termination cycle.
+        await electronApp.evaluate(({ BrowserWindow }) => {
+          for (const window of BrowserWindow.getAllWindows()) window.removeAllListeners('close');
+        });
+        await electronApp.close();
+        await exited;
+      })(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `Test Electron PID ${proc.pid} did not quit gracefully within 30s; process and profile preserved. Stop further launches and investigate; no force-kill performed.`
+              )
+            ),
+          30000
+        );
+      })
     ]);
-  } catch {
-    try {
-      proc?.kill(process.platform === 'win32' ? undefined : 'SIGKILL');
-    } catch {
-      // Process may already be gone.
-    }
-  }
-  if (proc) {
-    await new Promise<void>((resolve) => {
-      if (proc.exitCode !== null || proc.signalCode !== null) return resolve();
-      const timer = setTimeout(resolve, 5000);
-      proc.once('exit', () => {
-        clearTimeout(timer);
-        resolve();
-      });
-    });
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -305,7 +296,21 @@ export async function getMainWindow(electronApp: ElectronApplication): Promise<P
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  throw new Error('Main application window with .app root not found after 90s');
+  const states = await Promise.all(
+    electronApp.windows().map(async (win) => {
+      try {
+        return await win.evaluate(() => ({
+          url: location.href,
+          ready: document.readyState,
+          root: document.getElementById('root')?.innerHTML.slice(0, 2000),
+          app: document.querySelector('.app')?.getBoundingClientRect().toJSON()
+        }));
+      } catch (error) {
+        return { error: String(error) };
+      }
+    })
+  );
+  throw new Error(`Main application window with .app root not found after 90s: ${JSON.stringify(states)}`);
 }
 
 export async function isElementVisible(window: Page, selector: string): Promise<boolean> {

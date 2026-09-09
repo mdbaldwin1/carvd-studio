@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { join, normalize, isAbsolute, dirname } from 'path';
+import { setImmediate } from 'node:timers';
 
 // Enable CDP for automation when explicitly opted in via env. Off in normal dev,
 // so it doesn't keep a debugging port open by default. Set CARVD_REMOTE_DEBUG=1
@@ -276,6 +277,13 @@ const windows: Set<BrowserWindow> = new Set();
 // Track windows that are allowed to close (after user confirmed or chose to discard)
 const windowsAllowedToClose: Set<BrowserWindow> = new Set();
 
+// Electron cancels app.quit() when a close listener prevents the first close.
+// Keep the user's intent until every window approves, or any renderer cancels.
+let quitRequested = false;
+app.on('before-quit', () => {
+  quitRequested = true;
+});
+
 // Splash window reference and timing
 let splashWindow: BrowserWindow | null = null;
 let splashStartTime: number = 0;
@@ -470,6 +478,11 @@ function createWindow(fileToOpen?: string): BrowserWindow {
   newWindow.on('closed', () => {
     windows.delete(newWindow);
     windowsAllowedToClose.delete(newWindow);
+    if (quitRequested && windows.size === 0) {
+      setImmediate(() => {
+        if (quitRequested && windows.size === 0) app.quit();
+      });
+    }
   });
 
   // Open external links in default browser
@@ -552,6 +565,10 @@ ipcMain.handle('read-file', async (_event, filePath: string) => {
   return readFile(filePath, 'utf-8');
 });
 
+// Renderer save queues preserve each document's request order. Serialize the
+// physical boundary too, so independent windows cannot complete old writes
+// after newer writes to the same file (including differently spelled aliases).
+let pendingTextWrite = Promise.resolve();
 ipcMain.handle('write-file', async (_event, filePath: string, data: string) => {
   if (!isPathSafe(filePath)) {
     throw new Error('Invalid file path');
@@ -559,7 +576,9 @@ ipcMain.handle('write-file', async (_event, filePath: string, data: string) => {
   if (typeof data !== 'string') {
     throw new Error('Invalid data type');
   }
-  await writeFile(filePath, data, 'utf-8');
+  const write = pendingTextWrite.then(() => writeFile(filePath, data, 'utf-8'));
+  pendingTextWrite = write.catch(() => undefined);
+  await write;
 });
 
 // Write binary file (for PDFs, images, etc.)
@@ -1185,8 +1204,7 @@ ipcMain.handle('confirm-close', (event) => {
 
 // Window close cancellation - called by renderer to cancel close
 ipcMain.handle('cancel-close', () => {
-  // Nothing to do - just don't close the window
-  // The close was already prevented by event.preventDefault()
+  quitRequested = false;
 });
 
 // Called only after the renderer's unsaved-change guard approves the action.

@@ -11,8 +11,11 @@ import { useUIStore } from '../store/uiStore';
 import {
   saveProject,
   saveProjectAs,
+  hasPendingProjectSaves,
+  waitForPendingProjectSaves,
   openProject,
   openProjectFromPath,
+  beginProjectReplacement,
   newProject,
   hasUnsavedChanges,
   updateWindowTitle,
@@ -207,6 +210,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   const handleRelocateFile = useCallback(
     async (originalPath: string, fileName: string) => {
       if (blockPartCutsReplacement()) return;
+      const transaction = beginProjectReplacement();
       try {
         const result = await window.electronAPI.showOpenDialog({
           title: `Locate "${fileName}"`,
@@ -225,7 +229,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
         await window.electronAPI.updateRecentProjectPath(originalPath, newPath);
 
         // Open the file from the new location
-        const openResult = await openProjectFromPath(newPath);
+        const openResult = await openProjectFromPath(newPath, transaction);
 
         if (handleFileOperationResult(openResult)) {
           return; // Recovery modal will be shown
@@ -285,18 +289,30 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
 
   // Handle window close event from main process
   useEffect(() => {
-    const cleanup = window.electronAPI.onBeforeClose(() => {
+    const cleanup = window.electronAPI.onBeforeClose(async () => {
       if (dialogSavingRef.current) return;
       setDialogSaveError(null);
       // Fraction inputs commit on blur. Read the live session after that commit,
       // not only the project snapshot (Save Cut has not updated the project yet).
       flushFocusedInput();
+      // A clean document may still have an explicitly requested write in
+      // flight. Do not destroy its renderer (or quit the process) mid-save.
+      if (!hasUnsavedChanges() && !hasUnsavedCutChanges() && hasPendingProjectSaves()) {
+        dialogSavingRef.current = true;
+        try {
+          await waitForPendingProjectSaves();
+        } finally {
+          dialogSavingRef.current = false;
+        }
+        flushFocusedInput();
+      }
       if (hasUnsavedChanges() || hasUnsavedCutChanges()) {
         // Show the unsaved changes dialog
         setPendingAction({
           type: 'close',
           execute: async () => {
             // This executes after user chooses "Don't Save"
+            await waitForPendingProjectSaves();
             await window.electronAPI.confirmClose();
           }
         });
@@ -537,8 +553,18 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       }
       flushFocusedInput();
       const execute = async () => {
+        await waitForPendingProjectSaves();
         await window.electronAPI.reloadWindow(ignoreCache);
       };
+      if (!hasUnsavedChanges() && !hasUnsavedCutChanges() && hasPendingProjectSaves()) {
+        dialogSavingRef.current = true;
+        try {
+          await waitForPendingProjectSaves();
+        } finally {
+          dialogSavingRef.current = false;
+        }
+        flushFocusedInput();
+      }
       if (hasUnsavedChanges() || hasUnsavedCutChanges()) {
         setDialogSaveError(null);
         setPendingAction({ type: 'reload', execute });
@@ -566,12 +592,18 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
             ? saveToast.message
             : 'Cannot save this cut. Cancel and correct the highlighted operation.'
         );
+        if (isCloseAction) await window.electronAPI.cancelClose();
         return;
       }
       setDialogSaveError(null);
       const result = await saveProject();
       if (result.success) {
-        if (result.pendingChanges || useProjectStore.getState().isDirty || hasUnsavedCutChanges()) {
+        if (
+          result.documentChanged ||
+          result.pendingChanges ||
+          useProjectStore.getState().isDirty ||
+          hasUnsavedCutChanges()
+        ) {
           setDialogSaveError('New changes were made while saving. Save again to include them.');
           return;
         }
@@ -602,9 +634,20 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
     if (dialogSavingRef.current) return;
     setDialogSaveError(null);
     const pending = pendingAction;
-    setPendingAction(null);
-    if (pending) {
+    if (!pending) return;
+    const drainsWrites = pending.type === 'close' || pending.type === 'reload';
+    if (drainsWrites) {
+      dialogSavingRef.current = true;
+      setIsDialogSaving(true);
+    } else setPendingAction(null);
+    try {
       await pending.execute();
+      setPendingAction(null);
+    } finally {
+      if (drainsWrites) {
+        dialogSavingRef.current = false;
+        setIsDialogSaving(false);
+      }
     }
   }, [pendingAction]);
 

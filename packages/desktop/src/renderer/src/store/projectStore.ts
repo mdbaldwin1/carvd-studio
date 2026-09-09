@@ -58,6 +58,8 @@ export type AddDowelJointInput = Omit<CreateDowelJointInput, 'firstPart' | 'seco
 
 interface ProjectState {
   // Project data
+  // Runtime-only ownership token; excluded from files and undo history.
+  documentGeneration: number;
   projectName: string;
   parts: Part[];
   stocks: Stock[];
@@ -457,6 +459,7 @@ export const useProjectStore = create<ProjectState>()(
   temporal(
     (set, get) => ({
       // Initial state
+      documentGeneration: 0,
       projectName: UNTITLED_PROJECT_NAME,
       parts: [],
       stocks: [],
@@ -1494,6 +1497,7 @@ export const useProjectStore = create<ProjectState>()(
       newProject: (defaults) => {
         const now = new Date().toISOString();
         set({
+          documentGeneration: get().documentGeneration + 1,
           projectName: UNTITLED_PROJECT_NAME,
           parts: [],
           stocks: [],
@@ -1537,6 +1541,7 @@ export const useProjectStore = create<ProjectState>()(
 
       loadProject: (project, filePath) => {
         set({
+          documentGeneration: get().documentGeneration + 1,
           projectName: project.name,
           parts: (project.parts ?? []).map((part) => normalizePart(part)),
           stocks: project.stocks ?? [],

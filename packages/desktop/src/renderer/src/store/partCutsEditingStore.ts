@@ -9,6 +9,7 @@ function featuresEqual(a: PartFeature[], b: PartFeature[]): boolean {
 }
 
 interface PartCutsEditingState {
+  sessionGeneration: number;
   isEditingPartCuts: boolean;
   sourcePartId: string | null;
   sourcePartName: string;
@@ -40,6 +41,7 @@ interface PartCutsEditingState {
 }
 
 export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) => ({
+  sessionGeneration: 0,
   isEditingPartCuts: false,
   sourcePartId: null,
   sourcePartName: '',
@@ -57,6 +59,7 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
   startEditingPartCuts: (partId, partName, features = []) => {
     const draftFeatures = clonePartFeatures(features);
     set({
+      sessionGeneration: get().sessionGeneration + 1,
       isEditingPartCuts: true,
       sourcePartId: partId,
       sourcePartName: partName,
@@ -148,6 +151,7 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
 
   finishEditing: () => {
     set({
+      sessionGeneration: get().sessionGeneration + 1,
       isEditingPartCuts: false,
       sourcePartId: null,
       sourcePartName: '',

@@ -5,6 +5,7 @@
 
 import { useProjectStore, generateThumbnail } from '../store/projectStore';
 import { useCameraStore } from '../store/cameraStore';
+import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 import { ProjectThumbnail } from '../types';
 import {
   serializeProject,
@@ -28,6 +29,7 @@ export interface FileOperationResult {
   error?: string;
   canceled?: boolean;
   pendingChanges?: boolean;
+  documentChanged?: boolean;
   // For corrupted files that can potentially be recovered
   needsRecovery?: boolean;
   validationErrors?: string[];
@@ -39,11 +41,34 @@ export interface FileOperationResult {
  */
 export type ProjectSaveKind = 'initial' | 'manual' | 'auto' | 'save_as';
 
+// Queue the complete save, including thumbnail/dialog work: queuing only the
+// final write would allow an older slow thumbnail to write after a newer save.
+let pendingSave: Promise<void> | null = null;
+function enqueueProjectSave(operation: () => Promise<FileOperationResult>): Promise<FileOperationResult> {
+  const result = pendingSave ? pendingSave.then(operation) : operation();
+  const settled = result.then(
+    () => undefined,
+    () => undefined
+  );
+  pendingSave = settled;
+  void settled.then(() => {
+    if (pendingSave === settled) pendingSave = null;
+  });
+  return result;
+}
+
+export async function waitForPendingProjectSaves(): Promise<void> {
+  while (pendingSave) await pendingSave;
+}
+export function hasPendingProjectSaves(): boolean {
+  return pendingSave !== null;
+}
+
 export async function saveProject(saveKind?: 'manual' | 'auto'): Promise<FileOperationResult> {
   const state = useProjectStore.getState();
 
   if (state.filePath) {
-    return saveToPath(state.filePath, saveKind ?? 'manual');
+    return enqueueProjectSave(() => saveToPath(state.filePath!, saveKind ?? 'manual', state));
   } else {
     return saveProjectAs('initial');
   }
@@ -54,6 +79,15 @@ export async function saveProject(saveKind?: 'manual' | 'auto'): Promise<FileOpe
  */
 export async function saveProjectAs(saveKind: ProjectSaveKind = 'save_as'): Promise<FileOperationResult> {
   const state = useProjectStore.getState();
+  return enqueueProjectSave(() => performSaveAs(saveKind, state));
+}
+
+async function performSaveAs(
+  saveKind: ProjectSaveKind,
+  state: ReturnType<typeof useProjectStore.getState>
+): Promise<FileOperationResult> {
+  const ownsDocument = () => useProjectStore.getState().documentGeneration === state.documentGeneration;
+  if (!ownsDocument()) return { success: false, canceled: true, documentChanged: true };
 
   try {
     const result = await window.electronAPI.showSaveDialog({
@@ -64,25 +98,22 @@ export async function saveProjectAs(saveKind: ProjectSaveKind = 'save_as'): Prom
     if (result.canceled || !result.filePath) {
       return { success: false, canceled: true };
     }
+    if (!ownsDocument()) return { success: false, canceled: true, documentChanged: true };
 
     // Update project name to match the chosen filename
     const newProjectName = getProjectNameFromPath(result.filePath);
     useProjectStore.getState().setProjectName(newProjectName);
 
-    return saveToPath(result.filePath, saveKind);
+    return saveToPath(result.filePath, saveKind, { ...state, projectName: newProjectName });
   } catch (error) {
     return { success: false, error: String(error) };
   }
 }
 
-/**
- * Save to a specific file path
- */
-async function saveToPath(filePath: string, saveKind: ProjectSaveKind): Promise<FileOperationResult> {
-  const state = useProjectStore.getState();
+function captureDocumentFields(state = useProjectStore.getState()) {
   // Store actions replace document fields immutably. Retain the exact revision
   // being serialized, including edits that can happen during thumbnail/file I/O.
-  const snapshot = {
+  return {
     projectName: state.projectName,
     createdAt: state.createdAt,
     modifiedAt: state.modifiedAt,
@@ -101,6 +132,20 @@ async function saveToPath(filePath: string, saveKind: ProjectSaveKind): Promise<
     customShoppingItems: state.customShoppingItems,
     cutList: state.cutList
   };
+}
+
+function documentFieldsMatch(snapshot: ReturnType<typeof captureDocumentFields>): boolean {
+  const current = useProjectStore.getState();
+  return (Object.keys(snapshot) as Array<keyof typeof snapshot>).every((key) => current[key] === snapshot[key]);
+}
+
+/** Save the captured document, never whichever document happens to be open later. */
+async function saveToPath(
+  filePath: string,
+  saveKind: ProjectSaveKind,
+  state = useProjectStore.getState()
+): Promise<FileOperationResult> {
+  const snapshot = captureDocumentFields(state);
 
   try {
     const dowelErrors = validateDowelRelationships(state.parts);
@@ -128,18 +173,19 @@ async function saveToPath(filePath: string, saveKind: ProjectSaveKind): Promise<
     const json = stringifyCarvdFile(fileData);
     await window.electronAPI.writeFile(filePath, json);
 
-    // A successful write only saves its captured revision, not newer edits.
-    useProjectStore.getState().setFilePath(filePath);
-
     // Add to recent projects
     await window.electronAPI.addRecentProject(filePath);
 
     const current = useProjectStore.getState();
-    const pendingChanges = (Object.keys(snapshot) as Array<keyof typeof snapshot>).some(
-      (key) => current[key] !== snapshot[key]
-    );
-    if (pendingChanges) current.markDirty();
-    else current.markClean();
+    // An old document's successful write must not retarget or dirty its
+    // replacement, even if the replacement happens to contain identical data.
+    if (current.documentGeneration !== state.documentGeneration) {
+      return { success: true, filePath, documentChanged: true };
+    }
+    current.setFilePath(filePath);
+    const pendingChanges = !documentFieldsMatch(snapshot);
+    if (pendingChanges && !current.isDirty) current.markDirty();
+    else if (!pendingChanges) current.markClean();
 
     // Update window title
     updateWindowTitle();
@@ -160,7 +206,37 @@ async function saveToPath(filePath: string, saveKind: ProjectSaveKind): Promise<
 /**
  * Open a project file (shows file dialog)
  */
+let replacementRequest = 0;
+export function beginProjectReplacement() {
+  const state = useProjectStore.getState();
+  return {
+    request: ++replacementRequest,
+    generation: state.documentGeneration,
+    filePath: state.filePath,
+    fields: captureDocumentFields(state),
+    cutSession: usePartCutsEditingStore.getState().sessionGeneration
+  };
+}
+function replacementError(transaction: ReturnType<typeof beginProjectReplacement>): string | null {
+  const current = useProjectStore.getState();
+  const cuts = usePartCutsEditingStore.getState();
+  if (cuts.isEditingPartCuts) return 'Save or discard part cuts before changing projects.';
+  if (
+    transaction.request !== replacementRequest ||
+    transaction.generation !== current.documentGeneration ||
+    transaction.filePath !== current.filePath ||
+    transaction.cutSession !== cuts.sessionGeneration ||
+    !documentFieldsMatch(transaction.fields)
+  ) {
+    return 'The project or editing session changed while opening the file. Your current work was kept. Open the file again when ready.';
+  }
+  return null;
+}
+
 export async function openProject(): Promise<FileOperationResult> {
+  const transaction = beginProjectReplacement();
+  const error = replacementError(transaction);
+  if (error) return { success: false, error };
   try {
     const result = await window.electronAPI.showOpenDialog({
       filters: [CARVD_FILE_FILTER],
@@ -171,7 +247,7 @@ export async function openProject(): Promise<FileOperationResult> {
       return { success: false, canceled: true };
     }
 
-    return openProjectFromPath(result.filePaths[0]);
+    return readProjectFromPath(result.filePaths[0], transaction);
   } catch (error) {
     return { success: false, error: String(error) };
   }
@@ -180,11 +256,27 @@ export async function openProject(): Promise<FileOperationResult> {
 /**
  * Open a project from a specific file path
  */
-export async function openProjectFromPath(filePath: string): Promise<FileOperationResult> {
+export async function openProjectFromPath(
+  filePath: string,
+  transaction = beginProjectReplacement()
+): Promise<FileOperationResult> {
+  return readProjectFromPath(filePath, transaction);
+}
+
+async function readProjectFromPath(
+  filePath: string,
+  transaction: ReturnType<typeof beginProjectReplacement>
+): Promise<FileOperationResult> {
+  const error = replacementError(transaction);
+  if (error) return { success: false, error };
   logger.info('[openProjectFromPath] Starting to open:', filePath);
   try {
     logger.info('[openProjectFromPath] Reading file...');
     const content = await window.electronAPI.readFile(filePath);
+    // Validate after the async read, immediately before any parse/recovery/load
+    // side effects. The initial handler check cannot protect this interval.
+    const changed = replacementError(transaction);
+    if (changed) return { success: false, error: changed };
     logger.info('[openProjectFromPath] File read, content length:', content?.length || 0);
 
     logger.info('[openProjectFromPath] Parsing file...');
@@ -251,6 +343,8 @@ export function attemptFileRepair(rawContent: string): FileRepairResult {
  */
 export async function loadRepairedFile(repairedData: CarvdFile, filePath: string): Promise<FileOperationResult> {
   try {
+    const error = replacementError(beginProjectReplacement());
+    if (error) return { success: false, error };
     const project = deserializeToProject(repairedData);
     useProjectStore.getState().loadProject(project, filePath);
 
