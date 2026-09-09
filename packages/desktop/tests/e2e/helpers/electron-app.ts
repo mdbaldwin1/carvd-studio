@@ -417,9 +417,22 @@ export async function createBlankProject(window: Page, name = 'E2E Project'): Pr
 
   if (state === 'start-screen' || startScreenVisible) {
     await expect(window.locator('.blank-template')).toBeVisible({ timeout: 10000 });
-    await window.evaluate(() => {
-      (document.querySelector('.blank-template') as HTMLElement | null)?.click();
-    });
+    // querySelector()?.click() is a silent no-op when React has re-rendered the
+    // tile between the visibility check above and this evaluate, and the loss
+    // only surfaces ten seconds later as a missing dialog. Re-click until the
+    // dialog is actually up, so a slow renderer costs a retry, not the test.
+    await expect
+      .poll(
+        async () => {
+          if (await window.locator('.new-project-dialog').isVisible()) return true;
+          await window.evaluate(() => {
+            (document.querySelector('.blank-template') as HTMLElement | null)?.click();
+          });
+          return window.locator('.new-project-dialog').isVisible();
+        },
+        { timeout: 20000, message: 'blank template click never opened the new project dialog' }
+      )
+      .toBe(true);
   }
 
   await expect(window.locator('.new-project-dialog')).toBeVisible({ timeout: 10000 });
