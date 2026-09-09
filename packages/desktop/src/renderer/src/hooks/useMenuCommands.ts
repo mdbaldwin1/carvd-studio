@@ -30,6 +30,8 @@ interface UseMenuCommandsOptions {
   onOpenProject?: () => Promise<void>;
   onOpenRecentProject?: (filePath: string) => Promise<void>;
   onCloseProject?: () => void;
+  onReload?: (ignoreCache: boolean) => Promise<void>;
+  isFileActionBusy?: () => boolean;
   // Template/assembly editing mode
   isEditingTemplate?: boolean;
   isEditingPartCuts?: boolean;
@@ -48,6 +50,20 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
   useEffect(() => {
     const handleMenuCommand = async (command: string, ...args: unknown[]) => {
       const opts = optionsRef.current;
+      if (
+        opts.isFileActionBusy?.() &&
+        [
+          'new-project',
+          'new-from-template',
+          'open-project',
+          'open-recent',
+          'save-project',
+          'save-project-as',
+          'close-project',
+          'request-reload'
+        ].includes(command)
+      )
+        return;
 
       // Read store state imperatively
       const isEditingAssembly = useAssemblyEditingStore.getState().isEditingAssembly;
@@ -65,13 +81,17 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
             ? 'Finish editing assembly first'
             : opts.isEditingTemplate
               ? 'Finish editing template first'
-              : 'Finish editing part cuts first',
+              : 'Save or discard part cuts before changing projects.',
           'warning'
         );
         return;
       }
 
       switch (command) {
+        case 'request-reload': {
+          if (opts.onReload) await opts.onReload(args[0] === true);
+          break;
+        }
         // File commands
         case 'new-project': {
           // Use handler with unsaved changes dialog if provided

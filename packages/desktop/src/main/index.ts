@@ -1189,6 +1189,14 @@ ipcMain.handle('cancel-close', () => {
   // The close was already prevented by event.preventDefault()
 });
 
+// Called only after the renderer's unsaved-change guard approves the action.
+// Reload directly: dispatching another menu command would recurse into the guard.
+ipcMain.handle('reload-window', (event, ignoreCache: boolean) => {
+  if (typeof ignoreCache !== 'boolean') throw new Error('Invalid reload mode');
+  if (ignoreCache) event.sender.reloadIgnoringCache();
+  else event.sender.reload();
+});
+
 // Print to PDF - uses Electron's native PDF generation
 ipcMain.handle('print-to-pdf', async (event, options: { defaultFileName?: string; landscape?: boolean }) => {
   const win = BrowserWindow.fromWebContents(event.sender);

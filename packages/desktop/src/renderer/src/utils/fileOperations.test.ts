@@ -109,6 +109,22 @@ beforeEach(() => {
 // ============================================================
 
 describe('saveProject', () => {
+  it('M3 does not mark edits made during an older file write clean', async () => {
+    useProjectStore.setState({ filePath: '/tmp/racing.carvd', isDirty: true, projectNotes: 'First snapshot' });
+    let finish!: () => void;
+    vi.mocked(window.electronAPI.writeFile).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    const saving = saveProject();
+    useProjectStore.getState().setProjectNotes('Newer edit');
+    finish();
+    await saving;
+    expect(useProjectStore.getState().isDirty).toBe(true);
+    expect(useProjectStore.getState().projectNotes).toBe('Newer edit');
+  });
   it('delegates to saveProjectAs when no filePath is set', async () => {
     (window.electronAPI.showSaveDialog as ReturnType<typeof vi.fn>).mockResolvedValue({
       canceled: true

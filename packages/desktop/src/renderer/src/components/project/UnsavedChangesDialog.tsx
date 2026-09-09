@@ -13,13 +13,14 @@ import {
   AlertDialogDescription
 } from '@renderer/components/ui/alert-dialog';
 
-export type UnsavedChangesAction = 'new' | 'open' | 'close' | 'home' | 'custom';
+export type UnsavedChangesAction = 'new' | 'open' | 'close' | 'home' | 'reload' | 'custom';
 
 interface UnsavedChangesDialogProps {
   isOpen: boolean;
   action: UnsavedChangesAction;
   customMessage?: string;
   saveError?: string | null;
+  isSaving?: boolean;
   onSave: () => void;
   onDiscard: () => void;
   onCancel: () => void;
@@ -30,6 +31,7 @@ export function UnsavedChangesDialog({
   action,
   customMessage,
   saveError,
+  isSaving = false,
   onSave,
   onDiscard,
   onCancel
@@ -48,6 +50,8 @@ export function UnsavedChangesDialog({
         return `Do you want to save changes to "${projectName}" before closing?`;
       case 'home':
         return `Do you want to save changes to "${projectName}" before returning to the start screen?`;
+      case 'reload':
+        return `Do you want to save changes to "${projectName}" before reloading?`;
       default:
         return `Do you want to save changes to "${projectName}"?`;
     }
@@ -59,6 +63,7 @@ export function UnsavedChangesDialog({
       case 'open':
       case 'close':
       case 'home':
+      case 'reload':
         return "Don't Save";
       default:
         return 'Discard';
@@ -67,7 +72,7 @@ export function UnsavedChangesDialog({
 
   return (
     <AlertDialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
-      <AlertDialogContent className="max-w-[420px]">
+      <AlertDialogContent className="max-w-[420px]" aria-busy={isSaving}>
         <AlertDialogHeader>
           <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
         </AlertDialogHeader>
@@ -77,20 +82,26 @@ export function UnsavedChangesDialog({
           <p className="m-0 text-[13px] text-text-muted">Your changes will be lost if you don&apos;t save them.</p>
           {saveError && (
             <p role="alert" className="mt-3 text-sm text-danger">
-              {saveError} Cancel to return to the editor and correct this operation.
+              {saveError} You can retry Save, or Cancel to return to the editor.
             </p>
           )}
         </div>
 
         <AlertDialogFooter>
-          <Button size="sm" variant="secondary" className="min-w-[90px]" onClick={onCancel}>
+          <Button size="sm" variant="secondary" className="min-w-[90px]" onClick={onCancel} disabled={isSaving}>
             Cancel
           </Button>
-          <Button size="sm" variant="destructiveOutline" className="min-w-[90px]" onClick={onDiscard}>
+          <Button
+            size="sm"
+            variant="destructiveOutline"
+            className="min-w-[90px]"
+            onClick={onDiscard}
+            disabled={isSaving}
+          >
             {getDiscardLabel()}
           </Button>
-          <Button size="sm" className="min-w-[90px]" onClick={onSave} autoFocus>
-            Save
+          <Button size="sm" className="min-w-[90px]" onClick={onSave} autoFocus disabled={isSaving}>
+            {isSaving ? 'Saving…' : 'Save'}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

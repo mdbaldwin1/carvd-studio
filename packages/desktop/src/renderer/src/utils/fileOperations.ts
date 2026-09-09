@@ -27,6 +27,7 @@ export interface FileOperationResult {
   filePath?: string;
   error?: string;
   canceled?: boolean;
+  pendingChanges?: boolean;
   // For corrupted files that can potentially be recovered
   needsRecovery?: boolean;
   validationErrors?: string[];
@@ -79,6 +80,27 @@ export async function saveProjectAs(saveKind: ProjectSaveKind = 'save_as'): Prom
  */
 async function saveToPath(filePath: string, saveKind: ProjectSaveKind): Promise<FileOperationResult> {
   const state = useProjectStore.getState();
+  // Store actions replace document fields immutably. Retain the exact revision
+  // being serialized, including edits that can happen during thumbnail/file I/O.
+  const snapshot = {
+    projectName: state.projectName,
+    createdAt: state.createdAt,
+    modifiedAt: state.modifiedAt,
+    units: state.units,
+    gridSize: state.gridSize,
+    kerfWidth: state.kerfWidth,
+    overageFactor: state.overageFactor,
+    projectNotes: state.projectNotes,
+    stockConstraints: state.stockConstraints,
+    parts: state.parts,
+    stocks: state.stocks,
+    groups: state.groups,
+    groupMembers: state.groupMembers,
+    assemblies: state.assemblies,
+    snapGuides: state.snapGuides,
+    customShoppingItems: state.customShoppingItems,
+    cutList: state.cutList
+  };
 
   try {
     const dowelErrors = validateDowelRelationships(state.parts);
@@ -98,23 +120,7 @@ async function saveToPath(filePath: string, saveKind: ProjectSaveKind): Promise<
     }
 
     const fileData = serializeProject({
-      projectName: state.projectName,
-      createdAt: state.createdAt,
-      modifiedAt: state.modifiedAt,
-      units: state.units,
-      gridSize: state.gridSize,
-      kerfWidth: state.kerfWidth,
-      overageFactor: state.overageFactor,
-      projectNotes: state.projectNotes,
-      stockConstraints: state.stockConstraints,
-      parts: state.parts,
-      stocks: state.stocks,
-      groups: state.groups,
-      groupMembers: state.groupMembers,
-      assemblies: state.assemblies,
-      snapGuides: state.snapGuides,
-      customShoppingItems: state.customShoppingItems,
-      cutList: state.cutList,
+      ...snapshot,
       thumbnail,
       cameraState: useCameraStore.getState().cameraState
     });
@@ -122,12 +128,18 @@ async function saveToPath(filePath: string, saveKind: ProjectSaveKind): Promise<
     const json = stringifyCarvdFile(fileData);
     await window.electronAPI.writeFile(filePath, json);
 
-    // Update store with file path and mark as clean
+    // A successful write only saves its captured revision, not newer edits.
     useProjectStore.getState().setFilePath(filePath);
-    useProjectStore.getState().markClean();
 
     // Add to recent projects
     await window.electronAPI.addRecentProject(filePath);
+
+    const current = useProjectStore.getState();
+    const pendingChanges = (Object.keys(snapshot) as Array<keyof typeof snapshot>).some(
+      (key) => current[key] !== snapshot[key]
+    );
+    if (pendingChanges) current.markDirty();
+    else current.markClean();
 
     // Update window title
     updateWindowTitle();
@@ -139,7 +151,7 @@ async function saveToPath(filePath: string, saveKind: ProjectSaveKind): Promise<
       });
     }
 
-    return { success: true, filePath };
+    return { success: true, filePath, ...(pendingChanges ? { pendingChanges: true } : {}) };
   } catch (error) {
     return { success: false, error: String(error) };
   }

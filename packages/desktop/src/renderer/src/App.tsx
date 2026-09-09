@@ -208,6 +208,8 @@ function App() {
     handleRelocateFile,
     handleSave,
     handleSaveAs,
+    handleReload,
+    isFileActionBusy,
     handleGoHome
   } = useFileOperations({
     isEditingTemplate,
@@ -803,6 +805,8 @@ function App() {
     onOpenProject: handleOpen,
     onOpenRecentProject: handleOpenRecent,
     onCloseProject: async () => handleLogoClick(),
+    onReload: handleReload,
+    isFileActionBusy,
     // Focused editing modes - route save commands appropriately
     isEditingPartCuts,
     onSavePartCuts: handlePrimarySave,

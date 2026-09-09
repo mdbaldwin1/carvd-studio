@@ -162,6 +162,33 @@ describe('useMenuCommands', () => {
   });
 
   describe('file commands', () => {
+    it.each([
+      'new-project',
+      'new-from-template',
+      'open-project',
+      'open-recent',
+      'save-project',
+      'save-project-as',
+      'close-project',
+      'request-reload'
+    ])('M3 blocks native %s while a close-save is pending', async (command) => {
+      const onAction = vi.fn().mockResolvedValue(undefined);
+      renderHook(() =>
+        useMenuCommands({
+          isFileActionBusy: () => true,
+          onNewProject: onAction,
+          onOpenProject: onAction,
+          onOpenRecentProject: onAction,
+          onOpenTemplateBrowser: onAction,
+          onCloseProject: onAction,
+          onReload: onAction
+        })
+      );
+      await menuCommandHandler(command, '/tmp/recent.carvd');
+      expect.soft(onAction).not.toHaveBeenCalled();
+      expect.soft(saveProject).not.toHaveBeenCalled();
+      expect(saveProjectAs).not.toHaveBeenCalled();
+    });
     it('L2 native Save As delegates to the same guarded active-cut file route', async () => {
       const onSavePartCutsAs = vi.fn().mockResolvedValue(undefined);
       renderHook(() => useMenuCommands({ isEditingPartCuts: true, onSavePartCutsAs }));
@@ -251,7 +278,7 @@ describe('useMenuCommands', () => {
       await menuCommandHandler('open-project');
 
       expect(onOpenProject).not.toHaveBeenCalled();
-      expect(showToast).toHaveBeenCalledWith('Finish editing part cuts first', 'warning');
+      expect(showToast).toHaveBeenCalledWith('Save or discard part cuts before changing projects.', 'warning');
     });
 
     it('handles open-project without handler', async () => {

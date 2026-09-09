@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // File system (for project files only)
   readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath),
   writeFile: (filePath: string, data: string) => ipcRenderer.invoke('write-file', filePath, data),
+  reloadWindow: (ignoreCache: boolean) => ipcRenderer.invoke('reload-window', ignoreCache),
   writeBinaryFile: (filePath: string, data: number[]) => ipcRenderer.invoke('write-binary-file', filePath, data),
   showItemInFolder: (filePath: string) => ipcRenderer.invoke('show-item-in-folder', filePath),
 
@@ -265,6 +266,7 @@ export interface ElectronAPI {
   queueTestOpenDialogPaths: (filePaths: string[] | null) => Promise<{ success: boolean; error?: string }>;
   readFile: (filePath: string) => Promise<string>;
   writeFile: (filePath: string, data: string) => Promise<void>;
+  reloadWindow: (ignoreCache: boolean) => Promise<void>;
   writeBinaryFile: (filePath: string, data: number[]) => Promise<void>;
   showItemInFolder: (filePath: string) => Promise<{ success: boolean }>;
   getRecentProjects: () => Promise<string[]>;
