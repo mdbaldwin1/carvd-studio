@@ -1,5 +1,5 @@
-import type { CircularCutFeature, DowelJointMetadata, FaceTarget, Part } from '@renderer/types';
-import { clonePartFeature } from '@renderer/utils/partFeatures';
+import type { AssemblyPart, CircularCutFeature, DowelJointMetadata, FaceTarget, Part } from '@renderer/types';
+import { clonePartFeature, getAssemblyPartCopyMap } from '@renderer/utils/partFeatures';
 import { expandCircularCut, getFaceFrame, validateCircularCut } from '@renderer/utils/roundCutUtils';
 import * as THREE from 'three';
 import { Brush, Evaluator, INTERSECTION } from 'three-bvh-csg';
@@ -378,6 +378,81 @@ export function getDowelRelationshipIssues(parts: Part[]): DowelRelationshipIssu
 
 export function validateDowelRelationships(parts: Part[]): string[] {
   return getDowelRelationshipIssues(parts).map((issue) => issue.message);
+}
+
+/** Validate identity structure only so legacy geometry remains openable for correction. */
+export function validateDowelRelationshipReferences(parts: Part[]): string[] {
+  const errors: string[] = [];
+  const entries = new Map<string, Array<{ part: Part; metadata: DowelJointMetadata }>>();
+  for (const part of parts) {
+    for (const feature of part.features ?? []) {
+      const metadata = feature.metadata?.dowelJoint;
+      if (!metadata) continue;
+      const key = `${metadata.jointId}:${metadata.memberIndex}`;
+      if (feature.kind !== 'circular_cut') {
+        errors.push(`Dowel joint member ${key} is not a round hole.`);
+        continue;
+      }
+      const members = entries.get(key) ?? [];
+      members.push({ part, metadata });
+      entries.set(key, members);
+    }
+  }
+  for (const [key, members] of entries) {
+    if (members.length !== 2) {
+      errors.push(`Dowel joint member ${key} is missing its matching hole.`);
+      continue;
+    }
+    const [first, second] = members;
+    if (first.metadata.matePartId !== second.part.id || second.metadata.matePartId !== first.part.id) {
+      errors.push(`Dowel joint member ${key} has invalid mate references.`);
+    }
+  }
+  return errors;
+}
+
+/** Validate assembly-local dowel identities and geometry as ordinary parts. */
+function assemblyDowelParts(parts: AssemblyPart[]): Part[] {
+  const ids = parts.map((part, index) => part.localId ?? `assembly-part:${index}`);
+  const copyMap = getAssemblyPartCopyMap(parts, ids);
+  return parts.map((part, index) => {
+    const features = part.features?.map((feature) => {
+      const cloned = clonePartFeature(feature);
+      const dowel = cloned.metadata?.dowelJoint;
+      if (dowel) {
+        cloned.metadata = {
+          ...cloned.metadata,
+          dowelJoint: { ...dowel, matePartId: copyMap.get(dowel.matePartId) ?? dowel.matePartId }
+        };
+      }
+      return cloned;
+    });
+    return {
+      id: ids[index],
+      name: part.name,
+      length: part.length,
+      width: part.width,
+      thickness: part.thickness,
+      position: { ...part.relativePosition },
+      rotation: part.rotation,
+      stockId: part.stockId,
+      grainSensitive: part.grainSensitive,
+      grainDirection: part.grainDirection,
+      color: part.color,
+      notes: part.notes,
+      extraLength: part.extraLength,
+      extraWidth: part.extraWidth,
+      features
+    };
+  });
+}
+
+export function validateAssemblyDowelRelationships(parts: AssemblyPart[]): string[] {
+  return validateDowelRelationships(assemblyDowelParts(parts));
+}
+
+export function validateAssemblyDowelRelationshipReferences(parts: AssemblyPart[]): string[] {
+  return validateDowelRelationshipReferences(assemblyDowelParts(parts));
 }
 
 export function getDowelJointAlignment(

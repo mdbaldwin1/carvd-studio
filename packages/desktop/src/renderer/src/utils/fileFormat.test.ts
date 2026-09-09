@@ -674,6 +674,113 @@ describe('fileFormat', () => {
   // ============================================================
 
   describe('referential integrity', () => {
+    it('keeps a structurally paired but misaligned legacy dowel project openable for correction', () => {
+      const hole = (id: string, matePartId: string) => ({
+        id,
+        kind: 'circular_cut' as const,
+        version: 1 as const,
+        enabled: true,
+        metadata: {
+          dowelJoint: {
+            jointId: 'joint-1',
+            matePartId,
+            memberIndex: 0,
+            dowelDiameter: 0.375,
+            dowelLength: 2,
+            embedmentDepth: 1
+          }
+        },
+        target: { type: 'face' as const, face: 'top_face' as const },
+        reference: { primaryFrom: 'center' as const, secondaryFrom: 'center' as const },
+        cutType: 'round_hole' as const,
+        placement: { primary: 0, secondary: 0, rotation: 0 },
+        parameters: { diameter: 0.375, depthMode: 'blind' as const, depth: 1, tilt: 0, direction: 0 }
+      });
+      const first = createTestPart({ id: 'first', features: [hole('hole-1', 'second')] });
+      const second = createTestPart({
+        id: 'second',
+        position: { x: 20, y: 0, z: 0 },
+        features: [hole('hole-2', 'first')]
+      });
+
+      const result = validateCarvdFile(createValidCarvdFile({ parts: [first, second] }));
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('rejects a project with a dangling dowel mate reference', () => {
+      const part = createTestPart({
+        id: 'first',
+        features: [
+          {
+            id: 'hole-1',
+            kind: 'circular_cut',
+            version: 1,
+            enabled: true,
+            metadata: {
+              dowelJoint: {
+                jointId: 'joint-1',
+                matePartId: 'missing',
+                memberIndex: 0,
+                dowelDiameter: 0.375,
+                dowelLength: 2,
+                embedmentDepth: 1
+              }
+            },
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+            cutType: 'round_hole',
+            placement: { primary: 0, secondary: 0, rotation: 0 },
+            parameters: { diameter: 0.375, depthMode: 'blind', depth: 1, tilt: 0, direction: 0 }
+          }
+        ]
+      });
+
+      const result = validateCarvdFile(createValidCarvdFile({ parts: [part] }));
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual(expect.stringMatching(/missing its matching hole/i));
+    });
+
+    it('rejects an assembly with a dangling saved dowel relationship', () => {
+      const assembly = createTestAssembly({
+        parts: [
+          {
+            ...createTestPart(),
+            localId: 'part:0',
+            relativePosition: { x: 0, y: 0, z: 0 },
+            features: [
+              {
+                id: 'hole-1',
+                kind: 'circular_cut',
+                version: 1,
+                enabled: true,
+                metadata: {
+                  dowelJoint: {
+                    jointId: 'joint-1',
+                    matePartId: 'part:missing',
+                    memberIndex: 0,
+                    dowelDiameter: 0.375,
+                    dowelLength: 2,
+                    embedmentDepth: 1
+                  }
+                },
+                target: { type: 'face', face: 'top_face' },
+                reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+                cutType: 'round_hole',
+                placement: { primary: 0, secondary: 0, rotation: 0 },
+                parameters: { diameter: 0.375, depthMode: 'blind', depth: 1, tilt: 0, direction: 0 }
+              }
+            ]
+          }
+        ]
+      });
+
+      const result = validateCarvdFile(createValidCarvdFile({ assemblies: [assembly] }));
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toContainEqual(expect.stringMatching(/assembly .*missing its matching hole/i));
+    });
     it('warns about parts referencing non-existent stocks', () => {
       const part = createTestPart({
         stockId: 'non-existent-stock',
@@ -990,6 +1097,43 @@ describe('fileFormat', () => {
   // ============================================================
 
   describe('repairCarvdFile', () => {
+    it('fails safely instead of accepting malformed custom-cut data', () => {
+      const file = createValidCarvdFile({
+        parts: [
+          createTestPart({
+            features: [
+              {
+                id: 'broken-cut',
+                kind: 'rect_cut',
+                version: 1,
+                enabled: true,
+                cutType: 'cutout',
+                reference: { primaryFrom: 'min' },
+                parameters: { size: { length: 2, width: 1 }, depthMode: 'through' },
+                placement: { x: 0, z: 0 }
+              } as never
+            ]
+          })
+        ]
+      });
+      file.version = CARVD_FILE_VERSION;
+
+      expect(() => repairCarvdFile(JSON.stringify(file))).not.toThrow();
+      const result = repairCarvdFile(JSON.stringify(file));
+      expect(result.success).toBe(false);
+      expect(result.remainingErrors).toContain('parts[0].features[0].target is invalid');
+      expect(result.repairedData).toBeUndefined();
+    });
+
+    it('fails safely when a corrupted collection contains non-object entries', () => {
+      const file = createValidCarvdFile();
+      (file as unknown as { parts: unknown[] }).parts = [null];
+
+      expect(() => repairCarvdFile(JSON.stringify(file))).not.toThrow();
+      const result = repairCarvdFile(JSON.stringify(file));
+      expect(result.success).toBe(false);
+      expect(result.remainingErrors).toContain('parts[0] is invalid');
+    });
     it('fails on invalid JSON', () => {
       const result = repairCarvdFile('not valid json');
 

@@ -16,6 +16,7 @@ import { hasUnsavedChanges } from '../utils/fileOperations';
 import { logger } from '../utils/logger';
 import { getFeatureLimits, getBlockedMessage } from '../utils/featureLimits';
 import { clonePartFeaturesForCopy, getAssemblyPartCopyMap, normalizePart } from '../utils/partFeatures';
+import { validateDowelRelationships } from '../utils/dowelJointUtils';
 
 interface UseAssemblyEditingResult {
   // State
@@ -237,6 +238,12 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
     if (!editingAssemblyId) {
       logger.error('[saveAndExit] No editingAssemblyId');
       showToast('No assembly to save', 'warning');
+      return;
+    }
+
+    const dowelErrors = validateDowelRelationships(useProjectStore.getState().parts);
+    if (dowelErrors.length > 0) {
+      showToast(`Cannot save assembly: ${dowelErrors.join(' ')}`, 'error');
       return;
     }
 

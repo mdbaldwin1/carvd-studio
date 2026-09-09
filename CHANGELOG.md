@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Assembly and recovery integrity** — Invalid or misaligned paired dowels can no longer be saved inside reusable assemblies or project files. File recovery now applies the same Custom Cuts schema and joinery validation as a normal load and reports malformed data safely instead of accepting an unusable repair.
 - **Round-opening joinery collision** — Timber can pass through circular and rounded openings on rotated parts. Collision checks use the remaining wood, distinguish wall contact from intrusion, and avoid solid-boolean stalls when overlapping copied multi-cut parts.
 - **Composed tenon shoulders** — Every accepted tenon removes its own shoulders, including multiple cuts on one end and opposing cuts whose lengths meet or overlap. A later cut never restores material removed earlier.
 - **Safe cut-editor saves** — Header Save, Cmd+S, Save As (keyboard and native menu), and native Save commit a valid active cut before writing the project, including a still-focused measurement field. Invalid edits stay open with their exact correction; Exit, Home, Close Project, and closing the application window prompt for uncommitted editor or session changes. The window-close dialog validates before saving and shows any exact correction inside the dialog.

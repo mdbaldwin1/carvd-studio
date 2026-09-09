@@ -21,7 +21,7 @@ import {
 import { logger } from './logger';
 import { analytics } from './analytics';
 import { bucketCount } from '../../../shared/analytics';
-import { validateDowelRelationships } from './dowelJointUtils';
+import { validateAssemblyDowelRelationships, validateDowelRelationships } from './dowelJointUtils';
 
 export interface FileOperationResult {
   success: boolean;
@@ -198,6 +198,10 @@ async function saveToPath(
   try {
     const dowelErrors = validateDowelRelationships(state.parts);
     if (dowelErrors.length > 0) return { success: false, error: dowelErrors.join('\n') };
+    const assemblyDowelErrors = state.assemblies.flatMap((assembly) =>
+      validateAssemblyDowelRelationships(assembly.parts).map((error) => `Assembly "${assembly.name}": ${error}`)
+    );
+    if (assemblyDowelErrors.length > 0) return { success: false, error: assemblyDowelErrors.join('\n') };
     // Generate thumbnail before saving (only if we have parts to show)
     let thumbnail: ProjectThumbnail | null = null;
     if (state.parts.length > 0) {

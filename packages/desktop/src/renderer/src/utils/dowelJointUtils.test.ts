@@ -6,12 +6,38 @@ import {
   detachDeletedDowelMates,
   getDowelJointAlignment,
   getDowelVisualizations,
+  validateAssemblyDowelRelationshipReferences,
   validateDowelRelationships
 } from './dowelJointUtils';
 
 vi.unmock('three');
 
 describe('dowelJointUtils', () => {
+  it('recovers structurally valid relationship identities in legacy assemblies without local IDs', () => {
+    const firstPart = createTestPart({ id: 'first', thickness: 1, position: { x: 0, y: 0, z: 0 } });
+    const secondPart = createTestPart({ id: 'second', thickness: 1, position: { x: 0, y: 1, z: 0 } });
+    const joint = createDowelJoint({
+      firstPart,
+      firstFace: 'top_face',
+      secondPart,
+      secondFace: 'bottom_face',
+      diameter: 0.375,
+      dowelLength: 1,
+      firstEmbedmentDepth: 0.5,
+      secondEmbedmentDepth: 0.5,
+      count: 1,
+      spacing: 2,
+      firstPrimary: 0,
+      firstSecondary: 0
+    });
+    const legacyParts = [
+      { ...firstPart, relativePosition: firstPart.position, features: joint.firstFeatures },
+      { ...secondPart, relativePosition: secondPart.position, features: joint.secondFeatures }
+    ].map(({ id: _id, position: _position, ...part }) => part);
+
+    expect(validateAssemblyDowelRelationshipReferences(legacyParts)).toEqual([]);
+  });
+
   it('rejects separated opposing faces', () => {
     const firstPart = createTestPart({ position: { x: 0, y: 0, z: 0 } });
     const secondPart = createTestPart({ position: { x: 0, y: 10, z: 0 } });

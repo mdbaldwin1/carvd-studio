@@ -22,6 +22,7 @@ import {
   StockConstraintSettings
 } from '../types';
 import { normalizeAssemblyPart, normalizePart, validateSerializedPartFeatures } from './partFeatures';
+import { validateAssemblyDowelRelationshipReferences, validateDowelRelationshipReferences } from './dowelJointUtils';
 
 // Default stock constraints for migration
 const DEFAULT_STOCK_CONSTRAINTS: StockConstraintSettings = {
@@ -239,6 +240,8 @@ function validateReferentialIntegrity(file: CarvdFile): { errors: string[]; warn
   const stockIds = new Set(file.stocks.map((s) => s.id));
   const groupIds = new Set(file.groups.map((g) => g.id));
 
+  errors.push(...validateDowelRelationshipReferences(file.parts));
+
   // Check part stock references
   for (const part of file.parts) {
     if (part.stockId && !stockIds.has(part.stockId)) {
@@ -262,6 +265,11 @@ function validateReferentialIntegrity(file: CarvdFile): { errors: string[]; warn
   // Check assembly stock references (if present)
   if (file.assemblies) {
     for (const assembly of file.assemblies) {
+      errors.push(
+        ...validateAssemblyDowelRelationshipReferences(assembly.parts).map(
+          (error) => `Assembly "${assembly.name}": ${error}`
+        )
+      );
       for (const part of assembly.parts) {
         if (part.stockId && !stockIds.has(part.stockId)) {
           warnings.push(`Assembly "${assembly.name}" part references non-existent stock ID "${part.stockId}"`);
@@ -410,6 +418,25 @@ export function repairCarvdFile(jsonString: string): FileRepairResult {
   if (!Array.isArray(obj.groups)) obj.groups = [];
   if (!Array.isArray(obj.groupMembers)) obj.groupMembers = [];
 
+  const invalidCollectionEntries = [
+    ['parts', obj.parts],
+    ['stocks', obj.stocks],
+    ['groups', obj.groups],
+    ['groupMembers', obj.groupMembers]
+  ].flatMap(([name, entries]) =>
+    (entries as unknown[]).flatMap((entry, index) =>
+      entry && typeof entry === 'object' && !Array.isArray(entry) ? [] : [`${name}[${index}] is invalid`]
+    )
+  );
+  if (invalidCollectionEntries.length > 0) {
+    return {
+      success: false,
+      repairActions,
+      remainingErrors: invalidCollectionEntries,
+      warnings
+    };
+  }
+
   // Build ID sets for repair
   const partIds = new Set((obj.parts as Array<{ id: string }>).map((p) => p.id));
   const stockIds = new Set((obj.stocks as Array<{ id: string }>).map((s) => s.id));
@@ -450,25 +477,35 @@ export function repairCarvdFile(jsonString: string): FileRepairResult {
     }
   }
 
-  // Try to validate the repaired file
-  const migratedData = migrateFile(obj as CarvdFile);
-  const integrityResult = validateReferentialIntegrity(migratedData);
-
-  if (integrityResult.errors.length > 0) {
+  // Run the same complete schema, migration, and relationship validation as a
+  // normal load. Recovery must never claim success for data the app rejects.
+  let validation: FileValidationResult;
+  try {
+    validation = validateCarvdFile(obj);
+  } catch (error) {
     return {
       success: false,
       repairActions,
-      remainingErrors: integrityResult.errors,
-      warnings: [...warnings, ...integrityResult.warnings]
+      remainingErrors: [`Unable to safely repair file: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      warnings
+    };
+  }
+
+  if (!validation.valid || !validation.data) {
+    return {
+      success: false,
+      repairActions,
+      remainingErrors: validation.errors,
+      warnings: [...warnings, ...validation.warnings]
     };
   }
 
   return {
     success: true,
-    repairedData: migratedData,
+    repairedData: validation.data,
     repairActions,
     remainingErrors: [],
-    warnings: [...warnings, ...integrityResult.warnings]
+    warnings: [...warnings, ...validation.warnings]
   };
 }
 
