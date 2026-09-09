@@ -2,21 +2,24 @@
 
 ## Release qualification
 
-**Closure review remediation gates PASS — unreleased.**
+**Full-review round 3 remediation gates PASS — unreleased.**
 
-The final closure review confirmed the performance fix closed, then identified
-two Important findings (exact rotated contact and composed-rotation collision)
-plus one Minor hidden-offset finding. All three were independently reproduced
-RED and fixed test-first at `d984617785ab2c1d8974b51a3f599dcd5b0f4efb`.
-The fresh complete desktop gate passed **4,351 renderer tests, 213 main-process
-tests, and all 135 real-Electron tests**. This round adds 64 renderer tests for
-decimal-angle contact/tolerances, actual Three XYZ transforms, and explicit
-correction of hidden malformed offsets. No requested finding is deferred.
-Original R1–R15, scoped A–D, Q1–Q11 and round 3/4 regressions remain covered;
-this remediation performed an adjacent self-audit, not another independent
-review. See complete RED/GREEN, root-cause, timing, oracle reconciliation and
-gate mapping in the
-[round 5 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-5-report.md).
+Full-review findings K1–K8, including the separately noted blank-dimension
+precision defect, were independently reproduced RED and fixed test-first at
+`a6ce3c583a074f9a5bb91820c4568fe8e067d603`. The fresh complete gate passes
+**4,461 renderer tests, 213 main-process tests, and all 141 real-Electron tests**.
+This adds 110 renderer tests and six real desktop save/navigation flows.
+Round/rounded collision follows remaining material, all tenon shoulders compose,
+glue-up machining is panel-level, dowel relationships block invalid fabrication,
+saved references and active editor values survive saves, and exports preserve
+blank precision. The adjacent copied-part collision stall was also reproduced
+and fixed with finite BVH queries; the unchanged desktop flow passes.
+All six generated PDF variants were visually checked at their changed pages.
+No requested finding is deferred. All prior R1–R15, scoped A–D, Q1–Q11 and
+closure A–J regressions remain covered. This was an adjacent self-audit, not
+another independent review. Complete RED/GREEN, root causes, timings, PDF layout
+and aggregate reconciliation are recorded in the
+[round 6 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-6-report.md).
 
 P0 means any crash, lost/corrupted feature, wrong face or removal direction, false
 valid/invalid geometry, copy/undo/save corruption, valid joinery blocked by
@@ -34,7 +37,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | ------------------------------- | ------------------------------------------------------------------- |
 | Qualification date              | 2026-09-09, America/New_York                                        |
 | Starting Task 7 commit          | `6b9898897c14089d72291c3874211e97328f6b87`                          |
-| Qualified code candidate        | `d984617785ab2c1d8974b51a3f599dcd5b0f4efb`                          |
+| Qualified code candidate        | `a6ce3c583a074f9a5bb91820c4568fe8e067d603`                          |
 | Comparison base                 | `origin/develop` at `459b6a5177b9`; local `develop` was stale       |
 | OS                              | macOS 26.6.2, build 25G83                                           |
 | Architecture                    | arm64                                                               |
@@ -42,7 +45,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | Desktop / Electron / Playwright | 1.3.0 / 41.1.1 / 1.59.1                                             |
 | Electron viewport               | 1400 × 900                                                          |
 | Candidate static verification   | desktop lint/typecheck/build exit 0; Prettier and diff checks clean |
-| Candidate runtime verification  | 4,351 renderer + 213 main + 135 real-Electron tests passed          |
+| Candidate runtime verification  | 4,461 renderer + 213 main + 141 real-Electron tests passed          |
 
 The requested `/tmp/carvd-manual-qa-matrix.md` was absent at Task 6 start and
 again at review remediation time. The checked-in task briefs, master plan,

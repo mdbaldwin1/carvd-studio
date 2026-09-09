@@ -1,5 +1,9 @@
 # Final contact, rotation, and hidden-offset remediation
 
+> Historical checkpoint, superseded by the
+> [round 6 remediation report](task-7-remediation-round-6-report.md).
+> Subsequent full review identified K1–K8, fixed at `a6ce3c5`.
+
 Status: PASS, unreleased. Both Important findings H/I and Minor finding J closed.
 Starting candidate: `d5578d5f7c471aae3da6d75963e94477d9f07258`.
 Qualified code: `d984617785ab2c1d8974b51a3f599dcd5b0f4efb`
