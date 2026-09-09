@@ -2,13 +2,29 @@
 
 ## Release qualification
 
-**Closure remediation round 9 gates PASS — unreleased.**
+**Closure remediation round 10 gates PASS — unreleased.**
 
-Findings N1–N4 were independently reproduced RED and fixed test-first at
-`4724ed383228f2970958feb97c3971117cdafc25`.
-The fresh full gates pass **4,527 renderer, 221 main-process and all 193
-real-Electron tests** (Electron 5.8 minutes). This round adds 15 renderer,
-six main-harness and 12 actual Electron cases.
+P1 was independently reproduced RED in three production transaction/real-hook
+cases. The fix shares a document-generation-owned destination across queued
+saves; a successful preceding Save As changes where later manual, automatic,
+close and Quit saves write, without changing their captured edits or a newly
+opened document. Five adjacent RED assertions also cover filename metadata
+before chooser completion, failed Save As and repeated destinations. Automatic
+name/path changes commit only on success; authored names remain preserved.
+
+The focused suites pass **199/199**; full renderer/main pass **4,543/4,543 and
+221/221**. Two native P1 physical-file/close/Quit cases pass **2/2 (6.9s)**.
+This round adds 16 renderer and two actual Electron tests. The full isolated
+gate passes **195/195 (6.1m)**; total passing tests **4,959**. One existing
+round-6 fixture was corrected to seed completed-welcome status before startup,
+matching round 7, then its exact failed case passed before the full rerun. The first
+run's **57 passed / 1 tutorial-overlay fixture failure / 3 interrupted / 134
+not run** is retained in the report, not counted as complete verification.
+
+Final lint/typecheck/configured and changed-file formatting, production-only
+build/analytics boundary, diff/scope/security checks pass. The final runtime
+audit confirms generic Electron preferences unchanged, savedState absent,
+zero new Electron crash reports and no surviving test app process.
 
 Manual/native/auto/Save As/close saves preserve their requested order and drain
 before close/reload. Old save completions cannot retarget a replacement document.
@@ -26,13 +42,14 @@ report. A disposed Playwright wrapper uses the original retained process handle.
 The report records the earlier native crashes, failed initial copy smoke and
 fail-fast teardown reconciliation; none are represented as passing runs.
 
-All prior R1–R15, scoped A–D, Q1–Q11, closure A–J, K1–K8, L1–L3 and M1–M3
+All prior R1–R15, scoped A–D, Q1–Q11, closure A–J, K1–K8, L1–L3, M1–M3 and N1–N4
 regressions remain covered, including actual-PDF precision/layout tests.
 This was an adjacent self-audit, not another independent review. Exact
 RED/GREEN evidence, root causes, files, physical-file race checks and harness
 reconciliation are in the
-[round 9 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-9-report.md).
+[round 10 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-10-report.md).
 Earlier checkpoints remain in the
+[round 9 report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-9-report.md),
 [round 8 report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-8-report.md)
 and the visually inspected PDF qualification in the
 [round 7 report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-7-report.md).
@@ -53,7 +70,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | ------------------------------- | ------------------------------------------------------------------- |
 | Qualification date              | 2026-09-09, America/New_York                                        |
 | Starting Task 7 commit          | `6b9898897c14089d72291c3874211e97328f6b87`                          |
-| Qualified code candidate        | `4724ed383228f2970958feb97c3971117cdafc25`                          |
+| Qualified code candidate        | `50acf3b47eb6ff30827593dfd12fd019dac60c85`                          |
 | Comparison base                 | `origin/develop` at `459b6a5177b9`; local `develop` was stale       |
 | OS                              | macOS 26.6.2, build 25G83                                           |
 | Architecture                    | arm64                                                               |
@@ -61,7 +78,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | Desktop / Electron / Playwright | 1.3.0 / 41.1.1 / 1.59.1                                             |
 | Electron viewport               | 1400 × 900                                                          |
 | Candidate static verification   | desktop lint/typecheck/build exit 0; Prettier and diff checks clean |
-| Candidate runtime verification  | 4,527 renderer + 221 main + 193 real-Electron tests passed          |
+| Candidate runtime verification  | 4,543 renderer + 221 main + 195 real-Electron tests passed          |
 
 The requested `/tmp/carvd-manual-qa-matrix.md` was absent at Task 6 start and
 again at review remediation time. The checked-in task briefs, master plan,
@@ -133,10 +150,10 @@ re-ran every configured desktop gate.
 
 ## Evidence standard
 
-The latest round adds 64 renderer tests: 20 exact/decimal-angle contact cases,
+Historical round 5 added 64 renderer tests: 20 exact/decimal-angle contact cases,
 five composed-rotation physical/basis cases, and 39 hidden-offset correction
 and canonical-control cases. The focused editor gate passed 102/102; broad
-geometry/snap/collision/performance coverage passed 475/475. Current raw logs are
+geometry/snap/collision/performance coverage passed 475/475. Historical raw logs are
 `/tmp/carvd-review-round5.XkjzE8`. The full configured gate and production-only
 rebuild passed, with 465 main / 2 preload / 2,936 renderer modules and analytics
 E2E controls absent. Formatting/diff/scope/secret checks are clean. There is no
