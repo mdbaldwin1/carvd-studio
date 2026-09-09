@@ -267,12 +267,23 @@ async function closeElectronProcess(
         // channel is gone while ChildProcess.exitCode is still null. Clearing
         // close guards is only meaningful while the app is alive, and closing an
         // app that is already exiting is a no-op, so neither may fail teardown.
+        //
+        // Tolerate only that departure. Anything else -- notably on macOS, where
+        // the app outlives its last window and is still answering -- is a real
+        // teardown failure and must surface exactly as it did before.
+        const ignoreIfAppDeparted = (error: unknown) => {
+          const departed =
+            proc.exitCode !== null ||
+            proc.signalCode !== null ||
+            /Target (page|closed)|context or browser has been closed|Electron app is closed/i.test(String(error));
+          if (!departed) throw error;
+        };
         await electronApp
           .evaluate(({ BrowserWindow }) => {
             for (const window of BrowserWindow.getAllWindows()) window.removeAllListeners('close');
           })
-          .catch(() => undefined);
-        await electronApp.close().catch(() => undefined);
+          .catch(ignoreIfAppDeparted);
+        await electronApp.close().catch(ignoreIfAppDeparted);
         await exited;
       })(),
       new Promise<never>((_, reject) => {
