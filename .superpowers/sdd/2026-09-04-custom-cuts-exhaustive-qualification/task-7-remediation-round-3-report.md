@@ -1,5 +1,10 @@
 # Post-fix review remediation: collision, pocket support, and empty solids
 
+Historical checkpoint: closure review subsequently identified two Important
+findings (E/F) and one Minor finding (G). The
+[round 4 report](task-7-remediation-round-4-report.md) supersedes this acceptance
+stamp and records their test-first fixes, performance evidence and fresh gates.
+
 Status: PASS; all three Important findings and the Minor cache finding closed. Unreleased.
 Starting candidate: `e1e86717d1adb17911b4e115df7b7de04eb7c5bc`.
 Qualified code commit: `16e5827176c20242c1dfff88ceceda0be99d4486`.

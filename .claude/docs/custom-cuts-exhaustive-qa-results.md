@@ -2,21 +2,22 @@
 
 ## Release qualification
 
-**Post-fix review remediation gates PASS — unreleased.**
+**Closure review remediation gates PASS — unreleased.**
 
-The post-fix independent review closed Q1–Q11 and identified three Important
-findings plus one Minor cache finding. All four were independently reproduced
-RED and fixed test-first at `16e5827176c20242c1dfff88ceceda0be99d4486`.
-The fresh complete desktop gate passed **4,177 renderer tests, 213 main-process
-tests, and all 135 real-Electron tests**. This round adds 111 renderer tests
-covering literal collision planes, removal monotonicity, complete pocket
-support, all-family empty-solid rejection, real author/final-save controls,
-and geometry-cache identity. No requested finding is deferred. Original
-R1–R15, scoped A–D and Q1–Q11 regressions remain covered; this remediation
-performed an adjacent self-audit, not another independent review. See the
-complete finding-to-test, root-cause, RED/GREEN, fixture reconciliation and
+Closure review identified two Important findings (disconnected-stock collision
+and patterned-cut performance) plus one Minor malformed-offset finding. All
+three were independently reproduced RED and fixed test-first at
+`44033dda82398fd60f0e47883f5da6347706d27c`. The fresh complete desktop gate
+passed **4,287 renderer tests, 213 main-process tests, and all 135 real-Electron
+tests**. This round adds 110 renderer tests covering multi-component collision,
+16/128-hole geometry performance with physical oracles, 128-counterbore
+face/flip combinations, a nearly meeting end-plane case, malformed offsets,
+and actual author/final-save controls. No requested finding is deferred.
+Original R1–R15, scoped A–D, Q1–Q11 and round 3 regressions remain covered;
+this remediation performed an adjacent self-audit, not another independent
+review. See complete RED/GREEN, root-cause, timing, oracle reconciliation and
 gate mapping in the
-[round 3 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-3-report.md).
+[round 4 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-4-report.md).
 
 P0 means any crash, lost/corrupted feature, wrong face or removal direction, false
 valid/invalid geometry, copy/undo/save corruption, valid joinery blocked by
@@ -32,9 +33,9 @@ collision handling, or fabrication output that could cause a bad cut.
 
 | Field                           | Qualified/candidate value                                           |
 | ------------------------------- | ------------------------------------------------------------------- |
-| Qualification date              | 2026-09-08, America/New_York                                        |
+| Qualification date              | 2026-09-09, America/New_York                                        |
 | Starting Task 7 commit          | `6b9898897c14089d72291c3874211e97328f6b87`                          |
-| Qualified code candidate        | `16e5827176c20242c1dfff88ceceda0be99d4486`                          |
+| Qualified code candidate        | `44033dda82398fd60f0e47883f5da6347706d27c`                          |
 | Comparison base                 | `origin/develop` at `459b6a5177b9`; local `develop` was stale       |
 | OS                              | macOS 26.6.2, build 25G83                                           |
 | Architecture                    | arm64                                                               |
@@ -42,7 +43,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | Desktop / Electron / Playwright | 1.3.0 / 41.1.1 / 1.59.1                                             |
 | Electron viewport               | 1400 × 900                                                          |
 | Candidate static verification   | desktop lint/typecheck/build exit 0; Prettier and diff checks clean |
-| Candidate runtime verification  | 4,177 renderer + 213 main + 135 real-Electron tests passed          |
+| Candidate runtime verification  | 4,287 renderer + 213 main + 135 real-Electron tests passed          |
 
 The requested `/tmp/carvd-manual-qa-matrix.md` was absent at Task 6 start and
 again at review remediation time. The checked-in task briefs, master plan,
@@ -95,15 +96,33 @@ re-ran every configured desktop gate.
   offset 76, then corrects to 74 and continues every original downstream action.
   The focused flow passed 1/1 before the fresh complete rerun. Full details and
   literal stock-plane arithmetic are retained in the round 3 report.
+- Closure review added E/F Important and G Minor. All three and an adjacent
+  near-meeting-plane performance defect were independently RED before their
+  fixes at `44033dd`. The final gate passed 4,287 renderer, 213 main and all 135
+  Electron tests (2.3m), followed by production-only build and analytics-boundary
+  verification. Two legacy cap-extreme tests now sample the actual cap instead
+  of a one-percent thickness band, retaining their literal end-X expectations.
+  The preceding 4,286/213/135 snapshot is retained as historical evidence, not
+  substituted for the final rerun after the adjacent correction.
 
 ## Evidence standard
 
-The latest round adds 111 renderer tests: 65 collision cases, including 64
+The latest round adds 110 renderer tests: 27 disconnected-stock collision
+cases, 19 physical/performance cases, and 64 malformed-coordinate cases. The
+fixed 16-hole compound fixture took 4,423.8ms before the fix; the final focused
+run measured 8.2ms for 16 holes and 42.5ms for 128 holes, plus 2.8/9.5ms for
+downstream collision and validation. The near-meeting end-plane fixture took
+3,645.3ms RED and 5.4ms GREEN. Literal solid volumes, end-plane and recess-floor
+rays, all 128 hole axes and vertex containment protect geometry correctness.
+Current raw logs are `/tmp/carvd-review-round4.wwm4Cd`; production-only build,
+analytics boundary, formatting, diff/scope and added-line secret audits passed.
+
+Round 3 added 111 renderer tests: 65 collision cases, including 64
 end/edge/flip/boundary combinations in both orders; 33 rounded/rectangular
 pocket support and actual save-flow cases; three empty-solid cases; and ten
 cache reuse/invalidation cases. Original review defects were independently
 RED before their fixes; broad affected coverage passed 785/785 across 12 files.
-Current raw logs are `/tmp/carvd-review-round3.PmTCyH`. After Electron, the
+Historical raw logs are `/tmp/carvd-review-round3.PmTCyH`. After Electron, the
 production-only build passed (465 main, 2 preload, 2,934 renderer modules) and
 the analytics test-control boundary check passed. Added-line credential,
 focused/skipped-test, debugger, scope and diff checks were clean.
