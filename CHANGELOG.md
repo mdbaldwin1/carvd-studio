@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Rotated joinery contact** — Featured boards can touch at arbitrary decimal angles without a collision-check crash. Composed X/Y/Z rotations now keep collision cells and snap targets aligned with the rendered wood, including disconnected pieces and openings.
+- **Explicit correction of hidden offsets** — Invalid offsets remain invalid through unrelated edits, even when a cut hides that coordinate. Save Cut stays blocked until the value is corrected; an accessible reset action fixes only invalid offsets and preserves other authored values.
+
 - **Disconnected stock collision** — Through cutouts can leave multiple pieces of stock without restoring collision in earlier openings. Flat collision checks retain every outline and interior opening, and tilted rectangular-cut parts retain all remaining material cells.
 - **Responsive patterned cuts** — Compound-cut boards with large hole and counterbore patterns no longer stall on coplanar solid clipping. The clipping envelope preserves authored cutting planes, including nearly meeting end cuts, while geometry and collision caches remain reusable.
 - **Invalid cut offsets** — Non-finite rectangular offsets are rejected before normalization, saving, and fabrication validation. Malformed operations remain editable without crashing the preview or silently moving to zero when opened.

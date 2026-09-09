@@ -204,6 +204,8 @@ When end/edge cuts are combined with other removals, collision hull vertices are
 
 Flat rectangular through-cut collision retains the full polygon set, including disconnected components and interior rings. A single-outline bounding fallback must never stand in for the remaining material in collision checks. Tilted rectangular-cut sub-box decomposition also retains every component and excludes interior openings; angled 3D cuts retain their existing convex-envelope policy.
 
+Flat overlap triangulates local remaining polygons once, retaining every component and hole, and uses strict triangle separation tests in a pair-relative frame. It does not reconstruct polygon rings from coincident rotated world boundaries. Contact tolerance is a linear distance: exact contact and gaps are accepted while intrusion beyond that tolerance is blocked. The bounded local-triangle cache uses the same geometry-affecting key and clears with the geometry cache. OBB axes, material-cell centers, and snap vertices use the renderer's canonical Three.js XYZ Euler convention for composed rotations.
+
 The derived geometry bundle remains the single consumer contract for rendering, hit testing, bounds, snapping, measurement, ground constraints, and collision. No consumer receives a special-case round-hole path.
 
 ### Performance
@@ -244,6 +246,8 @@ Saving is blocked when:
 Duplicate round operations must have the same complete expanded member set and removal profile, including active recess diameter, depth, or included angle. Sharing only one pattern member or using a different stepped recess is an overlap, not a duplicate. Other overlaps use the existing ordered-operation conflict model and identify both operations in plain language. Draft edits are never discarded because of validation failures.
 
 Authored tenon dimensions and offsets are not clamped to hide invalid stock resizing. Blind rectangular depth is not snapped to through near the stock thickness. Measurement focus/blur and focused unmount are lossless without a text edit, in both unit systems. Invalid operations remain editable, show their specific error, and have a direct `Fix cut` action from the final-save explanation.
+
+Non-finite rectangular draft offsets survive family normalization, unrelated edits, and feature reconstruction, including hidden/derived coordinates. They block Save Cut and final/fabrication validation until explicitly corrected. The inspector offers `Reset invalid offsets to zero` for hidden coordinates; this action changes only non-finite offsets, not finite positions or other authored dimensions. Ordinary finite corner/dado offsets retain their canonical family behavior.
 
 ## Fabrication output
 

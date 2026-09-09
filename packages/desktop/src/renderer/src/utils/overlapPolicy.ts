@@ -80,7 +80,7 @@ export function partsOverlap(a: Part, b: Part, geometryCache?: GeometryCache): b
   }
 
   // For flat parts with through-depth features (corner notches, edge notches, etc.),
-  // use direct 2D polygon intersection on the actual contour shape.
+  // use strict triangle SAT on the actual contour components and holes.
   // This is exact for any contour geometry — no sub-box approximation.
   // Non-flat parts (rotated around X or Z) fall through to the sub-OBB path
   // because the 2D contour projection doesn't work for tilted parts.

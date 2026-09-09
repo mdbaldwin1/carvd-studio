@@ -1919,6 +1919,28 @@ export function PartCutsWorkspace({
                     className="mt-3 rounded-md border border-danger/30 bg-danger/5 p-3 text-[11px] text-danger"
                   >
                     {draftValidationMessage}
+                    {inspectorDraft.mode === 'rect_cut' &&
+                      (!Number.isFinite(inspectorDraft.placementX) || !Number.isFinite(inspectorDraft.placementZ)) && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 block"
+                          onClick={() =>
+                            setDraft((current) =>
+                              current?.mode === 'rect_cut'
+                                ? {
+                                    ...current,
+                                    placementX: Number.isFinite(current.placementX) ? current.placementX : 0,
+                                    placementZ: Number.isFinite(current.placementZ) ? current.placementZ : 0
+                                  }
+                                : current
+                            )
+                          }
+                        >
+                          Reset invalid offsets to zero
+                        </Button>
+                      )}
                   </div>
                 )}
                 <div className="mt-4 flex flex-wrap gap-2">

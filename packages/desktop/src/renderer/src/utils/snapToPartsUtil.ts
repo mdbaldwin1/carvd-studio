@@ -226,16 +226,17 @@ function eulerToAxes(rotation: { x: number; y: number; z: number }): {
     s2 = Math.sin(ry);
   const c3 = Math.cos(rz),
     s3 = Math.sin(rz);
-  // R = Rz(rz) * Ry(ry) * Rx(rx), columns = local axes in world space
+  // Three.js Euler('XYZ'): R = Rx(rx) * Ry(ry) * Rz(rz).
+  // Keep these allocation-free columns identical to the renderer quaternion.
   return {
     ax0: c2 * c3,
-    ax1: c2 * s3,
-    ax2: -s2,
-    ay0: s1 * s2 * c3 - c1 * s3,
-    ay1: s1 * s2 * s3 + c1 * c3,
-    ay2: s1 * c2,
-    az0: c1 * s2 * c3 + s1 * s3,
-    az1: c1 * s2 * s3 - s1 * c3,
+    ax1: c1 * s3 + s1 * s2 * c3,
+    ax2: s1 * s3 - c1 * s2 * c3,
+    ay0: -c2 * s3,
+    ay1: c1 * c3 - s1 * s2 * s3,
+    ay2: s1 * c3 + c1 * s2 * s3,
+    az0: s2,
+    az1: -s1 * c2,
     az2: c1 * c2
   };
 }

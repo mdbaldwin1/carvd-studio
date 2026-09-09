@@ -3,6 +3,7 @@ import polygonClipping from 'polygon-clipping';
 import { Brush, Evaluator, INTERSECTION, SUBTRACTION } from 'three-bvh-csg';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js';
+import { Earcut } from 'three/src/extras/Earcut.js';
 import { CircularCutFeature, Part, PartFeature, RectCutFeature, RoundedCutFeature } from '../types';
 import {
   getEdgeBevelInsetAt,
@@ -26,6 +27,7 @@ import { expandCircularCut, getFaceFrame } from './roundCutUtils';
 type Point2 = { x: number; z: number };
 
 const geometryCache = new Map<string, THREE.BufferGeometry>();
+const planTriangleCache = new Map<string, Point2[][]>();
 const convexVertexCache = new WeakMap<THREE.BufferGeometry, Array<{ x: number; y: number; z: number }>>();
 const MAX_GEOMETRY_CACHE_ENTRIES = 128;
 const _worldAabbPosition = new THREE.Vector3();
@@ -1131,32 +1133,73 @@ function projectContour(part: Part, contour: Point2[], position: Part['position'
   }));
 }
 
+function getPlanTriangles(part: Part): Point2[][] {
+  const key = featureKey(part);
+  const cached = planTriangleCache.get(key);
+  if (cached) return cached;
+  const triangles = getFeaturePolygons(part).flatMap((rings) => {
+    const points: Point2[] = [];
+    const holes: number[] = [];
+    for (const [index, ring] of rings.entries()) {
+      if (index) holes.push(points.length);
+      // Polygon clipping closes its rings; Earcut needs each vertex once.
+      const closed = ring.length > 1 && ring[0][0] === ring.at(-1)![0] && ring[0][1] === ring.at(-1)![1];
+      points.push(...(closed ? ring.slice(0, -1) : ring).map(([x, z]) => ({ x, z })));
+    }
+    const indices = Earcut.triangulate(
+      points.flatMap(({ x, z }) => [x, z]),
+      holes,
+      2
+    );
+    const result: Point2[][] = [];
+    for (let i = 0; i < indices.length; i += 3) result.push(indices.slice(i, i + 3).map((index) => points[index]));
+    return result;
+  });
+  if (planTriangleCache.size >= MAX_GEOMETRY_CACHE_ENTRIES)
+    planTriangleCache.delete(planTriangleCache.keys().next().value!);
+  planTriangleCache.set(key, triangles);
+  return triangles;
+}
+
+function trianglesOverlap(a: Point2[], b: Point2[], tolerance: number): boolean {
+  // Strict SAT avoids reconstructing rings from numerically coincident rotated
+  // boundaries. Tolerance is a distance, not an area or an unscaled dot product.
+  for (const triangle of [a, b]) {
+    for (let i = 0; i < 3; i++) {
+      const current = triangle[i];
+      const next = triangle[(i + 1) % 3];
+      const nx = current.z - next.z;
+      const nz = next.x - current.x;
+      const length = Math.hypot(nx, nz);
+      if (length === 0) continue;
+      const project = (point: Point2) => point.x * nx + point.z * nz;
+      const first = a.map(project);
+      const second = b.map(project);
+      if (
+        Math.max(...first) <= Math.min(...second) + tolerance * length ||
+        Math.max(...second) <= Math.min(...first) + tolerance * length
+      )
+        return false;
+    }
+  }
+  return true;
+}
+
 /** Exact flat-stock overlap, preserving disconnected components and holes. */
 export function partsOverlapInPlan(a: Part, b: Part, tolerance = 1e-8): boolean {
-  const worldPolygons = (part: Part): polygonClipping.MultiPolygon =>
-    getFeaturePolygons(part).map((rings) =>
-      rings.map((ring) =>
-        projectContour(
-          part,
-          ring.map(([x, z]) => ({ x, z })),
-          part.position
-        ).map(({ x, z }) => [x, z])
-      )
+  // Triangulate only local stock once, then transform the cached triangles into
+  // a pair-relative frame. Large world translations never enter SAT products.
+  const project = (part: Part) =>
+    getPlanTriangles(part).map((triangle) =>
+      projectContour(part, triangle, {
+        x: part.position.x - a.position.x,
+        y: 0,
+        z: part.position.z - a.position.z
+      })
     );
-  const first = worldPolygons(a);
-  const second = worldPolygons(b);
-  if (!first.length || !second.length) return false;
-  const overlap = polygonClipping.intersection(first, second);
-  const area = (ring: polygonClipping.Ring): number =>
-    Math.abs(
-      ring.reduce((sum, [x, z], index) => {
-        const next = ring[(index + 1) % ring.length];
-        return sum + x * next[1] - next[0] * z;
-      }, 0)
-    ) / 2;
-  return overlap.some(
-    ([outer, ...holes]) => area(outer) - holes.reduce((sum, hole) => sum + area(hole), 0) > tolerance ** 2
-  );
+  const first = project(a);
+  const second = project(b);
+  return first.some((triangle) => second.some((other) => trianglesOverlap(triangle, other, tolerance)));
 }
 
 /**
@@ -1274,4 +1317,5 @@ export function clearPartGeometryCache(): void {
     geometry.dispose();
   }
   geometryCache.clear();
+  planTriangleCache.clear();
 }

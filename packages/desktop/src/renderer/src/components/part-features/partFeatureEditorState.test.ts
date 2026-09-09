@@ -152,14 +152,14 @@ describe('partFeatureEditorState', () => {
       );
     });
 
-    it('sanitizes non-finite sizes and placements', () => {
+    it('sanitizes sizes and negative offsets but preserves malformed offsets for explicit correction', () => {
       const normalized = normalizeRectCutDraft(
         createRectDraft({ sizeLength: Number.NaN, sizeWidth: Number.NaN, placementX: Number.NaN, placementZ: -3 }),
         PART_DEFAULTS
       );
       expect(normalized.sizeLength).toBe(0.75);
       expect(normalized.sizeWidth).toBe(0.75);
-      expect(normalized.placementX).toBe(0);
+      expect(normalized.placementX).toBeNaN();
       expect(normalized.placementZ).toBe(0);
     });
 

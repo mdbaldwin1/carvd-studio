@@ -238,6 +238,13 @@ export function normalizeRectCutDraft(
   const partWidth = Math.max(0.125, sanitizeFinite(defaults.partWidth ?? 0, 0));
   const partThickness = Math.max(0.126, sanitizeFinite(defaults.partThickness ?? 0.75, 0.75));
   const normalized = { ...getDefaultRectDraft(draft.cutType), ...draft };
+  const preserveInvalidOffsets = () => {
+    // Hidden/derived offsets must remain invalid through unrelated edits. Only
+    // an explicit correction may move an imported malformed operation to zero.
+    if (!Number.isFinite(draft.placementX)) normalized.placementX = draft.placementX;
+    if (!Number.isFinite(draft.placementZ)) normalized.placementZ = draft.placementZ;
+    return normalized;
+  };
 
   normalized.depthMode = BLIND_ONLY_RECT_CUT_TYPES.includes(normalized.cutType) ? 'blind' : normalized.depthMode;
   normalized.depth = sanitizeFinite(normalized.depth, 0.25);
@@ -274,7 +281,7 @@ export function normalizeRectCutDraft(
       normalized.sizeWidth = Math.min(normalized.sizeWidth, defaults.partWidth);
       normalized.placementZ = Math.max(0, Math.min(normalized.placementZ, defaults.partWidth - normalized.sizeWidth));
     }
-    return normalized;
+    return preserveInvalidOffsets();
   }
 
   if (normalized.cutType === 'cutout' || normalized.cutType === 'mortise') {
@@ -371,7 +378,7 @@ export function normalizeRectCutDraft(
     normalized.placementZ = clamp(normalized.placementZ, 0, maxZ);
   }
 
-  return normalized;
+  return preserveInvalidOffsets();
 }
 
 export function generateFeatureId(): string {
@@ -567,10 +574,6 @@ export function buildDraftFromFeature(
     },
     _part ? { partLength: _part.length, partWidth: _part.width, partThickness: _part.thickness } : undefined
   );
-  // Existing malformed coordinates need explicit correction, not an implicit
-  // zero-offset move merely from opening the operation inspector.
-  if (!Number.isFinite(feature.placement.x)) rectDraft.placementX = feature.placement.x;
-  if (!Number.isFinite(feature.placement.z)) rectDraft.placementZ = feature.placement.z;
   return rectDraft;
 }
 
@@ -711,9 +714,10 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
       depth: draft.depthMode === 'blind' ? draft.depth : undefined
     },
     placement: {
-      x: draft.cutType === 'corner_notch' ? 0 : draft.placementX,
+      x: draft.cutType === 'corner_notch' && Number.isFinite(draft.placementX) ? 0 : draft.placementX,
       z:
-        draft.cutType === 'corner_notch' || draft.cutType === 'dado' || draft.cutType === 'stopped_dado'
+        (draft.cutType === 'corner_notch' || draft.cutType === 'dado' || draft.cutType === 'stopped_dado') &&
+        Number.isFinite(draft.placementZ)
           ? 0
           : draft.placementZ
     }
