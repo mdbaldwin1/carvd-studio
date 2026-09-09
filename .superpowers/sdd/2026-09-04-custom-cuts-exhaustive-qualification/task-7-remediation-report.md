@@ -1,5 +1,9 @@
 # Task 7 Whole-Branch Review Remediation
 
+This historical R1–R15 / A–D checkpoint is superseded by the
+[independent review pass 2 remediation report](task-7-remediation-round-2-report.md).
+Use that report and the canonical QA document for the current candidate and gates.
+
 ## Scope and status
 
 Date: 2026-09-08. Worktree: `.worktrees/custom-cuts-release`; branch:

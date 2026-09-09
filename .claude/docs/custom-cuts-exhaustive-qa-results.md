@@ -2,20 +2,20 @@
 
 ## Release qualification
 
-**Scoped re-review remediation gates PASS — unreleased.**
+**Independent review pass 2 remediation gates PASS — unreleased.**
 
-The subsequent whole-branch review identified 14 Important findings and one
-Minor finding beyond the earlier Task 7 checkpoint. After their first remediation,
-the independent scoped re-review found four remaining Important issues in mirrors,
-angled recesses, dowel PDF grouping, and blind-notch entry labels. All original
-and follow-up findings now have failing-first regressions and root-cause fixes at
-`db9dcd7e63b5e2776ade65db5f089b48387e53c8`. The fresh aggregate desktop gate
-passed **3,891 renderer tests, 213 main-process tests, and all 135 real-Electron
-tests**. No requested finding is deferred. The follow-up adds 28 renderer tests,
-and includes an explicit self-audit, not another independent-review claim.
-See the complete finding-to-test,
-implementation, RED/GREEN, and gate mapping in
-[Task 7 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-report.md).
+Independent review pass 2 superseded the preceding R1–R15 / A–D checkpoint
+with eleven further Important findings and confirmed accessibility/clarity
+issues. All were independently reproduced RED and fixed test-first at
+`28d81abc342466a7519676de29b5bcdb61d3a2b3`. The fresh complete desktop gate
+passed **4,066 renderer tests, 213 main-process tests, and all 135 real-Electron
+tests**. This round adds 175 renderer tests, including expanded physical plane,
+volume, cone-wall, precision, hardware-interference, and remaining-stock probes.
+No requested finding is deferred. Original R1–R15 and A–D regressions remain
+covered; the follow-up performed a self-audit, not another independent review.
+See the complete finding-to-test, root-cause, RED/GREEN, fixture reconciliation,
+and gate mapping in the
+[round 2 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-2-report.md).
 
 P0 means any crash, lost/corrupted feature, wrong face or removal direction, false
 valid/invalid geometry, copy/undo/save corruption, valid joinery blocked by
@@ -33,7 +33,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | ------------------------------- | ------------------------------------------------------------------- |
 | Qualification date              | 2026-09-08, America/New_York                                        |
 | Starting Task 7 commit          | `6b9898897c14089d72291c3874211e97328f6b87`                          |
-| Qualified code candidate        | `db9dcd7e63b5e2776ade65db5f089b48387e53c8`                          |
+| Qualified code candidate        | `28d81abc342466a7519676de29b5bcdb61d3a2b3`                          |
 | Comparison base                 | `origin/develop` at `459b6a5177b9`; local `develop` was stale       |
 | OS                              | macOS 26.6.2, build 25G83                                           |
 | Architecture                    | arm64                                                               |
@@ -41,7 +41,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | Desktop / Electron / Playwright | 1.3.0 / 41.1.1 / 1.59.1                                             |
 | Electron viewport               | 1400 × 900                                                          |
 | Candidate static verification   | desktop lint/typecheck/build exit 0; Prettier and diff checks clean |
-| Candidate runtime verification  | 3,891 renderer + 213 main + 135 real-Electron tests passed          |
+| Candidate runtime verification  | 4,066 renderer + 213 main + 135 real-Electron tests passed          |
 
 The requested `/tmp/carvd-manual-qa-matrix.md` was absent at Task 6 start and
 again at review remediation time. The checked-in task briefs, master plan,
@@ -72,10 +72,31 @@ re-ran every configured desktop gate.
   `db9dcd7`, including extended bore-envelope probes. No requested finding
   remains open or deferred. The follow-up explicitly self-audits all R1–R15 and
   A–D findings; no additional reviewer seat was used.
+- Independent review pass 2 then added eleven Important findings. Their fixes
+  at `28d81ab` preserve actual intersecting solids and authored measurements,
+  validate complete bore/hardware envelopes, and surface actionable cut errors.
+  All eleven plus confirmed UX findings are closed, with no P0/P1 deferred.
+  The complete configured rerun passed 4,066 renderer, 213 main, and 135 Electron
+  tests (Electron 3.2 minutes). Two earlier aggregate fixture failures are
+  recorded explicitly in the round 2 report: an actually removed metric hole
+  position, and an unfinished first-save library-import prompt. Neither was
+  solved by relaxing production validation or bypassing a prompt/assertion.
 - The application version remains 1.3.0. Task 7 did not bump a version, change
   release state, merge, push, open a PR, tag, package, publish, or release.
 
 ## Evidence standard
+
+The latest round adds 96 end/edge plane combinations with exact integrated
+volume and literal rays, both-end tenon composition, continuous Top/Bottom
+countersink walls, sub-thousandth blind floors, .755/.74-inch input preservation
+in both units, rounded-profile support/tangency, complete pattern equivalence,
+physical dowel interference, and a blind bore crossing a tenon shoulder between
+two valid caps. Save Cut, Save Part, main-canvas resize, and Cut List gates are
+covered. Unit announcements, toggle states, specific invalid-operation feedback,
+and a direct Fix cut action are verified through semantic controls. Current
+raw logs are `/tmp/carvd-review-round2.4FPEbV`; production-only rebuild and
+analytics E2E boundary checks passed after Electron. The following historical
+evidence remains relevant and is retained rather than recharacterized as new.
 
 The whole-branch remediation adds numeric solid-volume and real ray-hit
 regressions (38 in³ for two exterior removals; 34 in³ for intersecting interior
