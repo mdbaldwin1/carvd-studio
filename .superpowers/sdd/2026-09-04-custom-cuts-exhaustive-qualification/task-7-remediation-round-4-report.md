@@ -1,5 +1,10 @@
 # Closure review remediation: disconnected stock and interactive patterns
 
+> Historical checkpoint, superseded by the subsequent H/I/J findings and
+> [round 5 remediation report](task-7-remediation-round-5-report.md).
+> The closure review confirmed F's performance fix closed; all later findings
+> were independently reproduced and fixed at `d984617`.
+
 Status: PASS; both Important findings and the Minor finding closed. Unreleased.
 Starting candidate: `116893eb62954dd150e05a0dd7da5f40004ecb6e`.
 Qualified code commit: `44033dda82398fd60f0e47883f5da6347706d27c`.
