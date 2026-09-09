@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Disconnected stock collision** — Through cutouts can leave multiple pieces of stock without restoring collision in earlier openings. Flat collision checks retain every outline and interior opening, and tilted rectangular-cut parts retain all remaining material cells.
+- **Responsive patterned cuts** — Compound-cut boards with large hole and counterbore patterns no longer stall on coplanar solid clipping. The clipping envelope preserves authored cutting planes, including nearly meeting end cuts, while geometry and collision caches remain reusable.
+- **Invalid cut offsets** — Non-finite rectangular offsets are rejected before normalization, saving, and fabrication validation. Malformed operations remain editable without crashing the preview or silently moving to zero when opened.
+
 - **Cut-aware collision and pocket support** — Adding an opening to a bevelled or mitred part no longer creates invisible collision corners beyond the cut plane. Blind rectangular and rounded pockets validate their complete removal against remaining end-cut, bevel, and tenon stock; intentional open channels and through-boundary cuts remain supported. Entire-blank removal is blocked for every operation family, including rounded-only stacks.
 - **Shared geometry for renamed and copied cuts** — Changing a label or copying an otherwise identical feature reuses its geometry instead of rebuilding it; authored dimensions, placement, pattern, and shape changes still invalidate the cache.
 

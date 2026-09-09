@@ -1,11 +1,6 @@
 import { Part } from '../types';
 import { getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
-import {
-  getPartWorldContour,
-  hasRenderablePartFeatures,
-  partsOverlapOnYAxis,
-  worldContoursOverlap
-} from './partFeatureGeometry';
+import { hasRenderablePartFeatures, partsOverlapOnYAxis, partsOverlapInPlan } from './partFeatureGeometry';
 import {
   convexShapesOverlap,
   detectFeatureMateSnaps,
@@ -75,7 +70,7 @@ export function partsOverlap(a: Part, b: Part, geometryCache?: GeometryCache): b
   // still rejected at the authored mitre plane.
   if (hasAngledCuts && !hasVerticalCuts(a) && !hasVerticalCuts(b) && isFlat(a) && isFlat(b)) {
     if (!partsOverlapOnYAxis(a, b, CONTOUR_TOLERANCE)) return false;
-    return worldContoursOverlap(getPartWorldContour(a), getPartWorldContour(b), CONTOUR_TOLERANCE);
+    return partsOverlapInPlan(a, b, CONTOUR_TOLERANCE);
   }
 
   // Bevels, compounds, edge bevels, and tilted horizontal cuts require the
@@ -92,9 +87,7 @@ export function partsOverlap(a: Part, b: Part, geometryCache?: GeometryCache): b
   if (hasNonRectangularContour(a) || hasNonRectangularContour(b)) {
     if (isFlat(a) && isFlat(b)) {
       if (!partsOverlapOnYAxis(a, b, CONTOUR_TOLERANCE)) return false;
-      const contourA = getPartWorldContour(a);
-      const contourB = getPartWorldContour(b);
-      return worldContoursOverlap(contourA, contourB, CONTOUR_TOLERANCE);
+      return partsOverlapInPlan(a, b, CONTOUR_TOLERANCE);
     }
 
     // Non-flat featured parts: use sub-OBB decomposition which handles 3D rotation

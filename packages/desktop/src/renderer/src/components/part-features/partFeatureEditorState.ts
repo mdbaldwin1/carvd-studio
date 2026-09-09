@@ -548,7 +548,7 @@ export function buildDraftFromFeature(
     };
   }
 
-  return normalizeRectCutDraft(
+  const rectDraft = normalizeRectCutDraft(
     {
       mode: 'rect_cut',
       featureId: feature.id,
@@ -567,6 +567,11 @@ export function buildDraftFromFeature(
     },
     _part ? { partLength: _part.length, partWidth: _part.width, partThickness: _part.thickness } : undefined
   );
+  // Existing malformed coordinates need explicit correction, not an implicit
+  // zero-offset move merely from opening the operation inspector.
+  if (!Number.isFinite(feature.placement.x)) rectDraft.placementX = feature.placement.x;
+  if (!Number.isFinite(feature.placement.z)) rectDraft.placementZ = feature.placement.z;
+  return rectDraft;
 }
 
 export function isEdgeBevelTarget(face: 'left_end' | 'right_end' | 'front_face' | 'back_face'): boolean {

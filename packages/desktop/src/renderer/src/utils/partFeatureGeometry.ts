@@ -4,12 +4,19 @@ import { Brush, Evaluator, INTERSECTION, SUBTRACTION } from 'three-bvh-csg';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js';
 import { CircularCutFeature, Part, PartFeature, RectCutFeature, RoundedCutFeature } from '../types';
-import { getEdgeBevelInsetAt, getEndCutInsetAt, getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
+import {
+  getEdgeBevelInsetAt,
+  getEndCutInsetAt,
+  getPartEdgeBevelProfiles,
+  getPartEndCutProfiles,
+  getPartStockPlanes
+} from './endCutUtils';
 import {
   getRectCutDepth,
   getRectCutPlanBounds,
   getRectCutPreviewSupport,
   getResolvedRectCutFeature,
+  hasFiniteRectCutPlacement,
   isBottomTarget,
   isSideFaceTarget,
   isTopTarget
@@ -50,7 +57,10 @@ function clonePoint(point: Point2): Point2 {
 }
 
 function getEnabledFeatures(part: Part): PartFeature[] {
-  return (part.features ?? []).filter((feature) => feature.enabled);
+  // Invalid authored data remains editable, but must never enter triangulation.
+  return (part.features ?? []).filter(
+    (feature) => feature.enabled && (feature.kind !== 'rect_cut' || hasFiniteRectCutPlacement(feature))
+  );
 }
 
 export function hasRenderablePartFeatures(part: Part): boolean {
@@ -372,7 +382,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
   const layers = Array.from(sliceY).sort((a, b) => a - b);
   const layerGeometries: THREE.BufferGeometry[] = [];
   const stock = getEnabledFeatures(part).some((feature) => feature.kind === 'end_cut')
-    ? new Brush(createEndCutOnlyGeometry(part))
+    ? new Brush(createStockClipGeometry(part))
     : null;
   stock?.updateMatrixWorld(true);
   const evaluator = new Evaluator();
@@ -487,6 +497,67 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     geometry.computeBoundingBox();
     geometry.computeBoundingSphere();
   }
+  return geometry;
+}
+
+/** Keep authored cutting planes exact, but move irrelevant blank walls outside
+ * the layer. Coplanar perforated caps otherwise trigger quadratic triangle
+ * splitting in CSG even though those caps require no clipping at all. */
+function createStockClipGeometry(part: Part): THREE.BufferGeometry {
+  const padding = Math.min(part.length, part.width, part.thickness) * 0.01;
+  const planes = getPartStockPlanes(part).map((plane) => ({
+    normal: new THREE.Vector3(plane.normal.x, plane.normal.y, plane.normal.z),
+    limit: plane.limit + (Object.values(plane.normal).filter((value) => value !== 0).length === 1 ? padding : 0)
+  }));
+  planes.push(
+    { normal: new THREE.Vector3(0, 1, 0), limit: part.thickness / 2 + padding },
+    { normal: new THREE.Vector3(0, -1, 0), limit: part.thickness / 2 + padding }
+  );
+  // Six half spaces have at most twenty triple-plane intersections. This
+  // bounded construction also handles meeting end planes: it does not assume
+  // the clipped stock still has eight rectangular-blank corners.
+  const points: THREE.Vector3[] = [];
+  for (let i = 0; i < planes.length - 2; i += 1) {
+    for (let j = i + 1; j < planes.length - 1; j += 1) {
+      for (let k = j + 1; k < planes.length; k += 1) {
+        const a = planes[i],
+          b = planes[j],
+          c = planes[k];
+        const bc = new THREE.Vector3().crossVectors(b.normal, c.normal);
+        const determinant = a.normal.dot(bc);
+        if (determinant === 0) continue;
+        const point = bc
+          .multiplyScalar(a.limit)
+          .addScaledVector(new THREE.Vector3().crossVectors(c.normal, a.normal), b.limit)
+          .addScaledVector(new THREE.Vector3().crossVectors(a.normal, b.normal), c.limit)
+          .divideScalar(determinant);
+        if (planes.every((plane) => plane.normal.dot(point) <= plane.limit + 1e-9)) points.push(point);
+      }
+    }
+  }
+  const vertices: number[] = [];
+  // A lower-dimensional intersection contains no solid to triangulate.
+  const origin = points[0];
+  const fullDimensional =
+    origin &&
+    points.some((a) =>
+      points.some((b) => {
+        const normal = new THREE.Vector3().crossVectors(a.clone().sub(origin), b.clone().sub(origin));
+        return points.some((c) => Math.abs(normal.dot(c.clone().sub(origin))) > Number.EPSILON * 64);
+      })
+    );
+  if (fullDimensional) {
+    const hull = new ConvexHull().setFromPoints(points);
+    for (const face of hull.faces) {
+      for (let edge = 0; edge < 3; edge += 1) {
+        const point = face.getEdge(edge).head().point;
+        vertices.push(point.x, point.y, point.z);
+      }
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.computeVertexNormals();
   return geometry;
 }
 
@@ -658,17 +729,22 @@ function buildTenonLayerContour(part: Part, tenons: RectCutFeature[], yMid: numb
   return deduped;
 }
 
-function getFeatureContour(part: Part): Point2[] {
+function getFeaturePolygons(part: Part): polygonClipping.MultiPolygon {
   const contour = buildOuterContour(part);
   const removals = getEnabledFeatures(part)
     .filter(
       (feature): feature is RectCutFeature => feature.kind === 'rect_cut' && feature.parameters.depthMode === 'through'
     )
     .map((feature) => getRectCutHole(feature, part));
-  if (!removals.length) return contour;
-  const polygons = differenceContours(contour, removals);
-  // The flat-outline interface accepts one contour. Bound disconnected stock
-  // conservatively; layer rendering retains every connected component.
+  if (!removals.length) return [[contour.concat(contour[0]).map(({ x, z }) => [x, z])]];
+  return differenceContours(contour, removals);
+}
+
+function getFeatureContour(part: Part): Point2[] {
+  const contour = buildOuterContour(part);
+  const polygons = getFeaturePolygons(part);
+  // Legacy single-outline bounds may be conservative. Collision uses every
+  // component and interior ring via getFeaturePolygons, never this fallback.
   return polygons.length === 1 ? polygons[0][0].slice(0, -1).map(([x, z]) => ({ x, z })) : contour;
 }
 
@@ -931,7 +1007,11 @@ export interface ContourSubBox {
  * actual material area — eliminating "ghost corners" from the bounding box.
  */
 export function getPartContourSubBoxes(part: Part): ContourSubBox[] {
-  const contour = hasRenderablePartFeatures(part) ? getFeatureContour(part) : buildOuterContour(part);
+  const polygons = getFeaturePolygons(part).map((rings) =>
+    rings.map((ring) => ring.slice(0, -1).map(([x, z]) => ({ x, z })))
+  );
+  if (!polygons.length) return [];
+  const contour = polygons.flat(2);
 
   const xSet = new Set<number>();
   const zSet = new Set<number>();
@@ -964,7 +1044,11 @@ export function getPartContourSubBoxes(part: Part): ContourSubBox[] {
     for (let j = 0; j < zs.length - 1; j++) {
       const cx = (xs[i] + xs[i + 1]) / 2;
       const cz = (zs[j] + zs[j + 1]) / 2;
-      if (pointInPolygon(cx, cz, contour)) {
+      if (
+        polygons.some(
+          ([outer, ...holes]) => pointInPolygon(cx, cz, outer) && !holes.some((hole) => pointInPolygon(cx, cz, hole))
+        )
+      ) {
         boxes.push({
           centerX: cx,
           centerZ: cz,
@@ -973,17 +1057,6 @@ export function getPartContourSubBoxes(part: Part): ContourSubBox[] {
         });
       }
     }
-  }
-
-  if (boxes.length === 0) {
-    return [
-      {
-        centerX: (xs[0] + xs[xs.length - 1]) / 2,
-        centerZ: (zs[0] + zs[zs.length - 1]) / 2,
-        halfX: (xs[xs.length - 1] - xs[0]) / 2,
-        halfZ: (zs[zs.length - 1] - zs[0]) / 2
-      }
-    ];
   }
 
   return boxes;
@@ -1019,7 +1092,10 @@ export function getPartWorldContour(
   position: { x: number; y: number; z: number } = part.position
 ): Point2[] {
   const contour = hasRenderablePartFeatures(part) ? getFeatureContour(part) : buildOuterContour(part);
+  return projectContour(part, contour, position);
+}
 
+function projectContour(part: Part, contour: Point2[], position: Part['position']): Point2[] {
   // Compute rotation about Y (parts lie flat, so Y rotation is the relevant one).
   // For axis-aligned parts (rotation 0,0,0) this is a no-op.
   const rad = ((part.rotation.y ?? 0) * Math.PI) / 180;
@@ -1053,6 +1129,34 @@ export function getPartWorldContour(
     x: m00 * p.x + m02 * -p.z + position.x,
     z: m20 * p.x + m22 * -p.z + position.z
   }));
+}
+
+/** Exact flat-stock overlap, preserving disconnected components and holes. */
+export function partsOverlapInPlan(a: Part, b: Part, tolerance = 1e-8): boolean {
+  const worldPolygons = (part: Part): polygonClipping.MultiPolygon =>
+    getFeaturePolygons(part).map((rings) =>
+      rings.map((ring) =>
+        projectContour(
+          part,
+          ring.map(([x, z]) => ({ x, z })),
+          part.position
+        ).map(({ x, z }) => [x, z])
+      )
+    );
+  const first = worldPolygons(a);
+  const second = worldPolygons(b);
+  if (!first.length || !second.length) return false;
+  const overlap = polygonClipping.intersection(first, second);
+  const area = (ring: polygonClipping.Ring): number =>
+    Math.abs(
+      ring.reduce((sum, [x, z], index) => {
+        const next = ring[(index + 1) % ring.length];
+        return sum + x * next[1] - next[0] * z;
+      }, 0)
+    ) / 2;
+  return overlap.some(
+    ([outer, ...holes]) => area(outer) - holes.reduce((sum, hole) => sum + area(hole), 0) > tolerance ** 2
+  );
 }
 
 /**

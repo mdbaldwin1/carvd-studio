@@ -1548,8 +1548,10 @@ describe('partFeatureGeometry', () => {
         const x = positions.getX(i);
         const y = positions.getY(i);
         if (x > 0) continue;
-        if (y > 0.49) topLeftMinX = Math.min(topLeftMinX, x);
-        if (y < -0.49) bottomLeftMinX = Math.min(bottomLeftMinX, x);
+        // Only the actual cap belongs to this literal end-plane measurement;
+        // clipping can add valid wall vertices inside a one-percent band.
+        if (Math.abs(y - 0.5) < 1e-6) topLeftMinX = Math.min(topLeftMinX, x);
+        if (Math.abs(y + 0.5) < 1e-6) bottomLeftMinX = Math.min(bottomLeftMinX, x);
       }
       return { topLeftMinX, bottomLeftMinX };
     }
@@ -1596,8 +1598,8 @@ describe('partFeatureGeometry', () => {
         const x = positions.getX(i);
         const y = positions.getY(i);
         if (x < 0) continue;
-        if (y > 0.49) topRightMaxX = Math.max(topRightMaxX, x);
-        if (y < -0.49) bottomRightMaxX = Math.max(bottomRightMaxX, x);
+        if (Math.abs(y - 0.5) < 1e-6) topRightMaxX = Math.max(topRightMaxX, x);
+        if (Math.abs(y + 0.5) < 1e-6) bottomRightMaxX = Math.max(bottomRightMaxX, x);
       }
       return { topRightMaxX, bottomRightMaxX };
     }

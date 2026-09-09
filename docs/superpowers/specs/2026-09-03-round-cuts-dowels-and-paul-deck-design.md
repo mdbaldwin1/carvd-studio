@@ -202,6 +202,8 @@ The current layered extrusion algorithm remains the source for straight cuts. Ro
 
 When end/edge cuts are combined with other removals, collision hull vertices are derived from the clipped render solid and cached with that geometry. New cut corners must not be warped beyond an authored end or bevel plane. This preserves the existing convex overlap policy while keeping its hull inside the same remaining solid's convex envelope.
 
+Flat rectangular through-cut collision retains the full polygon set, including disconnected components and interior rings. A single-outline bounding fallback must never stand in for the remaining material in collision checks. Tilted rectangular-cut sub-box decomposition also retains every component and excludes interior openings; angled 3D cuts retain their existing convex-envelope policy.
+
 The derived geometry bundle remains the single consumer contract for rendering, hit testing, bounds, snapping, measurement, ground constraints, and collision. No consumer receives a special-case round-hole path.
 
 ### Performance
@@ -216,6 +218,8 @@ Geometry keys include dimensions and authored shape, target, placement, referenc
 
 Invalid or excessive patterns are blocked before geometry construction.
 
+End/edge stock clipping keeps the authored cutting planes exact and moves only irrelevant blank walls outside the current layer, avoiding expensive coplanar splitting of perforated caps. Its six-halfspace envelope is built from at most twenty triple-plane candidates, including cases where end planes nearly meet; no slow coplanar fallback is used. Fixed 16- and 128-hole fixtures, 128-counterbore face/flip cases, and downstream collision/validation have conservative 1,000ms regression budgets; cache-only reuse has a 50ms budget. These are local regression ceilings, not a promise of identical timings on every device. Actual measured timings are recorded in the qualification report.
+
 ### Snap behavior
 
 Round feature edges are valid snap geometry when feature-anchor snapping is enabled. Hole centers are point anchors. Dowel visualization never becomes an ordinary move/selection target.
@@ -225,6 +229,7 @@ Round feature edges are valid snap geometry when feature-anchor snapping is enab
 Saving is blocked when:
 
 - diameter, profile dimensions, radius, depth, or counts are non-positive;
+- either authored rectangular offset is non-finite, checked before family defaults can replace an unused axis; malformed offsets stay available for correction but are excluded from preview triangulation;
 - a blind depth reaches or exceeds the available material thickness along the authored axis;
 - an entry profile extends beyond the targeted face;
 - an entry ellipse or swept blind/recess cutter extends beyond remaining end-cut, bevel, or tenon material, including breakout between valid entry and end disks at a tenon shoulder;

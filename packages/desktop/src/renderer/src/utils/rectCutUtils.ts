@@ -316,10 +316,17 @@ export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPrevie
   };
 }
 
+export function hasFiniteRectCutPlacement(feature: RectCutFeature): boolean {
+  return Number.isFinite(feature.placement.x) && Number.isFinite(feature.placement.z);
+}
+
 export function validateRectCutFeature(
   feature: RectCutFeature,
   part: Pick<Part, 'length' | 'width' | 'thickness' | 'features'>
 ): string | null {
+  // Check authored coordinates before family resolution replaces unused axes.
+  if (!hasFiniteRectCutPlacement(feature))
+    return 'Cut offsets must be finite numbers. Enter a valid number for both offsets.';
   const resolvedFeature = getResolvedRectCutFeature(feature, part);
   const sizeLength = resolvedFeature.parameters.size.length;
   const sizeWidth = resolvedFeature.parameters.size.width;
