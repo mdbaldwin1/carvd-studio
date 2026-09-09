@@ -46,7 +46,7 @@ function fitBlankDimensionColumns(
   units: 'imperial' | 'metric',
   widths: number[],
   positions: number[]
-): void {
+): boolean {
   const fontSize = doc.getFontSize();
   setPdfFontSize(doc, 9);
   const fields = ['cutLength', 'cutWidth', 'thickness'] as const;
@@ -57,13 +57,35 @@ function fitBlankDimensionColumns(
     )
   );
   doc.setFontSize(fontSize);
-  // Preserve the stock/operation columns and legible numeric text. Names can
-  // use the existing abbreviated table label; their full identity is below.
-  widths[2] -= extra.reduce((sum, value) => sum + value, 0);
+  const expansion = extra.reduce((sum, value) => sum + value, 0);
+  // Keep the identity header and row IDs readable. Exceptionally precise
+  // dimensions get their own labeled line, never rounded or squeezed over names.
+  if (widths[2] - expansion < 100) {
+    widths[2] = positions[6] - positions[2];
+    return true;
+  }
+  widths[2] -= expansion;
   for (let i = 0; i < 3; i++) {
     widths[i + 3] += extra[i];
     positions[i + 3] -= extra.slice(i).reduce((sum, value) => sum + value, 0);
   }
+  return false;
+}
+
+function drawBlankDimensionDetail(
+  doc: jsPDF,
+  group: GroupedCutInstruction,
+  units: 'imperial' | 'metric',
+  x: number,
+  y: number,
+  width: number
+): void {
+  const dimensions = [
+    `Blank L: ${formatMeasurementWithUnit(group.cutLength, units)}`,
+    `Blank W: ${formatMeasurementWithUnit(group.cutWidth, units)}`,
+    `Thk: ${formatMeasurementWithUnit(group.thickness, units)}`
+  ];
+  dimensions.forEach((dimension, index) => doc.text(dimension, x + (index * width) / 3, y));
 }
 
 function drawFabricationOperations(
@@ -636,7 +658,7 @@ export async function exportCutListToPdf(
     margin + 342,
     margin + 418
   ];
-  fitBlankDimensionColumns(doc, grouped, units, colWidths, colX);
+  const stackedDimensions = fitBlankDimensionColumns(doc, grouped, units, colWidths, colX);
 
   doc.setFillColor(240, 240, 240);
   doc.rect(margin, y - 12, contentWidth, 18, 'F');
@@ -645,9 +667,11 @@ export async function exportCutListToPdf(
   doc.text('\u2610', colX[0], y);
   doc.text('Qty', colX[1], y);
   doc.text('Part IDs + Names', colX[2], y);
-  doc.text('Blank L', colX[3], y);
-  doc.text('Blank W', colX[4], y);
-  doc.text('Thk', colX[5], y);
+  if (!stackedDimensions) {
+    doc.text('Blank L', colX[3], y);
+    doc.text('Blank W', colX[4], y);
+    doc.text('Thk', colX[5], y);
+  }
   doc.text('Stock', colX[6], y);
   doc.text('Ops / Notes', colX[7], y);
 
@@ -657,7 +681,7 @@ export async function exportCutListToPdf(
 
   for (const group of grouped) {
     // Check for page break
-    if (y > pageHeight - 60) {
+    if (y + (stackedDimensions ? 18 : 0) > pageHeight - 60) {
       addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
       doc.addPage();
       y = margin + 20;
@@ -685,9 +709,11 @@ export async function exportCutListToPdf(
     }
     doc.text(displayName, colX[2], y);
 
-    doc.text(formatMeasurementWithUnit(group.cutLength, units), colX[3], y);
-    doc.text(formatMeasurementWithUnit(group.cutWidth, units), colX[4], y);
-    doc.text(formatMeasurementWithUnit(group.thickness, units), colX[5], y);
+    if (!stackedDimensions) {
+      doc.text(formatMeasurementWithUnit(group.cutLength, units), colX[3], y);
+      doc.text(formatMeasurementWithUnit(group.cutWidth, units), colX[4], y);
+      doc.text(formatMeasurementWithUnit(group.thickness, units), colX[5], y);
+    }
 
     // Stock name with notes
     const stockWithNotes = notes.length > 0 ? `${group.stockName} (${notes.join(', ')})` : group.stockName;
@@ -703,7 +729,10 @@ export async function exportCutListToPdf(
     }
     doc.text(displayOps, colX[7], y);
 
-    y += 16;
+    if (stackedDimensions) {
+      drawBlankDimensionDetail(doc, group, units, colX[2], y + 15, pageWidth - margin - colX[2]);
+    }
+    y += stackedDimensions ? 34 : 16;
   }
 
   y = drawFabricationOperations(
@@ -1045,7 +1074,7 @@ export async function exportProjectReportToPdf(
     margin + 330,
     margin + 404
   ];
-  fitBlankDimensionColumns(doc, grouped, units, colWidths2, colX2);
+  const stackedDimensions = fitBlankDimensionColumns(doc, grouped, units, colWidths2, colX2);
 
   doc.setFillColor(240, 240, 240);
   doc.rect(margin, y - 12, contentWidth, 18, 'F');
@@ -1054,9 +1083,11 @@ export async function exportProjectReportToPdf(
   doc.text('\u2610', colX2[0], y);
   doc.text('Qty', colX2[1], y);
   doc.text('Part IDs + Names', colX2[2], y);
-  doc.text('Blank L', colX2[3], y);
-  doc.text('Blank W', colX2[4], y);
-  doc.text('Thk', colX2[5], y);
+  if (!stackedDimensions) {
+    doc.text('Blank L', colX2[3], y);
+    doc.text('Blank W', colX2[4], y);
+    doc.text('Thk', colX2[5], y);
+  }
   doc.text('Stock', colX2[6], y);
   doc.text('Ops / Notes', colX2[7], y);
 
@@ -1065,7 +1096,7 @@ export async function exportProjectReportToPdf(
   setPdfFontSize(doc, 8);
 
   for (const group of grouped) {
-    if (y > pageHeight - 50) {
+    if (y + (stackedDimensions ? 18 : 0) > pageHeight - 50) {
       addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
       doc.addPage();
       y = margin + 20;
@@ -1089,9 +1120,11 @@ export async function exportProjectReportToPdf(
       displayName = displayName.substring(0, displayName.length - 4) + '...';
     }
     doc.text(displayName, colX2[2], y);
-    doc.text(formatMeasurementWithUnit(group.cutLength, units), colX2[3], y);
-    doc.text(formatMeasurementWithUnit(group.cutWidth, units), colX2[4], y);
-    doc.text(formatMeasurementWithUnit(group.thickness, units), colX2[5], y);
+    if (!stackedDimensions) {
+      doc.text(formatMeasurementWithUnit(group.cutLength, units), colX2[3], y);
+      doc.text(formatMeasurementWithUnit(group.cutWidth, units), colX2[4], y);
+      doc.text(formatMeasurementWithUnit(group.thickness, units), colX2[5], y);
+    }
 
     const stockWithNotes = notes.length > 0 ? `${group.stockName} (${notes.join(', ')})` : group.stockName;
     let displayStock = stockWithNotes;
@@ -1106,7 +1139,10 @@ export async function exportProjectReportToPdf(
     }
     doc.text(displayOps, colX2[7], y);
 
-    y += 14;
+    if (stackedDimensions) {
+      drawBlankDimensionDetail(doc, group, units, colX2[2], y + 14, pageWidth - margin - colX2[2]);
+    }
+    y += stackedDimensions ? 32 : 14;
   }
 
   y = drawFabricationOperations(

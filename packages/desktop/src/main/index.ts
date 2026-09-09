@@ -456,9 +456,6 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     const currentBounds = newWindow.getBounds();
     setWindowBounds(currentBounds);
 
-    // In test mode, always allow close (prevents teardown timeout)
-    if (isTest) return;
-
     // If this window is allowed to close, proceed
     if (windowsAllowedToClose.has(newWindow)) {
       windowsAllowedToClose.delete(newWindow);

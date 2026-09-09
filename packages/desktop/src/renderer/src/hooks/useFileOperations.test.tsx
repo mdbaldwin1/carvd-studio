@@ -3,6 +3,7 @@ import { renderHook, act, render } from '@testing-library/react';
 import React from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useUIStore } from '../store/uiStore';
+import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 
 vi.mock('../utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 
@@ -86,6 +87,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  usePartCutsEditingStore.getState().finishEditing();
   onOpenProjectCallback = null;
   onBeforeCloseCallback = null;
 
@@ -159,6 +161,112 @@ function renderWithDialogs(options?: Parameters<typeof useFileOperations>[0]) {
 // ============================================================
 
 describe('useFileOperations', () => {
+  describe('round 7 active inspector file boundaries', () => {
+    it('L1 retains the exact modal validation error until cancel, then clears it', async () => {
+      vi.mocked(hasUnsavedChanges).mockReturnValue(true);
+      renderWithDialogs({
+        isEditingPartCuts: true,
+        onSavePartCuts: () => {
+          useUIStore.setState({
+            toast: { id: 'cut-error', message: 'Hole profile extends beyond the selected face.' }
+          });
+          return false;
+        }
+      });
+      await act(async () => {
+        onBeforeCloseCallback!();
+      });
+      await act(async () => {
+        await getDialogProps().onSave();
+      });
+      expect(getDialogProps().saveError).toBe('Hole profile extends beyond the selected face.');
+      expect(getDialogProps().isOpen).toBe(true);
+      expect(saveProject).not.toHaveBeenCalled();
+      await act(async () => {
+        await getDialogProps().onCancel();
+      });
+      await act(async () => {
+        onBeforeCloseCallback!();
+      });
+      expect(getDialogProps().saveError).toBeNull();
+    });
+    it.each([false, true])('L1 native close detects inspector-only changes; project dirty=%s', async (projectDirty) => {
+      vi.mocked(hasUnsavedChanges).mockReturnValue(projectDirty);
+      usePartCutsEditingStore.setState({ isEditingPartCuts: true, inspectorDirty: true });
+      renderWithDialogs({ isEditingPartCuts: true, onSavePartCuts: vi.fn(() => true) });
+      await act(async () => {
+        onBeforeCloseCallback!();
+      });
+      expect(window.electronAPI.confirmClose).not.toHaveBeenCalled();
+      expect(getDialogProps().isOpen).toBe(true);
+    });
+    it.each([true, false])('L1 close dialog validates the active cut before saving; valid=%s', async (valid) => {
+      vi.mocked(hasUnsavedChanges).mockReturnValue(true);
+      const order: string[] = [];
+      const onSavePartCuts = vi.fn(() => {
+        order.push('cut');
+        return valid;
+      });
+      vi.mocked(saveProject).mockImplementation(async () => {
+        order.push('file');
+        return { success: true };
+      });
+      renderWithDialogs({ isEditingPartCuts: true, onSavePartCuts });
+      await act(async () => {
+        onBeforeCloseCallback!();
+      });
+      await act(async () => {
+        await getDialogProps().onSave();
+      });
+      expect(order).toEqual(valid ? ['cut', 'file'] : ['cut']);
+      expect(getDialogProps().isOpen).toBe(!valid);
+      expect(window.electronAPI.confirmClose).toHaveBeenCalledTimes(valid ? 1 : 0);
+    });
+    it.each(['direct', 'Meta', 'Control'] as const)(
+      'L2 %s Save As commits valid and refuses invalid focused edits',
+      async (route) => {
+        const order: string[] = [];
+        let valid = true;
+        const onSavePartCuts = vi.fn(() => {
+          order.push('cut');
+          return valid;
+        });
+        vi.mocked(saveProjectAs).mockImplementation(async () => {
+          order.push('file');
+          return { success: true };
+        });
+        const { result } = renderHook(() => useFileOperations({ isEditingPartCuts: true, onSavePartCuts }));
+        const input = document.createElement('input');
+        document.body.append(input);
+        input.focus();
+        const save = async () => {
+          await act(async () => {
+            if (route === 'direct') await result.current.handleSaveAs();
+            else
+              input.dispatchEvent(
+                new KeyboardEvent('keydown', {
+                  key: 'S',
+                  shiftKey: true,
+                  metaKey: route === 'Meta',
+                  ctrlKey: route === 'Control',
+                  bubbles: true
+                })
+              );
+          });
+        };
+        try {
+          await save();
+          expect.soft(order).toEqual(['cut', 'file']);
+          order.length = 0;
+          valid = false;
+          await save();
+          expect(order).toEqual(['cut']);
+        } finally {
+          input.remove();
+        }
+      }
+    );
+  });
   describe('handleSave', () => {
     it.each([true, false])('K7 commits active cuts before writing the project; valid=%s', async (valid) => {
       const order: string[] = [];

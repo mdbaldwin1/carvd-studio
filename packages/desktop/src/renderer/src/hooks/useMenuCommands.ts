@@ -34,6 +34,7 @@ interface UseMenuCommandsOptions {
   isEditingTemplate?: boolean;
   isEditingPartCuts?: boolean;
   onSavePartCuts?: () => void | Promise<void>;
+  onSavePartCutsAs?: () => void | Promise<void>;
   onSaveTemplate?: () => Promise<void>;
   onSaveAssembly?: () => Promise<void>;
 }
@@ -149,7 +150,8 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         case 'save-project-as': {
           // "Save As" doesn't apply to focused editing modes
           if (opts.isEditingPartCuts) {
-            showToast('Use "Save" to commit part cuts before saving the project', 'info');
+            if (opts.onSavePartCutsAs) await opts.onSavePartCutsAs();
+            else showToast('Use "Save" to commit part cuts before saving the project', 'info');
             break;
           }
           if (opts.isEditingTemplate) {

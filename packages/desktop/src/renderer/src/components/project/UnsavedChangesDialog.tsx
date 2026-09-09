@@ -19,6 +19,7 @@ interface UnsavedChangesDialogProps {
   isOpen: boolean;
   action: UnsavedChangesAction;
   customMessage?: string;
+  saveError?: string | null;
   onSave: () => void;
   onDiscard: () => void;
   onCancel: () => void;
@@ -28,6 +29,7 @@ export function UnsavedChangesDialog({
   isOpen,
   action,
   customMessage,
+  saveError,
   onSave,
   onDiscard,
   onCancel
@@ -73,6 +75,11 @@ export function UnsavedChangesDialog({
         <div className="px-5 py-4">
           <AlertDialogDescription className="mb-2">{getMessage()}</AlertDialogDescription>
           <p className="m-0 text-[13px] text-text-muted">Your changes will be lost if you don&apos;t save them.</p>
+          {saveError && (
+            <p role="alert" className="mt-3 text-sm text-danger">
+              {saveError} Cancel to return to the editor and correct this operation.
+            </p>
+          )}
         </div>
 
         <AlertDialogFooter>

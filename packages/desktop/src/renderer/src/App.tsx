@@ -207,6 +207,7 @@ function App() {
     handleOpenRecent,
     handleRelocateFile,
     handleSave,
+    handleSaveAs,
     handleGoHome
   } = useFileOperations({
     isEditingTemplate,
@@ -805,6 +806,7 @@ function App() {
     // Focused editing modes - route save commands appropriately
     isEditingPartCuts,
     onSavePartCuts: handlePrimarySave,
+    onSavePartCutsAs: handleSaveAs,
     isEditingTemplate,
     onSaveTemplate: saveTemplateDirectly,
     onSaveAssembly: saveAssemblyAndExit

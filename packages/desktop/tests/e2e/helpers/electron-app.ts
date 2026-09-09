@@ -65,6 +65,7 @@ export interface RunningElectronApp {
 export interface LaunchElectronAppOptions {
   analyticsMode?: 'success' | 'offline' | 'timeout';
   analyticsConsent?: 'unknown' | 'granted' | 'denied';
+  hasCompletedWelcome?: boolean;
   userDataDir?: string;
 }
 
@@ -118,12 +119,20 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
   const isNewProfile = options.userDataDir === undefined;
   const userDataDir = options.userDataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'carvd-e2e-'));
   const analyticsConsent = options.analyticsConsent ?? (isNewProfile ? 'denied' : undefined);
-  if (analyticsConsent) {
+  if (analyticsConsent || options.hasCompletedWelcome !== undefined) {
     const preferencesPath = path.join(userDataDir, 'preferences.json');
     const existingPreferences = fs.existsSync(preferencesPath)
       ? (JSON.parse(fs.readFileSync(preferencesPath, 'utf8')) as Record<string, unknown>)
       : {};
-    fs.writeFileSync(preferencesPath, JSON.stringify({ ...existingPreferences, analyticsConsent }), 'utf8');
+    fs.writeFileSync(
+      preferencesPath,
+      JSON.stringify({
+        ...existingPreferences,
+        ...(analyticsConsent ? { analyticsConsent } : {}),
+        ...(options.hasCompletedWelcome !== undefined ? { hasCompletedWelcome: options.hasCompletedWelcome } : {})
+      }),
+      'utf8'
+    );
   }
   const args = [appPath, '--test-mode', '--analytics-e2e-control', `--user-data-dir=${userDataDir}`];
   if (process.env.CI) {
@@ -199,6 +208,11 @@ export async function closeElectronApp(
     // A failed launch can leave Playwright's ElectronApplication wrapper unusable.
   }
   try {
+    // Teardown is not a user close: bypass dialogs here, not in the production
+    // BrowserWindow close listener, so tests can exercise the real close guard.
+    await running.electronApp.evaluate(({ BrowserWindow }) => {
+      for (const window of BrowserWindow.getAllWindows()) window.destroy();
+    });
     await Promise.race([
       running.electronApp.close(),
       new Promise<void>((_, reject) => setTimeout(() => reject(new Error('close timeout')), 5000))

@@ -162,6 +162,13 @@ describe('useMenuCommands', () => {
   });
 
   describe('file commands', () => {
+    it('L2 native Save As delegates to the same guarded active-cut file route', async () => {
+      const onSavePartCutsAs = vi.fn().mockResolvedValue(undefined);
+      renderHook(() => useMenuCommands({ isEditingPartCuts: true, onSavePartCutsAs }));
+      await menuCommandHandler('save-project-as');
+      expect(onSavePartCutsAs).toHaveBeenCalledOnce();
+      expect(saveProjectAs).not.toHaveBeenCalled();
+    });
     it('handles new-project with provided handler', async () => {
       const onNewProject = vi.fn().mockResolvedValue(undefined);
       renderHook(() => useMenuCommands({ onNewProject }));

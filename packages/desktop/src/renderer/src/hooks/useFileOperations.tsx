@@ -4,7 +4,9 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useProjectStore } from '../store/projectStore';
+import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 import { useUIStore } from '../store/uiStore';
 import {
   saveProject,
@@ -76,6 +78,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
 
   // Dialog state
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [dialogSaveError, setDialogSaveError] = useState<string | null>(null);
   const [recentProjects, setRecentProjects] = useState<string[]>([]);
 
   // File recovery state
@@ -258,7 +261,15 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   // Handle window close event from main process
   useEffect(() => {
     const cleanup = window.electronAPI.onBeforeClose(() => {
-      if (hasUnsavedChanges()) {
+      setDialogSaveError(null);
+      // Fraction inputs commit on blur. Read the live session after that commit,
+      // not only the project snapshot (Save Cut has not updated the project yet).
+      flushSync(() => {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      });
+      const cuts = usePartCutsEditingStore.getState();
+      const sourceFeatures = useProjectStore.getState().parts.find((part) => part.id === cuts.sourcePartId)?.features;
+      if (hasUnsavedChanges() || (cuts.isEditingPartCuts && cuts.hasUnsavedDraftChanges(sourceFeatures))) {
         // Show the unsaved changes dialog
         setPendingAction({
           type: 'close',
@@ -317,6 +328,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   ]);
 
   const handleSaveAs = useCallback(async () => {
+    if (isEditingPartCuts && onSavePartCuts && !onSavePartCuts()) return;
     // "Save As" doesn't apply to template or assembly editing
     if (isEditingTemplate) {
       showToast('Use "Save Template" to save template changes', 'info');
@@ -335,7 +347,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       showToast(`Error saving: ${result.error}`, 'error');
     }
     // If canceled, do nothing
-  }, [showToast, refreshRecentProjects, isEditingTemplate, isEditingAssembly]);
+  }, [showToast, refreshRecentProjects, isEditingTemplate, isEditingAssembly, isEditingPartCuts, onSavePartCuts]);
 
   const handleNew = useCallback(async () => {
     // Block when editing template or assembly
@@ -468,6 +480,21 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   const handleDialogSave = useCallback(async () => {
     const pending = pendingAction;
     const isCloseAction = pending?.type === 'close';
+    // A rejected inspector edit must leave both the editor and pending close
+    // intact; the user can cancel the dialog to correct the specific error.
+    const previousToast = useUIStore.getState().toast;
+    if (isEditingPartCuts && onSavePartCuts && !onSavePartCuts()) {
+      const saveToast = useUIStore.getState().toast;
+      // The save callback reports the exact validation failure through the UI
+      // store. Repeat it inside the modal, since outside toasts are aria-hidden.
+      setDialogSaveError(
+        saveToast && saveToast !== previousToast
+          ? saveToast.message
+          : 'Cannot save this cut. Cancel and correct the highlighted operation.'
+      );
+      return;
+    }
+    setDialogSaveError(null);
     setPendingAction(null);
 
     const result = await saveProject();
@@ -483,9 +510,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       // User canceled save dialog during close - cancel the close
       await window.electronAPI.cancelClose();
     }
-  }, [pendingAction, showToast]);
+  }, [pendingAction, showToast, isEditingPartCuts, onSavePartCuts]);
 
   const handleDialogDiscard = useCallback(async () => {
+    setDialogSaveError(null);
     const pending = pendingAction;
     setPendingAction(null);
     if (pending) {
@@ -494,6 +522,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   }, [pendingAction]);
 
   const handleDialogCancel = useCallback(async () => {
+    setDialogSaveError(null);
     const isCloseAction = pendingAction?.type === 'close';
     setPendingAction(null);
     // If this was a close action, notify main process that close was canceled
@@ -549,12 +578,13 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       <UnsavedChangesDialog
         isOpen={pendingAction !== null}
         action={pendingAction?.type || 'custom'}
+        saveError={dialogSaveError}
         onSave={handleDialogSave}
         onDiscard={handleDialogDiscard}
         onCancel={handleDialogCancel}
       />
     ),
-    [pendingAction, handleDialogSave, handleDialogDiscard, handleDialogCancel]
+    [pendingAction, dialogSaveError, handleDialogSave, handleDialogDiscard, handleDialogCancel]
   );
 
   // File recovery modal component
