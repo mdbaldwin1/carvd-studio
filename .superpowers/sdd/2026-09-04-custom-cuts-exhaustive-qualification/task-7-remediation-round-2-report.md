@@ -1,5 +1,10 @@
 # Independent review pass 2 remediation
 
+Historical checkpoint: the post-fix independent review closed Q1–Q11 and
+identified three further Important issues plus one Minor cache issue. The
+[round 3 report](task-7-remediation-round-3-report.md) supersedes this report's
+acceptance stamp and records their remediation and fresh gates.
+
 Status: PASS; all eleven Important findings and confirmed UX defects closed. Unreleased.
 Starting code/evidence commit: `eaaddfe8b45eff97fa78c21c37408ebbcc558c6a`.
 Qualified code commit: `28d81abc342466a7519676de29b5bcdb61d3a2b3`.

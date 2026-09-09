@@ -2,20 +2,21 @@
 
 ## Release qualification
 
-**Independent review pass 2 remediation gates PASS — unreleased.**
+**Post-fix review remediation gates PASS — unreleased.**
 
-Independent review pass 2 superseded the preceding R1–R15 / A–D checkpoint
-with eleven further Important findings and confirmed accessibility/clarity
-issues. All were independently reproduced RED and fixed test-first at
-`28d81abc342466a7519676de29b5bcdb61d3a2b3`. The fresh complete desktop gate
-passed **4,066 renderer tests, 213 main-process tests, and all 135 real-Electron
-tests**. This round adds 175 renderer tests, including expanded physical plane,
-volume, cone-wall, precision, hardware-interference, and remaining-stock probes.
-No requested finding is deferred. Original R1–R15 and A–D regressions remain
-covered; the follow-up performed a self-audit, not another independent review.
-See the complete finding-to-test, root-cause, RED/GREEN, fixture reconciliation,
-and gate mapping in the
-[round 2 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-2-report.md).
+The post-fix independent review closed Q1–Q11 and identified three Important
+findings plus one Minor cache finding. All four were independently reproduced
+RED and fixed test-first at `16e5827176c20242c1dfff88ceceda0be99d4486`.
+The fresh complete desktop gate passed **4,177 renderer tests, 213 main-process
+tests, and all 135 real-Electron tests**. This round adds 111 renderer tests
+covering literal collision planes, removal monotonicity, complete pocket
+support, all-family empty-solid rejection, real author/final-save controls,
+and geometry-cache identity. No requested finding is deferred. Original
+R1–R15, scoped A–D and Q1–Q11 regressions remain covered; this remediation
+performed an adjacent self-audit, not another independent review. See the
+complete finding-to-test, root-cause, RED/GREEN, fixture reconciliation and
+gate mapping in the
+[round 3 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-3-report.md).
 
 P0 means any crash, lost/corrupted feature, wrong face or removal direction, false
 valid/invalid geometry, copy/undo/save corruption, valid joinery blocked by
@@ -33,7 +34,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | ------------------------------- | ------------------------------------------------------------------- |
 | Qualification date              | 2026-09-08, America/New_York                                        |
 | Starting Task 7 commit          | `6b9898897c14089d72291c3874211e97328f6b87`                          |
-| Qualified code candidate        | `28d81abc342466a7519676de29b5bcdb61d3a2b3`                          |
+| Qualified code candidate        | `16e5827176c20242c1dfff88ceceda0be99d4486`                          |
 | Comparison base                 | `origin/develop` at `459b6a5177b9`; local `develop` was stale       |
 | OS                              | macOS 26.6.2, build 25G83                                           |
 | Architecture                    | arm64                                                               |
@@ -41,7 +42,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | Desktop / Electron / Playwright | 1.3.0 / 41.1.1 / 1.59.1                                             |
 | Electron viewport               | 1400 × 900                                                          |
 | Candidate static verification   | desktop lint/typecheck/build exit 0; Prettier and diff checks clean |
-| Candidate runtime verification  | 4,066 renderer + 213 main + 135 real-Electron tests passed          |
+| Candidate runtime verification  | 4,177 renderer + 213 main + 135 real-Electron tests passed          |
 
 The requested `/tmp/carvd-manual-qa-matrix.md` was absent at Task 6 start and
 again at review remediation time. The checked-in task briefs, master plan,
@@ -83,17 +84,38 @@ re-ran every configured desktop gate.
   solved by relaxing production validation or bypassing a prompt/assertion.
 - The application version remains 1.3.0. Task 7 did not bump a version, change
   release state, merge, push, open a PR, tag, package, publish, or release.
+- The post-fix review closed Q1–Q11 and added three Important findings and one
+  Minor finding. All four were reproduced RED and fixed at `16e5827`. Mixed
+  collision hulls now follow the clipped solid; complete blind pocket support
+  covers rounded and rectangular families; the no-material guard covers every
+  supported removal family; copied/renamed cuts reuse geometry. The fresh full
+  gate passed 4,177 renderer, 213 main and 135 Electron tests (2.5 minutes).
+  The earlier 134/135 Electron run identified an actually unsupported stress
+  pocket, not a validation regression: the fixture now verifies rejection at
+  offset 76, then corrects to 74 and continues every original downstream action.
+  The focused flow passed 1/1 before the fresh complete rerun. Full details and
+  literal stock-plane arithmetic are retained in the round 3 report.
 
 ## Evidence standard
 
-The latest round adds 96 end/edge plane combinations with exact integrated
+The latest round adds 111 renderer tests: 65 collision cases, including 64
+end/edge/flip/boundary combinations in both orders; 33 rounded/rectangular
+pocket support and actual save-flow cases; three empty-solid cases; and ten
+cache reuse/invalidation cases. Original review defects were independently
+RED before their fixes; broad affected coverage passed 785/785 across 12 files.
+Current raw logs are `/tmp/carvd-review-round3.PmTCyH`. After Electron, the
+production-only build passed (465 main, 2 preload, 2,934 renderer modules) and
+the analytics test-control boundary check passed. Added-line credential,
+focused/skipped-test, debugger, scope and diff checks were clean.
+
+Round 2 added 96 end/edge plane combinations with exact integrated
 volume and literal rays, both-end tenon composition, continuous Top/Bottom
 countersink walls, sub-thousandth blind floors, .755/.74-inch input preservation
 in both units, rounded-profile support/tangency, complete pattern equivalence,
 physical dowel interference, and a blind bore crossing a tenon shoulder between
 two valid caps. Save Cut, Save Part, main-canvas resize, and Cut List gates are
 covered. Unit announcements, toggle states, specific invalid-operation feedback,
-and a direct Fix cut action are verified through semantic controls. Current
+and a direct Fix cut action are verified through semantic controls. Historical
 raw logs are `/tmp/carvd-review-round2.4FPEbV`; production-only rebuild and
 analytics E2E boundary checks passed after Electron. The following historical
 evidence remains relevant and is retained rather than recharacterized as new.
@@ -545,7 +567,8 @@ worker to respond`; Playwright timed out in `beforeEach` at
 | `15c7034` | Preserve both compound-cut mitre and bevel geometry on boards with other cuts                         |
 | `bd62e06` | Revalidate circular and rounded cuts at final save and Cut List boundaries                            |
 
-`CHANGELOG.md` records all six user-visible production corrections.
+`CHANGELOG.md` records the historical production corrections and subsequent
+review-remediation fixes under Unreleased.
 
 ## Residual ruling
 
