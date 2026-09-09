@@ -308,6 +308,11 @@ test.describe('hands-on custom cuts qualification', () => {
     await fillMeasurement(window, 'Hole Depth', '12.7');
     await fillMeasurement(window, 'Offset Along Face', '228.6');
     await fillMeasurement(window, 'Offset Across Face', '6.35');
+    // The right 45° Back-long mitre removes the Front face beyond x=2 in
+    // on this 24 × 10 blank. x=9 was never a physically valid hole location.
+    await expect(window.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    await expect(window.getByRole('alert')).toContainText('remaining material');
+    await fillMeasurement(window, 'Offset Along Face', '25.4');
     await saveCut(window);
     await window.getByRole('button', { name: 'Save Part' }).click();
 
@@ -350,7 +355,7 @@ test.describe('hands-on custom cuts qualification', () => {
     expect(metric.mortiseSecondary).toBeCloseTo(2, 8);
     expect(metric.holeDiameter).toBeCloseTo(0.25, 8);
     expect(metric.holeDepth).toBeCloseTo(0.5, 8);
-    expect(metric.holePrimary).toBeCloseTo(9, 8);
+    expect(metric.holePrimary).toBeCloseTo(1, 8);
     expect(metric.holeSecondary).toBeCloseTo(0.25, 8);
 
     await setProjectUnits(window, 'imperial');

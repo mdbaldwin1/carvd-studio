@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
-import { Brush, Evaluator, SUBTRACTION } from 'three-bvh-csg';
+import { Brush, Evaluator, INTERSECTION, SUBTRACTION } from 'three-bvh-csg';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { CircularCutFeature, Part, PartFeature, RectCutFeature, RoundedCutFeature } from '../types';
 import { getEdgeBevelInsetAt, getEndCutInsetAt, getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
@@ -216,42 +216,42 @@ function createEndCutOnlyGeometry(part: Part): THREE.BufferGeometry {
   const backZAt = (y: number) => halfWidth - getEdgeBevelInsetAt('back', edgeProfiles, part, { y });
 
   const lfb = {
-    x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z: -halfWidth }),
+    x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z: frontZAt(-halfThickness) }),
     y: -halfThickness,
     z: frontZAt(-halfThickness)
   };
   const lbb = {
-    x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z: halfWidth }),
+    x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: -halfThickness, z: backZAt(-halfThickness) }),
     y: -halfThickness,
     z: backZAt(-halfThickness)
   };
   const lbt = {
-    x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: halfThickness, z: halfWidth }),
+    x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: halfThickness, z: backZAt(halfThickness) }),
     y: halfThickness,
     z: backZAt(halfThickness)
   };
   const lft = {
-    x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: halfThickness, z: -halfWidth }),
+    x: -halfLength + getEndCutInsetAt('left', profiles, part, { y: halfThickness, z: frontZAt(halfThickness) }),
     y: halfThickness,
     z: frontZAt(halfThickness)
   };
   const rfb = {
-    x: halfLength - getEndCutInsetAt('right', profiles, part, { y: -halfThickness, z: -halfWidth }),
+    x: halfLength - getEndCutInsetAt('right', profiles, part, { y: -halfThickness, z: frontZAt(-halfThickness) }),
     y: -halfThickness,
     z: frontZAt(-halfThickness)
   };
   const rbb = {
-    x: halfLength - getEndCutInsetAt('right', profiles, part, { y: -halfThickness, z: halfWidth }),
+    x: halfLength - getEndCutInsetAt('right', profiles, part, { y: -halfThickness, z: backZAt(-halfThickness) }),
     y: -halfThickness,
     z: backZAt(-halfThickness)
   };
   const rbt = {
-    x: halfLength - getEndCutInsetAt('right', profiles, part, { y: halfThickness, z: halfWidth }),
+    x: halfLength - getEndCutInsetAt('right', profiles, part, { y: halfThickness, z: backZAt(halfThickness) }),
     y: halfThickness,
     z: backZAt(halfThickness)
   };
   const rft = {
-    x: halfLength - getEndCutInsetAt('right', profiles, part, { y: halfThickness, z: -halfWidth }),
+    x: halfLength - getEndCutInsetAt('right', profiles, part, { y: halfThickness, z: frontZAt(halfThickness) }),
     y: halfThickness,
     z: frontZAt(halfThickness)
   };
@@ -283,7 +283,9 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     return createEndCutOnlyGeometry(part);
   }
 
-  const contour = buildOuterContour(part);
+  // Build removals in the authored blank coordinates. End/edge cuts clip this
+  // solid afterwards; moving boundary vertices would distort other cuts.
+  const contour = buildOuterContour({ ...part, features: [] });
   const rectCuts = getEnabledFeatures(part)
     .filter((feature): feature is RectCutFeature => feature.kind === 'rect_cut')
     .map((feature) => getResolvedRectCutFeature(feature, part));
@@ -293,6 +295,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
   const circularCuts = getEnabledFeatures(part).filter(
     (feature): feature is CircularCutFeature =>
       feature.kind === 'circular_cut' &&
+      feature.cutType !== 'countersink' &&
       feature.target.type === 'face' &&
       feature.parameters.tilt === 0 &&
       (feature.target.face === 'top_face' || feature.target.face === 'bottom_face')
@@ -347,32 +350,28 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     else sliceY.add(-part.thickness / 2 + feature.parameters.depth);
   }
   for (const feature of circularCuts) {
-    if (feature.parameters.tilt === 0) continue;
-    for (let step = 1; step < 16; step += 1) sliceY.add(-part.thickness / 2 + (part.thickness * step) / 16);
-  }
-  for (const feature of circularCuts) {
-    let recessDepth = 0;
-    if (feature.cutType === 'counterbore') recessDepth = feature.parameters.counterbore?.depth ?? 0;
-    if (feature.cutType === 'countersink' && feature.parameters.countersink) {
-      const radialDifference = (feature.parameters.countersink.majorDiameter - feature.parameters.diameter) / 2;
-      recessDepth = radialDifference / Math.tan((feature.parameters.countersink.includedAngle * Math.PI) / 360);
-    }
+    const recessDepth = feature.cutType === 'counterbore' ? (feature.parameters.counterbore?.depth ?? 0) : 0;
     if (recessDepth <= 0) continue;
-    const steps = feature.cutType === 'countersink' ? 8 : 1;
-    for (let step = 1; step <= steps; step += 1) {
-      const depth = (recessDepth * step) / steps;
-      sliceY.add(feature.target.face === 'top_face' ? part.thickness / 2 - depth : -part.thickness / 2 + depth);
-    }
+    sliceY.add(
+      feature.target.face === 'top_face' ? part.thickness / 2 - recessDepth : -part.thickness / 2 + recessDepth
+    );
   }
 
   const layers = Array.from(sliceY).sort((a, b) => a - b);
   const layerGeometries: THREE.BufferGeometry[] = [];
+  const stock = getEnabledFeatures(part).some((feature) => feature.kind === 'end_cut')
+    ? new Brush(createEndCutOnlyGeometry(part))
+    : null;
+  stock?.updateMatrixWorld(true);
+  const evaluator = new Evaluator();
+  evaluator.attributes = ['position', 'normal'];
+  evaluator.useGroups = false;
 
   for (let i = 0; i < layers.length - 1; i += 1) {
     const yMin = layers[i];
     const yMax = layers[i + 1];
     const layerDepth = yMax - yMin;
-    if (layerDepth <= 1e-6) continue;
+    if (layerDepth <= 0) continue;
     const yMid = yMin + layerDepth / 2;
 
     const tenons = supportedRectCuts.filter((feature) => feature.cutType === 'tenon');
@@ -436,15 +435,6 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
         surfaceDepth < feature.parameters.counterbore.depth
       ) {
         diameter = feature.parameters.counterbore.diameter;
-      } else if (feature.cutType === 'countersink' && feature.parameters.countersink) {
-        const radialDifference = (feature.parameters.countersink.majorDiameter - feature.parameters.diameter) / 2;
-        const sinkDepth = radialDifference / Math.tan((feature.parameters.countersink.includedAngle * Math.PI) / 360);
-        if (surfaceDepth < sinkDepth) {
-          const progress = surfaceDepth / sinkDepth;
-          diameter =
-            feature.parameters.countersink.majorDiameter -
-            (feature.parameters.countersink.majorDiameter - feature.parameters.diameter) * progress;
-        }
       }
       layerHoles.push(...getCircularCutHoles(feature, part, yMid, diameter));
     }
@@ -457,33 +447,68 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
       if (active) layerHoles.push(getRoundedCutHole(feature, part));
     }
 
-    layerGeometries.push(getLayerGeometry(layerContour, layerHoles, layerDepth, yMin));
+    let layer = getLayerGeometry(layerContour, layerHoles, layerDepth, yMin);
+    if (stock) {
+      // Each slice is a closed solid. A merged stack contains coincident
+      // internal caps, which are not a valid single input for solid clipping.
+      const removed = new Brush(layer);
+      removed.updateMatrixWorld(true);
+      const clipped = evaluator.evaluate(removed, stock, INTERSECTION);
+      layer.dispose();
+      layer = clipped.geometry;
+    }
+    layerGeometries.push(subtractSolidCircularCuts(layer, part));
   }
+  stock?.geometry.dispose();
 
-  let geometry =
+  const geometry =
     layerGeometries.length === 1
       ? layerGeometries[0]
       : (mergeGeometries(layerGeometries, false) ?? getLayerGeometry(contour, [], part.thickness, -part.thickness / 2));
+  for (const layer of layerGeometries) if (layer !== geometry) layer.dispose();
 
-  applyVerticalEndCuts(geometry, part);
-  applyEdgeBevels(geometry, part);
-  geometry = subtractNonVerticalCircularCuts(geometry, part);
   geometry.computeVertexNormals();
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
+  if (geometry.getAttribute('position').count === 0) {
+    geometry.boundingBox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+    geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 0);
+  } else {
+    geometry.computeBoundingBox();
+    geometry.computeBoundingSphere();
+  }
   return geometry;
 }
 
-function subtractNonVerticalCircularCuts(baseGeometry: THREE.BufferGeometry, part: Part): THREE.BufferGeometry {
+/** Signed tetrahedral volume of the rendered, closed layer solids. */
+export function getPartMaterialVolume(part: Part): number {
+  const geometry = getPartRenderGeometry(part);
+  const positions = geometry.getAttribute('position');
+  const index = geometry.index;
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  let volume = 0;
+  for (let i = 0; i < (index?.count ?? positions.count); i += 3) {
+    a.fromBufferAttribute(positions, index ? index.getX(i) : i);
+    b.fromBufferAttribute(positions, index ? index.getX(i + 1) : i + 1);
+    c.fromBufferAttribute(positions, index ? index.getX(i + 2) : i + 2);
+    volume += a.dot(b.cross(c)) / 6;
+  }
+  return Math.abs(volume);
+}
+
+function subtractSolidCircularCuts(baseGeometry: THREE.BufferGeometry, part: Part): THREE.BufferGeometry {
   const features = getEnabledFeatures(part).filter(
     (feature): feature is CircularCutFeature =>
       feature.kind === 'circular_cut' &&
       feature.target.type === 'face' &&
-      ((feature.target.face !== 'top_face' && feature.target.face !== 'bottom_face') || feature.parameters.tilt !== 0)
+      (feature.cutType === 'countersink' ||
+        (feature.target.face !== 'top_face' && feature.target.face !== 'bottom_face') ||
+        feature.parameters.tilt !== 0)
   );
   if (features.length === 0) return baseGeometry;
 
   const evaluator = new Evaluator();
+  evaluator.attributes = ['position', 'normal'];
   evaluator.useGroups = false;
   let current = new Brush(baseGeometry);
   current.updateMatrixWorld(true);
@@ -553,74 +578,6 @@ function subtractNonVerticalCircularCuts(baseGeometry: THREE.BufferGeometry, par
 
   if (current.geometry !== baseGeometry) baseGeometry.dispose();
   return current.geometry;
-}
-
-function applyVerticalEndCuts(geometry: THREE.BufferGeometry, part: Part): void {
-  const profiles = getPartEndCutProfiles(part);
-  if (profiles.left.verticalInset <= 0 && profiles.right.verticalInset <= 0) return;
-
-  const positions = geometry.getAttribute('position');
-  const halfLength = part.length / 2;
-  const halfThickness = part.thickness / 2;
-  const epsilon = 1e-4;
-
-  for (let i = 0; i < positions.count; i += 1) {
-    const x = positions.getX(i);
-    const y = positions.getY(i);
-    const z = positions.getZ(i);
-    // Layer extrusion rotates contour XY into rendered XZ, mirroring contour Z.
-    // End-cut profiles stay in contour space so their Front/Back interpolation
-    // matches the contour builder and the snap/collision hull.
-    const contourZ = -z;
-
-    if (profiles.left.maxInset > 0) {
-      const leftReferenceY = profiles.left.verticalFlip ? halfThickness : -halfThickness;
-      const leftBaseInset = getEndCutInsetAt('left', profiles, part, { y: leftReferenceY, z: contourZ });
-      const leftBaseBoundaryX = -halfLength + leftBaseInset;
-      const leftInset = getEndCutInsetAt('left', profiles, part, { y, z: contourZ });
-      if (Math.abs(x - leftBaseBoundaryX) < epsilon) {
-        positions.setX(i, -halfLength + leftInset);
-      }
-    }
-
-    if (profiles.right.maxInset > 0) {
-      const rightReferenceY = profiles.right.verticalFlip ? -halfThickness : halfThickness;
-      const rightBaseInset = getEndCutInsetAt('right', profiles, part, { y: rightReferenceY, z: contourZ });
-      const rightBaseBoundaryX = halfLength - rightBaseInset;
-      const rightInset = getEndCutInsetAt('right', profiles, part, { y, z: contourZ });
-      if (Math.abs(x - rightBaseBoundaryX) < epsilon) {
-        positions.setX(i, halfLength - rightInset);
-      }
-    }
-  }
-
-  positions.needsUpdate = true;
-}
-
-function applyEdgeBevels(geometry: THREE.BufferGeometry, part: Part): void {
-  const profiles = getPartEdgeBevelProfiles(part);
-  if (profiles.front.inset <= 0 && profiles.back.inset <= 0) return;
-
-  const positions = geometry.getAttribute('position');
-  const halfWidth = part.width / 2;
-  const epsilon = 1e-4;
-
-  for (let i = 0; i < positions.count; i += 1) {
-    const y = positions.getY(i);
-    const z = positions.getZ(i);
-
-    // World-space convention (matching partCutPicking): the FRONT face
-    // renders at +Z and the BACK face at -Z.
-    if (profiles.front.inset > 0 && Math.abs(z - halfWidth) < epsilon) {
-      positions.setZ(i, halfWidth - getEdgeBevelInsetAt('front', profiles, part, { y }));
-    }
-
-    if (profiles.back.inset > 0 && Math.abs(z + halfWidth) < epsilon) {
-      positions.setZ(i, -halfWidth + getEdgeBevelInsetAt('back', profiles, part, { y }));
-    }
-  }
-
-  positions.needsUpdate = true;
 }
 
 /**
@@ -786,6 +743,7 @@ export function getPartLocalConvexVertices(part: Part): Array<{ x: number; y: nu
   for (const p of contour) {
     for (const y of [-halfThickness, halfThickness]) {
       let x = p.x;
+      const z = applyEdgeBevelToVertex(-p.z, y);
 
       // Adjust left-end vertices
       if (profiles.left.maxInset > 0) {
@@ -796,7 +754,7 @@ export function getPartLocalConvexVertices(part: Part): Array<{ x: number; y: nu
             z: p.z
           });
         if (Math.abs(x - leftBaseX) < 1e-6) {
-          x = -halfLength + getEndCutInsetAt('left', profiles, part, { y, z: p.z });
+          x = -halfLength + getEndCutInsetAt('left', profiles, part, { y, z: -z });
         }
       }
 
@@ -809,13 +767,12 @@ export function getPartLocalConvexVertices(part: Part): Array<{ x: number; y: nu
             z: p.z
           });
         if (Math.abs(x - rightBaseX) < 1e-6) {
-          x = halfLength - getEndCutInsetAt('right', profiles, part, { y, z: p.z });
+          x = halfLength - getEndCutInsetAt('right', profiles, part, { y, z: -z });
         }
       }
 
       // Negate contour Z to match the mirrored render geometry, then apply
       // the edge bevel in that same world space.
-      const z = applyEdgeBevelToVertex(-p.z, y);
       const key = `${x.toFixed(8)},${y.toFixed(8)},${z.toFixed(8)}`;
       if (!seen.has(key)) {
         seen.add(key);

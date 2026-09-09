@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
 import { getPartFeatureConflicts } from './partFeatureConflicts';
+vi.unmock('three');
 
 describe('getPartFeatureConflicts', () => {
   it('reports a deterministic actionable conflict for intersecting dado, hole, and cutout removals', () => {

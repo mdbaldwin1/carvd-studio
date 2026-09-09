@@ -10,6 +10,7 @@ import type { PartFeature } from '../types';
 
 const { captureAnalytics } = vi.hoisted(() => ({ captureAnalytics: vi.fn() }));
 vi.mock('../utils/analytics', () => ({ analytics: { capture: captureAnalytics } }));
+vi.unmock('three');
 
 const openPartOne = () => {
   const part = useProjectStore.getState().parts.find((p) => p.id === 'part-1')!;
@@ -18,6 +19,92 @@ const openPartOne = () => {
 };
 
 describe('usePartCutsEditing', () => {
+  it.each(['Q9', 'Q10'])('%s blocks final save using the complete unsaved operation set', (kind) => {
+    const circular: PartFeature = {
+      id: 'hole',
+      kind: 'circular_cut',
+      version: 1,
+      enabled: true,
+      target: { type: 'face', face: 'top_face' },
+      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      cutType: 'round_hole',
+      placement: { primary: 4, secondary: -1, rotation: 0 },
+      parameters: { diameter: 0.25, depthMode: 'blind', depth: 0.25, tilt: 0, direction: 0 }
+    };
+    const first: PartFeature = {
+      id: 'a',
+      kind: 'rect_cut',
+      version: 1,
+      enabled: true,
+      target: { type: 'face', face: 'top_face' },
+      reference: { primaryFrom: 'min' },
+      cutType: 'cutout',
+      placement: { x: 0, z: 0 },
+      parameters: { size: { length: 5, width: 4 }, depthMode: 'through' }
+    };
+    const end: PartFeature = {
+      id: 'end',
+      kind: 'end_cut',
+      version: 1,
+      enabled: true,
+      target: { type: 'face', face: 'right_end' },
+      reference: { primaryFrom: 'min' },
+      cutType: 'mitre',
+      lengthMode: 'long_point',
+      parameters: { horizontalAngle: 45 }
+    };
+    const original = kind === 'Q9' ? [circular] : [first];
+    useProjectStore.setState({
+      parts: [createTestPart({ id: 'part-1', length: 10, width: 4, thickness: 1, features: original })]
+    });
+    const { result } = renderHook(() => usePartCutsEditing());
+    act(openPartOne);
+    act(() =>
+      result.current.setDraftFeatures(
+        kind === 'Q9' ? [circular, end] : [first, { ...first, id: 'b', placement: { x: 5, z: 0 } }]
+      )
+    );
+    let saved = true;
+    act(() => {
+      saved = result.current.saveAndExit();
+    });
+    expect(saved).toBe(false);
+    expect(useProjectStore.getState().updatePart).not.toHaveBeenCalled();
+    expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
+  });
+  it('Q3 blocks final save of an authored tenon made wider than resized stock', () => {
+    useProjectStore.setState({
+      parts: [
+        createTestPart({
+          id: 'part-1',
+          length: 10,
+          width: 2,
+          thickness: 1,
+          features: [
+            {
+              id: 'tenon',
+              kind: 'rect_cut',
+              version: 1,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'tenon',
+              parameters: { size: { length: 1, width: 3 }, depthMode: 'blind', depth: 0.5 },
+              placement: { x: 0, z: 1 }
+            }
+          ]
+        })
+      ]
+    });
+    const { result } = renderHook(() => usePartCutsEditing());
+    act(openPartOne);
+    let saved = true;
+    act(() => {
+      saved = result.current.saveAndExit();
+    });
+    expect(saved).toBe(false);
+    expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
+  });
   it('R5 blocks final saving of an end cut whose angle exceeds stock length', () => {
     const cut: PartFeature = {
       id: 'end',

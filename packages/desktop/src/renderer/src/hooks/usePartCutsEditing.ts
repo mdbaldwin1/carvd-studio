@@ -55,7 +55,7 @@ export function usePartCutsEditing() {
         feature.kind === 'rect_cut'
           ? validateRectCutFeature(feature, currentPart)
           : feature.kind === 'circular_cut'
-            ? validateCircularCut(feature, currentPart)
+            ? validateCircularCut(feature, { ...currentPart, features: draftFeatures })
             : feature.kind === 'rounded_cut'
               ? validateRoundedCut(feature, currentPart)
               : validateEndCutFeature(feature, { ...currentPart, features: draftFeatures });

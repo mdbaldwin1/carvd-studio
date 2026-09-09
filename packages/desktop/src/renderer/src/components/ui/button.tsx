@@ -55,7 +55,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   return (
     <button
       ref={ref}
-      aria-pressed={active || undefined}
+      aria-pressed={active}
       className={cn(
         buttonVariants({ variant, size }),
         // Hover variants are emitted after base utilities, so a variant's

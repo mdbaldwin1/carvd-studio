@@ -237,8 +237,8 @@ describe('rectCutUtils', () => {
       expect(getRectCutDepth(feature, 0.75)).toBe(0);
     });
 
-    it('snaps blind depth to full thickness when within tolerance', () => {
-      expect(getRectCutDepth(createRectCut({ depth: 0.7495 }), 0.75)).toBe(0.75);
+    it('preserves a blind floor even within the former snapping tolerance', () => {
+      expect(getRectCutDepth(createRectCut({ depth: 0.7495 }), 0.75)).toBe(0.7495);
       expect(getRectCutDepth(createRectCut({ depth: 0.7485 }), 0.75)).toBe(0.7485);
     });
   });
@@ -703,13 +703,14 @@ describe('rectCutUtils', () => {
 
     const part = { length: 24, width: 4, thickness: 1.5 };
 
-    it('accepts a well-formed tenon and clamps the tongue inside the blank', () => {
+    it('accepts a well-formed tenon and preserves an invalid authored offset for diagnosis', () => {
       expect(validateRectCutFeature(tenon(), part)).toBeNull();
 
       const resolved = getResolvedRectCutFeature(tenon({ placement: { x: 3, z: 9 } }), part);
-      // Offset clamps so the tongue stays on the board; placement.x is unused.
+      // placement.x is unused; the authored width offset must never be changed.
       expect(resolved.placement.x).toBe(0);
-      expect(resolved.placement.z).toBe(2);
+      expect(resolved.placement.z).toBe(9);
+      expect(validateRectCutFeature(resolved, part)).toContain('past the blank');
       expect(resolved.parameters.depthMode).toBe('blind');
     });
 
@@ -733,12 +734,10 @@ describe('rectCutUtils', () => {
       ).toContain('less than part length');
     });
 
-    it('clamps an oversized tongue to the blank instead of failing', () => {
+    it('rejects an oversized tongue without changing its authored width', () => {
       const oversized = tenon({ parameters: { size: { length: 1.5, width: 9 }, depthMode: 'blind', depth: 0.5 } });
-      // Width is a resolver-clamped dimension: typing too wide gives a
-      // full-width (bare-faced) tenon rather than a validation error.
-      expect(validateRectCutFeature(oversized, part)).toBeNull();
-      expect(getResolvedRectCutFeature(oversized, part).parameters.size.width).toBe(4);
+      expect(validateRectCutFeature(oversized, part)).toContain('Tenon width');
+      expect(getResolvedRectCutFeature(oversized, part).parameters.size.width).toBe(9);
     });
 
     it('supports preview only on end targets', () => {

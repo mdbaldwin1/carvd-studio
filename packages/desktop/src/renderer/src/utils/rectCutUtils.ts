@@ -49,9 +49,7 @@ function clamp(value: number, min: number, max: number): number {
 
 export function getRectCutDepth(feature: RectCutFeature, thickness: number): number {
   if (feature.parameters.depthMode === 'through') return thickness;
-  const depth = clamp(feature.parameters.depth ?? 0, 0, thickness);
-  // Treat as full thickness when within tolerance to avoid a paper-thin residual layer
-  return thickness - depth < 0.001 ? thickness : depth;
+  return clamp(feature.parameters.depth ?? 0, 0, thickness);
 }
 
 export function isTopOrBottomFace(face: FaceTarget): boolean {
@@ -172,11 +170,12 @@ export function getResolvedRectCutFeature(
       feature.target.type === 'face' && (feature.target.face === 'left_end' || feature.target.face === 'right_end')
         ? feature.target.face
         : 'right_end';
-    const tenonLength = Math.max(0, Math.min(feature.parameters.size.length, part.length));
-    const tongueWidth = Math.max(0, Math.min(feature.parameters.size.width, part.width));
-    const tongueThickness = Math.max(0, Math.min(feature.parameters.depth ?? 0, part.thickness));
-    // Keep the tongue inside the blank across the width.
-    const maxOffset = Math.max(0, part.width - tongueWidth);
+    // Resolution must retain authored dimensions, including invalid imported or
+    // resized values. Validation reports them; silently shrinking the tongue
+    // would disagree with the saved feature and its fabrication instructions.
+    const tenonLength = feature.parameters.size.length;
+    const tongueWidth = feature.parameters.size.width;
+    const tongueThickness = feature.parameters.depth ?? 0;
     return {
       ...cloneRectCutFeature(feature),
       target: { type: 'face', face: targetFace },
@@ -188,7 +187,7 @@ export function getResolvedRectCutFeature(
       },
       placement: {
         x: 0,
-        z: Math.max(0, Math.min(feature.placement.z, maxOffset))
+        z: feature.placement.z
       }
     };
   }
@@ -452,6 +451,12 @@ export function validateRectCutFeature(
 
   const support = getRectCutPreviewSupport(resolvedFeature);
   if (!support.supported) return support.reason;
+
+  if (resolvedFeature.parameters.depthMode === 'through') {
+    const bounds = getRectCutPlanBounds(resolvedFeature, part);
+    if (bounds.minX <= 0 && bounds.maxX >= part.length && bounds.minZ <= 0 && bounds.maxZ >= part.width)
+      return 'This cut removes the entire blank. Reduce its size so some material remains.';
+  }
 
   return null;
 }

@@ -14,7 +14,8 @@ import { Label } from '@renderer/components/ui/label';
 import { Select } from '@renderer/components/ui/select';
 import type { AddDowelJointInput } from '@renderer/store/projectStore';
 import type { FaceTarget, Part } from '@renderer/types';
-import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
+import { formatFabricationMeasurement } from '@renderer/utils/fractions';
+import { useProjectStore } from '@renderer/store/projectStore';
 import { createDowelJoint, validateDowelJointFaces } from '@renderer/utils/dowelJointUtils';
 import { FACE_LABELS } from '@renderer/utils/partFeatureSummary';
 import { getFaceFrame } from '@renderer/utils/roundCutUtils';
@@ -44,6 +45,8 @@ export function DowelJointDialog({
   onCreate,
   onAlignRequested
 }: DowelJointDialogProps) {
+  const units = useProjectStore((state) => state.units);
+  const measurement = (value: number) => formatFabricationMeasurement(value, units);
   const [step, setStep] = useState(1);
   const [secondPartId, setSecondPartId] = useState(candidateParts[0]?.id ?? '');
   const [firstFace, setFirstFace] = useState<FaceTarget>('top_face');
@@ -84,7 +87,12 @@ export function DowelJointDialog({
   let previewFeatures: ReturnType<typeof createDowelJoint> | null = null;
   if (input && secondPart) {
     try {
-      previewFeatures = createDowelJoint({ ...input, firstPart, secondPart });
+      previewFeatures = createDowelJoint({
+        ...input,
+        firstPart,
+        secondPart,
+        existingParts: [firstPart, ...candidateParts]
+      });
     } catch (cause) {
       validationError = cause instanceof Error ? cause.message : 'Unable to validate the dowel joint.';
     }
@@ -104,7 +112,7 @@ export function DowelJointDialog({
       return;
     }
     try {
-      createDowelJoint({ ...input, firstPart, secondPart });
+      createDowelJoint({ ...input, firstPart, secondPart, existingParts: [firstPart, ...candidateParts] });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to validate the dowel joint.');
       return;
@@ -203,6 +211,11 @@ export function DowelJointDialog({
 
           {step === 3 && (
             <div className="space-y-4">
+              <p className="text-sm text-text-secondary">
+                {units === 'metric'
+                  ? 'Enter measurements in millimeters (mm).'
+                  : 'Enter measurements in inches (decimals or fractions).'}
+              </p>
               <svg
                 role="img"
                 aria-label={`Dowel placement on ${firstPart.name} ${FACE_LABELS[firstFace]}`}
@@ -295,8 +308,7 @@ export function DowelJointDialog({
                   {firstPart.name} — {FACE_LABELS[firstFace]}
                 </p>
                 <p>
-                  {formatMeasurementWithUnit(diameter, 'imperial')} diameter ×{' '}
-                  {formatMeasurementWithUnit(firstEmbedmentDepth, 'imperial')} deep
+                  {measurement(diameter)} diameter × {measurement(firstEmbedmentDepth)} deep
                 </p>
               </div>
               <div>
@@ -304,18 +316,15 @@ export function DowelJointDialog({
                   {secondPart.name} — {FACE_LABELS[secondFace]}
                 </p>
                 <p>
-                  {formatMeasurementWithUnit(diameter, 'imperial')} diameter ×{' '}
-                  {formatMeasurementWithUnit(secondEmbedmentDepth, 'imperial')} deep
+                  {measurement(diameter)} diameter × {measurement(secondEmbedmentDepth)} deep
                 </p>
               </div>
               <p>
-                {count} holes, {formatMeasurementWithUnit(spacing, 'imperial')} apart; first center{' '}
-                {formatMeasurementWithUnit(firstPrimaryEdge, 'imperial')} from the left edge and{' '}
-                {formatMeasurementWithUnit(firstSecondaryEdge, 'imperial')} from the near edge.
+                {count} holes, {measurement(spacing)} apart; first center {measurement(firstPrimaryEdge)} from the left
+                edge and {measurement(firstSecondaryEdge)} from the near edge.
               </p>
               <p>
-                Dowel: {formatMeasurementWithUnit(diameter, 'imperial')} diameter ×{' '}
-                {formatMeasurementWithUnit(dowelLength, 'imperial')} long.
+                Dowel: {measurement(diameter)} diameter × {measurement(dowelLength)} long.
               </p>
               {previewFeatures && <p className="text-success">All holes fit within both boards.</p>}
             </div>

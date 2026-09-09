@@ -21,6 +21,8 @@ A round hole may be blind or through. It may follow the selected face normal or 
 
 A rounded slot is defined by center, overall length, width, orientation, and depth mode. A rounded rectangular cutout is defined by center, length, width, corner radius, orientation, and depth mode. The corner radius is constrained to half the smaller profile dimension.
 
+Slots use semicircular ends (radius = half width), so length must be at least width. Rotated fit uses the support of the actual rounded profile, not its sharp-corner bounding rectangle. Tangency to the blank is permitted.
+
 A hole pattern creates a managed collection of identical holes rather than copying unrelated features. The first release supports:
 
 - linear patterns with count and spacing;
@@ -101,6 +103,8 @@ Pattern controls appear beneath the seed-hole controls and expose pattern type p
 4. review alignment and save.
 
 The action is refused when the faces are not sufficiently parallel, opposing, and touching, when requested holes leave either blank, or when the combined drilling depths are shorter than the selected dowel length. Exact depth fits are accepted; extra drilling depth provides explicit end clearance, distributed proportionally between the two holes in the derived visualization. A gap between selected faces is not supported by the initial joint model. The user may change the dowel length or depths without losing face selections.
+
+Multiple dowels require center spacing at least their diameter. Creation checks the new hardware against existing project joints before any mutation; relationship validation and the visualization also identify interference after edits. Flat-ended cylinders touching at sides or ends are not overlapping hardware. The dimensions step and drilling review use the active project units and retain authored precision.
 
 ## Data model and file compatibility
 
@@ -184,15 +188,17 @@ Blind edge notches retain their Top/Bottom edge identity in fabrication instruct
 
 ### Exact representation
 
-The current layered extrusion algorithm remains the source for straight cuts. Round and rounded operations extend the part-feature geometry derivation with analytic profile sampling plus a bounded `three-bvh-csg` subtraction path for non-vertical bores whose horizontal slices can contain disconnected material regions:
+The current layered extrusion algorithm remains the source for straight cuts. Round and rounded operations extend the part-feature geometry derivation with analytic profile sampling plus bounded `three-bvh-csg` solid operations:
 
 - circles use a deterministic segment count selected by physical diameter and capped for performance;
 - rounded rectangles and slots use deterministic quarter-arc sampling;
 - blind vertical bores are represented as profile holes only in affected depth layers;
 - through bores are represented through all intersected layers;
-- angled cylinders are sliced at layer boundaries to produce the correct shifted elliptical cross-section;
-- countersinks and counterbores contribute additional depth intervals and profiles.
-- side-face, end-face, and arbitrary-angle bores use finite analytic cylinder/cone cutters through `three-bvh-csg`; the result is immediately converted back to the existing cached `BufferGeometry` contract.
+- normal counterbores contribute an additional recess interval;
+- all countersinks, including zero tilt, use a continuous conical cutter, never a stack of midpoint cylinders;
+- side-face, end-face, and arbitrary-angle bores use finite cylinder/cone cutters through `three-bvh-csg`;
+- every closed removal layer is intersected with the end/edge-cut stock solid before merging, so tenons preserve other end cuts and combined planes intersect without vertex warping;
+- solid operations run on individual closed layers, not merged stacks containing coincident internal caps; temporary layer buffers are disposed after merging.
 
 The derived geometry bundle remains the single consumer contract for rendering, hit testing, bounds, snapping, measurement, ground constraints, and collision. No consumer receives a special-case round-hole path.
 
@@ -217,13 +223,17 @@ Saving is blocked when:
 - diameter, profile dimensions, radius, depth, or counts are non-positive;
 - a blind depth reaches or exceeds the available material thickness along the authored axis;
 - an entry profile extends beyond the targeted face;
+- an entry ellipse or swept blind/recess cutter extends beyond remaining end-cut, bevel, or tenon material, including breakout between valid entry and end disks at a tenon shoulder;
+- one or more operations consume the entire blank; individual cut save, final part save, and Cut List generation share this guard;
 - a requested through or angled path fails to intersect the blank as expected;
 - countersink/counterbore dimensions are physically inconsistent;
 - pattern members leave the target face or exceed limits;
 - a round/rounded removal intersects an existing removal in a way that consumes its anchor or produces unsupported disconnected material;
-- a dowel joint is missing either mate or produces mismatched member geometry.
+- a dowel joint is missing either mate, produces mismatched member geometry, or has interfering hardware.
 
-Overlapping compatible holes with identical axes and dimensions are reported as duplicates. Other overlaps use the existing ordered-operation conflict model and identify both operations in plain language. Draft edits are never discarded because of validation failures.
+Duplicate round operations must have the same complete expanded member set and removal profile, including active recess diameter, depth, or included angle. Sharing only one pattern member or using a different stepped recess is an overlap, not a duplicate. Other overlaps use the existing ordered-operation conflict model and identify both operations in plain language. Draft edits are never discarded because of validation failures.
+
+Authored tenon dimensions and offsets are not clamped to hide invalid stock resizing. Blind rectangular depth is not snapped to through near the stock thickness. Measurement focus/blur and focused unmount are lossless without a text edit, in both unit systems. Invalid operations remain editable, show their specific error, and have a direct `Fix cut` action from the final-save explanation.
 
 ## Fabrication output
 

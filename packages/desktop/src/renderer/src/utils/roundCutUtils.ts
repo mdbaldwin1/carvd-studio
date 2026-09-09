@@ -1,4 +1,5 @@
 import type { CircularCutFeature, FaceTarget, Part, RoundedCutFeature } from '../types';
+import { getPartStockPlanes } from './endCutUtils';
 
 export interface Point3 {
   x: number;
@@ -19,6 +20,49 @@ export interface ExpandedCircularCut {
   memberIndex: number;
   entryPoint: Point3;
   axis: Point3;
+}
+
+const dot = (a: Point3, b: Point3): number => a.x * b.x + a.y * b.y + a.z * b.z;
+function fitsRemainingStock(part: Part, center: Point3, support: (normal: Point3) => number): boolean {
+  const absoluteSupport = (normal: Point3) => dot(normal, center) + support(normal);
+  if (getPartStockPlanes(part).some((plane) => absoluteSupport(plane.normal) > plane.limit + 1e-9)) return false;
+  for (const feature of part.features ?? []) {
+    if (!feature.enabled || feature.kind !== 'rect_cut' || feature.cutType !== 'tenon') continue;
+    const side = feature.target.type === 'face' && feature.target.face === 'left_end' ? -1 : 1;
+    const shoulder = part.length / 2 - feature.parameters.size.length;
+    if (absoluteSupport({ x: side, y: 0, z: 0 }) <= shoulder + 1e-9) continue;
+    const maxZ = part.width / 2 - feature.placement.z;
+    const minZ = maxZ - feature.parameters.size.width;
+    for (const [normal, limit] of [
+      [{ x: 0, y: 1, z: 0 }, Number(feature.parameters.depth) / 2],
+      [{ x: 0, y: -1, z: 0 }, Number(feature.parameters.depth) / 2],
+      [{ x: 0, y: 0, z: 1 }, maxZ],
+      [{ x: 0, y: 0, z: -1 }, -minZ]
+    ] as Array<[Point3, number]>) {
+      if (absoluteSupport(normal) <= limit + 1e-9) continue;
+      // Maximize the profile/cutter support only in the end region x*side >=
+      // shoulder. The one-constraint convex dual is a bounded scalar minimum;
+      // unlike endpoint sampling it catches breakout between the bore caps.
+      const bound = (lambda: number) => absoluteSupport({ ...normal, x: normal.x + lambda * side }) - lambda * shoulder;
+      let high = 1;
+      let previous = bound(0);
+      for (let i = 0; i < 64; i += 1) {
+        const value = bound(high);
+        if (value >= previous) break;
+        previous = value;
+        high *= 2;
+      }
+      let low = 0;
+      for (let i = 0; i < 80; i += 1) {
+        const left = low + (high - low) / 3;
+        const right = high - (high - low) / 3;
+        if (bound(left) < bound(right)) high = right;
+        else low = left;
+      }
+      if (Math.min(bound(0), bound((low + high) / 2)) > limit + 1e-9) return false;
+    }
+  }
+  return true;
 }
 
 const degrees = (value: number): number => (value * Math.PI) / 180;
@@ -317,19 +361,80 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
       Math.abs(secondary) + pilotSecondaryRadius > frame.secondarySize / 2 + 1e-9
     )
       return 'Hole profile extends beyond the selected face.';
+    const along = {
+      x: frame.primaryAxis.x * Math.cos(direction) + frame.secondaryAxis.x * Math.sin(direction),
+      y: frame.primaryAxis.y * Math.cos(direction) + frame.secondaryAxis.y * Math.sin(direction),
+      z: frame.primaryAxis.z * Math.cos(direction) + frame.secondaryAxis.z * Math.sin(direction)
+    };
+    const across = {
+      x: -frame.primaryAxis.x * Math.sin(direction) + frame.secondaryAxis.x * Math.cos(direction),
+      y: -frame.primaryAxis.y * Math.sin(direction) + frame.secondaryAxis.y * Math.cos(direction),
+      z: -frame.primaryAxis.z * Math.sin(direction) + frame.secondaryAxis.z * Math.cos(direction)
+    };
+    const entryCenter = {
+      x: member.entryPoint.x + along.x * centerShift,
+      y: member.entryPoint.y + along.y * centerShift,
+      z: member.entryPoint.z + along.z * centerShift
+    };
+    const recessEntrySupport = (normal: Point3) =>
+      dot(normal, entryCenter) + Math.hypot(dot(normal, along) * alongRadius, dot(normal, across) * acrossRadius);
+    const pilotEntrySupport = (normal: Point3) =>
+      dot(normal, member.entryPoint) +
+      Math.hypot((dot(normal, along) * pilotRadius) / cosine, dot(normal, across) * pilotRadius);
+    if (
+      !fitsRemainingStock(part, entryCenter, (normal) =>
+        Math.hypot(dot(normal, along) * alongRadius, dot(normal, across) * acrossRadius)
+      ) ||
+      !fitsRemainingStock(part, member.entryPoint, (normal) =>
+        Math.hypot((dot(normal, along) * pilotRadius) / cosine, dot(normal, across) * pilotRadius)
+      )
+    )
+      return 'Hole entry extends outside the remaining material after an end cut, bevel, or tenon. Move the hole away from the removed material.';
     const available = distanceToExit(member.entryPoint, member.axis, part);
     if (recessDepth > 0 && recessDepth >= available - 1e-9) return 'Recess depth exceeds the available material.';
     if (feature.parameters.depthMode === 'blind' && Number(feature.parameters.depth) >= available - 1e-9)
       return 'Blind-hole depth exceeds the available material.';
     const ends = [
       ...(feature.parameters.depthMode === 'blind'
-        ? [{ depth: Number(feature.parameters.depth), radius: feature.parameters.diameter / 2 }]
+        ? [
+            {
+              depth: Number(feature.parameters.depth),
+              radius: feature.parameters.diameter / 2,
+              entrySupport: pilotEntrySupport
+            }
+          ]
         : []),
       ...(recessDepth > 0
-        ? [{ depth: recessDepth, radius: feature.cutType === 'counterbore' ? radius : feature.parameters.diameter / 2 }]
+        ? [
+            {
+              depth: recessDepth,
+              radius: feature.cutType === 'counterbore' ? radius : feature.parameters.diameter / 2,
+              entrySupport: recessEntrySupport
+            }
+          ]
         : [])
     ];
     for (const end of ends) {
+      const center = {
+        x: member.entryPoint.x + member.axis.x * end.depth,
+        y: member.entryPoint.y + member.axis.y * end.depth,
+        z: member.entryPoint.z + member.axis.z * end.depth
+      };
+      if (
+        !fitsRemainingStock(
+          part,
+          { x: 0, y: 0, z: 0 },
+          // The clipped finite cutter is the convex hull of its entry ellipse
+          // and end disk. Its support is the maximum of those two supports.
+          (normal) =>
+            Math.max(
+              end.entrySupport(normal),
+              dot(normal, center) +
+                end.radius * Math.sqrt(Math.max(0, dot(normal, normal) - dot(normal, member.axis) ** 2))
+            )
+        )
+      )
+        return 'Blind-hole or recess depth extends outside the remaining material. Reduce the depth or move the hole away from the cut.';
       for (const [coordinate, axis, inward, halfSize] of [
         [member.entryPoint.x, member.axis.x, frame.inwardNormal.x, part.length / 2],
         [member.entryPoint.y, member.axis.y, frame.inwardNormal.y, part.thickness / 2],
@@ -360,6 +465,8 @@ export function validateRoundedCut(feature: RoundedCutFeature, part: Part): stri
     feature.parameters.width <= 0
   )
     return 'Rounded-cut length and width must be greater than zero.';
+  if (feature.cutType === 'rounded_slot' && feature.parameters.length < feature.parameters.width)
+    return 'Slot length must be at least its width.';
   if (
     !Number.isFinite(feature.parameters.cornerRadius) ||
     feature.parameters.cornerRadius <= 0 ||
@@ -378,11 +485,16 @@ export function validateRoundedCut(feature: RoundedCutFeature, part: Part): stri
   const angle = degrees(feature.placement.rotation);
   const halfLength = feature.parameters.length / 2;
   const halfWidth = feature.parameters.width / 2;
-  const primaryExtent = Math.abs(Math.cos(angle)) * halfLength + Math.abs(Math.sin(angle)) * halfWidth;
-  const secondaryExtent = Math.abs(Math.sin(angle)) * halfLength + Math.abs(Math.cos(angle)) * halfWidth;
+  // Rounded rectangles are a smaller rectangle swept by a radius disk. A
+  // slot uses fully round end caps regardless of its stored corner radius.
+  const radius = feature.cutType === 'rounded_slot' ? halfWidth : feature.parameters.cornerRadius;
+  const primaryExtent =
+    Math.abs(Math.cos(angle)) * (halfLength - radius) + Math.abs(Math.sin(angle)) * (halfWidth - radius) + radius;
+  const secondaryExtent =
+    Math.abs(Math.sin(angle)) * (halfLength - radius) + Math.abs(Math.cos(angle)) * (halfWidth - radius) + radius;
   if (
-    Math.abs(primary) + primaryExtent > frame.primarySize / 2 ||
-    Math.abs(secondary) + secondaryExtent > frame.secondarySize / 2
+    Math.abs(primary) + primaryExtent > frame.primarySize / 2 + 1e-9 ||
+    Math.abs(secondary) + secondaryExtent > frame.secondarySize / 2 + 1e-9
   ) {
     return 'Rounded cut extends beyond the selected face.';
   }

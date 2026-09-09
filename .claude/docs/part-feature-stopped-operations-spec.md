@@ -80,11 +80,13 @@ Canonical storage:
 The cuts workspace should treat these as constrained joinery operations:
 
 - `Dado`: full board width run
-- `Stopped Dado`: partial run across board width
+- `Stopped Dado`: full board width, with a limited run and start offset along the blank
 - `Groove`: full board length run
 - `Stopped Groove`: partial run along board length
 
 The inspector should explain the difference in plain language instead of making the user infer it from disabled fields.
+
+This operation does not stop short of a side edge. Its help points woodworkers to `Mortise` for an enclosed channel and `Stopped Groove` for a limited lengthwise channel. This clarification preserves the approved storage and full-width geometry rather than silently redefining existing files.
 
 Starter presets may seed these later, but presets are not required for this pass.
 

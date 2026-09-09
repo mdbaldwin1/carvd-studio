@@ -1,7 +1,9 @@
 import { CircularCutFeature, Part, PartFeature, RectCutFeature } from '@renderer/types';
 import { getFeatureTargetLabel } from '@renderer/utils/partFeatureSummary';
 import { getResolvedRectCutFeature, isBottomTarget, isSideFaceTarget, isTopTarget } from '@renderer/utils/rectCutUtils';
-import { expandCircularCut } from '@renderer/utils/roundCutUtils';
+import { expandCircularCut, validateCircularCut } from '@renderer/utils/roundCutUtils';
+import { getPartMaterialVolume } from '@renderer/utils/partFeatureGeometry';
+import { getPartEdgeBevelProfiles, getPartEndCutProfiles } from '@renderer/utils/endCutUtils';
 
 export interface PartFeatureConflict {
   featureId: string;
@@ -16,7 +18,9 @@ export interface PartFeatureConflict {
     | 'rect_overlap'
     | 'rect_consumed'
     | 'rect_anchor_removed'
-    | 'rect_depth_intersection';
+    | 'rect_depth_intersection'
+    | 'no_material'
+    | 'material_removed';
   severity: 'warning' | 'error';
   message: string;
 }
@@ -236,12 +240,18 @@ function circularMembersOverlap(
 
   const firstMembers = expandCircularCut(first, part);
   const secondMembers = expandCircularCut(second, part);
-  const radiusSum = (first.parameters.diameter + second.parameters.diameter) / 2;
+  const profileDiameter = (feature: CircularCutFeature) =>
+    feature.cutType === 'counterbore'
+      ? (feature.parameters.counterbore?.diameter ?? feature.parameters.diameter)
+      : feature.cutType === 'countersink'
+        ? (feature.parameters.countersink?.majorDiameter ?? feature.parameters.diameter)
+        : feature.parameters.diameter;
+  const radiusSum = (profileDiameter(first) + profileDiameter(second)) / 2;
   let memberOverlap = false;
-  let coaxial = false;
+  const matchingMembers = new Set<number>();
 
   for (const firstMember of firstMembers) {
-    for (const secondMember of secondMembers) {
+    for (const [secondIndex, secondMember] of secondMembers.entries()) {
       const dx = firstMember.entryPoint.x - secondMember.entryPoint.x;
       const dy = firstMember.entryPoint.y - secondMember.entryPoint.y;
       const dz = firstMember.entryPoint.z - secondMember.entryPoint.z;
@@ -251,17 +261,31 @@ function circularMembersOverlap(
         firstMember.axis.x * secondMember.axis.x +
         firstMember.axis.y * secondMember.axis.y +
         firstMember.axis.z * secondMember.axis.z;
-      if (distance < 1e-9 && Math.abs(axisDot - 1) < 1e-9) coaxial = true;
+      if (distance < 1e-9 && Math.abs(axisDot - 1) < 1e-9) matchingMembers.add(secondIndex);
     }
   }
 
+  const equalDimension = (a: number | undefined, b: number | undefined) =>
+    a === b || (a !== undefined && b !== undefined && Math.abs(a - b) < 1e-9);
+  const sameRecess =
+    first.cutType === 'counterbore'
+      ? equalDimension(first.parameters.counterbore?.diameter, second.parameters.counterbore?.diameter) &&
+        equalDimension(first.parameters.counterbore?.depth, second.parameters.counterbore?.depth)
+      : first.cutType !== 'countersink' ||
+        (equalDimension(first.parameters.countersink?.majorDiameter, second.parameters.countersink?.majorDiameter) &&
+          equalDimension(first.parameters.countersink?.includedAngle, second.parameters.countersink?.includedAngle));
   const sameShape =
+    sameRecess &&
     first.cutType === second.cutType &&
     Math.abs(first.parameters.diameter - second.parameters.diameter) < 1e-9 &&
     first.parameters.depthMode === second.parameters.depthMode &&
     (first.parameters.depthMode === 'through' ||
       Math.abs(Number(first.parameters.depth) - Number(second.parameters.depth)) < 1e-9);
-  return { overlaps: memberOverlap, duplicate: coaxial && sameShape };
+  return {
+    overlaps: memberOverlap,
+    duplicate:
+      firstMembers.length === secondMembers.length && matchingMembers.size === secondMembers.length && sameShape
+  };
 }
 
 function circularOverlapsRect(
@@ -359,6 +383,15 @@ export function getPartFeatureConflicts(
     }
 
     if (feature.kind === 'circular_cut') {
+      const materialIssue = validateCircularCut(feature, { ...part, features } as Part);
+      if (materialIssue?.includes('remaining material'))
+        conflicts.push({
+          featureId: feature.id,
+          featureIndex: index,
+          code: 'material_removed',
+          severity: 'error',
+          message: `Operation ${index + 1}: ${materialIssue}`
+        });
       for (const prior of priorRectCuts) {
         if (circularOverlapsRect(feature, prior.feature, part))
           addRoundRectOverlapConflict(conflicts, { feature, index }, prior);
@@ -454,5 +487,70 @@ export function getPartFeatureConflicts(
     priorRectCuts.push({ feature, index });
   }
 
+  // Circular/rounded profiles individually retain their surrounding stock;
+  // rectangular removals can consume a whole blank, including cumulatively.
+  // Skip malformed numeric inputs here; their operation validator owns that
+  // diagnostic and they must not enter triangulation.
+  if (
+    enabledFeatures.some(({ feature }) => feature.kind === 'rect_cut') &&
+    couldConsumeBlank(features, part) &&
+    enabledFeatures.every(({ feature }) => {
+      if (feature.kind !== 'rect_cut') return true;
+      return [
+        feature.parameters.size.length,
+        feature.parameters.size.width,
+        feature.placement.x,
+        feature.placement.z,
+        feature.parameters.depthMode === 'blind' ? feature.parameters.depth : 1
+      ].every((value) => Number.isFinite(value));
+    }) &&
+    getPartMaterialVolume({ ...part, features } as Part) <= part.length * part.width * part.thickness * 1e-12
+  ) {
+    for (const { feature, index } of enabledFeatures) {
+      conflicts.push({
+        featureId: feature.id,
+        featureIndex: index,
+        code: 'no_material',
+        severity: 'error',
+        message: 'These operations remove the entire blank; no material remains. Reduce or disable a cut before saving.'
+      });
+    }
+  }
   return conflicts;
+}
+
+/** An upper bound only: overlapping cutters are deliberately counted twice.
+ * Most edits cannot remove all stock, so avoid triangulating them to prove it. */
+function couldConsumeBlank(features: PartFeature[], part: Pick<Part, 'length' | 'width' | 'thickness'>): boolean {
+  const ends = getPartEndCutProfiles({ ...part, features });
+  const edges = getPartEdgeBevelProfiles({ ...part, features });
+  let removed =
+    (ends.left.maxInset + ends.right.maxInset) * part.width * part.thickness +
+    (edges.front.inset + edges.back.inset) * part.length * part.thickness;
+  for (const feature of features) {
+    if (!feature.enabled) continue;
+    if (feature.kind === 'rect_cut') {
+      const cut = getResolvedRectCutFeature(feature, part);
+      if (cut.cutType === 'tenon') removed += cut.parameters.size.length * part.width * part.thickness;
+      else
+        removed +=
+          cut.parameters.size.length *
+          cut.parameters.size.width *
+          (cut.parameters.depthMode === 'through' ? part.thickness : Number(cut.parameters.depth));
+    } else if (feature.kind === 'circular_cut') {
+      const diameter = Math.max(
+        feature.parameters.diameter,
+        feature.parameters.counterbore?.diameter ?? 0,
+        feature.parameters.countersink?.majorDiameter ?? 0
+      );
+      removed +=
+        expandCircularCut(feature, part as Part).length *
+        Math.PI *
+        (diameter / 2) ** 2 *
+        Math.hypot(part.length, part.width, part.thickness);
+    } else if (feature.kind === 'rounded_cut') {
+      removed += feature.parameters.length * feature.parameters.width * part.thickness;
+    }
+  }
+  return removed >= part.length * part.width * part.thickness - 1e-12;
 }

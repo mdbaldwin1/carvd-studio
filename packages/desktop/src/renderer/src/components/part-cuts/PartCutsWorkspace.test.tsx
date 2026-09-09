@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ComponentProps } from 'react';
-import { describe, expect, it, vi, type Mock } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 import type { CircularCutFeature, EndCutFeature, RectCutFeature } from '@renderer/types';
 import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
@@ -12,6 +12,7 @@ import { expandCircularCut } from '@renderer/utils/roundCutUtils';
 import { buildDraftFromFeature } from '@renderer/components/part-features/partFeatureEditorState';
 import { getEditableHandleOverlay } from './PartCutsPreviewCanvas';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
+vi.unmock('three');
 
 type WorkspaceProps = ComponentProps<typeof PartCutsWorkspace>;
 
@@ -98,6 +99,70 @@ function lastFeatures(onDraftFeaturesChange: WorkspaceProps['onDraftFeaturesChan
 }
 
 describe('PartCutsWorkspace', () => {
+  beforeEach(() => useProjectStore.setState({ units: 'imperial' }));
+  it('UX exposes selected and unselected target states without relying on color', () => {
+    renderWorkspace();
+    startCut('Round Hole');
+    const buttons = screen.getAllByRole('button', { name: 'Bottom Face' });
+    expect(buttons.every((button) => button.getAttribute('aria-pressed') === 'false')).toBe(true);
+    clickInspectorTarget('Bottom Face');
+    expect(
+      screen
+        .getAllByRole('button', { name: 'Bottom Face' })
+        .every((button) => button.getAttribute('aria-pressed') === 'true')
+    ).toBe(true);
+  });
+  it('UX identifies an invalid operation and opens it directly from the save explanation', () => {
+    const cut = createMortiseFeature({ label: 'Oversize pocket', placement: { x: 23, z: 1 } });
+    renderWorkspace({ draftFeatures: [cut], hasUnsavedChanges: true });
+    expect.soft(screen.getByRole('button', { name: 'Save Part' })).toBeDisabled();
+    const issue = screen.getByRole('alert');
+    expect(issue).toHaveTextContent(/Oversize pocket.*runs past the blank/i);
+    fireEvent.click(within(issue).getByRole('button', { name: 'Fix cut 1' }));
+    expect(screen.getByLabelText('Label (optional)')).toHaveValue('Oversize pocket');
+  });
+  it('UX clarifies the limited-run full-width dado and points to enclosed pockets', () => {
+    renderWorkspace();
+    startCut('Stopped Dado');
+    expect(screen.getByText(/For a channel stopped before a side edge, use Mortise/i)).toBeInTheDocument();
+  });
+  it('Q10 blocks Save Cut when the candidate completes cumulative blank removal', () => {
+    const a = createMortiseFeature({
+      id: 'a',
+      cutType: 'cutout',
+      placement: { x: 0, z: 0 },
+      parameters: { size: { length: 12, width: 12 }, depthMode: 'through' }
+    });
+    const b = { ...a, id: 'b', label: 'Other half', placement: { x: 12, z: 0 } };
+    renderWorkspace({ draftFeatures: [a, b] });
+    fireEvent.click(screen.getByRole('button', { name: /^2\. Other half/ }));
+    expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+  });
+  it.each((['imperial', 'metric'] as const).flatMap((units) => [0.755, 0.74].map((value) => ({ units, value }))))(
+    'Q4 saves and reopens exact $value after untouched focus/blur in $units',
+    ({ units, value }) => {
+      useProjectStore.setState({ units });
+      const cut = createMortiseFeature({
+        label: 'Precision cut',
+        cutType: 'cutout',
+        parameters: { size: { length: value, width: 1 }, depthMode: 'through' }
+      });
+      const view = renderWorkspace({ units, draftFeatures: [cut], selectedFeatureId: cut.id });
+      fireEvent.click(screen.getByRole('button', { name: /^1\. Precision cut/ }));
+      const input = screen.getByRole('textbox', { name: 'Run Along Blank' });
+      fireEvent.focus(input);
+      fireEvent.blur(input);
+      fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
+      const saved = lastFeatures(view.props.onDraftFeaturesChange);
+      expect(saved[0].parameters.size.length).toBe(value);
+      view.unmount();
+      renderWorkspace({ units, draftFeatures: saved, selectedFeatureId: cut.id });
+      fireEvent.click(screen.getByRole('button', { name: /^1\. Precision cut/ }));
+      expect(screen.getByRole('textbox', { name: 'Run Along Blank' })).toHaveValue(
+        units === 'imperial' ? String(value) : value === 0.755 ? '19.177' : '18.796'
+      );
+    }
+  );
   it('R9 mirrors an edge bevel to the opposite long edge through its menu', async () => {
     const user = userEvent.setup();
     const cut = createEndCutFeature({

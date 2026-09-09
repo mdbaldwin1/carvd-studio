@@ -50,7 +50,7 @@ import {
   type CreateDowelJointInput
 } from '../utils/dowelJointUtils';
 
-export type AddDowelJointInput = Omit<CreateDowelJointInput, 'firstPart' | 'secondPart'> & {
+export type AddDowelJointInput = Omit<CreateDowelJointInput, 'firstPart' | 'secondPart' | 'existingParts'> & {
   firstPartId: string;
   secondPartId: string;
 };
@@ -648,6 +648,7 @@ export const useProjectStore = create<ProjectState>()(
         try {
           const result = createDowelJoint({
             ...input,
+            existingParts: parts,
             firstPart,
             secondPart
           });

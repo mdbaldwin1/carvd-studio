@@ -263,10 +263,25 @@ export function PartCutsWorkspace({
   const draftValidationMessage = useMemo(() => {
     if (!draft) return null;
     const feature = buildFeatureFromDraft(draft);
-    if (feature.kind === 'rect_cut') return validateRectCutFeature(feature, part);
-    if (feature.kind === 'circular_cut') return validateCircularCut(feature, part);
-    if (feature.kind === 'rounded_cut') return validateRoundedCut(feature, part);
-    return validateEndCutFeature(feature, { ...part, features: draftFeatures });
+    const features = draft.featureId
+      ? draftFeatures.map((existing) => (existing.id === draft.featureId ? feature : existing))
+      : [...draftFeatures, feature];
+    const candidate = { ...part, features };
+    const issue =
+      feature.kind === 'rect_cut'
+        ? validateRectCutFeature(feature, candidate)
+        : feature.kind === 'circular_cut'
+          ? validateCircularCut(feature, candidate)
+          : feature.kind === 'rounded_cut'
+            ? validateRoundedCut(feature, candidate)
+            : validateEndCutFeature(feature, candidate);
+    if (issue) return issue;
+    return (
+      getPartFeatureConflicts(features, part).find(
+        (conflict) =>
+          conflict.severity === 'error' && (conflict.code === 'no_material' || conflict.code === 'material_removed')
+      )?.message ?? null
+    );
   }, [draft, part, draftFeatures]);
 
   const endCutPreviewMeasurements = useMemo(() => {
@@ -314,6 +329,28 @@ export function PartCutsWorkspace({
 
   const featureConflicts = useMemo(() => getPartFeatureConflicts(draftFeatures, part), [draftFeatures, part]);
   const hasBlockingFeatureConflicts = featureConflicts.some((conflict) => conflict.severity === 'error');
+  const operationIssues = useMemo(() => {
+    const candidate = { ...part, features: draftFeatures };
+    return new Map(
+      draftFeatures
+        .filter((feature) => feature.enabled)
+        .map((feature) => [
+          feature.id,
+          feature.kind === 'rect_cut'
+            ? validateRectCutFeature(feature, candidate)
+            : feature.kind === 'circular_cut'
+              ? validateCircularCut(feature, candidate)
+              : feature.kind === 'rounded_cut'
+                ? validateRoundedCut(feature, candidate)
+                : validateEndCutFeature(feature, candidate)
+        ])
+    );
+  }, [part, draftFeatures]);
+  const firstInvalidIndex = draftFeatures.findIndex(
+    (feature) =>
+      operationIssues.get(feature.id) ||
+      featureConflicts.some((conflict) => conflict.featureId === feature.id && conflict.severity === 'error')
+  );
   const enabledOperationCount = draftFeatures.filter((feature) => feature.enabled).length;
   const conflictsByFeatureId = useMemo(() => {
     const map = new Map<string, typeof featureConflicts>();
@@ -612,6 +649,7 @@ export function PartCutsWorkspace({
                     ) : (
                       draftFeatures.map((feature, index) => {
                         const conflicts = conflictsByFeatureId.get(feature.id) ?? [];
+                        const issue = operationIssues.get(feature.id);
                         return (
                           <div
                             key={feature.id}
@@ -646,17 +684,19 @@ export function PartCutsWorkspace({
                                   </div>
                                 </div>
                                 <div className="flex flex-wrap justify-end gap-1">
-                                  {conflicts.length > 0 && (
+                                  {(issue || conflicts.length > 0) && (
                                     <Badge variant="outline" className="border-warning/40 bg-warning/10 text-warning">
-                                      {conflicts.some((conflict) => conflict.severity === 'error')
-                                        ? 'Conflict'
-                                        : 'Warning'}
+                                      {issue
+                                        ? 'Invalid cut'
+                                        : conflicts.some((conflict) => conflict.severity === 'error')
+                                          ? 'Conflict'
+                                          : 'Warning'}
                                     </Badge>
                                   )}
                                 </div>
                               </div>
-                              {conflicts.length > 0 && (
-                                <div className="mt-2 text-[11px] text-warning">{conflicts[0].message}</div>
+                              {(issue || conflicts.length > 0) && (
+                                <div className="mt-2 text-[11px] text-warning">{issue || conflicts[0].message}</div>
                               )}
                             </button>
                             <DropdownMenu>
@@ -708,13 +748,37 @@ export function PartCutsWorkspace({
                   </div>
                 </ScrollArea>
 
+                {firstInvalidIndex >= 0 && (
+                  <div
+                    id="part-cuts-save-errors"
+                    role="alert"
+                    className="rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger"
+                  >
+                    <p>
+                      {draftFeatures[firstInvalidIndex].label || `Cut ${firstInvalidIndex + 1}`}:{' '}
+                      {operationIssues.get(draftFeatures[firstInvalidIndex].id) ||
+                        featureConflicts.find(
+                          (conflict) =>
+                            conflict.featureId === draftFeatures[firstInvalidIndex].id && conflict.severity === 'error'
+                        )?.message}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={() => handleEditFeature(draftFeatures[firstInvalidIndex])}
+                    >
+                      Fix cut {firstInvalidIndex + 1}
+                    </Button>
+                  </div>
+                )}
                 <div className="mt-auto flex flex-wrap gap-2">
                   <Button variant="outline" onClick={onExit}>
                     Back to Project
                   </Button>
                   <Button
                     onClick={onSave}
-                    disabled={!hasUnsavedChanges || hasBlockingFeatureConflicts}
+                    disabled={!hasUnsavedChanges || hasBlockingFeatureConflicts || firstInvalidIndex >= 0}
+                    aria-describedby={firstInvalidIndex >= 0 ? 'part-cuts-save-errors' : undefined}
                     className="ml-auto"
                   >
                     Save Part
@@ -1572,7 +1636,8 @@ export function PartCutsWorkspace({
                         {inspectorDraft.cutType === 'stopped_dado' && (
                           <p className="text-[11px] text-text-muted">
                             Stopped dado spans full board width, but the run is limited along the blank. Set run length,
-                            start offset, and blind depth.
+                            start offset, and blind depth. For a channel stopped before a side edge, use Mortise; use
+                            Stopped Groove for a limited lengthwise channel.
                           </p>
                         )}
                         {inspectorDraft.cutType === 'rabbet' && (
@@ -1849,7 +1914,10 @@ export function PartCutsWorkspace({
                   </div>
                 </div>
                 {draftValidationMessage && (
-                  <div className="mt-3 rounded-md border border-danger/30 bg-danger/5 p-3 text-[11px] text-danger">
+                  <div
+                    role="alert"
+                    className="mt-3 rounded-md border border-danger/30 bg-danger/5 p-3 text-[11px] text-danger"
+                  >
                     {draftValidationMessage}
                   </div>
                 )}

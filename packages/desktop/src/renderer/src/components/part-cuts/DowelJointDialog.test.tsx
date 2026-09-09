@@ -1,11 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useProjectStore } from '@renderer/store/projectStore';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 import { DowelJointDialog } from './DowelJointDialog';
 
 vi.unmock('three');
 
 describe('DowelJointDialog', () => {
+  beforeEach(() => useProjectStore.setState({ units: 'imperial' }));
   const firstPart = createTestPart({
     id: 'first',
     name: 'Lower rail',
@@ -21,6 +23,20 @@ describe('DowelJointDialog', () => {
     width: 4,
     thickness: 1,
     position: { x: 0, y: 1, z: 0 }
+  });
+
+  it('UX uses metric labels and exact metric dimensions in the drilling review', () => {
+    useProjectStore.setState({ units: 'metric' });
+    render(
+      <DowelJointDialog open firstPart={firstPart} candidateParts={[secondPart]} onClose={vi.fn()} onCreate={vi.fn()} />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect.soft(screen.queryByText('Enter measurements in millimeters (mm).')).toBeInTheDocument();
+    expect(screen.getByLabelText('Dowel Diameter')).toHaveValue('9.525');
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect.soft(screen.getAllByText('9.525mm diameter × 9.525mm deep')).toHaveLength(2);
+    expect(screen.getByText('Dowel: 9.525mm diameter × 19.05mm long.')).toBeInTheDocument();
   });
 
   it('walks through mate, faces, dimensions, and review before creating', () => {
@@ -58,6 +74,24 @@ describe('DowelJointDialog', () => {
         count: 2
       })
     );
+  });
+
+  it('Q6 keeps the dimensions step open with an actionable spacing error for overlapping dowels', () => {
+    render(
+      <DowelJointDialog open firstPart={firstPart} candidateParts={[secondPart]} onClose={vi.fn()} onCreate={vi.fn()} />
+    );
+    fireEvent.change(screen.getByLabelText('Mating Part'), { target: { value: 'second' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.change(screen.getByLabelText('Face on Lower rail'), { target: { value: 'top_face' } });
+    fireEvent.change(screen.getByLabelText('Face on Upper rail'), { target: { value: 'bottom_face' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.change(screen.getByLabelText('Dowel Count'), { target: { value: '2' } });
+    const spacing = screen.getByLabelText('Distance between dowels');
+    fireEvent.focus(spacing);
+    fireEvent.change(spacing, { target: { value: '0.1' } });
+    fireEvent.blur(spacing);
+    expect.soft(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(screen.getByText(/spacing.*diameter/i)).toBeInTheDocument();
   });
 
   it('retains face choices when validation rejects the joint', () => {

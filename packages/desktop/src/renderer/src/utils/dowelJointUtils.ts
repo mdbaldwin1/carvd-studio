@@ -2,8 +2,10 @@ import type { CircularCutFeature, DowelJointMetadata, FaceTarget, Part } from '@
 import { clonePartFeature } from '@renderer/utils/partFeatures';
 import { expandCircularCut, getFaceFrame, validateCircularCut } from '@renderer/utils/roundCutUtils';
 import * as THREE from 'three';
+import { Brush, Evaluator, INTERSECTION } from 'three-bvh-csg';
 
 export interface CreateDowelJointInput {
+  existingParts?: Part[];
   firstPart: Part;
   firstFace: FaceTarget;
   secondPart: Part;
@@ -134,6 +136,8 @@ export function createDowelJoint(input: CreateDowelJointInput): DowelJointResult
     throw new Error('Dowel dimensions and embedment depths must be greater than zero.');
   if (input.firstEmbedmentDepth + input.secondEmbedmentDepth < input.dowelLength - 1e-9)
     throw new Error('Combined hole depths must accommodate the full dowel length.');
+  if (input.count > 1 && (!Number.isFinite(input.spacing) || input.spacing < input.diameter - 1e-9))
+    throw new Error('Dowel spacing must be at least the dowel diameter so the dowels do not overlap.');
 
   validateDowelJointFaces(input);
   const secondFrame = getFaceFrame(input.secondPart, input.secondFace);
@@ -188,6 +192,19 @@ export function createDowelJoint(input: CreateDowelJointInput): DowelJointResult
     secondFeatures.push(second);
   }
 
+  const parts = (input.existingParts ?? [input.firstPart, input.secondPart]).map((part) =>
+    part.id === input.firstPart.id
+      ? { ...input.firstPart, features: [...(input.firstPart.features ?? []), ...firstFeatures] }
+      : part.id === input.secondPart.id
+        ? { ...input.secondPart, features: [...(input.secondPart.features ?? []), ...secondFeatures] }
+        : part
+  );
+  if (
+    findDowelInterferences(getRawDowelVisualizations(parts)).some((pair) =>
+      pair.some((dowel) => dowel.jointId === jointId)
+    )
+  )
+    throw new Error('The new dowels overlap existing hardware. Increase spacing or move this joint.');
   return { jointId, firstFeatures, secondFeatures };
 }
 
@@ -333,6 +350,11 @@ export function validateDowelRelationships(parts: Part[]): string[] {
     if (!isValidDowelPair(first, second))
       errors.push(`Dowel joint member ${key} has mismatched or misaligned hole geometry.`);
   }
+  for (const [first, second] of findDowelInterferences(getRawDowelVisualizations(parts))) {
+    errors.push(
+      `Dowel members ${first.memberIndex + 1} and ${second.memberIndex + 1} overlap. Increase their spacing or move the joints apart.`
+    );
+  }
   return errors;
 }
 
@@ -364,7 +386,7 @@ function getDowelMetadata(feature: CircularCutFeature): DowelJointMetadata | nul
     : null;
 }
 
-export function getDowelVisualizations(parts: Part[]): DowelVisualization[] {
+function getRawDowelVisualizations(parts: Part[]): DowelVisualization[] {
   const members = new Map<string, Array<{ part: Part; feature: CircularCutFeature; metadata: DowelJointMetadata }>>();
   for (const part of parts) {
     for (const feature of part.features ?? []) {
@@ -399,4 +421,83 @@ export function getDowelVisualizations(parts: Part[]): DowelVisualization[] {
     });
   }
   return visuals.sort((a, b) => a.jointId.localeCompare(b.jointId) || a.memberIndex - b.memberIndex);
+}
+
+/** Flat-ended dowels, not capsules: touching sides or ends do not overlap. */
+function dowelsIntersect(first: DowelVisualization, second: DowelVisualization): boolean {
+  const a = new THREE.Vector3(first.axis.x, first.axis.y, first.axis.z);
+  const b = new THREE.Vector3(second.axis.x, second.axis.y, second.axis.z);
+  const delta = new THREE.Vector3(
+    second.center.x - first.center.x,
+    second.center.y - first.center.y,
+    second.center.z - first.center.z
+  );
+  const ar = first.diameter / 2;
+  const br = second.diameter / 2;
+  if (![ar, br, first.length, second.length, ...delta.toArray()].every(Number.isFinite)) return false;
+  for (const coordinate of ['x', 'y', 'z'] as const) {
+    const extent =
+      (Math.abs(a[coordinate]) * first.length) / 2 +
+      Math.sqrt(Math.max(0, 1 - a[coordinate] ** 2)) * ar +
+      (Math.abs(b[coordinate]) * second.length) / 2 +
+      Math.sqrt(Math.max(0, 1 - b[coordinate] ** 2)) * br;
+    if (Math.abs(delta[coordinate]) >= extent - 1e-9) return false;
+  }
+  if (Math.abs(a.dot(b)) > 1 - 1e-9) {
+    const axial = delta.dot(a);
+    return (
+      Math.abs(axial) < (first.length + second.length) / 2 - 1e-9 &&
+      delta.clone().addScaledVector(a, -axial).length() < ar + br - 1e-9
+    );
+  }
+  // Nonparallel finite cylinders need their end caps included. Use the same
+  // solid intersection engine as cut geometry after the cheap analytic bounds.
+  const brushFor = (dowel: DowelVisualization, axis: THREE.Vector3) => {
+    const brush = new Brush(new THREE.CylinderGeometry(dowel.diameter / 2, dowel.diameter / 2, dowel.length, 64));
+    brush.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+    brush.position.set(dowel.center.x, dowel.center.y, dowel.center.z);
+    brush.updateMatrixWorld(true);
+    return brush;
+  };
+  const firstBrush = brushFor(first, a);
+  const secondBrush = brushFor(second, b);
+  const evaluator = new Evaluator();
+  evaluator.attributes = ['position', 'normal'];
+  evaluator.useGroups = false;
+  const result = evaluator.evaluate(firstBrush, secondBrush, INTERSECTION);
+  const positions = result.geometry.getAttribute('position');
+  const index = result.geometry.index;
+  let volume = 0;
+  const p = new THREE.Vector3();
+  const q = new THREE.Vector3();
+  const r = new THREE.Vector3();
+  for (let i = 0; i < (index?.count ?? positions.count); i += 3) {
+    p.fromBufferAttribute(positions, index ? index.getX(i) : i);
+    q.fromBufferAttribute(positions, index ? index.getX(i + 1) : i + 1);
+    r.fromBufferAttribute(positions, index ? index.getX(i + 2) : i + 2);
+    volume += p.dot(q.cross(r)) / 6;
+  }
+  firstBrush.geometry.dispose();
+  secondBrush.geometry.dispose();
+  result.geometry.dispose();
+  return Math.abs(volume) > 1e-10;
+}
+
+function findDowelInterferences(visuals: DowelVisualization[]): Array<[DowelVisualization, DowelVisualization]> {
+  const overlaps: Array<[DowelVisualization, DowelVisualization]> = [];
+  for (let i = 0; i < visuals.length; i += 1) {
+    for (let j = i + 1; j < visuals.length; j += 1) {
+      if (dowelsIntersect(visuals[i], visuals[j])) overlaps.push([visuals[i], visuals[j]]);
+    }
+  }
+  return overlaps;
+}
+
+export function getDowelVisualizations(parts: Part[]): DowelVisualization[] {
+  const visuals = getRawDowelVisualizations(parts);
+  for (const [first, second] of findDowelInterferences(visuals)) {
+    first.aligned = false;
+    second.aligned = false;
+  }
+  return visuals;
 }

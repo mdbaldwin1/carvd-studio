@@ -1411,10 +1411,15 @@ test.describe('part cuts editing lifecycle', () => {
     await queueSavePath(window, projectPath);
     await pressSaveShortcut(window);
     await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
+    // The first file-path transition checks this fixture's non-library stock
+    // after saving. Complete that prompt before leaving, rather than racing
+    // its delayed appearance with the Home click.
+    const importDialog = window.getByRole('dialog', { name: 'Import to Library' });
+    await importDialog.getByRole('button', { name: 'Skip' }).click();
+    await expect(importDialog).toBeHidden();
     await window.getByRole('button', { name: 'Carvd Studio home' }).click();
     await queueOpenPaths(window, [projectPath]);
     await window.getByRole('button', { name: 'Open file...' }).click();
-    const importDialog = window.getByRole('dialog', { name: 'Import to Library' });
     await importDialog.getByRole('button', { name: 'Skip' }).click();
     await expect
       .poll(async () =>

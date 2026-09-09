@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Combined joinery stays physically correct** — Tenons preserve opposite mitres, bevels, and compound cuts; end cuts and edge bevels now meet at their true intersecting planes. Countersinks have continuous conical walls, and very shallow remaining blind floors are no longer silently cut through.
+- **Lossless woodworking dimensions** — Focusing and leaving a measurement field preserves exact authored values such as .755 inches in either unit system. Resizing stock reports an oversized tenon instead of changing its dimensions, and rotated rounded openings use their real curved outline for fit checks.
+- **Safer cut and dowel validation** — Cuts cannot remove the entire blank or place holes outside material left by end cuts, bevels, and tenons. Dowel setup rejects overlapping hardware, including existing joints, and diagnoses interference after edits. Distinct overlapping hole patterns and stepped counterbores are no longer mistaken for duplicates.
+- **Clearer Custom Cuts feedback** — Invalid operations show a specific explanation and a direct edit action. Measurement inputs announce their units, dowel review respects exact metric dimensions, target buttons expose both selection states, and stopped-dado help clarifies its full-width behavior.
+
 - **Mirrored pocket and bevel orientation** — Mirroring a Front/Back pocket across width now changes its entry face while preserving its height. Opposite-end bevels and compound cuts retain their physical high-point orientation.
 - **Angled recess depth** — Angled counterbores and countersinks use depth along the drilling axis for validation and rendered geometry, allowing deep angled recesses that fit while still blocking cutter-edge breakout.
 - **Dowel and notch fabrication identity** — Cut List grouping and both PDF exports preserve distinct dowel lengths and joint groupings without depending on copied UUIDs. Blind edge-notch instructions identify Top or Bottom entry; through-notch side labels stay simple.

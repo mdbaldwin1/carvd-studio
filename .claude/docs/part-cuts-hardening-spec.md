@@ -86,6 +86,8 @@ Changing operation type must:
 - recompute any derived dimensions for constrained operations
 - zero out ignored offsets so hidden stale values do not survive invisibly
 
+These normalization rules apply to an explicit change of operation family, not to merely loading, resolving, focusing, or resizing existing authored work. In particular, a stock resize must preserve tenon size/offset and report invalid bounds; measurement focus/blur must not round-trip exact values through a rounded display string. Blind depths must retain their authored floor rather than snap to through.
+
 ### Source of truth requirement
 
 There should be one canonical normalization/resolution layer for rectangular operations.

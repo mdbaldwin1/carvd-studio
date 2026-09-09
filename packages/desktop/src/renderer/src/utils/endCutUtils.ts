@@ -148,6 +148,38 @@ export function getEndCutInsetAt(
   return profile.baseInset + profile.horizontalInset * horizontalRatio + profile.verticalInset * verticalRatio;
 }
 
+/** Remaining-stock half spaces in rendered local coordinates (Front is +Z). */
+export function getPartStockPlanes(part: Pick<Part, 'length' | 'width' | 'thickness' | 'features'>): Array<{
+  normal: { x: number; y: number; z: number };
+  limit: number;
+}> {
+  const ends = getPartEndCutProfiles(part);
+  const edges = getPartEdgeBevelProfiles(part);
+  const planes = (['left', 'right'] as const).map((side) => {
+    const inset = (y: number, z: number) => getEndCutInsetAt(side, ends, part, { y, z: -z });
+    return {
+      normal: {
+        x: side === 'left' ? -1 : 1,
+        y: (inset(part.thickness / 2, 0) - inset(-part.thickness / 2, 0)) / part.thickness,
+        z: (inset(0, part.width / 2) - inset(0, -part.width / 2)) / part.width
+      },
+      limit: part.length / 2 - inset(0, 0)
+    };
+  });
+  for (const side of ['front', 'back'] as const) {
+    const inset = (y: number) => getEdgeBevelInsetAt(side, edges, part, { y });
+    planes.push({
+      normal: {
+        x: 0,
+        y: (inset(part.thickness / 2) - inset(-part.thickness / 2)) / part.thickness,
+        z: side === 'front' ? 1 : -1
+      },
+      limit: part.width / 2 - inset(0)
+    });
+  }
+  return planes;
+}
+
 export function getDerivedLengthMeasurements(input: {
   length: number;
   width: number;
