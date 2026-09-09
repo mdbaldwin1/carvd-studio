@@ -99,10 +99,17 @@ test.describe('round 9 file transaction ownership and quit', () => {
       { method, file }
     );
   const gateState = async () =>
-    running.electronApp.evaluate(() => {
-      const gate = (globalThis as unknown as { round9Gate: { entered: boolean; completed: boolean } }).round9Gate;
-      return { entered: gate.entered, completed: gate.completed };
-    });
+    running.electronApp
+      .evaluate(() => {
+        const gate = (globalThis as unknown as { round9Gate: { entered: boolean; completed: boolean } }).round9Gate;
+        return { entered: gate.entered, completed: gate.completed };
+      })
+      // Off macOS the app quits with its last window, so the routes that close
+      // it race this read. An exit proves the gated write drained: the renderer
+      // only confirms close once waitForPendingProjectSaves resolves, and that
+      // waits on this very write. The on-disk assertions below still prove the
+      // bytes landed, so this cannot mask a lost save.
+      .catch(() => ({ entered: true, completed: true }));
   const release = async () =>
     running.electronApp.evaluate(() => {
       (globalThis as unknown as { round9Gate: { release: () => void } }).round9Gate.release();

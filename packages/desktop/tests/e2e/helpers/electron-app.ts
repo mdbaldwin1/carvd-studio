@@ -247,17 +247,32 @@ async function closeElectronProcess(
   const proc = processHandle ?? electronApp.process();
   if (proc.exitCode !== null || proc.signalCode !== null) return;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const exited = new Promise<void>((resolve) => proc.once('exit', () => resolve()));
+  const exited = new Promise<void>((resolve) => {
+    // The process can exit between the check above and this listener.
+    if (proc.exitCode !== null || proc.signalCode !== null) {
+      resolve();
+      return;
+    }
+    proc.once('exit', () => resolve());
+  });
   try {
     await Promise.race([
       (async () => {
         // Teardown approves discarding this synthetic test session. Leave the
         // production close/quit behavior intact during the test itself. Normal
         // app.quit closes windows and lets AppKit finish its termination cycle.
-        await electronApp.evaluate(({ BrowserWindow }) => {
-          for (const window of BrowserWindow.getAllWindows()) window.removeAllListeners('close');
-        });
-        await electronApp.close();
+        //
+        // Off macOS the app quits with its last window, so a test that closed
+        // the window has already started tearing the process down: Playwright's
+        // channel is gone while ChildProcess.exitCode is still null. Clearing
+        // close guards is only meaningful while the app is alive, and closing an
+        // app that is already exiting is a no-op, so neither may fail teardown.
+        await electronApp
+          .evaluate(({ BrowserWindow }) => {
+            for (const window of BrowserWindow.getAllWindows()) window.removeAllListeners('close');
+          })
+          .catch(() => undefined);
+        await electronApp.close().catch(() => undefined);
         await exited;
       })(),
       new Promise<never>((_, reject) => {
