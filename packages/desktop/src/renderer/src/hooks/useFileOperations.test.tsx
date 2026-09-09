@@ -160,6 +160,35 @@ function renderWithDialogs(options?: Parameters<typeof useFileOperations>[0]) {
 
 describe('useFileOperations', () => {
   describe('handleSave', () => {
+    it.each([true, false])('K7 commits active cuts before writing the project; valid=%s', async (valid) => {
+      const order: string[] = [];
+      const onSavePartCuts = vi.fn(() => {
+        order.push('cut');
+        return valid;
+      });
+      vi.mocked(saveProject).mockImplementation(async () => {
+        order.push('file');
+        return { success: true };
+      });
+      const { result } = renderHook(() => useFileOperations({ isEditingPartCuts: true, onSavePartCuts }));
+      await act(async () => {
+        await result.current.handleSave();
+      });
+      expect(order).toEqual(valid ? ['cut', 'file'] : ['cut']);
+    });
+    it('K7 routes Cmd+S from a focused input through the active cut commit', async () => {
+      const onSavePartCuts = vi.fn(() => false);
+      renderHook(() => useFileOperations({ isEditingPartCuts: true, onSavePartCuts }));
+      const input = document.createElement('input');
+      document.body.append(input);
+      input.focus();
+      await act(async () => {
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 's', metaKey: true, bubbles: true }));
+      });
+      expect(onSavePartCuts).toHaveBeenCalledOnce();
+      expect(saveProject).not.toHaveBeenCalled();
+      input.remove();
+    });
     it('saves project and shows toast on success', async () => {
       (saveProject as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
       const showToast = vi.fn();

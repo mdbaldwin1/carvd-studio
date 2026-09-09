@@ -1,6 +1,11 @@
 import { Part } from '../types';
 import { getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
-import { hasRenderablePartFeatures, partsOverlapOnYAxis, partsOverlapInPlan } from './partFeatureGeometry';
+import {
+  hasRenderablePartFeatures,
+  partsOverlapOnYAxis,
+  partsOverlapInPlan,
+  partsOverlapInMaterial
+} from './partFeatureGeometry';
 import {
   convexShapesOverlap,
   detectFeatureMateSnaps,
@@ -62,6 +67,17 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
 
 export function partsOverlap(a: Part, b: Part, geometryCache?: GeometryCache): boolean {
   if (!overlapCheckEnabled(a, b)) return false;
+
+  if (
+    [a, b].some((part) =>
+      part.features?.some(
+        (feature) => feature.enabled && (feature.kind === 'circular_cut' || feature.kind === 'rounded_cut')
+      )
+    )
+  ) {
+    if (!obbsOverlap(getPartOBB(a), getPartOBB(b), OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false)) return false;
+    return partsOverlapInMaterial(a, b);
+  }
 
   const hasAngledCuts = hasAngledEndCuts(a) || hasAngledEndCuts(b);
 

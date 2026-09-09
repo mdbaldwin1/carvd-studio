@@ -4,6 +4,7 @@ import { Brush, Evaluator, INTERSECTION, SUBTRACTION } from 'three-bvh-csg';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js';
 import { Earcut } from 'three/src/extras/Earcut.js';
+import { MeshBVH } from 'three-mesh-bvh';
 import { CircularCutFeature, Part, PartFeature, RectCutFeature, RoundedCutFeature } from '../types';
 import {
   getEdgeBevelInsetAt,
@@ -52,10 +53,6 @@ function featureKey(part: Part): string {
         ...(feature.kind === 'circular_cut' ? { pattern: feature.pattern } : {})
       }))
   });
-}
-
-function clonePoint(point: Point2): Point2 {
-  return { x: point.x, z: point.z };
 }
 
 function getEnabledFeatures(part: Part): PartFeature[] {
@@ -399,8 +396,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     const yMid = yMin + layerDepth / 2;
 
     const tenons = supportedRectCuts.filter((feature) => feature.cutType === 'tenon');
-    const layerContour = tenons.length > 0 ? buildTenonLayerContour(part, tenons, yMid) : contour.map(clonePoint);
-    const layerHoles: Point2[][] = [];
+    const layerHoles = getTenonLayerRemovals(part, tenons, yMid);
 
     for (const feature of supportedRectCuts) {
       if (feature.cutType === 'tenon') continue;
@@ -471,7 +467,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
       if (active) layerHoles.push(getRoundedCutHole(feature, part));
     }
 
-    let layer = getLayerGeometry(layerContour, layerHoles, layerDepth, yMin);
+    let layer = getLayerGeometry(contour, layerHoles, layerDepth, yMin);
     if (stock) {
       // Each slice is a closed solid. A merged stack contains coincident
       // internal caps, which are not a valid single input for solid clipping.
@@ -565,7 +561,10 @@ function createStockClipGeometry(part: Part): THREE.BufferGeometry {
 
 /** Signed tetrahedral volume of the rendered, closed layer solids. */
 export function getPartMaterialVolume(part: Part): number {
-  const geometry = getPartRenderGeometry(part);
+  return getGeometryVolume(getPartRenderGeometry(part));
+}
+
+function getGeometryVolume(geometry: THREE.BufferGeometry): number {
   const positions = geometry.getAttribute('position');
   const index = geometry.index;
   const a = new THREE.Vector3();
@@ -579,6 +578,103 @@ export function getPartMaterialVolume(part: Part): number {
     volume += a.dot(b.cross(c)) / 6;
   }
   return Math.abs(volume);
+}
+
+/** Compare the remaining solids, including openings on any face. */
+export function partsOverlapInMaterial(a: Part, b: Part, tolerance = 1e-6): boolean {
+  const geometryFor = (part: Part) => {
+    const source = getPartRenderGeometry(part);
+    const geometry = hasRenderablePartFeatures(part) ? source.clone() : source;
+    const rotation = new THREE.Euler(
+      (part.rotation.x * Math.PI) / 180,
+      (part.rotation.y * Math.PI) / 180,
+      (part.rotation.z * Math.PI) / 180,
+      'XYZ'
+    );
+    geometry.applyMatrix4(
+      new THREE.Matrix4().compose(
+        new THREE.Vector3(
+          part.position.x - a.position.x,
+          part.position.y - a.position.y,
+          part.position.z - a.position.z
+        ),
+        new THREE.Quaternion().setFromEuler(rotation),
+        new THREE.Vector3(1, 1, 1)
+      )
+    );
+    return geometry;
+  };
+  const first = geometryFor(a),
+    second = geometryFor(b);
+  try {
+    if (!first.getAttribute('position').count || !second.getAttribute('position').count) return false;
+    const treeA = new MeshBVH(first),
+      treeB = new MeshBVH(second);
+    const direction = new THREE.Vector3(0.371, 0.529, 0.763).normalize();
+    const inside = (tree: MeshBVH, point: THREE.Vector3): boolean => {
+      if (!tree.geometry.boundingBox!.containsPoint(point)) return false;
+      const hits = tree
+        .raycast(new THREE.Ray(point, direction), THREE.DoubleSide)
+        .sort((a, b) => a.distance - b.distance);
+      let winding = 0;
+      for (let i = 0; i < hits.length; ) {
+        const distance = hits[i].distance;
+        let orientation = 0,
+          normalDistance = Infinity;
+        do {
+          const dot = hits[i].face!.normal.dot(direction);
+          orientation += Math.sign(dot);
+          normalDistance = Math.min(normalDistance, distance * Math.abs(dot));
+          i++;
+        } while (i < hits.length && Math.abs(hits[i].distance - distance) < tolerance * 0.1);
+        // Opposite caps between closed layers cancel. Duplicate edge hits on
+        // the same outward face count once, as a winding crossing, not twice.
+        if (orientation) {
+          if (normalDistance <= tolerance) return false;
+          winding += Math.sign(orientation);
+        }
+      }
+      return winding > 0;
+    };
+    const inBoth = (point: THREE.Vector3) => inside(treeA, point) && inside(treeB, point);
+    const normalA = new THREE.Vector3(),
+      normalB = new THREE.Vector3(),
+      point = new THREE.Vector3();
+    const surfaceSample = (tree: MeshBVH) =>
+      tree.shapecast({
+        intersectsBounds: () => true,
+        intersectsTriangle: (triangle) => {
+          triangle.getNormal(normalA);
+          triangle.getMidpoint(point).addScaledVector(normalA, -tolerance * 2);
+          return inBoth(point);
+        }
+      });
+    if (surfaceSample(treeA) || surfaceSample(treeB)) return true;
+    const line = new THREE.Line3();
+    return treeA.bvhcast(treeB, new THREE.Matrix4(), {
+      intersectsTriangles: (triangleA, triangleB) => {
+        triangleA.getNormal(normalA);
+        triangleB.getNormal(normalB);
+        const dot = normalA.dot(normalB);
+        // Coplanar/tangent surfaces cannot establish strict volume overlap;
+        // their interior is covered by the surface samples above.
+        if (
+          Math.abs(dot) > 1 - 1e-10 ||
+          !triangleA.intersectsTriangle(triangleB, line, true) ||
+          line.distanceSq() <= tolerance * tolerance
+        )
+          return false;
+        line
+          .getCenter(point)
+          .addScaledVector(normalA, (-tolerance * 2) / (1 + dot))
+          .addScaledVector(normalB, (-tolerance * 2) / (1 + dot));
+        return inBoth(point);
+      }
+    });
+  } finally {
+    first.dispose();
+    second.dispose();
+  }
 }
 
 function subtractSolidCircularCuts(baseGeometry: THREE.BufferGeometry, part: Part): THREE.BufferGeometry {
@@ -666,69 +762,44 @@ function subtractSolidCircularCuts(baseGeometry: THREE.BufferGeometry, part: Par
 }
 
 /**
- * Contour for a layer of a tenoned part.
+ * Shoulder removals for a layer of a tenoned part.
  *
  * A tenon leaves a projecting tongue at one end: layers inside the tongue's
  * thickness band keep the full length (narrowed to the tongue width by the
  * shoulders), while layers outside the band stop at the shoulder line. Both
- * ends are handled in one pass so a rail can carry a tenon at each end.
+ * Every operation contributes removal regions. Unioning these cutters avoids
+ * self-crossing outlines when opposing shoulders pass and never ignores later
+ * same-end cuts. Adding or lengthening a cut cannot restore material.
  */
-function buildTenonLayerContour(part: Part, tenons: RectCutFeature[], yMid: number): Point2[] {
+function getTenonLayerRemovals(part: Part, tenons: RectCutFeature[], yMid: number): Point2[][] {
   const halfLength = part.length / 2;
   const halfWidth = part.width / 2;
-
-  const sideOf = (feature: RectCutFeature): 'left' | 'right' =>
-    feature.target.type === 'face' && feature.target.face === 'left_end' ? 'left' : 'right';
-
-  const describe = (feature: RectCutFeature | undefined) => {
-    if (!feature) return null;
+  const removals: Point2[][] = [];
+  for (const feature of tenons) {
     const tongueThickness = feature.parameters.depth ?? 0;
-    const tenonLength = feature.parameters.size.length;
-    if (tongueThickness <= 0 || tenonLength <= 0) return null;
-    // The tongue is centred in the blank's thickness.
-    const inBand = Math.abs(yMid) <= tongueThickness / 2;
-    const zMin = -halfWidth + feature.placement.z;
-    return { tenonLength, inBand, zMin, zMax: zMin + feature.parameters.size.width };
-  };
-
-  const left = describe(tenons.find((feature) => sideOf(feature) === 'left'));
-  const right = describe(tenons.find((feature) => sideOf(feature) === 'right'));
-
-  const xLeftBody = left ? -halfLength + left.tenonLength : -halfLength;
-  const xRightBody = right ? halfLength - right.tenonLength : halfLength;
-
-  const points: Point2[] = [];
-  points.push({ x: xLeftBody, z: -halfWidth });
-  points.push({ x: xRightBody, z: -halfWidth });
-
-  if (right?.inBand) {
-    points.push({ x: xRightBody, z: right.zMin });
-    points.push({ x: halfLength, z: right.zMin });
-    points.push({ x: halfLength, z: right.zMax });
-    points.push({ x: xRightBody, z: right.zMax });
+    const length = feature.parameters.size.length;
+    if (tongueThickness <= 0 || length <= 0) continue;
+    const left = feature.target.type === 'face' && feature.target.face === 'left_end';
+    const minX = left ? -halfLength : halfLength - length;
+    const maxX = left ? -halfLength + length : halfLength;
+    const removeBand = (minZ: number, maxZ: number) => {
+      if (maxZ <= minZ) return;
+      removals.push([
+        { x: minX, z: minZ },
+        { x: maxX, z: minZ },
+        { x: maxX, z: maxZ },
+        { x: minX, z: maxZ }
+      ]);
+    };
+    if (Math.abs(yMid) > tongueThickness / 2) {
+      removeBand(-halfWidth, halfWidth);
+    } else {
+      const minZ = -halfWidth + feature.placement.z;
+      removeBand(-halfWidth, minZ);
+      removeBand(minZ + feature.parameters.size.width, halfWidth);
+    }
   }
-  points.push({ x: xRightBody, z: halfWidth });
-  points.push({ x: xLeftBody, z: halfWidth });
-
-  if (left?.inBand) {
-    points.push({ x: xLeftBody, z: left.zMax });
-    points.push({ x: -halfLength, z: left.zMax });
-    points.push({ x: -halfLength, z: left.zMin });
-    points.push({ x: xLeftBody, z: left.zMin });
-  }
-
-  // Drop points a degenerate tongue (flush to an edge, or full width) leaves
-  // duplicated, so the extruded wall has no zero-length segments.
-  const deduped: Point2[] = [];
-  for (const point of points) {
-    const previous = deduped[deduped.length - 1];
-    if (previous && Math.abs(previous.x - point.x) < 1e-9 && Math.abs(previous.z - point.z) < 1e-9) continue;
-    deduped.push(point);
-  }
-  const first = deduped[0];
-  const last = deduped[deduped.length - 1];
-  if (deduped.length > 1 && Math.abs(first.x - last.x) < 1e-9 && Math.abs(first.z - last.z) < 1e-9) deduped.pop();
-  return deduped;
+  return removals;
 }
 
 function getFeaturePolygons(part: Part): polygonClipping.MultiPolygon {

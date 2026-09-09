@@ -11,7 +11,7 @@ import {
   groupCutInstructions,
   type GroupedCutInstruction
 } from './cutListInstructions';
-import { formatMeasurementWithUnit } from './fractions';
+import { formatFabricationMeasurement as formatMeasurementWithUnit } from './fractions';
 import { logger } from './logger';
 
 interface ExportOptions {
@@ -38,6 +38,32 @@ function toPdfFabricationText(text: string): string {
   // The built-in PDF fonts use WinAnsi encoding. Keep the operational record
   // searchable and legible when the source summary uses typographic symbols.
   return text.replaceAll('—', ' - ').replaceAll('·', ' | ').replaceAll('°', ' deg').replaceAll('×', ' x ');
+}
+
+function fitBlankDimensionColumns(
+  doc: jsPDF,
+  groups: GroupedCutInstruction[],
+  units: 'imperial' | 'metric',
+  widths: number[],
+  positions: number[]
+): void {
+  const fontSize = doc.getFontSize();
+  setPdfFontSize(doc, 9);
+  const fields = ['cutLength', 'cutWidth', 'thickness'] as const;
+  const extra = fields.map((field, index) =>
+    Math.max(
+      0,
+      ...groups.map((group) => doc.getTextWidth(formatMeasurementWithUnit(group[field], units)) + 6 - widths[index + 3])
+    )
+  );
+  doc.setFontSize(fontSize);
+  // Preserve the stock/operation columns and legible numeric text. Names can
+  // use the existing abbreviated table label; their full identity is below.
+  widths[2] -= extra.reduce((sum, value) => sum + value, 0);
+  for (let i = 0; i < 3; i++) {
+    widths[i + 3] += extra[i];
+    positions[i + 3] -= extra.slice(i).reduce((sum, value) => sum + value, 0);
+  }
 }
 
 function drawFabricationOperations(
@@ -73,7 +99,11 @@ function drawFabricationOperations(
   y += 18;
   for (const group of groupsWithOperations) {
     const identity = group.items.map((item) => `#${getShortPartId(item.partId)} ${item.partName}`).join(', ');
-    const heading = `Parts: ${identity} | Qty ${group.quantity}`;
+    const panel = group.items[0].stage === 'post_glue_up';
+    const dimensions = [group.cutLength, group.cutWidth, group.thickness]
+      .map((value) => formatMeasurementWithUnit(value, units))
+      .join(' x ');
+    const heading = `${panel ? 'After glue-up - finished panels' : 'Parts'}: ${identity} | Qty ${group.quantity}${panel ? ` | ${dimensions} (not additional stock blanks)` : ''}`;
     const writeHeading = (continued: boolean) => {
       setPdfFontSize(doc, 9);
       doc.setFont('helvetica', 'bold');
@@ -606,6 +636,7 @@ export async function exportCutListToPdf(
     margin + 342,
     margin + 418
   ];
+  fitBlankDimensionColumns(doc, grouped, units, colWidths, colX);
 
   doc.setFillColor(240, 240, 240);
   doc.rect(margin, y - 12, contentWidth, 18, 'F');
@@ -675,7 +706,13 @@ export async function exportCutListToPdf(
     y += 16;
   }
 
-  y = drawFabricationOperations(doc, grouped, units, y, watermarkLogoDataUrl);
+  y = drawFabricationOperations(
+    doc,
+    [...grouped, ...groupCutInstructions(cutList.postGlueUpInstructions ?? [])],
+    units,
+    y,
+    watermarkLogoDataUrl
+  );
 
   addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
 
@@ -1008,6 +1045,7 @@ export async function exportProjectReportToPdf(
     margin + 330,
     margin + 404
   ];
+  fitBlankDimensionColumns(doc, grouped, units, colWidths2, colX2);
 
   doc.setFillColor(240, 240, 240);
   doc.rect(margin, y - 12, contentWidth, 18, 'F');
@@ -1071,7 +1109,13 @@ export async function exportProjectReportToPdf(
     y += 14;
   }
 
-  y = drawFabricationOperations(doc, grouped, units, y, watermarkLogoDataUrl);
+  y = drawFabricationOperations(
+    doc,
+    [...grouped, ...groupCutInstructions(cutList.postGlueUpInstructions ?? [])],
+    units,
+    y,
+    watermarkLogoDataUrl
+  );
 
   addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
 
@@ -1375,7 +1419,10 @@ export async function exportDiagramsToPdf(
  * Export cut list to CSV with watermark header
  */
 export function exportCutListToCsv(cutList: CutList, units: 'imperial' | 'metric'): string {
-  const grouped = groupCutInstructions(cutList.instructions);
+  const grouped = [
+    ...groupCutInstructions(cutList.instructions),
+    ...groupCutInstructions(cutList.postGlueUpInstructions ?? [])
+  ];
   const partBoardMap = buildPartBoardMap(cutList.stockBoards);
   const unitLabel = units === 'imperial' ? 'inches' : 'mm';
 
@@ -1397,7 +1444,8 @@ export function exportCutListToCsv(cutList: CutList, units: 'imperial' | 'metric
       'Group Path',
       'Grain Sensitive',
       'Glue-Up',
-      'Operations / Notes'
+      'Operations / Notes',
+      'Stage'
     ].join(',')
   ];
 
@@ -1423,7 +1471,10 @@ export function exportCutListToCsv(cutList: CutList, units: 'imperial' | 'metric
         csvEscape(groupPath),
         group.grainSensitive ? 'Yes' : 'No',
         group.isGlueUp ? 'Yes' : 'No',
-        csvEscape(fabricationSummary)
+        csvEscape(fabricationSummary),
+        group.items[0].stage === 'post_glue_up'
+          ? 'After glue-up - finished panel (not an additional stock blank)'
+          : 'Stock blank'
       ].join(',')
     );
   }

@@ -69,7 +69,7 @@ import {
   DropdownMenuTrigger
 } from '@renderer/components/ui/dropdown-menu';
 import { MoreHorizontal } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 interface PartCutsWorkspaceProps {
   part: Part;
@@ -383,9 +383,9 @@ export function PartCutsWorkspace({
     onSelectFeature(feature.id);
   };
 
-  const handleSaveDraft = () => {
-    if (!draft) return;
-    if (draftValidationMessage) return;
+  const handleSaveDraft = useCallback((): string | null => {
+    if (!draft) return null;
+    if (draftValidationMessage) return draftValidationMessage;
 
     const builtFeature = buildFeatureFromDraft(draft.mode === 'end_cut' ? normalizeEndCutDraft(draft) : draft);
     const originalFeature = draft.featureId
@@ -402,7 +402,20 @@ export function PartCutsWorkspace({
     onSelectFeature(nextFeature.id);
     setDraft(null);
     setPanelMode('list');
-  };
+    return null;
+  }, [draft, draftValidationMessage, draftFeatures, onDraftFeaturesChange, onSelectFeature]);
+
+  const originalInspectorFeature = draft?.featureId
+    ? draftFeatures.find((feature) => feature.id === draft.featureId)
+    : undefined;
+  const inspectorDirty =
+    !!draft &&
+    (!originalInspectorFeature ||
+      JSON.stringify(draft) !== JSON.stringify(buildDraftFromFeature(originalInspectorFeature, part)));
+  useLayoutEffect(() => {
+    usePartCutsEditingStore.getState().registerInspector(inspectorDirty, draft ? handleSaveDraft : null);
+    return () => usePartCutsEditingStore.getState().registerInspector(false, null);
+  }, [draft, handleSaveDraft, inspectorDirty]);
 
   const handleRemoveFeature = (featureId: string) => {
     onDraftFeaturesChange(draftFeatures.filter((feature) => feature.id !== featureId));

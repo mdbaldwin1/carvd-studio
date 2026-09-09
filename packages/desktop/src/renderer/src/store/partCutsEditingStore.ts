@@ -19,6 +19,9 @@ interface PartCutsEditingState {
   hoveredTarget: PartFeatureTarget | null;
   pendingTarget: PartFeatureTarget | null;
   showExitDialog: boolean;
+  inspectorDirty: boolean;
+  commitInspector: (() => string | null) | null;
+  registerInspector: (dirty: boolean, commit: (() => string | null) | null) => void;
 
   startEditingPartCuts: (partId: string, partName: string, features?: PartFeature[]) => void;
   setDraftFeatures: (features: PartFeature[]) => void;
@@ -47,6 +50,9 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
   hoveredTarget: null,
   pendingTarget: null,
   showExitDialog: false,
+  inspectorDirty: false,
+  commitInspector: null,
+  registerInspector: (inspectorDirty, commitInspector) => set({ inspectorDirty, commitInspector }),
 
   startEditingPartCuts: (partId, partName, features = []) => {
     const draftFeatures = clonePartFeatures(features);
@@ -60,7 +66,9 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
       selectedFeatureId: draftFeatures[0]?.id ?? null,
       hoveredTarget: null,
       pendingTarget: null,
-      showExitDialog: false
+      showExitDialog: false,
+      inspectorDirty: false,
+      commitInspector: null
     });
   },
 
@@ -129,7 +137,7 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
   requestExit: (sourceFeatures = []) => {
     const { draftFeatures } = get();
     const normalizedSourceFeatures = clonePartFeatures(sourceFeatures);
-    if (featuresEqual(draftFeatures, normalizedSourceFeatures)) {
+    if (!get().inspectorDirty && featuresEqual(draftFeatures, normalizedSourceFeatures)) {
       get().finishEditing();
       return;
     }
@@ -149,7 +157,9 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
       selectedFeatureId: null,
       hoveredTarget: null,
       pendingTarget: null,
-      showExitDialog: false
+      showExitDialog: false,
+      inspectorDirty: false,
+      commitInspector: null
     });
     // Clear geometry cache so the main workspace doesn't use stale meshes
     clearPartGeometryCache();
@@ -161,6 +171,6 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
 
   hasUnsavedDraftChanges: (sourceFeatures = []) => {
     const { draftFeatures } = get();
-    return !featuresEqual(draftFeatures, clonePartFeatures(sourceFeatures));
+    return get().inspectorDirty || !featuresEqual(draftFeatures, clonePartFeatures(sourceFeatures));
   }
 }));

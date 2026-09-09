@@ -483,6 +483,7 @@ export interface PartValidationIssue {
 
 // Represents a single part's cut instructions
 export interface CutInstruction {
+  stage?: 'post_glue_up'; // Absent means a stock blank; retained for legacy cut lists.
   partId: string;
   partName: string;
   cutLength: number; // length + extraLength
@@ -563,6 +564,9 @@ export interface CutList {
 
   // Per-part instructions
   instructions: CutInstruction[];
+  // Finished-panel machining, performed after assembling the optimized strips.
+  // Separate from stock blanks so it never consumes stock or multiplies per strip.
+  postGlueUpInstructions?: CutInstruction[];
 
   // Per-stock optimization results
   stockBoards: StockBoard[];

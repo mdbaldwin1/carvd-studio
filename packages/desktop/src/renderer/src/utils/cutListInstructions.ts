@@ -105,7 +105,7 @@ export function groupCutInstructions(instructions: CutInstruction[]): GroupedCut
       .map((feature) => getFeatureGroupingKey(feature, jointGroups))
       .join('|');
     const noteKey = inst.notes?.trim() ?? '';
-    const key = `${inst.cutLength}-${inst.cutWidth}-${inst.thickness}-${inst.stockId}-${inst.grainSensitive}-${inst.isGlueUp}-${featureKey}-${noteKey}`;
+    const key = `${inst.stage ?? 'blank'}-${inst.cutLength}-${inst.cutWidth}-${inst.thickness}-${inst.stockId}-${inst.grainSensitive}-${inst.isGlueUp}-${featureKey}-${noteKey}`;
 
     const existing = groups.get(key);
     if (existing) {

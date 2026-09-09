@@ -348,6 +348,7 @@ vi.mock('jspdf', () => {
   class MockJsPDF {
     internal = { pageSize: { getWidth: () => 612, getHeight: () => 792 } };
     setFontSize = vi.fn();
+    getFontSize = vi.fn().mockReturnValue(10.35);
     setFont = vi.fn();
     setTextColor = vi.fn();
     setFillColor = vi.fn();

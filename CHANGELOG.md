@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Round-opening joinery collision** — Timber can pass through circular and rounded openings on rotated parts. Collision checks use the remaining wood, distinguish wall contact from intrusion, and avoid solid-boolean stalls when overlapping copied multi-cut parts.
+- **Composed tenon shoulders** — Every accepted tenon removes its own shoulders, including multiple cuts on one end and opposing cuts whose lengths meet or overlap. A later cut never restores material removed earlier.
+- **Safe cut-editor saves** — Header Save, Cmd+S, and native Save commit a valid active cut before writing the project, including a still-focused measurement field. Invalid edits stay open with their exact correction; Exit, Home, and Close Project prompt for uncommitted editor changes.
+- **Preserved measurement references** — Editing or renaming circular and rounded cuts retains saved minimum, center, and maximum references, including patterns and legacy files.
+- **Panel-level glue-up machining** — Cut lists, CSV, and both PDF reports separate strip blanks from machining performed once on the assembled panel, with finished-panel dimensions and an explicit after-glue-up sequence.
+- **Fabrication integrity** — Cut List validation blocks inconsistent paired dowel dimensions, depths, alignment, missing mates, and hardware interference. Blank dimensions retain authored precision in PDF/CSV and the parts table; metric PDF columns expand to keep precise values legible.
+
 - **Rotated joinery contact** — Featured boards can touch at arbitrary decimal angles without a collision-check crash. Composed X/Y/Z rotations now keep collision cells and snap targets aligned with the rendered wood, including disconnected pieces and openings.
 - **Explicit correction of hidden offsets** — Invalid offsets remain invalid through unrelated edits, even when a cut hides that coordinate. Save Cut stays blocked until the value is corrected; an accessible reset action fixes only invalid offsets and preserves other authored values.
 

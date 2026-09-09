@@ -213,6 +213,8 @@ function App() {
     onSaveTemplate: saveTemplateDirectly,
     isEditingAssembly,
     onSaveAssembly: saveAssemblyAndExit,
+    isEditingPartCuts,
+    onSavePartCuts: savePartCutsAndExit,
     onGoHome: () => {
       newProject(); // Reset project state to clear isDirty flag
       setShowStartScreen(true);
@@ -653,10 +655,6 @@ function App() {
   };
 
   const handlePrimarySave = async () => {
-    if (isEditingPartCuts) {
-      savePartCutsAndExit();
-      return;
-    }
     await handleSave();
   };
 
@@ -803,10 +801,10 @@ function App() {
     onNewProject: handleNew,
     onOpenProject: handleOpen,
     onOpenRecentProject: handleOpenRecent,
-    onCloseProject: handleGoHome,
+    onCloseProject: async () => handleLogoClick(),
     // Focused editing modes - route save commands appropriately
     isEditingPartCuts,
-    onSavePartCuts: savePartCutsAndExit,
+    onSavePartCuts: handlePrimarySave,
     isEditingTemplate,
     onSaveTemplate: saveTemplateDirectly,
     onSaveAssembly: saveAssemblyAndExit

@@ -128,6 +128,7 @@ export type FeatureDraft =
     }
   | {
       mode: 'circular_cut';
+      reference?: CircularCutFeature['reference'];
       featureId: string | null;
       label: string;
       enabled: boolean;
@@ -149,6 +150,7 @@ export type FeatureDraft =
     }
   | {
       mode: 'rounded_cut';
+      reference?: RoundedCutFeature['reference'];
       featureId: string | null;
       label: string;
       enabled: boolean;
@@ -515,6 +517,7 @@ export function buildDraftFromFeature(
   if (feature.kind === 'circular_cut') {
     return {
       mode: 'circular_cut',
+      reference: { ...feature.reference },
       featureId: feature.id,
       label: feature.label ?? '',
       enabled: feature.enabled,
@@ -539,6 +542,7 @@ export function buildDraftFromFeature(
   if (feature.kind === 'rounded_cut') {
     return {
       mode: 'rounded_cut',
+      reference: { ...feature.reference },
       featureId: feature.id,
       label: feature.label ?? '',
       enabled: feature.enabled,
@@ -635,7 +639,7 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
       enabled: draft.enabled,
       label: draft.label || undefined,
       target: { type: 'face', face: draft.faceTarget },
-      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      reference: draft.reference ? { ...draft.reference } : { primaryFrom: 'center', secondaryFrom: 'center' },
       cutType: draft.cutType,
       parameters: {
         diameter: draft.diameter,
@@ -669,7 +673,7 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
       enabled: draft.enabled,
       label: draft.label || undefined,
       target: { type: 'face', face: draft.faceTarget },
-      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      reference: draft.reference ? { ...draft.reference } : { primaryFrom: 'center', secondaryFrom: 'center' },
       cutType: draft.cutType,
       parameters: {
         length: draft.length,

@@ -46,6 +46,7 @@ import { resolveSelectedGroupIdsWithDescendants, resolveTransformSelectedPartIds
 import { dragDebug } from '../utils/dragDebug';
 import {
   createDowelJoint,
+  getDowelRelationshipIssues,
   reconcileDowelRelationshipRemovals,
   type CreateDowelJointInput
 } from '../utils/dowelJointUtils';
@@ -431,6 +432,24 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
     }
   }
 
+  // Relationships span parts, so validate once after individual operations.
+  // One issue identifies the joint's parts instead of repeating it per mate.
+  const seenRelationships = new Set<string>();
+  for (const relationship of getDowelRelationshipIssues(parts)) {
+    const key = `${[...relationship.partIds].sort().join(':')}:${relationship.message}`;
+    if (seenRelationships.has(key)) continue;
+    seenRelationships.add(key);
+    const relatedParts = parts.filter((part) => relationship.partIds.includes(part.id));
+    const part = relatedParts[0];
+    if (!part) continue;
+    issues.push({
+      partId: part.id,
+      partName: part.name,
+      type: 'feature_validation',
+      severity: 'error',
+      message: `${relationship.message} Parts: ${relatedParts.map((member) => member.name).join(', ')}. Check paired-hole diameter, depth, spacing and alignment before fabrication.`
+    });
+  }
   return issues;
 };
 

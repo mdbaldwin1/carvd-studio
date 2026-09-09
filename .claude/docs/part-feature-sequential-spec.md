@@ -4,6 +4,16 @@ Workflow and policy source of truth: see `AGENTS.md`. This file is reference gui
 
 ## Implemented POC Status
 
+### Qualification addendum — 2026-09-09
+
+- Every accepted tenon is a subtractive shoulder operation. All same-end and opposing-end shoulder regions are unioned per depth band before subtraction. Overlapping cuts intersect retained tongues; they never restore stock. These are successive machining operations, not a union of independently added tongues.
+- Circular/rounded collision uses the rendered remaining mesh on all supported faces and canonical XYZ transforms. Finite BVH surface/crossing queries establish strict common material; oriented ray crossings cancel internal layer caps. Collision never constructs a new Boolean solid. Contact tolerance is a linear distance, and real 0.0001-inch intrusion remains blocked.
+- Circular and rounded editor drafts preserve both stored coordinate references. Legacy omitted secondary references remain omitted; newly authored drafts retain the existing center defaults. Rounded authoring remains Top/Bottom only; retaining legacy metadata does not silently enable unsupported faces.
+- Global Save flushes the active measurement field, validates and commits the inspector into session history, saves the part as one project-history operation, then saves the project file. Invalid input leaves the inspector open with its exact error. Exit/Home/Close Project consult inspector dirtiness as well as the committed session list. Explicit Save Cut remains a local undo step.
+- Fabrication validates paired-dowel relationships once at the project boundary and attributes each issue to involved parts. It does not print inconsistent hardware instructions merely because each hole independently fits its blank.
+- Glue-up strips carry no panel features. Optional `CutList.postGlueUpInstructions` records contain the original panel identity, finished dimensions and machining features with `stage: post_glue_up`; they do not consume stock or increase blank counts. UI, CSV and both PDF reports identify these as after-glue-up operations, performed once per panel. Older cut lists without the optional field still load.
+- Fabrication blank dimensions use exact authored decimal precision, with fractions only for exact fraction values. PDF column widths account for the full measurement text instead of rounding or overlapping adjacent columns.
+
 As of beads `15.2` and `15.3`, the current branch now implements:
 
 - list-order-driven preview geometry for supported part-feature stacks

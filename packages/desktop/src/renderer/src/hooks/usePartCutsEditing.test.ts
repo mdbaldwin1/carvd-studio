@@ -313,7 +313,7 @@ describe('usePartCutsEditing', () => {
 
     expect(saved).toBe(false);
     expect(updatePart).not.toHaveBeenCalled();
-    expect(showToast).toHaveBeenCalledWith('Resolve "Oversized hole" before saving part cuts', 'error');
+    expect(showToast).toHaveBeenCalledWith('Oversized hole: Hole profile extends beyond the selected face.', 'error');
     expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
   });
 

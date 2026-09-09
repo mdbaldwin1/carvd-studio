@@ -324,8 +324,13 @@ function isValidDowelPair(
   );
 }
 
-export function validateDowelRelationships(parts: Part[]): string[] {
-  const errors: string[] = [];
+export interface DowelRelationshipIssue {
+  partIds: string[];
+  message: string;
+}
+
+export function getDowelRelationshipIssues(parts: Part[]): DowelRelationshipIssue[] {
+  const errors: DowelRelationshipIssue[] = [];
   const entries = new Map<string, Array<{ part: Part; feature: CircularCutFeature; metadata: DowelJointMetadata }>>();
   for (const part of parts) {
     for (const feature of part.features ?? []) {
@@ -333,7 +338,7 @@ export function validateDowelRelationships(parts: Part[]): string[] {
       if (!dowel) continue;
       const key = `${dowel.jointId}:${dowel.memberIndex}`;
       if (feature.kind !== 'circular_cut') {
-        errors.push(`Dowel joint member ${key} is not a round hole.`);
+        errors.push({ partIds: [part.id], message: `Dowel joint member ${key} is not a round hole.` });
         continue;
       }
       const members = entries.get(key) ?? [];
@@ -343,19 +348,36 @@ export function validateDowelRelationships(parts: Part[]): string[] {
   }
   for (const [key, members] of entries) {
     if (members.length !== 2) {
-      errors.push(`Dowel joint member ${key} is missing its matching hole.`);
+      errors.push({
+        partIds: members.map((member) => member.part.id),
+        message: `Dowel joint member ${key} is missing its matching hole.`
+      });
       continue;
     }
     const [first, second] = members;
     if (!isValidDowelPair(first, second))
-      errors.push(`Dowel joint member ${key} has mismatched or misaligned hole geometry.`);
+      errors.push({
+        partIds: members.map((member) => member.part.id),
+        message: `Dowel joint member ${key} has mismatched or misaligned hole geometry.`
+      });
   }
   for (const [first, second] of findDowelInterferences(getRawDowelVisualizations(parts))) {
-    errors.push(
-      `Dowel members ${first.memberIndex + 1} and ${second.memberIndex + 1} overlap. Increase their spacing or move the joints apart.`
-    );
+    errors.push({
+      partIds: [
+        ...new Set(
+          [first, second].flatMap((visual) =>
+            (entries.get(`${visual.jointId}:${visual.memberIndex}`) ?? []).map((member) => member.part.id)
+          )
+        )
+      ],
+      message: `Dowel members ${first.memberIndex + 1} and ${second.memberIndex + 1} overlap. Increase their spacing or move the joints apart.`
+    });
   }
   return errors;
+}
+
+export function validateDowelRelationships(parts: Part[]): string[] {
+  return getDowelRelationshipIssues(parts).map((issue) => issue.message);
 }
 
 export function getDowelJointAlignment(

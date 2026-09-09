@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { useProjectStore } from '../store/projectStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useUIStore } from '../store/uiStore';
@@ -34,6 +35,7 @@ export function usePartCutsEditing() {
   const cancelExit = usePartCutsEditingStore((s) => s.cancelExit);
   const finishEditing = usePartCutsEditingStore((s) => s.finishEditing);
   const hasUnsavedDraftChanges = usePartCutsEditingStore((s) => s.hasUnsavedDraftChanges);
+  const inspectorDirty = usePartCutsEditingStore((s) => s.inspectorDirty);
 
   const sourcePart = useMemo(
     () => (sourcePartId ? (parts.find((part) => part.id === sourcePartId) ?? null) : null),
@@ -42,6 +44,17 @@ export function usePartCutsEditing() {
   const sourceFeatures = useMemo(() => sourcePart?.features ?? [], [sourcePart]);
 
   const saveAndExit = useCallback(() => {
+    // Fraction inputs commit on blur. Flush that update before reading the
+    // registered inspector callback, including saves from native menus.
+    flushSync(() => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    });
+    const inspectorIssue = usePartCutsEditingStore.getState().commitInspector?.();
+    if (inspectorIssue) {
+      showToast(inspectorIssue, 'error');
+      return false;
+    }
+    const draftFeatures = usePartCutsEditingStore.getState().draftFeatures;
     const currentPart = sourcePartId ? useProjectStore.getState().parts.find((part) => part.id === sourcePartId) : null;
     if (!currentPart || !sourcePartId) {
       showToast('Part not found', 'error');
@@ -62,7 +75,7 @@ export function usePartCutsEditing() {
       if (!featureIssue) continue;
       const featureLabel =
         feature.label?.trim() || `${feature.cutType.replace(/_/g, ' ')} on ${getFeatureTargetLabel(feature)}`;
-      showToast(`Resolve "${featureLabel}" before saving part cuts`, 'error');
+      showToast(`${featureLabel}: ${featureIssue}`, 'error');
       return false;
     }
 
@@ -84,7 +97,7 @@ export function usePartCutsEditing() {
     selectPart(sourcePartId);
     showToast(`Saved cuts for "${currentPart.name}"`, 'success');
     return true;
-  }, [draftFeatures, finishEditing, selectPart, showToast, sourcePartId, updatePart]);
+  }, [finishEditing, selectPart, showToast, sourcePartId, updatePart]);
 
   const discardAndExit = useCallback(() => {
     finishEditing();
@@ -94,6 +107,9 @@ export function usePartCutsEditing() {
   }, [finishEditing, selectPart, sourcePartId]);
 
   const requestExit = useCallback(() => {
+    flushSync(() => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    });
     requestStoreExit(sourceFeatures);
   }, [requestStoreExit, sourceFeatures]);
 
@@ -115,6 +131,6 @@ export function usePartCutsEditing() {
     selectFeature,
     setHoveredTarget,
     setPendingTarget,
-    hasUnsavedChanges: hasUnsavedDraftChanges(sourceFeatures)
+    hasUnsavedChanges: inspectorDirty || hasUnsavedDraftChanges(sourceFeatures)
   };
 }

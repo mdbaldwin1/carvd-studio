@@ -31,6 +31,8 @@ interface UseFileOperationsOptions {
   // Assembly editing mode
   isEditingAssembly?: boolean;
   onSaveAssembly?: () => Promise<void>;
+  isEditingPartCuts?: boolean;
+  onSavePartCuts?: () => boolean;
   // Callback when returning to start screen
   onGoHome?: () => void;
 }
@@ -58,7 +60,15 @@ type PendingAction = {
 } | null;
 
 export function useFileOperations(options: UseFileOperationsOptions = {}): UseFileOperationsResult {
-  const { isEditingTemplate = false, onSaveTemplate, isEditingAssembly = false, onSaveAssembly, onGoHome } = options;
+  const {
+    isEditingTemplate = false,
+    onSaveTemplate,
+    isEditingAssembly = false,
+    onSaveAssembly,
+    isEditingPartCuts = false,
+    onSavePartCuts,
+    onGoHome
+  } = options;
   const isDirty = useProjectStore((s) => s.isDirty);
   const projectName = useProjectStore((s) => s.projectName);
   const filePath = useProjectStore((s) => s.filePath);
@@ -275,6 +285,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   }, []);
 
   const handleSave = useCallback(async () => {
+    if (isEditingPartCuts && onSavePartCuts && !onSavePartCuts()) return;
     // Check if we're in template or assembly editing mode
     if (isEditingTemplate && onSaveTemplate) {
       await onSaveTemplate();
@@ -294,7 +305,16 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       showToast(`Error saving: ${result.error}`, 'error');
     }
     // If canceled, do nothing
-  }, [showToast, refreshRecentProjects, isEditingTemplate, onSaveTemplate, isEditingAssembly, onSaveAssembly]);
+  }, [
+    showToast,
+    refreshRecentProjects,
+    isEditingTemplate,
+    onSaveTemplate,
+    isEditingAssembly,
+    onSaveAssembly,
+    isEditingPartCuts,
+    onSavePartCuts
+  ]);
 
   const handleSaveAs = useCallback(async () => {
     // "Save As" doesn't apply to template or assembly editing
@@ -486,7 +506,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (
+        (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) &&
+        !(isEditingPartCuts && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's')
+      ) {
         return;
       }
 
@@ -518,7 +541,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, handleSaveAs, handleOpen, handleNew]);
+  }, [handleSave, handleSaveAs, handleOpen, handleNew, isEditingPartCuts]);
 
   // Dialog component
   const UnsavedChangesDialogComponent = useCallback(

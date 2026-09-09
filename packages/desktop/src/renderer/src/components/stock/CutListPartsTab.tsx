@@ -2,9 +2,13 @@ import { Badge } from '@renderer/components/ui/badge';
 import { ChevronDown, ChevronRight, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import React, { useState, useCallback, useMemo } from 'react';
 import { useUIStore } from '../../store/uiStore';
-import { getInstructionFabricationSummary, groupCutInstructions } from '../../utils/cutListInstructions';
+import {
+  getInstructionFabricationLines,
+  getInstructionFabricationSummary,
+  groupCutInstructions
+} from '../../utils/cutListInstructions';
 import { getBlockedMessage } from '../../utils/featureLimits';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { formatFabricationMeasurement as formatMeasurementWithUnit } from '../../utils/fractions';
 import { showSavedFileToast } from '../../utils/fileToast';
 // pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { logger } from '../../utils/logger';
@@ -207,6 +211,31 @@ export function CutListPartsTab({
             })}
           </TableBody>
         </Table>
+        {(cutList.postGlueUpInstructions?.length ?? 0) > 0 && (
+          <section aria-label="After glue-up — finished panels" className="p-4 border-t border-border">
+            <h3 className="font-semibold">After glue-up — finished panels</h3>
+            <p className="text-sm text-text-muted">
+              These are assembled panels, not additional stock blanks. Glue the strips first; machine each complete
+              panel once.
+            </p>
+            {cutList.postGlueUpInstructions!.map((instruction) => (
+              <div key={instruction.partId} className="mt-3">
+                <h4 className="font-medium">{instruction.partName}</h4>
+                <p>
+                  Finished panel:{' '}
+                  {[instruction.cutLength, instruction.cutWidth, instruction.thickness]
+                    .map((value) => formatMeasurementWithUnit(value, units))
+                    .join(' × ')}
+                </p>
+                <ul className="text-sm list-disc pl-5">
+                  {getInstructionFabricationLines(instruction, units).map((line, index) => (
+                    <li key={index}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </section>
+        )}
       </div>
     </div>
   );
