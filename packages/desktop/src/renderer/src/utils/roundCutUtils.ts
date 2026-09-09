@@ -1,5 +1,5 @@
 import type { CircularCutFeature, FaceTarget, Part, RoundedCutFeature } from '../types';
-import { getPartStockPlanes } from './endCutUtils';
+import { fitsRemainingStock } from './remainingStock';
 
 export interface Point3 {
   x: number;
@@ -23,47 +23,6 @@ export interface ExpandedCircularCut {
 }
 
 const dot = (a: Point3, b: Point3): number => a.x * b.x + a.y * b.y + a.z * b.z;
-function fitsRemainingStock(part: Part, center: Point3, support: (normal: Point3) => number): boolean {
-  const absoluteSupport = (normal: Point3) => dot(normal, center) + support(normal);
-  if (getPartStockPlanes(part).some((plane) => absoluteSupport(plane.normal) > plane.limit + 1e-9)) return false;
-  for (const feature of part.features ?? []) {
-    if (!feature.enabled || feature.kind !== 'rect_cut' || feature.cutType !== 'tenon') continue;
-    const side = feature.target.type === 'face' && feature.target.face === 'left_end' ? -1 : 1;
-    const shoulder = part.length / 2 - feature.parameters.size.length;
-    if (absoluteSupport({ x: side, y: 0, z: 0 }) <= shoulder + 1e-9) continue;
-    const maxZ = part.width / 2 - feature.placement.z;
-    const minZ = maxZ - feature.parameters.size.width;
-    for (const [normal, limit] of [
-      [{ x: 0, y: 1, z: 0 }, Number(feature.parameters.depth) / 2],
-      [{ x: 0, y: -1, z: 0 }, Number(feature.parameters.depth) / 2],
-      [{ x: 0, y: 0, z: 1 }, maxZ],
-      [{ x: 0, y: 0, z: -1 }, -minZ]
-    ] as Array<[Point3, number]>) {
-      if (absoluteSupport(normal) <= limit + 1e-9) continue;
-      // Maximize the profile/cutter support only in the end region x*side >=
-      // shoulder. The one-constraint convex dual is a bounded scalar minimum;
-      // unlike endpoint sampling it catches breakout between the bore caps.
-      const bound = (lambda: number) => absoluteSupport({ ...normal, x: normal.x + lambda * side }) - lambda * shoulder;
-      let high = 1;
-      let previous = bound(0);
-      for (let i = 0; i < 64; i += 1) {
-        const value = bound(high);
-        if (value >= previous) break;
-        previous = value;
-        high *= 2;
-      }
-      let low = 0;
-      for (let i = 0; i < 80; i += 1) {
-        const left = low + (high - low) / 3;
-        const right = high - (high - low) / 3;
-        if (bound(left) < bound(right)) high = right;
-        else low = left;
-      }
-      if (Math.min(bound(0), bound((low + high) / 2)) > limit + 1e-9) return false;
-    }
-  }
-  return true;
-}
 
 const degrees = (value: number): number => (value * Math.PI) / 180;
 const clean = (value: number): number => (Math.abs(value) < 1e-12 ? 0 : Number(value.toFixed(12)));
@@ -504,6 +463,22 @@ export function validateRoundedCut(feature: RoundedCutFeature, part: Part): stri
     if (!Number.isFinite(depth) || depth === undefined || depth <= 0)
       return 'Rounded-cut depth must be greater than zero.';
     if (depth >= available - 1e-9) return 'Rounded-cut depth exceeds the available material.';
+    const center = addScaled(frame.origin, frame.primaryAxis, primary, frame.secondaryAxis, secondary);
+    center.y += (frame.inwardNormal.y * depth) / 2;
+    const along = { x: Math.cos(angle), y: 0, z: frame.secondaryAxis.z * Math.sin(angle) };
+    const across = { x: -Math.sin(angle), y: 0, z: frame.secondaryAxis.z * Math.cos(angle) };
+    if (
+      !fitsRemainingStock(
+        part,
+        center,
+        (normal) =>
+          Math.abs(dot(normal, along)) * (halfLength - radius) +
+          Math.abs(dot(normal, across)) * (halfWidth - radius) +
+          radius * Math.hypot(dot(normal, along), dot(normal, across)) +
+          (Math.abs(normal.y) * depth) / 2
+      )
+    )
+      return 'Rounded pocket extends outside the remaining material. Move or resize it, or reduce its depth.';
   }
   return null;
 }

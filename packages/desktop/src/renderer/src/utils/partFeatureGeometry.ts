@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
 import { Brush, Evaluator, INTERSECTION, SUBTRACTION } from 'three-bvh-csg';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js';
 import { CircularCutFeature, Part, PartFeature, RectCutFeature, RoundedCutFeature } from '../types';
 import { getEdgeBevelInsetAt, getEndCutInsetAt, getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
 import {
@@ -18,6 +19,7 @@ import { expandCircularCut, getFaceFrame } from './roundCutUtils';
 type Point2 = { x: number; z: number };
 
 const geometryCache = new Map<string, THREE.BufferGeometry>();
+const convexVertexCache = new WeakMap<THREE.BufferGeometry, Array<{ x: number; y: number; z: number }>>();
 const MAX_GEOMETRY_CACHE_ENTRIES = 128;
 const _worldAabbPosition = new THREE.Vector3();
 const _worldAabbQuaternion = new THREE.Quaternion();
@@ -29,7 +31,17 @@ function featureKey(part: Part): string {
     length: part.length,
     width: part.width,
     thickness: part.thickness,
-    features: (part.features ?? []).filter((feature) => feature.enabled)
+    features: (part.features ?? [])
+      .filter((feature) => feature.enabled)
+      .map((feature) => ({
+        kind: feature.kind,
+        cutType: feature.cutType,
+        target: feature.target,
+        reference: feature.reference,
+        parameters: feature.parameters,
+        ...(feature.kind === 'end_cut' ? { lengthMode: feature.lengthMode } : { placement: feature.placement }),
+        ...(feature.kind === 'circular_cut' ? { pattern: feature.pattern } : {})
+      }))
   });
 }
 
@@ -698,6 +710,32 @@ export function getPartGeometryCacheSizeForTests(): number {
  * and duplicate vertices are removed to keep the hull minimal.
  */
 export function getPartLocalConvexVertices(part: Part): Array<{ x: number; y: number; z: number }> {
+  const features = getEnabledFeatures(part);
+  if (
+    features.some((feature) => feature.kind === 'end_cut') &&
+    features.some((feature) => feature.kind !== 'end_cut')
+  ) {
+    // Mixed removals introduce corners that were never on the original end
+    // boundary. Derive their hull from the already clipped solid, rather than
+    // warping selected contour points back beyond an authored cut plane.
+    const geometry = getPartRenderGeometry(part);
+    const cached = convexVertexCache.get(geometry);
+    if (cached) return cached;
+    const positions = geometry.getAttribute('position');
+    const points = new Map<string, THREE.Vector3>();
+    for (let i = 0; i < positions.count; i += 1) {
+      const point = new THREE.Vector3().fromBufferAttribute(positions, i);
+      points.set(`${point.x},${point.y},${point.z}`, point);
+    }
+    const hull = new ConvexHull().setFromPoints([...points.values()]);
+    const vertices = new Set<THREE.Vector3>();
+    for (const face of hull.faces) {
+      for (let i = 0; i < 3; i += 1) vertices.add(face.getEdge(i).head().point);
+    }
+    const result = [...vertices].map(({ x, y, z }) => ({ x, y, z }));
+    convexVertexCache.set(geometry, result);
+    return result;
+  }
   const contour = hasRenderablePartFeatures(part) ? getFeatureContour(part) : buildOuterContour(part);
   const halfThickness = part.thickness / 2;
 

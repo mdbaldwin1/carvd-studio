@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Cut-aware collision and pocket support** — Adding an opening to a bevelled or mitred part no longer creates invisible collision corners beyond the cut plane. Blind rectangular and rounded pockets validate their complete removal against remaining end-cut, bevel, and tenon stock; intentional open channels and through-boundary cuts remain supported. Entire-blank removal is blocked for every operation family, including rounded-only stacks.
+- **Shared geometry for renamed and copied cuts** — Changing a label or copying an otherwise identical feature reuses its geometry instead of rebuilding it; authored dimensions, placement, pattern, and shape changes still invalidate the cache.
+
 - **Combined joinery stays physically correct** — Tenons preserve opposite mitres, bevels, and compound cuts; end cuts and edge bevels now meet at their true intersecting planes. Countersinks have continuous conical walls, and very shallow remaining blind floors are no longer silently cut through.
 - **Lossless woodworking dimensions** — Focusing and leaving a measurement field preserves exact authored values such as .755 inches in either unit system. Resizing stock reports an oversized tenon instead of changing its dimensions, and rotated rounded openings use their real curved outline for fit checks.
 - **Safer cut and dowel validation** — Cuts cannot remove the entire blank or place holes outside material left by end cuts, bevels, and tenons. Dowel setup rejects overlapping hardware, including existing joints, and diagnoses interference after edits. Distinct overlapping hole patterns and stepped counterbores are no longer mistaken for duplicates.

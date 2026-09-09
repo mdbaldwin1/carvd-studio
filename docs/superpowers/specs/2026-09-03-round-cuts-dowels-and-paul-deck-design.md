@@ -200,11 +200,15 @@ The current layered extrusion algorithm remains the source for straight cuts. Ro
 - every closed removal layer is intersected with the end/edge-cut stock solid before merging, so tenons preserve other end cuts and combined planes intersect without vertex warping;
 - solid operations run on individual closed layers, not merged stacks containing coincident internal caps; temporary layer buffers are disposed after merging.
 
+When end/edge cuts are combined with other removals, collision hull vertices are derived from the clipped render solid and cached with that geometry. New cut corners must not be warped beyond an authored end or bevel plane. This preserves the existing convex overlap policy while keeping its hull inside the same remaining solid's convex envelope.
+
 The derived geometry bundle remains the single consumer contract for rendering, hit testing, bounds, snapping, measurement, ground constraints, and collision. No consumer receives a special-case round-hole path.
 
 ### Performance
 
 Feature geometry stays cache-backed and disposes evicted buffers. Pattern expansion is lazy inside derivation and validation; pattern members are not stored as individual feature records. Limits prevent pathological meshes:
+
+Geometry keys include dimensions and authored shape, target, placement, references, and pattern fields, excluding feature IDs, labels, and descriptive/relationship metadata. Dowel metadata controls separate hardware visualization and relationship validation, not the drilled part mesh; its actual hole diameter/depth remain geometry parameters in the key. Identical copied cuts share geometry and mixed-operation hulls.
 
 - maximum 128 members per pattern;
 - maximum 512 effective circular profiles per part;
@@ -224,7 +228,8 @@ Saving is blocked when:
 - a blind depth reaches or exceeds the available material thickness along the authored axis;
 - an entry profile extends beyond the targeted face;
 - an entry ellipse or swept blind/recess cutter extends beyond remaining end-cut, bevel, or tenon material, including breakout between valid entry and end disks at a tenon shoulder;
-- one or more operations consume the entire blank; individual cut save, final part save, and Cut List generation share this guard;
+- a blind rectangular or rounded pocket's complete prism extends beyond that remaining material, including its floor and rotated rounded outline; enclosed pockets require stock support, while open channels/notches and through-boundary openings may intentionally intersect an outer cut plane;
+- one or more operations of any supported family consume the entire blank; individual cut save, final part save, and Cut List generation share this guard, after numeric/shape validation and a conservative removal-volume bound;
 - a requested through or angled path fails to intersect the blank as expected;
 - countersink/counterbore dimensions are physically inconsistent;
 - pattern members leave the target face or exceed limits;

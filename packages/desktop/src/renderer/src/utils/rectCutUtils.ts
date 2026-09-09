@@ -1,4 +1,5 @@
 import { CornerTarget, EdgeTarget, FaceTarget, Part, RectCutFeature } from '../types';
+import { fitsRemainingStock } from './remainingStock';
 
 export type RectCutPreviewSupport =
   | { supported: true }
@@ -317,7 +318,7 @@ export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPrevie
 
 export function validateRectCutFeature(
   feature: RectCutFeature,
-  part: Pick<Part, 'length' | 'width' | 'thickness'>
+  part: Pick<Part, 'length' | 'width' | 'thickness' | 'features'>
 ): string | null {
   const resolvedFeature = getResolvedRectCutFeature(feature, part);
   const sizeLength = resolvedFeature.parameters.size.length;
@@ -451,6 +452,37 @@ export function validateRectCutFeature(
 
   const support = getRectCutPreviewSupport(resolvedFeature);
   if (!support.supported) return support.reason;
+
+  // Enclosed blind pockets need their full prism supported by stock. Open
+  // channels/notches and through cutouts intentionally cross stock boundaries.
+  if (
+    resolvedFeature.parameters.depthMode === 'blind' &&
+    ['mortise', 'cutout', 'stopped_groove'].includes(resolvedFeature.cutType)
+  ) {
+    const depth = resolvedFeature.parameters.depth!;
+    const sideFace = isSideFaceTarget(resolvedFeature);
+    const front = resolvedFeature.target.type === 'face' && resolvedFeature.target.face === 'front_face';
+    const center = {
+      x: resolvedFeature.placement.x + sizeLength / 2 - part.length / 2,
+      y: sideFace
+        ? -part.thickness / 2 + resolvedFeature.placement.z + sizeWidth / 2
+        : ((isTopTarget(resolvedFeature) ? 1 : -1) * (part.thickness - depth)) / 2,
+      z: sideFace
+        ? ((front ? 1 : -1) * (part.width - depth)) / 2
+        : part.width / 2 - resolvedFeature.placement.z - sizeWidth / 2
+    };
+    if (
+      !fitsRemainingStock(
+        part,
+        center,
+        (normal) =>
+          (Math.abs(normal.x) * sizeLength) / 2 +
+          (Math.abs(normal.y) * (sideFace ? sizeWidth : depth)) / 2 +
+          (Math.abs(normal.z) * (sideFace ? depth : sizeWidth)) / 2
+      )
+    )
+      return 'Pocket extends outside the remaining material. Move or resize it, or reduce its depth.';
+  }
 
   if (resolvedFeature.parameters.depthMode === 'through') {
     const bounds = getRectCutPlanBounds(resolvedFeature, part);

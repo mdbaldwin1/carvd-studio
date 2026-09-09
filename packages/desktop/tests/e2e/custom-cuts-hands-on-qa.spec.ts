@@ -644,6 +644,11 @@ test.describe('hands-on custom cuts qualification', () => {
     await window.getByLabel('Label (optional)', { exact: true }).fill('Temporary stress duplicate');
     await fillMeasurement(window, 'Offset Along Length', '76');
     await fillMeasurement(window, 'Offset Across Width', '5');
+    // The right 15°/5° Back-long compound leaves only 77.2794 inches
+    // at this pocket's front-bottom corner; [76, 78] breaks out of stock.
+    await expect(window.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    await expect(window.getByRole('alert')).toContainText('remaining material');
+    await fillMeasurement(window, 'Offset Along Length', '74');
     await saveCut(window);
     await expect(window.getByRole('checkbox', { name: /^Enable cut / })).toHaveCount(21);
     await window.getByRole('button', { name: 'Actions for cut 21' }).click();

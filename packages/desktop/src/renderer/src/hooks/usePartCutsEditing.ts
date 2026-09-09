@@ -53,11 +53,11 @@ export function usePartCutsEditing() {
       if (!feature.enabled) continue;
       const featureIssue =
         feature.kind === 'rect_cut'
-          ? validateRectCutFeature(feature, currentPart)
+          ? validateRectCutFeature(feature, { ...currentPart, features: draftFeatures })
           : feature.kind === 'circular_cut'
             ? validateCircularCut(feature, { ...currentPart, features: draftFeatures })
             : feature.kind === 'rounded_cut'
-              ? validateRoundedCut(feature, currentPart)
+              ? validateRoundedCut(feature, { ...currentPart, features: draftFeatures })
               : validateEndCutFeature(feature, { ...currentPart, features: draftFeatures });
       if (!featureIssue) continue;
       const featureLabel =

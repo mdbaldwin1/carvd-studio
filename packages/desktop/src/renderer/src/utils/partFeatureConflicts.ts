@@ -1,9 +1,15 @@
 import { CircularCutFeature, Part, PartFeature, RectCutFeature } from '@renderer/types';
 import { getFeatureTargetLabel } from '@renderer/utils/partFeatureSummary';
-import { getResolvedRectCutFeature, isBottomTarget, isSideFaceTarget, isTopTarget } from '@renderer/utils/rectCutUtils';
-import { expandCircularCut, validateCircularCut } from '@renderer/utils/roundCutUtils';
+import {
+  getResolvedRectCutFeature,
+  isBottomTarget,
+  isSideFaceTarget,
+  isTopTarget,
+  validateRectCutFeature
+} from '@renderer/utils/rectCutUtils';
+import { expandCircularCut, validateCircularCut, validateRoundedCut } from '@renderer/utils/roundCutUtils';
 import { getPartMaterialVolume } from '@renderer/utils/partFeatureGeometry';
-import { getPartEdgeBevelProfiles, getPartEndCutProfiles } from '@renderer/utils/endCutUtils';
+import { getPartEdgeBevelProfiles, getPartEndCutProfiles, validateEndCutFeature } from '@renderer/utils/endCutUtils';
 
 export interface PartFeatureConflict {
   featureId: string;
@@ -347,7 +353,26 @@ export function getPartFeatureConflicts(
   const priorRectCuts: Array<{ feature: RectCutFeature; index: number }> = [];
   const priorCircularCuts: Array<{ feature: CircularCutFeature; index: number }> = [];
 
+  const featureIssues = new Map<PartFeature, string | null>();
   for (const { feature, index } of enabledFeatures) {
+    const candidate = { ...part, features } as Part;
+    const materialIssue =
+      feature.kind === 'circular_cut'
+        ? validateCircularCut(feature, candidate)
+        : feature.kind === 'rounded_cut'
+          ? validateRoundedCut(feature, candidate)
+          : feature.kind === 'rect_cut'
+            ? validateRectCutFeature(feature, candidate)
+            : validateEndCutFeature(feature, candidate);
+    featureIssues.set(feature, materialIssue);
+    if (materialIssue?.includes('remaining material'))
+      conflicts.push({
+        featureId: feature.id,
+        featureIndex: index,
+        code: 'material_removed',
+        severity: 'error',
+        message: `Operation ${index + 1}: ${materialIssue}`
+      });
     if (feature.kind === 'end_cut') {
       const face = feature.target.face;
       const prior = endCutsByFace.get(face);
@@ -383,15 +408,6 @@ export function getPartFeatureConflicts(
     }
 
     if (feature.kind === 'circular_cut') {
-      const materialIssue = validateCircularCut(feature, { ...part, features } as Part);
-      if (materialIssue?.includes('remaining material'))
-        conflicts.push({
-          featureId: feature.id,
-          featureIndex: index,
-          code: 'material_removed',
-          severity: 'error',
-          message: `Operation ${index + 1}: ${materialIssue}`
-        });
       for (const prior of priorRectCuts) {
         if (circularOverlapsRect(feature, prior.feature, part))
           addRoundRectOverlapConflict(conflicts, { feature, index }, prior);
@@ -487,23 +503,18 @@ export function getPartFeatureConflicts(
     priorRectCuts.push({ feature, index });
   }
 
-  // Circular/rounded profiles individually retain their surrounding stock;
-  // rectangular removals can consume a whole blank, including cumulatively.
-  // Skip malformed numeric inputs here; their operation validator owns that
-  // diagnostic and they must not enter triangulation.
+  // Any combination of removal families can consume all remaining stock.
+  // Individual validators own malformed numeric/unsupported inputs; those
+  // must not reach solid evaluation. Valid removals and material-support
+  // failures can still be evaluated to identify complete blank consumption.
   if (
-    enabledFeatures.some(({ feature }) => feature.kind === 'rect_cut') &&
-    couldConsumeBlank(features, part) &&
+    enabledFeatures.length > 0 &&
+    [part.length, part.width, part.thickness].every((value) => Number.isFinite(value) && value > 0) &&
     enabledFeatures.every(({ feature }) => {
-      if (feature.kind !== 'rect_cut') return true;
-      return [
-        feature.parameters.size.length,
-        feature.parameters.size.width,
-        feature.placement.x,
-        feature.placement.z,
-        feature.parameters.depthMode === 'blind' ? feature.parameters.depth : 1
-      ].every((value) => Number.isFinite(value));
+      const issue = featureIssues.get(feature);
+      return !issue || issue.includes('remaining material') || issue.includes('entire blank');
     }) &&
+    couldConsumeBlank(features, part) &&
     getPartMaterialVolume({ ...part, features } as Part) <= part.length * part.width * part.thickness * 1e-12
   ) {
     for (const { feature, index } of enabledFeatures) {
