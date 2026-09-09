@@ -127,6 +127,40 @@ test.describe('round 9 file transaction ownership and quit', () => {
     expect(JSON.parse(fs.readFileSync(first, 'utf8')).parts[0].features[0].label).toBe('NEWEST');
   });
 
+  for (const route of ['close', 'quit'] as const)
+    test(`P1 Save As destination is inherited by a queued ${route}-save`, async () => {
+      const original = fs.readFileSync(first, 'utf8');
+      const copy = path.join(running.userDataDir, 'copy.carvd');
+      await installGate('writeFile', copy);
+      await queueSavePath(running.window, copy);
+      await sendNativeMenuCommand(running, 'save-project-as');
+      await expect.poll(async () => (await gateState()).entered).toBe(true);
+      await running.window.evaluate(() => window.useProjectStore.getState().setProjectNotes('LATEST'));
+      const proc = running.processHandle!;
+      if (route === 'quit')
+        await running.electronApp.evaluate(({ app }) => {
+          app.quit();
+        });
+      else await closeWindow();
+      await running.window.getByRole('alertdialog').getByRole('button', { name: 'Save', exact: true }).click();
+      // The actual main-process write remains blocked, including any incorrectly
+      // retargeted later save. Confirm that destructive completion cannot pass it.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const prematureClose = running.window.isClosed();
+      await release();
+      await expect.poll(() => running.window.isClosed()).toBe(true);
+      if (route === 'quit') {
+        await expect.poll(() => proc.exitCode).toBe(0);
+        expect(proc.signalCode).toBeNull();
+      }
+      expect(prematureClose).toBe(false);
+      expect(fs.readFileSync(first, 'utf8')).toBe(original);
+      const saved = JSON.parse(fs.readFileSync(copy, 'utf8'));
+      expect(saved.project.projectNotes).toBe('LATEST');
+      expect(saved.project.name).toBe('copy');
+      expect(saved.parts[0].features[0].label).toBe('Original');
+    });
+
   test('N1 the main-process file boundary orders independent concurrent writers', async () => {
     await installGate('writeFile', first);
     const older = JSON.parse(fs.readFileSync(first, 'utf8'));

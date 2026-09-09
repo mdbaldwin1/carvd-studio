@@ -44,6 +44,33 @@ export type ProjectSaveKind = 'initial' | 'manual' | 'auto' | 'save_as';
 // Queue the complete save, including thumbnail/dialog work: queuing only the
 // final write would allow an older slow thumbnail to write after a newer save.
 let pendingSave: Promise<void> | null = null;
+type SaveDocument = {
+  generation: number;
+  filePath: string | null;
+  renames: Array<{ from: string; to: string }>;
+};
+let requestedSaveDocument: SaveDocument | null = null;
+
+function captureSaveDocument(state: ReturnType<typeof useProjectStore.getState>): SaveDocument {
+  if (!pendingSave || requestedSaveDocument?.generation !== state.documentGeneration) {
+    requestedSaveDocument = { generation: state.documentGeneration, filePath: state.filePath, renames: [] };
+  }
+  return requestedSaveDocument;
+}
+
+function resolveSaveState(
+  state: ReturnType<typeof useProjectStore.getState>,
+  document: SaveDocument,
+  nameRevision: number
+) {
+  // A queued snapshot may predate the preceding Save As chooser. Carry forward
+  // its automatic filename-derived rename, but never overwrite an authored name.
+  let projectName = state.projectName;
+  for (const rename of document.renames.slice(nameRevision)) {
+    if (projectName === rename.from) projectName = rename.to;
+  }
+  return projectName === state.projectName ? state : { ...state, projectName };
+}
 function enqueueProjectSave(operation: () => Promise<FileOperationResult>): Promise<FileOperationResult> {
   const result = pendingSave ? pendingSave.then(operation) : operation();
   const settled = result.then(
@@ -52,7 +79,10 @@ function enqueueProjectSave(operation: () => Promise<FileOperationResult>): Prom
   );
   pendingSave = settled;
   void settled.then(() => {
-    if (pendingSave === settled) pendingSave = null;
+    if (pendingSave === settled) {
+      pendingSave = null;
+      requestedSaveDocument = null;
+    }
   });
   return result;
 }
@@ -66,12 +96,17 @@ export function hasPendingProjectSaves(): boolean {
 
 export async function saveProject(saveKind?: 'manual' | 'auto'): Promise<FileOperationResult> {
   const state = useProjectStore.getState();
-
-  if (state.filePath) {
-    return enqueueProjectSave(() => saveToPath(state.filePath!, saveKind ?? 'manual', state));
-  } else {
-    return saveProjectAs('initial');
-  }
+  const document = captureSaveDocument(state);
+  const nameRevision = document.renames.length;
+  // Content belongs to the request; the destination belongs to its ordered
+  // document transaction. A preceding successful Save As may change it while
+  // this save waits. Never consult a replacement document's live file path.
+  return enqueueProjectSave(() => {
+    const snapshot = resolveSaveState(state, document, nameRevision);
+    return document.filePath
+      ? saveToPath(document.filePath, saveKind ?? 'manual', snapshot)
+      : performSaveAs('initial', snapshot, document);
+  });
 }
 
 /**
@@ -79,12 +114,15 @@ export async function saveProject(saveKind?: 'manual' | 'auto'): Promise<FileOpe
  */
 export async function saveProjectAs(saveKind: ProjectSaveKind = 'save_as'): Promise<FileOperationResult> {
   const state = useProjectStore.getState();
-  return enqueueProjectSave(() => performSaveAs(saveKind, state));
+  const document = captureSaveDocument(state);
+  const nameRevision = document.renames.length;
+  return enqueueProjectSave(() => performSaveAs(saveKind, resolveSaveState(state, document, nameRevision), document));
 }
 
 async function performSaveAs(
   saveKind: ProjectSaveKind,
-  state: ReturnType<typeof useProjectStore.getState>
+  state: ReturnType<typeof useProjectStore.getState>,
+  document: SaveDocument
 ): Promise<FileOperationResult> {
   const ownsDocument = () => useProjectStore.getState().documentGeneration === state.documentGeneration;
   if (!ownsDocument()) return { success: false, canceled: true, documentChanged: true };
@@ -100,11 +138,20 @@ async function performSaveAs(
     }
     if (!ownsDocument()) return { success: false, canceled: true, documentChanged: true };
 
-    // Update project name to match the chosen filename
+    // Commit destination/name only after a successful write. Cancellation or
+    // failure must leave succeeding saves on the last successful destination.
     const newProjectName = getProjectNameFromPath(result.filePath);
-    useProjectStore.getState().setProjectName(newProjectName);
-
-    return saveToPath(result.filePath, saveKind, { ...state, projectName: newProjectName });
+    const saved = await saveToPath(
+      result.filePath,
+      saveKind,
+      { ...state, projectName: newProjectName },
+      state.projectName
+    );
+    if (saved.success) {
+      document.filePath = result.filePath;
+      document.renames.push({ from: state.projectName, to: newProjectName });
+    }
+    return saved;
   } catch (error) {
     return { success: false, error: String(error) };
   }
@@ -143,7 +190,8 @@ function documentFieldsMatch(snapshot: ReturnType<typeof captureDocumentFields>)
 async function saveToPath(
   filePath: string,
   saveKind: ProjectSaveKind,
-  state = useProjectStore.getState()
+  state = useProjectStore.getState(),
+  renameFrom?: string
 ): Promise<FileOperationResult> {
   const snapshot = captureDocumentFields(state);
 
@@ -182,6 +230,7 @@ async function saveToPath(
     if (current.documentGeneration !== state.documentGeneration) {
       return { success: true, filePath, documentChanged: true };
     }
+    if (renameFrom !== undefined && current.projectName === renameFrom) current.setProjectName(snapshot.projectName);
     current.setFilePath(filePath);
     const pendingChanges = !documentFieldsMatch(snapshot);
     if (pendingChanges && !current.isDirty) current.markDirty();

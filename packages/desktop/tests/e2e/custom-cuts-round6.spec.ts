@@ -13,7 +13,9 @@ import {
 test.describe('round 6 active cut inspector lifecycle', () => {
   let running: RunningElectronApp;
   test.beforeEach(async () => {
-    running = await launchElectronApp();
+    // This suite starts in an existing user's cut editor, not first-run onboarding.
+    // Seed the persisted preference before App schedules its delayed tutorial.
+    running = await launchElectronApp({ hasCompletedWelcome: true });
     await seedProject(running.window, 'one-part');
     await running.window.evaluate(() => {
       const part = window.useProjectStore.getState().parts[0];
