@@ -2,23 +2,25 @@
 
 ## Release qualification
 
-**Full-review round 3 remediation gates PASS — unreleased.**
+**Closure remediation round 7 gates PASS — unreleased.**
 
-Full-review findings K1–K8, including the separately noted blank-dimension
-precision defect, were independently reproduced RED and fixed test-first at
-`a6ce3c583a074f9a5bb91820c4568fe8e067d603`. The fresh complete gate passes
-**4,461 renderer tests, 213 main-process tests, and all 141 real-Electron tests**.
-This adds 110 renderer tests and six real desktop save/navigation flows.
-Round/rounded collision follows remaining material, all tenon shoulders compose,
-glue-up machining is panel-level, dowel relationships block invalid fabrication,
-saved references and active editor values survive saves, and exports preserve
-blank precision. The adjacent copied-part collision stall was also reproduced
-and fixed with finite BVH queries; the unchanged desktop flow passes.
-All six generated PDF variants were visually checked at their changed pages.
-No requested finding is deferred. All prior R1–R15, scoped A–D, Q1–Q11 and
-closure A–J regressions remain covered. This was an adjacent self-audit, not
-another independent review. Complete RED/GREEN, root causes, timings, PDF layout
-and aggregate reconciliation are recorded in the
+Findings L1–L3 were independently reproduced RED and fixed test-first;
+qualified code `0785de1fe798ce483252e9181497eb47ad5058bd`. The complete gate passes **4,478 renderer
+tests, 213 main-process tests, and all 153 real-Electron tests**. This round adds
+17 renderer tests and twelve real desktop window-close/Save As cases.
+Actual application-window close now protects both active inspector and saved-cut
+session changes; Save validates before writing or closing, with exact errors
+inside the modal. Direct, focused keyboard and native-menu Save As share the
+validated save route. Both PDF reports reserve readable identity space and use
+labeled detail lines for long precise dimensions. All eight imperial/metric,
+short/long-name PDF variants were rendered and visually checked.
+
+All prior R1–R15, scoped A–D, Q1–Q11, closure A–J and K1–K8 regressions remain
+covered. No requested finding is deferred. This was an adjacent self-audit,
+not another independent review. Exact RED/GREEN evidence, root causes,
+production files, PDF coordinate checks and test-harness reconciliation are in
+the [round 7 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-7-report.md).
+Previous qualification remains documented in the
 [round 6 remediation report](../../.superpowers/sdd/2026-09-04-custom-cuts-exhaustive-qualification/task-7-remediation-round-6-report.md).
 
 P0 means any crash, lost/corrupted feature, wrong face or removal direction, false
@@ -37,7 +39,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | ------------------------------- | ------------------------------------------------------------------- |
 | Qualification date              | 2026-09-09, America/New_York                                        |
 | Starting Task 7 commit          | `6b9898897c14089d72291c3874211e97328f6b87`                          |
-| Qualified code candidate        | `a6ce3c583a074f9a5bb91820c4568fe8e067d603`                          |
+| Qualified code candidate        | `0785de1fe798ce483252e9181497eb47ad5058bd`                          |
 | Comparison base                 | `origin/develop` at `459b6a5177b9`; local `develop` was stale       |
 | OS                              | macOS 26.6.2, build 25G83                                           |
 | Architecture                    | arm64                                                               |
@@ -45,7 +47,7 @@ collision handling, or fabrication output that could cause a bad cut.
 | Desktop / Electron / Playwright | 1.3.0 / 41.1.1 / 1.59.1                                             |
 | Electron viewport               | 1400 × 900                                                          |
 | Candidate static verification   | desktop lint/typecheck/build exit 0; Prettier and diff checks clean |
-| Candidate runtime verification  | 4,461 renderer + 213 main + 141 real-Electron tests passed          |
+| Candidate runtime verification  | 4,478 renderer + 213 main + 153 real-Electron tests passed          |
 
 The requested `/tmp/carvd-manual-qa-matrix.md` was absent at Task 6 start and
 again at review remediation time. The checked-in task briefs, master plan,
