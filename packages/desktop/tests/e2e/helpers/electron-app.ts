@@ -122,7 +122,14 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
   const isNewProfile = options.userDataDir === undefined;
   const userDataDir = options.userDataDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'carvd-e2e-'));
   const analyticsConsent = options.analyticsConsent ?? (isNewProfile ? 'denied' : undefined);
-  if (analyticsConsent || options.hasCompletedWelcome !== undefined) {
+  // A fresh profile otherwise schedules the welcome tutorial, which seeds the
+  // "Simple Writing Desk" project and lands in the editor. waitForAppReady
+  // races to skip it, and when the tutorial wins, createBlankProject finds no
+  // start screen and fails ten seconds later on a dialog that never opens.
+  // Settle it before launch, as the round 6-9 specs already do by hand. Specs
+  // that exercise the tutorial pass hasCompletedWelcome: false explicitly.
+  const hasCompletedWelcome = options.hasCompletedWelcome ?? (isNewProfile ? true : undefined);
+  if (analyticsConsent || hasCompletedWelcome !== undefined) {
     const preferencesPath = path.join(userDataDir, 'preferences.json');
     const existingPreferences = fs.existsSync(preferencesPath)
       ? (JSON.parse(fs.readFileSync(preferencesPath, 'utf8')) as Record<string, unknown>)
@@ -132,7 +139,7 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
       JSON.stringify({
         ...existingPreferences,
         ...(analyticsConsent ? { analyticsConsent } : {}),
-        ...(options.hasCompletedWelcome !== undefined ? { hasCompletedWelcome: options.hasCompletedWelcome } : {})
+        ...(hasCompletedWelcome !== undefined ? { hasCompletedWelcome } : {})
       }),
       'utf8'
     );
