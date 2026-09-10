@@ -90,7 +90,7 @@ function setMeasurementField(labelText: string, value: string) {
 
 /** Open the add-cut flow and choose an operation preset. */
 function startCut(presetLabel: string) {
-  fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+  fireEvent.click(screen.getByTitle('Add Cut'));
   fireEvent.click(screen.getByText(presetLabel));
 }
 
@@ -268,7 +268,7 @@ describe('PartCutsWorkspace', () => {
     useProjectStore.setState({ parts: [part, mate] });
     renderWorkspace({ part });
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByTitle('Add Cut'));
     expect(screen.getByText('Joinery')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Create Dowel Joint/ }));
 
@@ -282,7 +282,7 @@ describe('PartCutsWorkspace', () => {
     useProjectStore.setState({ parts: [part, mate] });
     renderWorkspace({ part, draftFeatures: [createMortiseFeature()], hasUnsavedChanges: true });
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByTitle('Add Cut'));
 
     expect(screen.getByText('Save or discard part changes first')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Create Dowel Joint/ })).toBeDisabled();
@@ -298,7 +298,7 @@ describe('PartCutsWorkspace', () => {
     useSelectionStore.getState().clearSelection();
     renderWorkspace({ part, onExit });
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByTitle('Add Cut'));
     fireEvent.click(screen.getByRole('button', { name: /^Create Dowel Joint/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     fireEvent.click(screen.getByRole('button', { name: 'Back to Project & Align Parts' }));
@@ -311,7 +311,7 @@ describe('PartCutsWorkspace', () => {
     const onDraftFeaturesChange = vi.fn();
     renderWorkspace({ onDraftFeaturesChange });
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByTitle('Add Cut'));
     expect(screen.getByText('Round Cuts')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Round Hole'));
     expect(screen.getByText(/Set the face, diameter, depth, angle, placement/)).toBeInTheDocument();
@@ -362,7 +362,7 @@ describe('PartCutsWorkspace', () => {
     {
       title: 'a countersink whose major profile exits the blank',
       configure: () => {
-        fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+        fireEvent.click(screen.getByTitle('Add Cut'));
         fireEvent.click(screen.getByText('Countersink'));
         setMeasurementField('Offset Along Face', '11 1/2');
         setMeasurementField('Countersink Major Diameter', '1 1/4');
@@ -695,7 +695,7 @@ describe('PartCutsWorkspace', () => {
 
   it('shows dedicated rounded opening controls', () => {
     renderWorkspace();
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByTitle('Add Cut'));
     expect(screen.getByText('Rounded Openings')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Rounded Rectangle'));
     expect(screen.getByText('Opening Length')).toBeInTheDocument();
@@ -730,7 +730,7 @@ describe('PartCutsWorkspace', () => {
     );
 
     expect(screen.getByText('Cuts')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '+ Add Cut' })).toBeInTheDocument();
+    expect(screen.getByTitle('Add Cut')).toBeInTheDocument();
     expect(screen.getByText(/No cuts yet/i)).toBeInTheDocument();
   });
 
@@ -762,7 +762,7 @@ describe('PartCutsWorkspace', () => {
       </SidebarProvider>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByTitle('Add Cut'));
 
     expect(screen.getByText(/What kind of cut/i)).toBeInTheDocument();
 
@@ -854,7 +854,7 @@ describe('PartCutsWorkspace', () => {
       </SidebarProvider>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByTitle('Add Cut'));
     fireEvent.click(screen.getByText('End Cut'));
     fireEvent.click(
       within(screen.getByText('Preview Targets').parentElement as HTMLElement).getByRole('button', {
@@ -890,7 +890,7 @@ describe('PartCutsWorkspace', () => {
       </SidebarProvider>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByTitle('Add Cut'));
     fireEvent.click(screen.getByText('Dado'));
     expect(screen.getByText(/Dado spans the full board width/i)).toBeInTheDocument();
   });
@@ -922,7 +922,7 @@ describe('PartCutsWorkspace', () => {
       </SidebarProvider>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByTitle('Add Cut'));
     fireEvent.click(screen.getByText('Rabbet'));
 
     expect(screen.getByText('Blind only')).toBeInTheDocument();
@@ -961,7 +961,7 @@ describe('PartCutsWorkspace', () => {
       </SidebarProvider>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByTitle('Add Cut'));
     fireEvent.click(screen.getByText('End Cut'));
 
     expect(screen.getByLabelText('Long Point On')).toBeInTheDocument();
@@ -994,7 +994,7 @@ describe('PartCutsWorkspace', () => {
       </SidebarProvider>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+    fireEvent.click(screen.getByTitle('Add Cut'));
     fireEvent.click(screen.getByText('End Cut'));
     fireEvent.change(screen.getByLabelText('Cut Style'), { target: { value: 'compound' } });
     fireEvent.change(screen.getByLabelText('Bevel Angle'), { target: { value: '10' } });
@@ -1090,7 +1090,7 @@ describe('PartCutsWorkspace', () => {
     // the cut list and its Add Cut action.
     expect(screen.queryByRole('button', { name: 'Back to Project' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Save Part' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '+ Add Cut' })).toBeInTheDocument();
+    expect(screen.getByTitle('Add Cut')).toBeInTheDocument();
   });
 
   it('opens every operation preset into an inspector describing that cut', () => {
@@ -1568,7 +1568,7 @@ describe('PartCutsWorkspace', () => {
   describe('cut picker layout', () => {
     it('lets an odd trailing tile fill its row so groups have no gap', () => {
       renderWorkspace();
-      fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
+      fireEvent.click(screen.getByTitle('Add Cut'));
 
       // Ends & Edges holds three tiles, so Tenon is the odd one out.
       const tenon = screen.getByRole('button', { name: /^Tenon/ });

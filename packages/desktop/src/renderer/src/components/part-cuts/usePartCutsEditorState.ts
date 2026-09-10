@@ -245,7 +245,6 @@ export function usePartCutsEditorState({
   const featureConflicts = draftStatus.conflicts;
   const operationIssues = draftStatus.issues;
   const firstInvalidIndex = draftStatus.firstInvalidIndex;
-  const enabledOperationCount = draftFeatures.filter((feature) => feature.enabled).length;
   const conflictsByFeatureId = useMemo(() => {
     const map = new Map<string, typeof featureConflicts>();
     for (const conflict of featureConflicts) {
@@ -557,7 +556,6 @@ export function usePartCutsEditorState({
     featureConflicts,
     operationIssues,
     firstInvalidIndex,
-    enabledOperationCount,
     conflictsByFeatureId,
     handleStartPreset,
     handleBeginAdd,

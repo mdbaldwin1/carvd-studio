@@ -174,6 +174,7 @@ export function SnapAlignmentLines({ data, units, displayMode }: SnapAlignmentLi
               : [camera.position.x * 0.1, camera.position.y * 0.1, camera.position.z * 0.1]
           }
           center
+          zIndexRange={[0, 50]}
         >
           <div
             style={{

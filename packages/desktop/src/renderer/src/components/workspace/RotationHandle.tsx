@@ -570,7 +570,7 @@ export const RotationHandle = memo(
         </group>
 
         {isDragging && (
-          <Html position={[0, 0, 0]} center style={{ pointerEvents: 'none' }}>
+          <Html position={[0, 0, 0]} center zIndexRange={[0, 50]} style={{ pointerEvents: 'none' }}>
             <div className="rounded border border-border bg-surface px-1.5 py-0.5 text-[10px] text-text">
               {Math.round(displayAngle)}°
             </div>

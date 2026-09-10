@@ -33,8 +33,6 @@ export function CutsSection({ isCollapsed, onOpenChange }: CutsSectionProps) {
     part,
     units,
     draftFeatures,
-    hasUnsavedChanges,
-    enabledOperationCount,
     conflictsByFeatureId,
     featureConflicts,
     operationIssues,
@@ -70,38 +68,31 @@ export function CutsSection({ isCollapsed, onOpenChange }: CutsSectionProps) {
                 {isCollapsed ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
               </span>
               <SidebarGroupLabel>Cuts</SidebarGroupLabel>
+              {/* The same icon affordance Parts and Stock use in this rail. */}
               <Button
-                size="xs"
-                className="ml-auto"
+                variant="ghost"
+                size="icon"
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleBeginAdd();
                 }}
-                title="Add a cut to this part"
+                title="Add Cut"
               >
-                + Add Cut
+                +
               </Button>
             </div>
           </CollapsibleTrigger>
           <CollapsibleContent className="flex min-h-0 flex-1 flex-col">
+            {/* No summary strip: the enabled count is visible in the rows'
+                checkboxes, and the header's Save and Exit/Cancel already say
+                whether there are unsaved changes, as they do for a project. */}
             <div className="flex min-h-0 flex-1 flex-col gap-3 p-4 pt-3">
-              <div className="rounded-md border border-border bg-bg-secondary px-3 py-2 text-sm text-text-secondary">
-                <div className="flex items-center justify-between gap-2">
-                  <span>
-                    <span className="font-medium text-text">{enabledOperationCount}</span> enabled
-                  </span>
-                  <span className={`font-medium ${hasUnsavedChanges ? 'text-accent' : 'text-text'}`}>
-                    {hasUnsavedChanges ? 'Unsaved part changes' : 'No unsaved changes'}
-                  </span>
-                </div>
-              </div>
-
               <ScrollArea className="min-h-0 flex-1">
                 <div className="space-y-3 pr-1">
                   {draftFeatures.length === 0 ? (
                     <div className="rounded-md border border-dashed border-border px-3 py-5 text-sm text-text-muted">
-                      No cuts yet. Use <span className="font-medium text-text">+ Add Cut</span> to start the first one.
+                      No cuts yet. Use <span className="font-medium text-text">+</span> above to add the first one.
                     </div>
                   ) : (
                     draftFeatures.map((feature, index) => {

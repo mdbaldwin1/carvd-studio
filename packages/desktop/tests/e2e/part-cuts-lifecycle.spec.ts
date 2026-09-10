@@ -53,7 +53,7 @@ async function addDadoCut(window: Page): Promise<void> {
 }
 
 async function addPresetCut(window: Page, preset: string): Promise<void> {
-  await window.getByRole('button', { name: '+ Add Cut' }).click();
+  await window.locator('button[title="Add Cut"]').click();
   await window.getByRole('button', { name: new RegExp(`^${preset}\\b`) }).click();
 }
 
@@ -1042,7 +1042,7 @@ async function qualifyOperationLifecycle(
   // destination has to exist before the first save rather than only before
   // the explicit project save later in the cycle.
   await queueSavePath(window, projectPath);
-  await window.getByRole('button', { name: '+ Add Cut' }).click();
+  await window.locator('button[title="Add Cut"]').click();
   await window.getByRole('button', { name: new RegExp(`^${scenario.preset}\\b`) }).click();
   if (scenario.blindOnly) await expect(window.getByLabel('Depth', { exact: true })).toHaveCount(0);
   await applyFeatureControls(window, scenario.initial);
@@ -1499,7 +1499,7 @@ test.describe('part cuts editing lifecycle', () => {
     await queueSavePath(window, projectPath);
 
     await openPartCutsFromProperties(window);
-    await window.getByRole('button', { name: '+ Add Cut' }).click();
+    await window.locator('button[title="Add Cut"]').click();
     await window.getByRole('button', { name: /^Round Hole\b/ }).click();
     await window.getByLabel('Depth').selectOption('blind');
     await window.getByLabel('Tilt From Square (degrees)').fill('15');
@@ -1512,7 +1512,7 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByRole('button', { name: 'Enlarge Hole' }).click();
     await expect.poll(() => roundPreview.getAttribute('data-geometry-signature')).not.toBe(roundGeometryBefore);
 
-    await window.getByRole('button', { name: '+ Add Cut' }).click();
+    await window.locator('button[title="Add Cut"]').click();
     await window.getByRole('button', { name: /^Countersink\b/ }).click();
     await window.getByLabel('Repeating Pattern').selectOption('grid');
     await window.getByLabel('Rows').fill('3');
@@ -1521,14 +1521,14 @@ test.describe('part cuts editing lifecycle', () => {
     await fillFraction(window, 'Column Spacing', 0.5);
     await window.getByLabel('Grid Rotation').fill('23');
 
-    await window.getByRole('button', { name: '+ Add Cut' }).click();
+    await window.locator('button[title="Add Cut"]').click();
     await window.getByRole('button', { name: /^Counterbore\b/ }).click();
     await window.getByLabel('Repeating Pattern').selectOption('circular');
     await window.getByLabel('Hole Count').fill('4');
     await fillFraction(window, 'Pattern Radius', 0.5);
     await window.getByLabel('Start Angle').fill('30');
 
-    await window.getByRole('button', { name: '+ Add Cut' }).click();
+    await window.locator('button[title="Add Cut"]').click();
     await window.getByRole('button', { name: /^Rounded Rectangle\b/ }).click();
     const rectanglePreview = window.getByRole('img', { name: 'Part cuts geometry preview' });
     const rectangleGeometryBefore = await rectanglePreview.getAttribute('data-geometry-signature');
@@ -1537,7 +1537,7 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByRole('button', { name: 'Widen' }).click();
     await expect.poll(() => rectanglePreview.getAttribute('data-geometry-signature')).not.toBe(rectangleGeometryBefore);
 
-    await window.getByRole('button', { name: '+ Add Cut' }).click();
+    await window.locator('button[title="Add Cut"]').click();
     await window.getByRole('button', { name: /^Rounded Slot\b/ }).click();
     await window.getByRole('button', { name: 'Move Right' }).click();
     await window.getByRole('button', { name: 'Extend Length' }).click();
@@ -1614,7 +1614,7 @@ test.describe('part cuts editing lifecycle', () => {
     });
 
     await openPartCutsFromProperties(window);
-    await window.getByRole('button', { name: '+ Add Cut' }).click();
+    await window.locator('button[title="Add Cut"]').click();
     await window.getByRole('button', { name: /^Create Dowel Joint\b/ }).click();
     await window.getByRole('button', { name: 'Next' }).click();
     await window.getByRole('button', { name: 'Next' }).click();

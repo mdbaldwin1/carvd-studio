@@ -749,7 +749,7 @@ function DepthIndicator({
         renderOrder={8}
         depthWrite={false}
       />
-      <Html position={mid} center style={{ pointerEvents: 'none' }}>
+      <Html position={mid} center zIndexRange={[0, 50]} style={{ pointerEvents: 'none' }}>
         <div
           className="whitespace-nowrap rounded px-1 py-0.5 text-[9px] font-semibold shadow-sm"
           style={{ backgroundColor: depthInfo.color, color: '#fff' }}
@@ -931,7 +931,7 @@ function PartCutsPreviewScene({
                       renderOrder={8}
                       depthWrite={false}
                     />
-                    <Html position={mid} center style={{ pointerEvents: 'none' }}>
+                    <Html position={mid} center zIndexRange={[0, 50]} style={{ pointerEvents: 'none' }}>
                       <div
                         className="whitespace-nowrap rounded px-1 py-0.5 text-[9px] font-semibold shadow-sm"
                         style={{ backgroundColor: dim.color, color: '#fff' }}
@@ -945,7 +945,7 @@ function PartCutsPreviewScene({
             {handleOverlay.angleArcs?.map((arc, i) => (
               <group key={`arc-${i}`}>
                 <Line points={arc.points} color={arc.color} lineWidth={2} renderOrder={8} depthWrite={false} />
-                <Html position={arc.labelPosition} center style={{ pointerEvents: 'none' }}>
+                <Html position={arc.labelPosition} center zIndexRange={[0, 50]} style={{ pointerEvents: 'none' }}>
                   <div
                     className="whitespace-nowrap rounded px-1 py-0.5 text-[9px] font-semibold shadow-sm"
                     style={{ backgroundColor: arc.color, color: '#fff' }}

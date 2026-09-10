@@ -237,6 +237,7 @@ export function ReferenceDistanceIndicators({ data }: ReferenceDistanceIndicator
           position={[activeRuler.labelPosition.x, activeRuler.labelPosition.y + 0.9, activeRuler.labelPosition.z]}
           center
           occlude={displayMode === 'solid'}
+          zIndexRange={[0, 50]}
           style={{ pointerEvents: 'none' }}
         >
           <div className="rounded-[6px] border border-white/18 bg-[rgba(15,20,30,0.85)] px-2.5 py-1 text-[11px] font-medium text-white/92 shadow-[0_4px_14px_rgba(0,0,0,0.25)] whitespace-nowrap">
@@ -295,7 +296,13 @@ export function ReferenceDistanceIndicators({ data }: ReferenceDistanceIndicator
             />
 
             {/* Distance label */}
-            <Html position={labelPosition} center occlude={displayMode === 'solid'} style={{ pointerEvents: 'auto' }}>
+            <Html
+              position={labelPosition}
+              center
+              occlude={displayMode === 'solid'}
+              zIndexRange={[0, 50]}
+              style={{ pointerEvents: 'auto' }}
+            >
               {!labelLayout.get(ruler.id)?.visible ? null : isEditing ? (
                 <Input
                   type="text"

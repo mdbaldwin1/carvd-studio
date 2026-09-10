@@ -31,7 +31,7 @@ async function openSelectedPartCuts(window: Page): Promise<void> {
 }
 
 async function startPreset(window: Page, preset: string): Promise<void> {
-  await window.getByRole('button', { name: '+ Add Cut' }).click();
+  await window.locator('button[title="Add Cut"]').click();
   await window.getByRole('button', { name: new RegExp(`^${preset}\\b`) }).click();
 }
 

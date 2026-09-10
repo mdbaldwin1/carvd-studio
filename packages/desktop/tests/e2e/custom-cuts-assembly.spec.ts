@@ -232,7 +232,7 @@ async function openSelectedPartCuts(window: Page, partId: string): Promise<void>
 
 async function authorRightMitre(window: Page, partId: string, flip: boolean): Promise<void> {
   await openSelectedPartCuts(window, partId);
-  await window.getByRole('button', { name: '+ Add Cut' }).click();
+  await window.locator('button[title="Add Cut"]').click();
   await window.getByRole('button', { name: /^End Cut\b/ }).click();
   await window.getByRole('button', { name: 'Right End', exact: true }).click();
   await window.getByLabel('Cut Style', { exact: true }).selectOption('mitre');
@@ -270,7 +270,7 @@ async function editFirstMitreAngle(window: Page, partId: string, angle: number):
 
 async function createDefaultDowelJoint(window: Page, firstPartId: string): Promise<void> {
   await openSelectedPartCuts(window, firstPartId);
-  await window.getByRole('button', { name: '+ Add Cut' }).click();
+  await window.locator('button[title="Add Cut"]').click();
   await window.getByRole('button', { name: /^Create Dowel Joint\b/ }).click();
   await window.getByRole('button', { name: 'Next' }).click();
   await window.getByRole('button', { name: 'Next' }).click();
@@ -1366,7 +1366,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
 
     await openSelectedPartCuts(running.window, 'dirty-draft-lower');
 
-    await running.window.getByRole('button', { name: '+ Add Cut' }).click();
+    await running.window.locator('button[title="Add Cut"]').click();
     await running.window.getByRole('button', { name: /^Round Hole\b/ }).click();
     await running.window.getByLabel('Label (optional)', { exact: true }).fill('Dirty Added Hole');
     const addedOffset = running.window.getByLabel('Offset Along Face', { exact: true });
@@ -1397,7 +1397,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
         { id: 'dirty-hole-2', label: 'Dirty Hole Two', enabled: false }
       ]);
 
-    await running.window.getByRole('button', { name: '+ Add Cut' }).click();
+    await running.window.locator('button[title="Add Cut"]').click();
     const createJoint = running.window.getByRole('button', { name: /^Create Dowel Joint/ });
     await expect(createJoint).toBeDisabled();
     await expect(running.window.getByText('Save or discard part changes first')).toBeVisible();
