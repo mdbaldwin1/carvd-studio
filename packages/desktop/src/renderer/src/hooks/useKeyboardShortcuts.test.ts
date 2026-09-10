@@ -7,6 +7,7 @@ import { useSelectionStore } from '../store/selectionStore';
 import { useSnapStore } from '../store/snapStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
+import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 import type { Part, Group } from '../types';
 
 // Controllable mock euler output for rotation tests
@@ -874,5 +875,120 @@ describe('useKeyboardShortcuts', () => {
       // doesn't fire for 'p' when dispatched from an input.
       document.body.removeChild(input);
     });
+  });
+});
+
+describe('part cuts mode', () => {
+  const mortise = (id: string, x = 4) =>
+    ({
+      id,
+      kind: 'rect_cut',
+      version: 1,
+      enabled: true,
+      cutType: 'mortise',
+      target: { type: 'face', face: 'top_face' },
+      reference: { primaryFrom: 'min' },
+      parameters: { size: { length: 2, width: 0.75 }, depthMode: 'blind', depth: 0.25 },
+      placement: { x, z: 3 }
+    }) as unknown as NonNullable<Part['features']>[number];
+
+  const enterCutsMode = (features: ReturnType<typeof mortise>[]) => {
+    const store = usePartCutsEditingStore.getState();
+    store.startEditingPartCuts('p1', 'Panel', []);
+    store.setDraftFeatures(features);
+  };
+
+  beforeEach(() => {
+    usePartCutsEditingStore.getState().finishEditing();
+  });
+
+  it('steps the cut draft back and forward with the platform shortcuts', () => {
+    enterCutsMode([mortise('first')]);
+    usePartCutsEditingStore.getState().setDraftFeatures([mortise('first'), mortise('second')]);
+    renderHook(() => useKeyboardShortcuts());
+
+    fireKey('z', { metaKey: true });
+    expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first']);
+
+    fireKey('z', { metaKey: true, shiftKey: true });
+    expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first', 'second']);
+  });
+
+  it('nudges the selected cut along the length with the arrow keys', () => {
+    enterCutsMode([mortise('first', 4)]);
+    usePartCutsEditingStore.getState().selectFeature('first');
+    renderHook(() => useKeyboardShortcuts());
+
+    fireKey('ArrowRight');
+    let placement = usePartCutsEditingStore.getState().draftFeatures[0].placement as { x: number; z: number };
+    expect(placement.x).toBeCloseTo(4.25);
+    expect(placement.z).toBeCloseTo(3);
+
+    fireKey('ArrowLeft');
+    placement = usePartCutsEditingStore.getState().draftFeatures[0].placement as { x: number; z: number };
+    expect(placement.x).toBeCloseTo(4);
+  });
+
+  it('deletes the selected cut', () => {
+    enterCutsMode([mortise('first'), mortise('second')]);
+    usePartCutsEditingStore.getState().selectFeature('second');
+    renderHook(() => useKeyboardShortcuts());
+
+    fireKey('Delete');
+
+    expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first']);
+    expect(usePartCutsEditingStore.getState().selectedFeatureId).toBeNull();
+  });
+
+  it('steps Escape back one level before offering to exit', () => {
+    enterCutsMode([mortise('first')]);
+    usePartCutsEditingStore.getState().selectFeature('first');
+    renderHook(() => useKeyboardShortcuts());
+
+    fireKey('Escape');
+    expect(usePartCutsEditingStore.getState().selectedFeatureId).toBeNull();
+    expect(usePartCutsEditingStore.getState().showExitDialog).toBe(false);
+
+    fireKey('Escape');
+    expect(usePartCutsEditingStore.getState().showExitDialog).toBe(true);
+  });
+
+  it('ignores unmodified keys and keystrokes aimed at text fields', () => {
+    enterCutsMode([mortise('first')]);
+    usePartCutsEditingStore.getState().setDraftFeatures([mortise('first'), mortise('second')]);
+    renderHook(() => useKeyboardShortcuts());
+    const before = usePartCutsEditingStore.getState().draftFeatures.length;
+
+    // No modifier: a bare "z" must not undo.
+    fireKey('z');
+    expect(usePartCutsEditingStore.getState().draftFeatures).toHaveLength(before);
+
+    // The same chord typed into a text field must not undo either.
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', metaKey: true, bubbles: true }));
+    expect(usePartCutsEditingStore.getState().draftFeatures).toHaveLength(before);
+    document.body.removeChild(input);
+  });
+
+  it('never lets a project shortcut reach the part behind the workspace', () => {
+    // The source part stays selected while the workspace is open. This is the
+    // guarantee the old blanket early-return provided; scoping must keep it.
+    useProjectStore.setState({
+      parts: [{ id: 'behind', name: 'Behind', position: { x: 0, y: 0, z: 0 } }] as unknown as Part[]
+    });
+    useSelectionStore.setState({ selectedPartIds: ['behind'], selectedGroupIds: [] });
+    const before = JSON.stringify(useProjectStore.getState().parts);
+    enterCutsMode([mortise('first')]);
+    renderHook(() => useKeyboardShortcuts());
+
+    // Rotate, duplicate, delete, paste, and nudge in one pass.
+    for (const key of ['r', 'd', 'Delete', 'Backspace', 'ArrowUp', 'ArrowDown']) fireKey(key);
+    fireKey('d', { metaKey: true });
+    fireKey('v', { metaKey: true });
+    fireKey('c', { metaKey: true });
+
+    expect(JSON.stringify(useProjectStore.getState().parts)).toBe(before);
+    expect(useProjectStore.getState().parts).toHaveLength(1);
   });
 });

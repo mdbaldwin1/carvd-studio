@@ -195,33 +195,11 @@ export function PartCutsWorkspace({
     workspaceRootRef.current?.focus();
   }, []);
 
-  const undoDraft = usePartCutsEditingStore((state) => state.undoDraft);
-  const redoDraft = usePartCutsEditingStore((state) => state.redoDraft);
   const projectParts = useProjectStore((state) => state.parts);
   const addDowelJoint = useProjectStore((state) => state.addDowelJoint);
 
-  // Draft-level undo/redo: the global project shortcuts are gated off in this
-  // mode, so Cmd+Z here steps the cut draft, not the project.
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
-      const isMod = event.metaKey || event.ctrlKey;
-      if (!isMod) return;
-      const key = event.key.toLowerCase();
-      if (key === 'z' && event.shiftKey) {
-        event.preventDefault();
-        redoDraft();
-      } else if (key === 'z') {
-        event.preventDefault();
-        undoDraft();
-      } else if (key === 'y') {
-        event.preventDefault();
-        redoDraft();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [redoDraft, undoDraft]);
+  // Cut shortcuts (undo/redo, Escape, delete, nudge) live in
+  // useKeyboardShortcuts alongside the project ones, routed by mode.
 
   useEffect(() => {
     setDraft(null);

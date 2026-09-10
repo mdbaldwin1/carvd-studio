@@ -9,9 +9,29 @@ import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
 import { getContainingGroupId } from '../utils/interactionSelection';
-import { Rotation3D } from '../types';
+import { PartFeature, Rotation3D } from '../types';
 import { rotationTool } from '../interaction/tools/rotationTool';
 import { resolveRotateBatchGrounding } from '../utils/interactionMovement';
+
+/**
+ * Shift a cut along the blank's length, leaving every other axis alone.
+ *
+ * Rect cuts carry `placement.x`; round and rounded cuts carry
+ * `placement.primary`. End cuts have no along-length placement to move.
+ * Offsets never go negative, matching the inspector's own bound.
+ */
+function nudgeFeatureAlong(feature: PartFeature, step: number): PartFeature {
+  if (feature.kind === 'rect_cut') {
+    return { ...feature, placement: { ...feature.placement, x: Math.max(0, feature.placement.x + step) } };
+  }
+  if (feature.kind === 'circular_cut' || feature.kind === 'rounded_cut') {
+    return {
+      ...feature,
+      placement: { ...feature.placement, primary: Math.max(0, feature.placement.primary + step) }
+    };
+  }
+  return feature;
+}
 
 export function useKeyboardShortcuts() {
   const isEditingPartCuts = usePartCutsEditingStore((s) => s.isEditingPartCuts);
@@ -45,14 +65,80 @@ export function useKeyboardShortcuts() {
   const addPart = useProjectStore((s) => s.addPart);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Part Cuts mode owns its own editing surface. The source part stays
-      // selected behind the workspace, so project-level shortcuts (undo,
-      // rotate, duplicate, delete, copy/paste) would silently edit it.
-      if (isEditingPartCuts) return;
+    /**
+     * The cuts-mode half of the same shortcut vocabulary.
+     *
+     * Every key here maps onto the cut draft. Nothing in it can reach the
+     * project, which is what lets the caller route to it and return rather
+     * than disabling shortcuts wholesale in this mode.
+     */
+    const handlePartCutsKeyDown = (e: KeyboardEvent) => {
+      const cuts = usePartCutsEditingStore.getState();
+      const key = e.key.toLowerCase();
+      const isMod = e.metaKey || e.ctrlKey;
 
+      if (isMod) {
+        if (key === 'z' && e.shiftKey) {
+          e.preventDefault();
+          cuts.redoDraft();
+        } else if (key === 'z') {
+          e.preventDefault();
+          cuts.undoDraft();
+        } else if (key === 'y') {
+          e.preventDefault();
+          cuts.redoDraft();
+        }
+        return;
+      }
+
+      const selected = cuts.draftFeatures.find((feature) => feature.id === cuts.selectedFeatureId) ?? null;
+
+      switch (key) {
+        case 'escape':
+          // Step back one level rather than leaving outright: a selected cut
+          // deselects first, and only an already-empty selection asks to exit.
+          e.preventDefault();
+          if (cuts.selectedFeatureId) cuts.selectFeature(null);
+          else cuts.requestExit();
+          break;
+
+        case 'delete':
+        case 'backspace':
+          if (selected) {
+            e.preventDefault();
+            cuts.setDraftFeatures(cuts.draftFeatures.filter((feature) => feature.id !== selected.id));
+            cuts.selectFeature(null);
+          }
+          break;
+
+        case 'arrowleft':
+        case 'arrowright': {
+          // Nudge along the length, matching the preview's Move controls.
+          if (!selected) break;
+          e.preventDefault();
+          const step = (e.shiftKey ? 1 : 0.25) * (key === 'arrowright' ? 1 : -1);
+          cuts.setDraftFeatures(cuts.draftFeatures.map((f) => (f.id === selected.id ? nudgeFeatureAlong(f, step) : f)));
+          break;
+        }
+
+        default:
+          break;
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      // Part Cuts mode owns its own editing surface. The source part stays
+      // selected behind the workspace, so every project-level shortcut below
+      // (rotate, duplicate, delete, copy/paste, nudge) would silently edit it.
+      // Route the same keys onto the cut draft instead and return, so none of
+      // them can reach the part. Returning here is what keeps that guarantee.
+      if (isEditingPartCuts) {
+        handlePartCutsKeyDown(e);
         return;
       }
 

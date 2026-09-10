@@ -4,7 +4,6 @@ import { ComponentProps } from 'react';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 import type { CircularCutFeature, EndCutFeature, RectCutFeature } from '@renderer/types';
-import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { useProjectStore } from '@renderer/store/projectStore';
 import { useSelectionStore } from '@renderer/store/selectionStore';
 import { validateCircularCut } from '@renderer/utils/roundCutUtils';
@@ -1429,50 +1428,8 @@ describe('PartCutsWorkspace', () => {
     // Save lives in the app header now; assert the shared rule it obeys.
     expect(getPartCutsDraftStatus(props.part, conflictingFeatures, true).canSave).toBe(false);
   });
-  describe('draft keyboard shortcuts', () => {
-    const seedDraftHistory = () => {
-      const store = usePartCutsEditingStore.getState();
-      store.startEditingPartCuts('p1', 'Panel', []);
-      store.setDraftFeatures([createMortiseFeature({ id: 'first' })]);
-      store.setDraftFeatures([createMortiseFeature({ id: 'first' }), createMortiseFeature({ id: 'second' })]);
-    };
-
-    it('steps the cut draft back and forward with the platform shortcuts', () => {
-      seedDraftHistory();
-      renderWorkspace();
-
-      fireEvent.keyDown(window, { key: 'z', metaKey: true });
-      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first']);
-
-      fireEvent.keyDown(window, { key: 'z', metaKey: true, shiftKey: true });
-      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first', 'second']);
-
-      fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
-      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first']);
-
-      fireEvent.keyDown(window, { key: 'y', ctrlKey: true });
-      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first', 'second']);
-    });
-
-    it('ignores unmodified keys and keystrokes aimed at text fields', () => {
-      seedDraftHistory();
-      renderWorkspace();
-      const before = usePartCutsEditingStore.getState().draftFeatures.length;
-
-      // No modifier: plain "z" must not undo.
-      fireEvent.keyDown(window, { key: 'z' });
-      expect(usePartCutsEditingStore.getState().draftFeatures).toHaveLength(before);
-
-      // Typing the same shortcut inside a text field must not undo either.
-      startCut('Mortise');
-      const label = screen.getByPlaceholderText('Face-frame left stile');
-      fireEvent.keyDown(label, { key: 'z', metaKey: true });
-      expect(usePartCutsEditingStore.getState().draftFeatures).toHaveLength(before);
-    });
-
-    // Undo/Redo are the app header's buttons for every mode; their wiring to
-    // the draft history is covered in UndoRedoButtons.test.tsx.
-  });
+  // Cut shortcuts (undo/redo, Escape, delete, nudge) are routed by mode in
+  // useKeyboardShortcuts and covered in useKeyboardShortcuts.test.ts.
 
   describe('target-aware field labels', () => {
     it('labels tenon fields by tongue dimensions and hides the controls it forces', () => {
