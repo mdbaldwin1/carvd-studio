@@ -11,9 +11,6 @@ import {
   DialogHeader,
   DialogTitle
 } from '@renderer/components/ui/dialog';
-import { Input } from '@renderer/components/ui/input';
-import { Select } from '@renderer/components/ui/select';
-import { UNTITLED_PROJECT_NAME } from '@renderer/constants/appDefaults';
 
 // Stock item from the app-level stock library
 interface StockLibraryItem {
@@ -41,59 +38,36 @@ function categorizeStock(stock: StockLibraryItem): string {
 interface NewProjectDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateProject: (options: {
-    name: string;
-    units: 'imperial' | 'metric';
-    selectedMaterials: string[];
-  }) => void | Promise<void>;
+  /**
+   * Starting stock is the only thing this dialog decides.
+   *
+   * The name comes from the file the first save writes, and the units from
+   * the app's New Project Defaults, so neither is asked for here.
+   */
+  onCreateProject: (options: { selectedMaterials: string[] }) => void | Promise<void>;
 }
 
 export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjectDialogProps) {
-  const [projectName, setProjectName] = useState(UNTITLED_PROJECT_NAME);
-  const [units, setUnits] = useState<'imperial' | 'metric'>('imperial');
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
-  const [rememberChoices, setRememberChoices] = useState(false);
   const [hasLoadedDefaults, setHasLoadedDefaults] = useState(false);
   const [stockLibrary, setStockLibrary] = useState<StockLibraryItem[]>([]);
   const [isLoadingStocks, setIsLoadingStocks] = useState(true);
 
-  // Load stock library and saved defaults on mount
+  // Load the stock library on open. The skipSetupDialog preference is no
+  // longer read: the checkbox that set it is gone, and nothing else could
+  // ever clear it, so honouring it would suppress this dialog permanently
+  // for anyone who had ticked that box.
   useEffect(() => {
     if (isOpen && !hasLoadedDefaults) {
       const loadData = async () => {
         try {
-          // Load stock library and defaults in parallel
-          const [stocks, defaults] = await Promise.all([
-            window.electronAPI.getPreference('stockLibrary') as Promise<StockLibraryItem[]>,
-            window.electronAPI.getNewProjectDefaults()
-          ]);
-
-          setStockLibrary(stocks || []);
-          setIsLoadingStocks(false);
-
-          if (defaults.skipSetupDialog) {
-            // User wants to skip - create project immediately with saved defaults
-            onCreateProject({
-              name: UNTITLED_PROJECT_NAME,
-              units: defaults.units,
-              selectedMaterials: defaults.addCommonMaterials ? defaults.selectedMaterials : []
-            });
-            return;
-          }
-
-          // Pre-fill the form with their last choices
-          setUnits(defaults.units);
+          const stocks = (await window.electronAPI.getPreference('stockLibrary')) as StockLibraryItem[];
           const stockList = stocks || [];
-          if (defaults.selectedMaterials.length > 0) {
-            // Only select materials that still exist in the library
-            const stockIds = new Set(stockList.map((s: StockLibraryItem) => s.id));
-            const validSelections = defaults.selectedMaterials.filter((id: string) => stockIds.has(id));
-            setSelectedMaterials(validSelections);
-          } else {
-            // Default to selecting the first few common stocks
-            const defaultStockIds = stockList.slice(0, 4).map((s: StockLibraryItem) => s.id);
-            setSelectedMaterials(defaultStockIds);
-          }
+          setStockLibrary(stockList);
+          setIsLoadingStocks(false);
+          // A few common stocks, pre-ticked, so Create Project works as one
+          // click for the common case.
+          setSelectedMaterials(stockList.slice(0, 4).map((stock) => stock.id));
         } catch (error) {
           console.error('Failed to load data:', error);
           setIsLoadingStocks(false);
@@ -102,12 +76,11 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
       };
       loadData();
     }
-  }, [isOpen, hasLoadedDefaults, onCreateProject]);
+  }, [isOpen, hasLoadedDefaults]);
 
   // Reset when dialog closes
   useEffect(() => {
     if (!isOpen) {
-      setProjectName(UNTITLED_PROJECT_NAME);
       setHasLoadedDefaults(false);
       setSelectedMaterials([]);
     }
@@ -127,22 +100,8 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
     setSelectedMaterials([]);
   };
 
-  const handleCreate = async () => {
-    // Save preferences if "remember" is checked
-    if (rememberChoices) {
-      await window.electronAPI.setNewProjectDefaults({
-        units,
-        addCommonMaterials: selectedMaterials.length > 0,
-        selectedMaterials,
-        skipSetupDialog: true
-      });
-    }
-
-    onCreateProject({
-      name: projectName,
-      units,
-      selectedMaterials
-    });
+  const handleCreate = () => {
+    onCreateProject({ selectedMaterials });
   };
 
   // Group materials by category
@@ -188,44 +147,7 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
         </DialogHeader>
 
         <div className="p-6 overflow-y-auto flex flex-col gap-4">
-          <Card className="border-border bg-bg">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Project Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col gap-2">
-                <label htmlFor="project-name" className="text-sm font-medium text-text">
-                  Project Name
-                </label>
-                <Input
-                  id="project-name"
-                  type="text"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  placeholder="Enter project name"
-                  autoFocus
-                  className="bg-bg-secondary"
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label htmlFor="project-units" className="text-sm font-medium text-text">
-                  Units
-                </label>
-                <Select
-                  id="project-units"
-                  value={units}
-                  onChange={(e) => setUnits(e.target.value as 'imperial' | 'metric')}
-                  className="bg-bg-secondary"
-                >
-                  <option value="imperial">Imperial (inches)</option>
-                  <option value="metric">Metric (mm)</option>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Materials Selection */}
+          {/* Starting stock is the only choice this dialog makes. */}
           <Card className="border-border bg-bg">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -270,21 +192,6 @@ export function NewProjectDialog({ isOpen, onClose, onCreateProject }: NewProjec
                   ))
                 )}
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border bg-bg">
-            <CardContent className="pt-5">
-              <label className="flex items-center gap-2.5 cursor-pointer">
-                <Checkbox
-                  className="w-4 h-4"
-                  checked={rememberChoices}
-                  onChange={(e) => setRememberChoices(e.target.checked)}
-                />
-                <span className="text-[13px] text-text-secondary">
-                  Remember these choices (skip this dialog next time)
-                </span>
-              </label>
             </CardContent>
           </Card>
         </div>

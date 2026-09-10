@@ -443,7 +443,8 @@ export async function createBlankProject(window: Page, name = 'E2E Project'): Pr
   }
 
   await expect(window.locator('.new-project-dialog')).toBeVisible({ timeout: 10000 });
-  await window.locator('.new-project-dialog input').first().fill(name);
+  // The dialog only chooses starting stock; it has no name field. Its first
+  // input is a stock checkbox, so naming happens through the header below.
   await window.evaluate(() => {
     const dialog = document.querySelector('.new-project-dialog');
     const buttons = Array.from(dialog?.querySelectorAll('button') ?? []);
@@ -456,6 +457,32 @@ export async function createBlankProject(window: Page, name = 'E2E Project'): Pr
   await expect(window.locator('.app-header')).toBeVisible({ timeout: 15000 });
   await expect(window.locator('.sidebar')).toBeVisible();
   await expect(window.locator('canvas')).toBeVisible();
+
+  await renameProjectFromHeader(window, name);
+}
+
+/**
+ * Name a project the way a user now does: click the header name and type.
+ *
+ * Polls the committed name rather than trusting the keystroke, because the
+ * inline editor mounts on click and autofocuses, so a slow renderer can
+ * swallow the first fill.
+ */
+export async function renameProjectFromHeader(window: Page, name: string): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        if ((await getProjectSnapshot(window)).projectName === name) return true;
+        await window.locator('.project-name').click();
+        const input = window.locator('.header-name-editor input');
+        if (!(await input.isVisible())) return false;
+        await input.fill(name);
+        await input.press('Enter');
+        return (await getProjectSnapshot(window)).projectName === name;
+      },
+      { timeout: 15000, message: `header rename never committed "${name}"` }
+    )
+    .toBe(true);
 }
 
 export async function ensureEditorReady(window: Page): Promise<void> {

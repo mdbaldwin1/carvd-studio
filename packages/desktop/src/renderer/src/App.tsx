@@ -40,6 +40,7 @@ import {
   UNTITLED_TEMPLATE_NAME
 } from './constants/appDefaults';
 import { useAppSettings } from './hooks/useAppSettings';
+import { useAppSettingsStore } from './store/appSettingsStore';
 import { useAnalyticsConsentDialog } from './hooks/useAnalyticsConsentDialog';
 import { useAssemblyEditing } from './hooks/useAssemblyEditing';
 import { useAssemblyLibrary } from './hooks/useAssemblyLibrary';
@@ -487,12 +488,12 @@ function App() {
     }
   };
 
-  const handleNewProjectDialogCreate = async (options: {
-    name: string;
-    units: 'imperial' | 'metric';
-    selectedMaterials: string[];
-  }) => {
-    // Create a new project with the selected options
+  const handleNewProjectDialogCreate = async (options: { selectedMaterials: string[] }) => {
+    // The dialog only chooses starting stock. The name comes from the file
+    // the first save writes, and the units from the app's New Project
+    // Defaults -- which is also the fix for that setting having had no
+    // effect on new projects, since the dialog used to carry its own copy.
+    const units = useAppSettingsStore.getState().settings.defaultUnits;
     const now = new Date().toISOString();
     const libraryStocks = ((await window.electronAPI.getPreference('stockLibrary')) as Stock[]) || [];
     const stockLibraryById = new Map(libraryStocks.map((stock) => [stock.id, stock] as const));
@@ -506,9 +507,9 @@ function App() {
 
     const newProject: Project = {
       version: PROJECT_FILE_VERSION,
-      name: options.name,
-      units: options.units,
-      gridSize: DEFAULT_PROJECT_GRID_SIZE[options.units],
+      name: UNTITLED_PROJECT_NAME,
+      units,
+      gridSize: DEFAULT_PROJECT_GRID_SIZE[units],
       parts: [],
       stocks: selectedStocks,
       assemblies: [],
@@ -520,7 +521,7 @@ function App() {
 
     loadProject(newProject);
     markDirty(); // Mark as dirty since it's a new unsaved project
-    analytics.capture('project_created', { source: 'start_screen', units: options.units });
+    analytics.capture('project_created', { source: 'start_screen', units });
     setShowNewProjectDialog(false);
     setShowStartScreen(false);
   };

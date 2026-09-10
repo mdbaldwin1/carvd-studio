@@ -72,30 +72,19 @@ describe('NewProjectDialog', () => {
       expect(screen.queryByText('New Project')).not.toBeInTheDocument();
     });
 
-    it('shows project name input', async () => {
+    it('asks for starting stock and nothing else', async () => {
       render(<NewProjectDialog {...defaultProps} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText('Project Name')).toBeInTheDocument();
+        expect(screen.getByText('Starting Materials')).toBeInTheDocument();
       });
-    });
 
-    it('has "Untitled Project" as default name', async () => {
-      render(<NewProjectDialog {...defaultProps} />);
-
-      await waitFor(() => {
-        const input = screen.getByLabelText('Project Name') as HTMLInputElement;
-        expect(input.value).toBe('Untitled Project');
-      });
-    });
-
-    it('shows units selection', async () => {
-      render(<NewProjectDialog {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Imperial (inches)')).toBeInTheDocument();
-        expect(screen.getByText('Metric (mm)')).toBeInTheDocument();
-      });
+      // The name comes from the file the first save writes, the units from
+      // the app's New Project Defaults, and nothing remembers a choice made
+      // here, so none of the three is asked for.
+      expect(screen.queryByLabelText('Project Name')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Units')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Remember these choices/i)).not.toBeInTheDocument();
     });
 
     it('shows Create Project button', async () => {
@@ -112,30 +101,6 @@ describe('NewProjectDialog', () => {
       await waitFor(() => {
         expect(screen.getByText('Cancel')).toBeInTheDocument();
       });
-    });
-  });
-
-  describe('units selection', () => {
-    it('has imperial selected by default', async () => {
-      render(<NewProjectDialog {...defaultProps} />);
-
-      await waitFor(() => {
-        const unitsSelect = screen.getByLabelText('Units') as HTMLSelectElement;
-        expect(unitsSelect.value).toBe('imperial');
-      });
-    });
-
-    it('can switch to metric', async () => {
-      render(<NewProjectDialog {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Metric (mm)')).toBeInTheDocument();
-      });
-
-      const unitsSelect = screen.getByLabelText('Units') as HTMLSelectElement;
-      fireEvent.change(unitsSelect, { target: { value: 'metric' } });
-
-      expect(unitsSelect.value).toBe('metric');
     });
   });
 
@@ -195,7 +160,7 @@ describe('NewProjectDialog', () => {
   });
 
   describe('form submission', () => {
-    it('calls onCreateProject with form data', async () => {
+    it('reports only the chosen stock, pre-ticked from the library', async () => {
       const onCreateProject = vi.fn();
       render(<NewProjectDialog {...defaultProps} onCreateProject={onCreateProject} />);
 
@@ -203,36 +168,24 @@ describe('NewProjectDialog', () => {
         expect(screen.getByText('Create Project')).toBeInTheDocument();
       });
 
-      // Change project name
-      const nameInput = screen.getByLabelText('Project Name');
-      fireEvent.change(nameInput, { target: { value: 'My New Project' } });
-
+      // A few stocks arrive already ticked, so Create Project is one click.
       fireEvent.click(screen.getByText('Create Project'));
 
-      expect(onCreateProject).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'My New Project',
-          units: 'imperial'
-        })
-      );
+      expect(onCreateProject).toHaveBeenCalledWith({ selectedMaterials: ['stock-1', 'stock-2'] });
     });
 
-    it('calls onCreateProject with metric units when selected', async () => {
+    it('reports an empty selection when the user clears it', async () => {
       const onCreateProject = vi.fn();
       render(<NewProjectDialog {...defaultProps} onCreateProject={onCreateProject} />);
 
       await waitFor(() => {
-        expect(screen.getByLabelText('Units')).toBeInTheDocument();
+        expect(screen.getByText('Select None')).toBeInTheDocument();
       });
 
-      fireEvent.change(screen.getByLabelText('Units'), { target: { value: 'metric' } });
+      fireEvent.click(screen.getByText('Select None'));
       fireEvent.click(screen.getByText('Create Project'));
 
-      expect(onCreateProject).toHaveBeenCalledWith(
-        expect.objectContaining({
-          units: 'metric'
-        })
-      );
+      expect(onCreateProject).toHaveBeenCalledWith({ selectedMaterials: [] });
     });
   });
 
@@ -264,36 +217,8 @@ describe('NewProjectDialog', () => {
     });
   });
 
-  describe('remember choices', () => {
-    it('shows remember checkbox', async () => {
-      render(<NewProjectDialog {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Remember these choices/)).toBeInTheDocument();
-      });
-    });
-
-    it('saves defaults when remember is checked', async () => {
-      render(<NewProjectDialog {...defaultProps} />);
-
-      await waitFor(() => {
-        expect(screen.getByText(/Remember these choices/)).toBeInTheDocument();
-      });
-
-      // Check the remember checkbox
-      const rememberCheckbox = screen.getByRole('checkbox', { name: /Remember these choices/ });
-      fireEvent.click(rememberCheckbox);
-
-      fireEvent.click(screen.getByText('Create Project'));
-
-      await waitFor(() => {
-        expect(window.electronAPI.setNewProjectDefaults).toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('skip dialog feature', () => {
-    it('immediately creates project when skipSetupDialog is true', async () => {
+  describe('the retired skip preference', () => {
+    it('still shows the dialog for a profile that had skipSetupDialog set', async () => {
       const onCreateProject = vi.fn();
       vi.mocked(window.electronAPI.getNewProjectDefaults).mockResolvedValue({
         units: 'metric',
@@ -304,13 +229,12 @@ describe('NewProjectDialog', () => {
 
       render(<NewProjectDialog {...defaultProps} onCreateProject={onCreateProject} />);
 
+      // The checkbox that set this is gone and nothing else could clear it,
+      // so honouring it would suppress the dialog forever for these users.
       await waitFor(() => {
-        expect(onCreateProject).toHaveBeenCalledWith({
-          name: 'Untitled Project',
-          units: 'metric',
-          selectedMaterials: []
-        });
+        expect(screen.getByText('Starting Materials')).toBeInTheDocument();
       });
+      expect(onCreateProject).not.toHaveBeenCalled();
     });
   });
 
