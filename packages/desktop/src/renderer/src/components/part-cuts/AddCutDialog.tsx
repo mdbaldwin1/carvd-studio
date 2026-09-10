@@ -1,4 +1,11 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@renderer/components/ui/dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from '@renderer/components/ui/dialog';
 import { usePartCutsEditor } from './PartCutsEditorContext';
 import {
   getPresetHint as getOperationPresetHint,
@@ -18,14 +25,22 @@ export function AddCutDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : handleCancelEditor())}>
-      <DialogContent className="max-w-2xl">
+      {/* Same shell as the app's other dialogs: a fixed width with a viewport
+          cap, a header that owns its padding, and a body that supplies its own
+          and does the scrolling. */}
+      <DialogContent className="w-[620px] max-w-[94vw]" onClose={handleCancelEditor}>
         <DialogHeader>
-          <DialogTitle>What kind of cut?</DialogTitle>
-          <DialogDescription>
-            Pick the cut type first. The next step will walk through the right target and measurements.
-          </DialogDescription>
+          <div>
+            <DialogTitle>What kind of cut?</DialogTitle>
+            <DialogDescription>
+              Pick the cut type first. The next step walks through the target and measurements.
+            </DialogDescription>
+          </div>
+          <DialogClose onClose={handleCancelEditor} />
         </DialogHeader>
-        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+        {/* A long chooser: cap the body so the dialog does not fill the
+            window, and let it scroll rather than the page. */}
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto px-5 py-4">
           <div className="flex flex-col gap-3">
             {(
               [
