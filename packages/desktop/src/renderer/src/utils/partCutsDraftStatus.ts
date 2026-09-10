@@ -11,29 +11,24 @@ export interface PartCutsDraftStatus {
   hasBlockingConflicts: boolean;
   /** Index of the first cut that is invalid or in an error conflict, or -1. */
   firstInvalidIndex: number;
-  /** False when saving would write a draft the app rejects. */
-  canSave: boolean;
 }
 
 /**
- * Derive whether a cut draft is savable, and why not.
+ * Which cuts in a draft are invalid, and why.
  *
- * Shared so the header Save button and the workspace agree by construction.
- * When the header owned a different rule than the panel it replaced, Save
- * could accept a draft the panel would have refused.
+ * Save itself is never gated on this. usePartCutsEditing.saveAndExit blurs the
+ * focused field, commits the inspector, then validates every enabled cut and
+ * reports the first problem, keeping the workspace open. Disabling the header
+ * button instead would deadlock an edit that is still focused: the click that
+ * would commit it can never land while the button is disabled.
  */
-export function getPartCutsDraftStatus(
-  part: Part | null,
-  draftFeatures: PartFeature[],
-  hasUnsavedChanges: boolean
-): PartCutsDraftStatus {
+export function getPartCutsDraftStatus(part: Part | null, draftFeatures: PartFeature[]): PartCutsDraftStatus {
   if (!part) {
     return {
       conflicts: [],
       issues: new Map(),
       hasBlockingConflicts: false,
-      firstInvalidIndex: -1,
-      canSave: false
+      firstInvalidIndex: -1
     };
   }
 
@@ -66,7 +61,6 @@ export function getPartCutsDraftStatus(
     conflicts,
     issues,
     hasBlockingConflicts,
-    firstInvalidIndex,
-    canSave: hasUnsavedChanges && !hasBlockingConflicts && firstInvalidIndex < 0
+    firstInvalidIndex
   };
 }

@@ -13,10 +13,12 @@ import {
   clickMenuItem,
   closeElectronApp,
   createBlankProject,
+  exitPartCutsFromHeader,
   launchElectronApp,
   openSelectionContextMenu,
   queueOpenPaths,
   queueSavePath,
+  savePartCutsFromHeader,
   seedProject,
   type RunningElectronApp
 } from './helpers/electron-app';
@@ -964,7 +966,7 @@ async function previewGeometrySignature(window: Page): Promise<string> {
 }
 
 async function savePartAndReopen(window: Page): Promise<void> {
-  await window.getByRole('button', { name: 'Save Part' }).click();
+  await savePartCutsFromHeader(window);
   await expect.poll(() => isEditingPartCuts(window)).toBe(false);
   await openPartCutsFromProperties(window);
 }
@@ -1023,6 +1025,10 @@ async function qualifyOperationLifecycle(
   scenario: OperationScenario,
   projectPath: string
 ): Promise<void> {
+  // One header Save now commits the cuts and writes the project, so a
+  // destination has to exist before the first save rather than only before
+  // the explicit project save later in the cycle.
+  await queueSavePath(window, projectPath);
   await window.getByRole('button', { name: '+ Add Cut' }).click();
   await window.getByRole('button', { name: new RegExp(`^${scenario.preset}\\b`) }).click();
   if (scenario.blindOnly) await expect(window.getByLabel('Depth', { exact: true })).toHaveCount(0);
@@ -1048,7 +1054,7 @@ async function qualifyOperationLifecycle(
   await applyFeatureControls(window, scenario.edited);
   await expectFeatureControls(window, scenario.edited);
   await window.getByRole('button', { name: 'Save Cut' }).click();
-  await window.getByRole('button', { name: 'Save Part' }).click();
+  await savePartCutsFromHeader(window);
   await expect.poll(() => isEditingPartCuts(window)).toBe(false);
   await expect.poll(() => persistedFirstFeature(window)).toEqual(scenario.edited);
   await expect.poll(() => getFirstPartFeatureCount(window)).toBe(1);
@@ -1100,7 +1106,7 @@ async function qualifyOperationLifecycle(
   await expect(window.getByText(scenario.edited.label)).toHaveCount(0);
   await expect.poll(() => firstDraftFeatureSnapshot(window)).toBeNull();
   await expect.poll(() => previewGeometrySignature(window)).toBe(geometryAfterDelete);
-  await window.getByRole('button', { name: 'Save Part' }).click();
+  await savePartCutsFromHeader(window);
   await expect.poll(() => getFirstPartFeatureCount(window)).toBe(0);
   await expect.poll(() => firstPartFeatureSnapshot(window)).toBeNull();
 }
@@ -1158,7 +1164,7 @@ test.describe('part cuts editing lifecycle', () => {
     // The saved cut shows up in the cuts list with its numbered summary.
     await expect(window.getByText(/^1\./)).toBeVisible();
 
-    await window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(window);
 
     await expect.poll(() => isEditingPartCuts(window), { timeout: 5000 }).toBe(false);
     await expect.poll(() => getFirstPartFeatureCount(window), { timeout: 5000 }).toBe(1);
@@ -1171,7 +1177,7 @@ test.describe('part cuts editing lifecycle', () => {
     await openPartCutsFromProperties(window);
     await addDadoCut(window);
 
-    await window.getByRole('button', { name: 'Back to Project' }).click();
+    await exitPartCutsFromHeader(window);
     const exitDialog = window.getByRole('alertdialog', { name: 'Save Part Cuts?' });
     await expect(exitDialog).toBeVisible();
 
@@ -1181,7 +1187,7 @@ test.describe('part cuts editing lifecycle', () => {
     expect(await isEditingPartCuts(window)).toBe(true);
 
     // Discard: the workspace closes and no features reach the part.
-    await window.getByRole('button', { name: 'Back to Project' }).click();
+    await exitPartCutsFromHeader(window);
     await window.getByRole('alertdialog', { name: 'Save Part Cuts?' }).getByRole('button', { name: 'Discard' }).click();
 
     await expect.poll(() => isEditingPartCuts(window), { timeout: 5000 }).toBe(false);
@@ -1211,10 +1217,12 @@ test.describe('part cuts editing lifecycle', () => {
     const { window, userDataDir } = running;
     const projectPath = path.join(userDataDir, 'part-cuts-persistence.carvd');
 
+    // The single header Save commits the cuts and writes the project, so the
+    // destination must be queued before it, not after.
+    await queueSavePath(window, projectPath);
     await openPartCutsFromProperties(window);
     await addDadoCut(window);
-    await window.getByRole('button', { name: 'Save Part' }).click();
-    await queueSavePath(window, projectPath);
+    await savePartCutsFromHeader(window);
     await pressSaveShortcut(window);
 
     await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
@@ -1239,7 +1247,7 @@ test.describe('part cuts editing lifecycle', () => {
     await openPartCutsFromProperties(window);
     await addPresetCut(window, 'Tenon');
     await addPresetCut(window, 'Mortise');
-    await window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(window);
 
     await expect.poll(() => getFirstPartFeatureCount(window)).toBe(2);
     expect((await getFirstPartFeatures(window)).map((feature) => feature.cutType)).toEqual(['tenon', 'mortise']);
@@ -1252,7 +1260,9 @@ test.describe('part cuts editing lifecycle', () => {
     await addPresetCut(window, 'End Cut');
 
     await expect(window.getByText(/Only one enabled cut per end or edge/i).first()).toBeVisible();
-    await expect(window.getByRole('button', { name: 'Save Part' })).toBeDisabled();
+    // Save is never disabled: a focused, uncommitted edit could never be
+    // committed if it were. Clicking reports the conflict and stays open.
+    await savePartCutsFromHeader(window);
     expect(await isEditingPartCuts(window)).toBe(true);
   });
 
@@ -1260,7 +1270,7 @@ test.describe('part cuts editing lifecycle', () => {
     const { window } = running;
     await openPartCutsFromProperties(window);
     await addDadoCut(window);
-    await window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(window);
     await addPartFromSidebar(window);
 
     await window.evaluate(() => {
@@ -1302,7 +1312,7 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByRole('button', { name: /^1\./ }).click();
     await window.getByLabel('Label (optional)').fill('Pasted dado only');
     await window.getByRole('button', { name: 'Save Cut' }).click();
-    await window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(window);
     expect(await window.evaluate(() => JSON.stringify(window.useProjectStore.getState().parts[0].features))).toBe(
       sourceBefore
     );
@@ -1316,7 +1326,7 @@ test.describe('part cuts editing lifecycle', () => {
     await seedProject(window, 'stocked-one-part');
     await openPartCutsFromProperties(window);
     await addDadoCut(window);
-    await window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(window);
 
     await window.getByRole('button', { name: /Generate Cut List|View Cut List/ }).click();
     const dialog = window.getByRole('dialog').filter({ has: window.getByRole('heading', { name: 'Cut List' }) });
@@ -1476,6 +1486,9 @@ test.describe('part cuts editing lifecycle', () => {
   test('persists round and rounded operations through save and reopen', async () => {
     const { window, userDataDir } = running;
     const projectPath = path.join(userDataDir, 'round-cuts-persistence.carvd');
+    // The single header Save commits the cuts and writes the project, so the
+    // destination must be queued before it, not after.
+    await queueSavePath(window, projectPath);
 
     await openPartCutsFromProperties(window);
     await window.getByRole('button', { name: '+ Add Cut' }).click();
@@ -1525,7 +1538,7 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByRole('button', { name: 'Move Right' }).click();
     await window.getByRole('button', { name: 'Extend Length' }).click();
     await window.getByRole('button', { name: 'Save Cut' }).click();
-    await window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(window);
 
     await queueSavePath(window, projectPath);
     await pressSaveShortcut(window);
@@ -1553,7 +1566,7 @@ test.describe('part cuts editing lifecycle', () => {
       {
         kind: 'circular_cut',
         pattern: { type: 'linear', count: 3, spacing: 1, direction: 37 },
-        placement: { primary: 0.25, secondary: 0.25, rotation: 0 },
+        placement: { primary: 0.25, secondary: 0, rotation: 0 },
         parameters: { diameter: 0.5 }
       },
       {
@@ -1571,13 +1584,13 @@ test.describe('part cuts editing lifecycle', () => {
       {
         kind: 'rounded_cut',
         pattern: undefined,
-        placement: { primary: 0.25, secondary: 0.25, rotation: 0 },
+        placement: { primary: 0.25, secondary: 0, rotation: 0 },
         parameters: { length: 3.25, width: 1.25 }
       },
       {
         kind: 'rounded_cut',
         pattern: undefined,
-        placement: { primary: 0.25, secondary: 0.25, rotation: 0 },
+        placement: { primary: 0.25, secondary: 0, rotation: 0 },
         parameters: { length: 3.25, width: 1 }
       }
     ]);

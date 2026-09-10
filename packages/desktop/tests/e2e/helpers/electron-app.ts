@@ -731,3 +731,30 @@ export async function openSelectionContextMenu(window: Page, point = { x: 500, y
   }, point);
   await expect(window.locator('[role="menu"], .context-menu')).toBeVisible({ timeout: 5000 });
 }
+
+/**
+ * Save the open cut draft from the app header.
+ *
+ * Exit and Save moved to the one header that already owned them for the
+ * project, template, and assembly editors, so the cuts workspace no longer
+ * renders its own "Save Part"/"Back to Project" pair.
+ */
+export async function savePartCutsFromHeader(window: Page): Promise<void> {
+  await window.getByTitle('Save (Cmd+S)', { exact: true }).click();
+  // In cuts mode this Save commits the draft and then writes the project, so
+  // the library import prompt can follow it. Clear it, or its modal overlay
+  // swallows the next click.
+  await dismissLibraryImportPrompt(window);
+}
+
+/** Skip the library import prompt when a project write raises it. */
+export async function dismissLibraryImportPrompt(window: Page): Promise<void> {
+  const skip = window.getByRole('dialog', { name: 'Import to Library' }).getByRole('button', { name: 'Skip' });
+  if (await skip.isVisible({ timeout: 2000 }).catch(() => false)) await skip.click();
+}
+
+/** Leave the cuts workspace from the app header (Exit, or Cancel when dirty). */
+export async function exitPartCutsFromHeader(window: Page): Promise<void> {
+  const exit = window.getByRole('button', { name: /^(Exit|Cancel)$/ });
+  await exit.first().click();
+}

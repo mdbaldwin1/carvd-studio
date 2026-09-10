@@ -131,6 +131,7 @@ export function usePartCutsEditing() {
     selectFeature,
     setHoveredTarget,
     setPendingTarget,
-    hasUnsavedChanges: inspectorDirty || hasUnsavedDraftChanges(sourceFeatures)
+    hasUnsavedChanges: inspectorDirty || hasUnsavedDraftChanges(sourceFeatures),
+    inspectorDirty
   };
 }

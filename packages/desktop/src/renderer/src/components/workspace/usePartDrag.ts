@@ -83,10 +83,10 @@ export function usePartDrag(
     partPos: THREE.Vector3;
     partOriginalPos: THREE.Vector3;
     /**
-     * Plane the anchor `point` was captured against. Latched for the whole
-     * gesture: deriving it per frame from evt.shiftKey while the anchor stayed
-     * on the ground plane made the part jump by the gap between the two
-     * ray-plane hits the instant Shift was pressed or released.
+     * Plane the anchor `point` was last captured against. Shift switches to
+     * the camera-facing plane mid-drag, and the anchor is re-taken when it
+     * does; without that the delta jumped by the gap between the two
+     * ray-plane hits.
      */
     planeMode: 'ground' | 'face';
   } | null>(null);
@@ -128,6 +128,8 @@ export function usePartDrag(
   const _tempCameraTarget = useRef(new THREE.Vector3());
   const _tempDelta = useRef(new THREE.Vector3());
   const _tempProjectedDelta = useRef(new THREE.Vector3());
+  /** Delta applied on the previous frame, used to re-anchor across a plane flip. */
+  const lastDragDelta = useRef(new THREE.Vector3());
 
   const dragFrameCounterRef = useRef(0);
 
@@ -138,6 +140,7 @@ export function usePartDrag(
     moveToolStateRef.current = null;
     mateHostPartIdRef.current = null;
     wasSnappedByParts.current = { x: false, y: false, z: false };
+    lastDragDelta.current.set(0, 0, 0);
   };
 
   const finishDragState = (
@@ -415,11 +418,24 @@ export function usePartDrag(
     const pointerRafQueue = createPointerRafQueue(window, (evt) => {
       if (!isDragging || !dragStart.current || !isActiveMoveInteractionOwner('part')) return;
 
+      // Shift switches to the camera-facing plane, which is the only way to
+      // move a part in Y. Choose the plane before sampling the ray so the two
+      // always agree, then re-anchor when the mode flips: the anchor was taken
+      // against the previous plane, and reusing it made the part jump by the
+      // gap between the two ray-plane hits.
+      const planeMode: 'ground' | 'face' = evt.shiftKey ? 'face' : 'ground';
+      const planeInfo = getDragPlaneInfo(dragStart.current.partPos, planeMode);
       const currentPoint = getWorldPoint(evt);
       if (currentPoint) {
+        if (dragStart.current.planeMode !== planeMode) {
+          // Keep the motion so far: anchor so that currentPoint - anchor is
+          // still the delta the part is already displaced by.
+          dragStart.current.point.copy(currentPoint).sub(lastDragDelta.current);
+          dragStart.current.planeMode = planeMode;
+        }
         const delta = _tempDelta.current.copy(currentPoint).sub(dragStart.current.point);
+        lastDragDelta.current.copy(delta);
         dragFrameCounterRef.current += 1;
-        const planeInfo = getDragPlaneInfo(dragStart.current.partPos, dragStart.current.planeMode);
 
         let uAmount = delta.dot(planeInfo.basisU);
         let vAmount = delta.dot(planeInfo.basisV);

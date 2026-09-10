@@ -115,8 +115,8 @@ describe('PartCutsWorkspace', () => {
   it('UX identifies an invalid operation and opens it directly from the save explanation', () => {
     const cut = createMortiseFeature({ label: 'Oversize pocket', placement: { x: 23, z: 1 } });
     const { props } = renderWorkspace({ draftFeatures: [cut], hasUnsavedChanges: true });
-    // Save lives in the app header now; assert the shared rule it obeys.
-    expect.soft(getPartCutsDraftStatus(props.part, [cut], true).canSave).toBe(false);
+    // Save lives in the app header now; assert the invalidity it reports.
+    expect.soft(getPartCutsDraftStatus(props.part, [cut]).firstInvalidIndex).toBeGreaterThanOrEqual(0);
     const issue = screen.getByRole('alert');
     expect(issue).toHaveTextContent(/Oversize pocket.*runs past the blank/i);
     fireEvent.click(within(issue).getByRole('button', { name: 'Fix cut 1' }));
@@ -1425,8 +1425,8 @@ describe('PartCutsWorkspace', () => {
     ];
     const { props } = renderWorkspace({ draftFeatures: conflictingFeatures, hasUnsavedChanges: true });
 
-    // Save lives in the app header now; assert the shared rule it obeys.
-    expect(getPartCutsDraftStatus(props.part, conflictingFeatures, true).canSave).toBe(false);
+    // Save lives in the app header now; assert the invalidity it reports.
+    expect(getPartCutsDraftStatus(props.part, conflictingFeatures).firstInvalidIndex).toBeGreaterThanOrEqual(0);
   });
   // Cut shortcuts (undo/redo, Escape, delete, nudge) are routed by mode in
   // useKeyboardShortcuts and covered in useKeyboardShortcuts.test.ts.

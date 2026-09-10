@@ -3,9 +3,11 @@ import type { Page } from 'playwright';
 import {
   closeElectronApp,
   dragCanvas,
+  exitPartCutsFromHeader,
   getResizeHandleCanvasPoint,
   getSelectedPartCanvasPoint,
   launchElectronApp,
+  savePartCutsFromHeader,
   seedProject,
   type RunningElectronApp
 } from './helpers/electron-app';
@@ -239,7 +241,7 @@ async function authorRightMitre(window: Page, partId: string, flip: boolean): Pr
   await longPoint.selectOption(flip ? 'back' : 'front');
   await expect(longPoint).toHaveValue(flip ? 'back' : 'front');
   await window.getByRole('button', { name: 'Save Cut' }).click();
-  await window.getByRole('button', { name: 'Save Part' }).click();
+  await savePartCutsFromHeader(window);
   await expect
     .poll(() => window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
     .toBe(false);
@@ -261,7 +263,7 @@ async function editFirstMitreAngle(window: Page, partId: string, angle: number):
   await window.getByLabel('Mitre Angle', { exact: true }).fill(String(angle));
   await expect.poll(() => preview.getAttribute('data-geometry-signature')).not.toBe(before);
   await window.getByRole('button', { name: 'Save Cut' }).click();
-  await window.getByRole('button', { name: 'Save Part' }).click();
+  await savePartCutsFromHeader(window);
   await expect
     .poll(() => window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
     .toBe(false);
@@ -279,7 +281,7 @@ async function createDefaultDowelJoint(window: Page, firstPartId: string): Promi
   await window.getByRole('button', { name: 'Next' }).click();
   await expect(window.getByText('All holes fit within both boards.')).toBeVisible();
   await window.getByRole('button', { name: 'Create Dowel Joint' }).click();
-  await window.getByRole('button', { name: 'Back to Project' }).click();
+  await exitPartCutsFromHeader(window);
   await window.waitForFunction(() => typeof window.__carvdE2E?.getDowelVisualizations === 'function');
 }
 
@@ -290,7 +292,7 @@ async function editFirstHoleDiameter(window: Page, partId: string, diameter: num
   await input.fill(String(diameter));
   await input.press('Enter');
   await window.getByRole('button', { name: 'Save Cut' }).click();
-  await window.getByRole('button', { name: 'Save Part' }).click();
+  await savePartCutsFromHeader(window);
   await expect
     .poll(() => window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
     .toBe(false);
@@ -1032,7 +1034,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
     await blindDepth.fill('0.25');
     await blindDepth.press('Enter');
     await running.window.getByRole('button', { name: 'Save Cut' }).click();
-    await running.window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(running.window);
     await expect
       .poll(() =>
         running.window.evaluate(() => {
@@ -1433,7 +1435,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
     ]);
     expect(afterDraftUndo.draft[3]).toMatchObject({ label: 'Dirty Added Hole', enabled: true });
 
-    await running.window.getByRole('button', { name: 'Back to Project' }).click();
+    await exitPartCutsFromHeader(running.window);
     const exitDialog = running.window.getByRole('alertdialog', { name: 'Save Part Cuts?' });
     await exitDialog.getByRole('button', { name: 'Discard' }).click();
     await expect
@@ -1613,7 +1615,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
     await openSelectedPartCuts(running.window, 'copy-dowel-lower');
     await running.window.getByRole('button', { name: 'Actions for cut 1' }).click();
     await running.window.getByRole('menuitem', { name: 'Delete' }).click();
-    await running.window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(running.window);
     await expect
       .poll(() => running.window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
       .toBe(false);

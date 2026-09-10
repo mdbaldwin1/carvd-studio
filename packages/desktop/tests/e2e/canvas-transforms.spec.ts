@@ -5,6 +5,7 @@ import {
   getProjectSnapshot,
   getSelectedPartCanvasPoint,
   launchElectronApp,
+  savePartCutsFromHeader,
   seedProject,
   type RunningElectronApp
 } from './helpers/electron-app';
@@ -218,7 +219,7 @@ test.describe('Canvas transform workflows', () => {
     await running.window.getByRole('button', { name: /^2\./ }).click();
     await running.window.getByLabel('Run Along Blank').fill('1.25');
     await running.window.getByRole('button', { name: 'Save Cut' }).click();
-    await running.window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(running.window);
     expect(
       await running.window.evaluate(() => JSON.stringify(window.useProjectStore.getState().parts[0].features))
     ).toBe(sourceBefore);

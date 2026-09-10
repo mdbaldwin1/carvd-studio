@@ -205,8 +205,8 @@ describe('closure review disconnected stock and pattern performance', () => {
         onSave: vi.fn()
       })
     );
-    // Save lives in the app header now; assert the shared rule it obeys.
-    expect.soft(getPartCutsDraftStatus(part, [cut], true).canSave).toBe(false);
+    // Save lives in the app header now; assert the invalidity it reports.
+    expect.soft(getPartCutsDraftStatus(part, [cut]).firstInvalidIndex).toBeGreaterThanOrEqual(0);
     fireEvent.click(screen.getByRole('button', { name: /^1\. Malformed opening/ }));
     expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
     expect(screen.getByRole('alert')).toHaveTextContent(/finite|valid number/i);

@@ -134,8 +134,8 @@ describe('independent review round 3', () => {
           onSave: vi.fn()
         })
       );
-      // Save lives in the app header now; assert the shared rule it obeys.
-      expect.soft(getPartCutsDraftStatus(original, part.features!, true).canSave).toBe(false);
+      // Save lives in the app header now; assert the invalidity it reports.
+      expect.soft(getPartCutsDraftStatus(original, part.features!).firstInvalidIndex).toBeGreaterThanOrEqual(0);
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${part.features!.length}\\. ${last.label}`) }));
       expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
       expect(screen.getByRole('alert')).toHaveTextContent(

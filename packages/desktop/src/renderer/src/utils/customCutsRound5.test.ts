@@ -175,8 +175,8 @@ describe('closure review exact contact, XYZ axes, and hidden offsets', () => {
           onSave: vi.fn()
         })
       );
-      // Save lives in the app header now; assert the shared rule it obeys.
-      expect(getPartCutsDraftStatus(part, [cut], true).canSave).toBe(false);
+      // Save lives in the app header now; assert the invalidity it reports.
+      expect(getPartCutsDraftStatus(part, [cut]).firstInvalidIndex).toBeGreaterThanOrEqual(0);
       fireEvent.click(screen.getByRole('button', { name: /^1\. Malformed cut/ }));
       expect.soft(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
       fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
