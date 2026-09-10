@@ -758,18 +758,37 @@ export function getFeatureDraftTarget(draft: FeatureDraft): PartFeatureTarget {
 }
 
 export function applyTargetToFeatureDraft(draft: FeatureDraft, target: PartFeatureTarget): FeatureDraft {
+  // Each branch must accept exactly what isTargetValidForDraft offers a pane
+  // for. A pane offered here but rejected there is a control that does
+  // nothing when clicked.
   if (draft.mode === 'end_cut') {
-    return target.type === 'face' && (target.face === 'left_end' || target.face === 'right_end')
+    return target.type === 'face' &&
+      (target.face === 'left_end' ||
+        target.face === 'right_end' ||
+        target.face === 'front_face' ||
+        target.face === 'back_face')
       ? { ...draft, targetFace: target.face }
       : draft;
   }
 
-  if (draft.mode === 'circular_cut' || draft.mode === 'rounded_cut') {
+  if (draft.mode === 'circular_cut') {
     return target.type === 'face' ? { ...draft, faceTarget: target.face } : draft;
+  }
+
+  if (draft.mode === 'rounded_cut') {
+    return target.type === 'face' && (target.face === 'top_face' || target.face === 'bottom_face')
+      ? { ...draft, faceTarget: target.face }
+      : draft;
   }
 
   if (draft.cutType === 'corner_notch') {
     return target.type === 'corner' ? { ...draft, cornerTarget: target.corner } : draft;
+  }
+
+  if (draft.cutType === 'tenon') {
+    return target.type === 'face' && (target.face === 'left_end' || target.face === 'right_end')
+      ? { ...draft, faceTarget: target.face }
+      : draft;
   }
 
   if (draft.cutType === 'edge_notch' || draft.cutType === 'rabbet') {

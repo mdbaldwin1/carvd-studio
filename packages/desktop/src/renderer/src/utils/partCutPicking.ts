@@ -329,11 +329,30 @@ export function isTargetValidForDraft(target: PartFeatureTarget, draft: FeatureD
   if (!draft) return false;
 
   if (draft.mode === 'end_cut') {
-    return target.type === 'face' && (target.face === 'left_end' || target.face === 'right_end');
+    // Both ends and both long edges: the inspector presents all four as one
+    // family (Left End, Right End, Front Edge, Back Edge), so an edge bevel
+    // could not be moved to the opposite edge from the canvas while the panel
+    // offered exactly that.
+    return (
+      target.type === 'face' &&
+      (target.face === 'left_end' ||
+        target.face === 'right_end' ||
+        target.face === 'front_face' ||
+        target.face === 'back_face')
+    );
   }
 
-  if (draft.mode === 'circular_cut' || draft.mode === 'rounded_cut') {
+  if (draft.mode === 'circular_cut') {
+    // A hole is legitimate on any face, ends included -- dowel holes live
+    // there -- and the inspector offers all six.
     return target.type === 'face';
+  }
+
+  if (draft.mode === 'rounded_cut') {
+    // Only the two faces the inspector offers. The overlay and handle maths
+    // are top-down, so an end-face rounded slot picked here could then be
+    // edited neither in the canvas nor in the panel.
+    return target.type === 'face' && (target.face === 'top_face' || target.face === 'bottom_face');
   }
 
   if (draft.cutType === 'corner_notch') {
@@ -341,6 +360,14 @@ export function isTargetValidForDraft(target: PartFeatureTarget, draft: FeatureD
     // "bottom", so testing for those offered a blind corner notch no pick
     // handles at all while the side panel still listed all four corners.
     return target.type === 'corner';
+  }
+
+  if (draft.cutType === 'tenon') {
+    // A tenon is anchored to an end, and normalizeRectCutDraft snaps it back
+    // to one. Falling through to the top/bottom faces below meant a click set
+    // a face, normalization reverted it, and the pane looked broken -- the
+    // same fault already fixed for corner notches and for rabbets below.
+    return target.type === 'face' && (target.face === 'left_end' || target.face === 'right_end');
   }
 
   if (draft.cutType === 'edge_notch' || draft.cutType === 'rabbet') {
