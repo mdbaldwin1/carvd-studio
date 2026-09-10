@@ -29,11 +29,13 @@ The early return is well-motivated — the source part stays selected behind the
 - Exactly one Exit control and one Save control, both in the header.
 - The cuts preview keeps framing the part on entry. Framing is the default camera placement, not a constraint on navigation.
 - Preserve every existing behaviour asserted by the round 6–9 qualification specs; where a test drives a moved control, update the driver, never the assertion's intent.
-- Target `codex/custom-cuts-release` or a branch cut from it after that merges.
+- Target `codex/custom-cuts-release`. This work ships in PR #444 alongside the rest of Custom Cuts, not as a follow-up.
 
 ## Sequencing note
 
-This plan is written to be executed **after** PR #444 merges. It is committed to the release branch so the analysis is not lost, but landing a shell refactor inside a 100-commit release branch that has just gone green would put the beta at risk for no benefit. Tasks 1–3 are independently shippable and low-risk; Task 4 is the large one.
+This ships in the same PR as the rest of Custom Cuts, so the beta presents one coherent editor rather than a screen that is reorganised a release later.
+
+Order the tasks 1 → 5 regardless. Tasks 1–3 are small, independently verifiable, and leave the app working after each; doing them first means Task 4 is a pure layout move with the header, camera, and input behaviour already settled. Re-run the full desktop and Electron suites after every task rather than only at the end, so a regression is attributable to one change.
 
 ---
 
