@@ -84,10 +84,16 @@ test.describe('round 8 destructive file actions', () => {
           const replacementPath = path.join(running.userDataDir, 'replacement.carvd');
           fs.writeFileSync(replacementPath, JSON.stringify(replacement));
           await queueOpenPaths(window, [replacementPath]);
-          await window.getByRole('button', { name: 'Save Cut', exact: true }).focus();
+          // Any focusable control inside the inspector will do -- the panel has
+          // no Save button of its own now that a cut is written as it is edited.
+          const inspectorButton = window
+            .getByRole('complementary', { name: 'Cut properties' })
+            .getByRole('button')
+            .first();
+          await inspectorButton.focus();
           if (route === 'keyboard') await window.keyboard.press(`${modifier}+${key}`);
           else
-            await window.getByRole('button', { name: 'Save Cut', exact: true }).evaluate(
+            await inspectorButton.evaluate(
               (button, { modifier, key }) => {
                 button.dispatchEvent(
                   new KeyboardEvent('keydown', {

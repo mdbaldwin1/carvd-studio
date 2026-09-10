@@ -1,6 +1,6 @@
 import { SidebarProvider } from '@renderer/components/ui/sidebar';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
 import { CutProperties } from '@renderer/components/part-cuts/CutProperties';
@@ -110,10 +110,14 @@ describe('K7 shared inspector save and dirty lifecycle', () => {
   it('keeps invalid active input open on global Save with an actionable error', () => {
     render(<Harness />);
     edit('invalid');
-    expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    expect(
+      within(screen.getByRole('complementary', { name: 'Cut properties' })).getByRole('alert')
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Global Save' }));
     expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
-    expect(screen.getByRole('alert')).toHaveTextContent(/diameter|edge|face/i);
+    expect(within(screen.getByRole('complementary', { name: 'Cut properties' })).getByRole('alert')).toHaveTextContent(
+      /diameter|edge|face/i
+    );
     expect(useProjectStore.getState().parts[0].features![0]).toEqual(feature);
   });
   it.each(['Global Save', 'Global Exit'])('flushes a still-focused fraction input before %s', (action) => {
@@ -127,10 +131,9 @@ describe('K7 shared inspector save and dirty lifecycle', () => {
       expect((useProjectStore.getState().parts[0].features![0] as CircularCutFeature).parameters.diameter).toBe(0.755);
     else expect(screen.getByLabelText('Exit prompt')).toHaveTextContent('true');
   });
-  it('keeps Save Cut local undo separate from the single project save undo', () => {
+  it('keeps cut-list undo separate from the single project save undo', () => {
     render(<Harness />);
     edit('diameter');
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
     expect(usePartCutsEditingStore.getState().draftHistory).toHaveLength(1);
     act(() => usePartCutsEditingStore.getState().undoDraft());
     expect(usePartCutsEditingStore.getState().draftFeatures[0]).toEqual(feature);
@@ -138,23 +141,25 @@ describe('K7 shared inspector save and dirty lifecycle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Global Save' }));
     expect(useProjectStore.temporal.getState().pastStates).toHaveLength(1);
   });
-  it.each(['min', 'center', 'max'] as const)('K6 keeps %s reference coordinates on actual Save Cut', (from) => {
-    const part = useProjectStore.getState().parts[0];
-    const cut = {
-      ...globalThis.structuredClone(feature),
-      reference: { primaryFrom: from, secondaryFrom: from },
-      placement: { primary: 1, secondary: 1, rotation: 0 }
-    };
-    useProjectStore.setState({ parts: [{ ...part, features: [cut] }] });
-    usePartCutsEditingStore.getState().startEditingPartCuts(part.id, part.name, [cut]);
-    render(<Harness />);
-    edit('label');
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
-    expect(usePartCutsEditingStore.getState().draftFeatures[0].reference).toEqual(cut.reference);
-    fireEvent.click(screen.getByRole('button', { name: 'Global Save' }));
-    expect(useProjectStore.getState().parts[0].features![0]).toMatchObject({
-      reference: cut.reference,
-      placement: cut.placement
-    });
-  });
+  it.each(['min', 'center', 'max'] as const)(
+    'K6 keeps %s reference coordinates once written to the cut list',
+    (from) => {
+      const part = useProjectStore.getState().parts[0];
+      const cut = {
+        ...globalThis.structuredClone(feature),
+        reference: { primaryFrom: from, secondaryFrom: from },
+        placement: { primary: 1, secondary: 1, rotation: 0 }
+      };
+      useProjectStore.setState({ parts: [{ ...part, features: [cut] }] });
+      usePartCutsEditingStore.getState().startEditingPartCuts(part.id, part.name, [cut]);
+      render(<Harness />);
+      edit('label');
+      expect(usePartCutsEditingStore.getState().draftFeatures[0].reference).toEqual(cut.reference);
+      fireEvent.click(screen.getByRole('button', { name: 'Global Save' }));
+      expect(useProjectStore.getState().parts[0].features![0]).toMatchObject({
+        reference: cut.reference,
+        placement: cut.placement
+      });
+    }
+  );
 });

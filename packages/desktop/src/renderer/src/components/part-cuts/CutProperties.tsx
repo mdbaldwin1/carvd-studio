@@ -22,7 +22,7 @@ import {} from '@renderer/utils/rectCutUtils';
 import {} from '@renderer/components/ui/dropdown-menu';
 
 import { usePartCutsEditor } from './PartCutsEditorContext';
-import { getDraftStepDescription, getDraftStepTitle } from './draftSteps';
+import { getCutHint } from './cutHints';
 
 /**
  * The selected cut's fields, in the properties panel the project editor uses
@@ -34,7 +34,6 @@ export function CutProperties() {
     part,
     units,
     setDraft,
-    panelMode,
     inspectorDraft,
     isEditingDraft,
     draftValidationMessage,
@@ -46,8 +45,8 @@ export function CutProperties() {
     availableEdgeTargets,
     availableFaceTargets,
     updateRectDraft,
-    handleSaveDraft,
-    handleCancelEditor,
+    selectedFeatureSummary,
+    selectedFeatureTargetLabel,
     preservedEndCutReferenceNote,
     inspectorUsesBlindOnlyDepth,
     inspectorHidesDepthSelector,
@@ -59,24 +58,24 @@ export function CutProperties() {
   if (!isEditingDraft || !inspectorDraft) return null;
 
   return (
-    <aside className="properties-panel">
-      <div className="flex items-center justify-between gap-2">
-        <h2>{panelMode === 'add' ? 'Add Cut' : 'Edit Cut'}</h2>
-        {/* Named rather than "Cancel" so it cannot be confused with the
-            header's Cancel, which abandons the whole cuts session. */}
-        <Button variant="ghost" size="xs" onClick={handleCancelEditor}>
-          Back to Cuts
-        </Button>
-      </div>
+    // Named so the panel's own alert is distinguishable from the sidebar's
+    // blocking-conflicts summary, which is also an alert.
+    <aside className="properties-panel" aria-label="Cut properties">
+      {/* The same heading every other properties panel uses. There is no
+          dismiss button: the panel follows the selection, so Escape or picking
+          another cut closes it, and nothing here needs saving or cancelling. */}
+      <h2>Properties</h2>
       <div className="properties-card">
         <div className="min-h-0 flex-1 overflow-y-auto pr-1">
           <div className="rounded-md border border-border bg-bg-secondary p-3">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <Label className="block">{getDraftStepTitle(inspectorDraft)}</Label>
-                <p className="mt-1 text-[11px] text-text-muted">{getDraftStepDescription(inspectorDraft)}</p>
+                {/* Named as the cut list names it, so the panel and the row
+                    plainly refer to the same cut. */}
+                <Label className="block">{inspectorDraft.label?.trim() || selectedFeatureSummary}</Label>
+                <p className="mt-1 text-[11px] text-text-muted">{getCutHint(inspectorDraft)}</p>
               </div>
-              <Badge variant="outline">{panelMode === 'edit' ? 'Editing' : 'New Cut'}</Badge>
+              {selectedFeatureTargetLabel && <Badge variant="outline">{selectedFeatureTargetLabel}</Badge>}
             </div>
 
             {inspectorDraft.mode === 'end_cut' && (
@@ -1146,14 +1145,6 @@ export function CutProperties() {
                 )}
             </div>
           )}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button type="button" size="sm" onClick={handleSaveDraft} disabled={!!draftValidationMessage}>
-              Save Cut
-            </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={handleCancelEditor}>
-              Cancel
-            </Button>
-          </div>
         </div>
       </div>
     </aside>

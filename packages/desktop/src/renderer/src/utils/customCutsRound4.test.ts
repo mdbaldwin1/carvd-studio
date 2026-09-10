@@ -3,7 +3,7 @@ import { SidebarProvider } from '@renderer/components/ui/sidebar';
 import { getPartCutsDraftStatus } from '@renderer/utils/partCutsDraftStatus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
-import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
 import { createElement } from 'react';
 import { createTestPart } from '../../../../tests/helpers/factories';
 import type { CircularCutFeature, EndCutFeature, Part, RectCutFeature } from '../types';
@@ -222,7 +222,9 @@ describe('closure review disconnected stock and pattern performance', () => {
     // Save lives in the app header now; assert the invalidity it reports.
     expect.soft(getPartCutsDraftStatus(part, [cut]).firstInvalidIndex).toBeGreaterThanOrEqual(0);
     fireEvent.click(screen.getByRole('button', { name: /^1\. Malformed opening/ }));
-    expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    expect(
+      within(screen.getByRole('complementary', { name: 'Cut properties' })).getByRole('alert')
+    ).toBeInTheDocument();
     expect(screen.getAllByRole('alert').at(-1)).toHaveTextContent(/finite|valid number/i);
   });
   it.each([1, 8])(

@@ -57,10 +57,19 @@ async function expectImperialMeasurement(window: Page, label: string, value: num
   await expect.poll(async () => parseImperialMeasurement(await input.inputValue())).toBeCloseTo(value, 8);
 }
 
-async function saveCut(window: Page): Promise<void> {
-  const button = window.getByRole('button', { name: 'Save Cut' });
-  await expect(button).toBeEnabled();
-  await button.click();
+function cutPanel(window: Page) {
+  return window.getByRole('complementary', { name: 'Cut properties' });
+}
+
+/**
+ * Confirm the open cut has been written to the list.
+ *
+ * Picking a type adds the cut and every field writes straight through, so
+ * there is no Save to press. What is still worth asserting at each step is
+ * that the panel is not withholding the cut over a validation problem.
+ */
+async function expectCutAccepted(window: Page): Promise<void> {
+  await expect(cutPanel(window).getByRole('alert')).toHaveCount(0);
 }
 
 async function saveProjectTo(window: Page, filePath: string): Promise<void> {
@@ -283,14 +292,14 @@ test.describe('hands-on custom cuts qualification', () => {
     await window.getByLabel('Cut Style', { exact: true }).selectOption('mitre');
     await window.getByLabel('Mitre Angle', { exact: true }).fill('45');
     await window.getByLabel('Long Point On', { exact: true }).selectOption('back');
-    await saveCut(window);
+    await expectCutAccepted(window);
 
     await startPreset(window, 'Dado');
     await window.getByRole('button', { name: 'Top Face', exact: true }).click();
     await window.getByLabel('Label (optional)', { exact: true }).fill('Metric shelf dado');
     await fillMeasurement(window, 'Run Along Blank', '19.05');
     await fillMeasurement(window, 'Blind Depth', '6.35');
-    await saveCut(window);
+    await expectCutAccepted(window);
 
     await startPreset(window, 'Mortise');
     await window.getByRole('button', { name: 'Bottom Face', exact: true }).click();
@@ -300,7 +309,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await fillMeasurement(window, 'Blind Depth', '9.525');
     await fillMeasurement(window, 'Offset Along Length', '152.4');
     await fillMeasurement(window, 'Offset Across Width', '50.8');
-    await saveCut(window);
+    await expectCutAccepted(window);
 
     await startPreset(window, 'Round Hole');
     await window.getByRole('button', { name: 'Front Face', exact: true }).click();
@@ -312,10 +321,10 @@ test.describe('hands-on custom cuts qualification', () => {
     await fillMeasurement(window, 'Offset Across Face', '6.35');
     // The right 45° Back-long mitre removes the Front face beyond x=2 in
     // on this 24 × 10 blank. x=9 was never a physically valid hole location.
-    await expect(window.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    await expect(cutPanel(window).getByRole('alert')).toBeVisible();
     await expect(window.getByRole('alert').last()).toContainText('remaining material');
     await fillMeasurement(window, 'Offset Along Face', '25.4');
-    await saveCut(window);
+    await expectCutAccepted(window);
     await savePartCutsFromHeader(window);
 
     const metric = await window.evaluate(() => {
@@ -367,13 +376,13 @@ test.describe('hands-on custom cuts qualification', () => {
     await window.getByLabel('Label (optional)', { exact: true }).fill('Fractional frame mitre');
     await window.getByLabel('Mitre Angle', { exact: true }).fill('22.5');
     await window.getByLabel('Long Point On', { exact: true }).selectOption('front');
-    await saveCut(window);
+    await expectCutAccepted(window);
 
     await window.getByRole('button', { name: /^2\. Metric shelf dado/ }).click();
     await window.getByLabel('Label (optional)', { exact: true }).fill('Fractional shelf dado');
     await fillMeasurement(window, 'Run Along Blank', '13/16');
     await fillMeasurement(window, 'Blind Depth', '5/16');
-    await saveCut(window);
+    await expectCutAccepted(window);
 
     await window.getByRole('button', { name: /^3\. Metric rail mortise/ }).click();
     await window.getByLabel('Label (optional)', { exact: true }).fill('Fractional rail mortise');
@@ -382,7 +391,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await fillMeasurement(window, 'Blind Depth', '7/16');
     await fillMeasurement(window, 'Offset Along Length', '6 1/4');
     await fillMeasurement(window, 'Offset Across Width', '2 1/4');
-    await saveCut(window);
+    await expectCutAccepted(window);
 
     await window.getByRole('button', { name: /^4\. Metric face hole/ }).click();
     await window.getByLabel('Label (optional)', { exact: true }).fill('Fractional face hole');
@@ -390,7 +399,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await fillMeasurement(window, 'Hole Depth', '9/16');
     await fillMeasurement(window, 'Offset Along Face', '8 1/2');
     await fillMeasurement(window, 'Offset Across Face', '3/8');
-    await saveCut(window);
+    await expectCutAccepted(window);
     await savePartCutsFromHeader(window);
 
     const fractional = await window.evaluate(() => {
@@ -508,7 +517,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await window.getByLabel('Label (optional)', { exact: true }).fill('Layered shelf dado');
     await fillMeasurement(window, 'Run Along Blank', '3/4');
     await fillMeasurement(window, 'Blind Depth', '1/4');
-    await saveCut(window);
+    await expectCutAccepted(window);
 
     await startPreset(window, 'End Cut');
     await window.getByRole('button', { name: 'Right End', exact: true }).click();
@@ -518,7 +527,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await window.getByLabel('Long Point On', { exact: true }).selectOption('front');
     await window.getByLabel('Bevel Angle', { exact: true }).fill('45');
     await window.getByLabel('High Point On', { exact: true }).selectOption('top');
-    await saveCut(window);
+    await expectCutAccepted(window);
 
     const preview = window.getByRole('img', { name: 'Part cuts geometry preview' });
     const topFrontGeometry = await preview.getAttribute('data-geometry-signature');
@@ -529,14 +538,14 @@ test.describe('hands-on custom cuts qualification', () => {
     await expect.poll(() => preview.getAttribute('data-geometry-signature')).not.toBe(topFrontGeometry);
     const bottomFrontGeometry = await preview.getAttribute('data-geometry-signature');
     expectFiniteNondegenerateGeometrySignature(bottomFrontGeometry);
-    await saveCut(window);
+    await expectCutAccepted(window);
 
     await window.getByRole('button', { name: /^2\. Layered compound end/ }).click();
     await window.getByLabel('Long Point On', { exact: true }).selectOption('back');
     await expect.poll(() => preview.getAttribute('data-geometry-signature')).not.toBe(bottomFrontGeometry);
     const bottomBackGeometry = await preview.getAttribute('data-geometry-signature');
     expectFiniteNondegenerateGeometrySignature(bottomBackGeometry);
-    await saveCut(window);
+    await expectCutAccepted(window);
     await savePartCutsFromHeader(window);
 
     await expect
@@ -628,7 +637,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await window.getByRole('button', { name: /^20\. Stress rounded 6/ }).click();
     await window.getByLabel('Label (optional)', { exact: true }).fill('Stress rounded 6 edited');
     await fillMeasurement(window, 'Opening Length', '5');
-    await saveCut(window);
+    await expectCutAccepted(window);
     const editedGeometry = await preview.getAttribute('data-geometry-signature');
     expectFiniteNondegenerateGeometrySignature(editedGeometry);
     expect(editedGeometry).not.toBe(initialGeometry);
@@ -648,10 +657,10 @@ test.describe('hands-on custom cuts qualification', () => {
     await fillMeasurement(window, 'Offset Across Width', '5');
     // The right 15°/5° Back-long compound leaves only 77.2794 inches
     // at this pocket's front-bottom corner; [76, 78] breaks out of stock.
-    await expect(window.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    await expect(cutPanel(window).getByRole('alert')).toBeVisible();
     await expect(window.getByRole('alert').last()).toContainText('remaining material');
     await fillMeasurement(window, 'Offset Along Length', '74');
-    await saveCut(window);
+    await expectCutAccepted(window);
     await expect(window.getByRole('checkbox', { name: /^Enable cut / })).toHaveCount(21);
     await window.getByRole('button', { name: 'Actions for cut 21' }).click();
     await window.getByRole('menuitem', { name: 'Delete' }).click();
@@ -734,7 +743,7 @@ test.describe('hands-on custom cuts qualification', () => {
     const stoppedDadoAfterMove = await preview.getAttribute('data-geometry-signature');
     expectFiniteNondegenerateGeometrySignature(stoppedDadoAfterMove);
     expect(stoppedDadoAfterMove).not.toBe(stoppedDadoBeforeMove);
-    await saveCut(window);
+    await expectCutAccepted(window);
 
     await startPreset(window, 'Edge Notch');
     await window.getByRole('button', { name: 'Front', exact: true }).click();
@@ -744,10 +753,10 @@ test.describe('hands-on custom cuts qualification', () => {
     await fillMeasurement(window, 'Offset Along Length', '33');
     await expectImperialMeasurement(window, 'Offset Along Length', 32);
     await fillMeasurement(window, 'Offset Along Length', '20');
-    await saveCut(window);
+    await expectCutAccepted(window);
     await window.getByRole('button', { name: /^2\. Cable chase edge notch/ }).click();
     await fillMeasurement(window, 'Cross-Cut Width', '1 3/4');
-    await saveCut(window);
+    await expectCutAccepted(window);
 
     await startPreset(window, 'Corner Notch');
     await window.getByRole('button', { name: 'Back-Right Corner', exact: true }).click();
@@ -755,12 +764,12 @@ test.describe('hands-on custom cuts qualification', () => {
     await fillMeasurement(window, 'Run Along Blank', '40');
     await fillMeasurement(window, 'Cross-Cut Width', '2');
     await expect(window.getByText('Corner notch size runs past the blank.')).toBeVisible();
-    await expect(window.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    await expect(cutPanel(window).getByRole('alert')).toBeVisible();
     await fillMeasurement(window, 'Run Along Blank', '2 1/2');
-    await saveCut(window);
+    await expectCutAccepted(window);
     await window.getByRole('button', { name: /^3\. Post corner clearance/ }).click();
     await fillMeasurement(window, 'Cross-Cut Width', '2 1/4');
-    await saveCut(window);
+    await expectCutAccepted(window);
     await savePartCutsFromHeader(window);
 
     const expectedFeatures = [

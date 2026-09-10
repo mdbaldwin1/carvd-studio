@@ -55,7 +55,20 @@ async function addDadoCut(window: Page): Promise<void> {
 async function addPresetCut(window: Page, preset: string): Promise<void> {
   await window.getByRole('button', { name: '+ Add Cut' }).click();
   await window.getByRole('button', { name: new RegExp(`^${preset}\\b`) }).click();
-  await window.getByRole('button', { name: 'Save Cut' }).click();
+}
+
+/**
+ * Close the cut inspector back to the list.
+ *
+ * The panel has no dismiss button any more: it follows the selection, so
+ * clearing the selected cut is what closes it. Blur first because the
+ * shortcut handler ignores keys typed into a field, exactly as a user
+ * clicking away from an input before pressing Escape would.
+ */
+async function closeCutInspector(window: Page): Promise<void> {
+  await window.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await window.keyboard.press('Escape');
+  await expect(window.getByRole('complementary', { name: 'Cut properties' })).toHaveCount(0);
 }
 
 async function getFirstPartFeatures(window: Page): Promise<Array<{ id: string; cutType: string }>> {
@@ -1034,7 +1047,6 @@ async function qualifyOperationLifecycle(
   if (scenario.blindOnly) await expect(window.getByLabel('Depth', { exact: true })).toHaveCount(0);
   await applyFeatureControls(window, scenario.initial);
   await expectFeatureControls(window, scenario.initial);
-  await window.getByRole('button', { name: 'Save Cut' }).click();
 
   // Persist disabled state, then restore enabled state as part of the edited lifecycle.
   const enabledToggle = window.getByRole('checkbox', { name: 'Enable cut 1' });
@@ -1047,13 +1059,12 @@ async function qualifyOperationLifecycle(
 
   await window.getByRole('button', { name: new RegExp(`^1\\. ${scenario.initial.label}`) }).click();
   await expectFeatureControls(window, initiallyDisabled);
-  await window.getByRole('button', { name: 'Back to Cuts' }).click();
+  await closeCutInspector(window);
   await enabledToggle.check();
   await expect(enabledToggle).toBeChecked();
   await window.getByRole('button', { name: new RegExp(`^1\\. ${scenario.initial.label}`) }).click();
   await applyFeatureControls(window, scenario.edited);
   await expectFeatureControls(window, scenario.edited);
-  await window.getByRole('button', { name: 'Save Cut' }).click();
   await savePartCutsFromHeader(window);
   await expect.poll(() => isEditingPartCuts(window)).toBe(false);
   await expect.poll(() => persistedFirstFeature(window)).toEqual(scenario.edited);
@@ -1067,7 +1078,7 @@ async function qualifyOperationLifecycle(
 
   await window.getByRole('button', { name: new RegExp(`^1\\. ${scenario.edited.label}`) }).click();
   await expectFeatureControls(window, scenario.edited);
-  await window.getByRole('button', { name: 'Back to Cuts' }).click();
+  await closeCutInspector(window);
   await expect.poll(() => firstDraftFeatureSnapshot(window)).toEqual(editedFeature);
   const geometryBeforeDelete = await previewGeometrySignature(window);
 
@@ -1083,9 +1094,7 @@ async function qualifyOperationLifecycle(
   expect(sourceId).toBe(sourceBeforeDuplicate.id);
   expect(duplicateId).not.toBe(sourceId);
   expect(duplicateWithoutId).toEqual(sourceWithoutId);
-  // The inspector is the properties panel now, outside the preview region, so
-  // reach for its unambiguous back action rather than a region-scoped Cancel.
-  await window.getByRole('button', { name: 'Back to Cuts' }).click();
+  await closeCutInspector(window);
   await window.getByRole('button', { name: 'Actions for cut 2' }).click();
   await window.getByRole('menuitem', { name: 'Delete' }).click();
   await expect.poll(async () => (await draftFeatureSnapshots(window)).length).toBe(1);
@@ -1311,7 +1320,6 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByRole('button', { name: 'Edit Part Cuts' }).click();
     await window.getByRole('button', { name: /^1\./ }).click();
     await window.getByLabel('Label (optional)').fill('Pasted dado only');
-    await window.getByRole('button', { name: 'Save Cut' }).click();
     await savePartCutsFromHeader(window);
     expect(await window.evaluate(() => JSON.stringify(window.useProjectStore.getState().parts[0].features))).toBe(
       sourceBefore
@@ -1503,7 +1511,6 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByRole('button', { name: 'Move Right' }).click();
     await window.getByRole('button', { name: 'Enlarge Hole' }).click();
     await expect.poll(() => roundPreview.getAttribute('data-geometry-signature')).not.toBe(roundGeometryBefore);
-    await window.getByRole('button', { name: 'Save Cut' }).click();
 
     await window.getByRole('button', { name: '+ Add Cut' }).click();
     await window.getByRole('button', { name: /^Countersink\b/ }).click();
@@ -1513,7 +1520,6 @@ test.describe('part cuts editing lifecycle', () => {
     await fillFraction(window, 'Row Spacing', 0.25);
     await fillFraction(window, 'Column Spacing', 0.5);
     await window.getByLabel('Grid Rotation').fill('23');
-    await window.getByRole('button', { name: 'Save Cut' }).click();
 
     await window.getByRole('button', { name: '+ Add Cut' }).click();
     await window.getByRole('button', { name: /^Counterbore\b/ }).click();
@@ -1521,7 +1527,6 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByLabel('Hole Count').fill('4');
     await fillFraction(window, 'Pattern Radius', 0.5);
     await window.getByLabel('Start Angle').fill('30');
-    await window.getByRole('button', { name: 'Save Cut' }).click();
 
     await window.getByRole('button', { name: '+ Add Cut' }).click();
     await window.getByRole('button', { name: /^Rounded Rectangle\b/ }).click();
@@ -1531,13 +1536,11 @@ test.describe('part cuts editing lifecycle', () => {
     await window.getByRole('button', { name: 'Extend Length' }).click();
     await window.getByRole('button', { name: 'Widen' }).click();
     await expect.poll(() => rectanglePreview.getAttribute('data-geometry-signature')).not.toBe(rectangleGeometryBefore);
-    await window.getByRole('button', { name: 'Save Cut' }).click();
 
     await window.getByRole('button', { name: '+ Add Cut' }).click();
     await window.getByRole('button', { name: /^Rounded Slot\b/ }).click();
     await window.getByRole('button', { name: 'Move Right' }).click();
     await window.getByRole('button', { name: 'Extend Length' }).click();
-    await window.getByRole('button', { name: 'Save Cut' }).click();
     await savePartCutsFromHeader(window);
 
     await queueSavePath(window, projectPath);

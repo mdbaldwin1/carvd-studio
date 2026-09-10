@@ -257,8 +257,15 @@ test.describe('round 9 file transaction ownership and quit', () => {
     expect(
       await running.window.evaluate(() => {
         const cut = window.usePartCutsEditingStore.getState();
+        const part = window.useProjectStore.getState().parts.find((part) => part.id === cut.sourcePartId);
+        // Editing a field writes it into the cut list rather than leaving the
+        // inspector holding it, so inspectorDirty now means only "the panel has
+        // something invalid". The unsaved work shows as a draft that differs
+        // from the part still on file, which is the stronger statement anyway.
         return (
-          window.useProjectStore.getState().parts.some((part) => part.id === cut.sourcePartId) && cut.inspectorDirty
+          !!part &&
+          cut.draftFeatures[0]?.label === 'Unsaved inspector' &&
+          part.features?.[0]?.label !== 'Unsaved inspector'
         );
       })
     ).toBe(true);

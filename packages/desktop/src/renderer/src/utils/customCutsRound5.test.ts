@@ -1,7 +1,7 @@
 import { getPartCutsDraftStatus } from '@renderer/utils/partCutsDraftStatus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { createElement } from 'react';
 import { createTestPart, createTestStock } from '../../../../tests/helpers/factories';
 import type { Part, RectCutFeature } from '../types';
@@ -192,12 +192,12 @@ describe('closure review exact contact, XYZ axes, and hidden offsets', () => {
       // Save lives in the app header now; assert the invalidity it reports.
       expect(getPartCutsDraftStatus(part, [cut]).firstInvalidIndex).toBeGreaterThanOrEqual(0);
       fireEvent.click(screen.getByRole('button', { name: /^1\. Malformed cut/ }));
-      expect.soft(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
-      fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
+      expect
+        .soft(within(screen.getByRole('complementary', { name: 'Cut properties' })).getByRole('alert'))
+        .toBeInTheDocument();
       expect(onDraftFeaturesChange).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: 'Reset invalid offsets to zero' }));
-      expect(screen.getByRole('button', { name: 'Save Cut' })).toBeEnabled();
-      fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
+      expect(within(screen.getByRole('complementary', { name: 'Cut properties' })).queryByRole('alert')).toBeNull();
       const saved = onDraftFeaturesChange.mock.calls[0][0][0] as RectCutFeature;
       expect(saved.placement[coordinate]).toBe(0);
       expect(validateRectCutFeature(saved, part)).toBeNull();

@@ -240,7 +240,6 @@ async function authorRightMitre(window: Page, partId: string, flip: boolean): Pr
   const longPoint = window.getByLabel('Long Point On', { exact: true });
   await longPoint.selectOption(flip ? 'back' : 'front');
   await expect(longPoint).toHaveValue(flip ? 'back' : 'front');
-  await window.getByRole('button', { name: 'Save Cut' }).click();
   await savePartCutsFromHeader(window);
   await expect
     .poll(() => window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
@@ -262,7 +261,6 @@ async function editFirstMitreAngle(window: Page, partId: string, angle: number):
   const before = await preview.getAttribute('data-geometry-signature');
   await window.getByLabel('Mitre Angle', { exact: true }).fill(String(angle));
   await expect.poll(() => preview.getAttribute('data-geometry-signature')).not.toBe(before);
-  await window.getByRole('button', { name: 'Save Cut' }).click();
   await savePartCutsFromHeader(window);
   await expect
     .poll(() => window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
@@ -291,7 +289,6 @@ async function editFirstHoleDiameter(window: Page, partId: string, diameter: num
   const input = window.getByLabel('Hole Diameter', { exact: true });
   await input.fill(String(diameter));
   await input.press('Enter');
-  await window.getByRole('button', { name: 'Save Cut' }).click();
   await savePartCutsFromHeader(window);
   await expect
     .poll(() => window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
@@ -1033,7 +1030,6 @@ test.describe.serial('custom cuts assembly qualification', () => {
     const blindDepth = running.window.getByLabel('Blind Depth', { exact: true });
     await blindDepth.fill('0.25');
     await blindDepth.press('Enter');
-    await running.window.getByRole('button', { name: 'Save Cut' }).click();
     await savePartCutsFromHeader(running.window);
     await expect
       .poll(() =>
@@ -1376,11 +1372,9 @@ test.describe.serial('custom cuts assembly qualification', () => {
     const addedOffset = running.window.getByLabel('Offset Along Face', { exact: true });
     await addedOffset.fill('3');
     await addedOffset.press('Enter');
-    await running.window.getByRole('button', { name: 'Save Cut' }).click();
 
     await running.window.getByRole('button', { name: /^1\. Dirty Hole One/ }).click();
     await running.window.getByLabel('Label (optional)', { exact: true }).fill('Dirty Hole One Edited');
-    await running.window.getByRole('button', { name: 'Save Cut' }).click();
     await running.window.getByRole('checkbox', { name: 'Enable cut 2' }).uncheck();
     await running.window.getByRole('button', { name: 'Actions for cut 3' }).click();
     await running.window.getByRole('menuitem', { name: 'Move Up' }).click();

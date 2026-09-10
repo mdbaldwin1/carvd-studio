@@ -139,7 +139,7 @@ describe('PartCutsWorkspace', () => {
     startCut('Stopped Dado');
     expect(screen.getByText(/For a channel stopped before a side edge, use Mortise/i)).toBeInTheDocument();
   });
-  it('Q10 blocks Save Cut when the candidate completes cumulative blank removal', () => {
+  it('Q10 refuses to write the cut when the candidate completes cumulative blank removal', () => {
     const a = createMortiseFeature({
       id: 'a',
       cutType: 'cutout',
@@ -149,10 +149,12 @@ describe('PartCutsWorkspace', () => {
     const b = { ...a, id: 'b', label: 'Other half', placement: { x: 12, z: 0 } };
     renderWorkspace({ draftFeatures: [a, b] });
     fireEvent.click(screen.getByRole('button', { name: /^2\. Other half/ }));
-    expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    expect(
+      within(screen.getByRole('complementary', { name: 'Cut properties' })).getByRole('alert')
+    ).toBeInTheDocument();
   });
   it.each((['imperial', 'metric'] as const).flatMap((units) => [0.755, 0.74].map((value) => ({ units, value }))))(
-    'Q4 saves and reopens exact $value after untouched focus/blur in $units',
+    'Q4 keeps exact $value through an untouched focus/blur in $units',
     ({ units, value }) => {
       useProjectStore.setState({ units });
       const cut = createMortiseFeature({
@@ -165,11 +167,15 @@ describe('PartCutsWorkspace', () => {
       const input = screen.getByRole('textbox', { name: 'Run Along Blank' });
       fireEvent.focus(input);
       fireEvent.blur(input);
-      fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
-      const saved = lastFeatures(view.props.onDraftFeaturesChange);
-      expect(saved[0].parameters.size.length).toBe(value);
+
+      // Every edit writes straight through, so the guarantee here is that
+      // visiting a field is not an edit: an untouched focus/blur writes
+      // nothing, and the authored precision is never round-tripped through
+      // the field's own display rounding.
+      expect(view.props.onDraftFeaturesChange).not.toHaveBeenCalled();
       view.unmount();
-      renderWorkspace({ units, draftFeatures: saved, selectedFeatureId: cut.id });
+
+      renderWorkspace({ units, draftFeatures: [cut], selectedFeatureId: cut.id });
       fireEvent.click(screen.getByRole('button', { name: /^1\. Precision cut/ }));
       expect(screen.getByRole('textbox', { name: 'Run Along Blank' })).toHaveValue(
         units === 'imperial' ? String(value) : value === 0.755 ? '19.177' : '18.796'
@@ -244,7 +250,11 @@ describe('PartCutsWorkspace', () => {
     renderWorkspace({ part: createTestPart({ length: 10, width: 4, thickness: 1 }) });
     startCut('End Cut');
     fireEvent.change(screen.getByLabelText('Mitre Angle'), { target: { value: '80' } });
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled());
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('complementary', { name: 'Cut properties' })).getByRole('alert')
+      ).toBeInTheDocument()
+    );
   });
   it('gives each feature enabled control an accessible name', () => {
     renderWorkspace({ draftFeatures: [createMortiseFeature()] });
@@ -304,15 +314,16 @@ describe('PartCutsWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
     expect(screen.getByText('Round Cuts')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Round Hole'));
-    expect(screen.getByText('Step 2: Pick a face and place the hole')).toBeInTheDocument();
+    expect(screen.getByText(/Set the face, diameter, depth, angle, placement/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Depth'), { target: { value: 'blind' } });
     fireEvent.change(screen.getByLabelText('Tilt From Square (degrees)'), { target: { value: '15' } });
     fireEvent.change(screen.getByLabelText('Tilt Toward (degrees)'), { target: { value: '90' } });
     fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'linear' } });
     fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '3' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
-    expect(onDraftFeaturesChange).toHaveBeenCalledWith([
+    // The first write is the bare preset, added the moment the type was
+    // picked; the fields land on it one at a time after that.
+    expect(lastFeatures(onDraftFeaturesChange)).toEqual([
       expect.objectContaining({
         kind: 'circular_cut',
         cutType: 'round_hole',
@@ -323,7 +334,7 @@ describe('PartCutsWorkspace', () => {
   });
 
   // This fails if round-cut validation permits unsafe drilling geometry to
-  // reach the Save Cut action (for example by removing pattern/tilt checks).
+  // let an invalid candidate through (for example by removing pattern/tilt checks).
   it.each([
     {
       title: 'a zero-member linear pattern',
@@ -359,7 +370,7 @@ describe('PartCutsWorkspace', () => {
       message: /profile extends beyond/i,
       preset: 'countersink'
     }
-  ])('disables Save Cut for $title', async ({ configure, message, preset }) => {
+  ])('withholds $title from the cut list and says why', async ({ configure, message, preset }) => {
     renderWorkspace();
     if (!preset) startCut('Round Hole');
 
@@ -367,7 +378,9 @@ describe('PartCutsWorkspace', () => {
 
     await waitFor(() => {
       expect(screen.getByText(message)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+      expect(
+        within(screen.getByRole('complementary', { name: 'Cut properties' })).getByRole('alert')
+      ).toBeInTheDocument();
     });
   });
 
@@ -379,7 +392,7 @@ describe('PartCutsWorkspace', () => {
     setMeasurementField('Spacing', '0.01');
     fireEvent.change(screen.getByLabelText('Tilt From Square (degrees)'), { target: { value: '89' } });
 
-    expect(screen.getByRole('button', { name: 'Save Cut' })).toBeEnabled();
+    expect(within(screen.getByRole('complementary', { name: 'Cut properties' })).queryByRole('alert')).toBeNull();
   });
 
   it('preserves dowel relationship metadata while editing a paired hole', () => {
@@ -410,7 +423,6 @@ describe('PartCutsWorkspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^1\./ }));
     setMeasurementField('Hole Diameter', '1/2');
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
     expect(lastFeatures(onDraftFeaturesChange)[0]).toMatchObject({
       parameters: { diameter: 0.5 },
@@ -439,7 +451,6 @@ describe('PartCutsWorkspace', () => {
       expect(screen.getByLabelText('Offset Along Face')).toHaveValue('1/4');
       expect(screen.getByLabelText('Offset Across Face')).toHaveValue('0');
       expect(screen.getByLabelText(field)).toHaveValue(parameter === 'diameter' ? '1/2' : '3 1/4');
-      fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
       expect(lastFeatures(onDraftFeaturesChange)[0]).toEqual(
         expect.objectContaining({
@@ -483,7 +494,6 @@ describe('PartCutsWorkspace', () => {
       expect(screen.getByLabelText('Offset Along Face')).toHaveValue('0');
       expect(screen.getByLabelText('Offset Across Face')).toHaveValue('0');
 
-      fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
       const savedFeature = lastFeatures(onDraftFeaturesChange)[0];
       expect(savedFeature).toMatchObject({
         kind: 'rounded_cut',
@@ -528,7 +538,9 @@ describe('PartCutsWorkspace', () => {
     setMeasurementField('Spacing', '0');
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+      expect(
+        within(screen.getByRole('complementary', { name: 'Cut properties' })).getByRole('alert')
+      ).toBeInTheDocument();
       expect(screen.getByText(/spacing must be greater than zero/i)).toBeInTheDocument();
     });
   });
@@ -577,12 +589,16 @@ describe('PartCutsWorkspace', () => {
         setMeasurementField('Pattern Radius', '12');
       }
     ]
-  ])('disables Save Cut for %s in the real inspector', async (_title, configure) => {
+  ])('withholds %s from the cut list in the real inspector', async (_title, configure) => {
     renderWorkspace();
     startCut('Round Hole');
     configure();
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled());
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('complementary', { name: 'Cut properties' })).getByRole('alert')
+      ).toBeInTheDocument()
+    );
   });
 
   it.each([
@@ -637,7 +653,7 @@ describe('PartCutsWorkspace', () => {
     startCut('Round Hole');
     configure();
 
-    expect(screen.getByRole('button', { name: 'Save Cut' })).toBeEnabled();
+    expect(within(screen.getByRole('complementary', { name: 'Cut properties' })).queryByRole('alert')).toBeNull();
   });
 
   it.each([
@@ -665,12 +681,16 @@ describe('PartCutsWorkspace', () => {
         setMeasurementField('Counterbore Depth', '1/2');
       }
     ]
-  ])('disables Save Cut for %s', async (_title, preset, configure) => {
+  ])('withholds %s from the cut list and says why', async (_title, preset, configure) => {
     renderWorkspace();
     startCut(preset);
     configure();
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled());
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('complementary', { name: 'Cut properties' })).getByRole('alert')
+      ).toBeInTheDocument()
+    );
   });
 
   it('shows dedicated rounded opening controls', () => {
@@ -747,7 +767,6 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByText(/What kind of cut/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('End Cut'));
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
     expect(onDraftFeaturesChange).toHaveBeenCalledWith([
       expect.objectContaining({
@@ -806,9 +825,7 @@ describe('PartCutsWorkspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Mitre 45° on Left End/i }));
 
-    expect(screen.getByText('Edit Cut')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Back to Cuts' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save Cut' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Properties' })).toBeInTheDocument();
     expect(screen.getByLabelText('Long Point On')).toBeInTheDocument();
   });
 
@@ -909,8 +926,6 @@ describe('PartCutsWorkspace', () => {
     fireEvent.click(screen.getByText('Rabbet'));
 
     expect(screen.getByText('Blind only')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
     expect(onDraftFeaturesChange).toHaveBeenCalledWith([
       expect.objectContaining({
@@ -1078,24 +1093,24 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByRole('button', { name: '+ Add Cut' })).toBeInTheDocument();
   });
 
-  it('walks every operation preset into its step-2 editor', () => {
+  it('opens every operation preset into an inspector describing that cut', () => {
     const cases: Array<[string, RegExp]> = [
-      ['End Cut', /Pick the end and set the angle/],
-      ['Corner Notch', /Pick the corner and size the notch/],
-      ['Edge Notch', /Pick the edge and size the notch/],
-      ['Cutout', /Pick the face and place the cutout/],
-      ['Dado', /Pick the face and lay out the dado/],
-      ['Stopped Dado', /Pick the face and lay out the dado/],
-      ['Rabbet', /Pick the edge and size the rabbet/],
-      ['Groove', /Pick the face and lay out the groove/],
-      ['Stopped Groove', /Pick the face and lay out the groove/],
-      ['Mortise', /Pick the face and place the mortise/]
+      ['End Cut', /Set the end, cut style, angle, and direction/],
+      ['Corner Notch', /Set the corner, the notch size, and the depth/],
+      ['Edge Notch', /Set the edge, the notch size, the depth, and the offsets/],
+      ['Cutout', /Set the face, the opening size, the depth, and the placement/],
+      ['Dado', /Set the face, the dado width, and the depth/],
+      ['Stopped Dado', /Set the face, the stopped run, the width, the start offset, and the depth/],
+      ['Rabbet', /Set the edge, the shoulder width, and the depth/],
+      ['Groove', /Set the face, the groove width, and the depth/],
+      ['Stopped Groove', /Set the face, the groove run, the width, the offsets, and the depth/],
+      ['Mortise', /Set the face, the pocket size, the placement, and the depth/]
     ];
 
-    for (const [label, stepTitle] of cases) {
+    for (const [label, hint] of cases) {
       const { unmount } = renderWorkspace();
       startCut(label);
-      expect(screen.getByText(stepTitle)).toBeInTheDocument();
+      expect(screen.getByText(hint)).toBeInTheDocument();
       unmount();
     }
   });
@@ -1106,12 +1121,11 @@ describe('PartCutsWorkspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Target: Top Face/ }));
 
-    expect(screen.getByText('Edit Cut')).toBeInTheDocument();
-    expect(screen.getByText('Editing')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Properties' })).toBeInTheDocument();
+    expect(screen.getByText(/Set the face, the pocket size, the placement, and the depth/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Label (optional)'), { target: { value: 'Tenon pocket' } });
     setMeasurementField('Offset Along Length', '3');
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
     const features = lastFeatures(props.onDraftFeaturesChange);
     expect(features).toHaveLength(1);
@@ -1124,16 +1138,41 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByText('Cuts')).toBeInTheDocument();
   });
 
-  it('cancels the editor back to the cut list', () => {
+  it('adds the cut as soon as its type is picked, with nothing left to confirm', () => {
     const { props } = renderWorkspace();
 
     startCut('Mortise');
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
+    // Picking a type is the add. There is no Save to press and no Cancel to
+    // press instead, so the cut is in the list from this moment.
+    expect(lastFeatures(props.onDraftFeaturesChange)).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: 'Properties' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save Cut' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back to Cuts' })).not.toBeInTheDocument();
+  });
+
+  it('closes the inspector back to the list when the cut is deselected', () => {
+    const feature = createMortiseFeature();
+    const { rerender, props } = renderWorkspace({ draftFeatures: [feature], selectedFeatureId: feature.id });
+
+    fireEvent.click(screen.getByRole('button', { name: /Target: Top Face/ }));
+    expect(screen.getByRole('heading', { name: 'Properties' })).toBeInTheDocument();
+
+    // Escape clears the selection in the store; the inspector follows it,
+    // which is the only way back to the list now that Cancel is gone.
+    rerender(
+      <SidebarProvider>
+        <PartCutsEditorProvider {...props} selectedFeatureId={null}>
+          <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+          <PartCutsWorkspace />
+          <CutProperties />
+        </PartCutsEditorProvider>
+      </SidebarProvider>
+    );
+
+    expect(screen.queryByRole('complementary', { name: 'Cut properties' })).not.toBeInTheDocument();
     expect(screen.getByText('Cuts')).toBeInTheDocument();
-    expect(props.onSelectFeature).toHaveBeenLastCalledWith(null);
     expect(props.onPendingTargetChange).toHaveBeenLastCalledWith(null);
-    expect(props.onDraftFeaturesChange).not.toHaveBeenCalled();
   });
 
   it('toggles a cut enabled state from the list', () => {
@@ -1187,7 +1226,7 @@ describe('PartCutsWorkspace', () => {
     expect(features[1].id).not.toBe('rect-1');
     expect(features[1]).toMatchObject({ cutType: 'mortise' });
     expect(props.onSelectFeature).toHaveBeenCalledWith(features[1].id);
-    expect(screen.getByText('Edit Cut')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Properties' })).toBeInTheDocument();
   });
 
   it('mirrors an end cut to the opposite end', async () => {
@@ -1205,7 +1244,7 @@ describe('PartCutsWorkspace', () => {
       target: { type: 'face', face: 'right_end' },
       label: 'Left mitre (Opposite End)'
     });
-    expect(screen.getByText('Edit Cut')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Properties' })).toBeInTheDocument();
   });
 
   it('mirrors a rect cut across the length', async () => {
@@ -1239,7 +1278,6 @@ describe('PartCutsWorkspace', () => {
     startCut('Corner Notch');
     clickInspectorTarget('Back-Right Corner');
     setMeasurementField('Cross-Cut Width', '1 1/2');
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
     const features = lastFeatures(props.onDraftFeaturesChange);
     expect(features[0]).toMatchObject({
@@ -1260,7 +1298,6 @@ describe('PartCutsWorkspace', () => {
     clickInspectorTarget('Left');
     expect(screen.getByText('Offset Across Width')).toBeInTheDocument();
     setMeasurementField('Offset Across Width', '2');
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
     const features = lastFeatures(props.onDraftFeaturesChange);
     expect(features[0]).toMatchObject({
@@ -1283,7 +1320,6 @@ describe('PartCutsWorkspace', () => {
     clickInspectorTarget('Top-Left Edge');
     setMeasurementField('Shoulder Width', '2');
     setMeasurementField('Blind Depth', '3/8');
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
     const features = lastFeatures(props.onDraftFeaturesChange);
     expect(features[0]).toMatchObject({
@@ -1306,7 +1342,6 @@ describe('PartCutsWorkspace', () => {
     fireEvent.change(screen.getByLabelText('Depth'), { target: { value: 'blind' } });
     expect(screen.getByText('Blind Depth')).toBeInTheDocument();
     setMeasurementField('Blind Depth', '1/2');
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
     const features = lastFeatures(props.onDraftFeaturesChange);
     expect(features[0]).toMatchObject({
@@ -1324,7 +1359,6 @@ describe('PartCutsWorkspace', () => {
     // Editing the run keeps the derived full-length value
     setMeasurementField('Full Board Run', '5');
     setMeasurementField('Groove Width', '1');
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
     const features = lastFeatures(props.onDraftFeaturesChange);
     expect(features[0]).toMatchObject({
@@ -1341,7 +1375,6 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByText(/Stopped dados span the full board width/i)).toBeInTheDocument();
     setMeasurementField('Run Along Blank', '5');
     setMeasurementField('Offset Along Length', '2');
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
     const features = lastFeatures(props.onDraftFeaturesChange);
     expect(features[0]).toMatchObject({
@@ -1358,12 +1391,13 @@ describe('PartCutsWorkspace', () => {
     setMeasurementField('Run Along Blank', '30');
 
     expect(screen.getByText(/runs past the blank/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
+    expect(
+      within(screen.getByRole('complementary', { name: 'Cut properties' })).getByRole('alert')
+    ).toBeInTheDocument();
 
     setMeasurementField('Run Along Blank', '2');
     expect(screen.queryByText(/runs past the blank/i)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
     expect(props.onDraftFeaturesChange).toHaveBeenCalled();
   });
 
@@ -1386,7 +1420,6 @@ describe('PartCutsWorkspace', () => {
     startCut('End Cut');
     clickInspectorTarget('Right End');
     expect(screen.getByText('Resulting Lengths')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
     const features = lastFeatures(props.onDraftFeaturesChange);
     expect(features[0]).toMatchObject({
@@ -1420,7 +1453,6 @@ describe('PartCutsWorkspace', () => {
     fireEvent.click(within(handlesSection).getByRole('button', { name: 'Move Right' }));
     fireEvent.click(within(handlesSection).getByRole('button', { name: 'Move Right' }));
     fireEvent.click(within(handlesSection).getByRole('button', { name: 'Move Left' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
     const features = lastFeatures(props.onDraftFeaturesChange);
     expect(features[0]).toMatchObject({

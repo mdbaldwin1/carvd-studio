@@ -71,7 +71,6 @@ test.describe('round 7 native close and Save As', () => {
     const { window } = running;
     await open();
     await window.getByLabel('Label (optional)', { exact: true }).fill('Session label');
-    await window.getByRole('button', { name: 'Save Cut', exact: true }).click();
     expect(await window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(false);
     expect(await window.evaluate(() => window.usePartCutsEditingStore.getState().inspectorDirty)).toBe(false);
     await closeWindow();

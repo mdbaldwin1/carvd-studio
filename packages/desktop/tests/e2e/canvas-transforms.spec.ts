@@ -212,13 +212,11 @@ test.describe('Canvas transform workflows', () => {
     await running.window.getByRole('button', { name: 'Edit Part Cuts' }).click();
     await running.window.getByRole('button', { name: /^3\./ }).click();
     await running.window.getByLabel('Hole Diameter').fill('0.375');
-    await running.window.getByRole('button', { name: 'Save Cut' }).click();
     // Edit the pasted rectangular operation through the same inspector rather
     // than mutating store data. Its nested size object must remain independent
     // from the original feature after the real copy/paste command.
     await running.window.getByRole('button', { name: /^2\./ }).click();
     await running.window.getByLabel('Run Along Blank').fill('1.25');
-    await running.window.getByRole('button', { name: 'Save Cut' }).click();
     await savePartCutsFromHeader(running.window);
     expect(
       await running.window.evaluate(() => JSON.stringify(window.useProjectStore.getState().parts[0].features))

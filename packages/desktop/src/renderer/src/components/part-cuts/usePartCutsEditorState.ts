@@ -48,7 +48,7 @@ interface PartCutsWorkspaceProps {
   hoveredTarget: PartFeatureTarget | null;
   pendingTarget: PartFeatureTarget | null;
   onSelectFeature: (featureId: string | null) => void;
-  onDraftFeaturesChange: (features: PartFeature[]) => void;
+  onDraftFeaturesChange: (features: PartFeature[], options?: { coalesceKey?: string }) => void;
   onHoveredTargetChange: (target: PartFeatureTarget | null) => void;
   onPendingTargetChange: (target: PartFeatureTarget | null) => void;
   onExit: () => void;
@@ -58,6 +58,22 @@ interface PartCutsWorkspaceProps {
 }
 
 type CutsPanelMode = 'list' | 'add' | 'edit';
+
+/**
+ * A cut's identity, independent of property order.
+ *
+ * buildFeatureFromDraft and a stored feature spell the same cut with their
+ * properties in different orders, so comparing plain JSON.stringify output
+ * reports a change where there is none — which left the inspector and the cut
+ * list writing to each other without end.
+ */
+function featureIdentity(feature: PartFeature): string {
+  return JSON.stringify(feature, (_key, value) =>
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
+      : value
+  );
+}
 
 function reorderFeatures(features: PartFeature[], fromIndex: number, toIndex: number): PartFeature[] {
   if (toIndex < 0 || toIndex >= features.length || fromIndex === toIndex) return features;
@@ -89,6 +105,10 @@ export function usePartCutsEditorState({
   hasUnsavedChanges
 }: PartCutsWorkspaceProps) {
   const [draft, setDraft] = useState<FeatureDraft | null>(null);
+  /** Identity of the cut this inspector last wrote, to recognise its own echo. */
+  const lastWrittenFeature = useRef<string | null>(null);
+  /** Identity of the cut as the list last presented it, to spot an outside change. */
+  const lastSeenFeature = useRef<string | null>(null);
   const [panelMode, setPanelMode] = useState<CutsPanelMode>('list');
   const [showDowelDialog, setShowDowelDialog] = useState(false);
   const workspaceRootRef = useRef<HTMLDivElement | null>(null);
@@ -236,12 +256,22 @@ export function usePartCutsEditorState({
     return map;
   }, [featureConflicts]);
 
+  // Picking a type in the dialog adds the cut. There is no staging step: the
+  // cut is in the list from here on, at the preset's defaults, and the
+  // inspector edits it in place the way the part panel edits a part.
   const handleStartPreset = (preset: OperationPreset) => {
-    setDraft(
-      buildDraftFromPreset(preset, { partLength: part.length, partWidth: part.width, partThickness: part.thickness })
+    const presetDraft = buildDraftFromPreset(preset, {
+      partLength: part.length,
+      partWidth: part.width,
+      partThickness: part.thickness
+    });
+    const feature = buildFeatureFromDraft(
+      presetDraft.mode === 'end_cut' ? normalizeEndCutDraft(presetDraft) : presetDraft
     );
-    setPanelMode('add');
-    onSelectFeature(null);
+    onDraftFeaturesChange([...draftFeatures, feature]);
+    setDraft({ ...presetDraft, featureId: feature.id });
+    setPanelMode('edit');
+    onSelectFeature(feature.id);
   };
 
   const handleBeginAdd = () => {
@@ -257,6 +287,14 @@ export function usePartCutsEditorState({
     onSelectFeature(feature.id);
   };
 
+  /**
+   * Write the open draft into the cut list. The inspector calls this on every
+   * change, so it must be idempotent and must leave the panel alone — closing
+   * the inspector is a selection concern now, not a save one.
+   *
+   * Returns the validation message when the draft cannot be written, which is
+   * how the header's Save reports a half-typed field instead of committing it.
+   */
   const handleSaveDraft = useCallback((): string | null => {
     if (!draft) return null;
     if (draftValidationMessage) return draftValidationMessage;
@@ -272,17 +310,60 @@ export function usePartCutsEditorState({
     // still open. Replacing by id would then match nothing and drop the edit
     // without a word, so re-add a cut whose original is gone rather than
     // silently discarding what the user just typed.
+    // Opening a cut must not count as changing it. The inspector writes on
+    // every render pass now, and a round trip through the draft reorders and
+    // re-spells the feature without altering it, so compare before writing or
+    // simply selecting a cut would spend an undo step.
+    if (originalFeature && featureIdentity(nextFeature) === featureIdentity(originalFeature)) {
+      lastWrittenFeature.current = featureIdentity(originalFeature);
+      return null;
+    }
+    lastWrittenFeature.current = featureIdentity(nextFeature);
+
     const nextFeatures =
       draft.featureId && originalFeature
         ? draftFeatures.map((feature) => (feature.id === draft.featureId ? nextFeature : feature))
         : [...draftFeatures, nextFeature];
 
-    onDraftFeaturesChange(nextFeatures);
+    // The whole run of edits to one cut is a single undo step, so undo steps
+    // back to the cut as it was before this visit rather than one keystroke.
+    onDraftFeaturesChange(nextFeatures, { coalesceKey: nextFeature.id });
     onSelectFeature(nextFeature.id);
-    setDraft(null);
-    setPanelMode('list');
     return null;
   }, [draft, draftValidationMessage, draftFeatures, onDraftFeaturesChange, onSelectFeature]);
+
+  // The inspector and the cut list keep each other in step, in that order of
+  // priority. Both directions have to live in one effect: as two, the write
+  // would run first on the pass after an undo and put the stale draft straight
+  // back, so undo did nothing at all while a cut was open.
+  useEffect(() => {
+    if (!draft) return;
+    const feature = draft.featureId ? draftFeatures.find((candidate) => candidate.id === draft.featureId) : undefined;
+
+    // The list moved to something the inspector did not put there -- an undo,
+    // a redo, a nudge, a mirror. That wins over what the panel is holding, so
+    // adopt it and write nothing this pass. It has to be an actual transition
+    // of the list and not merely "the list disagrees with me": a list that
+    // never changes means nobody is accepting the writes, which is not the
+    // same as somebody else making one.
+    if (feature) {
+      const current = featureIdentity(feature);
+      const previous = lastSeenFeature.current;
+      lastSeenFeature.current = current;
+      if (previous !== null && current !== previous && current !== lastWrittenFeature.current) {
+        lastWrittenFeature.current = current;
+        setDraft(buildDraftFromFeature(feature, part));
+        return;
+      }
+    }
+
+    // Otherwise every inspector change writes straight through. Invalid input
+    // is held back rather than committed: the inspector states the reason and
+    // the list keeps the last good values, which is also what stops a
+    // half-typed dimension from reaching the CSG preview.
+    if (draftValidationMessage) return;
+    handleSaveDraft();
+  }, [draft, draftFeatures, draftValidationMessage, handleSaveDraft, part]);
 
   const originalInspectorFeature = draft?.featureId
     ? draftFeatures.find((feature) => feature.id === draft.featureId)
@@ -349,6 +430,28 @@ export function usePartCutsEditorState({
     });
   };
 
+  // With no dismiss button of its own, the inspector follows the selection the
+  // way the part panel does: deselecting (Escape, or the preview's empty space)
+  // closes it, and selecting a different cut retargets it.
+  const lastSelectedFeatureId = useRef(selectedFeatureId);
+  useEffect(() => {
+    const previous = lastSelectedFeatureId.current;
+    lastSelectedFeatureId.current = selectedFeatureId;
+    // Only the selection *moving* means anything here. Reading the current
+    // value instead would close the inspector on behalf of any caller that
+    // does not drive selection at all, rather than only when the user
+    // deselects.
+    if (panelMode !== 'edit' || previous === selectedFeatureId) return;
+    if (selectedFeatureId === null) {
+      setDraft(null);
+      setPanelMode('list');
+      onPendingTargetChange(null);
+      return;
+    }
+    const feature = draftFeatures.find((candidate) => candidate.id === selectedFeatureId);
+    if (feature && draft?.featureId !== selectedFeatureId) setDraft(buildDraftFromFeature(feature, part));
+  }, [panelMode, selectedFeatureId, draft?.featureId, draftFeatures, part, onPendingTargetChange]);
+
   const inspectorDraft = panelMode === 'list' ? null : draft;
   const isChoosingCutType = panelMode === 'add' && !draft;
   const isEditingDraft = !!inspectorDraft;
@@ -375,7 +478,13 @@ export function usePartCutsEditorState({
     );
   };
 
-  const handleCancelEditor = () => {
+  /**
+   * Close the inspector and go back to the list. No cut is discarded — by the
+   * time an inspector is open its cut is already in the list — so this is
+   * dismissal, not cancellation. Dismissing the type dialog lands here too,
+   * before any cut exists.
+   */
+  const handleCloseInspector = () => {
     setDraft(null);
     setPanelMode('list');
     onSelectFeature(null);
@@ -465,7 +574,7 @@ export function usePartCutsEditorState({
     isChoosingCutType,
     isEditingDraft,
     handlePreviewTargetActivation,
-    handleCancelEditor,
+    handleCloseInspector,
     selectedFeatureSummary,
     selectedFeatureTargetLabel,
     inspectorIsRabbet,

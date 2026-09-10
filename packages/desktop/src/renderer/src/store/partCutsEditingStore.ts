@@ -16,6 +16,8 @@ interface PartCutsEditingState {
   draftFeatures: PartFeature[];
   draftHistory: PartFeature[][];
   draftFuture: PartFeature[][];
+  /** Which cut the newest history entry belongs to, for collapsing edit runs. */
+  draftCoalesceKey: string | null;
   selectedFeatureId: string | null;
   hoveredTarget: PartFeatureTarget | null;
   pendingTarget: PartFeatureTarget | null;
@@ -25,7 +27,7 @@ interface PartCutsEditingState {
   registerInspector: (dirty: boolean, commit: (() => string | null) | null) => void;
 
   startEditingPartCuts: (partId: string, partName: string, features?: PartFeature[]) => void;
-  setDraftFeatures: (features: PartFeature[]) => void;
+  setDraftFeatures: (features: PartFeature[], options?: { coalesceKey?: string }) => void;
   resetDraftFeatures: (features?: PartFeature[]) => void;
   selectFeature: (featureId: string | null) => void;
   setHoveredTarget: (target: PartFeatureTarget | null) => void;
@@ -48,6 +50,7 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
   draftFeatures: [],
   draftHistory: [],
   draftFuture: [],
+  draftCoalesceKey: null,
   selectedFeatureId: null,
   hoveredTarget: null,
   pendingTarget: null,
@@ -66,6 +69,7 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
       draftFeatures,
       draftHistory: [],
       draftFuture: [],
+      draftCoalesceKey: null,
       selectedFeatureId: draftFeatures[0]?.id ?? null,
       hoveredTarget: null,
       pendingTarget: null,
@@ -75,7 +79,7 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
     });
   },
 
-  setDraftFeatures: (features) =>
+  setDraftFeatures: (features, options) =>
     set((state) => {
       const draftFeatures = clonePartFeatures(features);
       if (featuresEqual(draftFeatures, state.draftFeatures)) {
@@ -85,10 +89,17 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
         ? draftFeatures.some((feature) => feature.id === state.selectedFeatureId)
         : false;
 
+      // A run of edits to one cut collapses into a single undo step: the first
+      // change pushes history and the rest fold into it. The inspector writes
+      // straight through on every keystroke, so without this a typed dimension
+      // would spend the 50-entry budget a character at a time and push the
+      // cut's own creation off the end of the stack.
+      const coalesce = !!options?.coalesceKey && options.coalesceKey === state.draftCoalesceKey;
+
       return {
         draftFeatures,
-        // Each committed draft change is an undo step within the session.
-        draftHistory: [...state.draftHistory.slice(-49), state.draftFeatures],
+        draftHistory: coalesce ? state.draftHistory : [...state.draftHistory.slice(-49), state.draftFeatures],
+        draftCoalesceKey: options?.coalesceKey ?? null,
         draftFuture: [],
         selectedFeatureId: selectedStillExists ? state.selectedFeatureId : (draftFeatures[0]?.id ?? null)
       };
@@ -102,6 +113,7 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
         draftFeatures: clonePartFeatures(previous),
         draftHistory: state.draftHistory.slice(0, -1),
         draftFuture: [state.draftFeatures, ...state.draftFuture],
+        draftCoalesceKey: null,
         selectedFeatureId: previous[0]?.id ?? null
       };
     }),
@@ -114,6 +126,7 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
         draftFeatures: clonePartFeatures(next),
         draftHistory: [...state.draftHistory, state.draftFeatures],
         draftFuture: state.draftFuture.slice(1),
+        draftCoalesceKey: null,
         selectedFeatureId: next[0]?.id ?? null
       };
     }),
@@ -127,6 +140,7 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
       draftFeatures,
       draftHistory: [],
       draftFuture: [],
+      draftCoalesceKey: null,
       selectedFeatureId: draftFeatures[0]?.id ?? null,
       hoveredTarget: null,
       pendingTarget: null
@@ -158,6 +172,7 @@ export const usePartCutsEditingStore = create<PartCutsEditingState>((set, get) =
       draftFeatures: [],
       draftHistory: [],
       draftFuture: [],
+      draftCoalesceKey: null,
       selectedFeatureId: null,
       hoveredTarget: null,
       pendingTarget: null,

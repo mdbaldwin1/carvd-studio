@@ -19,16 +19,16 @@ import { cn } from '@renderer/lib/utils';
  * dialog like New Project rather than as a third state of a side panel.
  */
 export function AddCutDialog() {
-  const { panelMode, draft, handleStartPreset, handleCancelEditor, setShowDowelDialog, hasUnsavedChanges } =
+  const { panelMode, draft, handleStartPreset, handleCloseInspector, setShowDowelDialog, hasUnsavedChanges } =
     usePartCutsEditor();
   const open = panelMode === 'add' && !draft;
 
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? undefined : handleCancelEditor())}>
+    <Dialog open={open} onOpenChange={(next) => (next ? undefined : handleCloseInspector())}>
       {/* Same shell as the app's other dialogs: a fixed width with a viewport
           cap, a header that owns its padding, and a body that supplies its own
           and does the scrolling. */}
-      <DialogContent className="w-[620px] max-w-[94vw]" onClose={handleCancelEditor}>
+      <DialogContent className="w-[620px] max-w-[94vw]" onClose={handleCloseInspector}>
         <DialogHeader>
           <div>
             <DialogTitle>What kind of cut?</DialogTitle>
@@ -36,7 +36,7 @@ export function AddCutDialog() {
               Pick the cut type first. The next step walks through the target and measurements.
             </DialogDescription>
           </div>
-          <DialogClose onClose={handleCancelEditor} />
+          <DialogClose onClose={handleCloseInspector} />
         </DialogHeader>
         {/* A long chooser: cap the body so the dialog does not fill the
             window, and let it scroll rather than the page. */}
