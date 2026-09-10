@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
+import { CutProperties } from '@renderer/components/part-cuts/CutProperties';
 import { PartCutsEditorProvider } from './PartCutsEditorContext';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
 import { usePartCutsEditing } from '../../hooks/usePartCutsEditing';
@@ -50,6 +51,7 @@ function Harness() {
           >
             <CutsSection isCollapsed={false} onOpenChange={() => {}} />
             <PartCutsWorkspace />
+            <CutProperties />
           </PartCutsEditorProvider>
         </SidebarProvider>
       )}

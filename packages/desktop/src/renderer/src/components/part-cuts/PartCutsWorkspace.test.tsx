@@ -13,6 +13,7 @@ import { buildDraftFromFeature } from '@renderer/components/part-features/partFe
 import { getEditableHandleOverlay } from './PartCutsPreviewCanvas';
 import { getPartCutsDraftStatus } from '@renderer/utils/partCutsDraftStatus';
 import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
+import { CutProperties } from '@renderer/components/part-cuts/CutProperties';
 import { PartCutsEditorProvider } from './PartCutsEditorContext';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
 vi.unmock('three');
@@ -41,6 +42,7 @@ function renderWorkspace(overrides: Partial<WorkspaceProps> = {}) {
       <PartCutsEditorProvider {...props}>
         <CutsSection isCollapsed={false} onOpenChange={() => {}} />
         <PartCutsWorkspace />
+        <CutProperties />
       </PartCutsEditorProvider>
     </SidebarProvider>
   );
@@ -702,6 +704,7 @@ describe('PartCutsWorkspace', () => {
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
           <PartCutsWorkspace />
+          <CutProperties />
         </PartCutsEditorProvider>
       </SidebarProvider>
     );
@@ -734,6 +737,7 @@ describe('PartCutsWorkspace', () => {
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
           <PartCutsWorkspace />
+          <CutProperties />
         </PartCutsEditorProvider>
       </SidebarProvider>
     );
@@ -795,6 +799,7 @@ describe('PartCutsWorkspace', () => {
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
           <PartCutsWorkspace />
+          <CutProperties />
         </PartCutsEditorProvider>
       </SidebarProvider>
     );
@@ -827,6 +832,7 @@ describe('PartCutsWorkspace', () => {
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
           <PartCutsWorkspace />
+          <CutProperties />
         </PartCutsEditorProvider>
       </SidebarProvider>
     );
@@ -862,6 +868,7 @@ describe('PartCutsWorkspace', () => {
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
           <PartCutsWorkspace />
+          <CutProperties />
         </PartCutsEditorProvider>
       </SidebarProvider>
     );
@@ -893,6 +900,7 @@ describe('PartCutsWorkspace', () => {
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
           <PartCutsWorkspace />
+          <CutProperties />
         </PartCutsEditorProvider>
       </SidebarProvider>
     );
@@ -933,6 +941,7 @@ describe('PartCutsWorkspace', () => {
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
           <PartCutsWorkspace />
+          <CutProperties />
         </PartCutsEditorProvider>
       </SidebarProvider>
     );
@@ -965,6 +974,7 @@ describe('PartCutsWorkspace', () => {
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
           <PartCutsWorkspace />
+          <CutProperties />
         </PartCutsEditorProvider>
       </SidebarProvider>
     );
@@ -1027,6 +1037,7 @@ describe('PartCutsWorkspace', () => {
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
           <PartCutsWorkspace />
+          <CutProperties />
         </PartCutsEditorProvider>
       </SidebarProvider>
     );
@@ -1055,6 +1066,7 @@ describe('PartCutsWorkspace', () => {
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
           <PartCutsWorkspace />
+          <CutProperties />
         </PartCutsEditorProvider>
       </SidebarProvider>
     );

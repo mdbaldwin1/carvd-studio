@@ -20,6 +20,7 @@ import { getPartFeatureConflicts } from './partFeatureConflicts';
 import { useProjectStore, validatePartsForCutList } from '../store/projectStore';
 import { usePartCutsEditing } from '../hooks/usePartCutsEditing';
 import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
+import { CutProperties } from '@renderer/components/part-cuts/CutProperties';
 import { PartCutsEditorProvider } from '@renderer/components/part-cuts/PartCutsEditorContext';
 import { PartCutsWorkspace } from '../components/part-cuts/PartCutsWorkspace';
 
@@ -213,7 +214,8 @@ describe('closure review disconnected stock and pattern performance', () => {
             onSave: vi.fn()
           },
           createElement(CutsSection, { isCollapsed: false, onOpenChange: () => {} }),
-          createElement(PartCutsWorkspace)
+          createElement(PartCutsWorkspace),
+          createElement(CutProperties)
         )
       )
     );

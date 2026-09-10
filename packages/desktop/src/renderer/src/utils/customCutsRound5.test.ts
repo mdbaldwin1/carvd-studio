@@ -18,6 +18,7 @@ import {
 import { validatePartsForCutList } from '../store/projectStore';
 import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
 import { SidebarProvider } from '@renderer/components/ui/sidebar';
+import { CutProperties } from '@renderer/components/part-cuts/CutProperties';
 import { PartCutsEditorProvider } from '@renderer/components/part-cuts/PartCutsEditorContext';
 import { PartCutsWorkspace } from '../components/part-cuts/PartCutsWorkspace';
 
@@ -183,7 +184,8 @@ describe('closure review exact contact, XYZ axes, and hidden offsets', () => {
               onSave: vi.fn()
             },
             createElement(CutsSection, { isCollapsed: false, onOpenChange: () => {} }),
-            createElement(PartCutsWorkspace)
+            createElement(PartCutsWorkspace),
+            createElement(CutProperties)
           )
         )
       );

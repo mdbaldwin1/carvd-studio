@@ -18,6 +18,7 @@ import { getPartFeatureConflicts } from './partFeatureConflicts';
 import { useProjectStore, validatePartsForCutList } from '../store/projectStore';
 import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
 import { SidebarProvider } from '@renderer/components/ui/sidebar';
+import { CutProperties } from '@renderer/components/part-cuts/CutProperties';
 import { PartCutsEditorProvider } from '@renderer/components/part-cuts/PartCutsEditorContext';
 import { PartCutsWorkspace } from '../components/part-cuts/PartCutsWorkspace';
 import { usePartCutsEditing } from '../hooks/usePartCutsEditing';
@@ -142,7 +143,8 @@ describe('independent review round 3', () => {
               onSave: vi.fn()
             },
             createElement(CutsSection, { isCollapsed: false, onOpenChange: () => {} }),
-            createElement(PartCutsWorkspace)
+            createElement(PartCutsWorkspace),
+            createElement(CutProperties)
           )
         )
       );

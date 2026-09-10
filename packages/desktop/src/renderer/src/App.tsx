@@ -1031,9 +1031,7 @@ function App() {
                     onShowLicenseModal={() => setShowLicenseModal(true)}
                   />
                   <PartCutsWorkspace />
-                  {/* The selected cut's fields still live in the workspace's
-                      own panel. Rendering the part's PropertiesPanel here too
-                      would show its saved cuts beside the draft being edited. */}
+                  <PropertiesPanel />
                 </PartCutsEditorProvider>
               ) : (
                 <>

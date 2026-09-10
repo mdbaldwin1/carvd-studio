@@ -1083,10 +1083,9 @@ async function qualifyOperationLifecycle(
   expect(sourceId).toBe(sourceBeforeDuplicate.id);
   expect(duplicateId).not.toBe(sourceId);
   expect(duplicateWithoutId).toEqual(sourceWithoutId);
-  await window
-    .getByLabel(/^Part cuts for /)
-    .getByRole('button', { name: 'Cancel' })
-    .click();
+  // The inspector is the properties panel now, outside the preview region, so
+  // reach for its unambiguous back action rather than a region-scoped Cancel.
+  await window.getByRole('button', { name: 'Back to Cuts' }).click();
   await window.getByRole('button', { name: 'Actions for cut 2' }).click();
   await window.getByRole('menuitem', { name: 'Delete' }).click();
   await expect.poll(async () => (await draftFeatureSnapshots(window)).length).toBe(1);

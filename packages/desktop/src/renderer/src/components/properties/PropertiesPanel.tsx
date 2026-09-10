@@ -13,6 +13,7 @@ import { useStockLibrary } from '@renderer/hooks/useStockLibrary';
 import { useAssemblyEditingStore } from '@renderer/store/assemblyEditingStore';
 import { useCameraStore } from '@renderer/store/cameraStore';
 import { useLicenseStore } from '@renderer/store/licenseStore';
+import { CutProperties } from '@renderer/components/part-cuts/CutProperties';
 import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { useProjectStore } from '@renderer/store/projectStore';
 import { useWorkspaceSceneGraph } from '@renderer/interaction/useWorkspaceSceneGraph';
@@ -40,6 +41,7 @@ export function PropertiesPanel() {
   const addProjectStock = useProjectStore((s) => s.addStock);
   const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
+  const isEditingPartCuts = usePartCutsEditingStore((s) => s.isEditingPartCuts);
   const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const groups = useProjectStore((s) => s.groups);
   const units = useProjectStore((s) => s.units);
@@ -178,6 +180,13 @@ export function PropertiesPanel() {
       removeFromGroup(selectedGroupIds, 'group');
     }
   };
+
+  // Editing a part's cuts: the panel describes the selected cut, not the part
+  // it belongs to. Showing the part here would put its saved cuts beside the
+  // draft being edited.
+  if (isEditingPartCuts) {
+    return <CutProperties />;
+  }
 
   // No selection at all
   if (selectedPartIds.length === 0 && selectedGroupIds.length === 0) {
