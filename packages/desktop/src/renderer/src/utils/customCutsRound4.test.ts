@@ -1,3 +1,5 @@
+import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
+import { SidebarProvider } from '@renderer/components/ui/sidebar';
 import { getPartCutsDraftStatus } from '@renderer/utils/partCutsDraftStatus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
@@ -18,6 +20,7 @@ import { getPartFeatureConflicts } from './partFeatureConflicts';
 import { useProjectStore, validatePartsForCutList } from '../store/projectStore';
 import { usePartCutsEditing } from '../hooks/usePartCutsEditing';
 import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
+import { PartCutsEditorProvider } from '@renderer/components/part-cuts/PartCutsEditorContext';
 import { PartCutsWorkspace } from '../components/part-cuts/PartCutsWorkspace';
 
 vi.unmock('three');
@@ -189,27 +192,36 @@ describe('closure review disconnected stock and pattern performance', () => {
     expect.soft(useProjectStore.getState().parts[0].features).toEqual([]);
     hook.unmount();
     render(
-      createElement(PartCutsWorkspace, {
-        part,
-        draftFeatures: [cut],
-        units: 'imperial',
-        selectedFeatureId: null,
-        hoveredTarget: null,
-        pendingTarget: null,
-        hasUnsavedChanges: true,
-        onSelectFeature: vi.fn(),
-        onDraftFeaturesChange: vi.fn(),
-        onHoveredTargetChange: vi.fn(),
-        onPendingTargetChange: vi.fn(),
-        onExit: vi.fn(),
-        onSave: vi.fn()
-      })
+      createElement(
+        SidebarProvider,
+        null,
+        createElement(
+          PartCutsEditorProvider,
+          {
+            part,
+            draftFeatures: [cut],
+            units: 'imperial',
+            selectedFeatureId: null,
+            hoveredTarget: null,
+            pendingTarget: null,
+            hasUnsavedChanges: true,
+            onSelectFeature: vi.fn(),
+            onDraftFeaturesChange: vi.fn(),
+            onHoveredTargetChange: vi.fn(),
+            onPendingTargetChange: vi.fn(),
+            onExit: vi.fn(),
+            onSave: vi.fn()
+          },
+          createElement(CutsSection, { isCollapsed: false, onOpenChange: () => {} }),
+          createElement(PartCutsWorkspace)
+        )
+      )
     );
     // Save lives in the app header now; assert the invalidity it reports.
     expect.soft(getPartCutsDraftStatus(part, [cut]).firstInvalidIndex).toBeGreaterThanOrEqual(0);
     fireEvent.click(screen.getByRole('button', { name: /^1\. Malformed opening/ }));
     expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
-    expect(screen.getByRole('alert')).toHaveTextContent(/finite|valid number/i);
+    expect(screen.getAllByRole('alert').at(-1)).toHaveTextContent(/finite|valid number/i);
   });
   it.each([1, 8])(
     'F builds a cold %s-row compound grid within an interactive budget with exact stock',

@@ -16,6 +16,9 @@ import { validateRectCutFeature } from './rectCutUtils';
 import { validateRoundedCut } from './roundCutUtils';
 import { getPartFeatureConflicts } from './partFeatureConflicts';
 import { useProjectStore, validatePartsForCutList } from '../store/projectStore';
+import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
+import { SidebarProvider } from '@renderer/components/ui/sidebar';
+import { PartCutsEditorProvider } from '@renderer/components/part-cuts/PartCutsEditorContext';
 import { PartCutsWorkspace } from '../components/part-cuts/PartCutsWorkspace';
 import { usePartCutsEditing } from '../hooks/usePartCutsEditing';
 import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
@@ -118,27 +121,36 @@ describe('independent review round 3', () => {
       expect.soft(useProjectStore.getState().parts[0].features).toEqual([]);
       hook.unmount();
       render(
-        createElement(PartCutsWorkspace, {
-          part: original,
-          draftFeatures: part.features!,
-          units: 'imperial',
-          selectedFeatureId: null,
-          hoveredTarget: null,
-          pendingTarget: null,
-          hasUnsavedChanges: true,
-          onSelectFeature: vi.fn(),
-          onDraftFeaturesChange: vi.fn(),
-          onHoveredTargetChange: vi.fn(),
-          onPendingTargetChange: vi.fn(),
-          onExit: vi.fn(),
-          onSave: vi.fn()
-        })
+        createElement(
+          SidebarProvider,
+          null,
+          createElement(
+            PartCutsEditorProvider,
+            {
+              part: original,
+              draftFeatures: part.features!,
+              units: 'imperial',
+              selectedFeatureId: null,
+              hoveredTarget: null,
+              pendingTarget: null,
+              hasUnsavedChanges: true,
+              onSelectFeature: vi.fn(),
+              onDraftFeaturesChange: vi.fn(),
+              onHoveredTargetChange: vi.fn(),
+              onPendingTargetChange: vi.fn(),
+              onExit: vi.fn(),
+              onSave: vi.fn()
+            },
+            createElement(CutsSection, { isCollapsed: false, onOpenChange: () => {} }),
+            createElement(PartCutsWorkspace)
+          )
+        )
       );
       // Save lives in the app header now; assert the invalidity it reports.
       expect.soft(getPartCutsDraftStatus(original, part.features!).firstInvalidIndex).toBeGreaterThanOrEqual(0);
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${part.features!.length}\\. ${last.label}`) }));
       expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
-      expect(screen.getByRole('alert')).toHaveTextContent(
+      expect(screen.getAllByRole('alert').at(-1)).toHaveTextContent(
         kind === 'no-material' ? /entire blank/ : /remaining material/
       );
     }

@@ -1,6 +1,9 @@
+import { SidebarProvider } from '@renderer/components/ui/sidebar';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createTestPart } from '../../../../../tests/helpers/factories';
+import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
+import { PartCutsEditorProvider } from './PartCutsEditorContext';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
 import { usePartCutsEditing } from '../../hooks/usePartCutsEditing';
 import { usePartCutsEditingStore } from '../../store/partCutsEditingStore';
@@ -29,21 +32,26 @@ function Harness() {
       <output aria-label="Unsaved">{String(session.hasUnsavedChanges)}</output>
       <output aria-label="Exit prompt">{String(session.showExitDialog)}</output>
       {session.isEditingPartCuts && session.sourcePart && (
-        <PartCutsWorkspace
-          part={session.sourcePart}
-          draftFeatures={session.draftFeatures}
-          units="imperial"
-          selectedFeatureId={session.selectedFeatureId}
-          hoveredTarget={session.hoveredTarget}
-          pendingTarget={session.pendingTarget}
-          hasUnsavedChanges={session.hasUnsavedChanges}
-          onSelectFeature={session.selectFeature}
-          onDraftFeaturesChange={session.setDraftFeatures}
-          onHoveredTargetChange={session.setHoveredTarget}
-          onPendingTargetChange={session.setPendingTarget}
-          onExit={session.requestExit}
-          onSave={session.saveAndExit}
-        />
+        <SidebarProvider>
+          <PartCutsEditorProvider
+            part={session.sourcePart}
+            draftFeatures={session.draftFeatures}
+            units="imperial"
+            selectedFeatureId={session.selectedFeatureId}
+            hoveredTarget={session.hoveredTarget}
+            pendingTarget={session.pendingTarget}
+            hasUnsavedChanges={session.hasUnsavedChanges}
+            onSelectFeature={session.selectFeature}
+            onDraftFeaturesChange={session.setDraftFeatures}
+            onHoveredTargetChange={session.setHoveredTarget}
+            onPendingTargetChange={session.setPendingTarget}
+            onExit={session.requestExit}
+            onSave={session.saveAndExit}
+          >
+            <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+            <PartCutsWorkspace />
+          </PartCutsEditorProvider>
+        </SidebarProvider>
       )}
     </>
   );

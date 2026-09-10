@@ -1094,6 +1094,7 @@ async function qualifyOperationLifecycle(
 
   await window.getByRole('button', { name: 'Actions for cut 1' }).click();
   await window.getByRole('menuitem', { name: 'Delete' }).click();
+  await expect.poll(() => firstDraftFeatureSnapshot(window)).toBeNull();
   await expect(window.getByText(scenario.edited.label)).toHaveCount(0);
   await expect.poll(() => firstDraftFeatureSnapshot(window)).toBeNull();
   const geometryAfterDelete = await previewGeometrySignature(window);

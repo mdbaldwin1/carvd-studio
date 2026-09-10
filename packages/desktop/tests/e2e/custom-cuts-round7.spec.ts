@@ -162,7 +162,7 @@ test.describe('round 7 native close and Save As', () => {
       const invalid = path.join(userDataDir, `${route}-invalid.carvd`);
       await queueSavePath(window, invalid);
       await saveAs();
-      await expect(window.getByRole('alert')).toContainText(/diameter|edge|face/i);
+      await expect(window.getByRole('alert').last()).toContainText(/diameter|edge|face/i);
       expect(fs.existsSync(invalid)).toBe(false);
       expect(await window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts)).toBe(true);
     });

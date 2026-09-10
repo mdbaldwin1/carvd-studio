@@ -6,9 +6,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AddAssemblyModal } from '@renderer/components/assembly/AddAssemblyModal';
 import { AddStockModal } from '@renderer/components/stock/AddStockModal';
 import { EditStockModal } from '@renderer/components/stock/EditStockModal';
+import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { AssembliesSection } from '@renderer/components/layout/sidebar/AssembliesSection';
 import { PartsSection } from '@renderer/components/layout/sidebar/PartsSection';
 import { StockSection } from '@renderer/components/layout/sidebar/StockSection';
+import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
 import { STOCK_COLORS } from '@renderer/constants';
 import { useAssemblyLibrary } from '@renderer/hooks/useAssemblyLibrary';
 import { useStockLibrary } from '@renderer/hooks/useStockLibrary';
@@ -37,6 +39,7 @@ export function AppSidebar({
   const projectAssemblies = useProjectStore((s) => s.assemblies);
   const units = useProjectStore((s) => s.units);
   const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
+  const isEditingPartCuts = usePartCutsEditingStore((s) => s.isEditingPartCuts);
   const licenseMode = useLicenseStore((s) => s.licenseMode);
   const canUseAssemblies = getFeatureLimits(licenseMode).canUseAssemblies;
   const addPart = useProjectStore((s) => s.addPart);
@@ -191,6 +194,21 @@ export function AppSidebar({
     },
     [requestDeleteParts]
   );
+
+  // Editing a part's cuts replaces the project's collections with that part's
+  // cut list, the same way assembly editing relabels the stock section.
+  if (isEditingPartCuts) {
+    return (
+      <SidebarShell className="sidebar">
+        <SidebarContent>
+          <CutsSection
+            isCollapsed={!!collapsedSections.cuts}
+            onOpenChange={(open) => setCollapsedSections((prev) => ({ ...prev, cuts: !open }))}
+          />
+        </SidebarContent>
+      </SidebarShell>
+    );
+  }
 
   return (
     <SidebarShell className="sidebar">

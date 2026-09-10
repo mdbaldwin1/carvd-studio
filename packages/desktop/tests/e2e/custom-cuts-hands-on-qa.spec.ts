@@ -313,7 +313,7 @@ test.describe('hands-on custom cuts qualification', () => {
     // The right 45° Back-long mitre removes the Front face beyond x=2 in
     // on this 24 × 10 blank. x=9 was never a physically valid hole location.
     await expect(window.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
-    await expect(window.getByRole('alert')).toContainText('remaining material');
+    await expect(window.getByRole('alert').last()).toContainText('remaining material');
     await fillMeasurement(window, 'Offset Along Face', '25.4');
     await saveCut(window);
     await savePartCutsFromHeader(window);
@@ -649,7 +649,7 @@ test.describe('hands-on custom cuts qualification', () => {
     // The right 15°/5° Back-long compound leaves only 77.2794 inches
     // at this pocket's front-bottom corner; [76, 78] breaks out of stock.
     await expect(window.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
-    await expect(window.getByRole('alert')).toContainText('remaining material');
+    await expect(window.getByRole('alert').last()).toContainText('remaining material');
     await fillMeasurement(window, 'Offset Along Length', '74');
     await saveCut(window);
     await expect(window.getByRole('checkbox', { name: /^Enable cut / })).toHaveCount(21);

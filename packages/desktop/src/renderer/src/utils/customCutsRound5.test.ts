@@ -16,6 +16,9 @@ import {
   normalizeRectCutDraft
 } from '../components/part-features/partFeatureEditorState';
 import { validatePartsForCutList } from '../store/projectStore';
+import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
+import { SidebarProvider } from '@renderer/components/ui/sidebar';
+import { PartCutsEditorProvider } from '@renderer/components/part-cuts/PartCutsEditorContext';
 import { PartCutsWorkspace } from '../components/part-cuts/PartCutsWorkspace';
 
 vi.unmock('three');
@@ -159,21 +162,30 @@ describe('closure review exact contact, XYZ axes, and hidden offsets', () => {
         .toEqual(expect.stringMatching(/finite|valid number/i));
       const onDraftFeaturesChange = vi.fn();
       render(
-        createElement(PartCutsWorkspace, {
-          part,
-          draftFeatures: [cut],
-          units: 'imperial',
-          selectedFeatureId: null,
-          hoveredTarget: null,
-          pendingTarget: null,
-          hasUnsavedChanges: true,
-          onSelectFeature: vi.fn(),
-          onDraftFeaturesChange,
-          onHoveredTargetChange: vi.fn(),
-          onPendingTargetChange: vi.fn(),
-          onExit: vi.fn(),
-          onSave: vi.fn()
-        })
+        createElement(
+          SidebarProvider,
+          null,
+          createElement(
+            PartCutsEditorProvider,
+            {
+              part,
+              draftFeatures: [cut],
+              units: 'imperial',
+              selectedFeatureId: null,
+              hoveredTarget: null,
+              pendingTarget: null,
+              hasUnsavedChanges: true,
+              onSelectFeature: vi.fn(),
+              onDraftFeaturesChange,
+              onHoveredTargetChange: vi.fn(),
+              onPendingTargetChange: vi.fn(),
+              onExit: vi.fn(),
+              onSave: vi.fn()
+            },
+            createElement(CutsSection, { isCollapsed: false, onOpenChange: () => {} }),
+            createElement(PartCutsWorkspace)
+          )
+        )
       );
       // Save lives in the app header now; assert the invalidity it reports.
       expect(getPartCutsDraftStatus(part, [cut]).firstInvalidIndex).toBeGreaterThanOrEqual(0);

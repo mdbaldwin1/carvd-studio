@@ -1,3 +1,4 @@
+import { SidebarProvider } from '@renderer/components/ui/sidebar';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ComponentProps } from 'react';
@@ -11,6 +12,8 @@ import { expandCircularCut } from '@renderer/utils/roundCutUtils';
 import { buildDraftFromFeature } from '@renderer/components/part-features/partFeatureEditorState';
 import { getEditableHandleOverlay } from './PartCutsPreviewCanvas';
 import { getPartCutsDraftStatus } from '@renderer/utils/partCutsDraftStatus';
+import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
+import { PartCutsEditorProvider } from './PartCutsEditorContext';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
 vi.unmock('three');
 
@@ -33,7 +36,14 @@ function renderWorkspace(overrides: Partial<WorkspaceProps> = {}) {
     hasUnsavedChanges: false,
     ...overrides
   };
-  const view = render(<PartCutsWorkspace {...props} />);
+  const view = render(
+    <SidebarProvider>
+      <PartCutsEditorProvider {...props}>
+        <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+        <PartCutsWorkspace />
+      </PartCutsEditorProvider>
+    </SidebarProvider>
+  );
   return { ...view, props };
 }
 
@@ -674,21 +684,26 @@ describe('PartCutsWorkspace', () => {
 
   it('shows the cuts list with an add button by default', () => {
     render(
-      <PartCutsWorkspace
-        part={createTestPart({ name: 'Side' })}
-        draftFeatures={[]}
-        units="imperial"
-        selectedFeatureId={null}
-        hoveredTarget={null}
-        pendingTarget={null}
-        onSelectFeature={vi.fn()}
-        onDraftFeaturesChange={vi.fn()}
-        onHoveredTargetChange={vi.fn()}
-        onPendingTargetChange={vi.fn()}
-        onExit={vi.fn()}
-        onSave={vi.fn()}
-        hasUnsavedChanges={false}
-      />
+      <SidebarProvider>
+        <PartCutsEditorProvider
+          part={createTestPart({ name: 'Side' })}
+          draftFeatures={[]}
+          units="imperial"
+          selectedFeatureId={null}
+          hoveredTarget={null}
+          pendingTarget={null}
+          onSelectFeature={vi.fn()}
+          onDraftFeaturesChange={vi.fn()}
+          onHoveredTargetChange={vi.fn()}
+          onPendingTargetChange={vi.fn()}
+          onExit={vi.fn()}
+          onSave={vi.fn()}
+          hasUnsavedChanges={false}
+        >
+          <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+          <PartCutsWorkspace />
+        </PartCutsEditorProvider>
+      </SidebarProvider>
     );
 
     expect(screen.getByText('Cuts')).toBeInTheDocument();
@@ -701,21 +716,26 @@ describe('PartCutsWorkspace', () => {
     const onSelectFeature = vi.fn();
 
     render(
-      <PartCutsWorkspace
-        part={createTestPart({ name: 'Side' })}
-        draftFeatures={[]}
-        units="imperial"
-        selectedFeatureId={null}
-        hoveredTarget={null}
-        pendingTarget={null}
-        onSelectFeature={onSelectFeature}
-        onDraftFeaturesChange={onDraftFeaturesChange}
-        onHoveredTargetChange={vi.fn()}
-        onPendingTargetChange={vi.fn()}
-        onExit={vi.fn()}
-        onSave={vi.fn()}
-        hasUnsavedChanges={false}
-      />
+      <SidebarProvider>
+        <PartCutsEditorProvider
+          part={createTestPart({ name: 'Side' })}
+          draftFeatures={[]}
+          units="imperial"
+          selectedFeatureId={null}
+          hoveredTarget={null}
+          pendingTarget={null}
+          onSelectFeature={onSelectFeature}
+          onDraftFeaturesChange={onDraftFeaturesChange}
+          onHoveredTargetChange={vi.fn()}
+          onPendingTargetChange={vi.fn()}
+          onExit={vi.fn()}
+          onSave={vi.fn()}
+          hasUnsavedChanges={false}
+        >
+          <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+          <PartCutsWorkspace />
+        </PartCutsEditorProvider>
+      </SidebarProvider>
     );
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
@@ -757,21 +777,26 @@ describe('PartCutsWorkspace', () => {
     });
 
     render(
-      <PartCutsWorkspace
-        part={part}
-        draftFeatures={part.features ?? []}
-        units="imperial"
-        selectedFeatureId={null}
-        hoveredTarget={null}
-        pendingTarget={null}
-        onSelectFeature={vi.fn()}
-        onDraftFeaturesChange={vi.fn()}
-        onHoveredTargetChange={vi.fn()}
-        onPendingTargetChange={vi.fn()}
-        onExit={vi.fn()}
-        onSave={vi.fn()}
-        hasUnsavedChanges={true}
-      />
+      <SidebarProvider>
+        <PartCutsEditorProvider
+          part={part}
+          draftFeatures={part.features ?? []}
+          units="imperial"
+          selectedFeatureId={null}
+          hoveredTarget={null}
+          pendingTarget={null}
+          onSelectFeature={vi.fn()}
+          onDraftFeaturesChange={vi.fn()}
+          onHoveredTargetChange={vi.fn()}
+          onPendingTargetChange={vi.fn()}
+          onExit={vi.fn()}
+          onSave={vi.fn()}
+          hasUnsavedChanges={true}
+        >
+          <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+          <PartCutsWorkspace />
+        </PartCutsEditorProvider>
+      </SidebarProvider>
     );
 
     fireEvent.click(screen.getByRole('button', { name: /Mitre 45° on Left End/i }));
@@ -784,21 +809,26 @@ describe('PartCutsWorkspace', () => {
 
   it('retargets the active draft through the preview fallback controls', () => {
     render(
-      <PartCutsWorkspace
-        part={createTestPart({ name: 'Stretcher' })}
-        draftFeatures={[]}
-        units="imperial"
-        selectedFeatureId={null}
-        hoveredTarget={null}
-        pendingTarget={{ type: 'face', face: 'left_end' }}
-        onSelectFeature={vi.fn()}
-        onDraftFeaturesChange={vi.fn()}
-        onHoveredTargetChange={vi.fn()}
-        onPendingTargetChange={vi.fn()}
-        onExit={vi.fn()}
-        onSave={vi.fn()}
-        hasUnsavedChanges={false}
-      />
+      <SidebarProvider>
+        <PartCutsEditorProvider
+          part={createTestPart({ name: 'Stretcher' })}
+          draftFeatures={[]}
+          units="imperial"
+          selectedFeatureId={null}
+          hoveredTarget={null}
+          pendingTarget={{ type: 'face', face: 'left_end' }}
+          onSelectFeature={vi.fn()}
+          onDraftFeaturesChange={vi.fn()}
+          onHoveredTargetChange={vi.fn()}
+          onPendingTargetChange={vi.fn()}
+          onExit={vi.fn()}
+          onSave={vi.fn()}
+          hasUnsavedChanges={false}
+        >
+          <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+          <PartCutsWorkspace />
+        </PartCutsEditorProvider>
+      </SidebarProvider>
     );
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
@@ -814,21 +844,26 @@ describe('PartCutsWorkspace', () => {
 
   it('supports dado and rabbet operation types in the editor workflow', () => {
     render(
-      <PartCutsWorkspace
-        part={createTestPart({ name: 'Panel', width: 8 })}
-        draftFeatures={[]}
-        units="imperial"
-        selectedFeatureId={null}
-        hoveredTarget={null}
-        pendingTarget={null}
-        onSelectFeature={vi.fn()}
-        onDraftFeaturesChange={vi.fn()}
-        onHoveredTargetChange={vi.fn()}
-        onPendingTargetChange={vi.fn()}
-        onExit={vi.fn()}
-        onSave={vi.fn()}
-        hasUnsavedChanges={false}
-      />
+      <SidebarProvider>
+        <PartCutsEditorProvider
+          part={createTestPart({ name: 'Panel', width: 8 })}
+          draftFeatures={[]}
+          units="imperial"
+          selectedFeatureId={null}
+          hoveredTarget={null}
+          pendingTarget={null}
+          onSelectFeature={vi.fn()}
+          onDraftFeaturesChange={vi.fn()}
+          onHoveredTargetChange={vi.fn()}
+          onPendingTargetChange={vi.fn()}
+          onExit={vi.fn()}
+          onSave={vi.fn()}
+          hasUnsavedChanges={false}
+        >
+          <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+          <PartCutsWorkspace />
+        </PartCutsEditorProvider>
+      </SidebarProvider>
     );
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
@@ -840,21 +875,26 @@ describe('PartCutsWorkspace', () => {
     const onDraftFeaturesChange = vi.fn();
 
     render(
-      <PartCutsWorkspace
-        part={createTestPart({ name: 'Panel', length: 24, width: 8, thickness: 0.75 })}
-        draftFeatures={[]}
-        units="imperial"
-        selectedFeatureId={null}
-        hoveredTarget={null}
-        pendingTarget={null}
-        onSelectFeature={vi.fn()}
-        onDraftFeaturesChange={onDraftFeaturesChange}
-        onHoveredTargetChange={vi.fn()}
-        onPendingTargetChange={vi.fn()}
-        onExit={vi.fn()}
-        onSave={vi.fn()}
-        hasUnsavedChanges={false}
-      />
+      <SidebarProvider>
+        <PartCutsEditorProvider
+          part={createTestPart({ name: 'Panel', length: 24, width: 8, thickness: 0.75 })}
+          draftFeatures={[]}
+          units="imperial"
+          selectedFeatureId={null}
+          hoveredTarget={null}
+          pendingTarget={null}
+          onSelectFeature={vi.fn()}
+          onDraftFeaturesChange={onDraftFeaturesChange}
+          onHoveredTargetChange={vi.fn()}
+          onPendingTargetChange={vi.fn()}
+          onExit={vi.fn()}
+          onSave={vi.fn()}
+          hasUnsavedChanges={false}
+        >
+          <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+          <PartCutsWorkspace />
+        </PartCutsEditorProvider>
+      </SidebarProvider>
     );
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
@@ -875,21 +915,26 @@ describe('PartCutsWorkspace', () => {
 
   it('lets users flip end-cut direction in edit mode', () => {
     render(
-      <PartCutsWorkspace
-        part={createTestPart({ name: 'Panel', length: 24, width: 8 })}
-        draftFeatures={[]}
-        units="imperial"
-        selectedFeatureId={null}
-        hoveredTarget={null}
-        pendingTarget={null}
-        onSelectFeature={vi.fn()}
-        onDraftFeaturesChange={vi.fn()}
-        onHoveredTargetChange={vi.fn()}
-        onPendingTargetChange={vi.fn()}
-        onExit={vi.fn()}
-        onSave={vi.fn()}
-        hasUnsavedChanges={false}
-      />
+      <SidebarProvider>
+        <PartCutsEditorProvider
+          part={createTestPart({ name: 'Panel', length: 24, width: 8 })}
+          draftFeatures={[]}
+          units="imperial"
+          selectedFeatureId={null}
+          hoveredTarget={null}
+          pendingTarget={null}
+          onSelectFeature={vi.fn()}
+          onDraftFeaturesChange={vi.fn()}
+          onHoveredTargetChange={vi.fn()}
+          onPendingTargetChange={vi.fn()}
+          onExit={vi.fn()}
+          onSave={vi.fn()}
+          hasUnsavedChanges={false}
+        >
+          <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+          <PartCutsWorkspace />
+        </PartCutsEditorProvider>
+      </SidebarProvider>
     );
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
@@ -902,21 +947,26 @@ describe('PartCutsWorkspace', () => {
 
   it('lets users flip bevel direction in edit mode', () => {
     render(
-      <PartCutsWorkspace
-        part={createTestPart({ name: 'Panel', length: 24, width: 8, thickness: 1 })}
-        draftFeatures={[]}
-        units="imperial"
-        selectedFeatureId={null}
-        hoveredTarget={null}
-        pendingTarget={null}
-        onSelectFeature={vi.fn()}
-        onDraftFeaturesChange={vi.fn()}
-        onHoveredTargetChange={vi.fn()}
-        onPendingTargetChange={vi.fn()}
-        onExit={vi.fn()}
-        onSave={vi.fn()}
-        hasUnsavedChanges={false}
-      />
+      <SidebarProvider>
+        <PartCutsEditorProvider
+          part={createTestPart({ name: 'Panel', length: 24, width: 8, thickness: 1 })}
+          draftFeatures={[]}
+          units="imperial"
+          selectedFeatureId={null}
+          hoveredTarget={null}
+          pendingTarget={null}
+          onSelectFeature={vi.fn()}
+          onDraftFeaturesChange={vi.fn()}
+          onHoveredTargetChange={vi.fn()}
+          onPendingTargetChange={vi.fn()}
+          onExit={vi.fn()}
+          onSave={vi.fn()}
+          hasUnsavedChanges={false}
+        >
+          <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+          <PartCutsWorkspace />
+        </PartCutsEditorProvider>
+      </SidebarProvider>
     );
 
     fireEvent.click(screen.getByRole('button', { name: '+ Add Cut' }));
@@ -959,21 +1009,26 @@ describe('PartCutsWorkspace', () => {
     });
 
     render(
-      <PartCutsWorkspace
-        part={part}
-        draftFeatures={part.features ?? []}
-        units="imperial"
-        selectedFeatureId={null}
-        hoveredTarget={null}
-        pendingTarget={null}
-        onSelectFeature={vi.fn()}
-        onDraftFeaturesChange={vi.fn()}
-        onHoveredTargetChange={vi.fn()}
-        onPendingTargetChange={vi.fn()}
-        onExit={vi.fn()}
-        onSave={vi.fn()}
-        hasUnsavedChanges={true}
-      />
+      <SidebarProvider>
+        <PartCutsEditorProvider
+          part={part}
+          draftFeatures={part.features ?? []}
+          units="imperial"
+          selectedFeatureId={null}
+          hoveredTarget={null}
+          pendingTarget={null}
+          onSelectFeature={vi.fn()}
+          onDraftFeaturesChange={vi.fn()}
+          onHoveredTargetChange={vi.fn()}
+          onPendingTargetChange={vi.fn()}
+          onExit={vi.fn()}
+          onSave={vi.fn()}
+          hasUnsavedChanges={true}
+        >
+          <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+          <PartCutsWorkspace />
+        </PartCutsEditorProvider>
+      </SidebarProvider>
     );
 
     expect(screen.getByText('Cut Conflicts')).toBeInTheDocument();
@@ -982,21 +1037,26 @@ describe('PartCutsWorkspace', () => {
 
   it('keeps the part-level footer actions in list state', () => {
     render(
-      <PartCutsWorkspace
-        part={createTestPart({ name: 'Side' })}
-        draftFeatures={[]}
-        units="imperial"
-        selectedFeatureId={null}
-        hoveredTarget={null}
-        pendingTarget={null}
-        onSelectFeature={vi.fn()}
-        onDraftFeaturesChange={vi.fn()}
-        onHoveredTargetChange={vi.fn()}
-        onPendingTargetChange={vi.fn()}
-        onExit={vi.fn()}
-        onSave={vi.fn()}
-        hasUnsavedChanges
-      />
+      <SidebarProvider>
+        <PartCutsEditorProvider
+          part={createTestPart({ name: 'Side' })}
+          draftFeatures={[]}
+          units="imperial"
+          selectedFeatureId={null}
+          hoveredTarget={null}
+          pendingTarget={null}
+          onSelectFeature={vi.fn()}
+          onDraftFeaturesChange={vi.fn()}
+          onHoveredTargetChange={vi.fn()}
+          onPendingTargetChange={vi.fn()}
+          onExit={vi.fn()}
+          onSave={vi.fn()}
+          hasUnsavedChanges
+        >
+          <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+          <PartCutsWorkspace />
+        </PartCutsEditorProvider>
+      </SidebarProvider>
     );
 
     // Exit and Save are the app header's, not this panel's. The panel owns

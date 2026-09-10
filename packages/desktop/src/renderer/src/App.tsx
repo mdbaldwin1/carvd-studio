@@ -11,6 +11,7 @@ import { AppSidebar } from './components/layout/AppSidebar';
 import { ContextMenu } from './components/layout/ContextMenu';
 import { UndoRedoButtons } from './components/layout/UndoRedoButtons';
 import { PartCutsEditingExitDialog } from './components/part-cuts/PartCutsEditingExitDialog';
+import { PartCutsEditorProvider } from './components/part-cuts/PartCutsEditorContext';
 import { PartCutsWorkspace } from './components/part-cuts/PartCutsWorkspace';
 import { TrialBanner } from './components/licensing/TrialBanner';
 import { TrialExpiredModal } from './components/licensing/TrialExpiredModal';
@@ -1005,7 +1006,11 @@ function App() {
             )}
             <SidebarProvider className="app-main">
               {isEditingPartCuts && sourcePart ? (
-                <PartCutsWorkspace
+                // Cuts editing is a mode of the ordinary shell, not a screen of
+                // its own: the cut list sits in the sidebar, the preview takes
+                // the canvas, and the selected cut's fields fill the properties
+                // panel, exactly as parts do in the project editor.
+                <PartCutsEditorProvider
                   part={sourcePart}
                   draftFeatures={draftFeatures}
                   units={useProjectStore.getState().units}
@@ -1017,9 +1022,19 @@ function App() {
                   onHoveredTargetChange={setPartCutsHoveredTarget}
                   onPendingTargetChange={setPartCutsPendingTarget}
                   onExit={requestPartCutsExit}
-                  onSave={savePartCutsAndExit}
                   hasUnsavedChanges={partCutsHasUnsavedChanges}
-                />
+                >
+                  <AppSidebar
+                    onOpenProjectSettings={() => setIsProjectSettingsOpen(true)}
+                    onOpenCutList={openCutListModal}
+                    onCreateNewAssembly={startCreatingNewAssembly}
+                    onShowLicenseModal={() => setShowLicenseModal(true)}
+                  />
+                  <PartCutsWorkspace />
+                  {/* The selected cut's fields still live in the workspace's
+                      own panel. Rendering the part's PropertiesPanel here too
+                      would show its saved cuts beside the draft being edited. */}
+                </PartCutsEditorProvider>
               ) : (
                 <>
                   <AppSidebar

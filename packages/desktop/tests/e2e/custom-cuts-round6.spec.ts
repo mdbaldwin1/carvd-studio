@@ -91,7 +91,7 @@ test.describe('round 6 active cut inspector lifecycle', () => {
       await open();
       await window.getByRole('textbox', { name: /Hole Diameter/ }).fill('20');
       await save();
-      await expect(window.getByRole('alert')).toContainText(/diameter|edge|face/i);
+      await expect(window.getByRole('alert').last()).toContainText(/diameter|edge|face/i);
       expect(await window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts)).toBe(true);
       expect(JSON.parse(fs.readFileSync(file, 'utf8')).parts[0].features[0].parameters.diameter).toBe(0.755);
     });
