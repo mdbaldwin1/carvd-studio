@@ -767,9 +767,11 @@ function PartCutsPreviewScene({
   pendingTarget,
   onHoverTarget,
   onActivateTarget,
-  onDraftChange
+  onDraftChange,
+  frameNonce
 }: {
   previewPart: Part;
+  frameNonce: number;
   draft: FeatureDraft | null;
   hoveredTarget: PartFeatureTarget | null;
   pendingTarget: PartFeatureTarget | null;
@@ -994,12 +996,19 @@ function PartCutsPreviewScene({
         })}
       </group>
 
-      <FrameCameraToPart part={previewPart} controlsRef={controlsRef} />
+      <FrameCameraToPart part={previewPart} controlsRef={controlsRef} frameNonce={frameNonce} />
+      {/* Same navigation as the main canvas. Panning was disabled here, so a
+          cut on the far end of a long board could not be brought into view --
+          the camera could only orbit a fixed centre. Framing on entry is the
+          default placement, not a constraint; "Frame Part" returns to it. */}
       <OrbitControls
         ref={controlsRef}
-        enablePan={false}
-        minDistance={maxDimension * 0.25}
-        maxDistance={maxDimension * 6}
+        makeDefault
+        enableDamping
+        dampingFactor={0.05}
+        zoomSpeed={0.5}
+        minDistance={Math.min(0.5, maxDimension * 0.05)}
+        maxDistance={maxDimension * 40}
       />
     </>
   );
@@ -1048,10 +1057,13 @@ export function computePreviewCameraFit(
  */
 function FrameCameraToPart({
   part,
-  controlsRef
+  controlsRef,
+  frameNonce
 }: {
   part: Part;
   controlsRef: React.RefObject<OrbitControlsImpl | null>;
+  /** Bump to re-frame on demand after the user has panned or orbited away. */
+  frameNonce: number;
 }): null {
   const { camera, size } = useThree();
   const dimensionKey = `${part.length}x${part.width}x${part.thickness}`;
@@ -1079,7 +1091,7 @@ function FrameCameraToPart({
     // Size is read for the fit but intentionally not a dependency: re-framing
     // on every panel resize would fight the user's orbit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dimensionKey, camera, controlsRef]);
+  }, [dimensionKey, camera, controlsRef, frameNonce]);
 
   return null;
 }
@@ -1114,6 +1126,9 @@ export function PartCutsPreviewCanvas({
     [draft, previewPart]
   );
   const supportsHandles = supportsPreviewHandles(draft);
+  // Panning and a wide zoom range mean the user can leave the part off screen;
+  // this puts the framed view back without ending the editing session.
+  const [frameNonce, setFrameNonce] = useState(0);
 
   if (fallback) {
     return (
@@ -1197,8 +1212,21 @@ export function PartCutsPreviewCanvas({
           onHoverTarget={onHoverTarget}
           onActivateTarget={onActivateTarget}
           onDraftChange={onDraftChange}
+          frameNonce={frameNonce}
         />
       </Canvas>
+
+      <div className="absolute right-3 top-3">
+        <Button
+          type="button"
+          size="xs"
+          variant="outline"
+          onClick={() => setFrameNonce((nonce) => nonce + 1)}
+          title="Frame the part in view"
+        >
+          Frame Part
+        </Button>
+      </div>
 
       {supportsHandles && draft && handleOverlay && (
         <div className="absolute bottom-3 right-3 max-w-[min(88%,24rem)]">

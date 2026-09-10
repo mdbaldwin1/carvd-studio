@@ -721,3 +721,25 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
     });
   });
 });
+
+describe('camera parity with the main canvas', () => {
+  it('frames a blank from any orbit angle using its bounding sphere', () => {
+    // The fit must hold after the user orbits, since framing is now only the
+    // entry placement rather than a cage the camera is held inside.
+    const fit = computePreviewCameraFit({ length: 96, width: 12, thickness: 0.75 }, { fov: 38, aspect: 1.6 });
+    const radius = Math.hypot(96 / 2, 0.75 / 2, 12 / 2);
+    expect(fit.distance).toBeGreaterThan(radius);
+    expect(fit.far).toBeGreaterThan(fit.distance);
+    expect(fit.near).toBeGreaterThan(0);
+  });
+
+  it('keeps a long board reachable within the preview zoom range', () => {
+    // enablePan was false and maxDistance was maxDimension * 6, so a cut on
+    // the far end of a long board could not be brought into view.
+    const blank = { length: 96, width: 12, thickness: 0.75 };
+    const maxDimension = Math.max(blank.length, blank.width, blank.thickness, 1);
+    const fit = computePreviewCameraFit(blank, { fov: 38, aspect: 1.6 });
+    expect(maxDimension * 40).toBeGreaterThan(fit.distance);
+    expect(Math.min(0.5, maxDimension * 0.05)).toBeLessThan(fit.distance);
+  });
+});
