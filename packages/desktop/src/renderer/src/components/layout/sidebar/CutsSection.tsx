@@ -83,9 +83,10 @@ export function CutsSection({ isCollapsed, onOpenChange }: CutsSectionProps) {
               <ScrollArea className="min-h-0 flex-1">
                 <div className="space-y-3 pr-1">
                   {draftFeatures.length === 0 ? (
-                    <div className="rounded-md border border-dashed border-border px-3 py-5 text-sm text-text-muted">
-                      No cuts yet. Use <span className="font-medium text-text">+</span> above to add the first one.
-                    </div>
+                    // Worded and styled like Stock's and Assemblies' empty
+                    // states. No px-4 here: this list's container already
+                    // pads, where theirs does not, so the indent matches.
+                    <p className="text-xs italic text-text-muted">No cuts yet. Click + to add.</p>
                   ) : (
                     draftFeatures.map((feature, index) => {
                       const conflicts = conflictsByFeatureId.get(feature.id) ?? [];
