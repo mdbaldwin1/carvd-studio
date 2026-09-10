@@ -335,7 +335,14 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
 
   const handleSave = useCallback(async () => {
     if (dialogSavingRef.current || pendingAction) return;
-    if (isEditingPartCuts && onSavePartCuts && !onSavePartCuts()) return;
+    // Each editing mode owns its own save and stops here, so Save always means
+    // "commit what this editor is editing". Cuts mode used to fall through and
+    // write the project as well, which made it the only mode whose Save did
+    // two things.
+    if (isEditingPartCuts && onSavePartCuts) {
+      onSavePartCuts();
+      return;
+    }
     // Check if we're in template or assembly editing mode
     if (isEditingTemplate && onSaveTemplate) {
       await onSaveTemplate();

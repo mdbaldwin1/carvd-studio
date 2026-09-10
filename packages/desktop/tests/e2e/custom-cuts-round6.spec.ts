@@ -58,11 +58,17 @@ test.describe('round 6 active cut inspector lifecycle', () => {
       const { window, userDataDir } = running;
       const file = path.join(userDataDir, `active-${route}.carvd`);
       await queueSavePath(window, file);
+      // Save in cuts mode commits the draft and stops there, exactly as it
+      // does for template and assembly editing. Writing the project is a
+      // second, ordinary Save once the workspace has closed.
       const save = async () => {
         if (route === 'header') await window.getByTitle('Save (Cmd+S)', { exact: true }).click();
         else if (route === 'shortcut')
           await window.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+S`);
         else await sendNativeMenuCommand(running, 'save-project');
+      };
+      const saveProjectFile = async () => {
+        await window.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+S`);
       };
       for (const kind of ['label', 'diameter'] as const) {
         await open();
@@ -72,6 +78,7 @@ test.describe('round 6 active cut inspector lifecycle', () => {
         await expect
           .poll(() => window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
           .toBe(false);
+        await saveProjectFile();
         await expect.poll(() => fs.existsSync(file)).toBe(true);
         await expect
           .poll(() => JSON.parse(fs.readFileSync(file, 'utf8')).parts[0].features[0])

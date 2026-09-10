@@ -4,10 +4,12 @@ import fs from 'fs';
 import path from 'path';
 import {
   closeElectronApp,
+  exitPartCutsFromHeader,
   getCanvasPoint,
   launchElectronApp,
   queueOpenPaths,
   queueSavePath,
+  savePartCutsFromHeader,
   seedProject,
   type RunningElectronApp
 } from './helpers/electron-app';
@@ -314,7 +316,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await expect(window.getByRole('alert')).toContainText('remaining material');
     await fillMeasurement(window, 'Offset Along Face', '25.4');
     await saveCut(window);
-    await window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(window);
 
     const metric = await window.evaluate(() => {
       const features = window.useProjectStore.getState().parts[0].features;
@@ -389,7 +391,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await fillMeasurement(window, 'Offset Along Face', '8 1/2');
     await fillMeasurement(window, 'Offset Across Face', '3/8');
     await saveCut(window);
-    await window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(window);
 
     const fractional = await window.evaluate(() => {
       const features = window.useProjectStore.getState().parts[0].features;
@@ -535,7 +537,7 @@ test.describe('hands-on custom cuts qualification', () => {
     const bottomBackGeometry = await preview.getAttribute('data-geometry-signature');
     expectFiniteNondegenerateGeometrySignature(bottomBackGeometry);
     await saveCut(window);
-    await window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(window);
 
     await expect
       .poll(() =>
@@ -658,7 +660,7 @@ test.describe('hands-on custom cuts qualification', () => {
 
     const savedGeometry = await preview.getAttribute('data-geometry-signature');
     expectFiniteNondegenerateGeometrySignature(savedGeometry);
-    await window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(window);
     const expected = await window.evaluate(() => JSON.stringify(window.useProjectStore.getState().parts[0].features));
     await saveProjectTo(window, projectPath);
     await reopenProject(window, projectPath);
@@ -682,7 +684,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await expect.poll(() => preview.getAttribute('data-geometry-signature'), { timeout: 15000 }).toBe(savedGeometry);
     expectFiniteNondegenerateGeometrySignature(await preview.getAttribute('data-geometry-signature'));
     await expect(window.getByRole('checkbox', { name: /^Enable cut / })).toHaveCount(20);
-    await window.getByRole('button', { name: 'Back to Project' }).click();
+    await exitPartCutsFromHeader(window);
 
     const dialog = await generateCutList(window);
     await expect(dialog.getByRole('tab', { name: 'Parts List (1)' })).toBeVisible();
@@ -759,7 +761,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await window.getByRole('button', { name: /^3\. Post corner clearance/ }).click();
     await fillMeasurement(window, 'Cross-Cut Width', '2 1/4');
     await saveCut(window);
-    await window.getByRole('button', { name: 'Save Part' }).click();
+    await savePartCutsFromHeader(window);
 
     const expectedFeatures = [
       {

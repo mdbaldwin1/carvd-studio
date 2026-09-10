@@ -741,10 +741,6 @@ export async function openSelectionContextMenu(window: Page, point = { x: 500, y
  */
 export async function savePartCutsFromHeader(window: Page): Promise<void> {
   await window.getByTitle('Save (Cmd+S)', { exact: true }).click();
-  // In cuts mode this Save commits the draft and then writes the project, so
-  // the library import prompt can follow it. Clear it, or its modal overlay
-  // swallows the next click.
-  await dismissLibraryImportPrompt(window);
 }
 
 /** Skip the library import prompt when a project write raises it. */

@@ -387,6 +387,8 @@ describe('useFileOperations', () => {
       await act(async () => {
         await getDialogProps().onSave();
       });
+      // The close dialog's Save is the project-close flow: it commits the
+      // active cut and then writes the project before leaving.
       expect(order).toEqual(valid ? ['cut', 'file'] : ['cut']);
       expect(getDialogProps().isOpen).toBe(!valid);
       expect(window.electronAPI.confirmClose).toHaveBeenCalledTimes(valid ? 1 : 0);
@@ -437,7 +439,7 @@ describe('useFileOperations', () => {
     );
   });
   describe('handleSave', () => {
-    it.each([true, false])('K7 commits active cuts before writing the project; valid=%s', async (valid) => {
+    it.each([true, false])('K7 commits active cuts and stops there; valid=%s', async (valid) => {
       const order: string[] = [];
       const onSavePartCuts = vi.fn(() => {
         order.push('cut');
@@ -451,7 +453,11 @@ describe('useFileOperations', () => {
       await act(async () => {
         await result.current.handleSave();
       });
-      expect(order).toEqual(valid ? ['cut', 'file'] : ['cut']);
+      // Save in cuts mode commits the draft and stops, as it does for
+      // template and assembly editing. Writing the project is a separate,
+      // ordinary Save once the workspace has closed.
+      expect(order).toEqual(['cut']);
+      expect(saveProject).not.toHaveBeenCalled();
     });
     it('K7 routes Cmd+S from a focused input through the active cut commit', async () => {
       const onSavePartCuts = vi.fn(() => false);
