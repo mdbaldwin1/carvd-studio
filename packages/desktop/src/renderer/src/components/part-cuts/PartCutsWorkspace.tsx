@@ -46,6 +46,7 @@ import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import { isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
 import { getAvailableMirrorActions, getMirrorActionLabel, mirrorFeature } from '@renderer/utils/partFeatureActions';
 import { getPartFeatureConflicts } from '@renderer/utils/partFeatureConflicts';
+import { getPartCutsDraftStatus } from '@renderer/utils/partCutsDraftStatus';
 import { clonePartFeature } from '@renderer/utils/partFeatures';
 import {
   CORNER_LABELS,
@@ -83,7 +84,8 @@ interface PartCutsWorkspaceProps {
   onHoveredTargetChange: (target: PartFeatureTarget | null) => void;
   onPendingTargetChange: (target: PartFeatureTarget | null) => void;
   onExit: () => void;
-  onSave: () => void;
+  /** Retained for the header's Save path; this panel no longer renders a Save button. */
+  onSave?: () => void;
   hasUnsavedChanges: boolean;
 }
 
@@ -180,7 +182,6 @@ export function PartCutsWorkspace({
   onHoveredTargetChange,
   onPendingTargetChange,
   onExit,
-  onSave,
   hasUnsavedChanges
 }: PartCutsWorkspaceProps) {
   const [draft, setDraft] = useState<FeatureDraft | null>(null);
@@ -198,8 +199,6 @@ export function PartCutsWorkspace({
   const redoDraft = usePartCutsEditingStore((state) => state.redoDraft);
   const projectParts = useProjectStore((state) => state.parts);
   const addDowelJoint = useProjectStore((state) => state.addDowelJoint);
-  const canUndoDraft = usePartCutsEditingStore((state) => state.draftHistory.length > 0);
-  const canRedoDraft = usePartCutsEditingStore((state) => state.draftFuture.length > 0);
 
   // Draft-level undo/redo: the global project shortcuts are gated off in this
   // mode, so Cmd+Z here steps the cut draft, not the project.
@@ -335,30 +334,15 @@ export function PartCutsWorkspace({
     highPoint: 'top' | 'bottom'
   ): boolean => (targetFace === 'right_end' ? highPoint !== 'top' : highPoint === 'top');
 
-  const featureConflicts = useMemo(() => getPartFeatureConflicts(draftFeatures, part), [draftFeatures, part]);
-  const hasBlockingFeatureConflicts = featureConflicts.some((conflict) => conflict.severity === 'error');
-  const operationIssues = useMemo(() => {
-    const candidate = { ...part, features: draftFeatures };
-    return new Map(
-      draftFeatures
-        .filter((feature) => feature.enabled)
-        .map((feature) => [
-          feature.id,
-          feature.kind === 'rect_cut'
-            ? validateRectCutFeature(feature, candidate)
-            : feature.kind === 'circular_cut'
-              ? validateCircularCut(feature, candidate)
-              : feature.kind === 'rounded_cut'
-                ? validateRoundedCut(feature, candidate)
-                : validateEndCutFeature(feature, candidate)
-        ])
-    );
-  }, [part, draftFeatures]);
-  const firstInvalidIndex = draftFeatures.findIndex(
-    (feature) =>
-      operationIssues.get(feature.id) ||
-      featureConflicts.some((conflict) => conflict.featureId === feature.id && conflict.severity === 'error')
+  // Shared with the header Save button so the two cannot disagree about
+  // whether this draft is savable.
+  const draftStatus = useMemo(
+    () => getPartCutsDraftStatus(part, draftFeatures, hasUnsavedChanges),
+    [part, draftFeatures, hasUnsavedChanges]
   );
+  const featureConflicts = draftStatus.conflicts;
+  const operationIssues = draftStatus.issues;
+  const firstInvalidIndex = draftStatus.firstInvalidIndex;
   const enabledOperationCount = draftFeatures.filter((feature) => feature.enabled).length;
   const conflictsByFeatureId = useMemo(() => {
     const map = new Map<string, typeof featureConflicts>();
@@ -621,29 +605,9 @@ export function PartCutsWorkspace({
                 </CardDescription>
               </div>
               {panelMode === 'list' ? (
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={undoDraft}
-                    disabled={!canUndoDraft}
-                    aria-label="Undo cut change"
-                    title="Undo cut change (Cmd+Z)"
-                  >
-                    Undo
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={redoDraft}
-                    disabled={!canRedoDraft}
-                    aria-label="Redo cut change"
-                    title="Redo cut change (Cmd+Shift+Z)"
-                  >
-                    Redo
-                  </Button>
-                  <Button onClick={handleBeginAdd}>+ Add Cut</Button>
-                </div>
+                // Undo/Redo live in the app header for every mode, including
+                // this one; they dispatch to the cut draft history here.
+                <Button onClick={handleBeginAdd}>+ Add Cut</Button>
               ) : (
                 <Button variant="ghost" onClick={handleCancelEditor}>
                   Back to Cuts
@@ -797,19 +761,6 @@ export function PartCutsWorkspace({
                     </Button>
                   </div>
                 )}
-                <div className="mt-auto flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={onExit}>
-                    Back to Project
-                  </Button>
-                  <Button
-                    onClick={onSave}
-                    disabled={!hasUnsavedChanges || hasBlockingFeatureConflicts || firstInvalidIndex >= 0}
-                    aria-describedby={firstInvalidIndex >= 0 ? 'part-cuts-save-errors' : undefined}
-                    className="ml-auto"
-                  >
-                    Save Part
-                  </Button>
-                </div>
               </>
             )}
 

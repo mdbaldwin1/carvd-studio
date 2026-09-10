@@ -1,3 +1,4 @@
+import { getPartCutsDraftStatus } from '@renderer/utils/partCutsDraftStatus';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { createElement } from 'react';
@@ -133,7 +134,8 @@ describe('independent review round 3', () => {
           onSave: vi.fn()
         })
       );
-      expect.soft(screen.getByRole('button', { name: 'Save Part' })).toBeDisabled();
+      // Save lives in the app header now; assert the shared rule it obeys.
+      expect.soft(getPartCutsDraftStatus(original, part.features!, true).canSave).toBe(false);
       fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${part.features!.length}\\. ${last.label}`) }));
       expect(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
       expect(screen.getByRole('alert')).toHaveTextContent(

@@ -11,6 +11,7 @@ import { validateCircularCut } from '@renderer/utils/roundCutUtils';
 import { expandCircularCut } from '@renderer/utils/roundCutUtils';
 import { buildDraftFromFeature } from '@renderer/components/part-features/partFeatureEditorState';
 import { getEditableHandleOverlay } from './PartCutsPreviewCanvas';
+import { getPartCutsDraftStatus } from '@renderer/utils/partCutsDraftStatus';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
 vi.unmock('three');
 
@@ -114,8 +115,9 @@ describe('PartCutsWorkspace', () => {
   });
   it('UX identifies an invalid operation and opens it directly from the save explanation', () => {
     const cut = createMortiseFeature({ label: 'Oversize pocket', placement: { x: 23, z: 1 } });
-    renderWorkspace({ draftFeatures: [cut], hasUnsavedChanges: true });
-    expect.soft(screen.getByRole('button', { name: 'Save Part' })).toBeDisabled();
+    const { props } = renderWorkspace({ draftFeatures: [cut], hasUnsavedChanges: true });
+    // Save lives in the app header now; assert the shared rule it obeys.
+    expect.soft(getPartCutsDraftStatus(props.part, [cut], true).canSave).toBe(false);
     const issue = screen.getByRole('alert');
     expect(issue).toHaveTextContent(/Oversize pocket.*runs past the blank/i);
     fireEvent.click(within(issue).getByRole('button', { name: 'Fix cut 1' }));
@@ -998,8 +1000,11 @@ describe('PartCutsWorkspace', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: 'Back to Project' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save Part' })).toBeInTheDocument();
+    // Exit and Save are the app header's, not this panel's. The panel owns
+    // the cut list and its Add Cut action.
+    expect(screen.queryByRole('button', { name: 'Back to Project' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save Part' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+ Add Cut' })).toBeInTheDocument();
   });
 
   it('walks every operation preset into its step-2 editor', () => {
@@ -1404,14 +1409,14 @@ describe('PartCutsWorkspace', () => {
     expect(screen.getByText(/Active target:/i)).toHaveTextContent('Top Face');
   });
 
-  it('wires the footer actions to exit and save', () => {
-    const { props } = renderWorkspace({ hasUnsavedChanges: true });
+  it('leaves exit and save to the app header', () => {
+    renderWorkspace({ hasUnsavedChanges: true });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Project' }));
-    expect(props.onExit).toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Save Part' }));
-    expect(props.onSave).toHaveBeenCalled();
+    // Both actions used to be duplicated here and in the header. The header is
+    // the single home for them, as it is for the project, template, and
+    // assembly editors.
+    expect(screen.queryByRole('button', { name: 'Back to Project' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save Part' })).not.toBeInTheDocument();
   });
 
   it('disables saving the part while blocking conflicts exist', () => {
@@ -1419,9 +1424,10 @@ describe('PartCutsWorkspace', () => {
       createEndCutFeature(),
       createEndCutFeature({ id: 'end-2', cutType: 'bevel', parameters: { horizontalAngle: 0, verticalAngle: 15 } })
     ];
-    renderWorkspace({ draftFeatures: conflictingFeatures, hasUnsavedChanges: true });
+    const { props } = renderWorkspace({ draftFeatures: conflictingFeatures, hasUnsavedChanges: true });
 
-    expect(screen.getByRole('button', { name: 'Save Part' })).toBeDisabled();
+    // Save lives in the app header now; assert the shared rule it obeys.
+    expect(getPartCutsDraftStatus(props.part, conflictingFeatures, true).canSave).toBe(false);
   });
   describe('draft keyboard shortcuts', () => {
     const seedDraftHistory = () => {
@@ -1464,16 +1470,8 @@ describe('PartCutsWorkspace', () => {
       expect(usePartCutsEditingStore.getState().draftFeatures).toHaveLength(before);
     });
 
-    it('drives undo and redo from the header buttons', () => {
-      seedDraftHistory();
-      renderWorkspace();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Undo cut change' }));
-      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first']);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Redo cut change' }));
-      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['first', 'second']);
-    });
+    // Undo/Redo are the app header's buttons for every mode; their wiring to
+    // the draft history is covered in UndoRedoButtons.test.tsx.
   });
 
   describe('target-aware field labels', () => {

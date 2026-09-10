@@ -2,7 +2,7 @@ import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import { SidebarProvider } from '@renderer/components/ui/sidebar';
 import { Check, Library, Pencil, Save, Settings } from 'lucide-react';
-import React, { Suspense, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AssemblyEditingExitDialog } from './components/assembly/AssemblyEditingExitDialog';
 import { AnalyticsConsentDialog } from './components/analytics/AnalyticsConsentDialog';
 import { AppHorizontalLogo } from './components/common/AppHorizontalLogo';
@@ -51,6 +51,7 @@ import { useLibraryImportCheck } from './hooks/useLibraryImportCheck';
 import { useLicenseStatus } from './hooks/useLicenseStatus';
 import { useMenuCommands } from './hooks/useMenuCommands';
 import { usePartCutsEditing } from './hooks/usePartCutsEditing';
+import { getPartCutsDraftStatus } from './utils/partCutsDraftStatus';
 import { useStockLibrary } from './hooks/useStockLibrary';
 import { useTemplateEditing } from './hooks/useTemplateEditing';
 import { useAssemblyEditingStore } from './store/assemblyEditingStore';
@@ -197,6 +198,13 @@ function App() {
     setHoveredTarget: setPartCutsHoveredTarget,
     setPendingTarget: setPartCutsPendingTarget
   } = usePartCutsEditing();
+
+  // The header Save owns the cuts draft too, so it must refuse exactly what
+  // the workspace's own Save button used to refuse.
+  const partCutsDraftStatus = useMemo(
+    () => getPartCutsDraftStatus(sourcePart, draftFeatures, partCutsHasUnsavedChanges),
+    [sourcePart, draftFeatures, partCutsHasUnsavedChanges]
+  );
 
   // File operations - now after editing hooks so we can route save commands appropriately
   const {
@@ -907,9 +915,10 @@ function App() {
               </div>
               <div className="header-actions">
                 <div className="header-actions-group">
-                  {/* Project undo/redo would silently edit the project behind
-                      the cuts workspace; the cut draft has its own save/discard. */}
-                  {!isEditingPartCuts && <UndoRedoButtons />}
+                  {/* One pair for every mode. It dispatches to the cut draft
+                      history while the cuts workspace is open, so it never
+                      reaches the project behind it. */}
+                  <UndoRedoButtons />
                   {(isEditingTemplate || isEditingAssembly || isEditingPartCuts) && (
                     <Button
                       variant={
@@ -955,7 +964,12 @@ function App() {
                     }
                     size="icon"
                     onClick={handlePrimarySave}
-                    title="Save (Cmd+S)"
+                    disabled={isEditingPartCuts && !partCutsDraftStatus.canSave}
+                    title={
+                      isEditingPartCuts && partCutsDraftStatus.firstInvalidIndex >= 0
+                        ? 'Fix the invalid cut before saving'
+                        : 'Save (Cmd+S)'
+                    }
                   >
                     <Save size={18} />
                   </Button>

@@ -1,3 +1,4 @@
+import { getPartCutsDraftStatus } from '@renderer/utils/partCutsDraftStatus';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
@@ -174,7 +175,8 @@ describe('closure review exact contact, XYZ axes, and hidden offsets', () => {
           onSave: vi.fn()
         })
       );
-      expect(screen.getByRole('button', { name: 'Save Part' })).toBeDisabled();
+      // Save lives in the app header now; assert the shared rule it obeys.
+      expect(getPartCutsDraftStatus(part, [cut], true).canSave).toBe(false);
       fireEvent.click(screen.getByRole('button', { name: /^1\. Malformed cut/ }));
       expect.soft(screen.getByRole('button', { name: 'Save Cut' })).toBeDisabled();
       fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
