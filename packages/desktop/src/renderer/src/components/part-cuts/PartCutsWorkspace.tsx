@@ -21,6 +21,7 @@ export function PartCutsWorkspace() {
   const {
     part,
     draftFeatures,
+    units,
     hoveredTarget,
     pendingTarget,
     onDraftFeaturesChange,
@@ -56,6 +57,7 @@ export function PartCutsWorkspace() {
         <PartCutsPreviewCanvas
           part={part}
           draftFeatures={draftFeatures}
+          units={units}
           draft={inspectorDraft}
           selectedFeatureSummary={selectedFeatureSummary}
           selectedFeatureTargetLabel={selectedFeatureTargetLabel}

@@ -12,6 +12,7 @@ import {
   applyHandleDelta,
   buildEndCutDimensionLines,
   buildPreviewPart,
+  buildBlankDimensionLines,
   buildRectDimensionOverlay,
   clamp,
   computePreviewCameraFit,
@@ -22,6 +23,7 @@ import {
   supportsPreviewHandles
 } from './PartCutsPreviewCanvas';
 import { clearPartGeometryCache, getPartRenderGeometry } from '@renderer/utils/partFeatureGeometry';
+import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 
 // The global setup mocks 'three' with a minimal surface; the preview geometry
 // builders need the real library (same pattern as partFeatureGeometry.test.ts).
@@ -245,7 +247,60 @@ describe('supportsPreviewHandles', () => {
   });
 });
 
+describe('buildBlankDimensionLines', () => {
+  const part = createTestPart({ length: 24, width: 12, thickness: 0.75 });
+
+  it('measures the blank along each axis, outside its own footprint', () => {
+    const [length, width, thickness] = buildBlankDimensionLines(part, 'imperial');
+
+    // The length line runs the full length in X, beyond the front edge.
+    expect(length.points[0][0]).toBeCloseTo(-12);
+    expect(length.points[1][0]).toBeCloseTo(12);
+    expect(length.points[0][2]).toBeGreaterThan(part.width / 2);
+    expect(length.label).toBe('24"');
+
+    // The width line runs the full width in Z, beyond the right end.
+    expect(width.points[0][2]).toBeCloseTo(-6);
+    expect(width.points[1][2]).toBeCloseTo(6);
+    expect(width.points[0][0]).toBeGreaterThan(part.length / 2);
+    expect(width.label).toBe('12"');
+
+    // The thickness line is the only vertical one.
+    expect(thickness.points[0][1]).toBeCloseTo(-0.375);
+    expect(thickness.points[1][1]).toBeCloseTo(0.375);
+    expect(thickness.label).toBe('3/4"');
+  });
+
+  it('labels a metric project in millimetres', () => {
+    expect(buildBlankDimensionLines(part, 'metric').map((line) => line.label)).toEqual([
+      formatMeasurementWithUnit(24, 'metric'),
+      formatMeasurementWithUnit(12, 'metric'),
+      formatMeasurementWithUnit(0.75, 'metric')
+    ]);
+  });
+
+  it('stands the lines further off a larger blank so they clear its edges', () => {
+    const sheet = createTestPart({ length: 96, width: 48, thickness: 0.75 });
+    const smallGap = buildBlankDimensionLines(part, 'imperial')[0].points[0][2] - part.width / 2;
+    const sheetGap = buildBlankDimensionLines(sheet, 'imperial')[0].points[0][2] - sheet.width / 2;
+
+    expect(sheetGap).toBeGreaterThan(smallGap);
+  });
+});
+
 describe('buildRectDimensionOverlay', () => {
+  it('labels a metric project in millimetres rather than inches', () => {
+    const part = createTestPart({ length: 24, width: 12, thickness: 0.75 });
+    const draft = createRectDraft('mortise');
+    const imperial = buildRectDimensionOverlay(part, draft, 'imperial');
+    const metric = buildRectDimensionOverlay(part, draft, 'metric');
+
+    // These labels were hardcoded to imperial, so a metric project measured
+    // its cuts in inches.
+    expect(imperial!.lines.map((line) => line.label)).not.toEqual(metric!.lines.map((line) => line.label));
+    expect(metric!.lines.every((line) => line.label.endsWith('mm'))).toBe(true);
+  });
+
   const part = createTestPart({ length: 24, width: 12, thickness: 0.75 });
 
   it('returns null for non-rect features', () => {
@@ -572,6 +627,7 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
       createElement(PartCutsPreviewCanvas, {
         part,
         draftFeatures: [],
+        units: 'imperial',
         draft,
         selectedFeatureSummary: 'Mortise on Top Face',
         selectedFeatureTargetLabel: 'Top Face',
@@ -592,6 +648,7 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
     return createElement(PartCutsPreviewCanvas, {
       part: createTestPart({ name: 'Panel', length: 24, width: 12, thickness: 0.75 }),
       draftFeatures: [],
+      units: 'imperial',
       draft,
       selectedFeatureSummary: null,
       selectedFeatureTargetLabel: 'Top Face',
@@ -657,6 +714,24 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
 
     expect(screen.getByTestId('r3f-canvas')).toBeInTheDocument();
     expect(screen.queryByText(/highlighted target/i)).not.toBeInTheDocument();
+  });
+
+  it('measures the blank on the part, with no cut open and in the project units', () => {
+    // The sidebar no longer states the blank size, so these have to be here
+    // whether or not a cut is being edited.
+    const canvas = renderCanvas(null).getByTestId('r3f-canvas');
+
+    expect(within(canvas).getByText('24"')).toBeInTheDocument();
+    expect(within(canvas).getByText('12"')).toBeInTheDocument();
+    expect(within(canvas).getByText('3/4"')).toBeInTheDocument();
+  });
+
+  it('measures the blank in millimetres for a metric project', () => {
+    const { getByTestId } = renderCanvas(null, { units: 'metric' });
+    const canvas = getByTestId('r3f-canvas');
+
+    expect(within(canvas).getByText(formatMeasurementWithUnit(24, 'metric'))).toBeInTheDocument();
+    expect(within(canvas).queryByText('24"')).not.toBeInTheDocument();
   });
 
   it('omits the width handle mesh for stopped dados', () => {

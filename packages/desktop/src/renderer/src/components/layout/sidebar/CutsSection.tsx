@@ -15,7 +15,6 @@ import {
 import { getAvailableMirrorActions, getMirrorActionLabel } from '@renderer/utils/partFeatureActions';
 import { getFeatureSummary, getFeatureTargetLabel } from '@renderer/utils/partFeatureSummary';
 import { usePartCutsEditor } from '@renderer/components/part-cuts/PartCutsEditorContext';
-import { getBlankSizeLabel } from '@renderer/components/part-cuts/blankSize';
 
 interface CutsSectionProps {
   isCollapsed: boolean;
@@ -30,7 +29,6 @@ interface CutsSectionProps {
  */
 export function CutsSection({ isCollapsed, onOpenChange }: CutsSectionProps) {
   const {
-    part,
     units,
     draftFeatures,
     conflictsByFeatureId,
@@ -48,15 +46,9 @@ export function CutsSection({ isCollapsed, onOpenChange }: CutsSectionProps) {
 
   return (
     <>
-      {/* The blank being cut names the whole sidebar, so it sits above the
-          Cuts section and stays visible when that section is collapsed. */}
-      <div className="border-b border-border px-4 py-3">
-        <div className="truncate text-sm font-medium text-text" title={part.name}>
-          {part.name}
-        </div>
-        <div className="mt-0.5 text-xs text-text-muted">Blank {getBlankSizeLabel(part, units)}</div>
-      </div>
-
+      {/* No blank header here: the header names the part, and its dimensions
+          are drawn on the part in the preview, where they also say which edge
+          is which. */}
       <Collapsible asChild open={!isCollapsed} onOpenChange={onOpenChange}>
         <SidebarGroup className={isCollapsed ? 'flex-none' : 'flex-1'}>
           <CollapsibleTrigger asChild>

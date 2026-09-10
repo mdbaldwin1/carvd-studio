@@ -26,6 +26,7 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 interface PartCutsPreviewCanvasProps {
   part: Part;
   draftFeatures: Part['features'];
+  units: 'imperial' | 'metric';
   draft: FeatureDraft | null;
   selectedFeatureSummary: string | null;
   selectedFeatureTargetLabel: string | null;
@@ -275,7 +276,11 @@ function buildRoundHandleOverlay(
  */
 export function buildRectDimensionOverlay(
   part: Part,
-  draft: FeatureDraft
+  draft: FeatureDraft,
+  // Optional so the existing callers and specs keep working; the canvas
+  // passes the project's real units. These labels used to be imperial for
+  // everyone, so a metric project measured its cuts in inches.
+  units: 'imperial' | 'metric' = 'imperial'
 ): {
   lines: DimensionLine[];
   depthData: DepthInfo;
@@ -303,7 +308,7 @@ export function buildRectDimensionOverlay(
   const cz0 = -z0;
   const cz1 = -z1;
 
-  const fmt = (v: number) => formatMeasurementWithUnit(Math.abs(v), 'imperial');
+  const fmt = (v: number) => formatMeasurementWithUnit(Math.abs(v), units);
   const cutLength = resolved.parameters.size.length;
   const cutWidth = resolved.parameters.size.width;
   const offsetLeft = resolved.placement.x;
@@ -385,11 +390,12 @@ export function buildRectDimensionOverlay(
 export function buildEndCutDimensionLines(
   part: Part,
   draft: FeatureDraft,
-  allFeatures?: PartFeature[]
+  allFeatures?: PartFeature[],
+  units: 'imperial' | 'metric' = 'imperial'
 ): { lines: DimensionLine[]; arcs: AngleArc[] } {
   if (draft.mode !== 'end_cut') return { lines: [], arcs: [] };
 
-  const fmt = (v: number) => formatMeasurementWithUnit(Math.abs(v), 'imperial');
+  const fmt = (v: number) => formatMeasurementWithUnit(Math.abs(v), units);
   const halfLength = part.length / 2;
   const halfWidth = part.width / 2;
   const halfThickness = part.thickness / 2;
@@ -525,13 +531,14 @@ export function buildEndCutDimensionLines(
 export function getEditableHandleOverlay(
   part: Part,
   draft: FeatureDraft | null,
-  allFeatures?: PartFeature[]
+  allFeatures?: PartFeature[],
+  units: 'imperial' | 'metric' = 'imperial'
 ): EditableHandleOverlay | null {
   if (!draft) return null;
 
   // End cuts: dimension-only overlay (no interactive handles)
   if (draft.mode === 'end_cut') {
-    const { lines, arcs } = buildEndCutDimensionLines(part, draft, allFeatures);
+    const { lines, arcs } = buildEndCutDimensionLines(part, draft, allFeatures, units);
     if (lines.length === 0 && arcs.length === 0) return null;
     return {
       mode: 'rect',
@@ -552,7 +559,7 @@ export function getEditableHandleOverlay(
     return null;
   }
 
-  const dims = buildRectDimensionOverlay(part, draft);
+  const dims = buildRectDimensionOverlay(part, draft, units);
   if (!dims) return null;
 
   const { lines, depthData, x0, x1, cz0, cz1, y } = dims;
@@ -684,6 +691,102 @@ const _camLocal = new THREE.Vector3();
 const DEPTH_INSET = 0.25; // how far inside the cutout to place the depth line
 
 /** Renders the depth indicator inside the cutout at the corner furthest from the camera. */
+const BLANK_DIMENSION_COLOR = '#8a7f72';
+
+/**
+ * The blank's length, width, and thickness, drawn on the part itself.
+ *
+ * These used to be a line of text at the top of the sidebar. On the part they
+ * say which edge is which, which a "24" x 12" x 3/4"" label never could. They
+ * sit outside the footprint, and in a muted stone rather than the blue,
+ * purple, and amber the cut overlays use, so an open cut's own dimensions stay
+ * the ones that draw the eye.
+ */
+export interface BlankDimensionLine {
+  points: [[number, number, number], [number, number, number]];
+  label: string;
+}
+
+/**
+ * The blank's length, width, and thickness as three lines on the part.
+ *
+ * They stand off the footprint by a fraction of the part so they clear the
+ * edges on a 3-inch offcut and a 96-inch sheet alike, and each starts at a
+ * different corner so the three labels never stack.
+ */
+export function buildBlankDimensionLines(part: Part, units: 'imperial' | 'metric'): BlankDimensionLine[] {
+  const halfLength = part.length / 2;
+  const halfWidth = part.width / 2;
+  const halfThickness = part.thickness / 2;
+  const gap = Math.max(0.2, Math.max(part.length, part.width) * 0.04);
+
+  return [
+    {
+      points: [
+        [-halfLength, -halfThickness, halfWidth + gap],
+        [halfLength, -halfThickness, halfWidth + gap]
+      ],
+      label: formatMeasurementWithUnit(part.length, units)
+    },
+    {
+      points: [
+        [halfLength + gap, -halfThickness, -halfWidth],
+        [halfLength + gap, -halfThickness, halfWidth]
+      ],
+      label: formatMeasurementWithUnit(part.width, units)
+    },
+    {
+      points: [
+        [halfLength + gap, -halfThickness, halfWidth + gap],
+        [halfLength + gap, halfThickness, halfWidth + gap]
+      ],
+      label: formatMeasurementWithUnit(part.thickness, units)
+    }
+  ];
+}
+
+/**
+ * Those lines, drawn. Muted stone rather than the blue, purple, and amber the
+ * cut overlays use, so an open cut's own dimensions stay the ones that draw
+ * the eye. These used to be a line of text at the top of the sidebar; on the
+ * part they also say which edge is which.
+ */
+function BlankDimensions({ part, units }: { part: Part; units: 'imperial' | 'metric' }) {
+  const lines = useMemo(() => buildBlankDimensionLines(part, units), [part, units]);
+
+  return (
+    <group>
+      {lines.map(({ points, label }, index) => {
+        const mid: [number, number, number] = [
+          (points[0][0] + points[1][0]) / 2,
+          (points[0][1] + points[1][1]) / 2,
+          (points[0][2] + points[1][2]) / 2
+        ];
+        return (
+          <group key={index}>
+            <Line
+              points={points}
+              color={BLANK_DIMENSION_COLOR}
+              lineWidth={1}
+              renderOrder={5}
+              depthWrite={false}
+              raycast={() => {}}
+            />
+            <Html position={mid} center zIndexRange={[0, 50]} style={{ pointerEvents: 'none' }}>
+              <div
+                className="whitespace-nowrap rounded px-1 py-0.5 text-[9px] font-medium text-white/95 shadow-sm"
+                style={{ backgroundColor: BLANK_DIMENSION_COLOR }}
+              >
+                {label}
+              </div>
+            </Html>
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
 function DepthIndicator({
   depthInfo,
   groupRef
@@ -763,6 +866,7 @@ function DepthIndicator({
 
 function PartCutsPreviewScene({
   previewPart,
+  units,
   draft,
   hoveredTarget,
   pendingTarget,
@@ -772,6 +876,7 @@ function PartCutsPreviewScene({
   frameNonce
 }: {
   previewPart: Part;
+  units: 'imperial' | 'metric';
   frameNonce: number;
   draft: FeatureDraft | null;
   hoveredTarget: PartFeatureTarget | null;
@@ -784,8 +889,8 @@ function PartCutsPreviewScene({
   const pickTargets = useMemo(() => getValidPickableTargets(previewPart, draft), [draft, previewPart]);
   const maxDimension = Math.max(previewPart.length, previewPart.width, previewPart.thickness, 1);
   const handleOverlay = useMemo(
-    () => getEditableHandleOverlay(previewPart, draft, previewPart.features ?? []),
-    [draft, previewPart]
+    () => getEditableHandleOverlay(previewPart, draft, previewPart.features ?? [], units),
+    [draft, previewPart, units]
   );
   const groupRef = useRef<THREE.Group>(null);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
@@ -864,6 +969,8 @@ function PartCutsPreviewScene({
           <meshStandardMaterial color="#d6c3a1" metalness={0.05} roughness={0.82} />
           <Edges geometry={geometry} threshold={15} color="#433225" raycast={() => {}} renderOrder={4} scale={1.002} />
         </mesh>
+
+        <BlankDimensions part={previewPart} units={units} />
 
         {/* Invisible drag plane — only appears during handle drags so pointer events
             keep firing even when the cursor moves off the part geometry.
@@ -1100,6 +1207,7 @@ function FrameCameraToPart({
 export function PartCutsPreviewCanvas({
   part,
   draftFeatures,
+  units,
   draft,
   selectedFeatureSummary,
   selectedFeatureTargetLabel,
@@ -1123,8 +1231,8 @@ export function PartCutsPreviewCanvas({
   const validTargets = useMemo(() => getValidPickableTargets(previewPart, draft), [draft, previewPart]);
   const draftTarget = draft ? getFeatureDraftTarget(draft) : null;
   const handleOverlay = useMemo(
-    () => getEditableHandleOverlay(previewPart, draft, previewPart.features ?? []),
-    [draft, previewPart]
+    () => getEditableHandleOverlay(previewPart, draft, previewPart.features ?? [], units),
+    [draft, previewPart, units]
   );
   const supportsHandles = supportsPreviewHandles(draft);
   // Panning and a wide zoom range mean the part can end up off screen. The
@@ -1216,6 +1324,7 @@ export function PartCutsPreviewCanvas({
       <Canvas camera={{ position: [maxDimension * 2.2, maxDimension * 1.6, maxDimension * 2.4], fov: 38 }}>
         <PartCutsPreviewScene
           previewPart={previewPart}
+          units={units}
           draft={draft}
           hoveredTarget={hoveredTarget}
           pendingTarget={pendingTarget}
