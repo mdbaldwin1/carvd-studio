@@ -337,14 +337,18 @@ export function isTargetValidForDraft(target: PartFeatureTarget, draft: FeatureD
   }
 
   if (draft.cutType === 'corner_notch') {
-    if (target.type !== 'corner') return false;
-    if (draft.depthMode === 'through') return true;
-    return target.corner.includes('top') || target.corner.includes('bottom');
+    // Every CornerTarget is front/back + left/right; none contains "top" or
+    // "bottom", so testing for those offered a blind corner notch no pick
+    // handles at all while the side panel still listed all four corners.
+    return target.type === 'corner';
   }
 
-  if (draft.cutType === 'edge_notch') {
+  if (draft.cutType === 'edge_notch' || draft.cutType === 'rabbet') {
     if (target.type !== 'edge') return false;
-    // Only accept canonical side targets (top_front/back/left/right)
+    // Only accept canonical side targets (top_front/back/left/right).
+    // Rabbets belong here too: applyTargetToFeatureDraft accepts only an edge
+    // for them, so falling through to the face check below advertised
+    // top/bottom face handles that silently did nothing when clicked.
     return (
       target.edge === 'top_front_edge' ||
       target.edge === 'top_back_edge' ||

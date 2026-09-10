@@ -520,16 +520,16 @@ describe('applyHandleDelta', () => {
 describe('nudgeDraft', () => {
   const part = createTestPart({ length: 24, width: 12, thickness: 0.75 });
 
-  it('nudges moves along both axes', () => {
+  it('nudges moves along the length only, matching the Move Left/Right buttons', () => {
     const draft = createRectDraft('mortise', { placementX: 4, placementZ: 3 });
 
     const nudged = nudgeDraft(part, draft, 'move', 1);
     expect(nudged.placementX).toBeCloseTo(4.25);
-    expect(nudged.placementZ).toBeCloseTo(3.25);
+    expect(nudged.placementZ).toBeCloseTo(3);
 
     const nudgedBack = nudgeDraft(part, draft, 'move', -1);
     expect(nudgedBack.placementX).toBeCloseTo(3.75);
-    expect(nudgedBack.placementZ).toBeCloseTo(2.75);
+    expect(nudgedBack.placementZ).toBeCloseTo(3);
   });
 
   it('nudges the run length and width independently', () => {

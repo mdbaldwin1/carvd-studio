@@ -668,3 +668,47 @@ describe('partFeatureEditorState', () => {
     });
   });
 });
+
+describe('regressions from the 2026-09-09 pre-release review', () => {
+  it('clamps a side-face pocket offset against thickness, not width', () => {
+    // On a leg (narrow but thick) the width clamp silently rewrote a valid
+    // front-face mortise the moment the inspector opened it.
+    const draft = normalizeRectCutDraft(
+      {
+        mode: 'rect_cut',
+        cutType: 'mortise',
+        faceTarget: 'front_face',
+        edgeTarget: 'top_front_edge',
+        cornerTarget: 'front_left_corner',
+        sizeLength: 2,
+        sizeWidth: 1,
+        placementX: 4,
+        placementZ: 2,
+        depthMode: 'blind',
+        depth: 0.5
+      } as never,
+      { partLength: 24, partWidth: 1.5, partThickness: 3.5 }
+    );
+    expect(draft.placementZ).toBeCloseTo(2);
+  });
+
+  it('still clamps a top-face pocket against the width', () => {
+    const draft = normalizeRectCutDraft(
+      {
+        mode: 'rect_cut',
+        cutType: 'mortise',
+        faceTarget: 'top_face',
+        edgeTarget: 'top_front_edge',
+        cornerTarget: 'front_left_corner',
+        sizeLength: 2,
+        sizeWidth: 1,
+        placementX: 4,
+        placementZ: 99,
+        depthMode: 'blind',
+        depth: 0.25
+      } as never,
+      { partLength: 24, partWidth: 6, partThickness: 0.75 }
+    );
+    expect(draft.placementZ).toBeCloseTo(5);
+  });
+});

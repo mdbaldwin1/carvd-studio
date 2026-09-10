@@ -267,6 +267,12 @@ export function validateSerializedPartFeatures(value: unknown, path: string): st
         (!isFiniteNumber(candidate.parameters.depth) || candidate.parameters.depth <= 0)
       )
         errors.push(`${featurePath}.parameters.depth is invalid`);
+      // A blind cut needs a depth, the same requirement circular and rounded
+      // cuts already enforce. Without it getRectCutDepth resolves to 0 and the
+      // pocket loads clean but renders as nothing, surfacing much later as an
+      // editor conflict instead of an import error.
+      if (candidate.parameters.depthMode === 'blind' && !isPositiveFiniteNumber(candidate.parameters.depth))
+        errors.push(`${featurePath}.parameters.depth is invalid`);
     }
     if (
       !isRecord(candidate.placement) ||

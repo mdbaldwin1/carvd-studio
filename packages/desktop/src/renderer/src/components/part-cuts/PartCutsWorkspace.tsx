@@ -231,7 +231,10 @@ export function PartCutsWorkspace({
 
   const draftPreviewFeature = useMemo(() => {
     if (!draft || draft.mode !== 'end_cut') return null;
-    return buildFeatureFromDraft(draft);
+    // Preview exactly what Save will write. normalizeEndCutDraft rewrites a
+    // zero bevel angle to 45, so previewing the raw draft showed a flat board
+    // for a cut that saved as a 45 degree bevel.
+    return buildFeatureFromDraft(normalizeEndCutDraft(draft));
   }, [draft]);
 
   const availableCornerTargets = useMemo(() => {
@@ -241,7 +244,10 @@ export function PartCutsWorkspace({
 
   const availableEdgeTargets = useMemo(() => {
     if (!draft || draft.mode !== 'rect_cut' || draft.cutType !== 'rabbet') return EDGE_TARGETS;
-    return draft.depthMode === 'blind' ? TOP_BOTTOM_EDGE_TARGETS : EDGE_TARGETS;
+    // getResolvedRectCutFeature makes every rabbet blind, and a rabbet's run is
+    // only defined along a horizontal edge, so never offer the vertical corner
+    // edges here regardless of the authored depth mode.
+    return TOP_BOTTOM_EDGE_TARGETS;
   }, [draft]);
 
   const availableFaceTargets = useMemo(() => {
@@ -262,7 +268,9 @@ export function PartCutsWorkspace({
 
   const draftValidationMessage = useMemo(() => {
     if (!draft) return null;
-    const feature = buildFeatureFromDraft(draft);
+    // Validate the same normalized draft that Save builds, so the message can
+    // never describe geometry other than what will be written.
+    const feature = buildFeatureFromDraft(draft.mode === 'end_cut' ? normalizeEndCutDraft(draft) : draft);
     const features = draft.featureId
       ? draftFeatures.map((existing) => (existing.id === draft.featureId ? feature : existing))
       : [...draftFeatures, feature];
@@ -394,9 +402,14 @@ export function PartCutsWorkspace({
     const nextFeature = originalFeature?.metadata
       ? { ...builtFeature, metadata: clonePartFeature(originalFeature).metadata }
       : builtFeature;
-    const nextFeatures = draft.featureId
-      ? draftFeatures.map((feature) => (feature.id === draft.featureId ? nextFeature : feature))
-      : [...draftFeatures, nextFeature];
+    // Draft undo can remove the edited cut from the list while its inspector is
+    // still open. Replacing by id would then match nothing and drop the edit
+    // without a word, so re-add a cut whose original is gone rather than
+    // silently discarding what the user just typed.
+    const nextFeatures =
+      draft.featureId && originalFeature
+        ? draftFeatures.map((feature) => (feature.id === draft.featureId ? nextFeature : feature))
+        : [...draftFeatures, nextFeature];
 
     onDraftFeaturesChange(nextFeatures);
     onSelectFeature(nextFeature.id);
@@ -1103,8 +1116,11 @@ export function PartCutsWorkspace({
                                   setDraft({
                                     ...inspectorDraft,
                                     verticalAngle: Math.abs(nextAngle),
-                                    verticalFlip:
-                                      nextAngle < 0 ? !inspectorDraft.verticalFlip : inspectorDraft.verticalFlip
+                                    // Set, never toggle: toggling makes the same
+                                    // typed value produce opposite geometry
+                                    // depending on history. Matches the mitre
+                                    // handler above.
+                                    verticalFlip: nextAngle < 0 ? true : inspectorDraft.verticalFlip
                                   });
                                 }}
                               />

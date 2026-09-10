@@ -604,3 +604,32 @@ describe('getPartFeatureConflicts', () => {
     expect(clearing.every((c) => c.code !== 'rect_depth_intersection')).toBe(true);
   });
 });
+
+describe('regressions from the 2026-09-09 pre-release review', () => {
+  it('bounds a side-face pocket across the width, not by its placement.z', () => {
+    // cutout/mortise are the only side-face-capable types and were swallowed by
+    // the general branch, which read placement.z (a height across the
+    // thickness) as a position across the board width.
+    const part = createTestPart({ length: 24, width: 6, thickness: 3 });
+    const topMortise = {
+      id: 'top',
+      kind: 'rect_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      cutType: 'mortise' as const,
+      target: { type: 'face' as const, face: 'top_face' as const },
+      parameters: { size: { length: 2, width: 1 }, depthMode: 'blind' as const, depth: 0.5 },
+      placement: { x: 4, z: 0 }
+    };
+    const frontMortise = {
+      ...topMortise,
+      id: 'front',
+      target: { type: 'face' as const, face: 'front_face' as const },
+      parameters: { size: { length: 2, width: 1 }, depthMode: 'blind' as const, depth: 2 },
+      placement: { x: 4, z: 2 }
+    };
+
+    const conflicts = getPartFeatureConflicts([topMortise, frontMortise], part);
+    expect(conflicts.length).toBeGreaterThan(0);
+  });
+});

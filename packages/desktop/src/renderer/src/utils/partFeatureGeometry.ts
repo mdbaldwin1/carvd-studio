@@ -804,10 +804,15 @@ function getTenonLayerRemovals(part: Part, tenons: RectCutFeature[], yMid: numbe
 
 function getFeaturePolygons(part: Part): polygonClipping.MultiPolygon {
   const contour = buildOuterContour(part);
+  // Resolve before testing depth, exactly as the 3D removal pass does. Family
+  // cuts (dado, groove, rabbet, tenon, mortise) resolve to blind whatever the
+  // authored mode says, so reading the authored one here would punch a full
+  // through hole in the plan model for a cut that renders as a shallow
+  // channel -- and collision would let parts pass through solid wood.
   const removals = getEnabledFeatures(part)
-    .filter(
-      (feature): feature is RectCutFeature => feature.kind === 'rect_cut' && feature.parameters.depthMode === 'through'
-    )
+    .filter((feature): feature is RectCutFeature => feature.kind === 'rect_cut')
+    .map((feature) => getResolvedRectCutFeature(feature, part))
+    .filter((feature) => feature.parameters.depthMode === 'through')
     .map((feature) => getRectCutHole(feature, part));
   if (!removals.length) return [[contour.concat(contour[0]).map(({ x, z }) => [x, z])]];
   return differenceContours(contour, removals);
@@ -838,7 +843,11 @@ export function getPartRenderGeometry(part: Part): THREE.BufferGeometry {
   if (geometryCache.size >= MAX_GEOMETRY_CACHE_ENTRIES) {
     const oldestKey = geometryCache.keys().next().value;
     if (oldestKey !== undefined) {
-      geometryCache.get(oldestKey)?.dispose();
+      // Evict the reference but never dispose here. Part.tsx memoizes whatever
+      // this returned and renders it via <primitive>, so the evicted geometry
+      // is very likely still mounted -- disposing it makes that part vanish
+      // once a scene holds more than MAX_GEOMETRY_CACHE_ENTRIES distinct cuts.
+      // Dropping the last reference lets three release the GPU buffers.
       geometryCache.delete(oldestKey);
     }
   }

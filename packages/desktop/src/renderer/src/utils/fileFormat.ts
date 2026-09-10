@@ -418,6 +418,30 @@ export function repairCarvdFile(jsonString: string): FileRepairResult {
   if (!Array.isArray(obj.groups)) obj.groups = [];
   if (!Array.isArray(obj.groupMembers)) obj.groupMembers = [];
 
+  // Repair the two scalar fields the full validation below insists on. Without
+  // this, recovery fails for exactly the corruption classes that make a file
+  // need recovering. A version *newer* than this build is left alone on
+  // purpose: that is a "please update Carvd Studio" condition, not damage.
+  if (typeof obj.version !== 'number') {
+    const hasPartFeatures = [
+      ...(obj.parts as unknown[]),
+      ...((obj.assemblies as { parts?: unknown[] }[] | undefined) ?? []).flatMap((assembly) => assembly?.parts ?? [])
+    ].some((part) => {
+      const features = (part as { features?: unknown })?.features;
+      return Array.isArray(features) && features.length > 0;
+    });
+    // Mirror how saves pick a version, so a project without cuts keeps the
+    // legacy version and stays readable by older builds.
+    obj.version = hasPartFeatures ? CARVD_FILE_VERSION : CARVD_FILE_VERSION_BASE;
+    repairActions.push(`Restored missing file version to ${obj.version}`);
+  }
+
+  const projectMetadata = obj.project as Record<string, unknown>;
+  if (typeof projectMetadata.name !== 'string') {
+    projectMetadata.name = 'Recovered Project';
+    repairActions.push('Restored missing project name');
+  }
+
   const invalidCollectionEntries = [
     ['parts', obj.parts],
     ['stocks', obj.stocks],

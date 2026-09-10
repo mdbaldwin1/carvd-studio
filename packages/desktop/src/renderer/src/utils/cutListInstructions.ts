@@ -104,7 +104,11 @@ export function groupCutInstructions(instructions: CutInstruction[]): GroupedCut
     const featureKey = getInstructionEnabledFeatures(inst)
       .map((feature) => getFeatureGroupingKey(feature, jointGroups))
       .join('|');
-    const noteKey = inst.notes?.trim() ?? '';
+    // A glue-up panel puts its note on the first strip only, so keying on it
+    // would split one panel into "Qty 1" plus "Qty 2" of identical blanks and
+    // inflate the unique-blank count. Distinct notes still separate ordinary
+    // parts, which is what this key was added for.
+    const noteKey = inst.isGlueUp ? '' : (inst.notes?.trim() ?? '');
     const key = `${inst.stage ?? 'blank'}-${inst.cutLength}-${inst.cutWidth}-${inst.thickness}-${inst.stockId}-${inst.grainSensitive}-${inst.isGlueUp}-${featureKey}-${noteKey}`;
 
     const existing = groups.get(key);

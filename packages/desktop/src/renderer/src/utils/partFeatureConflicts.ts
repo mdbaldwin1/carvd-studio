@@ -59,6 +59,22 @@ function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length'
   const sizeLength = resolvedFeature.parameters.size.length;
   const sizeWidth = resolvedFeature.parameters.size.width;
 
+  // Side-face pockets first: cutout and mortise are the only types that can
+  // target front/back, so the general branch below would otherwise swallow
+  // them and read placement.z -- a height across the thickness -- as if it
+  // were a position across the board width.
+  if (isSideFaceTarget(resolvedFeature)) {
+    const depth = Math.min(resolvedFeature.parameters.depth ?? 0, part.width);
+    if (depth <= 0) return null;
+    const front = resolvedFeature.target.type === 'face' && resolvedFeature.target.face === 'front_face';
+    return {
+      minX: resolvedFeature.placement.x,
+      maxX: resolvedFeature.placement.x + sizeLength,
+      minZ: front ? 0 : part.width - depth,
+      maxZ: front ? depth : part.width
+    };
+  }
+
   if (
     resolvedFeature.cutType === 'cutout' ||
     resolvedFeature.cutType === 'dado' ||
@@ -84,18 +100,6 @@ function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length'
       maxX: isLeft ? runLength : part.length,
       minZ: 0,
       maxZ: part.width
-    };
-  }
-
-  if (isSideFaceTarget(resolvedFeature)) {
-    const depth = Math.min(resolvedFeature.parameters.depth ?? 0, part.width);
-    if (depth <= 0) return null;
-    const front = resolvedFeature.target.type === 'face' && resolvedFeature.target.face === 'front_face';
-    return {
-      minX: resolvedFeature.placement.x,
-      maxX: resolvedFeature.placement.x + sizeLength,
-      minZ: front ? 0 : part.width - depth,
-      maxZ: front ? depth : part.width
     };
   }
 

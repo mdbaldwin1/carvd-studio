@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { RectCutFeature } from '../types';
+import type { EdgeTarget, RectCutFeature } from '../types';
 import {
   getRectCutDepth,
+  getRectCutPlanBounds,
   getRectCutPreviewSupport,
   getResolvedRectCutFeature,
   isBottomTarget,
@@ -819,5 +820,39 @@ describe('rectCutUtils', () => {
       expect(validateRectCutFeature(rect('stopped_dado', { placement: { x: 4, z: 0 } }), part)).toBeNull();
       expect(validateRectCutFeature(rect('groove', { placement: { x: 0, z: 2 } }), part)).toBeNull();
     });
+  });
+});
+
+describe('regressions from the 2026-09-09 pre-release review', () => {
+  const part = { length: 10, width: 6, thickness: 1 };
+  const notch = (edge: EdgeTarget): RectCutFeature => ({
+    id: `notch-${edge}`,
+    kind: 'rect_cut',
+    version: 1,
+    enabled: true,
+    cutType: 'edge_notch',
+    target: { type: 'edge', edge },
+    parameters: { size: { length: 2, width: 2 }, depthMode: 'through' },
+    placement: { x: 1, z: 0 }
+  });
+
+  it('anchors the vertical corner edges distinctly instead of aliasing them', () => {
+    // includes('front') also matched front_left_edge / front_right_edge, so the
+    // two produced byte-identical geometry.
+    const frontLeft = getRectCutPlanBounds(notch('front_left_edge'), part);
+    const frontRight = getRectCutPlanBounds(notch('front_right_edge'), part);
+    expect(frontLeft).not.toEqual(frontRight);
+    expect(frontLeft.minX).toBeCloseTo(0);
+    expect(frontRight.maxX).toBeCloseTo(part.length);
+
+    const backLeft = getRectCutPlanBounds(notch('back_left_edge'), part);
+    expect(backLeft.maxZ).toBeCloseTo(part.width);
+    expect(frontLeft.minZ).toBeCloseTo(0);
+  });
+
+  it('still treats the horizontal edges as lengthwise or widthwise', () => {
+    expect(getRectCutPlanBounds(notch('top_left_edge'), part).minX).toBeCloseTo(0);
+    expect(getRectCutPlanBounds(notch('top_right_edge'), part).maxX).toBeCloseTo(part.length);
+    expect(getRectCutPlanBounds(notch('top_back_edge'), part).maxZ).toBeCloseTo(part.width);
   });
 });

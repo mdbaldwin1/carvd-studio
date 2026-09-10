@@ -57,8 +57,23 @@ export function isTopOrBottomFace(face: FaceTarget): boolean {
   return face === 'top_face' || face === 'bottom_face';
 }
 
+/**
+ * The four `front_*`/`back_*` edges are the blank's vertical corner edges: they
+ * run along the thickness, not the length or the width. `includes('front')`
+ * matches them as well as `top_front_edge`, so anything choosing between the
+ * two horizontal orientations must test the prefix instead.
+ */
+export function isVerticalEdgeTarget(edge: EdgeTarget): boolean {
+  return edge.startsWith('front_') || edge.startsWith('back_');
+}
+
+/** True when the edge runs along the blank's length (a front/back edge). */
+export function isLengthwiseEdgeTarget(edge: EdgeTarget): boolean {
+  return !isVerticalEdgeTarget(edge) && (edge.includes('front') || edge.includes('back'));
+}
+
 function getRabbetRunLength(edge: EdgeTarget, part: Pick<Part, 'length' | 'width'>): number {
-  return edge.includes('front') || edge.includes('back') ? part.length : part.width;
+  return isLengthwiseEdgeTarget(edge) ? part.length : part.width;
 }
 
 export function getResolvedRectCutFeature(
@@ -110,7 +125,7 @@ export function getResolvedRectCutFeature(
   if (feature.cutType === 'rabbet') {
     const targetEdge = feature.target.type === 'edge' ? feature.target.edge : 'top_front_edge';
     const runLength = getRabbetRunLength(targetEdge, part);
-    const alongLength = targetEdge.includes('front') || targetEdge.includes('back');
+    const alongLength = isLengthwiseEdgeTarget(targetEdge);
     return {
       ...cloneRectCutFeature(feature),
       target: { type: 'edge', edge: targetEdge },
@@ -227,8 +242,17 @@ export function getRectCutPlanBounds(feature: RectCutFeature, part: Pick<Part, '
     z = resolved.target.corner.includes('back') ? part.width - width : 0;
   } else if (resolved.target.type === 'edge') {
     const edge = resolved.target.edge;
-    if (edge.includes('front') || edge.includes('back')) z = edge.includes('back') ? part.width - width : 0;
-    else x = edge.includes('right') ? part.length - length : 0;
+    if (isVerticalEdgeTarget(edge)) {
+      // A vertical edge runs through the thickness, so its footprint is pinned
+      // in both plan axes like a corner notch. Treating it as lengthwise left
+      // front_left_edge and front_right_edge with identical geometry.
+      x = edge.includes('right') ? part.length - length : 0;
+      z = edge.startsWith('back_') ? part.width - width : 0;
+    } else if (isLengthwiseEdgeTarget(edge)) {
+      z = edge.includes('back') ? part.width - width : 0;
+    } else {
+      x = edge.includes('right') ? part.length - length : 0;
+    }
   }
   return { minX: x, maxX: x + length, minZ: z, maxZ: z + width };
 }
@@ -444,7 +468,11 @@ export function validateRectCutFeature(
     if (resolvedFeature.placement.x < 0 || resolvedFeature.placement.z < 0) return 'Notch offsets cannot be negative.';
 
     const edge = resolvedFeature.target.type === 'edge' ? resolvedFeature.target.edge : 'top_front_edge';
-    if (edge.includes('front') || edge.includes('back')) {
+    if (isVerticalEdgeTarget(edge)) {
+      // Pinned in both plan axes, so both extents are bounded outright.
+      if (sizeLength > part.length) return 'Edge notch length runs past the blank.';
+      if (sizeWidth > part.width) return 'Edge notch width runs past the blank.';
+    } else if (isLengthwiseEdgeTarget(edge)) {
       if (resolvedFeature.placement.x + sizeLength > part.length) return 'Edge notch length runs past the blank.';
       if (sizeWidth > part.width) return 'Edge notch width runs past the blank.';
     } else {

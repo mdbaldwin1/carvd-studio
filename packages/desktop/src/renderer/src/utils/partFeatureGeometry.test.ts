@@ -240,7 +240,7 @@ describe('partFeatureGeometry', () => {
     expect(second).toBe(first);
   });
 
-  it('bounds cached feature geometries and disposes the oldest entry', () => {
+  it('bounds cached feature geometries without disposing the evicted entry', () => {
     const first = getPartRenderGeometry(
       createTestPart({
         features: [
@@ -281,7 +281,11 @@ describe('partFeatureGeometry', () => {
     }
 
     expect(getPartGeometryCacheSizeForTests()).toBeLessThanOrEqual(128);
-    expect(dispose).toHaveBeenCalledOnce();
+    // Evicting must not dispose: Part.tsx memoizes whatever this returned and
+    // renders it via <primitive>, so the evicted geometry is very likely still
+    // mounted. Disposing it made that part vanish once a scene held more than
+    // 128 distinctly-cut parts. Dropping the reference is enough.
+    expect(dispose).not.toHaveBeenCalled();
   });
 
   it('shortens the profile on mitred ends', () => {

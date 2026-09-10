@@ -1462,3 +1462,35 @@ describe('fileFormat', () => {
     });
   });
 });
+
+describe('repair regressions from the 2026-09-09 pre-release review', () => {
+  const sound = {
+    version: 1,
+    project: { name: 'P', units: 'imperial' },
+    parts: [],
+    stocks: [],
+    groups: [],
+    groupMembers: []
+  };
+
+  it('repairs a missing file version', () => {
+    // Repair began running full schema validation but never repaired the
+    // fields that validation newly demanded, so recovery failed for exactly
+    // the corruption that makes a file need recovering.
+    const noVersion: Record<string, unknown> = { ...sound };
+    delete noVersion.version;
+    const result = repairCarvdFile(JSON.stringify(noVersion));
+    expect(result.remainingErrors).toEqual([]);
+    expect(result.success).toBe(true);
+  });
+
+  it('repairs a missing project name', () => {
+    const result = repairCarvdFile(JSON.stringify({ ...sound, project: { units: 'imperial' } }));
+    expect(result.remainingErrors).toEqual([]);
+    expect(result.success).toBe(true);
+  });
+
+  it('still refuses a file newer than this build', () => {
+    expect(repairCarvdFile(JSON.stringify({ ...sound, version: 99 })).success).toBe(false);
+  });
+});

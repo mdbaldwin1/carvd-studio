@@ -78,9 +78,18 @@ export function usePartDrag(
 ) {
   const [isDragging, setIsDragging] = useState(false);
   const dragIntentForPart = useSelectionStore((s) => (s.dragIntent?.partId === part.id ? s.dragIntent : null));
-  const dragStart = useRef<{ point: THREE.Vector3; partPos: THREE.Vector3; partOriginalPos: THREE.Vector3 } | null>(
-    null
-  );
+  const dragStart = useRef<{
+    point: THREE.Vector3;
+    partPos: THREE.Vector3;
+    partOriginalPos: THREE.Vector3;
+    /**
+     * Plane the anchor `point` was captured against. Latched for the whole
+     * gesture: deriving it per frame from evt.shiftKey while the anchor stayed
+     * on the ground plane made the part jump by the gap between the two
+     * ray-plane hits the instant Shift was pressed or released.
+     */
+    planeMode: 'ground' | 'face';
+  } | null>(null);
   const justFinishedDragging = useRef(false);
   const justFinishedDraggingTimeoutRef = useRef<number | null>(null);
   const lastDragPosition = useRef<{ x: number; y: number; z: number } | null>(null);
@@ -333,7 +342,9 @@ export function usePartDrag(
       dragStart.current = {
         point: startPoint.clone(),
         partPos: anchorPos,
-        partOriginalPos: new THREE.Vector3(part.position.x, part.position.y, part.position.z)
+        partOriginalPos: new THREE.Vector3(part.position.x, part.position.y, part.position.z),
+        // getDragPlaneInfo(anchorPos) above defaults to the ground plane.
+        planeMode: 'ground'
       };
       lastDragPosition.current = { x: part.position.x, y: part.position.y, z: part.position.z };
       dragFrameCounterRef.current = 0;
@@ -408,7 +419,7 @@ export function usePartDrag(
       if (currentPoint) {
         const delta = _tempDelta.current.copy(currentPoint).sub(dragStart.current.point);
         dragFrameCounterRef.current += 1;
-        const planeInfo = getDragPlaneInfo(dragStart.current.partPos, evt.shiftKey ? 'face' : 'ground');
+        const planeInfo = getDragPlaneInfo(dragStart.current.partPos, dragStart.current.planeMode);
 
         let uAmount = delta.dot(planeInfo.basisU);
         let vAmount = delta.dot(planeInfo.basisV);
@@ -732,11 +743,15 @@ export function usePartDrag(
         const rawY = lastDragPosition.current.y;
         const rawZ = lastDragPosition.current.z;
 
-        const gridReleasePosition = resolveLiveGridReleasePosition(
-          { x: rawX, y: rawY, z: rawZ },
-          wasSnappedByParts.current,
-          liveGridSnap
-        );
+        const gridReleasePosition = {
+          ...resolveLiveGridReleasePosition({ x: rawX, y: rawY, z: rawZ }, wasSnappedByParts.current, liveGridSnap),
+          // This drag runs on the ground plane, so Y is never a drag axis and
+          // must not be quantized on release. On stock that is not a multiple
+          // of the grid (18mm = 0.7087") that nudges the part into the one
+          // below, and the collision search then scales the whole delta down,
+          // discarding most of the horizontal move the user actually made.
+          y: rawY
+        };
         let newX = gridReleasePosition.x;
         let newY = gridReleasePosition.y;
         let newZ = gridReleasePosition.z;
@@ -1022,7 +1037,9 @@ export function usePartDrag(
       dragStart.current = {
         point: startPoint.clone(),
         partPos: anchorPos,
-        partOriginalPos: partOriginalPos
+        partOriginalPos: partOriginalPos,
+        // getDragPlaneInfo(anchorPos) above defaults to the ground plane.
+        planeMode: 'ground'
       };
       lastDragPosition.current = { x: partOriginalPos.x, y: partOriginalPos.y, z: partOriginalPos.z };
       dragFrameCounterRef.current = 0;

@@ -666,12 +666,15 @@ export function nudgeDraft(part: Part, draft: FeatureDraft, kind: HandleKind, di
       kind === 'length' ? step * Math.sin(angle) : step * Math.cos(angle)
     );
   }
+  // 'move' drives the Move Left / Move Right buttons, so it travels along the
+  // length only. Sending `step` on both axes slid the cut diagonally across
+  // the board width as well, with no control to bring it back.
   return applyHandleDelta(
     part,
     draft,
     kind,
     kind === 'move' || kind === 'length' ? step : 0,
-    kind === 'move' || kind === 'width' ? step : 0
+    kind === 'width' ? step : 0
   );
 }
 
@@ -825,6 +828,27 @@ function PartCutsPreviewScene({
     setIsDraggingHandle(false);
     if (controlsRef.current) controlsRef.current.enabled = true;
   };
+
+  // The drag plane only receives pointerup when the release ray actually hits
+  // it. Letting go over the side panel, or anywhere above the horizon, would
+  // otherwise leave the drag live: OrbitControls stays disabled and moving the
+  // cursor back over the preview with no button held keeps resizing the cut.
+  useEffect(() => {
+    if (!isDraggingHandle) return;
+    const finishDrag = (event: PointerEvent) => {
+      const activeDrag = activeDragRef.current;
+      if (activeDrag && activeDrag.pointerId !== event.pointerId) return;
+      activeDragRef.current = null;
+      setIsDraggingHandle(false);
+      if (controlsRef.current) controlsRef.current.enabled = true;
+    };
+    window.addEventListener('pointerup', finishDrag);
+    window.addEventListener('pointercancel', finishDrag);
+    return () => {
+      window.removeEventListener('pointerup', finishDrag);
+      window.removeEventListener('pointercancel', finishDrag);
+    };
+  }, [isDraggingHandle]);
 
   return (
     <>

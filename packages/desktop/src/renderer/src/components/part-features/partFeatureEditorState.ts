@@ -11,6 +11,7 @@ import {
   RoundedCutFeature
 } from '@renderer/types';
 import { clonePartFeature } from '@renderer/utils/partFeatures';
+import { isLengthwiseEdgeTarget } from '@renderer/utils/rectCutUtils';
 
 export const END_TARGETS: FaceTarget[] = ['left_end', 'right_end'];
 export const FACE_TARGETS: FaceTarget[] = [
@@ -348,11 +349,13 @@ export function normalizeRectCutDraft(
   }
 
   if (normalized.cutType === 'rabbet') {
-    const shoulder =
-      normalized.edgeTarget.includes('front') || normalized.edgeTarget.includes('back')
-        ? Math.max(0.125, normalized.sizeWidth || 0.5)
-        : Math.max(0.125, normalized.sizeLength || 0.5);
-    if (normalized.edgeTarget.includes('front') || normalized.edgeTarget.includes('back')) {
+    // A rabbet runs along one horizontal edge; `includes` would also match the
+    // vertical corner edges and rip it the wrong way across the blank.
+    const alongLength = isLengthwiseEdgeTarget(normalized.edgeTarget);
+    const shoulder = alongLength
+      ? Math.max(0.125, normalized.sizeWidth || 0.5)
+      : Math.max(0.125, normalized.sizeLength || 0.5);
+    if (alongLength) {
       normalized.sizeLength = partLength;
       normalized.sizeWidth = shoulder;
       normalized.placementX = 0;
@@ -366,7 +369,13 @@ export function normalizeRectCutDraft(
   }
 
   const maxX = Math.max(0, partLength - normalized.sizeLength);
-  const maxZ = Math.max(0, partWidth - normalized.sizeWidth);
+  // On front/back faces the cross measurement and its offset run across the
+  // board thickness, not its width -- the same bound validateRectCutFeature
+  // applies. Clamping against the width instead silently rewrites a valid
+  // side-face pocket the moment the inspector opens it.
+  const isSideFacePocket = normalized.faceTarget === 'front_face' || normalized.faceTarget === 'back_face';
+  const crossExtent = isSideFacePocket ? partThickness : partWidth;
+  const maxZ = Math.max(0, crossExtent - normalized.sizeWidth);
 
   if (normalized.cutType !== 'corner_notch' && normalized.cutType !== 'groove' && normalized.cutType !== 'rabbet') {
     normalized.placementX = clamp(normalized.placementX, 0, maxX);

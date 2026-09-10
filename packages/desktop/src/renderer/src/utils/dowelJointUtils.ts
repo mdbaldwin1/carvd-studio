@@ -158,7 +158,11 @@ export function createDowelJoint(input: CreateDowelJointInput): DowelJointResult
   );
 
   for (let memberIndex = 0; memberIndex < input.count; memberIndex += 1) {
-    const primary = input.firstPrimary + memberIndex * input.spacing;
+    // Spacing is only meaningful past the first hole, and it is only checked
+    // for finiteness when count > 1. `0 * NaN` is NaN, so multiplying blindly
+    // turned an empty spacing field at count 1 into a hole-geometry error
+    // naming a field the dialog says is irrelevant.
+    const primary = memberIndex === 0 ? input.firstPrimary : input.firstPrimary + memberIndex * input.spacing;
     const first = feature(
       jointId,
       input.firstPart,
@@ -501,10 +505,17 @@ function getRawDowelVisualizations(parts: Part[]): DowelVisualization[] {
   for (const entries of members.values()) {
     if (entries.length !== 2) continue;
     const [first, second] = entries;
+    // A pattern that expands to nothing yields no member here. This runs on
+    // every render, so a bad payload must skip the dowel rather than take the
+    // viewport down with it.
     const member = expandCircularCut(first.feature, first.part)[0];
+    if (!member) continue;
     const entry = worldPoint(first.part, member.entryPoint);
     const axis = worldDirection(first.part, member.axis);
     const totalDepth = first.metadata.embedmentDepth + second.metadata.embedmentDepth;
+    // Zero total embedment would divide to NaN and emit a dowel whose centre
+    // poisons the renderer's bounding sphere and breaks raycasting.
+    if (!(totalDepth > 0)) continue;
     const firstInsertion = (first.metadata.dowelLength * first.metadata.embedmentDepth) / totalDepth;
     const center = entry.clone().addScaledVector(axis, firstInsertion - first.metadata.dowelLength / 2);
     visuals.push({

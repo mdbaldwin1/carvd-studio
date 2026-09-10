@@ -421,14 +421,16 @@ describe('PartCutsWorkspace', () => {
       fireEvent.click(within(preview).getByRole('button', { name: 'Move Right' }));
       fireEvent.click(within(preview).getByRole('button', { name: resize }));
 
+      // Move Right travels along the face only; the across-face offset is
+      // reached through its own field, not by nudging diagonally.
       expect(screen.getByLabelText('Offset Along Face')).toHaveValue('1/4');
-      expect(screen.getByLabelText('Offset Across Face')).toHaveValue('1/4');
+      expect(screen.getByLabelText('Offset Across Face')).toHaveValue('0');
       expect(screen.getByLabelText(field)).toHaveValue(parameter === 'diameter' ? '1/2' : '3 1/4');
       fireEvent.click(screen.getByRole('button', { name: 'Save Cut' }));
 
       expect(lastFeatures(onDraftFeaturesChange)[0]).toEqual(
         expect.objectContaining({
-          placement: expect.objectContaining({ primary: 0.25, secondary: 0.25 }),
+          placement: expect.objectContaining({ primary: 0.25, secondary: 0 }),
           parameters: expect.objectContaining({ [parameter]: parameter === 'diameter' ? 0.5 : 3.25 })
         })
       );
@@ -1348,7 +1350,9 @@ describe('PartCutsWorkspace', () => {
     expect(features[0]).toMatchObject({
       cutType: 'mortise',
       parameters: expect.objectContaining({ size: { length: 2.25, width: 1 } }),
-      placement: { x: 0.25, z: 0.25 }
+      // Two rights and one left net a single step along the length; the move
+      // handle does not travel across the width.
+      placement: { x: 0.25, z: 0 }
     });
   });
 

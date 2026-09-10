@@ -221,25 +221,40 @@ function existingOverlapDoesNotWorsen(
   geometryCache?: GeometryCache
 ): boolean {
   if (!overlapCheckEnabled(part, other)) return true;
-  // The depth comparison below reasons over raw OBBs, which is only valid
-  // when the OBB is the actual overlap representation. Feature-bearing parts
-  // (custom cuts) can interlock: their coarse OBBs overlap deeply and stably,
-  // so any translation would look like "not worsening" and bypass the exact
-  // contour/sub-OBB checks in partsOverlap.
-  if ((part.features && part.features.length > 0) || (other.features && other.features.length > 0)) {
-    return false;
-  }
-  const beforeDepth = getObbOverlapDepth(
-    getPartOBB(part, part.position, geometryCache),
-    getPartOBB(other, other.position, geometryCache)
-  );
+  // A coarse OBB is only the true overlap representation for an uncut board.
+  // Feature-bearing parts (custom cuts) interlock: their coarse OBBs overlap
+  // deeply and stably, so every translation would read as "not worsening" and
+  // skip the exact checks in partsOverlap. Measure those pairs over the
+  // material sub-OBBs instead, which respect the cuts. Refusing the exemption
+  // outright would strand a part seated in a dado -- it could never be dragged
+  // back out while Prevent Overlap is on.
+  const usesMaterialCells =
+    (part.features?.length ?? 0) > 0 || (other.features?.length ?? 0) > 0 || (movedPart.features?.length ?? 0) > 0;
+
+  const depthBetween = (a: Part, b: Part): number | null => {
+    if (!usesMaterialCells) {
+      return getObbOverlapDepth(getPartOBB(a, a.position, geometryCache), getPartOBB(b, b.position, geometryCache));
+    }
+    let deepest: number | null = null;
+    for (const aCell of getPartMaterialOBBs(a)) {
+      for (const bCell of getPartMaterialOBBs(b)) {
+        const depth = getObbOverlapDepth(aCell, bCell);
+        if (depth !== null) deepest = deepest === null ? depth : Math.max(deepest, depth);
+      }
+    }
+    return deepest;
+  };
+
+  const beforeDepth = depthBetween(part, other);
   if (beforeDepth === null) return false;
 
-  const afterDepth = getObbOverlapDepth(
-    getPartOBB(movedPart, movedPart.position, geometryCache),
-    getPartOBB(other, other.position, geometryCache)
-  );
-  return afterDepth !== null && afterDepth <= beforeDepth + OBB_EPSILON;
+  const afterDepth = depthBetween(movedPart, other);
+  if (!usesMaterialCells) return afterDepth !== null && afterDepth <= beforeDepth + OBB_EPSILON;
+
+  // Interlocked parts must *strictly* retreat to earn the exemption. Accepting
+  // "no worse" here would fire at zero delta too, masking a real overlap
+  // wherever this is asked about the current position rather than a move.
+  return afterDepth === null || afterDepth < beforeDepth - OBB_EPSILON;
 }
 
 function getObbOverlapDepth(a: PartOBB, b: PartOBB): number | null {

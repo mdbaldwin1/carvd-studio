@@ -1057,6 +1057,10 @@ export async function exportProjectReportToPdf(
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(90, 90, 90);
   doc.text('Blank sizes are optimized first. Apply listed operations after cutting blanks to size.', margin, y);
+  // Restore black before the table: the next setTextColor in this routine is
+  // inside drawFabricationOperations, which runs after it, so leaving grey set
+  // printed the entire cut-list header and every row in grey.
+  doc.setTextColor(0, 0, 0);
   y += 18;
 
   // Group instructions
