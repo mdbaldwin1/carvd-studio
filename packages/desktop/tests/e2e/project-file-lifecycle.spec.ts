@@ -9,6 +9,7 @@ import {
   launchElectronApp,
   queueOpenPaths,
   queueSavePath,
+  renameProjectFromHeader,
   waitForAppReady,
   type RunningElectronApp
 } from './helpers/electron-app';
@@ -23,6 +24,27 @@ test.describe('project file lifecycle', () => {
 
   test.afterEach(async () => {
     await closeElectronApp(running);
+  });
+
+  test('renames the project from the header, which is the only naming UI', async () => {
+    const { window } = running;
+
+    // The New Project dialog has no name field: a project is Untitled until
+    // the first save takes its name from the file, and this editor is how it
+    // is named before then.
+    await renameProjectFromHeader(window, 'Renamed From Header');
+
+    expect((await getProjectSnapshot(window)).projectName).toBe('Renamed From Header');
+    await expect(window.locator('.project-name')).toContainText('Renamed From Header');
+
+    // Escape abandons an edit rather than committing a half-typed name.
+    await window.locator('.project-name').click();
+    const input = window.locator('.header-name-editor input');
+    await expect(input).toBeVisible();
+    await input.fill('Abandoned');
+    await input.press('Escape');
+
+    expect((await getProjectSnapshot(window)).projectName).toBe('Renamed From Header');
   });
 
   test('saves, opens, records recents, and saves as a new project file', async () => {

@@ -458,11 +458,19 @@ export async function createBlankProject(window: Page, name = 'E2E Project'): Pr
   await expect(window.locator('.sidebar')).toBeVisible();
   await expect(window.locator('canvas')).toBeVisible();
 
-  await renameProjectFromHeader(window, name);
+  // The dialog has no name field, so set the name for the tests that assert
+  // it. Deliberately the store and not the header editor: this runs before
+  // every seeded project, including specs where a license modal or free-mode
+  // state covers the header, and setup must not depend on that. The header
+  // editor has its own test in project-file-lifecycle.
+  await window.evaluate((projectName) => {
+    window.useProjectStore.getState().setProjectName(projectName);
+  }, name);
+  await expect.poll(async () => (await getProjectSnapshot(window)).projectName).toBe(name);
 }
 
 /**
- * Name a project the way a user now does: click the header name and type.
+ * Name a project the way a user does: click the header name and type.
  *
  * Polls the committed name rather than trusting the keystroke, because the
  * inline editor mounts on click and autofocuses, so a slow renderer can
