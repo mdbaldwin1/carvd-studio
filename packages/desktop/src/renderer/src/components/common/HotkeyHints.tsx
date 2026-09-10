@@ -1,10 +1,14 @@
 import { useClipboardStore } from '@renderer/store/clipboardStore';
+import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { useSelectionStore } from '@renderer/store/selectionStore';
 
 export function HotkeyHints({ show }: { show: boolean }) {
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const clipboard = useClipboardStore((s) => s.clipboard);
+  const isEditingPartCuts = usePartCutsEditingStore((s) => s.isEditingPartCuts);
+  const selectedFeatureId = usePartCutsEditingStore((s) => s.selectedFeatureId);
+  const draftFeatureCount = usePartCutsEditingStore((s) => s.draftFeatures.length);
 
   const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
   const modKey = isMac ? '⌘' : 'Ctrl';
@@ -15,7 +19,28 @@ export function HotkeyHints({ show }: { show: boolean }) {
   const hasSelection = selectedPartIds.length > 0 || selectedGroupIds.length > 0;
   const totalSelected = selectedPartIds.length + selectedGroupIds.length;
 
-  if (!hasSelection) {
+  // Cuts mode has its own vocabulary, routed by useKeyboardShortcuts. Project
+  // shortcuts are deliberately unreachable there, so advertising them would be
+  // wrong.
+  if (isEditingPartCuts) {
+    hints = selectedFeatureId
+      ? [
+          { key: 'Arrows', action: 'Nudge Cut' },
+          { key: 'Shift+Arrows', action: 'Nudge 1"' },
+          { key: 'Del', action: 'Delete Cut' },
+          { key: 'F', action: 'Frame Part' },
+          { key: `${modKey}+Z`, action: 'Undo Cut' },
+          { key: 'Esc', action: 'Deselect' }
+        ]
+      : [
+          ...(draftFeatureCount > 0 ? [{ key: 'Click', action: 'Select Cut' }] : []),
+          { key: `${modKey}+Z`, action: 'Undo Cut' },
+          { key: `${modKey}+Shift+Z`, action: 'Redo Cut' },
+          { key: `${modKey}+S`, action: 'Save Cuts' },
+          { key: 'F', action: 'Frame Part' },
+          { key: 'Esc', action: 'Back to Project' }
+        ];
+  } else if (!hasSelection) {
     hints = [
       { key: `${modKey}+A`, action: 'Select All' },
       { key: `${modKey}+Drag`, action: 'Box Select' },

@@ -1410,7 +1410,10 @@ test.describe.serial('custom cuts assembly qualification', () => {
     await createJoint.click({ force: true });
     await expect(running.window.getByRole('dialog', { name: 'Create Dowel Joint' })).toHaveCount(0);
 
-    await running.window.getByRole('button', { name: 'Back to Cuts' }).click();
+    // Choosing a cut type is a dialog now, so it is dismissed the way dialogs
+    // are rather than by a panel button.
+    await running.window.keyboard.press('Escape');
+    await expect(running.window.getByRole('dialog', { name: 'What kind of cut?' })).toHaveCount(0);
     await running.window.keyboard.press(`${MODIFIER}+Z`);
     await expect
       .poll(() => running.window.evaluate(() => window.usePartCutsEditingStore.getState().draftFeatures.length))

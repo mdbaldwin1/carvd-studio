@@ -20,6 +20,7 @@ import { getRectCutDepth, getResolvedRectCutFeature } from '@renderer/utils/rect
 import { getFaceFrame, validateCircularCut, validateRoundedCut } from '@renderer/utils/roundCutUtils';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { useCameraStore } from '@renderer/store/cameraStore';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 interface PartCutsPreviewCanvasProps {
@@ -1000,7 +1001,7 @@ function PartCutsPreviewScene({
       {/* Same navigation as the main canvas. Panning was disabled here, so a
           cut on the far end of a long board could not be brought into view --
           the camera could only orbit a fixed centre. Framing on entry is the
-          default placement, not a constraint; "Frame Part" returns to it. */}
+          default placement, not a constraint; F and Home return to it. */}
       <OrbitControls
         ref={controlsRef}
         makeDefault
@@ -1126,9 +1127,18 @@ export function PartCutsPreviewCanvas({
     [draft, previewPart]
   );
   const supportsHandles = supportsPreviewHandles(draft);
-  // Panning and a wide zoom range mean the user can leave the part off screen;
-  // this puts the framed view back without ending the editing session.
+  // Panning and a wide zoom range mean the part can end up off screen. The
+  // project canvas answers F and Home through these camera requests, so the
+  // preview honours the same ones instead of owning a button.
+  const centerCameraRequested = useCameraStore((s) => s.centerCameraRequested);
+  const centerCameraAtOriginRequested = useCameraStore((s) => s.centerCameraAtOriginRequested);
+  const clearCenterCameraRequest = useCameraStore((s) => s.clearCenterCameraRequest);
   const [frameNonce, setFrameNonce] = useState(0);
+  useEffect(() => {
+    if (!centerCameraRequested && !centerCameraAtOriginRequested) return;
+    setFrameNonce((nonce) => nonce + 1);
+    clearCenterCameraRequest();
+  }, [centerCameraRequested, centerCameraAtOriginRequested, clearCenterCameraRequest]);
 
   if (fallback) {
     return (
@@ -1201,7 +1211,7 @@ export function PartCutsPreviewCanvas({
       role="img"
       aria-label="Part cuts geometry preview"
       data-geometry-signature={previewGeometrySignature}
-      className="relative min-h-[320px] flex-1 overflow-hidden rounded-lg border border-border bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),_transparent_40%),linear-gradient(180deg,_rgba(24,24,27,0.12),_rgba(12,12,14,0.02))]"
+      className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),_transparent_40%),linear-gradient(180deg,_rgba(24,24,27,0.12),_rgba(12,12,14,0.02))]"
     >
       <Canvas camera={{ position: [maxDimension * 2.2, maxDimension * 1.6, maxDimension * 2.4], fov: 38 }}>
         <PartCutsPreviewScene
@@ -1215,18 +1225,6 @@ export function PartCutsPreviewCanvas({
           frameNonce={frameNonce}
         />
       </Canvas>
-
-      <div className="absolute right-3 top-3">
-        <Button
-          type="button"
-          size="xs"
-          variant="outline"
-          onClick={() => setFrameNonce((nonce) => nonce + 1)}
-          title="Frame the part in view"
-        >
-          Frame Part
-        </Button>
-      </div>
 
       {supportsHandles && draft && handleOverlay && (
         <div className="absolute bottom-3 right-3 max-w-[min(88%,24rem)]">

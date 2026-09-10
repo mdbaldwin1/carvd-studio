@@ -73,6 +73,16 @@ export function useKeyboardShortcuts() {
      * than disabling shortcuts wholesale in this mode.
      */
     const handlePartCutsKeyDown = (e: KeyboardEvent) => {
+      // A dialog owns the keyboard while it is up. Radix closes on keydown and
+      // calls preventDefault, and it does so before this window-level handler
+      // runs -- so checking the DOM for an open dialog is too late and Escape
+      // would both dismiss the dialog and step the editor back. Trust the
+      // event instead, and still skip anything left standing.
+      if (e.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"][data-state="open"],[role="alertdialog"][data-state="open"]')) {
+        return;
+      }
+
       const cuts = usePartCutsEditingStore.getState();
       const key = e.key.toLowerCase();
       const isMod = e.metaKey || e.ctrlKey;
@@ -100,6 +110,13 @@ export function useKeyboardShortcuts() {
           e.preventDefault();
           if (cuts.selectedFeatureId) cuts.selectFeature(null);
           else cuts.requestExit();
+          break;
+
+        case 'f':
+        case 'home':
+          // Same keys the project canvas uses; the preview re-frames the part.
+          e.preventDefault();
+          useCameraStore.getState().requestCenterCamera();
           break;
 
         case 'delete':
