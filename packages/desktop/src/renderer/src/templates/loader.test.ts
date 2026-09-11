@@ -29,12 +29,10 @@ describe('loader', () => {
         overageFactor: 1.1,
         projectNotes: 'Test notes',
         stockConstraints: {
-          maxLength: 96,
-          maxWidth: 48,
-          maxBoardFeet: 50,
-          maxTotalCost: 500,
-          useGlobalDefaults: true,
-          preferBoardOverSheet: false
+          constrainDimensions: true,
+          constrainGrain: true,
+          constrainColor: true,
+          preventOverlap: true
         }
       },
       stocks: [],
@@ -65,12 +63,10 @@ describe('loader', () => {
     it('applies stock constraints', () => {
       const project = loadTemplateFromJSON(minimalTemplate);
       expect(project.stockConstraints).toEqual({
-        maxLength: 96,
-        maxWidth: 48,
-        maxBoardFeet: 50,
-        maxTotalCost: 500,
-        useGlobalDefaults: true,
-        preferBoardOverSheet: false
+        constrainDimensions: true,
+        constrainGrain: true,
+        constrainColor: true,
+        preventOverlap: true
       });
     });
 
@@ -723,12 +719,10 @@ describe('loader', () => {
         overageFactor: 1.1,
         projectNotes: '',
         stockConstraints: {
-          maxLength: 96,
-          maxWidth: 48,
-          maxBoardFeet: 50,
-          maxTotalCost: 500,
-          useGlobalDefaults: true,
-          preferBoardOverSheet: false
+          constrainDimensions: true,
+          constrainGrain: true,
+          constrainColor: true,
+          preventOverlap: true
         }
       },
       stocks: [

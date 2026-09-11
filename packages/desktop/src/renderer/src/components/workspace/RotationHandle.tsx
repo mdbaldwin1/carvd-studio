@@ -1,4 +1,4 @@
-import { ThreeEvent, useThree } from '@react-three/fiber';
+import { ThreeElements, ThreeEvent, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -16,6 +16,13 @@ import {
 } from './partGeometry';
 import { chooseBestRotationAxisCandidate } from './rotationAxisSelection';
 import { bindWindowPointerSession, resetWorkspaceCursor, setWorkspaceCursor } from './workspaceUtils';
+
+// React 19's SVG `line` shadows the three.js element of the same name. R3F
+// renames the clashing ones (`threeLine`), but its reconciler only strips that
+// prefix when creating an instance, not when updating one, so rendering
+// `threeLine` throws on the first re-render. The element therefore has to stay
+// `line`; this alias just carries R3F's props for it.
+const ThreeLine = 'line' as unknown as React.FC<ThreeElements['threeLine']>;
 
 export const RotationHandle = memo(
   function RotationHandle({
@@ -524,14 +531,14 @@ export const RotationHandle = memo(
 
         <group quaternion={faceQuaternion}>
           {/* Connector from ring to external grab handle */}
-          <threeLine
+          <ThreeLine
             geometry={connectorGeometry}
             userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}
             onPointerDown={stopWorkspaceSelection}
             onClick={stopWorkspaceSelection}
           >
             <lineBasicMaterial color={grabColor} transparent opacity={0.85} />
-          </threeLine>
+          </ThreeLine>
 
           {/* External grab handle for drag rotation */}
           <group position={grabPosition}>

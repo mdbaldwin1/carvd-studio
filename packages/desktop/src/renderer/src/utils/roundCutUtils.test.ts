@@ -74,12 +74,9 @@ describe('roundCutUtils', () => {
       'negative blind rounded depth',
       { length: 4, width: 2, cornerRadius: 0.25, depthMode: 'blind' as const, depth: -0.25 }
     ]
-  ] as const)('rejects %s', (_label, parameters, placement = {}) => {
+  ] as const)('rejects %s', (_label, parameters, placement = { rotation: 0 }) => {
     expect(
-      validateRoundedCut(
-        rounded({ parameters, placement: { primary: 0, secondary: 0, rotation: 0, ...placement } }),
-        part
-      )
+      validateRoundedCut(rounded({ parameters, placement: { primary: 0, secondary: 0, ...placement } }), part)
     ).not.toBeNull();
   });
 

@@ -2216,10 +2216,11 @@ describe('snapToPartsUtil', () => {
 
       const shallowMortise = createTestPart({
         ...hostPart,
-        features: hostPart.features?.map((feature) => ({
-          ...feature,
-          parameters: { ...feature.parameters, depth: 0.5 }
-        }))
+        // Only the rect cuts carry a depth; spreading across the whole union
+        // would build a feature that is not a valid member of it.
+        features: hostPart.features?.map((feature) =>
+          feature.kind === 'rect_cut' ? { ...feature, parameters: { ...feature.parameters, depth: 0.5 } } : feature
+        )
       });
       expect(
         detectFeatureMateSnaps(tenonedRail, { x: 0.01, y: 3.2, z: 0.01 }, [shallowMortise], [tenonedRail.id], 0.5)

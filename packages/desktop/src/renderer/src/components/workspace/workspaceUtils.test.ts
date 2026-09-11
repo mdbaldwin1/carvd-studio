@@ -1,3 +1,4 @@
+import type { RectCutFeature } from '../../types';
 import { describe, expect, it, vi } from 'vitest';
 
 // Use real Three.js so rotation math actually works in getPartAABB tests
@@ -357,7 +358,7 @@ describe('workspaceUtils', () => {
               depthMode: 'through'
             },
             placement: { x: 0, z: 0 }
-          }
+          } satisfies RectCutFeature
         ]
       };
 

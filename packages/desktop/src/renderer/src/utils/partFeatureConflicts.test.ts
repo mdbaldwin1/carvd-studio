@@ -483,7 +483,7 @@ describe('getPartFeatureConflicts', () => {
       ],
       part
     );
-    expect(conflicts.some((c) => c.code !== 'none')).toBe(true);
+    expect(conflicts.length).toBeGreaterThan(0);
     expect(conflicts[0].message).toMatch(/Operation 2/);
   });
 
@@ -618,6 +618,7 @@ describe('regressions from the 2026-09-09 pre-release review', () => {
       enabled: true,
       cutType: 'mortise' as const,
       target: { type: 'face' as const, face: 'top_face' as const },
+      reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
       parameters: { size: { length: 2, width: 1 }, depthMode: 'blind' as const, depth: 0.5 },
       placement: { x: 4, z: 0 }
     };

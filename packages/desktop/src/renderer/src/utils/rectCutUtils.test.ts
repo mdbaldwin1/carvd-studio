@@ -832,6 +832,7 @@ describe('regressions from the 2026-09-09 pre-release review', () => {
     enabled: true,
     cutType: 'edge_notch',
     target: { type: 'edge', edge },
+    reference: { primaryFrom: 'min', secondaryFrom: 'min' },
     parameters: { size: { length: 2, width: 2 }, depthMode: 'through' },
     placement: { x: 1, z: 0 }
   });

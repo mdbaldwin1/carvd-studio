@@ -1,3 +1,4 @@
+import type { RectCutFeature } from '@renderer/types';
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
@@ -920,12 +921,12 @@ describe('part cuts mode', () => {
     renderHook(() => useKeyboardShortcuts());
 
     fireKey('ArrowRight');
-    let placement = usePartCutsEditingStore.getState().draftFeatures[0].placement as { x: number; z: number };
+    let placement = (usePartCutsEditingStore.getState().draftFeatures[0] as RectCutFeature).placement;
     expect(placement.x).toBeCloseTo(4.25);
     expect(placement.z).toBeCloseTo(3);
 
     fireKey('ArrowLeft');
-    placement = usePartCutsEditingStore.getState().draftFeatures[0].placement as { x: number; z: number };
+    placement = (usePartCutsEditingStore.getState().draftFeatures[0] as RectCutFeature).placement;
     expect(placement.x).toBeCloseTo(4);
   });
 

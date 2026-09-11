@@ -578,7 +578,7 @@ describe('store', () => {
 
     it('reports missing version', () => {
       const data = createValidExport();
-      delete (data as Record<string, unknown>).version;
+      delete (data as unknown as Record<string, unknown>).version;
       const result = validateAppStateExport(data);
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Missing or invalid version field');
@@ -593,14 +593,14 @@ describe('store', () => {
 
     it('reports missing exportedAt', () => {
       const data = createValidExport();
-      delete (data as Record<string, unknown>).exportedAt;
+      delete (data as unknown as Record<string, unknown>).exportedAt;
       const result = validateAppStateExport(data);
       expect(result.errors).toContain('Missing exportedAt timestamp');
     });
 
     it('reports missing data field', () => {
       const data = createValidExport();
-      delete (data as Record<string, unknown>).data;
+      delete (data as unknown as Record<string, unknown>).data;
       const result = validateAppStateExport(data);
       expect(result.valid).toBe(false);
     });

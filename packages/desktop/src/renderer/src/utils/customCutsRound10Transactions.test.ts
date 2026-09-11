@@ -81,7 +81,7 @@ it.each([false, true])(
 it.each(['cancel', 'fail'] as const)(
   'P1 a %s Save As leaves queued manual and auto saves on the original destination',
   async (outcome) => {
-    const chooser = Promise.withResolvers<{ canceled: boolean; filePath?: string }>();
+    const chooser = Promise.withResolvers<{ canceled: boolean; filePath: string }>();
     window.electronAPI.showSaveDialog = vi.fn(() => chooser.promise);
     window.electronAPI.writeFile = vi.fn(async (file, data) => {
       if (file === '/copy.carvd') throw new Error('Read-only destination');
@@ -92,7 +92,9 @@ it.each(['cancel', 'fail'] as const)(
     const middle = saveProject('manual');
     useProjectStore.getState().setProjectNotes('LATEST');
     const latest = saveProject('auto');
-    chooser.resolve(outcome === 'cancel' ? { canceled: true } : { canceled: false, filePath: '/copy.carvd' });
+    chooser.resolve(
+      outcome === 'cancel' ? { canceled: true, filePath: '' } : { canceled: false, filePath: '/copy.carvd' }
+    );
     const results = await Promise.all([copy, middle, latest]);
     expect(results[0].success).toBe(false);
     expect(results[2]).toEqual({ success: true, filePath: '/original.carvd' });
@@ -208,7 +210,7 @@ it.each(['cancel', 'fail'] as const)(
   'P1 initial Save As %s allows the next requested save to choose a destination',
   async (outcome) => {
     useProjectStore.setState({ filePath: null });
-    const chooser = Promise.withResolvers<{ canceled: boolean; filePath?: string }>();
+    const chooser = Promise.withResolvers<{ canceled: boolean; filePath: string }>();
     window.electronAPI.showSaveDialog = vi
       .fn()
       .mockImplementationOnce(() => chooser.promise)
@@ -220,7 +222,9 @@ it.each(['cancel', 'fail'] as const)(
     const copy = saveProject();
     useProjectStore.getState().setProjectNotes('LATEST');
     const latest = saveProject();
-    chooser.resolve(outcome === 'cancel' ? { canceled: true } : { canceled: false, filePath: '/copy.carvd' });
+    chooser.resolve(
+      outcome === 'cancel' ? { canceled: true, filePath: '' } : { canceled: false, filePath: '/copy.carvd' }
+    );
     expect((await copy).success).toBe(false);
     expect(await latest).toEqual({ success: true, filePath: '/second.carvd' });
     expect(notes('/second.carvd')).toBe('LATEST');
@@ -264,7 +268,7 @@ it('P1 real close-save dialog writes the latest snapshot into the Save As copy b
     useProjectStore.getState().setProjectNotes('LATEST');
     beforeClose();
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   expect(closed).toEqual([]);
   await act(async () => {
     gate.release();

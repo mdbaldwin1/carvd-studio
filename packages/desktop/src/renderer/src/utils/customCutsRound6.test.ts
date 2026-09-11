@@ -117,6 +117,7 @@ describe('full review round 3 remediation', () => {
       version: 1 as const,
       enabled: true,
       cutType: 'compound',
+      lengthMode: 'long_point',
       target: { type: 'face', face: 'right_end' },
       reference: { primaryFrom: 'max' },
       parameters: { horizontalAngle: 15, verticalAngle: 20, horizontalFlip: false, verticalFlip: false }

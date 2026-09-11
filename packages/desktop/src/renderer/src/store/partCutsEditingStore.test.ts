@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { PartFeature } from '../types';
+import type { CircularPattern, PartFeature } from '../types';
 import { duplicateFeature } from '../components/part-features/partFeatureEditorState';
 import { mirrorFeature } from '../utils/partFeatureActions';
 import { useCameraStore } from './cameraStore';
@@ -297,7 +297,7 @@ describe('partCutsEditingStore', () => {
       // Edit the actual object returned by duplicateFeature. If duplicateFeature
       // ever becomes a shallow clone, these mutations will corrupt `round` and
       // the original-payload assertions below will fail.
-      duplicateRound.pattern!.rotation = 45;
+      (duplicateRound.pattern as Extract<CircularPattern, { type: 'grid' }>).rotation = 45;
       duplicateRound.parameters.counterbore!.depth = 0.2;
       store.setDraftFeatures([mirrored, duplicateRound, reenabledRound, rounded]);
 

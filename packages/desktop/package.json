@@ -37,7 +37,7 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run && vitest run --config vitest.main.config.ts && npm run test:e2e",
     "test:unit": "vitest run && vitest run --config vitest.main.config.ts",
     "test:main": "vitest run --config vitest.main.config.ts",

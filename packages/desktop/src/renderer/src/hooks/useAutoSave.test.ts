@@ -42,8 +42,7 @@ describe('useAutoSave', () => {
     // Reset project store state
     useProjectStore.setState({
       isDirty: false,
-      filePath: null,
-      toast: null
+      filePath: null
     });
 
     // Reset app settings store state

@@ -49,6 +49,7 @@ describe('clipboardStore', () => {
               length: 10,
               width: 5,
               thickness: 0.75,
+              grainSensitive: false,
               position: { x: 0, y: 0, z: 0 },
               rotation: { x: 0, y: 0, z: 0 },
               color: '#8B4513',

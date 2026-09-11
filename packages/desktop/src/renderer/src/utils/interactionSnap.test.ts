@@ -44,13 +44,13 @@ describe('interactionSnap appliers', () => {
   it('records winners and snap lines for accepted position-stage snaps', () => {
     const winners = createAxisSnapWinners();
     const snapLines: SnapLine[] = [];
-    const line = {
-      id: 'l1',
+    const line: SnapLine = {
       axis: 'x',
       type: 'edge',
       start: { x: 0, y: 0, z: 0 },
-      end: { x: 0, y: 0, z: 1 }
-    } as SnapLine;
+      end: { x: 0, y: 0, z: 1 },
+      snapValue: 0
+    };
 
     const applied = tryApplyPositionStageForAxis('x', 'guide', winners, snapLines, () => ({
       accepted: true,

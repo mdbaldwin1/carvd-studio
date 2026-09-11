@@ -9,7 +9,6 @@ vi.mock('../../templates', () => {
     name: 'Tutorial',
     description: 'Learn the basics',
     thumbnail: '📚',
-    thumbnailData: null,
     dimensions: { width: 24, height: 30, depth: 18 },
     partCount: 5,
     type: 'built-in' as const,
@@ -28,7 +27,6 @@ vi.mock('../../templates', () => {
     name: 'Simple Shelf',
     description: 'A simple shelf',
     thumbnail: '📦',
-    thumbnailData: null,
     dimensions: { width: 36, height: 48, depth: 12 },
     partCount: 8,
     type: 'built-in' as const,
@@ -47,7 +45,6 @@ vi.mock('../../templates', () => {
     name: 'Basic Cabinet',
     description: 'A basic cabinet',
     thumbnail: '🗄️',
-    thumbnailData: null,
     dimensions: { width: 30, height: 36, depth: 24 },
     partCount: 12,
     type: 'built-in' as const,
@@ -156,13 +153,12 @@ describe('TemplatesSection', () => {
         name: 'My Custom Template',
         description: 'Custom template',
         thumbnail: '🔨',
-        thumbnailData: null,
         dimensions: { width: 20, height: 30, depth: 10 },
         partCount: 3,
         type: 'user' as const,
+        category: 'other' as const,
         project: JSON.stringify({ parts: [], stocks: [], groups: [], groupMembers: [] }),
-        createdAt: '2025-01-01T00:00:00Z',
-        lastUsedAt: null
+        createdAt: '2025-01-01T00:00:00Z'
       }
     ];
     render(<TemplatesSection {...defaultProps} userTemplates={userTemplates} />);
@@ -177,10 +173,10 @@ describe('TemplatesSection', () => {
         name: 'User Template',
         description: 'Custom',
         thumbnail: '🔨',
-        thumbnailData: null,
         dimensions: { width: 20, height: 30, depth: 10 },
         partCount: 3,
         type: 'user' as const,
+        category: 'other' as const,
         project: JSON.stringify({
           parts: [],
           stocks: [],
@@ -189,8 +185,7 @@ describe('TemplatesSection', () => {
           createdAt: '2025-01-01T00:00:00Z',
           modifiedAt: '2025-01-01T00:00:00Z'
         }),
-        createdAt: '2025-01-01T00:00:00Z',
-        lastUsedAt: null
+        createdAt: '2025-01-01T00:00:00Z'
       }
     ];
     render(<TemplatesSection {...defaultProps} userTemplates={userTemplates} />);
@@ -205,23 +200,22 @@ describe('TemplatesSection', () => {
         name: 'Unused Template',
         description: 'Unused',
         thumbnail: '🔨',
-        thumbnailData: null,
         dimensions: { width: 10, height: 10, depth: 10 },
         partCount: 1,
         type: 'user' as const,
+        category: 'other' as const,
         project: JSON.stringify({ parts: [], stocks: [], groups: [], groupMembers: [] }),
-        createdAt: '2025-01-01T00:00:00Z',
-        lastUsedAt: null
+        createdAt: '2025-01-01T00:00:00Z'
       },
       {
         id: 'used',
         name: 'Recently Used',
         description: 'Used',
         thumbnail: '🔧',
-        thumbnailData: null,
         dimensions: { width: 20, height: 20, depth: 20 },
         partCount: 2,
         type: 'user' as const,
+        category: 'other' as const,
         project: JSON.stringify({ parts: [], stocks: [], groups: [], groupMembers: [] }),
         createdAt: '2025-01-01T00:00:00Z',
         lastUsedAt: '2025-01-15T00:00:00Z'

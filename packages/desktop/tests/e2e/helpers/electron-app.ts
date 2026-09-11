@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 declare global {
   interface Window {
     useProjectStore: { getState: () => any };
-    useSelectionStore: { getState: () => any };
+    useSelectionStore: { getState: () => any; setState: (state: Record<string, unknown>) => void };
     useSnapStore: { getState: () => any };
     useUIStore: { getState: () => any };
     useInteractionStore: { getState: () => any };
@@ -170,24 +170,24 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
       consoleMessages.push(`[main] ${chunk.toString()}`);
     });
 
-    const window = await getMainWindow(electronApp);
-    await window.setViewportSize({ width: 1400, height: 900 });
-    await waitForAutomationHooks(window);
+    const page = await getMainWindow(electronApp);
+    await page.setViewportSize({ width: 1400, height: 900 });
+    await waitForAutomationHooks(page);
 
-    window.on('console', (msg) => {
+    page.on('console', (msg) => {
       const text = `[${msg.type()}] ${msg.text()}`;
       consoleMessages.push(text);
       if (msg.type() === 'error') {
         console.log(`[E2E Console] ${text}`);
       }
     });
-    window.on('pageerror', (error) => {
+    page.on('pageerror', (error) => {
       const text = `[pageerror] ${error.message}`;
       consoleMessages.push(text);
       console.log(`[E2E] ${text}`);
     });
 
-    return { electronApp, window, userDataDir, consoleMessages, runtime, processHandle };
+    return { electronApp, window: page, userDataDir, consoleMessages, runtime, processHandle };
   } catch (error) {
     try {
       await closeElectronProcess(electronApp, processHandle);
@@ -209,8 +209,8 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
   }
 }
 
-export async function waitForAutomationHooks(window: Page): Promise<void> {
-  await window.waitForFunction(
+export async function waitForAutomationHooks(page: Page): Promise<void> {
+  await page.waitForFunction(
     () =>
       !!window.useProjectStore &&
       !!window.useSelectionStore &&
@@ -287,7 +287,7 @@ async function closeElectronProcess(
         };
         await electronApp
           .evaluate(({ BrowserWindow }) => {
-            for (const window of BrowserWindow.getAllWindows()) window.removeAllListeners('close');
+            for (const browserWindow of BrowserWindow.getAllWindows()) browserWindow.removeAllListeners('close');
           })
           .catch(ignoreIfAppDeparted);
         await electronApp.close().catch(ignoreIfAppDeparted);
@@ -346,8 +346,8 @@ export async function getMainWindow(electronApp: ElectronApplication): Promise<P
   throw new Error(`Main application window with .app root not found after 90s: ${JSON.stringify(states)}`);
 }
 
-export async function isElementVisible(window: Page, selector: string): Promise<boolean> {
-  return window.evaluate((sel) => {
+export async function isElementVisible(page: Page, selector: string): Promise<boolean> {
+  return page.evaluate((sel) => {
     const el = document.querySelector(sel);
     if (!el) return false;
     const rect = el.getBoundingClientRect();
@@ -355,13 +355,13 @@ export async function isElementVisible(window: Page, selector: string): Promise<
   }, selector);
 }
 
-export async function isEmptyStateVisible(window: Page): Promise<boolean> {
-  return isElementVisible(window, '.empty-state-overlay');
+export async function isEmptyStateVisible(page: Page): Promise<boolean> {
+  return isElementVisible(page, '.empty-state-overlay');
 }
 
-export async function waitForAppReady(window: Page): Promise<'start-screen' | 'editor'> {
+export async function waitForAppReady(page: Page): Promise<'start-screen' | 'editor'> {
   for (let i = 0; i < 60; i += 1) {
-    const state = await window.evaluate(() => {
+    const state = await page.evaluate(() => {
       function isVisible(el: Element | null): boolean {
         if (!el) return false;
         const rect = el.getBoundingClientRect();
@@ -404,26 +404,26 @@ export async function waitForAppReady(window: Page): Promise<'start-screen' | 'e
     if (state.type === 'editor') return 'editor';
     if (state.type === 'error-boundary') {
       console.log(`[E2E] Error boundary detected: ${(state as { error: string }).error}`);
-      await window.waitForTimeout(2000);
+      await page.waitForTimeout(2000);
       continue;
     }
     if (state.type === 'skipped-tutorial' || state.type === 'dismissed-trial') {
-      await window.waitForTimeout(500);
+      await page.waitForTimeout(500);
       continue;
     }
-    await window.waitForTimeout(1000);
+    await page.waitForTimeout(1000);
   }
 
-  const bodyHTML = await window.evaluate(() => document.body.innerHTML.substring(0, 1000));
+  const bodyHTML = await page.evaluate(() => document.body.innerHTML.substring(0, 1000));
   throw new Error(`App did not reach a usable state after 60s. Page content: ${bodyHTML}`);
 }
 
-export async function createBlankProject(window: Page, name = 'E2E Project'): Promise<void> {
-  const state = await waitForAppReady(window);
-  const startScreenVisible = await isElementVisible(window, '.start-screen');
+export async function createBlankProject(page: Page, name = 'E2E Project'): Promise<void> {
+  const state = await waitForAppReady(page);
+  const startScreenVisible = await isElementVisible(page, '.start-screen');
 
   if (state === 'start-screen' || startScreenVisible) {
-    await expect(window.locator('.blank-template')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.blank-template')).toBeVisible({ timeout: 10000 });
     // querySelector()?.click() is a silent no-op when React has re-rendered the
     // tile between the visibility check above and this evaluate, and the loss
     // only surfaces ten seconds later as a missing dialog. Re-click until the
@@ -431,21 +431,21 @@ export async function createBlankProject(window: Page, name = 'E2E Project'): Pr
     await expect
       .poll(
         async () => {
-          if (await window.locator('.new-project-dialog').isVisible()) return true;
-          await window.evaluate(() => {
+          if (await page.locator('.new-project-dialog').isVisible()) return true;
+          await page.evaluate(() => {
             (document.querySelector('.blank-template') as HTMLElement | null)?.click();
           });
-          return window.locator('.new-project-dialog').isVisible();
+          return page.locator('.new-project-dialog').isVisible();
         },
         { timeout: 20000, message: 'blank template click never opened the new project dialog' }
       )
       .toBe(true);
   }
 
-  await expect(window.locator('.new-project-dialog')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.new-project-dialog')).toBeVisible({ timeout: 10000 });
   // The dialog only chooses starting stock; it has no name field. Its first
   // input is a stock checkbox, so naming happens through the header below.
-  await window.evaluate(() => {
+  await page.evaluate(() => {
     const dialog = document.querySelector('.new-project-dialog');
     const buttons = Array.from(dialog?.querySelectorAll('button') ?? []);
     const createButton = buttons.find((button) => button.textContent?.trim() === 'Create Project') as
@@ -454,20 +454,20 @@ export async function createBlankProject(window: Page, name = 'E2E Project'): Pr
     createButton?.click();
   });
 
-  await expect(window.locator('.app-header')).toBeVisible({ timeout: 15000 });
-  await expect(window.locator('.sidebar')).toBeVisible();
-  await expect(window.locator('canvas')).toBeVisible();
-  await waitForCanvasLayout(window);
+  await expect(page.locator('.app-header')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('.sidebar')).toBeVisible();
+  await expect(page.locator('canvas')).toBeVisible();
+  await waitForCanvasLayout(page);
 
   // The dialog has no name field, so set the name for the tests that assert
   // it. Deliberately the store and not the header editor: this runs before
   // every seeded project, including specs where a license modal or free-mode
   // state covers the header, and setup must not depend on that. The header
   // editor has its own test in project-file-lifecycle.
-  await window.evaluate((projectName) => {
+  await page.evaluate((projectName) => {
     window.useProjectStore.getState().setProjectName(projectName);
   }, name);
-  await expect.poll(async () => (await getProjectSnapshot(window)).projectName).toBe(name);
+  await expect.poll(async () => (await getProjectSnapshot(page)).projectName).toBe(name);
 }
 
 /**
@@ -477,37 +477,37 @@ export async function createBlankProject(window: Page, name = 'E2E Project'): Pr
  * inline editor mounts on click and autofocuses, so a slow renderer can
  * swallow the first fill.
  */
-export async function renameProjectFromHeader(window: Page, name: string): Promise<void> {
+export async function renameProjectFromHeader(page: Page, name: string): Promise<void> {
   await expect
     .poll(
       async () => {
-        if ((await getProjectSnapshot(window)).projectName === name) return true;
-        await window.locator('.project-name').click();
-        const input = window.locator('.header-name-editor input');
+        if ((await getProjectSnapshot(page)).projectName === name) return true;
+        await page.locator('.project-name').click();
+        const input = page.locator('.header-name-editor input');
         if (!(await input.isVisible())) return false;
         await input.fill(name);
         await input.press('Enter');
-        return (await getProjectSnapshot(window)).projectName === name;
+        return (await getProjectSnapshot(page)).projectName === name;
       },
       { timeout: 15000, message: `header rename never committed "${name}"` }
     )
     .toBe(true);
 }
 
-export async function ensureEditorReady(window: Page): Promise<void> {
-  const state = await waitForAppReady(window);
-  if (state === 'start-screen' || (await isElementVisible(window, '.start-screen'))) {
-    await createBlankProject(window);
+export async function ensureEditorReady(page: Page): Promise<void> {
+  const state = await waitForAppReady(page);
+  if (state === 'start-screen' || (await isElementVisible(page, '.start-screen'))) {
+    await createBlankProject(page);
   }
-  await expect(window.locator('.app-header')).toBeVisible({ timeout: 15000 });
-  await expect(window.locator('.sidebar')).toBeVisible();
-  await expect(window.locator('canvas')).toBeVisible();
-  await waitForCanvasLayout(window);
+  await expect(page.locator('.app-header')).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('.sidebar')).toBeVisible();
+  await expect(page.locator('canvas')).toBeVisible();
+  await waitForCanvasLayout(page);
 }
 
-export async function addPartFromSidebar(window: Page): Promise<void> {
-  await window.locator('button[title="Add Part"]').first().click({ force: true });
-  await window.waitForTimeout(500);
+export async function addPartFromSidebar(page: Page): Promise<void> {
+  await page.locator('button[title="Add Part"]').first().click({ force: true });
+  await page.waitForTimeout(500);
 }
 
 type ElectronAPIWithTestDialogs = Window['electronAPI'] & {
@@ -515,16 +515,16 @@ type ElectronAPIWithTestDialogs = Window['electronAPI'] & {
   queueTestOpenDialogPaths: (filePaths: string[] | null) => Promise<{ success: boolean; error?: string }>;
 };
 
-export async function queueSavePath(window: Page, filePath: string | null): Promise<void> {
-  const result = await window.evaluate(async (queuedPath) => {
+export async function queueSavePath(page: Page, filePath: string | null): Promise<void> {
+  const result = await page.evaluate(async (queuedPath) => {
     const api = window.electronAPI as ElectronAPIWithTestDialogs;
     return api.queueTestSaveDialogPath(queuedPath);
   }, filePath);
   expect(result).toMatchObject({ success: true });
 }
 
-export async function queueOpenPaths(window: Page, filePaths: string[] | null): Promise<void> {
-  const result = await window.evaluate(async (queuedPaths) => {
+export async function queueOpenPaths(page: Page, filePaths: string[] | null): Promise<void> {
+  const result = await page.evaluate(async (queuedPaths) => {
     const api = window.electronAPI as ElectronAPIWithTestDialogs;
     return api.queueTestOpenDialogPaths(queuedPaths);
   }, filePaths);
@@ -549,8 +549,8 @@ export async function sendNativeMenuCommand(
   await running.window.waitForTimeout(300);
 }
 
-export async function getProjectSnapshot(window: Page): Promise<ProjectSnapshot> {
-  return window.evaluate(() => {
+export async function getProjectSnapshot(page: Page): Promise<ProjectSnapshot> {
+  return page.evaluate(() => {
     const project = window.useProjectStore.getState();
     const selection = window.useSelectionStore.getState();
     const ui = window.useUIStore.getState();
@@ -582,7 +582,7 @@ export async function getProjectSnapshot(window: Page): Promise<ProjectSnapshot>
 }
 
 export async function seedProject(
-  window: Page,
+  page: Page,
   seed:
     | 'empty'
     | 'one-part'
@@ -593,8 +593,8 @@ export async function seedProject(
     | 'mixed-part-and-group'
     | 'guide' = 'one-part'
 ) {
-  await ensureEditorReady(window);
-  await window.evaluate((seedKind) => {
+  await ensureEditorReady(page);
+  await page.evaluate((seedKind) => {
     const project = window.useProjectStore.getState();
     const selection = window.useSelectionStore.getState();
     project.newProject();
@@ -675,7 +675,7 @@ export async function seedProject(
       selection.clearSelection();
     }
   }, seed);
-  await window.waitForTimeout(500);
+  await page.waitForTimeout(500);
 }
 
 /**
@@ -687,8 +687,8 @@ export async function seedProject(
  * the scene -- so a "background" click computed from it lands on a toolbar
  * button and the test fails somewhere far from the cause.
  */
-export async function waitForCanvasLayout(window: Page): Promise<void> {
-  await window.waitForFunction(
+export async function waitForCanvasLayout(page: Page): Promise<void> {
+  await page.waitForFunction(
     () => {
       const canvas = document.querySelector('canvas');
       if (!canvas) return false;
@@ -701,9 +701,9 @@ export async function waitForCanvasLayout(window: Page): Promise<void> {
   );
 }
 
-export async function getCanvasPoint(window: Page, xRatio = 0.5, yRatio = 0.5): Promise<{ x: number; y: number }> {
-  await waitForCanvasLayout(window);
-  return window.locator('canvas').evaluate(
+export async function getCanvasPoint(page: Page, xRatio = 0.5, yRatio = 0.5): Promise<{ x: number; y: number }> {
+  await waitForCanvasLayout(page);
+  return page.locator('canvas').evaluate(
     (canvas, ratios) => {
       const rect = canvas.getBoundingClientRect();
       return {
@@ -715,9 +715,9 @@ export async function getCanvasPoint(window: Page, xRatio = 0.5, yRatio = 0.5): 
   );
 }
 
-export async function getSelectedPartCanvasPoint(window: Page): Promise<{ x: number; y: number }> {
-  await window.waitForFunction(() => !!window.__carvdE2E?.getPartScreenPoint(), null, { timeout: 10000 });
-  const point = await window.evaluate(() => window.__carvdE2E?.getPartScreenPoint() ?? null);
+export async function getSelectedPartCanvasPoint(page: Page): Promise<{ x: number; y: number }> {
+  await page.waitForFunction(() => !!window.__carvdE2E?.getPartScreenPoint(), null, { timeout: 10000 });
+  const point = await page.evaluate(() => window.__carvdE2E?.getPartScreenPoint() ?? null);
   if (!point) {
     throw new Error('No selected part screen point is available');
   }
@@ -725,13 +725,13 @@ export async function getSelectedPartCanvasPoint(window: Page): Promise<{ x: num
 }
 
 export async function getResizeHandleCanvasPoint(
-  window: Page,
+  page: Page,
   handle: { x: -1 | 0 | 1; y: -1 | 0 | 1; z: -1 | 0 | 1 }
 ): Promise<{ x: number; y: number }> {
-  await window.waitForFunction(() => typeof window.__carvdE2E?.getResizeHandleScreenPoint === 'function', null, {
+  await page.waitForFunction(() => typeof window.__carvdE2E?.getResizeHandleScreenPoint === 'function', null, {
     timeout: 10000
   });
-  const point = await window.evaluate(
+  const point = await page.evaluate(
     (targetHandle) => window.__carvdE2E?.getResizeHandleScreenPoint(targetHandle) ?? null,
     handle
   );
@@ -742,13 +742,13 @@ export async function getResizeHandleCanvasPoint(
 }
 
 export async function getRotationHandleCanvasPoint(
-  window: Page,
+  page: Page,
   handle: { axis: 'x' | 'y' | 'z'; side: -1 | 1; target?: 'ring' | 'grab' }
 ): Promise<{ x: number; y: number }> {
-  await window.waitForFunction(() => typeof window.__carvdE2E?.getRotationHandleScreenPoint === 'function', null, {
+  await page.waitForFunction(() => typeof window.__carvdE2E?.getRotationHandleScreenPoint === 'function', null, {
     timeout: 10000
   });
-  const point = await window.evaluate(
+  const point = await page.evaluate(
     (targetHandle) => window.__carvdE2E?.getRotationHandleScreenPoint(targetHandle) ?? null,
     handle
   );
@@ -758,39 +758,39 @@ export async function getRotationHandleCanvasPoint(
   return point;
 }
 
-export async function dragCanvas(window: Page, start: { x: number; y: number }, delta: { x: number; y: number }) {
-  await window.mouse.move(start.x, start.y);
-  await window.waitForTimeout(150);
-  await window.mouse.down();
-  await window.waitForTimeout(250);
+export async function dragCanvas(page: Page, start: { x: number; y: number }, delta: { x: number; y: number }) {
+  await page.mouse.move(start.x, start.y);
+  await page.waitForTimeout(150);
+  await page.mouse.down();
+  await page.waitForTimeout(250);
   for (let i = 1; i <= 12; i += 1) {
-    await window.mouse.move(start.x + (delta.x * i) / 12, start.y + (delta.y * i) / 12);
-    await window.waitForTimeout(20);
+    await page.mouse.move(start.x + (delta.x * i) / 12, start.y + (delta.y * i) / 12);
+    await page.waitForTimeout(20);
   }
-  await window.mouse.up();
-  await window.waitForTimeout(500);
+  await page.mouse.up();
+  await page.waitForTimeout(500);
 }
 
-export async function rightClickCanvas(window: Page, point: { x: number; y: number }) {
-  await window.mouse.click(point.x, point.y, { button: 'right' });
-  await window.waitForTimeout(300);
+export async function rightClickCanvas(page: Page, point: { x: number; y: number }) {
+  await page.mouse.click(point.x, point.y, { button: 'right' });
+  await page.waitForTimeout(300);
 }
 
-export async function clickMenuItem(window: Page, label: string) {
-  await window.evaluate((text) => {
+export async function clickMenuItem(page: Page, label: string) {
+  await page.evaluate((text) => {
     const item = Array.from(document.querySelectorAll('button, [role="menuitem"]')).find(
       (el) => el.textContent?.trim() === text
     ) as HTMLElement | undefined;
     item?.click();
   }, label);
-  await window.waitForTimeout(300);
+  await page.waitForTimeout(300);
 }
 
-export async function openSelectionContextMenu(window: Page, point = { x: 500, y: 300 }) {
-  await window.evaluate(({ x, y }) => {
+export async function openSelectionContextMenu(page: Page, point = { x: 500, y: 300 }) {
+  await page.evaluate(({ x, y }) => {
     window.useUIStore.getState().openContextMenu({ x, y, type: 'part' });
   }, point);
-  await expect(window.locator('[role="menu"], .context-menu')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('[role="menu"], .context-menu')).toBeVisible({ timeout: 5000 });
 }
 
 /**
@@ -800,18 +800,18 @@ export async function openSelectionContextMenu(window: Page, point = { x: 500, y
  * project, template, and assembly editors, so the cuts workspace no longer
  * renders its own "Save Part"/"Back to Project" pair.
  */
-export async function savePartCutsFromHeader(window: Page): Promise<void> {
-  await window.getByTitle('Save (Cmd+S)', { exact: true }).click();
+export async function savePartCutsFromHeader(page: Page): Promise<void> {
+  await page.getByTitle('Save (Cmd+S)', { exact: true }).click();
 }
 
 /** Skip the library import prompt when a project write raises it. */
-export async function dismissLibraryImportPrompt(window: Page): Promise<void> {
-  const skip = window.getByRole('dialog', { name: 'Import to Library' }).getByRole('button', { name: 'Skip' });
+export async function dismissLibraryImportPrompt(page: Page): Promise<void> {
+  const skip = page.getByRole('dialog', { name: 'Import to Library' }).getByRole('button', { name: 'Skip' });
   if (await skip.isVisible({ timeout: 2000 }).catch(() => false)) await skip.click();
 }
 
 /** Leave the cuts workspace from the app header (Exit, or Cancel when dirty). */
-export async function exitPartCutsFromHeader(window: Page): Promise<void> {
-  const exit = window.getByRole('button', { name: /^(Exit|Cancel)$/ });
+export async function exitPartCutsFromHeader(page: Page): Promise<void> {
+  const exit = page.getByRole('button', { name: /^(Exit|Cancel)$/ });
   await exit.first().click();
 }
