@@ -1,4 +1,4 @@
-import { Part } from '../types';
+import { Part, RectCutFeature } from '../types';
 import { getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
 import {
   hasRenderablePartFeatures,
@@ -66,14 +66,32 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
 }
 
 /**
+ * Rectangular cuts that seat another part in the pocket they open. Housed
+ * joinery is only correct when the mating part sits *inside* this recess, so
+ * these have to be settled against the real material rather than the
+ * full-thickness contour.
+ */
+const HOUSING_RECT_CUT_TYPES = new Set<RectCutFeature['cutType']>([
+  'dado',
+  'stopped_dado',
+  'groove',
+  'stopped_groove',
+  'rabbet',
+  'mortise',
+  'tenon'
+]);
+
+/**
  * Features whose removal the top-view contour cannot express, so the pair has
  * to be settled against the real material instead.
  *
  * The contour decomposition carries every sub-box at the part's full
- * thickness, which is fine for a shape that is only cut in plan. A tenon is
- * not: it thins the tongue as well as narrowing it, so a tenoned end still
- * met its mortise at full stock thickness and a correctly sized through
- * mortise-and-tenon read as a collision.
+ * thickness, which is fine for a shape that is only cut in plan. Housed
+ * joinery is not. A tenon thins the tongue as well as narrowing it, so a
+ * tenoned end still met its mortise at full stock thickness. A blind dado,
+ * groove, rabbet, or mortise is worse: it removes nothing in plan at all, so
+ * the housed part reads as driven into solid stock and every correctly
+ * seated shelf, back panel, and door panel is rejected as a collision.
  */
 function needsMaterialOverlapTest(part: Part): boolean {
   return (
@@ -82,13 +100,25 @@ function needsMaterialOverlapTest(part: Part): boolean {
         feature.enabled &&
         (feature.kind === 'circular_cut' ||
           feature.kind === 'rounded_cut' ||
-          (feature.kind === 'rect_cut' && feature.cutType === 'tenon'))
+          (feature.kind === 'rect_cut' && HOUSING_RECT_CUT_TYPES.has(feature.cutType)))
     ) ?? false
   );
 }
 
 export function partsOverlap(a: Part, b: Part, geometryCache?: GeometryCache): boolean {
   if (!overlapCheckEnabled(a, b)) return false;
+
+  // Overlap is a symmetric relation, but the material test builds both solids
+  // in a frame centred on its first argument, so an exactly tangent joint —
+  // the shared plane of a mitred corner, say — could round differently
+  // depending on which part was passed first. That let a move be accepted or
+  // refused purely on where the two parts happened to sit in the parts array.
+  // Fixing the argument order by id makes the answer independent of it.
+  if (b.id < a.id) {
+    const swap = a;
+    a = b;
+    b = swap;
+  }
 
   if (needsMaterialOverlapTest(a) || needsMaterialOverlapTest(b)) {
     if (!obbsOverlap(getPartOBB(a), getPartOBB(b), OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false)) return false;

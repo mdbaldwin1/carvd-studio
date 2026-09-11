@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Housed joinery is settled against the real material, so this suite needs
+// the actual three.js geometry classes.
+vi.unmock('three');
+
 import type { AppSettings, GroupMember, Part, SnapLine } from '../types';
 import {
   detectFeatureSnaps,
@@ -112,7 +117,10 @@ describe('drag snap flow integration', () => {
       new Set([divider.id]),
       proposedDelta
     );
-    expect(clampedWithoutMateIdentity).not.toEqual(proposedDelta);
+    // The snapped delta bottoms the divider in the dado with no interference,
+    // so it survives overlap prevention on its own merits rather than needing
+    // the mate identity to wave it through.
+    expect(clampedWithoutMateIdentity).toEqual(proposedDelta);
     expect(snapPreview.mateHostPartId).toBe(host.id);
 
     const seated = resolveSafeTranslationDelta(

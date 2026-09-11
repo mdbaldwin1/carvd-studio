@@ -511,7 +511,9 @@ describe('overlapPolicy', () => {
     const movingIds = new Set([moving.id]);
     const proposed = { x: 0, y: -0.425, z: 0 };
 
-    expect(wouldTranslationCauseOverlap([host, moving], movingIds, proposed)).toBe(true);
+    // The proposed delta bottoms the part in the dado with no interference, so
+    // housed joinery is accepted on its own merits and needs no mate exemption.
+    expect(wouldTranslationCauseOverlap([host, moving], movingIds, proposed)).toBe(false);
     expect(wouldTranslationCauseOverlap([host, moving], movingIds, proposed, undefined, host.id)).toBe(false);
     expect(resolveSafeTranslationDelta([host, moving], movingIds, proposed, undefined, host.id)).toEqual(proposed);
 
@@ -528,6 +530,101 @@ describe('overlapPolicy', () => {
 
     const plainHost = createPart({ ...host, features: [] });
     expect(wouldTranslationCauseOverlap([plainHost, moving], movingIds, proposed, undefined, plainHost.id)).toBe(true);
+  });
+
+  it('gives the same answer whichever part is passed first', () => {
+    // Two mitred frame members meeting on their shared 45-degree plane are
+    // exactly tangent, which is where the material test is most delicate.
+    const mitre = (id: string, face: 'left_end' | 'right_end', flip: boolean) => ({
+      id,
+      kind: 'end_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      cutType: 'mitre' as const,
+      target: { type: 'face' as const, face },
+      reference: { primaryFrom: (face === 'left_end' ? 'min' : 'max') as 'min' | 'max' },
+      lengthMode: 'long_point' as const,
+      parameters: { horizontalAngle: 45, horizontalFlip: flip }
+    });
+    const plough = {
+      id: 'plough',
+      kind: 'rect_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      cutType: 'mortise' as const,
+      target: { type: 'face' as const, face: 'front_face' as const },
+      reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+      parameters: { size: { length: 24, width: 0.25 }, depthMode: 'blind' as const, depth: 0.5 },
+      placement: { x: 0, z: 0.25 }
+    };
+    const stile = createPart({
+      id: 'aaa-stile',
+      length: 24,
+      width: 2.25,
+      thickness: 0.75,
+      position: { x: -7.875, y: 12, z: 3.375 },
+      rotation: { x: 0, y: 90, z: 270 },
+      features: [plough, mitre('m-l', 'left_end', true), mitre('m-r', 'right_end', true)]
+    });
+    const rail = createPart({
+      id: 'zzz-rail',
+      length: 18,
+      width: 2.25,
+      thickness: 0.75,
+      position: { x: 0, y: 22.875, z: 3.375 },
+      rotation: { x: 90, y: 0, z: 180 },
+      features: [
+        { ...plough, parameters: { ...plough.parameters, size: { length: 18, width: 0.25 } } },
+        mitre('m-l', 'left_end', true),
+        mitre('m-r', 'right_end', true)
+      ]
+    });
+
+    expect(partsOverlap(stile, rail)).toBe(partsOverlap(rail, stile));
+  });
+
+  it('accepts housed joinery that the full-thickness contour cannot express', () => {
+    // A blind dado removes nothing in plan, so the contour decomposition
+    // carried the housed part at full thickness and every correctly seated
+    // shelf and panel read as a collision.
+    // Side lying flat: 24 along X, 6 along Z, 0.75 thick spanning Y 0..0.75.
+    // Stopped dado on the top face, 1/4" deep, so its floor sits at Y 0.5.
+    const side = createPart({
+      id: 'side',
+      length: 24,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [
+        {
+          id: 'stopped-dado',
+          kind: 'rect_cut',
+          version: 1 as const,
+          enabled: true,
+          cutType: 'stopped_dado',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          parameters: { size: { length: 0.75, width: 5.25 }, depthMode: 'blind', depth: 0.25 },
+          placement: { x: (24 - 0.75) / 2, z: (6 - 5.25) / 2 }
+        }
+      ]
+    });
+
+    // Shelf stood on edge in that dado, bottomed exactly on the 0.5 floor.
+    const seated = createPart({
+      id: 'shelf',
+      length: 6.5,
+      width: 5.25,
+      thickness: 0.75,
+      position: { x: 0, y: 0.5 + 3.25, z: 0 },
+      rotation: { x: 0, y: 0, z: 90 }
+    });
+    expect(partsOverlap(side, seated)).toBe(false);
+
+    // Driving the same shelf a further 1/8" past the dado floor is a real
+    // collision and still has to be rejected.
+    const buried = { ...seated, position: { ...seated.position, y: seated.position.y - 0.125 } };
+    expect(partsOverlap(side, buried)).toBe(true);
   });
 
   it('exempts only a fully complementary half-lap from same-host collision', () => {
@@ -616,7 +713,13 @@ describe('overlapPolicy', () => {
       expect(mate.adjustedPosition.z, candidate.id).toBeCloseTo(candidate.position.z);
     }
 
-    for (const candidate of [wrongFace, partialLength, partialWidth, offsetCut, depthMismatch]) {
+    // A lap cut on the wrong face is poor joinery but not a collision: the
+    // crossing piece drops into the host's upward-facing pocket, rests on its
+    // floor, and stands proud. Overlap prevention settles interference, not
+    // joinery quality, so only the candidates that truly intrude are rejected.
+    expect(overlapsAtCurrentPosition(wrongFace), wrongFace.id).toBe(false);
+
+    for (const candidate of [partialLength, partialWidth, offsetCut, depthMismatch]) {
       expect(overlapsAtCurrentPosition(candidate), candidate.id).toBe(true);
     }
   });
