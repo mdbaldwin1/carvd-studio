@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Part, RectCutFeature } from '../types';
 import {
   overlapCheckEnabled,
@@ -9,6 +9,10 @@ import {
 } from './overlapPolicy';
 import { getPartContourSubBoxes } from './partFeatureGeometry';
 import { detectFeatureMateSnaps, getPartSubOBBs } from './snapToPartsUtil';
+
+// Overlap for tenoned and round-cut parts is settled against the real
+// material, so this suite needs the actual three.js geometry classes.
+vi.unmock('three');
 
 function createPart(overrides: Partial<Part> = {}): Part {
   return {
@@ -29,6 +33,67 @@ function createPart(overrides: Partial<Part> = {}): Part {
 }
 
 describe('overlapPolicy', () => {
+  // From a trestle table: a stretcher tenoned through a slab upright. The
+  // tenon thins the tongue as well as narrowing it, which the top-view
+  // contour cannot express, so this pair has to be judged on real material.
+  describe('a through mortise-and-tenon', () => {
+    const upright = (): Part =>
+      createPart({
+        id: 'upright',
+        length: 14,
+        width: 9,
+        thickness: 1.5,
+        position: { x: -15, y: 8.5, z: 0 },
+        rotation: { x: 0, y: 0, z: 90 },
+        features: [
+          {
+            id: 'through-mortise',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'cutout',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.75, width: 3 }, depthMode: 'through' },
+            placement: { x: 4, z: 3 }
+          } as RectCutFeature
+        ]
+      });
+
+    const stretcher = (position: { x: number; y: number; z: number }): Part =>
+      createPart({
+        id: 'stretcher',
+        length: 34.5,
+        width: 4,
+        thickness: 1.25,
+        position,
+        features: (['left_end', 'right_end'] as const).map(
+          (face) =>
+            ({
+              id: `tenon-${face}`,
+              kind: 'rect_cut',
+              version: 1,
+              enabled: true,
+              cutType: 'tenon',
+              target: { type: 'face', face },
+              reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+              parameters: { size: { length: 3, width: 3 }, depthMode: 'blind', depth: 0.75 },
+              // Shoulder offset centres the 3" tongue on the 4" board, so it
+              // lines up with a mortise cut on the upright's centreline.
+              placement: { x: 0, z: 0.5 }
+            }) as RectCutFeature
+        )
+      });
+
+    it('seats a tenon that matches its mortise', () => {
+      expect(partsOverlap(upright(), stretcher({ x: 0, y: 5.875, z: 0 }))).toBe(false);
+    });
+
+    it('still refuses a tenon driven into solid wood beside the mortise', () => {
+      expect(partsOverlap(upright(), stretcher({ x: 0, y: 9, z: 0 }))).toBe(true);
+    });
+  });
+
   const mitre = (horizontalFlip: boolean) => ({
     id: `mitre-${horizontalFlip ? 'flipped' : 'default'}`,
     kind: 'end_cut' as const,

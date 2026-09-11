@@ -65,16 +65,32 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
   return !a.ignoreOverlap && !b.ignoreOverlap;
 }
 
+/**
+ * Features whose removal the top-view contour cannot express, so the pair has
+ * to be settled against the real material instead.
+ *
+ * The contour decomposition carries every sub-box at the part's full
+ * thickness, which is fine for a shape that is only cut in plan. A tenon is
+ * not: it thins the tongue as well as narrowing it, so a tenoned end still
+ * met its mortise at full stock thickness and a correctly sized through
+ * mortise-and-tenon read as a collision.
+ */
+function needsMaterialOverlapTest(part: Part): boolean {
+  return (
+    part.features?.some(
+      (feature) =>
+        feature.enabled &&
+        (feature.kind === 'circular_cut' ||
+          feature.kind === 'rounded_cut' ||
+          (feature.kind === 'rect_cut' && feature.cutType === 'tenon'))
+    ) ?? false
+  );
+}
+
 export function partsOverlap(a: Part, b: Part, geometryCache?: GeometryCache): boolean {
   if (!overlapCheckEnabled(a, b)) return false;
 
-  if (
-    [a, b].some((part) =>
-      part.features?.some(
-        (feature) => feature.enabled && (feature.kind === 'circular_cut' || feature.kind === 'rounded_cut')
-      )
-    )
-  ) {
+  if (needsMaterialOverlapTest(a) || needsMaterialOverlapTest(b)) {
     if (!obbsOverlap(getPartOBB(a), getPartOBB(b), OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false)) return false;
     return partsOverlapInMaterial(a, b);
   }
