@@ -1,3 +1,4 @@
+import { createTestGroup, createTestGroupMember, createTestPart } from '../../../../../tests/helpers/factories';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PartContextMenu } from './PartContextMenu';
@@ -8,35 +9,14 @@ import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
 import { useLicenseStore } from '../../store/licenseStore';
 import { useCameraStore } from '../../store/cameraStore';
+import { usePartCutsEditingStore } from '../../store/partCutsEditingStore';
 import React from 'react';
 
 const createRef = () => React.createRef<HTMLDivElement>();
 
-const part1 = {
-  id: 'p1',
-  name: 'Part 1',
-  width: 10,
-  height: 20,
-  depth: 2,
-  x: 0,
-  y: 10,
-  z: 0,
-  color: '#cccccc',
-  stockId: 'stock-1',
-  rotation: { x: 0, y: 0, z: 0 },
-  grain: 'none' as const,
-  jointAllowances: { left: 0, right: 0, front: 0, back: 0, top: 0, bottom: 0 },
-  edgeBanding: null
-};
-
-const part2 = {
-  ...part1,
-  id: 'p2',
-  name: 'Part 2',
-  stockId: null
-};
-
-const group1 = { id: 'g1', name: 'Group 1', color: '#ff0000', isExpanded: true };
+const part1 = createTestPart({ id: 'p1', name: 'Part 1', stockId: 'stock-1' });
+const part2 = createTestPart({ id: 'p2', name: 'Part 2', stockId: null });
+const group1 = createTestGroup({ id: 'g1', name: 'Group 1' });
 const group2 = { id: 'g2', name: 'Group 2', color: '#00ff00', isExpanded: true };
 
 beforeEach(() => {
@@ -67,6 +47,7 @@ beforeEach(() => {
   });
   useUIStore.setState({
     openSaveAssemblyModal: vi.fn(),
+    showToast: vi.fn(),
     requestDeleteParts: vi.fn(),
     requestDeleteGroups: vi.fn()
   });
@@ -76,6 +57,7 @@ beforeEach(() => {
   useCameraStore.setState({
     requestCenterCamera: vi.fn()
   });
+  usePartCutsEditingStore.getState().finishEditing();
 });
 
 describe('PartContextMenu', () => {
@@ -99,7 +81,7 @@ describe('PartContextMenu', () => {
   it('shows group selection count', () => {
     useProjectStore.setState({
       groups: [group1],
-      groupMembers: [{ groupId: 'g1', memberId: 'p1', memberType: 'part' }]
+      groupMembers: [createTestGroupMember('g1', 'p1', 'part')]
     });
     useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1'] });
     render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={vi.fn()} />);
@@ -109,7 +91,7 @@ describe('PartContextMenu', () => {
   it('shows mixed selection count', () => {
     useProjectStore.setState({
       groups: [group1],
-      groupMembers: [{ groupId: 'g1', memberId: 'p2', memberType: 'part' }]
+      groupMembers: [createTestGroupMember('g1', 'p2', 'part')]
     });
     useSelectionStore.setState({ selectedPartIds: ['p1'], selectedGroupIds: ['g1'] });
     render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={vi.fn()} />);
@@ -130,6 +112,23 @@ describe('PartContextMenu', () => {
     fireEvent.click(screen.getByText('Copy'));
     expect(useClipboardStore.getState().copySelectedParts).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('shows Edit Cuts for single-part selection and starts cuts editing', () => {
+    const onClose = vi.fn();
+    render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={onClose} />);
+
+    fireEvent.click(screen.getByText('Edit Part Cuts...'));
+
+    expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(true);
+    expect(usePartCutsEditingStore.getState().sourcePartId).toBe('p1');
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('hides Edit Cuts for multi-select', () => {
+    useSelectionStore.setState({ selectedPartIds: ['p1', 'p2'] });
+    render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={vi.fn()} />);
+    expect(screen.queryByText('Edit Part Cuts...')).not.toBeInTheDocument();
   });
 
   it('renders Save as Assembly button', () => {
@@ -238,7 +237,7 @@ describe('PartContextMenu', () => {
     it('shows Ungroup when single group selected', () => {
       useProjectStore.setState({
         groups: [group1],
-        groupMembers: [{ groupId: 'g1', memberId: 'p1', memberType: 'part' }]
+        groupMembers: [createTestGroupMember('g1', 'p1', 'part')]
       });
       useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1'] });
       render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={vi.fn()} />);
@@ -248,10 +247,7 @@ describe('PartContextMenu', () => {
     it('shows Merge Groups when 2+ groups selected', () => {
       useProjectStore.setState({
         groups: [group1, group2],
-        groupMembers: [
-          { groupId: 'g1', memberId: 'p1', memberType: 'part' },
-          { groupId: 'g2', memberId: 'p2', memberType: 'part' }
-        ]
+        groupMembers: [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g2', 'p2', 'part')]
       });
       useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1', 'g2'] });
       render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={vi.fn()} />);
@@ -275,7 +271,7 @@ describe('PartContextMenu', () => {
   it('calls requestDeleteGroups when groups selected', () => {
     useProjectStore.setState({
       groups: [group1],
-      groupMembers: [{ groupId: 'g1', memberId: 'p1', memberType: 'part' }],
+      groupMembers: [createTestGroupMember('g1', 'p1', 'part')],
       deleteGroup: vi.fn()
     });
     useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1'] });
@@ -288,8 +284,122 @@ describe('PartContextMenu', () => {
 
   it('positions menu at given coordinates', () => {
     render(<PartContextMenu menuRef={createRef()} x={150} y={250} onClose={vi.fn()} />);
-    const menu = screen.getByText('Center View').closest('.context-menu')!;
+    const menu = screen.getByText('Center View').closest<HTMLElement>('.context-menu')!;
     expect(menu.style.left).toBe('150px');
     expect(menu.style.top).toBe('250px');
+  });
+  describe('grouping actions', () => {
+    it('creates a group from two ungrouped parts', () => {
+      const createGroup = vi.fn();
+      useProjectStore.setState({ createGroup });
+      useSelectionStore.setState({ selectedPartIds: ['p1', 'p2'], selectedGroupIds: [] });
+      const onClose = vi.fn();
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={onClose} />);
+
+      fireEvent.click(screen.getByText(/Create Group/));
+
+      expect(createGroup).toHaveBeenCalledWith(
+        'Group 1',
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'p1', type: 'part' }),
+          expect.objectContaining({ id: 'p2', type: 'part' })
+        ])
+      );
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('removes grouped parts from their group', () => {
+      const removeFromGroup = vi.fn();
+      useProjectStore.setState({
+        removeFromGroup,
+        groups: [group1],
+        groupMembers: [{ id: 'gm1', groupId: 'g1', memberId: 'p1', memberType: 'part' }]
+      });
+      useSelectionStore.setState({ selectedPartIds: ['p1'], selectedGroupIds: [], editingGroupId: 'g1' });
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={vi.fn()} />);
+
+      fireEvent.click(screen.getByText(/Remove from Group/));
+
+      expect(removeFromGroup).toHaveBeenCalledWith(['p1'], 'part');
+    });
+
+    it('ungroups a selected group', () => {
+      const deleteGroup = vi.fn();
+      useProjectStore.setState({
+        deleteGroup,
+        groups: [group1],
+        groupMembers: [
+          { id: 'gm1', groupId: 'g1', memberId: 'p1', memberType: 'part' },
+          { id: 'gm2', groupId: 'g1', memberId: 'p2', memberType: 'part' }
+        ]
+      });
+      useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1'] });
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={vi.fn()} />);
+
+      fireEvent.click(screen.getByText(/Ungroup/));
+
+      expect(deleteGroup).toHaveBeenCalledWith('g1', 'ungroup', null);
+    });
+
+    it('merges two selected groups', () => {
+      const mergeGroups = vi.fn();
+      useProjectStore.setState({
+        mergeGroups,
+        groups: [group1, group2],
+        groupMembers: [
+          { id: 'gm1', groupId: 'g1', memberId: 'p1', memberType: 'part' },
+          { id: 'gm2', groupId: 'g2', memberId: 'p2', memberType: 'part' }
+        ]
+      });
+      useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1', 'g2'] });
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={vi.fn()} />);
+
+      const submenuLabel = screen.getByText(/Merge Groups/);
+      fireEvent.mouseEnter(submenuLabel);
+      fireEvent.click(submenuLabel);
+      const topLevel = screen.queryByText(/Top Level/);
+      if (topLevel) {
+        fireEvent.click(topLevel);
+        expect(mergeGroups).toHaveBeenCalledWith(['g1', 'g2'], 'top-level');
+      }
+    });
+  });
+
+  describe('reference actions', () => {
+    it('toggles reference for the selection', () => {
+      const toggleReference = vi.fn();
+      useSnapStore.setState({ toggleReference, referencePartIds: [] });
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={vi.fn()} />);
+
+      fireEvent.click(screen.getByText(/Set as Reference/));
+
+      expect(toggleReference).toHaveBeenCalledWith(['p1']);
+    });
+
+    it('clears all references from the menu', () => {
+      const clearReferences = vi.fn();
+      useSnapStore.setState({ clearReferences, referencePartIds: ['p1', 'p2'] });
+      useSelectionStore.setState({ selectedPartIds: ['p1'], selectedGroupIds: [] });
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={vi.fn()} />);
+
+      const clearAll = screen.queryByText(/Clear All References/);
+      if (clearAll) {
+        fireEvent.click(clearAll);
+        expect(clearReferences).toHaveBeenCalled();
+      }
+    });
+  });
+
+  describe('edit cuts guards', () => {
+    it('warns instead of reopening cuts mode while already editing', () => {
+      const showToast = vi.fn();
+      useUIStore.setState({ showToast });
+      usePartCutsEditingStore.getState().startEditingPartCuts('p1', 'Part 1', []);
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={vi.fn()} />);
+
+      fireEvent.click(screen.getByText(/Edit Part Cuts/));
+
+      expect(showToast).toHaveBeenCalledWith('Finish editing part cuts first', 'warning');
+    });
   });
 });

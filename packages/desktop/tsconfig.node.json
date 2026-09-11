@@ -5,14 +5,16 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "target": "ESNext",
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM"],
     "outDir": "./out",
     "rootDir": ".",
-    "types": ["node"]
+    "types": ["node", "electron-vite/node"]
   },
   "include": [
     "src/main/**/*",
+    "src/shared/**/*",
     "src/preload/**/*",
-    "electron.vite.config.ts"
+    "electron.vite.config.ts",
+    "tests/e2e/helpers/**/*"
   ]
 }

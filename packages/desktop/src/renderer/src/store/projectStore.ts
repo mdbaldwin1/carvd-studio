@@ -29,13 +29,37 @@ import { useClipboardStore } from './clipboardStore';
 import { useLicenseStore } from './licenseStore';
 import { getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
+import {
+  clonePartFeaturesForCopy,
+  getAssemblyPartCopyMap,
+  normalizeAssemblyPart,
+  normalizePart
+} from '../utils/partFeatures';
+import { validateRectCutFeature } from '../utils/rectCutUtils';
+import { validateEndCutFeature } from '../utils/endCutUtils';
+import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
+import { getPartFeatureConflicts } from '../utils/partFeatureConflicts';
+import { getFeatureTargetLabel } from '../utils/partFeatureSummary';
 import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
 import { rotationTool } from '../interaction/tools/rotationTool';
 import { resolveSelectedGroupIdsWithDescendants, resolveTransformSelectedPartIds } from '../utils/interactionSelection';
 import { dragDebug } from '../utils/dragDebug';
+import {
+  createDowelJoint,
+  getDowelRelationshipIssues,
+  reconcileDowelRelationshipRemovals,
+  type CreateDowelJointInput
+} from '../utils/dowelJointUtils';
+
+export type AddDowelJointInput = Omit<CreateDowelJointInput, 'firstPart' | 'secondPart' | 'existingParts'> & {
+  firstPartId: string;
+  secondPartId: string;
+};
 
 interface ProjectState {
   // Project data
+  // Runtime-only ownership token; excluded from files and undo history.
+  documentGeneration: number;
   projectName: string;
   parts: Part[];
   stocks: Stock[];
@@ -67,14 +91,16 @@ interface ProjectState {
 
   // Actions - Parts
   addPart: (part?: Partial<Part>) => string | null;
-  updatePart: (id: string, updates: Partial<Part>) => void;
+  updatePart: (id: string, updates: Partial<Part>, options?: { mateHostPartId?: string }) => boolean;
   updateParts: (ids: string[], updates: Partial<Part>) => void;
   batchUpdateParts: (updates: Array<{ id: string; changes: Partial<Part> }>) => void;
+  addDowelJoint: (input: AddDowelJointInput) => string | null;
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
   rotateSelectedParts: (axis: 'x' | 'y' | 'z', degrees: number, pivot: { x: number; y: number; z: number }) => void;
   deletePart: (id: string) => void;
   deleteSelectedParts: () => void;
   confirmDeleteParts: () => void;
+  confirmDeleteGroups: () => void;
   duplicatePart: (id: string) => string | null;
   duplicateSelectedParts: () => string[];
   resetSelectedPartsToStock: () => void;
@@ -159,20 +185,21 @@ export const generateCopyName = (originalName: string): string => {
   return `${originalName} (copy)`;
 };
 
-const createDefaultPart = (overrides?: Partial<Part>): Part => ({
-  id: uuidv4(),
-  name: 'New Part',
-  length: 24,
-  width: 12,
-  thickness: 0.75,
-  position: { x: 0, y: 0.375, z: 0 }, // y = thickness/2 to sit on ground
-  rotation: { x: 0, y: 0, z: 0 },
-  stockId: null,
-  grainSensitive: true,
-  grainDirection: 'length',
-  color: STOCK_COLORS[0],
-  ...overrides
-});
+const createDefaultPart = (overrides?: Partial<Part>): Part =>
+  normalizePart({
+    id: uuidv4(),
+    name: 'New Part',
+    length: 24,
+    width: 12,
+    thickness: 0.75,
+    position: { x: 0, y: 0.375, z: 0 }, // y = thickness/2 to sit on ground
+    rotation: { x: 0, y: 0, z: 0 },
+    stockId: null,
+    grainSensitive: true,
+    grainDirection: 'length',
+    color: STOCK_COLORS[0],
+    ...overrides
+  });
 
 const createDefaultStock = (overrides?: Partial<Stock>): Stock => ({
   id: uuidv4(),
@@ -298,7 +325,9 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
   const issues: PartValidationIssue[] = [];
 
   for (const part of parts) {
-    // Check for unassigned stock
+    // Stock availability and authored-operation validity are independent. Keep
+    // checking operations even when a part has not yet been assigned stock.
+    const stock = part.stockId ? stocks.find((candidate) => candidate.id === part.stockId) : undefined;
     if (!part.stockId) {
       issues.push({
         partId: part.id,
@@ -307,11 +336,7 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
         message: 'No stock assigned',
         severity: 'error'
       });
-      continue;
-    }
-
-    const stock = stocks.find((s) => s.id === part.stockId);
-    if (!stock) {
+    } else if (!stock) {
       issues.push({
         partId: part.id,
         partName: part.name,
@@ -319,57 +344,115 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
         message: 'Assigned stock not found',
         severity: 'error'
       });
-      continue;
     }
 
-    const cutLength = part.length + (part.extraLength || 0);
-    const cutWidth = part.width + (part.extraWidth || 0);
+    if (stock) {
+      const cutLength = part.length + (part.extraLength || 0);
+      const cutWidth = part.width + (part.extraWidth || 0);
 
-    // Check thickness
-    if (part.thickness > stock.thickness) {
+      // Check thickness
+      if (part.thickness > stock.thickness) {
+        issues.push({
+          partId: part.id,
+          partName: part.name,
+          type: 'exceeds_thickness',
+          message: `Thickness (${part.thickness}") exceeds stock (${stock.thickness}")`,
+          severity: 'error'
+        });
+      }
+
+      // Check dimensions (considering rotation possibility)
+      const fitsNormal = cutLength <= stock.length && cutWidth <= stock.width;
+      const fitsRotated = !part.grainSensitive && cutLength <= stock.width && cutWidth <= stock.length;
+
+      if (!fitsNormal && !fitsRotated) {
+        // Check if it's a glue-up panel that only exceeds width
+        if (part.glueUpPanel && cutLength <= stock.length) {
+          // Glue-up panel that only exceeds width is acceptable - no issue to report
+          // The boards needed calculation is shown in the Properties panel
+        } else {
+          issues.push({
+            partId: part.id,
+            partName: part.name,
+            type: 'exceeds_dimensions',
+            message: `Dimensions (${cutLength}" × ${cutWidth}") exceed stock (${stock.length}" × ${stock.width}")`,
+            severity: 'error'
+          });
+        }
+      }
+
+      // Check grain mismatch (warning only)
+      if (part.grainSensitive && stock.grainDirection !== 'none') {
+        if (part.grainDirection !== stock.grainDirection) {
+          issues.push({
+            partId: part.id,
+            partName: part.name,
+            type: 'grain_mismatch',
+            message: `Grain direction (${part.grainDirection}) doesn't match stock (${stock.grainDirection})`,
+            severity: 'warning'
+          });
+        }
+      }
+    }
+
+    for (const feature of part.features ?? []) {
+      if (!feature.enabled) continue;
+
+      const featureIssue =
+        feature.kind === 'rect_cut'
+          ? validateRectCutFeature(feature, part)
+          : feature.kind === 'circular_cut'
+            ? validateCircularCut(feature, part)
+            : feature.kind === 'rounded_cut'
+              ? validateRoundedCut(feature, part)
+              : validateEndCutFeature(feature, part);
+      if (!featureIssue) continue;
+
+      const featureLabel =
+        feature.label?.trim() || `${feature.cutType.replace(/_/g, ' ')} on ${getFeatureTargetLabel(feature)}`;
       issues.push({
         partId: part.id,
         partName: part.name,
-        type: 'exceeds_thickness',
-        message: `Thickness (${part.thickness}") exceeds stock (${stock.thickness}")`,
+        type: 'feature_validation',
+        message: `Operation "${featureLabel}" is invalid: ${featureIssue}`,
         severity: 'error'
       });
     }
 
-    // Check dimensions (considering rotation possibility)
-    const fitsNormal = cutLength <= stock.length && cutWidth <= stock.width;
-    const fitsRotated = !part.grainSensitive && cutLength <= stock.width && cutWidth <= stock.length;
-
-    if (!fitsNormal && !fitsRotated) {
-      // Check if it's a glue-up panel that only exceeds width
-      if (part.glueUpPanel && cutLength <= stock.length) {
-        // Glue-up panel that only exceeds width is acceptable - no issue to report
-        // The boards needed calculation is shown in the Properties panel
-      } else {
-        issues.push({
-          partId: part.id,
-          partName: part.name,
-          type: 'exceeds_dimensions',
-          message: `Dimensions (${cutLength}" × ${cutWidth}") exceed stock (${stock.length}" × ${stock.width}")`,
-          severity: 'error'
-        });
-      }
-    }
-
-    // Check grain mismatch (warning only)
-    if (part.grainSensitive && stock.grainDirection !== 'none') {
-      if (part.grainDirection !== stock.grainDirection) {
-        issues.push({
-          partId: part.id,
-          partName: part.name,
-          type: 'grain_mismatch',
-          message: `Grain direction (${part.grainDirection}) doesn't match stock (${stock.grainDirection})`,
-          severity: 'warning'
-        });
-      }
+    const seenConflictMessages = new Set<string>();
+    for (const conflict of getPartFeatureConflicts(part.features ?? [], part)) {
+      const relatedIds = [conflict.featureId, conflict.relatedFeatureId ?? ''].sort().join(':');
+      const key = `${conflict.code}:${relatedIds}`;
+      if (seenConflictMessages.has(key)) continue;
+      seenConflictMessages.add(key);
+      issues.push({
+        partId: part.id,
+        partName: part.name,
+        type: 'feature_validation',
+        message: conflict.message,
+        severity: conflict.severity
+      });
     }
   }
 
+  // Relationships span parts, so validate once after individual operations.
+  // One issue identifies the joint's parts instead of repeating it per mate.
+  const seenRelationships = new Set<string>();
+  for (const relationship of getDowelRelationshipIssues(parts)) {
+    const key = `${[...relationship.partIds].sort().join(':')}:${relationship.message}`;
+    if (seenRelationships.has(key)) continue;
+    seenRelationships.add(key);
+    const relatedParts = parts.filter((part) => relationship.partIds.includes(part.id));
+    const part = relatedParts[0];
+    if (!part) continue;
+    issues.push({
+      partId: part.id,
+      partName: part.name,
+      type: 'feature_validation',
+      severity: 'error',
+      message: `${relationship.message} Parts: ${relatedParts.map((member) => member.name).join(', ')}. Check paired-hole diameter, depth, spacing and alignment before fabrication.`
+    });
+  }
   return issues;
 };
 
@@ -377,6 +460,7 @@ export const useProjectStore = create<ProjectState>()(
   temporal(
     (set, get) => ({
       // Initial state
+      documentGeneration: 0,
       projectName: UNTITLED_PROJECT_NAME,
       parts: [],
       stocks: [],
@@ -422,7 +506,7 @@ export const useProjectStore = create<ProjectState>()(
         return newPart.id;
       },
 
-      updatePart: (id, updates) => {
+      updatePart: (id, updates, options) => {
         let didUpdate = false;
         set((state) => {
           const existingPart = state.parts.find((p) => p.id === id);
@@ -430,13 +514,18 @@ export const useProjectStore = create<ProjectState>()(
 
           let nextPart = { ...existingPart, ...updates };
           const affectsOverlap =
-            updates.position !== undefined || updates.rotation !== undefined || updates.ignoreOverlap !== undefined;
+            updates.position !== undefined ||
+            updates.rotation !== undefined ||
+            updates.ignoreOverlap !== undefined ||
+            updates.length !== undefined ||
+            updates.width !== undefined ||
+            updates.thickness !== undefined;
 
           if (state.stockConstraints.preventOverlap && affectsOverlap) {
             const transformed = new Map<string, Part>([[id, nextPart]]);
             if (wouldTransformedPartsOverlap(state.parts, transformed)) {
               const isPositionOnlyMove =
-                updates.position !== undefined && updates.rotation === undefined && updates.ignoreOverlap === undefined;
+                updates.position !== undefined && Object.keys(updates).every((key) => key === 'position');
               if (!isPositionOnlyMove) {
                 dragDebug('projectStore:updatePart:rejectOverlap', { id, updates });
                 return state;
@@ -447,7 +536,13 @@ export const useProjectStore = create<ProjectState>()(
                 y: updates.position!.y - existingPart.position.y,
                 z: updates.position!.z - existingPart.position.z
               };
-              const safeDelta = resolveSafeTranslationDelta(state.parts, new Set([id]), proposedDelta);
+              const safeDelta = resolveSafeTranslationDelta(
+                state.parts,
+                new Set([id]),
+                proposedDelta,
+                undefined,
+                options?.mateHostPartId
+              );
               if (!safeDelta) {
                 dragDebug('projectStore:updatePart:noSafeDelta', { id, proposedDelta });
                 return state;
@@ -479,13 +574,17 @@ export const useProjectStore = create<ProjectState>()(
           }
 
           didUpdate = true;
+          const proposedParts = state.parts.map((part) => (part.id === id ? nextPart : part));
           return {
-            parts: state.parts.map((p) => (p.id === id ? nextPart : p)),
+            parts:
+              updates.features === undefined
+                ? proposedParts
+                : reconcileDowelRelationshipRemovals(state.parts, proposedParts),
             isDirty: true
           };
         });
 
-        if (!didUpdate) return;
+        if (!didUpdate) return false;
 
         get().markCutListStale();
         if (
@@ -497,13 +596,21 @@ export const useProjectStore = create<ProjectState>()(
         ) {
           useSnapStore.getState().updateReferenceDistances();
         }
+
+        return true;
       },
 
       updateParts: (ids, updates) => {
-        set((state) => ({
-          parts: state.parts.map((p) => (ids.includes(p.id) ? { ...p, ...updates } : p)),
-          isDirty: true
-        }));
+        set((state) => {
+          const proposedParts = state.parts.map((part) => (ids.includes(part.id) ? { ...part, ...updates } : part));
+          return {
+            parts:
+              updates.features === undefined
+                ? proposedParts
+                : reconcileDowelRelationshipRemovals(state.parts, proposedParts),
+            isDirty: true
+          };
+        });
         get().markCutListStale();
       },
 
@@ -524,7 +631,10 @@ export const useProjectStore = create<ProjectState>()(
             if (
               changes.position !== undefined ||
               changes.rotation !== undefined ||
-              changes.ignoreOverlap !== undefined
+              changes.ignoreOverlap !== undefined ||
+              changes.length !== undefined ||
+              changes.width !== undefined ||
+              changes.thickness !== undefined
             ) {
               affectsOverlap = true;
             }
@@ -537,8 +647,12 @@ export const useProjectStore = create<ProjectState>()(
           }
 
           didUpdate = true;
+          const proposedParts = state.parts.map((part) => transformed.get(part.id) ?? part);
+          const replacesFeatures = [...transformed.entries()].some(
+            ([partId]) => updateMap.get(partId)?.features !== undefined
+          );
           return {
-            parts: state.parts.map((p) => transformed.get(p.id) ?? p),
+            parts: replacesFeatures ? reconcileDowelRelationshipRemovals(state.parts, proposedParts) : proposedParts,
             isDirty: true
           };
         });
@@ -546,6 +660,41 @@ export const useProjectStore = create<ProjectState>()(
         if (!didUpdate) return;
         get().markCutListStale();
         useSnapStore.getState().updateReferenceDistances();
+      },
+
+      addDowelJoint: (input) => {
+        const { parts } = get();
+        const firstPart = parts.find((part) => part.id === input.firstPartId);
+        const secondPart = parts.find((part) => part.id === input.secondPartId);
+        if (!firstPart || !secondPart || firstPart.id === secondPart.id) return null;
+
+        try {
+          const result = createDowelJoint({
+            ...input,
+            existingParts: parts,
+            firstPart,
+            secondPart
+          });
+          set((state) => ({
+            parts: state.parts.map((part) => {
+              if (part.id === firstPart.id) {
+                return { ...part, features: [...(part.features ?? []), ...result.firstFeatures] };
+              }
+              if (part.id === secondPart.id) {
+                return { ...part, features: [...(part.features ?? []), ...result.secondFeatures] };
+              }
+              return part;
+            }),
+            isDirty: true
+          }));
+          get().markCutListStale();
+          return result.jointId;
+        } catch (error) {
+          useUIStore
+            .getState()
+            .showToast(error instanceof Error ? error.message : 'Unable to create the dowel joint.', 'warning');
+          return null;
+        }
       },
 
       moveSelectedParts: (delta) => {
@@ -663,12 +812,15 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       deletePart: (id) => {
-        set((state) => ({
-          parts: state.parts.filter((p) => p.id !== id),
-          // Remove from any groups
-          groupMembers: state.groupMembers.filter((gm) => !(gm.memberType === 'part' && gm.memberId === id)),
-          isDirty: true
-        }));
+        set((state) => {
+          const survivingParts = state.parts.filter((part) => part.id !== id);
+          return {
+            parts: reconcileDowelRelationshipRemovals(state.parts, survivingParts),
+            // Remove from any groups
+            groupMembers: state.groupMembers.filter((gm) => !(gm.memberType === 'part' && gm.memberId === id)),
+            isDirty: true
+          };
+        });
         useSelectionStore.setState((state) => ({
           selectedPartIds: state.selectedPartIds.filter((pid) => pid !== id)
         }));
@@ -681,14 +833,17 @@ export const useProjectStore = create<ProjectState>()(
       deleteSelectedParts: () => {
         const { selectedPartIds } = useSelectionStore.getState();
         if (selectedPartIds.length === 0) return;
-        set((state) => ({
-          parts: state.parts.filter((p) => !selectedPartIds.includes(p.id)),
-          // Remove from any groups
-          groupMembers: state.groupMembers.filter(
-            (gm) => !(gm.memberType === 'part' && selectedPartIds.includes(gm.memberId))
-          ),
-          isDirty: true
-        }));
+        set((state) => {
+          const survivingParts = state.parts.filter((part) => !selectedPartIds.includes(part.id));
+          return {
+            parts: reconcileDowelRelationshipRemovals(state.parts, survivingParts),
+            // Remove from any groups
+            groupMembers: state.groupMembers.filter(
+              (gm) => !(gm.memberType === 'part' && selectedPartIds.includes(gm.memberId))
+            ),
+            isDirty: true
+          };
+        });
         useSelectionStore.setState({ selectedPartIds: [] });
         useSnapStore.setState((state) => ({
           referencePartIds: state.referencePartIds.filter((id) => !selectedPartIds.includes(id))
@@ -699,14 +854,17 @@ export const useProjectStore = create<ProjectState>()(
       confirmDeleteParts: () => {
         const { pendingDeletePartIds } = useUIStore.getState();
         if (!pendingDeletePartIds || pendingDeletePartIds.length === 0) return;
-        set((state) => ({
-          parts: state.parts.filter((p) => !pendingDeletePartIds.includes(p.id)),
-          // Remove from any groups
-          groupMembers: state.groupMembers.filter(
-            (gm) => !(gm.memberType === 'part' && pendingDeletePartIds.includes(gm.memberId))
-          ),
-          isDirty: true
-        }));
+        set((state) => {
+          const survivingParts = state.parts.filter((part) => !pendingDeletePartIds.includes(part.id));
+          return {
+            parts: reconcileDowelRelationshipRemovals(state.parts, survivingParts),
+            // Remove from any groups
+            groupMembers: state.groupMembers.filter(
+              (gm) => !(gm.memberType === 'part' && pendingDeletePartIds.includes(gm.memberId))
+            ),
+            isDirty: true
+          };
+        });
         useSelectionStore.setState((state) => ({
           selectedPartIds: state.selectedPartIds.filter((id) => !pendingDeletePartIds.includes(id))
         }));
@@ -714,6 +872,19 @@ export const useProjectStore = create<ProjectState>()(
           referencePartIds: state.referencePartIds.filter((id) => !pendingDeletePartIds.includes(id))
         }));
         useUIStore.getState().cancelDeleteParts();
+        get().markCutListStale();
+      },
+
+      confirmDeleteGroups: () => {
+        const { pendingDeleteGroupIds } = useUIStore.getState();
+        if (!pendingDeleteGroupIds || pendingDeleteGroupIds.length === 0) return;
+        // The confirmation offers to delete each group "and all its contents",
+        // so this is the recursive delete, which already reconciles members,
+        // selection and snap references for every descendant.
+        for (const groupId of pendingDeleteGroupIds) {
+          get().deleteGroup(groupId, 'recursive');
+        }
+        useUIStore.getState().cancelDeleteGroups();
         get().markCutListStale();
       },
 
@@ -730,18 +901,19 @@ export const useProjectStore = create<ProjectState>()(
         const part = parts.find((p) => p.id === id);
         if (!part) return null;
         const duplicateOffset = getDuplicateOffset([part]);
+        const newPartId = uuidv4();
+        const partIdMap = new Map([[part.id, newPartId]]);
 
-        // Destructure to exclude `id` so createDefaultPart generates a new one
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { id: _oldId, ...partWithoutId } = part;
         const newPart = createDefaultPart({
-          ...partWithoutId,
+          ...part,
+          id: newPartId,
           name: generateCopyName(part.name),
           position: {
             x: part.position.x + duplicateOffset.x,
             y: part.position.y + duplicateOffset.y,
             z: part.position.z + duplicateOffset.z
-          }
+          },
+          features: clonePartFeaturesForCopy(part.features, partIdMap, new Map())
         });
 
         set((state) => ({
@@ -792,8 +964,10 @@ export const useProjectStore = create<ProjectState>()(
         }
 
         // Create ID mappings
-        const partIdMap = new Map<string, string>();
+        const selectedParts = parts.filter((p) => partIdsToDupe.has(p.id));
+        const partIdMap = new Map(selectedParts.map((part) => [part.id, uuidv4()]));
         const groupIdMap = new Map<string, string>();
+        const jointIdMap = new Map<string, string>();
 
         // Get group members that will be duplicated to identify child items
         const selectedGroupMembers = groupMembers.filter((gm) => groupIdsToDupe.has(gm.groupId));
@@ -809,13 +983,11 @@ export const useProjectStore = create<ProjectState>()(
 
         // Duplicate parts with offset
         // Only top-level parts (not in any group being duplicated) get "(copy)" appended
-        const selectedParts = parts.filter((p) => partIdsToDupe.has(p.id));
         const duplicateOffset = getDuplicateOffset(selectedParts);
         const newParts = selectedParts.map((part) => {
-          const newId = uuidv4();
-          partIdMap.set(part.id, newId);
+          const newId = partIdMap.get(part.id)!;
           const isChild = childPartIds.has(part.id);
-          return {
+          return normalizePart({
             ...part,
             id: newId,
             name: isChild ? part.name : generateCopyName(part.name),
@@ -823,8 +995,9 @@ export const useProjectStore = create<ProjectState>()(
               x: part.position.x + duplicateOffset.x,
               y: part.position.y + duplicateOffset.y,
               z: part.position.z + duplicateOffset.z
-            }
-          };
+            },
+            features: clonePartFeaturesForCopy(part.features, partIdMap, jointIdMap)
+          });
         });
 
         // Duplicate groups
@@ -1073,6 +1246,8 @@ export const useProjectStore = create<ProjectState>()(
 
         // Create part index map for group member references
         const partIdToIndex = new Map<string, number>();
+        const assemblyPartIds = new Map(selectedParts.map((part, index) => [part.id, `part:${index}`]));
+        const assemblyJointIds = new Map<string, string>();
         const assemblyParts: AssemblyPart[] = selectedParts.map((part, index) => {
           partIdToIndex.set(part.id, index);
 
@@ -1103,6 +1278,8 @@ export const useProjectStore = create<ProjectState>()(
             notes: part.notes,
             extraLength: part.extraLength,
             extraWidth: part.extraWidth,
+            localId: assemblyPartIds.get(part.id),
+            features: clonePartFeaturesForCopy(part.features, assemblyPartIds, assemblyJointIds),
             embeddedStock
           };
         });
@@ -1246,10 +1423,13 @@ export const useProjectStore = create<ProjectState>()(
         // Create ID mappings
         const partIdMap = new Map<number, string>(); // index -> new ID
         const groupIdMap = new Map<number, string>(); // index -> new ID
+        const newPartIdentities = assembly.parts.map(() => uuidv4());
+        const assemblyCopyMap = getAssemblyPartCopyMap(assembly.parts, newPartIdentities);
+        const placedJointIds = new Map<string, string>();
 
         // Create new parts with resolved stock IDs
         const newParts: Part[] = assembly.parts.map((cp, index) => {
-          const newId = uuidv4();
+          const newId = newPartIdentities[index];
           partIdMap.set(index, newId);
 
           // Resolve the stockId
@@ -1259,7 +1439,7 @@ export const useProjectStore = create<ProjectState>()(
             resolvedStockId = resolved || null; // Empty string means clear the stock
           }
 
-          return {
+          return normalizePart({
             id: newId,
             name: cp.name,
             length: cp.length,
@@ -1277,8 +1457,9 @@ export const useProjectStore = create<ProjectState>()(
             color: cp.color,
             notes: cp.notes,
             extraLength: cp.extraLength,
-            extraWidth: cp.extraWidth
-          };
+            extraWidth: cp.extraWidth,
+            features: clonePartFeaturesForCopy(cp.features, assemblyCopyMap, placedJointIds)
+          });
         });
 
         // Create new groups
@@ -1330,6 +1511,7 @@ export const useProjectStore = create<ProjectState>()(
       newProject: (defaults) => {
         const now = new Date().toISOString();
         set({
+          documentGeneration: get().documentGeneration + 1,
           projectName: UNTITLED_PROJECT_NAME,
           parts: [],
           stocks: [],
@@ -1373,12 +1555,17 @@ export const useProjectStore = create<ProjectState>()(
 
       loadProject: (project, filePath) => {
         set({
+          documentGeneration: get().documentGeneration + 1,
           projectName: project.name,
-          parts: project.parts,
-          stocks: project.stocks,
-          groups: project.groups,
+          parts: (project.parts ?? []).map((part) => normalizePart(part)),
+          stocks: project.stocks ?? [],
+          groups: project.groups ?? [],
           groupMembers: project.groupMembers || [],
-          assemblies: project.assemblies || [],
+          assemblies:
+            project.assemblies?.map((assembly) => ({
+              ...assembly,
+              parts: assembly.parts.map((part) => normalizeAssemblyPart(part))
+            })) || [],
           filePath: filePath || null,
           isDirty: false,
           // Load project settings or use defaults
@@ -1561,17 +1748,20 @@ export const useProjectStore = create<ProjectState>()(
           }));
         } else {
           // 'recursive' - delete group AND all member parts
-          set((state) => ({
-            groups: state.groups.filter((g) => !descendantGroupIds.includes(g.id)),
-            // Remove memberships inside deleted groups AND memberships that reference deleted groups as members
-            groupMembers: state.groupMembers.filter((gm) => {
-              if (descendantGroupIds.includes(gm.groupId)) return false;
-              if (gm.memberType === 'group' && descendantGroupIds.includes(gm.memberId)) return false;
-              return true;
-            }),
-            parts: state.parts.filter((p) => !descendantPartIds.includes(p.id)),
-            isDirty: true
-          }));
+          set((state) => {
+            const survivingParts = state.parts.filter((part) => !descendantPartIds.includes(part.id));
+            return {
+              groups: state.groups.filter((g) => !descendantGroupIds.includes(g.id)),
+              // Remove memberships inside deleted groups AND memberships that reference deleted groups as members
+              groupMembers: state.groupMembers.filter((gm) => {
+                if (descendantGroupIds.includes(gm.groupId)) return false;
+                if (gm.memberType === 'group' && descendantGroupIds.includes(gm.memberId)) return false;
+                return true;
+              }),
+              parts: reconcileDowelRelationshipRemovals(state.parts, survivingParts),
+              isDirty: true
+            };
+          });
           useSelectionStore.setState((state) => ({
             selectedPartIds: state.selectedPartIds.filter((id) => !descendantPartIds.includes(id)),
             selectedGroupIds: state.selectedGroupIds.filter((id) => !descendantGroupIds.includes(id)),

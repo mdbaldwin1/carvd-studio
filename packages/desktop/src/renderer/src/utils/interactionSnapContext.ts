@@ -2,6 +2,7 @@ import type { Part, SnapGuide } from '../types';
 import { isAxisAlignedRotation } from './rotation';
 import {
   detectFaceSnaps,
+  detectFeatureMateSnaps,
   detectFeatureSnaps,
   detectFractionalFaceSnaps,
   detectGuideSnaps,
@@ -9,6 +10,7 @@ import {
   detectSnaps,
   detectSurfaceAnchorSnaps,
   getPartBoundsAtPosition,
+  type MateSnapResult,
   type PartBounds,
   type SnapResult
 } from './snapToPartsUtil';
@@ -25,6 +27,7 @@ export interface InteractionSnapContext {
   guideSnaps?: ReturnType<typeof detectGuideSnaps>;
   originSnaps?: ReturnType<typeof detectOriginSnaps>;
   advancedDetectors: {
+    mate: () => MateSnapResult;
     surface: () => SnapResult;
     fraction: () => SnapResult;
     feature: () => SnapResult | { result: SnapResult; stage: SnapStage };
@@ -90,6 +93,7 @@ export function createPartSnapContext(params: {
     guideSnaps: snapGuides.length > 0 ? detectGuideSnaps(guideBounds, snapGuides, snapThreshold) : undefined,
     originSnaps: snapToOrigin ? detectOriginSnaps(guideBounds, snapThreshold) : undefined,
     advancedDetectors: {
+      mate: () => detectFeatureMateSnaps(part, position, referenceParts, movingPartIds, snapThreshold),
       surface: () => detectSurfaceAnchorSnaps(part, position, referenceParts, movingPartIds, snapThreshold),
       fraction: () =>
         detectFractionalFaceSnaps(
@@ -174,6 +178,7 @@ export function createGroupProxySnapContext(params: {
     guideSnaps: snapGuides.length > 0 ? detectGuideSnaps(guideBounds, snapGuides, snapThreshold) : undefined,
     originSnaps: snapToOrigin ? detectOriginSnaps(guideBounds, snapThreshold) : undefined,
     advancedDetectors: {
+      mate: () => detectFeatureMateSnaps(subjectPart, featurePosition, referenceParts, movingPartIds, snapThreshold),
       surface: () =>
         detectSurfaceAnchorSnaps(subjectPart, featurePosition, referenceParts, movingPartIds, snapThreshold),
       fraction: () =>

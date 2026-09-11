@@ -30,8 +30,13 @@ interface UseMenuCommandsOptions {
   onOpenProject?: () => Promise<void>;
   onOpenRecentProject?: (filePath: string) => Promise<void>;
   onCloseProject?: () => void;
+  onReload?: (ignoreCache: boolean) => Promise<void>;
+  isFileActionBusy?: () => boolean;
   // Template/assembly editing mode
   isEditingTemplate?: boolean;
+  isEditingPartCuts?: boolean;
+  onSavePartCuts?: () => void | Promise<void>;
+  onSavePartCutsAs?: () => void | Promise<void>;
   onSaveTemplate?: () => Promise<void>;
   onSaveAssembly?: () => Promise<void>;
 }
@@ -45,20 +50,48 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
   useEffect(() => {
     const handleMenuCommand = async (command: string, ...args: unknown[]) => {
       const opts = optionsRef.current;
+      if (
+        opts.isFileActionBusy?.() &&
+        [
+          'new-project',
+          'new-from-template',
+          'open-project',
+          'open-recent',
+          'save-project',
+          'save-project-as',
+          'close-project',
+          'request-reload'
+        ].includes(command)
+      )
+        return;
 
       // Read store state imperatively
       const isEditingAssembly = useAssemblyEditingStore.getState().isEditingAssembly;
       const showToast = useUIStore.getState().showToast;
       const filePath = useProjectStore.getState().filePath;
 
-      // Block certain file operations when editing a template or assembly
+      // Block certain file operations when editing a focused sub-mode
       const blockableFileCommands = ['new-project', 'new-from-template', 'open-project', 'open-recent'];
-      if ((isEditingAssembly || opts.isEditingTemplate) && blockableFileCommands.includes(command)) {
-        showToast(isEditingAssembly ? 'Finish editing assembly first' : 'Finish editing template first', 'warning');
+      if (
+        (isEditingAssembly || opts.isEditingTemplate || opts.isEditingPartCuts) &&
+        blockableFileCommands.includes(command)
+      ) {
+        showToast(
+          isEditingAssembly
+            ? 'Finish editing assembly first'
+            : opts.isEditingTemplate
+              ? 'Finish editing template first'
+              : 'Save or discard part cuts before changing projects.',
+          'warning'
+        );
         return;
       }
 
       switch (command) {
+        case 'request-reload': {
+          if (opts.onReload) await opts.onReload(args[0] === true);
+          break;
+        }
         // File commands
         case 'new-project': {
           // Use handler with unsaved changes dialog if provided
@@ -111,6 +144,10 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         }
 
         case 'save-project': {
+          if (opts.isEditingPartCuts && opts.onSavePartCuts) {
+            await opts.onSavePartCuts();
+            break;
+          }
           // Route to template or assembly save when in those modes
           if (opts.isEditingTemplate && opts.onSaveTemplate) {
             await opts.onSaveTemplate();
@@ -131,7 +168,12 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         }
 
         case 'save-project-as': {
-          // "Save As" doesn't apply to template or assembly editing
+          // "Save As" doesn't apply to focused editing modes
+          if (opts.isEditingPartCuts) {
+            if (opts.onSavePartCutsAs) await opts.onSavePartCutsAs();
+            else showToast('Use "Save" to commit part cuts before saving the project', 'info');
+            break;
+          }
           if (opts.isEditingTemplate) {
             showToast('Use "Save Template" to save template changes', 'info');
             break;

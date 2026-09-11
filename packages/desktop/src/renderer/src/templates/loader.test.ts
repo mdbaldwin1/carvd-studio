@@ -1,11 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
-  loadTemplateFromJSON,
-  loadAssemblyFromJSON,
-  getTemplateMetadata,
+  AssemblyDefinition,
   getAssemblyMetadata,
-  TemplateDefinition,
-  AssemblyDefinition
+  getTemplateMetadata,
+  loadAssemblyFromJSON,
+  loadTemplateFromJSON,
+  TemplateDefinition
 } from './loader';
 
 // Mock uuid to have predictable IDs in tests
@@ -29,12 +29,10 @@ describe('loader', () => {
         overageFactor: 1.1,
         projectNotes: 'Test notes',
         stockConstraints: {
-          maxLength: 96,
-          maxWidth: 48,
-          maxBoardFeet: 50,
-          maxTotalCost: 500,
-          useGlobalDefaults: true,
-          preferBoardOverSheet: false
+          constrainDimensions: true,
+          constrainGrain: true,
+          constrainColor: true,
+          preventOverlap: true
         }
       },
       stocks: [],
@@ -65,12 +63,10 @@ describe('loader', () => {
     it('applies stock constraints', () => {
       const project = loadTemplateFromJSON(minimalTemplate);
       expect(project.stockConstraints).toEqual({
-        maxLength: 96,
-        maxWidth: 48,
-        maxBoardFeet: 50,
-        maxTotalCost: 500,
-        useGlobalDefaults: true,
-        preferBoardOverSheet: false
+        constrainDimensions: true,
+        constrainGrain: true,
+        constrainColor: true,
+        preventOverlap: true
       });
     });
 
@@ -198,6 +194,35 @@ describe('loader', () => {
         expect(part.extraWidth).toBe(0.25);
         expect(part.glueUpPanel).toBe(true);
         expect(part.ignoreOverlap).toBe(false);
+      });
+
+      it('preserves part features', () => {
+        const templateWithFeaturedParts: TemplateDefinition = {
+          ...templateWithParts,
+          parts: [
+            {
+              ...templateWithParts.parts[0],
+              features: [
+                {
+                  id: 'feature-1',
+                  kind: 'end_cut',
+                  version: 1 as const,
+                  enabled: true,
+                  target: { type: 'face', face: 'left_end' },
+                  reference: { primaryFrom: 'min' },
+                  cutType: 'mitre',
+                  lengthMode: 'long_point',
+                  parameters: { horizontalAngle: 45 }
+                }
+              ]
+            }
+          ]
+        };
+
+        const project = loadTemplateFromJSON(templateWithFeaturedParts);
+        expect(project.parts[0].features).toHaveLength(1);
+        expect(project.parts[0].features?.[0].kind).toBe('end_cut');
+        expect(project.parts[0].features).not.toBe(templateWithFeaturedParts.parts[0].features);
       });
 
       it('copies position object', () => {
@@ -462,6 +487,38 @@ describe('loader', () => {
         expect(part.extraWidth).toBe(0.25);
       });
 
+      it('preserves assembly part features', () => {
+        const assemblyWithFeaturedParts: AssemblyDefinition = {
+          ...assemblyWithParts,
+          parts: [
+            {
+              ...assemblyWithParts.parts[0],
+              features: [
+                {
+                  id: 'feature-1',
+                  kind: 'rect_cut',
+                  version: 1 as const,
+                  enabled: true,
+                  target: { type: 'corner', corner: 'back_left_corner' },
+                  reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+                  cutType: 'corner_notch',
+                  parameters: {
+                    size: { length: 0.75, width: 0.75 },
+                    depthMode: 'through'
+                  },
+                  placement: { x: 0, z: 0 }
+                }
+              ]
+            }
+          ]
+        };
+
+        const assembly = loadAssemblyFromJSON(assemblyWithFeaturedParts);
+        expect(assembly.parts[0].features).toHaveLength(1);
+        expect(assembly.parts[0].features?.[0].kind).toBe('rect_cut');
+        expect(assembly.parts[0].features).not.toBe(assemblyWithFeaturedParts.parts[0].features);
+      });
+
       it('copies relativePosition object', () => {
         const assembly = loadAssemblyFromJSON(assemblyWithParts);
         expect(assembly.parts[0].relativePosition).toEqual({ x: 0, y: 18.75, z: 0 });
@@ -662,12 +719,10 @@ describe('loader', () => {
         overageFactor: 1.1,
         projectNotes: '',
         stockConstraints: {
-          maxLength: 96,
-          maxWidth: 48,
-          maxBoardFeet: 50,
-          maxTotalCost: 500,
-          useGlobalDefaults: true,
-          preferBoardOverSheet: false
+          constrainDimensions: true,
+          constrainGrain: true,
+          constrainColor: true,
+          preventOverlap: true
         }
       },
       stocks: [

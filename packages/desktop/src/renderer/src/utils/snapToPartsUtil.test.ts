@@ -1,20 +1,28 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { Part, SnapGuide } from '../types';
+import paulDeckFixture from '../../../../tests/fixtures/paul-deck-snap-regression.json';
 import {
-  getPartBounds,
-  getPartBoundsAtPosition,
-  getNearestParts,
+  calculateGroupReferenceDistances,
+  calculateReferenceDistances,
   calculateSnapThreshold,
-  detectSnaps,
-  detectDimensionSnaps,
+  calculateVectorReferenceDistance,
   createDimensionMatchSnapLine,
   createEnhancedDimensionSnapLine,
-  detectGuideSnaps,
   createGuideSnapLine,
-  detectOriginSnaps,
   createOriginSnapLine,
+  detectDimensionSnaps,
   detectFaceSnaps,
+  detectFeatureMateSnaps,
   detectFeatureSnaps,
+  detectGuideSnaps,
+  detectOriginSnaps,
+  detectSnaps,
+  getNearestParts,
+  getPartBounds,
+  getPartBoundsAtPosition,
+  getPartFeatureSockets,
   getPartOBB,
+  getPartVertices,
   obbsOverlap,
   STANDARD_DIMENSIONS_IMPERIAL,
   STANDARD_DIMENSIONS_METRIC,
@@ -22,7 +30,8 @@ import {
   STANDARD_THICKNESSES_METRIC,
   type PartBounds
 } from './snapToPartsUtil';
-import type { Part, SnapGuide } from '../types';
+
+vi.unmock('three');
 
 // Helper to create a test part
 function createTestPart(overrides: Partial<Part> = {}): Part {
@@ -111,6 +120,37 @@ describe('snapToPartsUtil', () => {
       expect(bounds.centerX).toBe(0);
       expect(bounds.centerY).toBe(0);
       expect(bounds.centerZ).toBe(0);
+    });
+
+    it('uses feature-aware bounds for notched parts', () => {
+      const part = createTestPart({
+        position: { x: 10, y: 2, z: -3 },
+        length: 24,
+        width: 12,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            target: { type: 'corner', corner: 'front_left_corner' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'corner_notch',
+            parameters: {
+              size: { length: 2, width: 2 },
+              depthMode: 'through'
+            },
+            placement: { x: 0, z: 0 }
+          }
+        ]
+      });
+
+      const bounds = getPartBounds(part);
+      expect(bounds.minX).toBeCloseTo(-2);
+      expect(bounds.maxX).toBeCloseTo(22);
+      expect(bounds.minZ).toBeCloseTo(-9);
+      expect(bounds.maxZ).toBeCloseTo(3);
     });
   });
 
@@ -1373,6 +1413,27 @@ describe('snapToPartsUtil', () => {
   });
 
   describe('detectFaceSnaps', () => {
+    const endCut = (
+      face: 'left_end' | 'right_end',
+      cutType: 'mitre' | 'bevel' | 'compound',
+      parameters: {
+        horizontalAngle: number;
+        horizontalFlip?: boolean;
+        verticalAngle?: number;
+        verticalFlip?: boolean;
+      }
+    ) => ({
+      id: `${face}-${cutType}`,
+      kind: 'end_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      target: { type: 'face' as const, face },
+      reference: { primaryFrom: face === 'left_end' ? ('min' as const) : ('max' as const) },
+      cutType,
+      lengthMode: 'long_point' as const,
+      parameters
+    });
+
     it('detects face-to-face snap on X axis (right to left)', () => {
       const draggingPart = createTestPart({
         id: 'dragging',
@@ -1483,6 +1544,205 @@ describe('snapToPartsUtil', () => {
 
       expect(result.snapLines.length).toBeGreaterThan(0);
       expect(result.snapLines[0].type).toBe('face');
+    });
+
+    it.each([
+      {
+        title: 'default 45 degree frame corner',
+        firstFlip: true,
+        secondFlip: false,
+        separatedPosition: { x: 4.2, y: 0.5, z: 4.2 },
+        assembledPosition: { x: 4, y: 0.5, z: 4 }
+      },
+      {
+        title: 'oppositely flipped 45 degree frame corner',
+        firstFlip: false,
+        secondFlip: true,
+        rotationY: -90,
+        separatedPosition: { x: 4.2, y: 0.5, z: -4.2 },
+        assembledPosition: { x: 4, y: 0.5, z: -4 }
+      }
+    ])(
+      'snaps the actual mitre planes for a $title',
+      ({ firstFlip, secondFlip, rotationY = 90, separatedPosition, assembledPosition }) => {
+        const horizontal = createTestPart({
+          id: 'horizontal-frame',
+          length: 10,
+          width: 2,
+          thickness: 1,
+          position: { x: 0, y: 0.5, z: 0 },
+          features: [endCut('right_end', 'mitre', { horizontalAngle: 45, horizontalFlip: firstFlip })]
+        });
+        const vertical = createTestPart({
+          id: 'vertical-frame',
+          length: 10,
+          width: 2,
+          thickness: 1,
+          position: separatedPosition,
+          rotation: { x: 0, y: rotationY, z: 0 },
+          features: [endCut('right_end', 'mitre', { horizontalAngle: 45, horizontalFlip: secondFlip })]
+        });
+
+        const result = detectFaceSnaps(vertical, separatedPosition, [horizontal, vertical], [vertical.id], 0.5);
+
+        expect(result.snappedX).toBe(true);
+        expect(result.snappedZ).toBe(true);
+        expect(result.adjustedPosition.x).toBeCloseTo(assembledPosition.x, 3);
+        expect(result.adjustedPosition.y).toBeCloseTo(assembledPosition.y, 5);
+        expect(result.adjustedPosition.z).toBeCloseTo(assembledPosition.z, 3);
+      }
+    );
+
+    it('snaps complementary 22.5 degree mitres for a 45 degree frame turn', () => {
+      const horizontal = createTestPart({
+        id: 'horizontal-22-5',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 22.5, horizontalFlip: true })]
+      });
+      const assembledPosition = { x: 7.82842712, y: 0.5, z: 3.24264069 };
+      const separatedPosition = { x: 8.01320303, y: 0.5, z: 3.31917738 };
+      const diagonal = createTestPart({
+        id: 'diagonal-22-5',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: separatedPosition,
+        rotation: { x: 0, y: 135, z: 0 },
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 22.5, horizontalFlip: false })]
+      });
+
+      const result = detectFaceSnaps(diagonal, separatedPosition, [horizontal, diagonal], [diagonal.id], 0.5);
+
+      expect(result.snappedX).toBe(true);
+      expect(result.snappedZ).toBe(true);
+      expect(result.adjustedPosition.x).toBeCloseTo(assembledPosition.x, 3);
+      expect(result.adjustedPosition.z).toBeCloseTo(assembledPosition.z, 3);
+    });
+
+    it('recomputes shaped snap planes after a mitre angle edit', () => {
+      const editedHost = createTestPart({
+        id: 'edited-host',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 30, horizontalFlip: true })]
+      });
+      const stale45Mate = createTestPart({
+        id: 'stale-45-mate',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 4.2, y: 0.5, z: 4.2 },
+        rotation: { x: 0, y: 90, z: 0 },
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 45, horizontalFlip: false })]
+      });
+
+      const staleResult = detectFaceSnaps(
+        stale45Mate,
+        stale45Mate.position,
+        [editedHost, stale45Mate],
+        [stale45Mate.id],
+        0.5
+      );
+      expect(staleResult.closestDistance).toBeUndefined();
+
+      const faceCenter = 5 - Math.tan(Math.PI / 6);
+      const assembledPosition = {
+        x: faceCenter * 1.5,
+        y: 0.5,
+        z: (faceCenter * Math.sqrt(3)) / 2
+      };
+      const separatedPosition = {
+        x: assembledPosition.x + Math.cos(Math.PI / 6) * 0.2,
+        y: 0.5,
+        z: assembledPosition.z + Math.sin(Math.PI / 6) * 0.2
+      };
+      const editedMate = createTestPart({
+        ...stale45Mate,
+        id: 'edited-mate',
+        position: separatedPosition,
+        rotation: { x: 0, y: 120, z: 0 },
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 30, horizontalFlip: false })]
+      });
+      const refreshedResult = detectFaceSnaps(
+        editedMate,
+        editedMate.position,
+        [editedHost, editedMate],
+        [editedMate.id],
+        0.5
+      );
+
+      expect(refreshedResult.snappedX).toBe(true);
+      expect(refreshedResult.snappedZ).toBe(true);
+      expect(refreshedResult.adjustedPosition.x).toBeCloseTo(assembledPosition.x, 3);
+      expect(refreshedResult.adjustedPosition.z).toBeCloseTo(assembledPosition.z, 3);
+    });
+
+    it('snaps complementary bevel and compound end planes in three dimensions', () => {
+      const bevelInset = Math.tan(Math.PI / 6);
+      const bevelCenter = 5 - bevelInset / 2;
+      const bevelA = createTestPart({
+        id: 'bevel-a',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [endCut('right_end', 'bevel', { horizontalAngle: 0, verticalAngle: 30 })]
+      });
+      const bevelAssembled = { x: bevelCenter * 2, y: 0.5, z: 0 };
+      const bevelSeparated = {
+        x: bevelAssembled.x + Math.cos(Math.PI / 6) * 0.2,
+        y: bevelAssembled.y - Math.sin(Math.PI / 6) * 0.2,
+        z: 0
+      };
+      const bevelB = createTestPart({
+        id: 'bevel-b',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: bevelSeparated,
+        features: [endCut('left_end', 'bevel', { horizontalAngle: 0, verticalAngle: 30 })]
+      });
+
+      const bevelResult = detectFaceSnaps(bevelB, bevelSeparated, [bevelA, bevelB], [bevelB.id], 0.5);
+      expect(bevelResult.adjustedPosition.x).toBeCloseTo(bevelAssembled.x, 3);
+      expect(bevelResult.adjustedPosition.y).toBeCloseTo(bevelAssembled.y, 3);
+
+      const horizontalInset = Math.tan(Math.PI / 8) * 2;
+      const verticalInset = Math.tan(Math.PI / 12);
+      const compoundCenter = 5 - (horizontalInset + verticalInset) / 2;
+      const compoundA = createTestPart({
+        id: 'compound-a',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [endCut('right_end', 'compound', { horizontalAngle: 22.5, horizontalFlip: true, verticalAngle: 15 })]
+      });
+      const compoundAssembled = { x: compoundCenter * 2, y: 0.5, z: 0 };
+      const normalLength = Math.sqrt(1 + Math.tan(Math.PI / 12) ** 2 + Math.tan(Math.PI / 8) ** 2);
+      const compoundSeparated = {
+        x: compoundAssembled.x + 0.2 / normalLength,
+        y: compoundAssembled.y - (Math.tan(Math.PI / 12) * 0.2) / normalLength,
+        z: (Math.tan(Math.PI / 8) * 0.2) / normalLength
+      };
+      const compoundB = createTestPart({
+        id: 'compound-b',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: compoundSeparated,
+        features: [endCut('left_end', 'compound', { horizontalAngle: 22.5, verticalAngle: 15 })]
+      });
+
+      const compoundResult = detectFaceSnaps(compoundB, compoundSeparated, [compoundA, compoundB], [compoundB.id], 0.5);
+      expect(compoundResult.adjustedPosition.x).toBeCloseTo(compoundAssembled.x, 3);
+      expect(compoundResult.adjustedPosition.y).toBeCloseTo(compoundAssembled.y, 3);
+      expect(compoundResult.adjustedPosition.z).toBeCloseTo(compoundAssembled.z, 3);
     });
   });
 
@@ -1603,6 +1863,41 @@ describe('snapToPartsUtil', () => {
       }
     });
 
+    it('edge-edge snap still fires when part is already face-snapped (sliding along a face)', () => {
+      // Target: a board lying flat
+      const target = createTestPart({
+        id: 'target',
+        length: 24,
+        width: 6,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 }
+      });
+
+      // Dragging part: sitting ON the target (face-snapped, gap ≈ 1e-4)
+      // Positioned so its front edge (z = -2) is close to target's front edge (z = -3)
+      const drag = createTestPart({
+        id: 'drag',
+        length: 6,
+        width: 4,
+        thickness: 0.75,
+        position: { x: 0, y: 0, z: 0 }
+      });
+
+      // Position: flush on top (Y gap ≈ 0.0001), front edge 0.3" from target's front edge
+      const currentPos = {
+        x: 0,
+        y: target.position.y + target.thickness / 2 + drag.thickness / 2 + 1e-4,
+        z: -0.7 // drag front edge at z = -0.7 - 2 = -2.7, target front edge at z = -3, gap = 0.3"
+      };
+
+      const result = detectFeatureSnaps(drag, currentPos, [target, drag], ['drag'], 0.5);
+
+      // The edge-edge snap on the Z axis should fire (0.3" < threshold 0.5")
+      // Previously this was blocked by vertex-face poisoning bestDistance
+      expect(result.snappedX || result.snappedY || result.snappedZ).toBe(true);
+      expect(result.snapLines.length).toBeGreaterThan(0);
+    });
+
     it('snaps collinear angled edges while sliding on a surface-snapped face', () => {
       const partA = createTestPart({
         id: 'part-a',
@@ -1635,6 +1930,27 @@ describe('snapToPartsUtil', () => {
       expect(result.snappedX || result.snappedY || result.snappedZ).toBe(true);
       expect(result.snapLines.length).toBeGreaterThan(0);
       expect(result.closestDistance).toBeLessThanOrEqual(0.2 + 1e-3);
+    });
+
+    it('recovers flush alignment for anonymized adjacent boards from Paul’s deck', () => {
+      const target = createTestPart({ id: 'deck-board-a', ...paulDeckFixture.target });
+      const moving = createTestPart({ id: 'deck-board-b', ...paulDeckFixture.moving });
+      const perturbed = {
+        x: moving.position.x + 0.18,
+        y: moving.position.y,
+        z: moving.position.z + 0.22
+      };
+
+      const faceContact = detectFeatureSnaps(moving, perturbed, [target, moving], [moving.id], 0.5);
+      expect(faceContact.snappedX).toBe(true);
+      expect(faceContact.adjustedPosition.x).toBeCloseTo(-6, 3);
+
+      // Drag snapping is recomputed every frame. Once face contact is held,
+      // the next pass must preserve it and recover the tangential end flush.
+      const endFlush = detectFeatureSnaps(moving, faceContact.adjustedPosition, [target, moving], [moving.id], 0.5);
+      expect(endFlush.snappedZ).toBe(true);
+      expect(endFlush.adjustedPosition.x).toBeCloseTo(-6, 3);
+      expect(endFlush.adjustedPosition.z).toBeCloseTo(0, 3);
     });
   });
 
@@ -1675,6 +1991,765 @@ describe('snapToPartsUtil', () => {
       expect(isSorted(STANDARD_DIMENSIONS_METRIC)).toBe(true);
       expect(isSorted(STANDARD_THICKNESSES_IMPERIAL)).toBe(true);
       expect(isSorted(STANDARD_THICKNESSES_METRIC)).toBe(true);
+    });
+  });
+
+  describe('getPartFeatureSockets', () => {
+    it('returns empty array for parts without features', () => {
+      const part = createTestPart();
+      expect(getPartFeatureSockets(part)).toEqual([]);
+    });
+
+    it('returns socket for a dado on the top face', () => {
+      const part = createTestPart({
+        id: 'host',
+        length: 24,
+        width: 6,
+        thickness: 0.75,
+        position: { x: 0, y: 0, z: 0 },
+        features: [
+          {
+            id: 'dado-1',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'dado',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            parameters: { size: { length: 0.75, width: 6 }, depthMode: 'blind', depth: 0.375 },
+            placement: { x: 6, z: 0 }
+          }
+        ]
+      });
+
+      const sockets = getPartFeatureSockets(part);
+      expect(sockets).toHaveLength(1);
+      const socket = sockets[0];
+      expect(socket.hostPartId).toBe('host');
+      expect(socket.featureId).toBe('dado-1');
+      expect(socket.depth).toBeCloseTo(0.375);
+      // Opening normal should point up (+Y) for top face
+      expect(socket.openingNormal.y).toBeCloseTo(1);
+      // halfExtent1 = size.length/2 = 0.375
+      expect(socket.halfExtent1).toBeCloseTo(0.375);
+      // halfExtent2 = size.width/2 = 3 (dado spans full board width)
+      expect(socket.halfExtent2).toBeCloseTo(3);
+    });
+
+    it('returns a top-opening socket for a rabbet edge', () => {
+      const part = createTestPart({
+        id: 'rabbet-host',
+        length: 12,
+        width: 6,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [
+          {
+            id: 'rabbet-1',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'rabbet',
+            target: { type: 'edge', edge: 'top_front_edge' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 12, width: 0.755 }, depthMode: 'blind', depth: 0.375 },
+            placement: { x: 0, z: 0 }
+          }
+        ]
+      });
+
+      const sockets = getPartFeatureSockets(part);
+      expect(sockets).toHaveLength(1);
+      expect(sockets[0]).toMatchObject({ hostPartId: 'rabbet-host', featureId: 'rabbet-1' });
+      expect(sockets[0].openingNormal.y).toBeCloseTo(1);
+      expect(sockets[0].halfExtent1).toBeCloseTo(6);
+      expect(sockets[0].halfExtent2).toBeCloseTo(0.3775);
+    });
+
+    it('ignores disabled features', () => {
+      const part = createTestPart({
+        features: [
+          {
+            id: 'dado-1',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: false,
+            cutType: 'dado',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            parameters: { size: { length: 0.75, width: 5 }, depthMode: 'blind', depth: 0.375 },
+            placement: { x: 3, z: 0 }
+          }
+        ]
+      });
+      expect(getPartFeatureSockets(part)).toEqual([]);
+    });
+  });
+
+  describe('detectFeatureMateSnaps', () => {
+    it.each([
+      ['nominal', 0.75, true],
+      ['clearance', 0.74, true],
+      ['oversized', 0.8, false]
+    ] as const)('%s divider fit against a .755 dado', (_label, dividerThickness, shouldFit) => {
+      const hostPart = createTestPart({
+        id: 'host',
+        length: 12,
+        width: 6,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [
+          {
+            id: 'dado',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'dado',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 },
+            placement: { x: 5.6225, z: 0 }
+          }
+        ]
+      });
+      const divider = createTestPart({
+        id: 'divider',
+        length: 4,
+        width: 6,
+        thickness: dividerThickness,
+        rotation: { x: 0, y: 0, z: 90 }
+      });
+
+      const result = detectFeatureMateSnaps(divider, { x: 0.01, y: 2.8, z: 0 }, [hostPart], [divider.id], 0.5);
+
+      expect(result.mateHostPartId === hostPart.id).toBe(shouldFit);
+      if (shouldFit) expect(result.adjustedPosition.y).toBeCloseTo(2.375);
+    });
+
+    it('keeps a shorter mate contained within both stopped-groove terminations', () => {
+      const hostPart = createTestPart({
+        id: 'host',
+        length: 12,
+        width: 6,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [
+          {
+            id: 'stopped-groove',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'stopped_groove',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 4, width: 0.755 }, depthMode: 'blind', depth: 0.375 },
+            placement: { x: 4, z: 2.6225 }
+          }
+        ]
+      });
+      const mate = createTestPart({ id: 'mate', length: 2, width: 0.75, thickness: 2 });
+
+      for (const [label, x, shouldMate] of [
+        ['inside', 0, true],
+        ['at left edge', -1, true],
+        ['at right edge', 1, true],
+        ['beyond left termination', -1.04, false],
+        ['beyond right termination', 1.04, false]
+      ] as const) {
+        const result = detectFeatureMateSnaps(mate, { x, y: 1.85, z: 0 }, [hostPart], [mate.id], 0.5);
+        expect(result.mateHostPartId === hostPart.id, label).toBe(shouldMate);
+        if (shouldMate) expect(result.adjustedPosition.x, label).toBeCloseTo(x);
+      }
+    });
+
+    it('mates an authored tenon solid to a matching mortise and rejects a depth mismatch', () => {
+      const hostPart = createTestPart({
+        id: 'mortise-host',
+        length: 12,
+        width: 6,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [
+          {
+            id: 'mortise',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'mortise',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.51, width: 1.01 }, depthMode: 'blind', depth: 0.75 },
+            placement: { x: 5.745, z: 2.495 }
+          }
+        ]
+      });
+      const tenonedRail = createTestPart({
+        id: 'tenoned-rail',
+        length: 4,
+        width: 2,
+        thickness: 1,
+        rotation: { x: 0, y: 0, z: 90 },
+        features: [
+          {
+            id: 'tenon',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'tenon',
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.75, width: 1 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 0, z: 0.5 }
+          }
+        ]
+      });
+
+      const matched = detectFeatureMateSnaps(
+        tenonedRail,
+        { x: 0.01, y: 3.2, z: 0.01 },
+        [hostPart],
+        [tenonedRail.id],
+        0.5
+      );
+      expect(matched.mateHostPartId).toBe(hostPart.id);
+      expect(matched.adjustedPosition.y).toBeCloseTo(2.25);
+
+      const shallowMortise = createTestPart({
+        ...hostPart,
+        // Only the rect cuts carry a depth; spreading across the whole union
+        // would build a feature that is not a valid member of it.
+        features: hostPart.features?.map((feature) =>
+          feature.kind === 'rect_cut' ? { ...feature, parameters: { ...feature.parameters, depth: 0.5 } } : feature
+        )
+      });
+      expect(
+        detectFeatureMateSnaps(tenonedRail, { x: 0.01, y: 3.2, z: 0.01 }, [shallowMortise], [tenonedRail.id], 0.5)
+          .mateHostPartId
+      ).toBeUndefined();
+    });
+
+    it('places an off-center tenon tongue on its rendered cross-width side', () => {
+      const hostPart = createTestPart({
+        id: 'centered-mortise-host',
+        length: 12,
+        width: 6,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [
+          {
+            id: 'centered-mortise',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'mortise',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.51, width: 1.01 }, depthMode: 'blind', depth: 0.75 },
+            placement: { x: 5.745, z: 2.495 }
+          }
+        ]
+      });
+      const tenonedRail = createTestPart({
+        id: 'off-center-tenon-rail',
+        length: 4,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 2.25, z: -0.25 },
+        rotation: { x: 0, y: 0, z: 90 },
+        features: [
+          {
+            id: 'off-center-tenon',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'tenon',
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.75, width: 1 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 0, z: 0.25 }
+          }
+        ]
+      });
+
+      const result = detectFeatureMateSnaps(tenonedRail, tenonedRail.position, [hostPart], [tenonedRail.id], 0.03);
+      expect(result.mateHostPartId).toBe(hostPart.id);
+      expect(result.adjustedPosition.x).toBeCloseTo(tenonedRail.position.x);
+      expect(result.adjustedPosition.y).toBeCloseTo(tenonedRail.position.y);
+      expect(result.adjustedPosition.z).toBeCloseTo(tenonedRail.position.z);
+    });
+
+    it('mates complementary half-lap solids and rejects a depth mismatch', () => {
+      const halfLap = (id: string, face: 'top_face' | 'bottom_face', depth: number) => ({
+        id,
+        kind: 'rect_cut' as const,
+        version: 1 as const,
+        enabled: true,
+        cutType: 'dado' as const,
+        target: { type: 'face' as const, face },
+        reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+        parameters: { size: { length: 2, width: 2 }, depthMode: 'blind' as const, depth },
+        placement: { x: 2, z: 0 }
+      });
+      const hostPart = createTestPart({
+        id: 'half-lap-host',
+        length: 6,
+        width: 2,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [halfLap('host-cut', 'top_face', 0.375)]
+      });
+      const crossingPart = createTestPart({
+        id: 'half-lap-crossing',
+        length: 6,
+        width: 2,
+        thickness: 0.75,
+        position: { x: 0.2, y: 0.375, z: 0.1 },
+        rotation: { x: 0, y: 90, z: 0 },
+        features: [halfLap('crossing-cut', 'bottom_face', 0.375)]
+      });
+
+      const matched = detectFeatureMateSnaps(crossingPart, crossingPart.position, [hostPart], [crossingPart.id], 0.5);
+      expect(matched.mateHostPartId).toBe(hostPart.id);
+      expect(matched.adjustedPosition.x).toBeCloseTo(0);
+      expect(matched.adjustedPosition.y).toBeCloseTo(0.375);
+      expect(matched.adjustedPosition.z).toBeCloseTo(0);
+
+      const mismatchedPart = createTestPart({
+        ...crossingPart,
+        features: [halfLap('crossing-cut', 'bottom_face', 0.25)]
+      });
+      expect(
+        detectFeatureMateSnaps(mismatchedPart, mismatchedPart.position, [hostPart], [mismatchedPart.id], 0.5)
+          .mateHostPartId
+      ).toBeUndefined();
+    });
+
+    it('places an off-center blind remaining-solid shape on its rendered cross-width side', () => {
+      const blindCut = (id: string, face: 'top_face' | 'bottom_face', z: number) => ({
+        id,
+        kind: 'rect_cut' as const,
+        version: 1 as const,
+        enabled: true,
+        cutType: 'cutout' as const,
+        target: { type: 'face' as const, face },
+        reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+        parameters: { size: { length: 2, width: 1 }, depthMode: 'blind' as const, depth: 0.375 },
+        placement: { x: 2, z }
+      });
+      const hostPart = createTestPart({
+        id: 'centered-blind-host',
+        length: 6,
+        width: 2,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [blindCut('centered-top-cut', 'top_face', 0.5)]
+      });
+      const movingPart = createTestPart({
+        id: 'off-center-blind-mover',
+        length: 6,
+        width: 2,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: -0.25 },
+        features: [blindCut('off-center-bottom-cut', 'bottom_face', 0.25)]
+      });
+
+      const result = detectFeatureMateSnaps(movingPart, movingPart.position, [hostPart], [movingPart.id], 0.03);
+      expect(result.mateHostPartId).toBe(hostPart.id);
+      expect(result.adjustedPosition).toEqual(movingPart.position);
+    });
+
+    it('snaps part into a matching cutout pocket', () => {
+      // Host part lying flat with a cutout pocket on top face
+      const hostPart = createTestPart({
+        id: 'host',
+        length: 24,
+        width: 12,
+        thickness: 1.5,
+        position: { x: 0, y: 0.75, z: 0 },
+        features: [
+          {
+            id: 'cutout-1',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'cutout',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            parameters: { size: { length: 6, width: 4 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 3, z: 4 }
+          }
+        ]
+      });
+
+      // Drag part: cross-section matches the cutout opening (length×width)
+      const dragPart = createTestPart({
+        id: 'drag',
+        length: 6,
+        width: 4,
+        thickness: 2,
+        position: { x: 0, y: 0, z: 0 }
+      });
+
+      // Cutout center in world space:
+      // localCenterX = -12 + 3 + 3 = -6, localCenterZ = -6 + 4 + 2 = 0
+      // worldCenter = (-6, 1.5, 0)
+      const currentPos = { x: -6, y: 2.5, z: 0 };
+
+      const result = detectFeatureMateSnaps(dragPart, currentPos, [hostPart, dragPart], ['drag'], 0.5);
+      expect(result.snappedY).toBe(true);
+      expect(result.mateHostPartId).toBe('host');
+      // Drag part bottom face = adjustedY - halfThickness = adjustedY - 1
+      // Should sit at floor = 1.5 - 0.5 = 1.0
+      // So adjustedY = 1.0 + 1.0 = 2.0
+      expect(result.adjustedPosition.y).toBeCloseTo(2.0);
+    });
+
+    it('returns no snap when dimensions do not match', () => {
+      const hostPart = createTestPart({
+        id: 'host',
+        length: 24,
+        width: 12,
+        thickness: 1.5,
+        position: { x: 0, y: 0.75, z: 0 },
+        features: [
+          {
+            id: 'cutout-1',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'cutout',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            parameters: { size: { length: 3, width: 2 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 5, z: 3 }
+          }
+        ]
+      });
+
+      // Drag part's cross-section (10×5) is too large for the 3×2 opening
+      const dragPart = createTestPart({
+        id: 'drag',
+        length: 10,
+        width: 5,
+        thickness: 1,
+        position: { x: 0, y: 0, z: 0 }
+      });
+
+      const result = detectFeatureMateSnaps(dragPart, { x: -5, y: 2, z: 0 }, [hostPart, dragPart], ['drag'], 0.5);
+      expect(result.snappedX).toBe(false);
+      expect(result.snappedY).toBe(false);
+      expect(result.snappedZ).toBe(false);
+      expect(result.mateHostPartId).toBeUndefined();
+    });
+
+    it('centers the part on tight-fit axes', () => {
+      const hostPart = createTestPart({
+        id: 'host',
+        length: 24,
+        width: 12,
+        thickness: 1.5,
+        position: { x: 0, y: 0.75, z: 0 },
+        features: [
+          {
+            id: 'cutout-1',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'cutout',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            parameters: { size: { length: 6, width: 4 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 3, z: 4 }
+          }
+        ]
+      });
+
+      // Drag part: tight fit on both axes (length=6, width=4 matches cutout)
+      const dragPart = createTestPart({
+        id: 'drag',
+        length: 6,
+        width: 4,
+        thickness: 2,
+        position: { x: 0, y: 0, z: 0 }
+      });
+
+      // Position slightly off-center from cutout
+      // Cutout world center = (-6, 1.5, 0)
+      const currentPos = { x: -5.8, y: 2.5, z: 0.1 };
+
+      const result = detectFeatureMateSnaps(dragPart, currentPos, [hostPart, dragPart], ['drag'], 0.5);
+      expect(result.snappedY).toBe(true);
+      expect(result.snappedX).toBe(true);
+      expect(result.snappedZ).toBe(true);
+      // Should center at cutout center
+      expect(result.adjustedPosition.x).toBeCloseTo(-6);
+      expect(result.adjustedPosition.z).toBeCloseTo(0);
+    });
+
+    it('handles mortise with two tight-fit dimensions', () => {
+      const hostPart = createTestPart({
+        id: 'host',
+        length: 24,
+        width: 6,
+        thickness: 1.5,
+        position: { x: 0, y: 0.75, z: 0 },
+        features: [
+          {
+            id: 'mortise-1',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'mortise',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            parameters: { size: { length: 2, width: 1 }, depthMode: 'blind', depth: 1.0 },
+            placement: { x: 10, z: 2 }
+          }
+        ]
+      });
+
+      // Drag part: a tenon-like piece with matching cross-section
+      const dragPart = createTestPart({
+        id: 'drag',
+        length: 2,
+        width: 1,
+        thickness: 3,
+        position: { x: 0, y: 0, z: 0 }
+      });
+
+      // Mortise world center:
+      // localCenterX = -12 + 10 + 1 = -1. The rendered geometry rotates
+      // contour Z through -90 degrees, so authored local Z -0.5 renders at +0.5.
+      // worldCenter = (-1, 1.5, 0.5)
+      const currentPos = { x: -1, y: 2.5, z: 0.5 };
+
+      const result = detectFeatureMateSnaps(dragPart, currentPos, [hostPart, dragPart], ['drag'], 0.5);
+      expect(result.mateHostPartId).toBe('host');
+      expect(result.snappedY).toBe(true);
+      // Floor = 1.5 - 1.0 = 0.5, drag halfThickness = 1.5
+      // adjustedY = 0.5 + 1.5 = 2.0
+      expect(result.adjustedPosition.y).toBeCloseTo(2.0);
+    });
+
+    it('does not snap when part is too far from socket', () => {
+      const hostPart = createTestPart({
+        id: 'host',
+        length: 24,
+        width: 12,
+        thickness: 1.5,
+        position: { x: 0, y: 0.75, z: 0 },
+        features: [
+          {
+            id: 'cutout-1',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'cutout',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            parameters: { size: { length: 6, width: 4 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 3, z: 4 }
+          }
+        ]
+      });
+
+      const dragPart = createTestPart({
+        id: 'drag',
+        length: 6,
+        width: 4,
+        thickness: 2,
+        position: { x: 0, y: 0, z: 0 }
+      });
+
+      // Position far above the socket (more than snapThreshold away)
+      const currentPos = { x: -6, y: 5.0, z: 0 };
+
+      const result = detectFeatureMateSnaps(dragPart, currentPos, [hostPart, dragPart], ['drag'], 0.5);
+      expect(result.mateHostPartId).toBeUndefined();
+    });
+  });
+  describe('reference distance indicators', () => {
+    it('calculates axis-aligned edge distances between a dragged part and a reference', () => {
+      const dragging = createTestPart({
+        id: 'drag',
+        length: 4,
+        width: 4,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 }
+      });
+      const reference = createTestPart({
+        id: 'ref',
+        length: 4,
+        width: 4,
+        thickness: 1,
+        position: { x: 10, y: 0.5, z: 0 }
+      });
+
+      const indicators = calculateReferenceDistances(dragging, dragging.position, [reference]);
+
+      expect(indicators.length).toBeGreaterThan(0);
+      const xIndicator = indicators.find((i) => i.axis === 'x');
+      expect(xIndicator).toBeDefined();
+      // Gap between facing edges: ref minX (8) - drag maxX (2) = 6
+      expect(xIndicator!.distance).toBeCloseTo(6);
+      expect(xIndicator!.fromPartId).toBe('drag');
+      expect(xIndicator!.toPartId).toBe('ref');
+    });
+
+    it('treats a multi-part drag as one combined unit with the applied delta', () => {
+      const a = createTestPart({ id: 'a', length: 4, width: 4, thickness: 1, position: { x: 0, y: 0.5, z: 0 } });
+      const b = createTestPart({ id: 'b', length: 4, width: 4, thickness: 1, position: { x: 6, y: 0.5, z: 0 } });
+      const reference = createTestPart({
+        id: 'ref',
+        length: 4,
+        width: 4,
+        thickness: 1,
+        position: { x: 20, y: 0.5, z: 0 }
+      });
+
+      const indicators = calculateGroupReferenceDistances([a, b], { x: 2, y: 0, z: 0 }, [reference]);
+
+      expect(indicators.length).toBeGreaterThan(0);
+      const xIndicator = indicators.find((i) => i.axis === 'x');
+      // Combined maxX after delta = 8 + 2 + 2 = 10... facing gap = ref minX (18) - 10 = 8
+      expect(xIndicator!.distance).toBeCloseTo(8);
+      expect(xIndicator!.fromPartId).toBe('selected-group');
+      expect(calculateGroupReferenceDistances([], { x: 0, y: 0, z: 0 }, [reference])).toEqual([]);
+    });
+
+    it('produces a single dominant-axis vector distance for rotated contexts', () => {
+      const selected = createTestPart({
+        id: 'sel',
+        length: 4,
+        width: 4,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 }
+      });
+      const reference = createTestPart({
+        id: 'ref',
+        length: 4,
+        width: 4,
+        thickness: 1,
+        position: { x: 9, y: 0.5, z: 3 }
+      });
+
+      const result = calculateVectorReferenceDistance([selected], [reference], 'sel', 'ref');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].axis).toBe('x');
+      expect(result[0].distance).toBeCloseTo(Math.sqrt(9 * 9 + 3 * 3));
+      expect(result[0].id).toBe('vector-sel-ref');
+
+      expect(calculateVectorReferenceDistance([], [reference], 'sel', 'ref')).toEqual([]);
+      expect(calculateVectorReferenceDistance([selected], [selected], 'sel', 'sel')).toEqual([]);
+    });
+  });
+
+  describe('feature-aware snap geometry (ghost corners)', () => {
+    const cornerNotchTarget = () =>
+      createTestPart({
+        id: 'notched',
+        length: 24,
+        width: 12,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [
+          {
+            id: 'notch-1',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'corner_notch',
+            target: { type: 'corner', corner: 'front_left_corner' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 6, width: 6 }, depthMode: 'through' },
+            placement: { x: 0, z: 0 }
+          }
+        ]
+      });
+
+    it('offers the notch inner corners but not the corner the notch removed', () => {
+      // The notch removes x -12..-6, z 0..6 in world space (the front face
+      // renders at +Z). Snap geometry must follow the material that is left.
+      const vertices = getPartVertices(cornerNotchTarget(), { x: 0, y: 0.375, z: 0 });
+      const hasCorner = (x: number, z: number) =>
+        vertices.some((v) => Math.abs(v.x - x) < 1e-6 && Math.abs(v.z - z) < 1e-6);
+
+      // Inner corners created by the notch are real material and must snap.
+      expect(hasCorner(-6, 0)).toBe(true);
+      expect(hasCorner(-6, 6)).toBe(true);
+      expect(hasCorner(-12, 0)).toBe(true);
+
+      // The original box corner was cut away — offering it would let users
+      // snap to empty space.
+      expect(hasCorner(-12, 6)).toBe(false);
+
+      // Untouched corners still snap.
+      expect(hasCorner(-12, -6)).toBe(true);
+      expect(hasCorner(12, 6)).toBe(true);
+    });
+
+    it('keeps a plain part on the full box corner set', () => {
+      const plain = createTestPart({ id: 'plain', length: 24, width: 12, thickness: 0.75 });
+      const vertices = getPartVertices(plain, { x: 0, y: 0.375, z: 0 });
+      const corners = new Set(vertices.map((v) => `${v.x.toFixed(3)},${v.z.toFixed(3)}`));
+      expect(corners.size).toBe(4);
+    });
+  });
+
+  describe('feature socket edge cases', () => {
+    it('exposes sockets for bottom-face pockets and skips zero-depth cuts', () => {
+      const part = createTestPart({
+        length: 24,
+        width: 12,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [
+          {
+            id: 'bottom-pocket',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'mortise',
+            target: { type: 'face', face: 'bottom_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 4, width: 3 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 4, z: 4 }
+          },
+          {
+            id: 'zero-depth',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'mortise',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 4, width: 3 }, depthMode: 'blind', depth: 0 },
+            placement: { x: 12, z: 4 }
+          }
+        ]
+      });
+
+      const sockets = getPartFeatureSockets(part);
+      expect(sockets).toHaveLength(1);
+      expect(sockets[0].featureId).toBe('bottom-pocket');
+    });
+  });
+
+  describe('getPartBounds bundle fallback', () => {
+    it('falls back to inline bounds when a bundle reports a non-box corner set', () => {
+      const part = createTestPart({ length: 8, width: 4, thickness: 2, position: { x: 1, y: 1, z: 1 } });
+      const fakeCache = {
+        get: () => ({
+          snapGraph: { corners: [{ point: { x: 0, y: 0, z: 0 } }] }
+        })
+      } as never;
+
+      const bounds = getPartBounds(part, fakeCache);
+      expect(bounds.minX).toBeCloseTo(-3);
+      expect(bounds.maxX).toBeCloseTo(5);
+      expect(bounds.minY).toBeCloseTo(0);
+      expect(bounds.maxY).toBeCloseTo(2);
     });
   });
 });

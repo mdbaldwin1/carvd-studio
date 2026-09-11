@@ -1,17 +1,20 @@
-import { Button } from '@renderer/components/ui/button';
 import { MultiSelectionProperties } from '@renderer/components/properties/MultiSelectionProperties';
 import { NoSelectionProperties } from '@renderer/components/properties/NoSelectionProperties';
+import { SingleGroupProperties } from '@renderer/components/properties/SingleGroupProperties';
 import { SinglePartAdvancedCard } from '@renderer/components/properties/SinglePartAdvancedCard';
 import { SinglePartBasicsCard } from '@renderer/components/properties/SinglePartBasicsCard';
+import { SinglePartCutsSummaryCard } from '@renderer/components/properties/SinglePartCutsSummaryCard';
 import { SinglePartMaterialCard } from '@renderer/components/properties/SinglePartMaterialCard';
 import { SinglePartNotesCard } from '@renderer/components/properties/SinglePartNotesCard';
-import { SingleGroupProperties } from '@renderer/components/properties/SingleGroupProperties';
 import { EditStockModal } from '@renderer/components/stock/EditStockModal';
+import { Button } from '@renderer/components/ui/button';
 import { useEffectiveStockConstraints } from '@renderer/hooks/useEffectiveStockConstraints';
 import { useStockLibrary } from '@renderer/hooks/useStockLibrary';
 import { useAssemblyEditingStore } from '@renderer/store/assemblyEditingStore';
 import { useCameraStore } from '@renderer/store/cameraStore';
 import { useLicenseStore } from '@renderer/store/licenseStore';
+import { CutProperties } from '@renderer/components/part-cuts/CutProperties';
+import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { useProjectStore } from '@renderer/store/projectStore';
 import { useWorkspaceSceneGraph } from '@renderer/interaction/useWorkspaceSceneGraph';
 import { useSelectionStore } from '@renderer/store/selectionStore';
@@ -21,6 +24,8 @@ import { useUIStore } from '@renderer/store/uiStore';
 import { Stock } from '@renderer/types';
 import { getDocsUrl } from '@renderer/utils/docsLinks';
 import { getFeatureLimits } from '@renderer/utils/featureLimits';
+import { analytics } from '@renderer/utils/analytics';
+import { bucketCount } from '../../../../shared/analytics';
 import { normalizeRotation, snapAngle } from '@renderer/utils/rotation';
 import { useMemo, useRef, useState } from 'react';
 import {
@@ -36,6 +41,7 @@ export function PropertiesPanel() {
   const addProjectStock = useProjectStore((s) => s.addStock);
   const isEditingAssembly = useAssemblyEditingStore((s) => s.isEditingAssembly);
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
+  const isEditingPartCuts = usePartCutsEditingStore((s) => s.isEditingPartCuts);
   const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const groups = useProjectStore((s) => s.groups);
   const units = useProjectStore((s) => s.units);
@@ -64,6 +70,7 @@ export function PropertiesPanel() {
   const canUseAssemblies = limits.canUseAssemblies;
   const canUseGroups = limits.canUseGroups;
   const constraints = useEffectiveStockConstraints();
+  const startEditingPartCuts = usePartCutsEditingStore((s) => s.startEditingPartCuts);
 
   // State for "Add New Stock..." modal
   const [isCreateStockModalOpen, setIsCreateStockModalOpen] = useState(false);
@@ -112,8 +119,12 @@ export function PropertiesPanel() {
       addLibraryStock(newStock);
       actualStockId = newStock.id;
     } else {
-      // addProjectStock returns the actual ID of the created stock
-      actualStockId = addProjectStock(stockData);
+      // addProjectStock returns the actual ID of the created stock, or null when
+      // the licence limit blocks it (it raises its own toast). Assigning that
+      // null onward would clear the stock on every selected part instead.
+      const createdStockId = addProjectStock(stockData);
+      if (!createdStockId) return;
+      actualStockId = createdStockId;
     }
 
     // Assign to all selected parts using the actual stock ID
@@ -173,6 +184,13 @@ export function PropertiesPanel() {
       removeFromGroup(selectedGroupIds, 'group');
     }
   };
+
+  // Editing a part's cuts: the panel describes the selected cut, not the part
+  // it belongs to. Showing the part here would put its saved cuts beside the
+  // draft being edited.
+  if (isEditingPartCuts) {
+    return <CutProperties />;
+  }
 
   // No selection at all
   if (selectedPartIds.length === 0 && selectedGroupIds.length === 0) {
@@ -386,7 +404,7 @@ export function PropertiesPanel() {
   }
 
   // Constraint enforcement helpers
-  const assignedStock = selectedPart.stockId ? stocks.find((s) => s.id === selectedPart.stockId) : null;
+  const assignedStock = (selectedPart.stockId ? stocks.find((s) => s.id === selectedPart.stockId) : null) ?? null;
   const isDimensionConstrained = constraints.constrainDimensions && !!assignedStock;
   const isGrainConstrained = constraints.constrainGrain && !!assignedStock && assignedStock.grainDirection !== 'none';
   const isColorConstrained = constraints.constrainColor && !!assignedStock;
@@ -499,7 +517,7 @@ export function PropertiesPanel() {
         selectedPart={selectedPart}
         units={units}
         isDimensionConstrained={isDimensionConstrained}
-        assignedStock={assignedStock}
+        assignedStock={assignedStock || null}
         onNameChange={(name) => updatePart(selectedPart.id, { name })}
         onLengthChange={handleLengthChange}
         onWidthChange={handleWidthChange}
@@ -517,6 +535,18 @@ export function PropertiesPanel() {
         onSnapIncrementChange={(value) => {
           if (!Number.isFinite(value)) return;
           setRotationSnapIncrement(Math.max(1, Math.min(90, Math.round(value))));
+        }}
+      />
+
+      <SinglePartCutsSummaryCard
+        selectedPart={selectedPart}
+        units={units}
+        onEditCuts={() => {
+          startEditingPartCuts(selectedPart.id, selectedPart.name, selectedPart.features);
+          analytics.capture('part_cuts_opened', {
+            source: 'properties',
+            operation_count_bucket: bucketCount(selectedPart.features?.length ?? 0)
+          });
         }}
       />
 

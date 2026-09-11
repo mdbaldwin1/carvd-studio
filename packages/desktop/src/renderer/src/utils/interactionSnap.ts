@@ -11,6 +11,8 @@ type SnapPositionResult = {
   snappedY: boolean;
   snappedZ: boolean;
   snapLines: SnapLine[];
+  /** Nearest compatible candidate distance, used for snap hysteresis below. */
+  closestDistance?: number;
 };
 
 type GuideSnapCandidate = {
@@ -25,12 +27,14 @@ type OriginSnapCandidate = {
 };
 type OriginSnapSet = Partial<Record<Axis, OriginSnapCandidate | null>>;
 type AdvancedPositionDetectors = {
+  mate?: () => SnapPositionResult;
   surface?: () => SnapPositionResult;
   fraction?: () => SnapPositionResult;
   feature?: () => { result: SnapPositionResult; stage: SnapStage };
   axis?: () => SnapPositionResult;
 };
 type AdvancedDeltaDetectors = {
+  mate?: () => SnapPositionResult;
   surface?: () => SnapPositionResult;
   fraction?: () => SnapPositionResult;
   feature?: () => SnapPositionResult;
@@ -342,7 +346,7 @@ export function applyAdvancedPositionSnapResult(
 
 export function applyAdvancedDeltaSnapResult(
   snapResult: SnapPositionResult,
-  stage: 'surface' | 'fraction' | 'feature' | 'face' | 'axis',
+  stage: 'mate' | 'surface' | 'fraction' | 'feature' | 'face' | 'axis',
   axes: Record<Axis, boolean>,
   winners: AxisSnapWinners,
   snapLines: SnapLine[],
@@ -484,6 +488,7 @@ export function runPositionAdvancedSnapFamilies(
     applyAxisPosition: (axis: Axis, nextValue: number) => boolean;
   },
   detectors: {
+    mate?: () => SnapPositionResult;
     surface?: () => SnapPositionResult;
     fraction?: () => SnapPositionResult;
     feature?: () => { result: SnapPositionResult; stage: SnapStage };
@@ -492,6 +497,11 @@ export function runPositionAdvancedSnapFamilies(
 ): void {
   const { axes, winners, snapLines, applyAxisPosition } = params;
 
+  if (params.enableFeatureAnchors && detectors.mate) {
+    // Feature-mating snaps (part fits a dado/groove/mortise socket) outrank
+    // face alignment via the 'mate' stage priority.
+    applyAdvancedPositionSnapResult(detectors.mate(), 'mate', axes, winners, snapLines, applyAxisPosition);
+  }
   if (params.enableSurfaceAnchors && detectors.surface) {
     applyAdvancedPositionSnapResult(detectors.surface(), 'surface', axes, winners, snapLines, applyAxisPosition);
   }
@@ -520,6 +530,7 @@ export function runDeltaAdvancedSnapFamilies(
     enableFeatureAnchors: boolean;
   },
   detectors: {
+    mate?: () => SnapPositionResult;
     surface?: () => SnapPositionResult;
     fraction?: () => SnapPositionResult;
     feature?: () => SnapPositionResult;
@@ -528,6 +539,9 @@ export function runDeltaAdvancedSnapFamilies(
 ): void {
   const { axes, winners, snapLines, workingDelta, anchorPosition } = params;
 
+  if (params.enableFeatureAnchors && detectors.mate) {
+    applyAdvancedDeltaSnapResult(detectors.mate(), 'mate', axes, winners, snapLines, workingDelta, anchorPosition);
+  }
   if (params.enableSurfaceAnchors && detectors.surface) {
     applyAdvancedDeltaSnapResult(
       detectors.surface(),

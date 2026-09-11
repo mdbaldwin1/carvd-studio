@@ -1,6 +1,6 @@
 import type { SnapLine } from '../types';
 
-export type SnapStage = 'guide' | 'origin' | 'face' | 'surface' | 'fraction' | 'feature' | 'axis';
+export type SnapStage = 'guide' | 'origin' | 'mate' | 'face' | 'surface' | 'fraction' | 'feature' | 'axis';
 type Axis = 'x' | 'y' | 'z';
 
 export type AxisSnapWinners = Record<Axis, SnapStage | null>;
@@ -9,6 +9,7 @@ export type AxisSnapWinners = Record<Axis, SnapStage | null>;
 export const SNAP_STAGE_PRIORITIES: Record<SnapStage, number> = {
   guide: 500,
   origin: 400,
+  mate: 350,
   face: 300,
   surface: 250,
   fraction: 225,

@@ -50,6 +50,13 @@ export function formatMeasurementWithUnit(inches: number, units: 'imperial' | 'm
   return `${decimalToFraction(inches)}"`;
 }
 
+/** Fabrication must not round a clearance or a bit size to a nearby fraction. */
+export function formatFabricationMeasurement(inches: number, units: 'imperial' | 'metric'): string {
+  if (units === 'metric') return `${Number((inches * INCHES_TO_MM).toPrecision(12))}mm`;
+  const exactSixteenth = Math.abs(inches * 16 - Math.round(inches * 16)) < 1e-9;
+  return `${exactSixteenth ? decimalToFraction(inches) : Number(inches.toPrecision(12))}"`;
+}
+
 /**
  * Parse user input based on units, returning inches.
  * @param input - User input string

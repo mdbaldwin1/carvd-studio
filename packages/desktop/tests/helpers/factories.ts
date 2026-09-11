@@ -5,6 +5,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import type {
+  AssemblyPart,
   Part,
   Stock,
   Group,
@@ -33,6 +34,7 @@ export function createTestPart(overrides?: Partial<Part>): Part {
     grainSensitive: true,
     grainDirection: 'length',
     color: '#d4a574',
+    features: [],
     ...overrides
   };
 }
@@ -57,7 +59,7 @@ export function createTestStock(overrides?: Partial<Stock>): Stock {
     thickness: 0.75,
     grainDirection: 'length',
     pricingUnit: 'board_foot',
-    pricePerUnit: 5.50,
+    pricePerUnit: 5.5,
     color: '#d4a574',
     ...overrides
   };
@@ -71,7 +73,7 @@ export function createPlywoodStock(overrides?: Partial<Stock>): Stock {
     thickness: 0.75,
     grainDirection: 'length',
     pricingUnit: 'per_item',
-    pricePerUnit: 45.00,
+    pricePerUnit: 45.0,
     ...overrides
   });
 }
@@ -84,7 +86,7 @@ export function createBoardStock(overrides?: Partial<Stock>): Stock {
     thickness: 0.75,
     grainDirection: 'length',
     pricingUnit: 'board_foot',
-    pricePerUnit: 3.50,
+    pricePerUnit: 3.5,
     ...overrides
   });
 }
@@ -117,6 +119,22 @@ export function createTestGroupMember(
 // ============================================================
 // Assembly Factory
 // ============================================================
+
+export function createTestAssemblyPart(overrides?: Partial<AssemblyPart>): AssemblyPart {
+  return {
+    name: 'Test Assembly Part',
+    length: 24,
+    width: 12,
+    thickness: 0.75,
+    relativePosition: { x: 0, y: 0, z: 0 },
+    rotation: { x: 0, y: 0, z: 0 },
+    stockId: null,
+    grainSensitive: false,
+    grainDirection: 'length',
+    color: '#c4a574',
+    ...overrides
+  };
+}
 
 export function createTestAssembly(overrides?: Partial<Assembly>): Assembly {
   return {
@@ -192,9 +210,7 @@ export function createDefaultStockConstraints(): StockConstraintSettings {
 // Custom Shopping Item Factory
 // ============================================================
 
-export function createTestCustomShoppingItem(
-  overrides?: Partial<CustomShoppingItem>
-): CustomShoppingItem {
+export function createTestCustomShoppingItem(overrides?: Partial<CustomShoppingItem>): CustomShoppingItem {
   return {
     id: uuidv4(),
     name: 'Test Item',

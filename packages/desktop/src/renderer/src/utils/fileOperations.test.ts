@@ -53,6 +53,7 @@ import { parseCarvdFile, deserializeToProject, repairCarvdFile } from './fileFor
 import type { CarvdFile, Part } from '../types';
 import { generateThumbnail } from '../store/projectStore';
 import { analytics } from './analytics';
+import { createTestAssembly, createTestPart } from '../../../../tests/helpers/factories';
 
 // ============================================================
 // Setup
@@ -109,6 +110,64 @@ beforeEach(() => {
 // ============================================================
 
 describe('saveProject', () => {
+  it('refuses to write a project containing an invalid dowel assembly', async () => {
+    const assembly = createTestAssembly({
+      parts: [
+        {
+          ...createTestPart(),
+          localId: 'part:0',
+          relativePosition: { x: 0, y: 0, z: 0 },
+          features: [
+            {
+              id: 'hole-1',
+              kind: 'circular_cut',
+              version: 1 as const,
+              enabled: true,
+              metadata: {
+                dowelJoint: {
+                  jointId: 'joint-1',
+                  matePartId: 'missing',
+                  memberIndex: 0,
+                  dowelDiameter: 0.375,
+                  dowelLength: 2,
+                  embedmentDepth: 1
+                }
+              },
+              target: { type: 'face', face: 'top_face' },
+              reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+              cutType: 'round_hole',
+              placement: { primary: 0, secondary: 0, rotation: 0 },
+              parameters: { diameter: 0.375, depthMode: 'blind', depth: 1, tilt: 0, direction: 0 }
+            }
+          ]
+        }
+      ]
+    });
+    useProjectStore.setState({ filePath: '/path/to/project.carvd', assemblies: [assembly] });
+
+    const result = await saveProject();
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/assembly .*matching hole/i);
+    expect(window.electronAPI.writeFile).not.toHaveBeenCalled();
+  });
+
+  it('M3 does not mark edits made during an older file write clean', async () => {
+    useProjectStore.setState({ filePath: '/tmp/racing.carvd', isDirty: true, projectNotes: 'First snapshot' });
+    let finish!: () => void;
+    vi.mocked(window.electronAPI.writeFile).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    const saving = saveProject();
+    useProjectStore.getState().setProjectNotes('Newer edit');
+    finish();
+    await saving;
+    expect(useProjectStore.getState().isDirty).toBe(true);
+    expect(useProjectStore.getState().projectNotes).toBe('Newer edit');
+  });
   it('delegates to saveProjectAs when no filePath is set', async () => {
     (window.electronAPI.showSaveDialog as ReturnType<typeof vi.fn>).mockResolvedValue({
       canceled: true

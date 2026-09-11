@@ -37,7 +37,7 @@ interface AnalyticsLifecycle {
 
 let lifecycle: AnalyticsLifecycle | null = null;
 let nextGeneration = 0;
-let createInstallationId = randomUUID;
+let createInstallationId: () => string = randomUUID;
 let restartOptions: AnalyticsServiceOptions | null = null;
 
 export function initializeAnalytics(options: AnalyticsServiceOptions = {}): void {

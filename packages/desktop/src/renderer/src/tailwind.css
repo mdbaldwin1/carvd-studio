@@ -516,6 +516,8 @@
     bottom: 16px;
     transform: translateX(-50%);
     z-index: 50;
+    /* A hint pane must never take a click meant for the viewport beneath it. */
+    pointer-events: none;
   }
 
   .hotkey-hints {

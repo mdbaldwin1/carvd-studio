@@ -9,11 +9,19 @@
     "jsx": "react-jsx",
     "outDir": "./out",
     "rootDir": ".",
-    "types": ["node"],
+    "types": ["node", "vite/client"],
     "baseUrl": ".",
     "paths": {
       "@renderer/*": ["src/renderer/src/*"]
     }
   },
-  "include": ["src/renderer/**/*"]
+  "include": [
+    "src/renderer/**/*",
+    "src/shared/**/*",
+    "src/renderer/**/*.json",
+    "tests/setup.ts",
+    "tests/helpers/**/*",
+    "tests/fixtures/**/*",
+    "tests/fixtures/**/*.json"
+  ]
 }

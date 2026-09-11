@@ -42,7 +42,8 @@ export const collisionConstraint: Constraint = {
       [...ctx.project.parts],
       movingIds,
       candidate.delta,
-      ctx.geometryCache
+      ctx.geometryCache,
+      candidate.mateHostPartId ?? ctx.project.mateHostPartId
     );
 
     if (safeDelta === null) {
@@ -98,7 +99,8 @@ export const collisionConstraint: Constraint = {
       adjusted: {
         kind: 'move',
         delta: { x: dx, y: dy, z: dz },
-        positions: adjustedPositions
+        positions: adjustedPositions,
+        mateHostPartId: candidate.mateHostPartId
       } satisfies CandidateTransform,
       blockers,
       warnings

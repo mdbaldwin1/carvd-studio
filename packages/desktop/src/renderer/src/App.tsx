@@ -10,6 +10,9 @@ import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { ContextMenu } from './components/layout/ContextMenu';
 import { UndoRedoButtons } from './components/layout/UndoRedoButtons';
+import { PartCutsEditingExitDialog } from './components/part-cuts/PartCutsEditingExitDialog';
+import { PartCutsEditorProvider } from './components/part-cuts/PartCutsEditorContext';
+import { PartCutsWorkspace } from './components/part-cuts/PartCutsWorkspace';
 import { TrialBanner } from './components/licensing/TrialBanner';
 import { TrialExpiredModal } from './components/licensing/TrialExpiredModal';
 import { ImportToLibraryDialog } from './components/parts-list/ImportToLibraryDialog';
@@ -37,6 +40,7 @@ import {
   UNTITLED_TEMPLATE_NAME
 } from './constants/appDefaults';
 import { useAppSettings } from './hooks/useAppSettings';
+import { useAppSettingsStore } from './store/appSettingsStore';
 import { useAnalyticsConsentDialog } from './hooks/useAnalyticsConsentDialog';
 import { useAssemblyEditing } from './hooks/useAssemblyEditing';
 import { useAssemblyLibrary } from './hooks/useAssemblyLibrary';
@@ -48,13 +52,14 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useLibraryImportCheck } from './hooks/useLibraryImportCheck';
 import { useLicenseStatus } from './hooks/useLicenseStatus';
 import { useMenuCommands } from './hooks/useMenuCommands';
+import { usePartCutsEditing } from './hooks/usePartCutsEditing';
 import { useStockLibrary } from './hooks/useStockLibrary';
 import { useTemplateEditing } from './hooks/useTemplateEditing';
 import { useAssemblyEditingStore } from './store/assemblyEditingStore';
 import { useLicenseStore } from './store/licenseStore';
 import { useProjectStore } from './store/projectStore';
 import { useUIStore } from './store/uiStore';
-import { Project, Stock } from './types';
+import { Assembly, Project, Stock } from './types';
 import { EXTERNAL_LINKS } from './utils/externalLinks';
 import { logger } from './utils/logger';
 import { analytics } from './utils/analytics';
@@ -175,6 +180,26 @@ function App() {
     }
   });
 
+  const {
+    isEditingPartCuts,
+    sourcePart,
+    sourcePartName,
+    draftFeatures,
+    selectedFeatureId,
+    hoveredTarget: partCutsHoveredTarget,
+    pendingTarget: partCutsPendingTarget,
+    showExitDialog: showPartCutsExitDialog,
+    saveAndExit: savePartCutsAndExit,
+    discardAndExit: discardPartCutsAndExit,
+    requestExit: requestPartCutsExit,
+    cancelExit: cancelPartCutsExit,
+    hasUnsavedChanges: partCutsHasUnsavedChanges,
+    setDraftFeatures: setPartCutsDraftFeatures,
+    selectFeature: selectPartCutsFeature,
+    setHoveredTarget: setPartCutsHoveredTarget,
+    setPendingTarget: setPartCutsPendingTarget
+  } = usePartCutsEditing();
+
   // File operations - now after editing hooks so we can route save commands appropriately
   const {
     UnsavedChangesDialogComponent,
@@ -184,12 +209,17 @@ function App() {
     handleOpenRecent,
     handleRelocateFile,
     handleSave,
+    handleSaveAs,
+    handleReload,
+    isFileActionBusy,
     handleGoHome
   } = useFileOperations({
     isEditingTemplate,
     onSaveTemplate: saveTemplateDirectly,
     isEditingAssembly,
     onSaveAssembly: saveAssemblyAndExit,
+    isEditingPartCuts,
+    onSavePartCuts: savePartCutsAndExit,
     onGoHome: () => {
       newProject(); // Reset project state to clear isDirty flag
       setShowStartScreen(true);
@@ -199,7 +229,7 @@ function App() {
   // Auto-save - saves project automatically when changes are made (if enabled in settings)
   useAutoSave({
     onInitialSaveNeeded: handleSave,
-    blocked: isEditingTemplate || isEditingAssembly || showStartScreen
+    blocked: isEditingTemplate || isEditingAssembly || isEditingPartCuts || showStartScreen
   });
 
   // Platform detection for custom title bar
@@ -458,12 +488,12 @@ function App() {
     }
   };
 
-  const handleNewProjectDialogCreate = async (options: {
-    name: string;
-    units: 'imperial' | 'metric';
-    selectedMaterials: string[];
-  }) => {
-    // Create a new project with the selected options
+  const handleNewProjectDialogCreate = async (options: { selectedMaterials: string[] }) => {
+    // The dialog only chooses starting stock. The name comes from the file
+    // the first save writes, and the units from the app's New Project
+    // Defaults -- which is also the fix for that setting having had no
+    // effect on new projects, since the dialog used to carry its own copy.
+    const units = useAppSettingsStore.getState().settings.defaultUnits;
     const now = new Date().toISOString();
     const libraryStocks = ((await window.electronAPI.getPreference('stockLibrary')) as Stock[]) || [];
     const stockLibraryById = new Map(libraryStocks.map((stock) => [stock.id, stock] as const));
@@ -477,9 +507,9 @@ function App() {
 
     const newProject: Project = {
       version: PROJECT_FILE_VERSION,
-      name: options.name,
-      units: options.units,
-      gridSize: DEFAULT_PROJECT_GRID_SIZE[options.units],
+      name: UNTITLED_PROJECT_NAME,
+      units,
+      gridSize: DEFAULT_PROJECT_GRID_SIZE[units],
       parts: [],
       stocks: selectedStocks,
       assemblies: [],
@@ -491,7 +521,7 @@ function App() {
 
     loadProject(newProject);
     markDirty(); // Mark as dirty since it's a new unsaved project
-    analytics.capture('project_created', { source: 'start_screen', units: options.units });
+    analytics.capture('project_created', { source: 'start_screen', units });
     setShowNewProjectDialog(false);
     setShowStartScreen(false);
   };
@@ -551,15 +581,19 @@ function App() {
   const [isHeaderNameEditing, setIsHeaderNameEditing] = useState(false);
   const [headerNameDraft, setHeaderNameDraft] = useState('');
 
-  const headerMode: 'project' | 'template' | 'assembly' = isEditingAssembly
-    ? 'assembly'
-    : isEditingTemplate
-      ? 'template'
-      : 'project';
+  const headerMode: 'project' | 'template' | 'assembly' | 'part-cuts' = isEditingPartCuts
+    ? 'part-cuts'
+    : isEditingAssembly
+      ? 'assembly'
+      : isEditingTemplate
+        ? 'template'
+        : 'project';
   const displayName =
     headerMode === 'assembly'
       ? editingAssemblyName || 'Untitled Assembly'
-      : projectName || (headerMode === 'template' ? UNTITLED_TEMPLATE_NAME : UNTITLED_PROJECT_NAME);
+      : headerMode === 'part-cuts'
+        ? sourcePartName || 'Part Cuts'
+        : projectName || (headerMode === 'template' ? UNTITLED_TEMPLATE_NAME : UNTITLED_PROJECT_NAME);
 
   useEffect(() => {
     if (!isHeaderNameEditing) {
@@ -568,11 +602,17 @@ function App() {
   }, [displayName, isHeaderNameEditing]);
 
   const handleStartHeaderNameEdit = () => {
+    if (headerMode === 'part-cuts') return;
     setHeaderNameDraft(displayName);
     setIsHeaderNameEditing(true);
   };
 
   const handleCommitHeaderName = () => {
+    if (headerMode === 'part-cuts') {
+      setIsHeaderNameEditing(false);
+      setHeaderNameDraft(displayName);
+      return;
+    }
     const trimmed = headerNameDraft.trim();
     const nextName = trimmed || displayName;
 
@@ -598,6 +638,10 @@ function App() {
   };
 
   const handleExitEditMode = () => {
+    if (isEditingPartCuts) {
+      requestPartCutsExit();
+      return;
+    }
     if (isEditingAssembly) {
       requestAssemblyExit();
       return;
@@ -605,6 +649,18 @@ function App() {
     if (isEditingTemplate) {
       requestTemplateDiscard();
     }
+  };
+
+  const handleLogoClick = () => {
+    if (isEditingPartCuts) {
+      requestPartCutsExit();
+      return;
+    }
+    void handleGoHome();
+  };
+
+  const handlePrimarySave = async () => {
+    await handleSave();
   };
 
   // Part deletion confirmation
@@ -713,7 +769,9 @@ function App() {
         const exists = assemblyLibrary.some((a) => a.name === templateAssembly.name);
         if (!exists) {
           try {
-            const currentAssemblies = (await window.electronAPI.getPreference('assemblyLibrary')) || [];
+            // getPreference is untyped; this key holds the saved assembly list.
+            const currentAssemblies =
+              ((await window.electronAPI.getPreference('assemblyLibrary')) as Assembly[] | null) ?? [];
             await window.electronAPI.setPreference('assemblyLibrary', [...currentAssemblies, templateAssembly]);
           } catch (error) {
             logger.error('Failed to add template assembly to library:', error);
@@ -750,8 +808,13 @@ function App() {
     onNewProject: handleNew,
     onOpenProject: handleOpen,
     onOpenRecentProject: handleOpenRecent,
-    onCloseProject: handleGoHome,
-    // Template/assembly editing mode - route save commands appropriately
+    onCloseProject: async () => handleLogoClick(),
+    onReload: handleReload,
+    isFileActionBusy,
+    // Focused editing modes - route save commands appropriately
+    isEditingPartCuts,
+    onSavePartCuts: handlePrimarySave,
+    onSavePartCutsAs: handleSaveAs,
     isEditingTemplate,
     onSaveTemplate: saveTemplateDirectly,
     onSaveAssembly: saveAssemblyAndExit
@@ -786,7 +849,7 @@ function App() {
                 <div className="header-title">
                   <button
                     className="app-name-btn"
-                    onClick={handleGoHome}
+                    onClick={handleLogoClick}
                     title="Return to start screen"
                     aria-label="Carvd Studio home"
                   >
@@ -799,13 +862,15 @@ function App() {
                       className={
                         headerMode === 'template'
                           ? 'header-mode-chip border-warning/50 bg-warning-bg text-warning'
-                          : 'header-mode-chip border-info bg-info-bg text-info'
+                          : headerMode === 'part-cuts'
+                            ? 'header-mode-chip border-primary/40 bg-primary/10 text-primary'
+                            : 'header-mode-chip border-info bg-info-bg text-info'
                       }
                     >
-                      {headerMode === 'template' ? 'Template' : 'Assembly'}
+                      {headerMode === 'template' ? 'Template' : headerMode === 'part-cuts' ? 'Part Cuts' : 'Assembly'}
                     </Badge>
                   )}
-                  {isHeaderNameEditing ? (
+                  {isHeaderNameEditing && headerMode !== 'part-cuts' ? (
                     <span className="header-name-editor">
                       <Input
                         type="text"
@@ -834,10 +899,11 @@ function App() {
                       size="xs"
                       className="project-name h-auto gap-1.5 rounded px-2 py-1"
                       onClick={handleStartHeaderNameEdit}
-                      title="Click to rename"
+                      title={headerMode === 'part-cuts' ? 'Part cuts workspace' : 'Click to rename'}
+                      disabled={headerMode === 'part-cuts'}
                     >
                       <span>{displayName}</span>
-                      <Pencil size={12} className="opacity-60" />
+                      {headerMode !== 'part-cuts' && <Pencil size={12} className="opacity-60" />}
                       {isDirty && <span className="dirty-indicator"> •</span>}
                     </Button>
                   )}
@@ -845,22 +911,55 @@ function App() {
               </div>
               <div className="header-actions">
                 <div className="header-actions-group">
+                  {/* One pair for every mode. It dispatches to the cut draft
+                      history while the cuts workspace is open, so it never
+                      reaches the project behind it. */}
                   <UndoRedoButtons />
-                  {(isEditingTemplate || isEditingAssembly) && (
+                  {(isEditingTemplate || isEditingAssembly || isEditingPartCuts) && (
                     <Button
-                      variant={isDirty ? 'secondary' : 'outline'}
+                      variant={
+                        isEditingPartCuts
+                          ? partCutsHasUnsavedChanges
+                            ? 'secondary'
+                            : 'outline'
+                          : isDirty
+                            ? 'secondary'
+                            : 'outline'
+                      }
                       size="xs"
                       className="h-7 px-2"
                       onClick={handleExitEditMode}
-                      title={isDirty ? 'Cancel editing' : 'Exit editing'}
+                      title={
+                        isEditingPartCuts
+                          ? partCutsHasUnsavedChanges
+                            ? 'Cancel editing'
+                            : 'Exit editing'
+                          : isDirty
+                            ? 'Cancel editing'
+                            : 'Exit editing'
+                      }
                     >
-                      {isDirty ? 'Cancel' : 'Exit'}
+                      {isEditingPartCuts
+                        ? partCutsHasUnsavedChanges
+                          ? 'Cancel'
+                          : 'Exit'
+                        : isDirty
+                          ? 'Cancel'
+                          : 'Exit'}
                     </Button>
                   )}
                   <Button
-                    variant={isDirty ? 'default' : 'outline'}
+                    variant={
+                      isEditingPartCuts
+                        ? partCutsHasUnsavedChanges
+                          ? 'default'
+                          : 'outline'
+                        : isDirty
+                          ? 'default'
+                          : 'outline'
+                    }
                     size="icon"
-                    onClick={handleSave}
+                    onClick={handlePrimarySave}
                     title="Save (Cmd+S)"
                   >
                     <Save size={18} />
@@ -909,14 +1008,46 @@ function App() {
               />
             )}
             <SidebarProvider className="app-main">
-              <AppSidebar
-                onOpenProjectSettings={() => setIsProjectSettingsOpen(true)}
-                onOpenCutList={openCutListModal}
-                onCreateNewAssembly={startCreatingNewAssembly}
-                onShowLicenseModal={() => setShowLicenseModal(true)}
-              />
-              <CanvasWithDrop />
-              <PropertiesPanel />
+              {isEditingPartCuts && sourcePart ? (
+                // Cuts editing is a mode of the ordinary shell, not a screen of
+                // its own: the cut list sits in the sidebar, the preview takes
+                // the canvas, and the selected cut's fields fill the properties
+                // panel, exactly as parts do in the project editor.
+                <PartCutsEditorProvider
+                  part={sourcePart}
+                  draftFeatures={draftFeatures}
+                  units={useProjectStore.getState().units}
+                  selectedFeatureId={selectedFeatureId}
+                  hoveredTarget={partCutsHoveredTarget}
+                  pendingTarget={partCutsPendingTarget}
+                  onSelectFeature={selectPartCutsFeature}
+                  onDraftFeaturesChange={setPartCutsDraftFeatures}
+                  onHoveredTargetChange={setPartCutsHoveredTarget}
+                  onPendingTargetChange={setPartCutsPendingTarget}
+                  onExit={requestPartCutsExit}
+                  hasUnsavedChanges={partCutsHasUnsavedChanges}
+                >
+                  <AppSidebar
+                    onOpenProjectSettings={() => setIsProjectSettingsOpen(true)}
+                    onOpenCutList={openCutListModal}
+                    onCreateNewAssembly={startCreatingNewAssembly}
+                    onShowLicenseModal={() => setShowLicenseModal(true)}
+                  />
+                  <PartCutsWorkspace />
+                  <PropertiesPanel />
+                </PartCutsEditorProvider>
+              ) : (
+                <>
+                  <AppSidebar
+                    onOpenProjectSettings={() => setIsProjectSettingsOpen(true)}
+                    onOpenCutList={openCutListModal}
+                    onCreateNewAssembly={startCreatingNewAssembly}
+                    onShowLicenseModal={() => setShowLicenseModal(true)}
+                  />
+                  <CanvasWithDrop />
+                  <PropertiesPanel />
+                </>
+              )}
             </SidebarProvider>
           </>
         )}
@@ -1081,6 +1212,13 @@ function App() {
         {/* Unsaved Changes Dialog */}
         <UnsavedChangesDialogComponent />
         <FileRecoveryModalComponent />
+        <PartCutsEditingExitDialog
+          isOpen={showPartCutsExitDialog}
+          partName={sourcePartName}
+          onSave={savePartCutsAndExit}
+          onDiscard={discardPartCutsAndExit}
+          onCancel={cancelPartCutsExit}
+        />
 
         {/* Auto-Recovery Dialog */}
         <RecoveryDialog

@@ -12,9 +12,12 @@ import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
+import { hasRenderablePartFeatures } from '../../utils/partFeatureGeometry';
 import { Part } from './Part';
 import { InstancedParts } from './InstancedParts';
 import { useWorkspaceSceneGraph } from '../../interaction/useWorkspaceSceneGraph';
+import { getDowelVisualizations } from '../../utils/dowelJointUtils';
+import { DowelVisualizations } from './DowelVisualizations';
 
 export function PartsRenderer() {
   const parts = useProjectStore((s) => s.parts);
@@ -24,6 +27,7 @@ export function PartsRenderer() {
   const dragIntentPartId = useSelectionStore((s) => s.dragIntent?.partId ?? null);
   const draggingPartId = useSelectionStore((s) => s.draggingPartId);
   const displayMode = useCameraStore((s) => s.displayMode);
+  const showDowels = useCameraStore((s) => s.showDowels);
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
   const selectedSidebarStockId = useUIStore((s) => s.selectedSidebarStockId);
   // ADR-008: read group descendants from the scene graph adapter.
@@ -63,6 +67,13 @@ export function PartsRenderer() {
         if (part.stockId === selectedSidebarStockId) {
           individualIds.add(part.id);
         }
+      }
+    }
+
+    // Feature-bearing parts use the dedicated geometry path instead of instancing.
+    for (const part of parts) {
+      if (hasRenderablePartFeatures(part)) {
+        individualIds.add(part.id);
       }
     }
 
@@ -119,6 +130,7 @@ export function PartsRenderer() {
     }
     return { instancedParts: instanced, individualParts: individual };
   }, [parts, individualPartIdSet, displayMode]);
+  const dowelVisualizations = useMemo(() => (showDowels ? getDowelVisualizations(parts) : []), [parts, showDowels]);
 
   return (
     <>
@@ -133,6 +145,7 @@ export function PartsRenderer() {
           isStockHighlighted={!!selectedSidebarStockId && part.stockId === selectedSidebarStockId}
         />
       ))}
+      {showDowels && <DowelVisualizations visualizations={dowelVisualizations} />}
     </>
   );
 }

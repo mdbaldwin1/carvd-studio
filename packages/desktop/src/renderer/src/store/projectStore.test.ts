@@ -1,18 +1,22 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useProjectStore, validatePartsForCutList } from './projectStore';
-import { useLicenseStore } from './licenseStore';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  createTestAssembly,
+  createTestPart,
+  createTestProject,
+  createTestStock
+} from '../../../../tests/helpers/factories';
+import type { CutList, PartFeature, Stock } from '../types';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
+import { useLicenseStore } from './licenseStore';
+import { useProjectStore, validatePartsForCutList } from './projectStore';
 import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
-import {
-  createTestPart,
-  createTestStock,
-  createTestProject,
-  createTestAssembly
-} from '../../../../tests/helpers/factories';
-import type { CutList, Stock } from '../types';
+import { createDowelJoint, validateDowelRelationships } from '../utils/dowelJointUtils';
+import { getInstructionFabricationLines } from '../utils/cutListInstructions';
+
+vi.unmock('three');
 
 // Helper to reset store state before each test
 const resetStore = () => {
@@ -52,6 +56,39 @@ const resetStore = () => {
   useLicenseStore.setState({ licenseMode: 'trial' });
 };
 
+function addPairedDowelFixture(): { firstPartId: string; secondPartId: string } {
+  const store = useProjectStore.getState();
+  const firstPartId = store.addPart({
+    name: 'Lower rail',
+    length: 10,
+    width: 4,
+    thickness: 1,
+    position: { x: 0, y: 0, z: 0 }
+  })!;
+  const secondPartId = store.addPart({
+    name: 'Upper rail',
+    length: 10,
+    width: 4,
+    thickness: 1,
+    position: { x: 0, y: 1, z: 0 }
+  })!;
+  store.addDowelJoint({
+    firstPartId,
+    firstFace: 'top_face',
+    secondPartId,
+    secondFace: 'bottom_face',
+    diameter: 0.375,
+    dowelLength: 0.75,
+    firstEmbedmentDepth: 0.375,
+    secondEmbedmentDepth: 0.375,
+    count: 1,
+    spacing: 1,
+    firstPrimary: 0,
+    firstSecondary: 0
+  });
+  return { firstPartId, secondPartId };
+}
+
 describe('projectStore', () => {
   beforeEach(() => {
     resetStore();
@@ -65,7 +102,7 @@ describe('projectStore', () => {
     describe('addPart', () => {
       it('creates a new part with default values', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
 
         const state = useProjectStore.getState();
         expect(state.parts).toHaveLength(1);
@@ -83,7 +120,7 @@ describe('projectStore', () => {
           length: 48,
           width: 24,
           thickness: 1.5
-        });
+        })!;
 
         const state = useProjectStore.getState();
         const part = state.parts.find((p) => p.id === partId);
@@ -95,7 +132,7 @@ describe('projectStore', () => {
 
       it('selects the new part after creation', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
 
         expect(useSelectionStore.getState().selectedPartIds).toContain(partId);
       });
@@ -104,7 +141,7 @@ describe('projectStore', () => {
         const store = useProjectStore.getState();
         expect(store.isDirty).toBe(false);
 
-        store.addPart();
+        store.addPart()!;
 
         const state = useProjectStore.getState();
         expect(state.isDirty).toBe(true);
@@ -114,7 +151,7 @@ describe('projectStore', () => {
     describe('updatePart', () => {
       it('updates a single part property', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Original' });
+        const partId = store.addPart({ name: 'Original' })!;
 
         store.updatePart(partId, { name: 'Updated' });
 
@@ -125,7 +162,7 @@ describe('projectStore', () => {
 
       it('updates multiple properties at once', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
 
         store.updatePart(partId, {
           name: 'Updated Part',
@@ -142,8 +179,8 @@ describe('projectStore', () => {
 
       it('does not affect other parts', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
 
         store.updatePart(part1Id, { name: 'Updated Part 1' });
 
@@ -151,13 +188,130 @@ describe('projectStore', () => {
         const part2 = state.parts.find((p) => p.id === part2Id);
         expect(part2?.name).toBe('Part 2');
       });
+
+      it('prevents dimension updates that would overlap another part when preventOverlap is enabled', () => {
+        const store = useProjectStore.getState();
+
+        const partAId = store.addPart({
+          name: 'A',
+          position: { x: 0, y: 0.5, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        })!;
+        store.addPart({
+          name: 'B',
+          position: { x: 12, y: 0.5, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        })!;
+
+        store.updatePart(partAId, { length: 30 });
+
+        const state = useProjectStore.getState();
+        const partA = state.parts.find((p) => p.id === partAId);
+        expect(partA?.length).toBe(10);
+      });
+
+      it('commits a validated feature mate host without disabling other overlap checks', () => {
+        const store = useProjectStore.getState();
+        const hostId = store.addPart({
+          name: 'Dado host',
+          length: 12,
+          width: 6,
+          thickness: 0.75,
+          position: { x: 0, y: 0.375, z: 0 },
+          features: [
+            {
+              id: 'dado',
+              kind: 'rect_cut',
+              version: 1 as const,
+              enabled: true,
+              cutType: 'dado',
+              target: { type: 'face', face: 'top_face' },
+              reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+              parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 },
+              placement: { x: 5.6225, z: 0 }
+            }
+          ]
+        })!;
+        const dividerId = store.addPart({
+          name: 'Divider',
+          length: 4,
+          width: 6,
+          thickness: 0.75,
+          position: { x: 0, y: 2.8, z: 0 },
+          rotation: { x: 0, y: 0, z: 90 }
+        })!;
+
+        expect(store.updatePart(dividerId, { position: { x: 0, y: 2.375, z: 0 } }, { mateHostPartId: hostId })).toBe(
+          true
+        );
+        expect(useProjectStore.getState().parts.find((part) => part.id === dividerId)?.position.y).toBeCloseTo(2.375);
+
+        store.addPart({
+          name: 'Unrelated blocker',
+          length: 1,
+          width: 6,
+          thickness: 0.5,
+          position: { x: 0, y: 0.5, z: 0 }
+        })!;
+        expect(store.updatePart(dividerId, { position: { x: 0, y: 2.3, z: 0 } }, { mateHostPartId: hostId })).toBe(
+          false
+        );
+      });
+
+      it('does not validate a combined move and resize against stale mate geometry', () => {
+        const store = useProjectStore.getState();
+        const hostId = store.addPart({
+          name: 'Dado host',
+          length: 12,
+          width: 6,
+          thickness: 0.75,
+          position: { x: 0, y: 0.375, z: 0 },
+          features: [
+            {
+              id: 'dado',
+              kind: 'rect_cut',
+              version: 1 as const,
+              enabled: true,
+              cutType: 'dado',
+              target: { type: 'face', face: 'top_face' },
+              reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+              parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 },
+              placement: { x: 5.6225, z: 0 }
+            }
+          ]
+        })!;
+        const dividerId = store.addPart({
+          name: 'Divider',
+          length: 4,
+          width: 6,
+          thickness: 0.75,
+          position: { x: 0, y: 2.8, z: 0 },
+          rotation: { x: 0, y: 0, z: 90 }
+        })!;
+
+        expect(
+          store.updatePart(
+            dividerId,
+            { position: { x: 0, y: 2.375, z: 0 }, thickness: 0.8 },
+            { mateHostPartId: hostId }
+          )
+        ).toBe(false);
+        expect(useProjectStore.getState().parts.find((part) => part.id === dividerId)).toMatchObject({
+          thickness: 0.75,
+          position: { x: 0, y: 2.8, z: 0 }
+        });
+      });
     });
 
     describe('updateParts', () => {
       it('updates multiple parts with the same changes', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
 
         store.updateParts([part1Id, part2Id], { color: '#ff0000' });
 
@@ -170,8 +324,22 @@ describe('projectStore', () => {
     describe('batchUpdateParts', () => {
       it('updates multiple parts with different changes each', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1', color: '#ffffff' });
-        const part2Id = store.addPart({ name: 'Part 2', color: '#ffffff' });
+        const part1Id = store.addPart({
+          name: 'Part 1',
+          color: '#ffffff',
+          position: { x: 0, y: 0.75, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        })!;
+        const part2Id = store.addPart({
+          name: 'Part 2',
+          color: '#ffffff',
+          position: { x: 20, y: 0.75, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        })!;
 
         store.batchUpdateParts([
           { id: part1Id, changes: { color: '#ff0000', length: 30 } },
@@ -189,7 +357,7 @@ describe('projectStore', () => {
 
       it('marks project as dirty', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
         store.markClean();
 
         store.batchUpdateParts([{ id: partId, changes: { name: 'Updated' } }]);
@@ -199,7 +367,7 @@ describe('projectStore', () => {
 
       it('ignores updates for non-existent parts', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Real Part' });
+        const partId = store.addPart({ name: 'Real Part' })!;
 
         store.batchUpdateParts([
           { id: partId, changes: { name: 'Updated' } },
@@ -210,12 +378,197 @@ describe('projectStore', () => {
         expect(state.parts).toHaveLength(1);
         expect(state.parts[0].name).toBe('Updated');
       });
+
+      it('prevents batched dimension updates that would cause overlap when preventOverlap is enabled', () => {
+        const store = useProjectStore.getState();
+
+        const partAId = store.addPart({
+          name: 'A',
+          position: { x: 0, y: 0.5, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        })!;
+        store.addPart({
+          name: 'B',
+          position: { x: 12, y: 0.5, z: 0 },
+          length: 10,
+          width: 10,
+          thickness: 1
+        })!;
+
+        store.batchUpdateParts([{ id: partAId, changes: { length: 30 } }]);
+
+        const state = useProjectStore.getState();
+        const partA = state.parts.find((p) => p.id === partAId);
+        expect(partA?.length).toBe(10);
+      });
+
+      it('atomically detaches a mate when bulk cut replacement removes its paired feature', () => {
+        const store = useProjectStore.getState();
+        const { firstPartId, secondPartId } = addPairedDowelFixture();
+        useProjectStore.temporal.getState().clear();
+        const replacement: PartFeature = {
+          id: 'replacement-mitre',
+          kind: 'end_cut',
+          version: 1 as const,
+          enabled: true,
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mitre',
+          lengthMode: 'long_point',
+          parameters: { horizontalAngle: 45 }
+        };
+
+        store.batchUpdateParts([{ id: firstPartId, changes: { features: [replacement] } }]);
+
+        let state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features).toEqual([replacement]);
+        expect(state.parts.find((part) => part.id === secondPartId)?.features?.[0]).toMatchObject({
+          label: 'Round hole 1',
+          metadata: undefined
+        });
+        expect(validateDowelRelationships(state.parts)).toEqual([]);
+        expect(useProjectStore.temporal.getState().pastStates).toHaveLength(1);
+
+        useProjectStore.temporal.getState().undo();
+        state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features?.[0].metadata?.dowelJoint).toBeDefined();
+        expect(state.parts.find((part) => part.id === secondPartId)?.features?.[0].metadata?.dowelJoint).toBeDefined();
+      });
+    });
+
+    describe('addDowelJoint', () => {
+      it('adds both feature sets in one undoable project transaction', () => {
+        const store = useProjectStore.getState();
+        const firstPartId = store.addPart({
+          name: 'Lower rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        })!;
+        const secondPartId = store.addPart({
+          name: 'Upper rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        });
+        expect(firstPartId).not.toBeNull();
+        expect(secondPartId).not.toBeNull();
+        useProjectStore.temporal.getState().clear();
+
+        const jointId = (
+          store as typeof store & {
+            addDowelJoint: (input: Record<string, unknown>) => string | null;
+          }
+        ).addDowelJoint({
+          firstPartId,
+          firstFace: 'top_face',
+          secondPartId,
+          secondFace: 'bottom_face',
+          diameter: 0.375,
+          dowelLength: 0.75,
+          firstEmbedmentDepth: 0.375,
+          secondEmbedmentDepth: 0.375,
+          count: 2,
+          spacing: 2,
+          firstPrimary: -1,
+          firstSecondary: 0
+        });
+
+        expect(jointId, useUIStore.getState().toast?.message).toEqual(expect.any(String));
+        let state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features).toHaveLength(2);
+        expect(state.parts.find((part) => part.id === secondPartId)?.features).toHaveLength(2);
+        expect(useProjectStore.temporal.getState().pastStates).toHaveLength(1);
+
+        useProjectStore.temporal.getState().undo();
+        state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features ?? []).toHaveLength(0);
+        expect(state.parts.find((part) => part.id === secondPartId)?.features ?? []).toHaveLength(0);
+      });
+
+      it('atomically turns the surviving mate into an ordinary hole when one member is deleted', () => {
+        const store = useProjectStore.getState();
+        const firstPartId = store.addPart({
+          name: 'Lower rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        })!;
+        const secondPartId = store.addPart({
+          name: 'Upper rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        })!;
+        store.addDowelJoint({
+          firstPartId,
+          firstFace: 'top_face',
+          secondPartId,
+          secondFace: 'bottom_face',
+          diameter: 0.375,
+          dowelLength: 0.75,
+          firstEmbedmentDepth: 0.375,
+          secondEmbedmentDepth: 0.375,
+          count: 1,
+          spacing: 1,
+          firstPrimary: 0,
+          firstSecondary: 0
+        });
+        useProjectStore.temporal.getState().clear();
+
+        store.updatePart(firstPartId, { features: [] });
+
+        let state = useProjectStore.getState();
+        const survivingHole = state.parts.find((part) => part.id === secondPartId)?.features?.[0];
+        expect(state.parts.find((part) => part.id === firstPartId)?.features).toEqual([]);
+        expect(survivingHole).toMatchObject({
+          kind: 'circular_cut',
+          cutType: 'round_hole',
+          parameters: { diameter: 0.375, depthMode: 'blind', depth: 0.375 }
+        });
+        expect(survivingHole?.metadata?.dowelJoint).toBeUndefined();
+        expect(validateDowelRelationships(state.parts)).toEqual([]);
+        expect(
+          getInstructionFabricationLines(
+            {
+              partId: secondPartId,
+              partName: 'Upper rail',
+              cutLength: 10,
+              cutWidth: 4,
+              thickness: 1,
+              stockId: 'stock-1',
+              stockName: 'Test stock',
+              grainSensitive: false,
+              canRotate: true,
+              isGlueUp: false,
+              features: survivingHole ? [survivingHole] : [],
+              notes: ''
+            },
+            'imperial'
+          )
+        ).toEqual([
+          '1. Round hole 1 — Round Hole on Bottom Face · 3/8" diameter × 3/8" deep · Primary 0" from center (+Right) · Secondary 0" from center (+Back)'
+        ]);
+        expect(useProjectStore.temporal.getState().pastStates).toHaveLength(1);
+
+        useProjectStore.temporal.getState().undo();
+        state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features?.[0]?.metadata?.dowelJoint).toBeDefined();
+        expect(state.parts.find((part) => part.id === secondPartId)?.features?.[0]?.metadata?.dowelJoint).toBeDefined();
+        expect(validateDowelRelationships(state.parts)).toEqual([]);
+      });
     });
 
     describe('deletePart', () => {
       it('removes a part from the store', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
 
         expect(useProjectStore.getState().parts).toHaveLength(1);
 
@@ -226,7 +579,7 @@ describe('projectStore', () => {
 
       it('removes the part from selection', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
 
         expect(useSelectionStore.getState().selectedPartIds).toContain(partId);
 
@@ -237,7 +590,7 @@ describe('projectStore', () => {
 
       it('removes the part from reference parts', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
         useSnapStore.getState().addToReferences([partId]);
 
         expect(useSnapStore.getState().referencePartIds).toContain(partId);
@@ -249,8 +602,8 @@ describe('projectStore', () => {
 
       it('removes the part from group memberships', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
-        store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart()!;
+        store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         expect(useProjectStore.getState().groupMembers).toHaveLength(1);
 
@@ -258,14 +611,38 @@ describe('projectStore', () => {
 
         expect(useProjectStore.getState().groupMembers).toHaveLength(0);
       });
+
+      it('atomically detaches the surviving hole when its paired part is deleted', () => {
+        const store = useProjectStore.getState();
+        const { firstPartId, secondPartId } = addPairedDowelFixture();
+        useProjectStore.temporal.getState().clear();
+
+        store.deletePart(firstPartId);
+
+        let state = useProjectStore.getState();
+        expect(state.parts.some((part) => part.id === firstPartId)).toBe(false);
+        expect(state.parts.find((part) => part.id === secondPartId)?.features?.[0]).toMatchObject({
+          label: 'Round hole 1',
+          kind: 'circular_cut',
+          cutType: 'round_hole',
+          metadata: undefined
+        });
+        expect(validateDowelRelationships(state.parts)).toEqual([]);
+        expect(useProjectStore.temporal.getState().pastStates).toHaveLength(1);
+
+        useProjectStore.temporal.getState().undo();
+        state = useProjectStore.getState();
+        expect(state.parts.find((part) => part.id === firstPartId)?.features?.[0].metadata?.dowelJoint).toBeDefined();
+        expect(state.parts.find((part) => part.id === secondPartId)?.features?.[0].metadata?.dowelJoint).toBeDefined();
+      });
     });
 
     describe('deleteSelectedParts', () => {
       it('removes all selected parts', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        store.addPart({ name: 'Part 3' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
+        store.addPart({ name: 'Part 3' })!;
 
         useSelectionStore.getState().selectParts([part1Id, part2Id]);
         store.deleteSelectedParts();
@@ -277,7 +654,7 @@ describe('projectStore', () => {
 
       it('does nothing when no parts are selected', () => {
         const store = useProjectStore.getState();
-        store.addPart();
+        store.addPart()!;
         useSelectionStore.getState().clearSelection();
 
         store.deleteSelectedParts();
@@ -290,9 +667,9 @@ describe('projectStore', () => {
       describe('confirmDeleteParts', () => {
         it('deletes pending parts', () => {
           const store = useProjectStore.getState();
-          const part1Id = store.addPart({ name: 'Part 1' });
-          const part2Id = store.addPart({ name: 'Part 2' });
-          store.addPart({ name: 'Part 3' });
+          const part1Id = store.addPart({ name: 'Part 1' })!;
+          const part2Id = store.addPart({ name: 'Part 2' })!;
+          store.addPart({ name: 'Part 3' })!;
           useUIStore.getState().requestDeleteParts([part1Id, part2Id]);
 
           store.confirmDeleteParts();
@@ -304,7 +681,7 @@ describe('projectStore', () => {
 
         it('clears pending delete list', () => {
           const store = useProjectStore.getState();
-          const partId = store.addPart();
+          const partId = store.addPart()!;
           useUIStore.getState().requestDeleteParts([partId]);
 
           store.confirmDeleteParts();
@@ -314,7 +691,7 @@ describe('projectStore', () => {
 
         it('does nothing when no pending parts', () => {
           const store = useProjectStore.getState();
-          store.addPart();
+          store.addPart()!;
 
           store.confirmDeleteParts();
 
@@ -330,9 +707,9 @@ describe('projectStore', () => {
           name: 'Original',
           length: 30,
           width: 15
-        });
+        })!;
 
-        const duplicateId = store.duplicatePart(originalId);
+        const duplicateId = store.duplicatePart(originalId)!;
 
         const state = useProjectStore.getState();
         expect(state.parts).toHaveLength(2);
@@ -344,13 +721,171 @@ describe('projectStore', () => {
         expect(duplicate?.width).toBe(15);
       });
 
+      it('copies part features onto the duplicate', () => {
+        const store = useProjectStore.getState();
+        const originalId = store.addPart({
+          name: 'Featured',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1 as const,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'mitre',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 45 }
+            }
+          ]
+        })!;
+
+        const duplicateId = store.duplicatePart(originalId)!;
+        const duplicate = useProjectStore.getState().parts.find((p) => p.id === duplicateId);
+
+        const originalFeatures = useProjectStore.getState().parts.find((p) => p.id === originalId)?.features;
+        expect(duplicate?.features?.map(({ id: _id, ...feature }) => feature)).toEqual(
+          originalFeatures?.map(({ id: _id, ...feature }) => feature)
+        );
+        expect(duplicate?.features?.[0].id).not.toBe(originalFeatures?.[0].id);
+        expect(duplicate?.features).not.toBe(
+          useProjectStore.getState().parts.find((p) => p.id === originalId)?.features
+        );
+      });
+
+      it('turns a one-member dowel duplicate into ordinary holes', () => {
+        const store = useProjectStore.getState();
+        const firstPartId = store.addPart({
+          name: 'Lower rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        })!;
+        const secondPartId = store.addPart({
+          name: 'Upper rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        })!;
+        store.addDowelJoint({
+          firstPartId,
+          firstFace: 'top_face',
+          secondPartId,
+          secondFace: 'bottom_face',
+          diameter: 0.375,
+          dowelLength: 0.75,
+          firstEmbedmentDepth: 0.375,
+          secondEmbedmentDepth: 0.375,
+          count: 1,
+          spacing: 1,
+          firstPrimary: 0,
+          firstSecondary: 0
+        });
+        const sourceFeatureId = useProjectStore.getState().parts.find((part) => part.id === firstPartId)!.features![0]
+          .id;
+
+        const duplicateId = store.duplicatePart(firstPartId)!;
+        const duplicateFeature = useProjectStore.getState().parts.find((part) => part.id === duplicateId)!.features![0];
+
+        expect(duplicateFeature.id).not.toBe(sourceFeatureId);
+        expect(duplicateFeature.metadata?.dowelJoint).toBeUndefined();
+        expect(validateDowelRelationships(useProjectStore.getState().parts)).toEqual([]);
+      });
+
+      it('gives every featured copy fresh, deeply independent feature identities', () => {
+        const features: PartFeature[] = [
+          {
+            id: 'mitre-1',
+            kind: 'end_cut',
+            version: 1 as const,
+            enabled: true,
+            label: 'Angled end',
+            target: { type: 'face', face: 'left_end' },
+            reference: { primaryFrom: 'min' },
+            cutType: 'mitre',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 33, horizontalFlip: true }
+          },
+          {
+            id: 'dado-1',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'dado',
+            parameters: { size: { length: 0.75, width: 4 }, depthMode: 'blind', depth: 0.375 },
+            placement: { x: 6, z: 0 }
+          },
+          {
+            id: 'holes-1',
+            kind: 'circular_cut',
+            version: 1 as const,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+            cutType: 'counterbore',
+            placement: { primary: 2, secondary: 3, rotation: 15 },
+            pattern: { type: 'linear', count: 3, spacing: 0.75, direction: 30 },
+            parameters: {
+              diameter: 0.25,
+              depthMode: 'blind',
+              depth: 0.5,
+              tilt: 0,
+              direction: 0,
+              counterbore: { diameter: 0.5, depth: 0.125 }
+            }
+          },
+          {
+            id: 'slot-1',
+            kind: 'rounded_cut',
+            version: 1 as const,
+            enabled: true,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+            cutType: 'rounded_slot',
+            placement: { primary: 4, secondary: 2, rotation: 45 },
+            parameters: { length: 3, width: 0.5, cornerRadius: 0.25, depthMode: 'through' }
+          }
+        ];
+        const store = useProjectStore.getState();
+        const originalId = store.addPart({ name: 'All feature families', features })!;
+
+        const duplicateId = store.duplicatePart(originalId)!;
+        const [original, duplicate] = useProjectStore
+          .getState()
+          .parts.filter((part) => [originalId, duplicateId].includes(part.id));
+
+        expect(duplicate.features?.map(({ id: _id, ...feature }) => feature)).toEqual(
+          original.features?.map(({ id: _id, ...feature }) => feature)
+        );
+        expect(duplicate.features?.map((feature) => feature.id)).not.toEqual(
+          original.features?.map((feature) => feature.id)
+        );
+        expect(duplicate.features?.every((feature, index) => feature !== original.features?.[index])).toBe(true);
+        expect(
+          (duplicate.features?.[2] as Extract<PartFeature, { kind: 'circular_cut' }>).parameters.counterbore
+        ).not.toBe((original.features?.[2] as Extract<PartFeature, { kind: 'circular_cut' }>).parameters.counterbore);
+        expect((duplicate.features?.[2] as Extract<PartFeature, { kind: 'circular_cut' }>).pattern).not.toBe(
+          (original.features?.[2] as Extract<PartFeature, { kind: 'circular_cut' }>).pattern
+        );
+
+        (duplicate.features?.[2] as Extract<PartFeature, { kind: 'circular_cut' }>).parameters.counterbore!.depth =
+          0.25;
+        expect(
+          (original.features?.[2] as Extract<PartFeature, { kind: 'circular_cut' }>).parameters.counterbore?.depth
+        ).toBe(0.125);
+      });
+
       it('generates smart copy names', () => {
         const store = useProjectStore.getState();
-        const originalId = store.addPart({ name: 'Test Part' });
+        const originalId = store.addPart({ name: 'Test Part' })!;
 
-        const copy1Id = store.duplicatePart(originalId);
-        const copy2Id = store.duplicatePart(copy1Id!);
-        const copy3Id = store.duplicatePart(copy2Id!);
+        const copy1Id = store.duplicatePart(originalId)!;
+        const copy2Id = store.duplicatePart(copy1Id!)!;
+        const copy3Id = store.duplicatePart(copy2Id!)!;
 
         const state = useProjectStore.getState();
         expect(state.parts.find((p) => p.id === copy1Id)?.name).toBe('Test Part (copy)');
@@ -368,8 +903,8 @@ describe('projectStore', () => {
     describe('duplicateSelectedParts', () => {
       it('duplicates all selected parts', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
 
         useSelectionStore.getState().selectParts([part1Id, part2Id]);
         const newIds = store.duplicateSelectedParts();
@@ -377,6 +912,56 @@ describe('projectStore', () => {
         const state = useProjectStore.getState();
         expect(state.parts).toHaveLength(4);
         expect(newIds).toHaveLength(2);
+      });
+
+      it('remaps a two-member dowel duplicate to a fresh reciprocal joint', () => {
+        const store = useProjectStore.getState();
+        const firstPartId = store.addPart({
+          name: 'Lower rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        })!;
+        const secondPartId = store.addPart({
+          name: 'Upper rail',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        })!;
+        store.addDowelJoint({
+          firstPartId,
+          firstFace: 'top_face',
+          secondPartId,
+          secondFace: 'bottom_face',
+          diameter: 0.375,
+          dowelLength: 0.75,
+          firstEmbedmentDepth: 0.375,
+          secondEmbedmentDepth: 0.375,
+          count: 1,
+          spacing: 1,
+          firstPrimary: 0,
+          firstSecondary: 0
+        });
+        const originalParts = useProjectStore.getState().parts;
+        const originalFeatureIds = originalParts.flatMap((part) => part.features?.map((feature) => feature.id) ?? []);
+        const originalJointId = originalParts[0].features![0].metadata!.dowelJoint!.jointId;
+        useSelectionStore.getState().selectParts([firstPartId, secondPartId]);
+
+        const duplicateIds = store.duplicateSelectedParts();
+        const duplicates = useProjectStore.getState().parts.filter((part) => duplicateIds.includes(part.id));
+        const firstMetadata = duplicates[0].features![0].metadata!.dowelJoint!;
+        const secondMetadata = duplicates[1].features![0].metadata!.dowelJoint!;
+
+        expect(duplicates.flatMap((part) => part.features!.map((feature) => feature.id))).not.toEqual(
+          expect.arrayContaining(originalFeatureIds)
+        );
+        expect(firstMetadata.jointId).toBe(secondMetadata.jointId);
+        expect(firstMetadata.jointId).not.toBe(originalJointId);
+        expect(firstMetadata.matePartId).toBe(duplicates[1].id);
+        expect(secondMetadata.matePartId).toBe(duplicates[0].id);
+        expect(validateDowelRelationships(useProjectStore.getState().parts)).toEqual([]);
       });
     });
   });
@@ -391,7 +976,7 @@ describe('projectStore', () => {
     describe('addStock', () => {
       it('creates a new stock with default values', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock();
+        const stockId = store.addStock()!;
 
         const state = useProjectStore.getState();
         expect(state.stocks).toHaveLength(1);
@@ -406,7 +991,7 @@ describe('projectStore', () => {
           length: 96,
           width: 48,
           thickness: 0.75
-        });
+        })!;
 
         const state = useProjectStore.getState();
         const stock = state.stocks.find((s) => s.id === stockId);
@@ -419,7 +1004,7 @@ describe('projectStore', () => {
     describe('updateStock', () => {
       it('updates stock properties', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock({ name: 'Original' });
+        const stockId = store.addStock({ name: 'Original' })!;
 
         store.updateStock(stockId, { name: 'Updated', pricePerUnit: 10 });
 
@@ -433,7 +1018,7 @@ describe('projectStore', () => {
     describe('deleteStock', () => {
       it('removes a stock from the store', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock();
+        const stockId = store.addStock()!;
 
         store.deleteStock(stockId);
 
@@ -442,8 +1027,8 @@ describe('projectStore', () => {
 
       it('unassigns stock from parts using it', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock();
-        const partId = store.addPart({ stockId });
+        const stockId = store.addStock()!;
+        const partId = store.addPart({ stockId })!;
 
         store.deleteStock(stockId);
 
@@ -455,9 +1040,9 @@ describe('projectStore', () => {
     describe('assignStockToSelectedParts', () => {
       it('assigns stock to all selected parts', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock({ color: '#ff0000' });
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
+        const stockId = store.addStock({ color: '#ff0000' })!;
+        const part1Id = store.addPart()!;
+        const part2Id = store.addPart()!;
 
         useSelectionStore.getState().selectParts([part1Id, part2Id]);
         store.assignStockToSelectedParts(stockId);
@@ -469,8 +1054,8 @@ describe('projectStore', () => {
 
       it('updates part color to match stock', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock({ color: '#ff0000' });
-        const partId = store.addPart({ color: '#000000' });
+        const stockId = store.addStock({ color: '#ff0000' })!;
+        const partId = store.addPart({ color: '#000000' })!;
 
         useSelectionStore.getState().selectPart(partId);
         store.assignStockToSelectedParts(stockId);
@@ -481,8 +1066,8 @@ describe('projectStore', () => {
 
       it('unassigns stock when called with null', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock();
-        const partId = store.addPart({ stockId });
+        const stockId = store.addStock()!;
+        const partId = store.addPart({ stockId })!;
 
         useSelectionStore.getState().selectPart(partId);
         store.assignStockToSelectedParts(null);
@@ -501,13 +1086,13 @@ describe('projectStore', () => {
     describe('createGroup', () => {
       it('creates a group with specified members', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
 
         const groupId = store.createGroup('Test Group', [
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
 
         const state = useProjectStore.getState();
         expect(state.groups).toHaveLength(1);
@@ -518,9 +1103,9 @@ describe('projectStore', () => {
 
       it('selects the new group after creation', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
 
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         expect(useSelectionStore.getState().selectedGroupIds).toContain(groupId);
       });
@@ -529,8 +1114,8 @@ describe('projectStore', () => {
     describe('renameGroup', () => {
       it('updates the group name', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
-        const groupId = store.createGroup('Original Name', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart()!;
+        const groupId = store.createGroup('Original Name', [{ id: partId, type: 'part' }])!;
 
         store.renameGroup(groupId, 'New Name');
 
@@ -542,12 +1127,12 @@ describe('projectStore', () => {
     describe('deleteGroup - ungroup mode', () => {
       it('removes the group but keeps parts', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
+        const part1Id = store.addPart()!;
+        const part2Id = store.addPart()!;
         const groupId = store.createGroup('Test Group', [
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
 
         store.deleteGroup(groupId, 'ungroup');
 
@@ -561,12 +1146,12 @@ describe('projectStore', () => {
     describe('deleteGroup - recursive mode', () => {
       it('removes the group and all nested parts', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
+        const part1Id = store.addPart()!;
+        const part2Id = store.addPart()!;
         const groupId = store.createGroup('Test Group', [
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
 
         store.deleteGroup(groupId, 'recursive');
 
@@ -579,14 +1164,14 @@ describe('projectStore', () => {
     describe('nested groups', () => {
       it('supports groups containing other groups', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
 
-        const innerGroupId = store.createGroup('Inner Group', [{ id: part1Id, type: 'part' }]);
+        const innerGroupId = store.createGroup('Inner Group', [{ id: part1Id, type: 'part' }])!;
         store.createGroup('Outer Group', [
           { id: innerGroupId, type: 'group' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
 
         const state = useProjectStore.getState();
         expect(state.groups).toHaveLength(2);
@@ -597,10 +1182,10 @@ describe('projectStore', () => {
     describe('addToGroup', () => {
       it('adds parts to an existing group', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        const part3Id = store.addPart({ name: 'Part 3' });
-        const groupId = store.createGroup('Test Group', [{ id: part1Id, type: 'part' }]);
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
+        const part3Id = store.addPart({ name: 'Part 3' })!;
+        const groupId = store.createGroup('Test Group', [{ id: part1Id, type: 'part' }])!;
 
         store.addToGroup(groupId, [part2Id, part3Id], 'part');
 
@@ -613,10 +1198,10 @@ describe('projectStore', () => {
 
       it('adds a group to another group', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        const innerGroupId = store.createGroup('Inner Group', [{ id: part1Id, type: 'part' }]);
-        const outerGroupId = store.createGroup('Outer Group', [{ id: part2Id, type: 'part' }]);
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
+        const innerGroupId = store.createGroup('Inner Group', [{ id: part1Id, type: 'part' }])!;
+        const outerGroupId = store.createGroup('Outer Group', [{ id: part2Id, type: 'part' }])!;
 
         store.addToGroup(outerGroupId, [innerGroupId], 'group');
 
@@ -627,8 +1212,8 @@ describe('projectStore', () => {
 
       it('does not add duplicates', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Part 1' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart({ name: 'Part 1' })!;
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
         const initialMemberCount = useProjectStore.getState().groupMembers.length;
 
         store.addToGroup(groupId, [partId], 'part');
@@ -640,12 +1225,12 @@ describe('projectStore', () => {
     describe('removeFromGroup', () => {
       it('removes parts from their group', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
         const groupId = store.createGroup('Test Group', [
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
 
         store.removeFromGroup([part1Id], 'part');
 
@@ -657,9 +1242,9 @@ describe('projectStore', () => {
 
       it('removes groups from their parent group', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Part 1' });
-        const innerGroupId = store.createGroup('Inner Group', [{ id: partId, type: 'part' }]);
-        const outerGroupId = store.createGroup('Outer Group', [{ id: innerGroupId, type: 'group' }]);
+        const partId = store.addPart({ name: 'Part 1' })!;
+        const innerGroupId = store.createGroup('Inner Group', [{ id: partId, type: 'part' }])!;
+        const outerGroupId = store.createGroup('Outer Group', [{ id: innerGroupId, type: 'group' }])!;
 
         store.removeFromGroup([innerGroupId], 'group');
 
@@ -684,8 +1269,8 @@ describe('projectStore', () => {
     describe('newProject', () => {
       it('resets the store to initial state', () => {
         const store = useProjectStore.getState();
-        store.addPart();
-        store.addStock();
+        store.addPart()!;
+        store.addStock()!;
         store.markDirty();
 
         store.newProject();
@@ -1052,7 +1637,7 @@ describe('projectStore', () => {
       const store = useProjectStore.getState();
       const partId = store.addPart({
         position: { x: 0, y: 0, z: 0 }
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.moveSelectedParts({ x: 5, y: 10, z: 15 });
@@ -1063,12 +1648,12 @@ describe('projectStore', () => {
 
     it('moves all parts in a selected group', () => {
       const store = useProjectStore.getState();
-      const part1Id = store.addPart({ position: { x: 0, y: 0, z: 0 } });
-      const part2Id = store.addPart({ position: { x: 10, y: 0, z: 0 } });
+      const part1Id = store.addPart({ position: { x: 0, y: 0, z: 0 } })!;
+      const part2Id = store.addPart({ position: { x: 10, y: 0, z: 0 } })!;
       const groupId = store.createGroup('Test Group', [
         { id: part1Id, type: 'part' },
         { id: part2Id, type: 'part' }
-      ]);
+      ])!;
 
       useSelectionStore.getState().clearSelection();
       useSelectionStore.getState().selectGroup(groupId);
@@ -1165,6 +1750,71 @@ describe('projectStore', () => {
     });
 
     describe('createAssemblyFromSelection', () => {
+      it('R8 remaps paired dowels on assembly capture, repeated placement, and edit save; detaches excluded mates', () => {
+        const first = createTestPart({
+          id: 'first',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 0, z: 0 }
+        });
+        const second = createTestPart({
+          id: 'second',
+          length: 10,
+          width: 4,
+          thickness: 1,
+          position: { x: 0, y: 1, z: 0 }
+        });
+        const joint = createDowelJoint({
+          firstPart: first,
+          secondPart: second,
+          firstFace: 'top_face',
+          secondFace: 'bottom_face',
+          diameter: 0.25,
+          dowelLength: 0.5,
+          firstEmbedmentDepth: 0.25,
+          secondEmbedmentDepth: 0.25,
+          count: 1,
+          spacing: 1,
+          firstPrimary: 0,
+          firstSecondary: 0
+        });
+        first.features = joint.firstFeatures;
+        second.features = joint.secondFeatures;
+        useProjectStore.setState({ parts: [first, second] });
+        useSelectionStore.getState().selectParts(['first', 'second']);
+        const assembly = useProjectStore.getState().createAssemblyFromSelection('Dowel pair')!;
+        useProjectStore.getState().addAssembly(assembly);
+        const placed = useProjectStore.getState().placeAssembly(assembly.id, { x: 20, y: 0, z: 0 });
+        const again = useProjectStore.getState().placeAssembly(assembly.id, { x: 40, y: 0, z: 0 });
+        const parts = useProjectStore.getState().parts;
+        expect.soft(validateDowelRelationships(parts.filter((part) => placed.includes(part.id)))).toEqual([]);
+        expect.soft(validateDowelRelationships(parts.filter((part) => again.includes(part.id)))).toEqual([]);
+        expect.soft(new Set(parts.flatMap((part) => part.features!.map((feature) => feature.id))).size).toBe(6);
+        expect.soft(new Set(parts.map((part) => part.features![0].metadata!.dowelJoint!.jointId)).size).toBe(3);
+        useSelectionStore.getState().selectParts(['first']);
+        const single = useProjectStore.getState().createAssemblyFromSelection('Single')!;
+        expect.soft(single.parts[0].features![0].metadata?.dowelJoint).toBeUndefined();
+        useAssemblyEditingStore.getState().startEditingAssembly(assembly.id, assembly.name, [first, second]);
+        const edited = useAssemblyEditingStore.getState().saveEditingAssembly()!;
+        useProjectStore.setState({ assemblies: [edited] });
+        const editedIds = useProjectStore.getState().placeAssembly(edited.id, { x: 60, y: 0, z: 0 });
+        expect(
+          validateDowelRelationships(useProjectStore.getState().parts.filter((part) => editedIds.includes(part.id)))
+        ).toEqual([]);
+        // Old assembly files have no localId; reciprocal relationship members
+        // still provide enough identity to recover and detach missing mates.
+        const legacy = {
+          ...assembly,
+          id: 'legacy',
+          parts: assembly.parts.map(({ localId: _localId, ...part }) => part)
+        };
+        useProjectStore.setState({ assemblies: [legacy] });
+        const legacyIds = useProjectStore.getState().placeAssembly('legacy', { x: 80, y: 0, z: 0 });
+        const legacyParts = useProjectStore.getState().parts.filter((part) => legacyIds.includes(part.id));
+        expect(validateDowelRelationships(legacyParts)).toEqual([]);
+        expect(legacyParts.every((part) => part.features![0].metadata?.dowelJoint)).toBe(true);
+      });
       it('creates assembly from selected parts', () => {
         const store = useProjectStore.getState();
         const part1Id = store.addPart({
@@ -1172,13 +1822,13 @@ describe('projectStore', () => {
           length: 24,
           width: 12,
           position: { x: 0, y: 0, z: 0 }
-        });
+        })!;
         const part2Id = store.addPart({
           name: 'Part 2',
           length: 24,
           width: 12,
           position: { x: 30, y: 0, z: 0 }
-        });
+        })!;
 
         useSelectionStore.getState().selectParts([part1Id, part2Id]);
         const assembly = store.createAssemblyFromSelection('My Assembly', 'A test assembly');
@@ -1193,13 +1843,13 @@ describe('projectStore', () => {
         const store = useProjectStore.getState();
         const part1Id = store.addPart({
           position: { x: 10, y: 0, z: 0 }
-        });
+        })!;
         const part2Id = store.addPart({
           position: { x: 30, y: 0, z: 0 }
-        });
+        })!;
 
         useSelectionStore.getState().selectParts([part1Id, part2Id]);
-        const assembly = store.createAssemblyFromSelection('Test');
+        const assembly = store.createAssemblyFromSelection('Test')!;
 
         // Parts should be centered around origin
         // Original center was (20, 0, 0), so:
@@ -1220,16 +1870,16 @@ describe('projectStore', () => {
 
       it('includes groups and group members in the assembly', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
         const groupId = store.createGroup('Test Group', [
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
 
         useSelectionStore.getState().clearSelection();
         useSelectionStore.getState().selectGroup(groupId);
-        const assembly = store.createAssemblyFromSelection('Grouped Assembly');
+        const assembly = store.createAssemblyFromSelection('Grouped Assembly')!;
 
         expect(assembly!.groups.length).toBeGreaterThan(0);
         expect(assembly!.groupMembers.length).toBeGreaterThan(0);
@@ -1237,13 +1887,42 @@ describe('projectStore', () => {
 
       it('stores stock ID reference in assembly parts', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock({ name: 'Test Stock' });
-        store.addPart({ name: 'Part with Stock' });
+        const stockId = store.addStock({ name: 'Test Stock' })!;
+        store.addPart({ name: 'Part with Stock' })!;
         store.assignStockToSelectedParts(stockId); // Part is auto-selected on creation
 
-        const assembly = store.createAssemblyFromSelection('Stock Assembly');
+        const assembly = store.createAssemblyFromSelection('Stock Assembly')!;
 
         expect(assembly!.parts[0].stockId).toBe(stockId);
+      });
+
+      it('includes part features in assembly parts', () => {
+        const store = useProjectStore.getState();
+        const partId = store.addPart({
+          name: 'Featured Part',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'rect_cut',
+              version: 1 as const,
+              enabled: true,
+              target: { type: 'corner', corner: 'back_left_corner' },
+              reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+              cutType: 'corner_notch',
+              parameters: {
+                size: { length: 0.75, width: 0.75 },
+                depthMode: 'through'
+              },
+              placement: { x: 0, z: 0 }
+            }
+          ]
+        })!;
+
+        useSelectionStore.getState().selectParts([partId]);
+        const assembly = store.createAssemblyFromSelection('Featured Assembly')!;
+
+        expect(assembly?.parts[0].features).toHaveLength(1);
+        expect(assembly?.parts[0].features?.[0].kind).toBe('rect_cut');
       });
     });
 
@@ -1255,9 +1934,9 @@ describe('projectStore', () => {
         const part1Id = store.addPart({
           name: 'Shelf',
           position: { x: 0, y: 0, z: 0 }
-        });
+        })!;
         useSelectionStore.getState().selectParts([part1Id]);
-        const assembly = store.createAssemblyFromSelection('Shelf Assembly');
+        const assembly = store.createAssemblyFromSelection('Shelf Assembly')!;
         store.addAssembly(assembly!);
 
         // Clear workspace
@@ -1292,9 +1971,9 @@ describe('projectStore', () => {
           color: '#ff0000',
           grainSensitive: true,
           grainDirection: 'width'
-        });
+        })!;
         useSelectionStore.getState().selectParts([partId]);
-        const assembly = store.createAssemblyFromSelection('Custom Assembly');
+        const assembly = store.createAssemblyFromSelection('Custom Assembly')!;
         store.addAssembly(assembly!);
         store.deletePart(partId);
 
@@ -1309,18 +1988,49 @@ describe('projectStore', () => {
         expect(placedPart.grainDirection).toBe('width');
       });
 
+      it('preserves part features when placing', () => {
+        const store = useProjectStore.getState();
+
+        const partId = store.addPart({
+          name: 'Featured Part',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1 as const,
+              enabled: true,
+              target: { type: 'face', face: 'right_end' },
+              reference: { primaryFrom: 'max' },
+              cutType: 'bevel',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 0, verticalAngle: 10 }
+            }
+          ]
+        })!;
+        useSelectionStore.getState().selectParts([partId]);
+        const assembly = store.createAssemblyFromSelection('Featured Assembly')!;
+        store.addAssembly(assembly!);
+        store.deletePart(partId);
+
+        store.placeAssembly(assembly!.id, { x: 0, y: 0, z: 0 });
+
+        const placedPart = useProjectStore.getState().parts[0];
+        expect(placedPart.features).toHaveLength(1);
+        expect(placedPart.features?.[0].kind).toBe('end_cut');
+      });
+
       it('creates new groups when placing grouped assembly', () => {
         const store = useProjectStore.getState();
 
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
         const groupId = store.createGroup('Test Group', [
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
         useSelectionStore.getState().clearSelection();
         useSelectionStore.getState().selectGroup(groupId);
-        const assembly = store.createAssemblyFromSelection('Grouped');
+        const assembly = store.createAssemblyFromSelection('Grouped')!;
         store.addAssembly(assembly!);
 
         // Clear workspace
@@ -1348,12 +2058,12 @@ describe('projectStore', () => {
         name: 'Red Stock',
         color: '#ff0000',
         grainDirection: 'length'
-      });
+      })!;
       const partId = store.addPart({
         name: 'Custom Color Part',
         stockId,
         color: '#0000ff' // Different color
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
@@ -1368,12 +2078,12 @@ describe('projectStore', () => {
         name: 'Length Grain Stock',
         color: '#d4a574',
         grainDirection: 'length'
-      });
+      })!;
       const partId = store.addPart({
         name: 'Width Grain Part',
         stockId,
         grainDirection: 'width' // Different grain
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
@@ -1391,14 +2101,14 @@ describe('projectStore', () => {
         thickness: 0.75,
         color: '#d4a574',
         grainDirection: 'length'
-      });
+      })!;
       const partId = store.addPart({
         name: 'Trimmed Part',
         stockId,
         length: 24,
         width: 6,
         thickness: 0.5
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
@@ -1415,12 +2125,12 @@ describe('projectStore', () => {
         name: 'MDF',
         color: '#d4a574',
         grainDirection: 'none'
-      });
+      })!;
       const partId = store.addPart({
         name: 'Grain Part',
         stockId,
         grainDirection: 'width'
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
@@ -1431,12 +2141,12 @@ describe('projectStore', () => {
 
     it('does nothing when no parts are selected', () => {
       const store = useProjectStore.getState();
-      const stockId = store.addStock({ name: 'Stock', color: '#ff0000' });
+      const stockId = store.addStock({ name: 'Stock', color: '#ff0000' })!;
       const partId = store.addPart({
         name: 'Part',
         stockId,
         color: '#0000ff'
-      });
+      })!;
 
       useSelectionStore.getState().clearSelection();
       store.resetSelectedPartsToStock();
@@ -1451,7 +2161,7 @@ describe('projectStore', () => {
         name: 'No Stock Part',
         stockId: null,
         color: '#0000ff'
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
@@ -1466,7 +2176,7 @@ describe('projectStore', () => {
         name: 'Bad Stock Part',
         stockId: 'non-existent-stock',
         color: '#0000ff'
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
@@ -1481,9 +2191,9 @@ describe('projectStore', () => {
         name: 'Stock',
         color: '#ff0000',
         grainDirection: 'length'
-      });
-      const partId1 = store.addPart({ name: 'Part 1', stockId, color: '#0000ff' });
-      const partId2 = store.addPart({ name: 'Part 2', stockId, color: '#00ff00' });
+      })!;
+      const partId1 = store.addPart({ name: 'Part 1', stockId, color: '#0000ff' })!;
+      const partId2 = store.addPart({ name: 'Part 2', stockId, color: '#00ff00' })!;
 
       useSelectionStore.getState().selectParts([partId1, partId2]);
       store.resetSelectedPartsToStock();
@@ -1504,7 +2214,7 @@ describe('projectStore', () => {
         thickness: 1,
         color: '#ff0000',
         grainDirection: 'length'
-      });
+      })!;
       const partId = store.addPart({
         name: 'Grouped Part',
         stockId,
@@ -1513,8 +2223,8 @@ describe('projectStore', () => {
         thickness: 0.5,
         color: '#0000ff',
         grainDirection: 'width'
-      });
-      const groupId = store.createGroup('Reset Group', [{ id: partId, type: 'part' }]);
+      })!;
+      const groupId = store.createGroup('Reset Group', [{ id: partId, type: 'part' }])!;
 
       useSelectionStore.getState().selectGroup(groupId);
       store.resetSelectedPartsToStock();
@@ -1540,9 +2250,9 @@ describe('projectStore', () => {
     describe('top-level mode', () => {
       it('merges two groups into a new group', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'Part 1' });
-        const p2 = store.addPart({ name: 'Part 2' });
-        const g1 = store.createGroup('Group A', [{ id: p1, type: 'part' }]);
+        const p1 = store.addPart({ name: 'Part 1' })!;
+        const p2 = store.addPart({ name: 'Part 2' })!;
+        const g1 = store.createGroup('Group A', [{ id: p1, type: 'part' }])!;
         const g2 = store.createGroup('Group B', [{ id: p2, type: 'part' }]);
 
         const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
@@ -1560,12 +2270,12 @@ describe('projectStore', () => {
 
       it('names merged group from 2 groups with both names', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const g1 = store.createGroup('Alpha', [{ id: p1, type: 'part' }]);
-        const g2 = store.createGroup('Beta', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const g1 = store.createGroup('Alpha', [{ id: p1, type: 'part' }])!;
+        const g2 = store.createGroup('Beta', [{ id: p2, type: 'part' }])!;
 
-        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level')!;
 
         const merged = useProjectStore.getState().groups.find((g) => g.id === mergedId);
         expect(merged?.name).toBe('Alpha & Beta Merged');
@@ -1573,14 +2283,14 @@ describe('projectStore', () => {
 
       it('names merged group from 3+ groups with count', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const p3 = store.addPart({ name: 'P3' });
-        const g1 = store.createGroup('Alpha', [{ id: p1, type: 'part' }]);
-        const g2 = store.createGroup('Beta', [{ id: p2, type: 'part' }]);
-        const g3 = store.createGroup('Gamma', [{ id: p3, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const p3 = store.addPart({ name: 'P3' })!;
+        const g1 = store.createGroup('Alpha', [{ id: p1, type: 'part' }])!;
+        const g2 = store.createGroup('Beta', [{ id: p2, type: 'part' }])!;
+        const g3 = store.createGroup('Gamma', [{ id: p3, type: 'part' }])!;
 
-        const mergedId = store.mergeGroups([g1!, g2!, g3!], 'top-level');
+        const mergedId = store.mergeGroups([g1!, g2!, g3!], 'top-level')!;
 
         const merged = useProjectStore.getState().groups.find((g) => g.id === mergedId);
         expect(merged?.name).toBe('Alpha & 2 others Merged');
@@ -1588,13 +2298,13 @@ describe('projectStore', () => {
 
       it('preserves nested groups in top-level mode', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }]);
-        const g1 = store.createGroup('Outer', [{ id: inner!, type: 'group' }]);
-        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }])!;
+        const g1 = store.createGroup('Outer', [{ id: inner!, type: 'group' }])!;
+        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }])!;
 
-        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level')!;
 
         const state = useProjectStore.getState();
         // Inner group should still exist as a member of the merged group
@@ -1605,7 +2315,7 @@ describe('projectStore', () => {
 
       it('returns null when fewer than 2 groups provided', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
+        const p1 = store.addPart({ name: 'P1' })!;
         const g1 = store.createGroup('Only One', [{ id: p1, type: 'part' }]);
 
         expect(store.mergeGroups([g1!], 'top-level')).toBeNull();
@@ -1614,12 +2324,12 @@ describe('projectStore', () => {
 
       it('selects and expands the merged group', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }]);
-        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }])!;
+        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }])!;
 
-        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level')!;
 
         const { selectedGroupIds, expandedGroupIds } = useSelectionStore.getState();
         expect(selectedGroupIds).toContain(mergedId);
@@ -1628,13 +2338,13 @@ describe('projectStore', () => {
 
       it('marks project as dirty', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }]);
-        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }])!;
+        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }])!;
         useProjectStore.setState({ isDirty: false });
 
-        store.mergeGroups([g1!, g2!], 'top-level');
+        store.mergeGroups([g1!, g2!], 'top-level')!;
 
         expect(useProjectStore.getState().isDirty).toBe(true);
       });
@@ -1643,13 +2353,13 @@ describe('projectStore', () => {
     describe('deep mode', () => {
       it('flattens nested groups into parts', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'Inner Part' });
-        const p2 = store.addPart({ name: 'Outer Part' });
-        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }]);
-        const g1 = store.createGroup('Outer', [{ id: inner!, type: 'group' }]);
-        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'Inner Part' })!;
+        const p2 = store.addPart({ name: 'Outer Part' })!;
+        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }])!;
+        const g1 = store.createGroup('Outer', [{ id: inner!, type: 'group' }])!;
+        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }])!;
 
-        const mergedId = store.mergeGroups([g1!, g2!], 'deep');
+        const mergedId = store.mergeGroups([g1!, g2!], 'deep')!;
 
         const state = useProjectStore.getState();
         // Inner group should be removed in deep mode
@@ -1662,13 +2372,13 @@ describe('projectStore', () => {
 
       it('removes original groups and nested groups', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }]);
-        const g1 = store.createGroup('Wrapper', [{ id: inner!, type: 'group' }]);
-        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }])!;
+        const g1 = store.createGroup('Wrapper', [{ id: inner!, type: 'group' }])!;
+        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }])!;
 
-        store.mergeGroups([g1!, g2!], 'deep');
+        store.mergeGroups([g1!, g2!], 'deep')!;
 
         const state = useProjectStore.getState();
         expect(state.groups.find((g) => g.id === g1)).toBeUndefined();
@@ -1680,10 +2390,10 @@ describe('projectStore', () => {
     describe('license checks', () => {
       it('blocks merge in free mode', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }]);
-        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }])!;
+        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }])!;
 
         useLicenseStore.setState({ licenseMode: 'free' });
 
@@ -1705,8 +2415,8 @@ describe('projectStore', () => {
   describe('removeFromGroup - empty group cleanup', () => {
     it('removes the group when last member is removed', () => {
       const store = useProjectStore.getState();
-      const partId = store.addPart({ name: 'Solo Part' });
-      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      const partId = store.addPart({ name: 'Solo Part' })!;
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }])!;
 
       store.removeFromGroup([partId], 'part');
 
@@ -1717,8 +2427,8 @@ describe('projectStore', () => {
 
     it('deselects the removed empty group', () => {
       const store = useProjectStore.getState();
-      const partId = store.addPart({ name: 'Solo Part' });
-      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      const partId = store.addPart({ name: 'Solo Part' })!;
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }])!;
       useSelectionStore.setState({ selectedGroupIds: [groupId!] });
 
       store.removeFromGroup([partId], 'part');
@@ -1728,8 +2438,8 @@ describe('projectStore', () => {
 
     it('clears editingGroupId if the empty group was being edited', () => {
       const store = useProjectStore.getState();
-      const partId = store.addPart({ name: 'Solo Part' });
-      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      const partId = store.addPart({ name: 'Solo Part' })!;
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }])!;
       useSelectionStore.setState({ editingGroupId: groupId! });
 
       store.removeFromGroup([partId], 'part');
@@ -1739,8 +2449,8 @@ describe('projectStore', () => {
 
     it('removes empty group from expandedGroupIds', () => {
       const store = useProjectStore.getState();
-      const partId = store.addPart({ name: 'Solo Part' });
-      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      const partId = store.addPart({ name: 'Solo Part' })!;
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }])!;
       useSelectionStore.setState({ expandedGroupIds: [groupId!] });
 
       store.removeFromGroup([partId], 'part');
@@ -1750,12 +2460,12 @@ describe('projectStore', () => {
 
     it('keeps non-empty groups when one member is removed', () => {
       const store = useProjectStore.getState();
-      const p1 = store.addPart({ name: 'Part 1' });
-      const p2 = store.addPart({ name: 'Part 2' });
+      const p1 = store.addPart({ name: 'Part 1' })!;
+      const p2 = store.addPart({ name: 'Part 2' })!;
       const groupId = store.createGroup('Multi', [
         { id: p1, type: 'part' },
         { id: p2, type: 'part' }
-      ]);
+      ])!;
 
       store.removeFromGroup([p1], 'part');
 
@@ -1968,7 +2678,7 @@ describe('validatePartsForCutList', () => {
           length: 48, // Fits within stock length
           width: 36, // Exceeds stock width but glue-up
           thickness: 0.75,
-          glueUpPanel: { boardCount: 3, boardWidth: 12 }
+          glueUpPanel: true
         })
       ];
 
@@ -1992,7 +2702,7 @@ describe('validatePartsForCutList', () => {
           length: 60, // Exceeds stock length
           width: 36,
           thickness: 0.75,
-          glueUpPanel: { boardCount: 3, boardWidth: 12 }
+          glueUpPanel: true
         })
       ];
 
@@ -2079,6 +2789,231 @@ describe('validatePartsForCutList', () => {
       const issues = validatePartsForCutList(parts, [stock]);
 
       expect(issues.filter((i) => i.type === 'grain_mismatch')).toHaveLength(0);
+    });
+  });
+
+  describe('feature validation', () => {
+    it('returns error for invalid rectangular operations loaded from part data', () => {
+      const stock = createTestStock({
+        id: 'stock-1',
+        length: 96,
+        width: 48,
+        thickness: 0.75
+      });
+      const parts = [
+        createTestPart({
+          name: 'Feature Part',
+          stockId: 'stock-1',
+          length: 24,
+          width: 12,
+          thickness: 0.75,
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'rect_cut',
+              version: 1 as const,
+              enabled: true,
+              label: 'Bad cutout',
+              target: { type: 'face', face: 'top_face' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'cutout',
+              parameters: {
+                size: { length: 30, width: 4 },
+                depthMode: 'through'
+              },
+              placement: { x: 0, z: 0 }
+            }
+          ]
+        })
+      ];
+
+      const issues = validatePartsForCutList(parts, [stock]);
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0].type).toBe('feature_validation');
+      expect(issues[0].message).toContain('Bad cutout');
+    });
+
+    it.each([
+      {
+        label: 'Oversized hole',
+        expectedMessage: 'Hole profile extends beyond the selected face.',
+        feature: {
+          id: 'oversized-hole',
+          kind: 'circular_cut',
+          version: 1 as const,
+          enabled: true,
+          label: 'Oversized hole',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          cutType: 'round_hole',
+          parameters: { diameter: 5, depthMode: 'through', tilt: 0, direction: 0 },
+          placement: { primary: 0, secondary: 0, rotation: 0 }
+        } satisfies PartFeature
+      },
+      {
+        label: 'Oversized rounded opening',
+        expectedMessage: 'Rounded cut extends beyond the selected face.',
+        feature: {
+          id: 'oversized-rounded-opening',
+          kind: 'rounded_cut',
+          version: 1 as const,
+          enabled: true,
+          label: 'Oversized rounded opening',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          cutType: 'rounded_rectangle',
+          parameters: { length: 5, width: 2, cornerRadius: 0.5, depthMode: 'through' },
+          placement: { primary: 0, secondary: 0, rotation: 0 }
+        } satisfies PartFeature
+      }
+    ])('returns an error for an invalid $label loaded from part data', ({ feature, expectedMessage }) => {
+      const stock = createTestStock({ id: 'stock-1', length: 96, width: 48, thickness: 0.75 });
+      const part = createTestPart({
+        name: 'Feature Part',
+        stockId: stock.id,
+        length: 4,
+        width: 4,
+        thickness: 0.75,
+        features: [feature]
+      });
+
+      expect(validatePartsForCutList([part], [stock])).toContainEqual(
+        expect.objectContaining({
+          partId: part.id,
+          type: 'feature_validation',
+          severity: 'error',
+          message: `Operation "${feature.label}" is invalid: ${expectedMessage}`
+        })
+      );
+    });
+
+    it('keeps the source intact and identifies the copied cut after a resize makes it no longer fit', () => {
+      const store = useProjectStore.getState();
+      const stockId = store.addStock({ name: 'Feature stock', length: 96, width: 48, thickness: 0.75 })!;
+      const sourceId = store.addPart({
+        name: 'Cutout source',
+        length: 24,
+        width: 12,
+        thickness: 0.75,
+        stockId,
+        features: [
+          {
+            id: 'edge-cutout',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            label: 'Copied edge cutout',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'cutout',
+            parameters: { size: { length: 4, width: 2 }, depthMode: 'through' },
+            placement: { x: 8, z: 0 }
+          }
+        ]
+      })!;
+      const sourceBefore = JSON.stringify(
+        useProjectStore.getState().parts.find((part) => part.id === sourceId)?.features
+      );
+      const copyId = store.duplicatePart(sourceId)!;
+
+      store.updatePart(copyId, { length: 6 });
+      const state = useProjectStore.getState();
+      const issues = validatePartsForCutList(state.parts, state.stocks);
+
+      expect(JSON.stringify(state.parts.find((part) => part.id === sourceId)?.features)).toBe(sourceBefore);
+      expect(issues).toContainEqual(
+        expect.objectContaining({
+          partId: copyId,
+          type: 'feature_validation',
+          message: expect.stringContaining('Copied edge cutout')
+        })
+      );
+    });
+
+    it('reports an invalid authored operation even when the part also lacks stock', () => {
+      const parts = [
+        createTestPart({
+          name: 'Unstocked resized copy',
+          stockId: null,
+          length: 6,
+          width: 12,
+          thickness: 0.75,
+          features: [
+            {
+              id: 'unstocked-edge-cutout',
+              kind: 'rect_cut',
+              version: 1 as const,
+              enabled: true,
+              label: 'Copied edge cutout',
+              target: { type: 'face', face: 'top_face' },
+              reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+              cutType: 'cutout',
+              parameters: { size: { length: 4, width: 2 }, depthMode: 'through' },
+              placement: { x: 8, z: 0 }
+            }
+          ]
+        })
+      ];
+
+      expect(validatePartsForCutList(parts, [])).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'no_stock' }),
+          expect.objectContaining({
+            type: 'feature_validation',
+            message: expect.stringContaining('Copied edge cutout')
+          })
+        ])
+      );
+    });
+
+    it('returns feature validation errors for duplicate enabled end cuts on the same end', () => {
+      const stock = createTestStock({
+        id: 'stock-1',
+        length: 96,
+        width: 48,
+        thickness: 0.75
+      });
+      const parts = [
+        createTestPart({
+          name: 'Feature Part',
+          stockId: 'stock-1',
+          length: 24,
+          width: 12,
+          thickness: 0.75,
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1 as const,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'mitre',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 45 }
+            },
+            {
+              id: 'feature-2',
+              kind: 'end_cut',
+              version: 1 as const,
+              enabled: true,
+              target: { type: 'face', face: 'left_end' },
+              reference: { primaryFrom: 'min' },
+              cutType: 'bevel',
+              lengthMode: 'centerline',
+              parameters: { horizontalAngle: 0, verticalAngle: 15 }
+            }
+          ]
+        })
+      ];
+
+      const issues = validatePartsForCutList(parts, [stock]);
+
+      const featureIssues = issues.filter((issue) => issue.type === 'feature_validation' && issue.severity === 'error');
+
+      expect(featureIssues).toHaveLength(1);
+      expect(featureIssues[0]?.message).toContain('Only one enabled cut per end or edge');
     });
   });
 

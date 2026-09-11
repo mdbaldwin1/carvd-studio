@@ -24,8 +24,10 @@ Desktop owner: Electron main analytics service; renderer capture sites own trigg
 | `export_completed`          | Project report, diagram PDF, shopping PDF/CSV finishes or fails      | `export_type=project_pdf\|cut_diagrams_pdf\|shopping_pdf\|shopping_csv`; `success=true\|false`       | Activation; export success; outcome retention    | `event=export_completed`, breakdown `export_type`, then `success`                 |
 | `checkout_opened`           | External checkout successfully opens from a desktop purchase surface | `surface=trial\|settings\|pricing_prompt`; `license_mode=trial\|free`                                | License intent                                   | `event=checkout_opened`, breakdown both properties                                |
 | `license_activated`         | License activation returns success                                   | `license_mode=licensed`                                                                              | Activation completion                            | `event=license_activated`, unique persons                                         |
+| `part_cuts_opened`          | Part Cuts workspace opens from a supported part action               | `source=properties\|context_menu`; `operation_count_bucket=0\|1-5\|6-20\|21-50\|51+`                 | Custom Cuts discovery and adoption               | `event=part_cuts_opened`, breakdown `source`, then operation bucket               |
+| `part_cuts_saved`           | Valid Part Cuts draft successfully saves to its source part          | `operation_count_bucket=0\|1-5\|6-20\|21-50\|51+`                                                    | Custom Cuts completion and depth of use          | `event=part_cuts_saved`, unique persons and operation bucket                      |
 
-Desktop-specific prohibited examples: renderer-supplied `$os`/`app_version`, project UUID, counts outside buckets, raw error messages, optimizer inputs, material/library contents, machine/user name, full OS paths, license response, or activation email.
+Desktop-specific prohibited examples: renderer-supplied `$os`/`app_version`, project UUID, part IDs/names, cut types/labels/dimensions/parameters, counts outside buckets, raw error messages, optimizer inputs, material/library contents, machine/user name, full OS paths, license response, or activation email.
 
 ## Website events
 

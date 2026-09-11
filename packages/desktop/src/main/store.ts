@@ -90,14 +90,6 @@ export interface UserTemplateItem {
   project: string; // JSON-serialized Project
 }
 
-// New project setup defaults (for "remember these choices" feature)
-export interface NewProjectDefaults {
-  units: 'imperial' | 'metric';
-  addCommonMaterials: boolean;
-  selectedMaterials: string[]; // IDs of materials to add
-  skipSetupDialog: boolean; // If true, use these defaults without showing dialog
-}
-
 export interface AppPreferences {
   // App-level defaults (used when creating new projects)
   defaultUnits: 'imperial' | 'metric';
@@ -131,7 +123,6 @@ export interface AppPreferences {
   assemblyLibrary: AssemblyLibraryItem[];
   userTemplates: UserTemplateItem[];
   customColors: string[]; // User-saved custom colors (max 16)
-  newProjectDefaults: NewProjectDefaults; // Saved new project setup preferences
   windowBounds: {
     width: number;
     height: number;
@@ -168,12 +159,6 @@ const defaults: AppPreferences = {
   assemblyLibrary: [],
   userTemplates: [],
   customColors: [],
-  newProjectDefaults: {
-    units: 'imperial',
-    addCommonMaterials: true,
-    selectedMaterials: ['default-plywood-3/4', 'default-plywood-1/2', 'default-oak-4/4', 'default-poplar-4/4'],
-    skipSetupDialog: false
-  },
   windowBounds: {
     width: 1200,
     height: 800
@@ -342,16 +327,6 @@ export function isFavoriteProject(filePath: string): boolean {
 
 export function setFavoriteProjects(filePaths: string[]): void {
   store.set('favoriteProjects', filePaths);
-}
-
-// New project defaults functions
-export function getNewProjectDefaults(): NewProjectDefaults {
-  return store.get('newProjectDefaults');
-}
-
-export function setNewProjectDefaults(defaults: Partial<NewProjectDefaults>): void {
-  const current = store.get('newProjectDefaults');
-  store.set('newProjectDefaults', { ...current, ...defaults });
 }
 
 export function getWindowBounds(): AppPreferences['windowBounds'] {

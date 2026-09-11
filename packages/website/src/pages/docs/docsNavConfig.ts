@@ -81,7 +81,7 @@ export const docPages: DocPage[] = [
   },
   {
     slug: "joinery",
-    title: "Joinery Allowances",
+    title: "Custom Cuts & Joinery",
     section: "Advanced Features",
     searchText:
       "dado rabbet mortise tenon allowances extra length extra width cut dimensions woodworking joinery",

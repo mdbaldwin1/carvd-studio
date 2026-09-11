@@ -59,51 +59,60 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     // Only initialize once
     if (get().isInitialized) return;
 
-    // Set up listener for settings changes from other instances
+    // Set up listener for settings changes from other instances. Cross-instance
+    // sync is a nicety; a bridge that cannot provide it must not stop settings
+    // from loading, and the latch only closes on success so a later init can
+    // still pick the listener up.
     if (!listenerSetup) {
-      listenerSetup = true;
-      window.electronAPI.onSettingsChanged((changes) => {
-        // Only apply changes for app settings keys
-        const appSettingsKeys: (keyof AppSettings)[] = [
-          'theme',
-          'confirmBeforeDelete',
-          'showHotkeyHints',
-          'defaultUnits',
-          'defaultGridSize',
-          'stockConstraints',
-          'liveGridSnap',
-          'snapSensitivity',
-          'snapToOrigin',
-          'dimensionSnapSameTypeOnly',
-          'advancedSnapPreset',
-          'enableSurfaceAnchors',
-          'enableFractionalAnchors',
-          'enableGoldenRatioAnchors',
-          'enableFeatureAnchors',
-          'enableLayoutSnaps',
-          'enableEqualSpacingSnap',
-          'enableDistributionSnap',
-          'enablePatternSnap',
-          'enableAxisLegacySnaps',
-          'showSnapCandidates',
-          'lightingMode',
-          'brightnessMultiplier',
-          'autoSave'
-        ];
+      try {
+        window.electronAPI.onSettingsChanged((changes) => {
+          // Only apply changes for app settings keys
+          const appSettingsKeys: (keyof AppSettings)[] = [
+            'theme',
+            'confirmBeforeDelete',
+            'showHotkeyHints',
+            'defaultUnits',
+            'defaultGridSize',
+            'stockConstraints',
+            'liveGridSnap',
+            'snapSensitivity',
+            'snapToOrigin',
+            'dimensionSnapSameTypeOnly',
+            'advancedSnapPreset',
+            'enableSurfaceAnchors',
+            'enableFractionalAnchors',
+            'enableGoldenRatioAnchors',
+            'enableFeatureAnchors',
+            'enableLayoutSnaps',
+            'enableEqualSpacingSnap',
+            'enableDistributionSnap',
+            'enablePatternSnap',
+            'enableAxisLegacySnaps',
+            'showSnapCandidates',
+            'lightingMode',
+            'brightnessMultiplier',
+            'autoSave'
+          ];
 
-        const relevantChanges: Partial<AppSettings> = {};
-        for (const key of appSettingsKeys) {
-          if (key in changes) {
-            relevantChanges[key] = changes[key] as AppSettings[typeof key];
+          const relevantChanges: Partial<AppSettings> = {};
+          for (const key of appSettingsKeys) {
+            if (key in changes) {
+              // A union key makes the per-key value type unresolvable here;
+              // appSettingsKeys guarantees the key belongs to AppSettings.
+              (relevantChanges as Record<string, unknown>)[key] = changes[key];
+            }
           }
-        }
 
-        // Update state if there are relevant changes
-        if (Object.keys(relevantChanges).length > 0) {
-          const currentSettings = get().settings;
-          set({ settings: { ...currentSettings, ...relevantChanges } });
-        }
-      });
+          // Update state if there are relevant changes
+          if (Object.keys(relevantChanges).length > 0) {
+            const currentSettings = get().settings;
+            set({ settings: { ...currentSettings, ...relevantChanges } });
+          }
+        });
+        listenerSetup = true;
+      } catch (error) {
+        logger.warn('Settings sync between windows unavailable:', error);
+      }
     }
 
     try {

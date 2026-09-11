@@ -1,3 +1,4 @@
+import { createTestAssemblyPart } from '../../../../../tests/helpers/factories';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AddAssemblyModal } from './AddAssemblyModal';
@@ -11,9 +12,9 @@ describe('AddAssemblyModal', () => {
       name: 'Drawer Assembly',
       description: 'Standard drawer with dovetail joints',
       parts: [
-        { id: 'p1', name: 'Front', length: 18, width: 6, thickness: 0.75 },
-        { id: 'p2', name: 'Back', length: 18, width: 6, thickness: 0.75 },
-        { id: 'p3', name: 'Side', length: 20, width: 6, thickness: 0.75 }
+        createTestAssemblyPart({ name: 'Front', length: 18, width: 6, thickness: 0.75 }),
+        createTestAssemblyPart({ name: 'Back', length: 18, width: 6, thickness: 0.75 }),
+        createTestAssemblyPart({ name: 'Side', length: 20, width: 6, thickness: 0.75 })
       ],
       groups: [],
       groupMembers: [],
@@ -24,8 +25,8 @@ describe('AddAssemblyModal', () => {
       id: 'assembly-2',
       name: 'Cabinet Face Frame',
       parts: [
-        { id: 'p4', name: 'Rail', length: 24, width: 2, thickness: 0.75 },
-        { id: 'p5', name: 'Stile', length: 30, width: 2, thickness: 0.75 }
+        createTestAssemblyPart({ name: 'Rail', length: 24, width: 2, thickness: 0.75 }),
+        createTestAssemblyPart({ name: 'Stile', length: 30, width: 2, thickness: 0.75 })
       ],
       groups: [],
       groupMembers: [],
@@ -413,13 +414,9 @@ describe('AddAssemblyModal', () => {
       const manyPartsAssembly: Assembly = {
         id: 'assembly-many',
         name: 'Large Assembly',
-        parts: Array.from({ length: 8 }, (_, i) => ({
-          id: `p${i}`,
-          name: `Part ${i + 1}`,
-          length: 10,
-          width: 5,
-          thickness: 0.75
-        })),
+        parts: Array.from({ length: 8 }, (_, i) =>
+          createTestAssemblyPart({ name: `Part ${i + 1}`, length: 10, width: 5, thickness: 0.75 })
+        ),
         groups: [],
         groupMembers: [],
         createdAt: new Date().toISOString(),

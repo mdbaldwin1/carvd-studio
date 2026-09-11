@@ -1,0 +1,385 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import type { CircularPattern, PartFeature } from '../types';
+import { duplicateFeature } from '../components/part-features/partFeatureEditorState';
+import { mirrorFeature } from '../utils/partFeatureActions';
+import { useCameraStore } from './cameraStore';
+import { usePartCutsEditingStore } from './partCutsEditingStore';
+
+function createFeature(id = 'feature-1', horizontalAngle = 45): PartFeature {
+  return {
+    id,
+    kind: 'end_cut' as const,
+    version: 1 as const,
+    enabled: true,
+    target: { type: 'face' as const, face: 'left_end' as const },
+    reference: { primaryFrom: 'min' as const },
+    cutType: 'mitre' as const,
+    lengthMode: 'long_point' as const,
+    parameters: { horizontalAngle }
+  };
+}
+
+describe('partCutsEditingStore', () => {
+  beforeEach(() => {
+    usePartCutsEditingStore.getState().finishEditing();
+    useCameraStore.setState({ cameraState: null, pendingCameraRestore: false });
+  });
+
+  it('starts editing with cloned draft features', () => {
+    const feature = {
+      id: 'feature-1',
+      kind: 'end_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      target: { type: 'face' as const, face: 'left_end' as const },
+      reference: { primaryFrom: 'min' as const },
+      cutType: 'mitre' as const,
+      lengthMode: 'long_point' as const,
+      parameters: { horizontalAngle: 45 }
+    };
+
+    usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Leg', [feature]);
+
+    const state = usePartCutsEditingStore.getState();
+    expect(state.isEditingPartCuts).toBe(true);
+    expect(state.sourcePartId).toBe('part-1');
+    expect(state.sourcePartName).toBe('Leg');
+    expect(state.draftFeatures).toEqual([feature]);
+    expect(state.draftFeatures).not.toBe([feature]);
+    expect(state.selectedFeatureId).toBe('feature-1');
+  });
+
+  it('shows exit dialog only when draft differs from source', () => {
+    const feature = {
+      id: 'feature-1',
+      kind: 'end_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      target: { type: 'face' as const, face: 'left_end' as const },
+      reference: { primaryFrom: 'min' as const },
+      cutType: 'mitre' as const,
+      lengthMode: 'long_point' as const,
+      parameters: { horizontalAngle: 45 }
+    };
+
+    usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Leg', [feature]);
+    usePartCutsEditingStore.getState().requestExit([feature]);
+    expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(false);
+
+    usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Leg', [feature]);
+    usePartCutsEditingStore.getState().setDraftFeatures([
+      {
+        ...feature,
+        parameters: { horizontalAngle: 30 }
+      }
+    ]);
+    usePartCutsEditingStore.getState().requestExit([feature]);
+    expect(usePartCutsEditingStore.getState().showExitDialog).toBe(true);
+  });
+
+  it('keeps editing when an exit request is cancelled', () => {
+    const feature = createFeature();
+    usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Leg', [feature]);
+    usePartCutsEditingStore.getState().setDraftFeatures([createFeature('feature-1', 30)]);
+    usePartCutsEditingStore.getState().requestExit([feature]);
+    expect(usePartCutsEditingStore.getState().showExitDialog).toBe(true);
+
+    usePartCutsEditingStore.getState().cancelExit();
+    const state = usePartCutsEditingStore.getState();
+    expect(state.showExitDialog).toBe(false);
+    expect(state.isEditingPartCuts).toBe(true);
+    expect(state.draftFeatures[0]).toMatchObject({ parameters: { horizontalAngle: 30 } });
+  });
+
+  it('treats requestExit with no source features as clean when the draft is empty', () => {
+    usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Leg');
+    usePartCutsEditingStore.getState().requestExit();
+    expect(usePartCutsEditingStore.getState().isEditingPartCuts).toBe(false);
+    expect(usePartCutsEditingStore.getState().showExitDialog).toBe(false);
+  });
+
+  it('reports unsaved draft changes only when the draft differs from the source', () => {
+    const feature = createFeature();
+    usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Leg', [feature]);
+    expect(usePartCutsEditingStore.getState().hasUnsavedDraftChanges([feature])).toBe(false);
+
+    usePartCutsEditingStore.getState().setDraftFeatures([createFeature('feature-1', 30)]);
+    expect(usePartCutsEditingStore.getState().hasUnsavedDraftChanges([feature])).toBe(true);
+    expect(usePartCutsEditingStore.getState().hasUnsavedDraftChanges()).toBe(true);
+  });
+
+  it('resets state and requests a camera restore when finishing with saved camera state', () => {
+    useCameraStore.setState({
+      cameraState: {
+        position: { x: 1, y: 2, z: 3 },
+        target: { x: 0, y: 0, z: 0 }
+      }
+    });
+    usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Leg', [createFeature()]);
+    usePartCutsEditingStore.getState().finishEditing();
+
+    const state = usePartCutsEditingStore.getState();
+    expect(state.isEditingPartCuts).toBe(false);
+    expect(state.sourcePartId).toBeNull();
+    expect(state.sourcePartName).toBe('');
+    expect(state.draftFeatures).toEqual([]);
+    expect(state.selectedFeatureId).toBeNull();
+    expect(useCameraStore.getState().pendingCameraRestore).toBe(true);
+  });
+
+  it('does not request a camera restore when no camera state is saved', () => {
+    usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Leg');
+    usePartCutsEditingStore.getState().finishEditing();
+    expect(useCameraStore.getState().pendingCameraRestore).toBe(false);
+  });
+
+  it('keeps the selection when the selected feature survives a draft update', () => {
+    const featureA = createFeature('feature-a');
+    const featureB = createFeature('feature-b', 30);
+    usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Leg', [featureA, featureB]);
+    usePartCutsEditingStore.getState().selectFeature('feature-b');
+
+    usePartCutsEditingStore.getState().setDraftFeatures([featureA, featureB]);
+    expect(usePartCutsEditingStore.getState().selectedFeatureId).toBe('feature-b');
+
+    usePartCutsEditingStore.getState().setDraftFeatures([featureA]);
+    expect(usePartCutsEditingStore.getState().selectedFeatureId).toBe('feature-a');
+  });
+
+  it('resets draft features and clears targets', () => {
+    const feature = createFeature();
+    usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Leg', [feature]);
+    usePartCutsEditingStore.getState().setHoveredTarget({ type: 'face', face: 'top_face' });
+    usePartCutsEditingStore.getState().setPendingTarget({ type: 'edge', edge: 'top_front_edge' });
+    expect(usePartCutsEditingStore.getState().hoveredTarget).toEqual({ type: 'face', face: 'top_face' });
+    expect(usePartCutsEditingStore.getState().pendingTarget).toEqual({ type: 'edge', edge: 'top_front_edge' });
+
+    const replacement = createFeature('feature-2', 15);
+    usePartCutsEditingStore.getState().resetDraftFeatures([replacement]);
+    const state = usePartCutsEditingStore.getState();
+    expect(state.draftFeatures).toEqual([replacement]);
+    expect(state.selectedFeatureId).toBe('feature-2');
+    expect(state.hoveredTarget).toBeNull();
+    expect(state.pendingTarget).toBeNull();
+
+    usePartCutsEditingStore.getState().resetDraftFeatures();
+    expect(usePartCutsEditingStore.getState().draftFeatures).toEqual([]);
+    expect(usePartCutsEditingStore.getState().selectedFeatureId).toBeNull();
+  });
+  describe('draft undo/redo', () => {
+    const feature = (id: string) =>
+      ({
+        id,
+        kind: 'rect_cut',
+        version: 1 as const,
+        enabled: true,
+        cutType: 'dado',
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        parameters: { size: { length: 0.75, width: 4 }, depthMode: 'blind', depth: 0.375 },
+        placement: { x: 2, z: 0 }
+      }) as never;
+
+    it('steps draft changes backward and forward within the session', () => {
+      const store = usePartCutsEditingStore.getState();
+      store.startEditingPartCuts('p1', 'Part 1', []);
+
+      store.setDraftFeatures([feature('a')]);
+      store.setDraftFeatures([feature('a'), feature('b')]);
+
+      expect(usePartCutsEditingStore.getState().canUndoDraft()).toBe(true);
+      usePartCutsEditingStore.getState().undoDraft();
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['a']);
+
+      usePartCutsEditingStore.getState().redoDraft();
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((f) => f.id)).toEqual(['a', 'b']);
+
+      // A new change clears the redo stack
+      usePartCutsEditingStore.getState().undoDraft();
+      usePartCutsEditingStore.getState().setDraftFeatures([feature('c')]);
+      expect(usePartCutsEditingStore.getState().canRedoDraft()).toBe(false);
+    });
+
+    it('ignores no-op draft updates and resets history on session start', () => {
+      const store = usePartCutsEditingStore.getState();
+      store.startEditingPartCuts('p1', 'Part 1', []);
+      store.setDraftFeatures([feature('a')]);
+      store.setDraftFeatures([feature('a')]); // identical — no history entry
+
+      expect(usePartCutsEditingStore.getState().draftHistory).toHaveLength(1);
+
+      store.startEditingPartCuts('p2', 'Part 2', []);
+      expect(usePartCutsEditingStore.getState().canUndoDraft()).toBe(false);
+    });
+
+    it('preserves nested round-pattern edits across undo and redo', () => {
+      const roundFeature = (spacing: number): PartFeature => ({
+        id: 'round-1',
+        kind: 'circular_cut',
+        version: 1 as const,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        cutType: 'counterbore',
+        placement: { primary: 2, secondary: 1, rotation: 0 },
+        parameters: {
+          diameter: 0.25,
+          depthMode: 'blind',
+          depth: 0.5,
+          tilt: 0,
+          direction: 0,
+          counterbore: { diameter: 0.5, depth: 0.125 }
+        },
+        pattern: { type: 'linear', count: 3, spacing, direction: 0 }
+      });
+      const store = usePartCutsEditingStore.getState();
+      store.startEditingPartCuts('p1', 'Part 1', [roundFeature(2)]);
+      store.setDraftFeatures([roundFeature(3)]);
+
+      usePartCutsEditingStore.getState().undoDraft();
+      expect(usePartCutsEditingStore.getState().draftFeatures[0]).toMatchObject({
+        pattern: { spacing: 2 },
+        parameters: { counterbore: { diameter: 0.5, depth: 0.125 } }
+      });
+      usePartCutsEditingStore.getState().redoDraft();
+      expect(usePartCutsEditingStore.getState().draftFeatures[0]).toMatchObject({ pattern: { spacing: 3 } });
+    });
+
+    it('preserves independent nested cut payloads through duplicate, reorder, enable, mirror, undo, and redo', () => {
+      const round: PartFeature = {
+        id: 'round',
+        kind: 'circular_cut',
+        version: 1 as const,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        cutType: 'counterbore',
+        placement: { primary: 3, secondary: 2, rotation: 0 },
+        parameters: {
+          diameter: 0.25,
+          depthMode: 'blind',
+          depth: 0.5,
+          tilt: 0,
+          direction: 20,
+          counterbore: { diameter: 0.5, depth: 0.125 }
+        },
+        pattern: { type: 'grid', rows: 2, columns: 3, rowSpacing: 0.5, columnSpacing: 0.75, rotation: 15 }
+      };
+      const rounded: PartFeature = {
+        id: 'rounded',
+        kind: 'rounded_cut',
+        version: 1 as const,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+        cutType: 'rounded_rectangle',
+        placement: { primary: 2, secondary: 1, rotation: 30 },
+        parameters: { length: 3, width: 1, cornerRadius: 0.25, depthMode: 'blind', depth: 0.25 }
+      };
+      const store = usePartCutsEditingStore.getState();
+      store.startEditingPartCuts('p1', 'Panel', [round, rounded]);
+      const duplicate = duplicateFeature(round);
+      const roundCircular = round as Extract<PartFeature, { kind: 'circular_cut' }>;
+      const duplicateRound = duplicate as Extract<PartFeature, { kind: 'circular_cut' }>;
+      const mirrored = mirrorFeature(rounded, 'across_width', { length: 24, width: 12, thickness: 0.75 });
+
+      expect(duplicateRound.pattern).not.toBe(roundCircular.pattern);
+      expect(duplicateRound.parameters.counterbore).not.toBe(roundCircular.parameters.counterbore);
+
+      store.setDraftFeatures([round, rounded, duplicate]);
+      store.setDraftFeatures([duplicate, round, rounded]);
+      const disabledRound = { ...round, enabled: false };
+      store.setDraftFeatures([duplicate, disabledRound, rounded]);
+      const reenabledRound = { ...disabledRound, enabled: true };
+      store.setDraftFeatures([duplicate, reenabledRound, rounded]);
+      store.setDraftFeatures([mirrored, duplicate, reenabledRound, rounded]);
+
+      // Edit the actual object returned by duplicateFeature. If duplicateFeature
+      // ever becomes a shallow clone, these mutations will corrupt `round` and
+      // the original-payload assertions below will fail.
+      (duplicateRound.pattern as Extract<CircularPattern, { type: 'grid' }>).rotation = 45;
+      duplicateRound.parameters.counterbore!.depth = 0.2;
+      store.setDraftFeatures([mirrored, duplicateRound, reenabledRound, rounded]);
+
+      expect(usePartCutsEditingStore.getState().draftFeatures.map((feature) => feature.id)).toEqual([
+        mirrored.id,
+        duplicate.id,
+        'round',
+        'rounded'
+      ]);
+      expect(usePartCutsEditingStore.getState().draftFeatures).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'round',
+            enabled: true,
+            pattern: expect.objectContaining({
+              type: 'grid',
+              rows: 2,
+              columns: 3,
+              rowSpacing: 0.5,
+              columnSpacing: 0.75,
+              rotation: 15
+            })
+          }),
+          expect.objectContaining({
+            id: duplicate.id,
+            pattern: expect.objectContaining({ rotation: 45 }),
+            parameters: expect.objectContaining({ counterbore: { diameter: 0.5, depth: 0.2 } })
+          }),
+          expect.objectContaining({
+            id: mirrored.id,
+            placement: expect.objectContaining({ primary: 2, secondary: -1, rotation: -30 })
+          })
+        ])
+      );
+      expect(roundCircular.pattern).toMatchObject({ rotation: 15 });
+      expect(roundCircular.parameters.counterbore).toMatchObject({ depth: 0.125 });
+
+      usePartCutsEditingStore.getState().undoDraft();
+      const undoneFeatures = usePartCutsEditingStore.getState().draftFeatures;
+      expect(undoneFeatures.map((feature) => feature.id)).toEqual([mirrored.id, duplicate.id, 'round', 'rounded']);
+      const undoneOriginal = undoneFeatures.find(
+        (feature): feature is Extract<PartFeature, { kind: 'circular_cut' }> =>
+          feature.id === 'round' && feature.kind === 'circular_cut'
+      );
+      const undoneDuplicate = undoneFeatures.find(
+        (feature): feature is Extract<PartFeature, { kind: 'circular_cut' }> =>
+          feature.id === duplicate.id && feature.kind === 'circular_cut'
+      );
+      expect(undoneOriginal).toMatchObject({
+        enabled: true,
+        pattern: { rotation: 15 },
+        parameters: { counterbore: { depth: 0.125 } }
+      });
+      expect(undoneDuplicate).toMatchObject({
+        pattern: { rotation: 15 },
+        parameters: { counterbore: { depth: 0.125 } }
+      });
+      expect(undoneDuplicate?.pattern).not.toBe(undoneOriginal?.pattern);
+      expect(undoneDuplicate?.parameters.counterbore).not.toBe(undoneOriginal?.parameters.counterbore);
+
+      usePartCutsEditingStore.getState().redoDraft();
+      const redoneFeatures = usePartCutsEditingStore.getState().draftFeatures;
+      expect(redoneFeatures.map((feature) => feature.id)).toEqual([mirrored.id, duplicate.id, 'round', 'rounded']);
+      const redoneOriginal = redoneFeatures.find(
+        (feature): feature is Extract<PartFeature, { kind: 'circular_cut' }> =>
+          feature.id === 'round' && feature.kind === 'circular_cut'
+      );
+      const redoneDuplicate = redoneFeatures.find(
+        (feature): feature is Extract<PartFeature, { kind: 'circular_cut' }> =>
+          feature.id === duplicate.id && feature.kind === 'circular_cut'
+      );
+      expect(redoneOriginal).toMatchObject({
+        enabled: true,
+        pattern: { rotation: 15 },
+        parameters: { counterbore: { depth: 0.125 } }
+      });
+      expect(redoneDuplicate).toMatchObject({
+        pattern: { rotation: 45 },
+        parameters: { counterbore: { depth: 0.2 } }
+      });
+      expect(redoneDuplicate?.pattern).not.toBe(redoneOriginal?.pattern);
+      expect(redoneDuplicate?.parameters.counterbore).not.toBe(redoneOriginal?.parameters.counterbore);
+    });
+  });
+});

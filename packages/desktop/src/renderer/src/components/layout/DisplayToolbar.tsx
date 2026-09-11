@@ -9,11 +9,13 @@ export function DisplayToolbar() {
   const displayMode = useCameraStore((s) => s.displayMode);
   const showGrid = useCameraStore((s) => s.showGrid);
   const showGrainDirection = useCameraStore((s) => s.showGrainDirection);
+  const showDowels = useCameraStore((s) => s.showDowels);
   const snapToPartsEnabled = useSnapStore((s) => s.snapToPartsEnabled);
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
   const setDisplayMode = useCameraStore((s) => s.setDisplayMode);
   const setShowGrid = useCameraStore((s) => s.setShowGrid);
   const toggleGrainDirection = useCameraStore((s) => s.toggleGrainDirection);
+  const toggleDowels = useCameraStore((s) => s.toggleDowels);
   const setSnapToPartsEnabled = useSnapStore((s) => s.setSnapToPartsEnabled);
   const clearReferences = useSnapStore((s) => s.clearReferences);
   const [brightnessOpen, setBrightnessOpen] = useState(false);
@@ -81,6 +83,15 @@ export function DisplayToolbar() {
           title="Toggle grain direction arrows"
         >
           Grain
+        </Button>
+        <Button
+          size="xs"
+          variant={showDowels ? 'default' : 'ghost'}
+          className={toolbarTextButtonClass}
+          onClick={toggleDowels}
+          title="Show or hide dowel joinery"
+        >
+          Dowels
         </Button>
         <Button
           size="xs"

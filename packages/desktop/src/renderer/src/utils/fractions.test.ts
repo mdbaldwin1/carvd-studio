@@ -50,9 +50,9 @@ describe('Unit Conversions', () => {
 
 describe('decimalToFraction', () => {
   it('converts whole numbers', () => {
-    expect(decimalToFraction(5)).toBe('5');
-    expect(decimalToFraction(0)).toBe('0');
-    expect(decimalToFraction(100)).toBe('100');
+    expect(decimalToFraction(5!)).toBe('5');
+    expect(decimalToFraction(0!)).toBe('0');
+    expect(decimalToFraction(100!)).toBe('100');
   });
 
   it('converts simple fractions', () => {
@@ -276,13 +276,13 @@ describe('Real-world woodworking scenarios', () => {
     // Typical table saw kerf is 1/8"
     const kerf = fractionToDecimal('1/8');
     expect(kerf).toBe(0.125);
-    expect(decimalToFraction(kerf)).toBe('1/8');
+    expect(decimalToFraction(kerf!)).toBe('1/8');
   });
 
   it('handles precise joinery measurements', () => {
     // Dovetail spacing might be 1 7/16"
     const spacing = fractionToDecimal('1 7/16');
     expect(spacing).toBeCloseTo(1.4375, 4);
-    expect(decimalToFraction(spacing)).toBe('1 7/16');
+    expect(decimalToFraction(spacing!)).toBe('1 7/16');
   });
 });

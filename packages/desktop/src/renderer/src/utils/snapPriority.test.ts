@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createAxisSnapWinners, shouldUseSnapStage, SNAP_STAGE_PRIORITIES, tryApplyAxisSnap } from './snapPriority';
 import type { SnapLine } from '../types';
+import { createAxisSnapWinners, shouldUseSnapStage, SNAP_STAGE_PRIORITIES, tryApplyAxisSnap } from './snapPriority';
 
 describe('snapPriority', () => {
   it('uses descending precedence order from guide to axis', () => {
     expect(SNAP_STAGE_PRIORITIES.guide).toBeGreaterThan(SNAP_STAGE_PRIORITIES.origin);
-    expect(SNAP_STAGE_PRIORITIES.origin).toBeGreaterThan(SNAP_STAGE_PRIORITIES.face);
+    expect(SNAP_STAGE_PRIORITIES.origin).toBeGreaterThan(SNAP_STAGE_PRIORITIES.mate);
+    expect(SNAP_STAGE_PRIORITIES.mate).toBeGreaterThan(SNAP_STAGE_PRIORITIES.face);
     expect(SNAP_STAGE_PRIORITIES.face).toBeGreaterThan(SNAP_STAGE_PRIORITIES.surface);
     expect(SNAP_STAGE_PRIORITIES.surface).toBeGreaterThan(SNAP_STAGE_PRIORITIES.fraction);
     expect(SNAP_STAGE_PRIORITIES.fraction).toBeGreaterThan(SNAP_STAGE_PRIORITIES.feature);
@@ -18,6 +19,10 @@ describe('snapPriority', () => {
     expect(shouldUseSnapStage('origin', 'face')).toBe(false);
     expect(shouldUseSnapStage('surface', 'surface')).toBe(false);
     expect(shouldUseSnapStage('axis', 'guide')).toBe(true);
+    // mate beats face but not origin
+    expect(shouldUseSnapStage('face', 'mate')).toBe(true);
+    expect(shouldUseSnapStage('mate', 'face')).toBe(false);
+    expect(shouldUseSnapStage('origin', 'mate')).toBe(false);
   });
 
   it('replaces axis lines only when candidate stage wins', () => {

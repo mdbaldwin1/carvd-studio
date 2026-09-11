@@ -3,6 +3,7 @@ import { renderHook, act, render } from '@testing-library/react';
 import React from 'react';
 import { useProjectStore } from '../store/projectStore';
 import { useUIStore } from '../store/uiStore';
+import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 
 vi.mock('../utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 
@@ -10,8 +11,11 @@ vi.mock('../utils/analytics', () => ({ analytics: { capture: vi.fn() } }));
 vi.mock('../utils/fileOperations', () => ({
   saveProject: vi.fn(),
   saveProjectAs: vi.fn(),
+  hasPendingProjectSaves: vi.fn().mockReturnValue(false),
+  waitForPendingProjectSaves: vi.fn().mockResolvedValue(undefined),
   openProject: vi.fn(),
   openProjectFromPath: vi.fn(),
+  beginProjectReplacement: vi.fn().mockReturnValue({ request: 1 }),
   newProject: vi.fn(),
   hasUnsavedChanges: vi.fn().mockReturnValue(false),
   updateWindowTitle: vi.fn(),
@@ -37,6 +41,9 @@ import { useFileOperations } from './useFileOperations';
 import {
   saveProject,
   saveProjectAs,
+  beginProjectReplacement,
+  hasPendingProjectSaves,
+  waitForPendingProjectSaves,
   openProject,
   openProjectFromPath,
   newProject,
@@ -80,12 +87,17 @@ beforeAll(() => {
     }),
     confirmClose: vi.fn(),
     cancelClose: vi.fn(),
+    reloadWindow: vi.fn(),
     updateRecentProjectPath: vi.fn()
   } as unknown as typeof window.electronAPI;
 });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(beginProjectReplacement).mockReturnValue({ request: 1 } as ReturnType<typeof beginProjectReplacement>);
+  vi.mocked(hasPendingProjectSaves).mockReturnValue(false);
+  vi.mocked(waitForPendingProjectSaves).mockResolvedValue(undefined);
+  usePartCutsEditingStore.getState().finishEditing();
   onOpenProjectCallback = null;
   onBeforeCloseCallback = null;
 
@@ -159,7 +171,307 @@ function renderWithDialogs(options?: Parameters<typeof useFileOperations>[0]) {
 // ============================================================
 
 describe('useFileOperations', () => {
+  describe('round 8 file lifecycle boundaries', () => {
+    it.each([false, true])('M2 clean reload executes only the requested cache mode=%s', async (force) => {
+      const { result } = renderHook(() => useFileOperations());
+      await act(async () => {
+        await result.current.handleReload(force);
+      });
+      expect(window.electronAPI.reloadWindow).toHaveBeenCalledWith(force);
+    });
+    for (const force of [false, true])
+      it.each(['save', 'discard', 'cancel'] as const)(
+        'M2 guarded reload ' + force + ' ' + '%s keeps the action explicit',
+        async (choice) => {
+          usePartCutsEditingStore.setState({ isEditingPartCuts: true, inspectorDirty: true });
+          const onSavePartCuts = vi.fn(() => {
+            usePartCutsEditingStore.getState().finishEditing();
+            return true;
+          });
+          vi.mocked(saveProject).mockResolvedValue({ success: true });
+          const { hookRef } = renderWithDialogs({ isEditingPartCuts: true, onSavePartCuts });
+          await act(async () => {
+            await hookRef.current!.handleReload(force);
+          });
+          expect(window.electronAPI.reloadWindow).not.toHaveBeenCalled();
+          expect(getDialogProps()).toMatchObject({ isOpen: true, action: 'reload' });
+          await act(async () => {
+            await getDialogProps()[choice === 'save' ? 'onSave' : choice === 'discard' ? 'onDiscard' : 'onCancel']();
+          });
+          expect(onSavePartCuts).toHaveBeenCalledTimes(choice === 'save' ? 1 : 0);
+          expect(window.electronAPI.reloadWindow).toHaveBeenCalledTimes(choice === 'cancel' ? 0 : 1);
+        }
+      );
+    it.each(['project', 'inspector'])('M3 rechecks newer %s changes after file I/O before closing', async (kind) => {
+      vi.mocked(hasUnsavedChanges).mockReturnValue(true);
+      let finish!: (result: { success: boolean }) => void;
+      vi.mocked(saveProject).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          })
+      );
+      renderWithDialogs();
+      await act(async () => {
+        onBeforeCloseCallback!();
+      });
+      let saving!: Promise<void>;
+      await act(async () => {
+        saving = getDialogProps().onSave();
+      });
+      await act(async () => {
+        if (kind === 'project') useProjectStore.getState().markDirty();
+        else usePartCutsEditingStore.setState({ isEditingPartCuts: true, inspectorDirty: true });
+        finish({ success: true });
+        await saving;
+      });
+      expect(window.electronAPI.confirmClose).not.toHaveBeenCalled();
+      expect(getDialogProps()).toMatchObject({
+        isOpen: true,
+        isSaving: false,
+        saveError: expect.stringMatching(/new changes.*save again/i)
+      });
+    });
+    it('M3 retains a failed close save for retry without closing or losing edits', async () => {
+      vi.mocked(hasUnsavedChanges).mockReturnValue(true);
+      vi.mocked(saveProject)
+        .mockResolvedValueOnce({ success: false, error: 'Disk full' })
+        .mockResolvedValueOnce({ success: true });
+      renderWithDialogs();
+      await act(async () => {
+        onBeforeCloseCallback!();
+      });
+      await act(async () => {
+        await getDialogProps().onSave();
+      });
+      expect(getDialogProps()).toMatchObject({ isOpen: true, isSaving: false, saveError: 'Error saving: Disk full' });
+      expect(window.electronAPI.confirmClose).not.toHaveBeenCalled();
+      await act(async () => {
+        await getDialogProps().onSave();
+      });
+      expect(window.electronAPI.confirmClose).toHaveBeenCalledOnce();
+      expect(getDialogProps().isOpen).toBe(false);
+    });
+    it.each(['new', 'open', 'recent', 'relocate', 'association', 'home'] as const)(
+      'M1 %s refuses to replace a live cut session',
+      async (route) => {
+        const showToast = vi.fn();
+        useUIStore.setState({ showToast });
+        usePartCutsEditingStore.setState({ isEditingPartCuts: true, inspectorDirty: true });
+        vi.mocked(newProject).mockResolvedValue({ success: true });
+        vi.mocked(openProject).mockResolvedValue({ success: true });
+        vi.mocked(openProjectFromPath).mockResolvedValue({ success: true });
+        const onGoHome = vi.fn();
+        const { result } = renderHook(() => useFileOperations({ isEditingPartCuts: true, onGoHome }));
+        await act(async () => {
+          if (route === 'new') await result.current.handleNew();
+          if (route === 'open') await result.current.handleOpen();
+          if (route === 'recent') await result.current.handleOpenRecent('/tmp/recent.carvd');
+          if (route === 'relocate') await result.current.handleRelocateFile('/tmp/missing.carvd', 'missing');
+          if (route === 'association') await onOpenProjectCallback!('/tmp/associated.carvd');
+          if (route === 'home') await result.current.handleGoHome();
+        });
+        expect.soft(newProject).not.toHaveBeenCalled();
+        expect.soft(openProject).not.toHaveBeenCalled();
+        expect.soft(openProjectFromPath).not.toHaveBeenCalled();
+        expect.soft(window.electronAPI.showOpenDialog).not.toHaveBeenCalled();
+        expect.soft(onGoHome).not.toHaveBeenCalled();
+        expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/save or discard.*part cuts/i), 'warning');
+      }
+    );
+    for (const modifier of ['metaKey', 'ctrlKey'] as const)
+      it.each(['n', 'o'])('M1 ' + modifier + '+%s cannot replace a cut when a button has focus', async (key) => {
+        usePartCutsEditingStore.setState({ isEditingPartCuts: true, inspectorDirty: true });
+        vi.mocked(newProject).mockResolvedValue({ success: true });
+        vi.mocked(openProject).mockResolvedValue({ success: true });
+        renderHook(() => useFileOperations({ isEditingPartCuts: true }));
+        const button = document.createElement('button');
+        document.body.append(button);
+        button.focus();
+        try {
+          await act(async () => {
+            button.dispatchEvent(new KeyboardEvent('keydown', { key, [modifier]: true, bubbles: true }));
+          });
+          expect.soft(newProject).not.toHaveBeenCalled();
+          expect(openProject).not.toHaveBeenCalled();
+        } finally {
+          button.remove();
+        }
+      });
+    it('M3 holds the close dialog and refuses reentrant Save while the write is pending', async () => {
+      vi.mocked(hasUnsavedChanges).mockReturnValue(true);
+      const finishes: Array<(value: { success: boolean }) => void> = [];
+      vi.mocked(saveProject).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finishes.push(resolve);
+          })
+      );
+      renderWithDialogs();
+      await act(async () => {
+        onBeforeCloseCallback!();
+      });
+      const save = getDialogProps().onSave;
+      let first!: Promise<void>;
+      await act(async () => {
+        first = save();
+      });
+      expect.soft(getDialogProps().isOpen).toBe(true);
+      expect.soft(getDialogProps().isSaving).toBe(true);
+      let second!: Promise<void>;
+      await act(async () => {
+        second = save();
+      });
+      expect.soft(saveProject).toHaveBeenCalledTimes(1);
+      // Resolve every captured write in the buggy version without leaving a pending test promise.
+      await act(async () => {
+        finishes.forEach((finish) => finish({ success: true }));
+        await Promise.all([first, second]);
+      });
+    });
+  });
+  describe('round 7 active inspector file boundaries', () => {
+    it('L1 retains the exact modal validation error until cancel, then clears it', async () => {
+      vi.mocked(hasUnsavedChanges).mockReturnValue(true);
+      renderWithDialogs({
+        isEditingPartCuts: true,
+        onSavePartCuts: () => {
+          useUIStore.setState({
+            toast: { id: 'cut-error', message: 'Hole profile extends beyond the selected face.' }
+          });
+          return false;
+        }
+      });
+      await act(async () => {
+        onBeforeCloseCallback!();
+      });
+      await act(async () => {
+        await getDialogProps().onSave();
+      });
+      expect(getDialogProps().saveError).toBe('Hole profile extends beyond the selected face.');
+      expect(getDialogProps().isOpen).toBe(true);
+      expect(saveProject).not.toHaveBeenCalled();
+      await act(async () => {
+        await getDialogProps().onCancel();
+      });
+      await act(async () => {
+        onBeforeCloseCallback!();
+      });
+      expect(getDialogProps().saveError).toBeNull();
+    });
+    it.each([false, true])('L1 native close detects inspector-only changes; project dirty=%s', async (projectDirty) => {
+      vi.mocked(hasUnsavedChanges).mockReturnValue(projectDirty);
+      usePartCutsEditingStore.setState({ isEditingPartCuts: true, inspectorDirty: true });
+      renderWithDialogs({ isEditingPartCuts: true, onSavePartCuts: vi.fn(() => true) });
+      await act(async () => {
+        onBeforeCloseCallback!();
+      });
+      expect(window.electronAPI.confirmClose).not.toHaveBeenCalled();
+      expect(getDialogProps().isOpen).toBe(true);
+    });
+    it.each([true, false])('L1 close dialog validates the active cut before saving; valid=%s', async (valid) => {
+      vi.mocked(hasUnsavedChanges).mockReturnValue(true);
+      const order: string[] = [];
+      const onSavePartCuts = vi.fn(() => {
+        order.push('cut');
+        return valid;
+      });
+      vi.mocked(saveProject).mockImplementation(async () => {
+        order.push('file');
+        return { success: true };
+      });
+      renderWithDialogs({ isEditingPartCuts: true, onSavePartCuts });
+      await act(async () => {
+        onBeforeCloseCallback!();
+      });
+      await act(async () => {
+        await getDialogProps().onSave();
+      });
+      // The close dialog's Save is the project-close flow: it commits the
+      // active cut and then writes the project before leaving.
+      expect(order).toEqual(valid ? ['cut', 'file'] : ['cut']);
+      expect(getDialogProps().isOpen).toBe(!valid);
+      expect(window.electronAPI.confirmClose).toHaveBeenCalledTimes(valid ? 1 : 0);
+    });
+    it.each(['direct', 'Meta', 'Control'] as const)(
+      'L2 %s Save As commits valid and refuses invalid focused edits',
+      async (route) => {
+        const order: string[] = [];
+        let valid = true;
+        const onSavePartCuts = vi.fn(() => {
+          order.push('cut');
+          return valid;
+        });
+        vi.mocked(saveProjectAs).mockImplementation(async () => {
+          order.push('file');
+          return { success: true };
+        });
+        const { result } = renderHook(() => useFileOperations({ isEditingPartCuts: true, onSavePartCuts }));
+        const input = document.createElement('input');
+        document.body.append(input);
+        input.focus();
+        const save = async () => {
+          await act(async () => {
+            if (route === 'direct') await result.current.handleSaveAs();
+            else
+              input.dispatchEvent(
+                new KeyboardEvent('keydown', {
+                  key: 'S',
+                  shiftKey: true,
+                  metaKey: route === 'Meta',
+                  ctrlKey: route === 'Control',
+                  bubbles: true
+                })
+              );
+          });
+        };
+        try {
+          await save();
+          expect.soft(order).toEqual(['cut', 'file']);
+          order.length = 0;
+          valid = false;
+          await save();
+          expect(order).toEqual(['cut']);
+        } finally {
+          input.remove();
+        }
+      }
+    );
+  });
   describe('handleSave', () => {
+    it.each([true, false])('K7 commits active cuts and stops there; valid=%s', async (valid) => {
+      const order: string[] = [];
+      const onSavePartCuts = vi.fn(() => {
+        order.push('cut');
+        return valid;
+      });
+      vi.mocked(saveProject).mockImplementation(async () => {
+        order.push('file');
+        return { success: true };
+      });
+      const { result } = renderHook(() => useFileOperations({ isEditingPartCuts: true, onSavePartCuts }));
+      await act(async () => {
+        await result.current.handleSave();
+      });
+      // Save in cuts mode commits the draft and stops, as it does for
+      // template and assembly editing. Writing the project is a separate,
+      // ordinary Save once the workspace has closed.
+      expect(order).toEqual(['cut']);
+      expect(saveProject).not.toHaveBeenCalled();
+    });
+    it('K7 routes Cmd+S from a focused input through the active cut commit', async () => {
+      const onSavePartCuts = vi.fn(() => false);
+      renderHook(() => useFileOperations({ isEditingPartCuts: true, onSavePartCuts }));
+      const input = document.createElement('input');
+      document.body.append(input);
+      input.focus();
+      await act(async () => {
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 's', metaKey: true, bubbles: true }));
+      });
+      expect(onSavePartCuts).toHaveBeenCalledOnce();
+      expect(saveProject).not.toHaveBeenCalled();
+      input.remove();
+    });
     it('saves project and shows toast on success', async () => {
       (saveProject as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
       const showToast = vi.fn();
@@ -679,7 +991,7 @@ describe('useFileOperations', () => {
         '/old/path/project.carvd',
         '/new/location/project.carvd'
       );
-      expect(openProjectFromPath).toHaveBeenCalledWith('/new/location/project.carvd');
+      expect(openProjectFromPath).toHaveBeenCalledWith('/new/location/project.carvd', { request: 1 });
     });
 
     it('does nothing when dialog is canceled', async () => {

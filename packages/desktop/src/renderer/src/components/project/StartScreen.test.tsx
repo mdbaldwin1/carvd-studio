@@ -10,7 +10,9 @@ describe('StartScreen', () => {
     onRelocateFile: vi.fn(),
     onSelectTemplate: vi.fn(),
     onStartTutorial: vi.fn(),
-    onViewAllTemplates: vi.fn()
+    onViewAllTemplates: vi.fn(),
+    onOpenSettings: vi.fn(),
+    onOpenLibrary: vi.fn()
   };
 
   beforeAll(() => {
@@ -535,7 +537,6 @@ describe('StartScreen', () => {
       vi.mocked(window.electronAPI.getUserTemplates).mockResolvedValue([
         {
           id: 'user-1',
-          type: 'user',
           name: 'My Custom Template',
           description: 'A custom template',
           dimensions: { width: 24, depth: 12, height: 18 },

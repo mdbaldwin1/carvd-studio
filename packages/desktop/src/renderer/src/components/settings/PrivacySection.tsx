@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AnalyticsConsent } from '../../../shared/analytics';
+import type { AnalyticsConsent } from '../../../../shared/analytics';
 import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { cn } from '@renderer/lib/utils';
 import { analytics } from '@renderer/utils/analytics';

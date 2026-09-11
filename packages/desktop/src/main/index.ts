@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { join, normalize, isAbsolute, dirname } from 'path';
+import { setImmediate } from 'node:timers';
 
 // Enable CDP for automation when explicitly opted in via env. Off in normal dev,
 // so it doesn't keep a debugging port open by default. Set CARVD_REMOTE_DEBUG=1
@@ -27,9 +28,6 @@ import {
   removeFavoriteProject,
   isFavoriteProject,
   setFavoriteProjects,
-  getNewProjectDefaults,
-  setNewProjectDefaults,
-  NewProjectDefaults,
   getHasCompletedWelcome,
   setHasCompletedWelcome,
   getUserTemplates,
@@ -103,7 +101,7 @@ function getQueuedTestSaveDialogResult(): Electron.SaveDialogReturnValue | null 
 
   const filePath = queuedTestSaveDialogPaths.shift();
   if (!filePath) {
-    return { canceled: true, filePath: undefined };
+    return { canceled: true, filePath: '' };
   }
 
   return { canceled: false, filePath };
@@ -275,6 +273,13 @@ const windows: Set<BrowserWindow> = new Set();
 
 // Track windows that are allowed to close (after user confirmed or chose to discard)
 const windowsAllowedToClose: Set<BrowserWindow> = new Set();
+
+// Electron cancels app.quit() when a close listener prevents the first close.
+// Keep the user's intent until every window approves, or any renderer cancels.
+let quitRequested = false;
+app.on('before-quit', () => {
+  quitRequested = true;
+});
 
 // Splash window reference and timing
 let splashWindow: BrowserWindow | null = null;
@@ -456,9 +461,6 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     const currentBounds = newWindow.getBounds();
     setWindowBounds(currentBounds);
 
-    // In test mode, always allow close (prevents teardown timeout)
-    if (isTest) return;
-
     // If this window is allowed to close, proceed
     if (windowsAllowedToClose.has(newWindow)) {
       windowsAllowedToClose.delete(newWindow);
@@ -473,6 +475,11 @@ function createWindow(fileToOpen?: string): BrowserWindow {
   newWindow.on('closed', () => {
     windows.delete(newWindow);
     windowsAllowedToClose.delete(newWindow);
+    if (quitRequested && windows.size === 0) {
+      setImmediate(() => {
+        if (quitRequested && windows.size === 0) app.quit();
+      });
+    }
   });
 
   // Open external links in default browser
@@ -555,6 +562,10 @@ ipcMain.handle('read-file', async (_event, filePath: string) => {
   return readFile(filePath, 'utf-8');
 });
 
+// Renderer save queues preserve each document's request order. Serialize the
+// physical boundary too, so independent windows cannot complete old writes
+// after newer writes to the same file (including differently spelled aliases).
+let pendingTextWrite = Promise.resolve();
 ipcMain.handle('write-file', async (_event, filePath: string, data: string) => {
   if (!isPathSafe(filePath)) {
     throw new Error('Invalid file path');
@@ -562,7 +573,9 @@ ipcMain.handle('write-file', async (_event, filePath: string, data: string) => {
   if (typeof data !== 'string') {
     throw new Error('Invalid data type');
   }
-  await writeFile(filePath, data, 'utf-8');
+  const write = pendingTextWrite.then(() => writeFile(filePath, data, 'utf-8'));
+  pendingTextWrite = write.catch(() => undefined);
+  await write;
 });
 
 // Write binary file (for PDFs, images, etc.)
@@ -1147,16 +1160,6 @@ ipcMain.handle('reorder-favorite-projects', (_event, filePaths: string[]) => {
   return { success: true };
 });
 
-// New project defaults (for "remember these choices" feature)
-ipcMain.handle('get-new-project-defaults', () => {
-  return getNewProjectDefaults();
-});
-
-ipcMain.handle('set-new-project-defaults', (_event, defaults: Partial<NewProjectDefaults>) => {
-  setNewProjectDefaults(defaults);
-  return { success: true };
-});
-
 // Window title
 ipcMain.handle('set-window-title', (event, title: string) => {
   const win = BrowserWindow.fromWebContents(event.sender);
@@ -1188,8 +1191,15 @@ ipcMain.handle('confirm-close', (event) => {
 
 // Window close cancellation - called by renderer to cancel close
 ipcMain.handle('cancel-close', () => {
-  // Nothing to do - just don't close the window
-  // The close was already prevented by event.preventDefault()
+  quitRequested = false;
+});
+
+// Called only after the renderer's unsaved-change guard approves the action.
+// Reload directly: dispatching another menu command would recurse into the guard.
+ipcMain.handle('reload-window', (event, ignoreCache: boolean) => {
+  if (typeof ignoreCache !== 'boolean') throw new Error('Invalid reload mode');
+  if (ignoreCache) event.sender.reloadIgnoringCache();
+  else event.sender.reload();
 });
 
 // Print to PDF - uses Electron's native PDF generation
@@ -1381,7 +1391,8 @@ app.whenReady().then(async () => {
     const appIconPath = resolveAppIconPath();
     if (appIconPath) {
       try {
-        app.dock.setIcon(appIconPath);
+        // `dock` is only present on macOS, which this branch already checks.
+        app.dock?.setIcon(appIconPath);
       } catch (error) {
         log.warn('[Main] Failed to set dock icon:', error);
       }

@@ -14,6 +14,11 @@ export interface DesktopAnalyticsEventMap {
   };
   checkout_opened: { surface: 'trial' | 'settings' | 'pricing_prompt'; license_mode: 'trial' | 'free' };
   license_activated: { license_mode: 'licensed' };
+  part_cuts_opened: {
+    source: 'properties' | 'context_menu';
+    operation_count_bucket: CountBucket;
+  };
+  part_cuts_saved: { operation_count_bucket: CountBucket };
 }
 
 export type DesktopAnalyticsEventName = keyof DesktopAnalyticsEventMap;
@@ -56,6 +61,13 @@ const eventPropertyValidators: Record<DesktopAnalyticsEventName, Record<string, 
   },
   license_activated: {
     license_mode: ['licensed']
+  },
+  part_cuts_opened: {
+    source: ['properties', 'context_menu'],
+    operation_count_bucket: ['0', '1-5', '6-20', '21-50', '51+']
+  },
+  part_cuts_saved: {
+    operation_count_bucket: ['0', '1-5', '6-20', '21-50', '51+']
   }
 };
 

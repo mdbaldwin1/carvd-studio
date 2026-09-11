@@ -33,7 +33,7 @@ describe('WelcomeTutorial', () => {
     previous: vi.fn(),
     skip: vi.fn(),
     complete: vi.fn(),
-    goTo: vi.fn()
+    goToStep: vi.fn()
   };
 
   const defaultProps = {
@@ -89,7 +89,7 @@ describe('WelcomeTutorial', () => {
     it('returns null when currentStep is null', () => {
       vi.mocked(useTutorial).mockReturnValue({
         ...mockTutorial,
-        currentStep: null
+        currentStep: undefined
       });
 
       const { container } = render(<WelcomeTutorial {...defaultProps} />);

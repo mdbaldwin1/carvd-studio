@@ -277,11 +277,11 @@ describe('seedData', () => {
     it('has appropriate stock constraints', () => {
       const project = generateSeedProject();
 
-      expect(project.stockConstraints.constrainDimensions).toBe(true);
-      expect(project.stockConstraints.constrainGrain).toBe(true);
-      expect(project.stockConstraints.constrainColor).toBe(true);
+      expect(project.stockConstraints!.constrainDimensions).toBe(true);
+      expect(project.stockConstraints!.constrainGrain).toBe(true);
+      expect(project.stockConstraints!.constrainColor).toBe(true);
       // preventOverlap is false for the tutorial to allow free placement
-      expect(project.stockConstraints.preventOverlap).toBe(false);
+      expect(project.stockConstraints!.preventOverlap).toBe(false);
     });
   });
 

@@ -134,9 +134,7 @@ describe('PostHog transport configuration', () => {
 
   it('does not call fetch when shutdown aborts the lifecycle before SDK dispatch', async () => {
     let requestCount = 0;
-    let postHogFetch: PostHogClientFactory extends (apiKey: string, options: infer Options) => unknown
-      ? Options['fetch']
-      : never;
+    let postHogFetch: Parameters<PostHogClientFactory>[1]['fetch'];
     const client: PostHogClient = {
       capture() {},
       async flush() {},
@@ -171,9 +169,7 @@ describe('PostHog transport configuration', () => {
   it('composes the SDK request signal with lifecycle shutdown', async () => {
     const requestController = new AbortController();
     const requestAborted = createDeferred<void>();
-    let postHogFetch: PostHogClientFactory extends (apiKey: string, options: infer Options) => unknown
-      ? Options['fetch']
-      : never;
+    let postHogFetch: Parameters<PostHogClientFactory>[1]['fetch'];
     const client: PostHogClient = {
       capture() {},
       async flush() {},

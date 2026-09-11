@@ -10,6 +10,7 @@ import { useInteractionStore } from '../../store/interactionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { Part as PartType } from '../../types';
 import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
+import { getPartRenderGeometry, hasRenderablePartFeatures } from '../../utils/partFeatureGeometry';
 import {
   beginRotateInteractionSession,
   clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances,
@@ -116,7 +117,13 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
 
   // Enforce ground constraint after rotation or dimension changes
   useEffect(() => {
-    const worldHalfHeight = calculateWorldHalfHeightFromDegrees(part.rotation, part.length, part.thickness, part.width);
+    const worldHalfHeight = calculateWorldHalfHeightFromDegrees(
+      part.rotation,
+      part.length,
+      part.thickness,
+      part.width,
+      part.features
+    );
 
     if (part.position.y < worldHalfHeight) {
       updatePart(part.id, {
@@ -304,22 +311,26 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
     clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances();
   }, [controls]);
 
-  // Use live dimensions for rendering
-  const dims: [number, number, number] = [liveDims.length, liveDims.thickness, liveDims.width];
-
-  // Calculate render position
-  let renderX = liveDims.x;
-  let renderY = liveDims.y;
-  let renderZ = liveDims.z;
+  const renderGeometry = useMemo(() => getPartRenderGeometry(part), [part]);
+  const isFeaturePart = hasRenderablePartFeatures(part);
 
   const interactionPreview = resolvePartInteractionPreview(part, activeSession);
-  const isAffectedByActiveInteraction = interactionPreview.affected;
-
-  if (!isDragging && !isResizing && isAffectedByActiveInteraction) {
-    renderX = interactionPreview.position.x;
-    renderY = interactionPreview.position.y;
-    renderZ = interactionPreview.position.z;
-  }
+  const localPartOwnsInteraction =
+    (isDragging && activeSession?.kind === 'move' && activeSession.moveOwner === 'part') ||
+    (isResizing && activeSession?.kind === 'resize' && activeSession.primaryPartId === part.id);
+  const shouldRenderInteractionPreview = interactionPreview.affected && !localPartOwnsInteraction;
+  const renderDims: LiveDimensions = shouldRenderInteractionPreview
+    ? {
+        x: interactionPreview.position.x,
+        y: interactionPreview.position.y,
+        z: interactionPreview.position.z,
+        length: interactionPreview.dimensions.length,
+        width: interactionPreview.dimensions.width,
+        thickness: interactionPreview.dimensions.thickness
+      }
+    : liveDims;
+  const dims: [number, number, number] = [renderDims.length, renderDims.thickness, renderDims.width];
+  const { x: renderX, y: renderY, z: renderZ } = renderDims;
 
   const partDimensionPlacements = useMemo(() => {
     const cameraLocal = new THREE.Vector3(
@@ -329,9 +340,9 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
     ).applyQuaternion(inverseRotationQuaternion);
 
     return getPartDimensionPlacements({
-      length: liveDims.length,
-      width: liveDims.width,
-      thickness: liveDims.thickness,
+      length: renderDims.length,
+      width: renderDims.width,
+      thickness: renderDims.thickness,
       cameraLocal: [cameraLocal.x, cameraLocal.y, cameraLocal.z]
     });
   }, [
@@ -339,9 +350,9 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
     camera.position.y,
     camera.position.z,
     inverseRotationQuaternion,
-    liveDims.length,
-    liveDims.thickness,
-    liveDims.width,
+    renderDims.length,
+    renderDims.thickness,
+    renderDims.width,
     renderX,
     renderY,
     renderZ
@@ -438,7 +449,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             hitTarget: { kind: 'part-body', nodeId: part.id, partId: part.id }
           }}
         >
-          <boxGeometry args={dims} />
+          {isFeaturePart ? <primitive object={renderGeometry} attach="geometry" /> : <boxGeometry args={dims} />}
           {displayMode === 'solid' && <meshStandardMaterial color={part.color} />}
           {displayMode === 'wireframe' && <meshBasicMaterial color={part.color} wireframe />}
           {displayMode === 'translucent' && (
@@ -479,7 +490,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
           part.grainSensitive &&
           (camera.position.x - renderX) ** 2 + (camera.position.y - renderY) ** 2 + (camera.position.z - renderZ) ** 2 <
             GRAIN_ARROW_MAX_DISTANCE_SQ && (
-            <GrainDirectionArrow liveDims={liveDims} grainDirection={part.grainDirection} />
+            <GrainDirectionArrow liveDims={renderDims} grainDirection={part.grainDirection} />
           )}
 
         {/* Resize handles - only show when single part selected and hovered/resizing */}
@@ -488,7 +499,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             <ResizeHandle
               key={idx}
               partId={part.id}
-              liveDims={liveDims}
+              liveDims={renderDims}
               handlePos={handlePos}
               onResizeStart={handleResizeStart}
               isResizing={isResizing}
@@ -500,7 +511,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
           <>
             <RotationHandle
               partId={part.id}
-              liveDims={liveDims}
+              liveDims={renderDims}
               axis="y"
               side={1}
               onRotate={handleRotate}
@@ -510,7 +521,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             />
             <RotationHandle
               partId={part.id}
-              liveDims={liveDims}
+              liveDims={renderDims}
               axis="y"
               side={-1}
               onRotate={handleRotate}
@@ -520,7 +531,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             />
             <RotationHandle
               partId={part.id}
-              liveDims={liveDims}
+              liveDims={renderDims}
               axis="x"
               side={1}
               onRotate={handleRotate}
@@ -530,7 +541,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             />
             <RotationHandle
               partId={part.id}
-              liveDims={liveDims}
+              liveDims={renderDims}
               axis="x"
               side={-1}
               onRotate={handleRotate}
@@ -540,7 +551,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             />
             <RotationHandle
               partId={part.id}
-              liveDims={liveDims}
+              liveDims={renderDims}
               axis="z"
               side={1}
               onRotate={handleRotate}
@@ -550,7 +561,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             />
             <RotationHandle
               partId={part.id}
-              liveDims={liveDims}
+              liveDims={renderDims}
               axis="z"
               side={-1}
               onRotate={handleRotate}
@@ -568,7 +579,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               hidden={!partDimensionLayout.get('length')?.visible}
               start={partDimensionPlacements.length.start}
               end={partDimensionPlacements.length.end}
-              value={liveDims.length}
+              value={renderDims.length}
               offsetDir={partDimensionPlacements.length.offsetDir}
               offset={partDimensionPlacements.length.offset + (partDimensionLayout.get('length')?.lane ?? 0) * 0.7}
               color="#e74c3c"
@@ -579,7 +590,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               hidden={!partDimensionLayout.get('width')?.visible}
               start={partDimensionPlacements.width.start}
               end={partDimensionPlacements.width.end}
-              value={liveDims.width}
+              value={renderDims.width}
               offsetDir={partDimensionPlacements.width.offsetDir}
               offset={partDimensionPlacements.width.offset + (partDimensionLayout.get('width')?.lane ?? 0) * 0.7}
               color="#3498db"
@@ -590,7 +601,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               hidden={!partDimensionLayout.get('thickness')?.visible}
               start={partDimensionPlacements.thickness.start}
               end={partDimensionPlacements.thickness.end}
-              value={liveDims.thickness}
+              value={renderDims.thickness}
               offsetDir={partDimensionPlacements.thickness.offsetDir}
               offset={
                 partDimensionPlacements.thickness.offset + (partDimensionLayout.get('thickness')?.lane ?? 0) * 0.65

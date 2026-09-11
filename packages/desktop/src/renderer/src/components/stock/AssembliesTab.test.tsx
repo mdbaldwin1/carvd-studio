@@ -795,7 +795,7 @@ describe('AssembliesTab', () => {
   describe('thumbnail rendering', () => {
     it('renders thumbnail image when thumbnailData is present', () => {
       const assembly = createAssembly({
-        thumbnailData: { data: 'abc123', width: 100, height: 75 }
+        thumbnailData: { data: 'abc123', width: 100, height: 75, generatedAt: '2024-01-01T00:00:00.000Z' }
       });
       render(<AssembliesTab {...defaultProps} assemblies={[assembly]} />);
       const img = screen.getByAltText('Test Assembly');

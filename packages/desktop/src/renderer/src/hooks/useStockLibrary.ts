@@ -75,7 +75,9 @@ export function useStockLibrary() {
     const unsubscribe = subscribeToStockLibrary(() => {
       setIsLoading(getStockLibraryLoadingSnapshot());
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Save stock library whenever it changes

@@ -1,27 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { ThreeEvent } from '@react-three/fiber';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Part as PartType } from '../../types';
+import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
-import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { useUIStore } from '../../store/uiStore';
 import { useInteractionStore } from '../../store/interactionStore';
 import {
   calculateSnapThreshold,
   calculateReferenceDistances,
-  calculateGroupReferenceDistances
+  calculateGroupReferenceDistances,
+  type SnapResult
 } from '../../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
-import { LiveDimensions, snapToGrid } from './partTypes';
+import { LiveDimensions, resolveLiveGridReleasePosition, snapToGrid } from './partTypes';
 import {
   bindWindowPointerSession,
   createPointerRafQueue,
   pauseOrbitControls,
   resumeOrbitControls
 } from './workspaceUtils';
-import { calculateWorldHalfHeight } from '../../utils/mathPool';
+import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 import { createGeometryCache } from '../../interaction/geometry/cache';
 import {
   createMoveCommitPreview,
@@ -42,6 +43,7 @@ import {
   clearTransformDraggingPart,
   clearTransformInteractionPreview,
   clearTransformInteractionPreviewKeepingReferenceDistances,
+  isActiveMoveInteractionOwner,
   markTransformDraggingPart,
   publishSelectionDragDelta,
   publishMoveInteractionPreview
@@ -71,15 +73,24 @@ export function usePartDrag(
   togglePartSelection: (id: string) => void,
   selectGroup: (id: string) => void,
   toggleGroupSelection: (id: string) => void,
-  updatePart: (id: string, updates: Partial<PartType>) => void,
+  updatePart: (id: string, updates: Partial<PartType>, options?: { mateHostPartId?: string }) => boolean,
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void,
-  startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number) => void
+  startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number, primaryPartId?: string) => boolean
 ) {
   const [isDragging, setIsDragging] = useState(false);
   const dragIntentForPart = useSelectionStore((s) => (s.dragIntent?.partId === part.id ? s.dragIntent : null));
-  const dragStart = useRef<{ point: THREE.Vector3; partPos: THREE.Vector3; partOriginalPos: THREE.Vector3 } | null>(
-    null
-  );
+  const dragStart = useRef<{
+    point: THREE.Vector3;
+    partPos: THREE.Vector3;
+    partOriginalPos: THREE.Vector3;
+    /**
+     * Plane the anchor `point` was last captured against. Shift switches to
+     * the camera-facing plane mid-drag, and the anchor is re-taken when it
+     * does; without that the delta jumped by the gap between the two
+     * ray-plane hits.
+     */
+    planeMode: 'ground' | 'face';
+  } | null>(null);
   const justFinishedDragging = useRef(false);
   const justFinishedDraggingTimeoutRef = useRef<number | null>(null);
   const lastDragPosition = useRef<{ x: number; y: number; z: number } | null>(null);
@@ -93,6 +104,7 @@ export function usePartDrag(
     snapLines: import('../../types').SnapLine[];
   } | null>(null);
   const moveToolStateRef = useRef<MoveToolState | null>(null);
+  const mateHostPartIdRef = useRef<string | null>(null);
 
   const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0));
   const raycaster = useRef(new THREE.Raycaster());
@@ -117,6 +129,8 @@ export function usePartDrag(
   const _tempCameraTarget = useRef(new THREE.Vector3());
   const _tempDelta = useRef(new THREE.Vector3());
   const _tempProjectedDelta = useRef(new THREE.Vector3());
+  /** Delta applied on the previous frame, used to re-anchor across a plane flip. */
+  const lastDragDelta = useRef(new THREE.Vector3());
 
   const dragFrameCounterRef = useRef(0);
 
@@ -125,10 +139,15 @@ export function usePartDrag(
     lastDragPosition.current = null;
     latchedFaceSnapRef.current = null;
     moveToolStateRef.current = null;
+    mateHostPartIdRef.current = null;
     wasSnappedByParts.current = { x: false, y: false, z: false };
+    lastDragDelta.current.set(0, 0, 0);
   };
 
-  const finishDragState = (didMove: boolean, clearPreview = clearTransformInteractionPreview) => {
+  const finishDragState = (
+    didMove: boolean,
+    clearPreview: () => void = () => clearTransformInteractionPreview('part')
+  ) => {
     setIsDragging(false);
     resetDragRefs();
     markJustFinishedDragging(didMove);
@@ -160,7 +179,22 @@ export function usePartDrag(
   };
 
   const getDragPlaneInfo = useCallback(
-    (partPosition: THREE.Vector3): DragPlaneInfo => {
+    (partPosition: THREE.Vector3, mode: 'ground' | 'face' = 'ground'): DragPlaneInfo => {
+      // Default: keep parts moving on the ground plane (XZ) so Y doesn't drift
+      // during drag. Holding Shift enables camera-aware face-plane dragging.
+      if (mode === 'ground') {
+        _tempNormal.current.set(0, 1, 0);
+        _tempBasisU.current.set(1, 0, 0);
+        _tempBasisV.current.set(0, 0, 1);
+        planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current, partPosition);
+        return {
+          normal: _tempNormal.current,
+          basisU: _tempBasisU.current,
+          basisV: _tempBasisV.current,
+          axes: { x: true, y: false, z: true }
+        };
+      }
+
       _tempForward.current.set(0, 0, -1).applyQuaternion(camera.quaternion);
       _tempNormal.current.copy(_tempForward.current).normalize();
       planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current, partPosition);
@@ -306,12 +340,15 @@ export function usePartDrag(
       setIsDragging(true);
       beginMoveInteractionSession({
         affectedPartIds: moveSelection.affectedPartIds,
-        primaryPartId: part.id
+        primaryPartId: part.id,
+        moveOwner: 'part'
       });
       dragStart.current = {
         point: startPoint.clone(),
         partPos: anchorPos,
-        partOriginalPos: new THREE.Vector3(part.position.x, part.position.y, part.position.z)
+        partOriginalPos: new THREE.Vector3(part.position.x, part.position.y, part.position.z),
+        // getDragPlaneInfo(anchorPos) above defaults to the ground plane.
+        planeMode: 'ground'
       };
       lastDragPosition.current = { x: part.position.x, y: part.position.y, z: part.position.z };
       dragFrameCounterRef.current = 0;
@@ -351,7 +388,7 @@ export function usePartDrag(
         // Safety net: drag was started but second useEffect hasn't attached its listeners yet.
         // Do minimal cleanup to prevent stuck drag state.
         removeIntentListeners();
-        finishDragState(false, clearTransformInteractionPreviewKeepingReferenceDistances);
+        finishDragState(false, () => clearTransformInteractionPreviewKeepingReferenceDistances('part'));
       }
     };
 
@@ -380,13 +417,26 @@ export function usePartDrag(
     }
 
     const pointerRafQueue = createPointerRafQueue(window, (evt) => {
-      if (!isDragging || !dragStart.current) return;
+      if (!isDragging || !dragStart.current || !isActiveMoveInteractionOwner('part')) return;
 
+      // Shift switches to the camera-facing plane, which is the only way to
+      // move a part in Y. Choose the plane before sampling the ray so the two
+      // always agree, then re-anchor when the mode flips: the anchor was taken
+      // against the previous plane, and reusing it made the part jump by the
+      // gap between the two ray-plane hits.
+      const planeMode: 'ground' | 'face' = evt.shiftKey ? 'face' : 'ground';
+      const planeInfo = getDragPlaneInfo(dragStart.current.partPos, planeMode);
       const currentPoint = getWorldPoint(evt);
       if (currentPoint) {
+        if (dragStart.current.planeMode !== planeMode) {
+          // Keep the motion so far: anchor so that currentPoint - anchor is
+          // still the delta the part is already displaced by.
+          dragStart.current.point.copy(currentPoint).sub(lastDragDelta.current);
+          dragStart.current.planeMode = planeMode;
+        }
         const delta = _tempDelta.current.copy(currentPoint).sub(dragStart.current.point);
+        lastDragDelta.current.copy(delta);
         dragFrameCounterRef.current += 1;
-        const planeInfo = getDragPlaneInfo(dragStart.current.partPos);
 
         let uAmount = delta.dot(planeInfo.basisU);
         let vAmount = delta.dot(planeInfo.basisV);
@@ -408,12 +458,15 @@ export function usePartDrag(
 
         // The snap solver below still needs `worldHalfHeight` as a scalar
         // for its in-snap ground rejection. Compute it here so both the
-        // constraint pipeline and the snap solver see the same value.
-        const worldHalfHeight = calculateWorldHalfHeight(
-          rotationQuaternion,
+        // constraint pipeline and the snap solver see the same value —
+        // feature-aware, so a beveled/mitred part doesn't hover at box
+        // height while a snap is active.
+        const worldHalfHeight = calculateWorldHalfHeightFromDegrees(
+          part.rotation,
           liveDims.length,
           liveDims.thickness,
-          liveDims.width
+          liveDims.width,
+          part.features
         );
 
         // ADR-006: ground clamp through the constraint pipeline. Uses the
@@ -482,7 +535,11 @@ export function usePartDrag(
             settings: appSettings,
             snapThreshold,
             latchedFaceSnap: latchedFaceSnapRef.current,
-            resolveFeatureStage: (featureSnapResult, currentPosition) => {
+            // toolInput is a bare literal, so these get no contextual type.
+            resolveFeatureStage: (
+              featureSnapResult: SnapResult,
+              currentPosition: { x: number; y: number; z: number }
+            ) => {
               const featureDelta = {
                 x: featureSnapResult.adjustedPosition.x - currentPosition.x,
                 y: featureSnapResult.adjustedPosition.y - currentPosition.y,
@@ -505,6 +562,7 @@ export function usePartDrag(
           newY = preview.primaryPosition.y;
           newZ = preview.primaryPosition.z;
           latchedFaceSnapRef.current = preview.nextLatchedFaceSnap;
+          mateHostPartIdRef.current = preview.mateHostPartId ?? null;
           snapLines.push(...preview.snapLines);
           wasSnappedByParts.current = preview.snappedAxes;
           if (dragFrameCounterRef.current % 10 === 0) {
@@ -523,6 +581,7 @@ export function usePartDrag(
         } else {
           wasSnappedByParts.current = { x: false, y: false, z: false };
           moveToolStateRef.current = null;
+          mateHostPartIdRef.current = null;
         }
 
         const previewDelta = {
@@ -599,6 +658,7 @@ export function usePartDrag(
         publishMoveInteractionPreview({
           delta: previewDelta,
           snapLines,
+          moveOwner: 'part',
           referenceDistances,
           referenceState,
           publishSelectionDragDelta: false
@@ -609,7 +669,22 @@ export function usePartDrag(
         const proposedDelta = { ...previewDelta };
 
         if (stockConstraints.preventOverlap) {
-          const safeDelta = resolveSafeTranslationDelta(allParts, new Set(effectiveDraggingIds), proposedDelta);
+          dragDebug('partDrag:move:collisionInput', {
+            partId: part.id,
+            mateHostPartId: mateHostPartIdRef.current,
+            proposedPosition: {
+              x: dragStart.current.partPos.x + proposedDelta.x,
+              y: dragStart.current.partPos.y + proposedDelta.y,
+              z: dragStart.current.partPos.z + proposedDelta.z
+            }
+          });
+          const safeDelta = resolveSafeTranslationDelta(
+            allParts,
+            new Set(effectiveDraggingIds),
+            proposedDelta,
+            geometryCacheRef.current,
+            mateHostPartIdRef.current ?? undefined
+          );
           if (!safeDelta) {
             dragDebug('partDrag:move:overlapBlocked', {
               partId: part.id,
@@ -674,14 +749,33 @@ export function usePartDrag(
     };
 
     const handleWindowPointerUp = () => {
+      if (!isActiveMoveInteractionOwner('part')) {
+        pointerRafQueue.cancel();
+        finishDragState(false, () => clearTransformInteractionPreviewKeepingReferenceDistances('part'));
+        return;
+      }
       if (isDragging && dragStart.current && lastDragPosition.current) {
         const dragDistanceSq =
           (lastDragPosition.current.x - dragStart.current.partOriginalPos.x) ** 2 +
           (lastDragPosition.current.y - dragStart.current.partOriginalPos.y) ** 2 +
           (lastDragPosition.current.z - dragStart.current.partOriginalPos.z) ** 2;
-        let newX = lastDragPosition.current.x;
-        let newY = lastDragPosition.current.y;
-        let newZ = lastDragPosition.current.z;
+        const { liveGridSnap } = useAppSettingsStore.getState().settings;
+        const rawX = lastDragPosition.current.x;
+        const rawY = lastDragPosition.current.y;
+        const rawZ = lastDragPosition.current.z;
+
+        const gridReleasePosition = {
+          ...resolveLiveGridReleasePosition({ x: rawX, y: rawY, z: rawZ }, wasSnappedByParts.current, liveGridSnap),
+          // This drag runs on the ground plane, so Y is never a drag axis and
+          // must not be quantized on release. On stock that is not a multiple
+          // of the grid (18mm = 0.7087") that nudges the part into the one
+          // below, and the collision search then scales the whole delta down,
+          // discarding most of the horizontal move the user actually made.
+          y: rawY
+        };
+        let newX = gridReleasePosition.x;
+        let newY = gridReleasePosition.y;
+        let newZ = gridReleasePosition.z;
 
         const currentSelectedIds = useSelectionStore.getState().selectedPartIds;
         const currentSelectedGroupIds = useSelectionStore.getState().selectedGroupIds;
@@ -721,7 +815,17 @@ export function usePartDrag(
             createMoveCommitState({
               primaryPosition: dragStart.current!.partPos
             });
-          const commitPreview = createMoveCommitPreview({ partId: part.id, position, state: commitState });
+          const commitPreview = createMoveCommitPreview({
+            partId: part.id,
+            position,
+            state: commitState,
+            mateHostPartId: mateHostPartIdRef.current ?? undefined
+          });
+          dragDebug('partDrag:release:commitInput', {
+            partId: part.id,
+            mateHostPartId: mateHostPartIdRef.current,
+            position
+          });
           applyCommitInstructions(moveTool.commit(commitState, commitPreview), { updatePart });
         };
 
@@ -764,7 +868,7 @@ export function usePartDrag(
 
           dragDebug('partDrag:release:multi:commit', { partId: part.id, delta: constrainedMultiDelta.delta });
           moveSelectedParts(constrainedMultiDelta.delta);
-          clearTransformInteractionPreview();
+          clearTransformInteractionPreview('part');
         } else {
           // ADR-006: single-part release runs ground + collision in one
           // pipeline call. groundConstraint lifts the part to the floor if
@@ -778,12 +882,18 @@ export function usePartDrag(
             width: liveDims.width
           };
           const stockConstraints = useProjectStore.getState().stockConstraints;
+          dragDebug('partDrag:release:collisionInput', {
+            partId: part.id,
+            mateHostPartId: mateHostPartIdRef.current,
+            proposedPosition: { x: newX, y: newY, z: newZ }
+          });
           const releaseResult = resolveSinglePartReleaseMove({
             part: releasePart,
             projectParts: allParts,
             proposedPosition: { x: newX, y: newY, z: newZ },
             preventOverlap: stockConstraints.preventOverlap,
-            geometryCache: geometryCacheRef.current
+            geometryCache: geometryCacheRef.current,
+            mateHostPartId: mateHostPartIdRef.current ?? undefined
           });
 
           if (releaseResult.collisionBlocked) {
@@ -825,7 +935,7 @@ export function usePartDrag(
     return () => {
       unbindPointerSession();
       pointerRafQueue.cancel();
-      clearTransformInteractionPreview();
+      clearTransformInteractionPreview('part');
     };
     // Depend only on the *dimension* fields of liveDims, not the position fields.
     // Position fields (x/y/z) update on every drag frame via setLiveDims, and
@@ -913,7 +1023,7 @@ export function usePartDrag(
     // Group-selected part drag should use the thresholded group-drag path (same as InstancedParts).
     if (isInSelectedGroup) {
       if (e.point) {
-        startGroupDrag(e.point, e.nativeEvent.clientX, e.nativeEvent.clientY);
+        startGroupDrag(e.point, e.nativeEvent.clientX, e.nativeEvent.clientY, part.id);
       }
       return;
     }
@@ -934,7 +1044,7 @@ export function usePartDrag(
       moveSelection.anchorPosition.z
     );
 
-    getDragPlaneInfo(anchorPos);
+    getDragPlaneInfo(anchorPos, 'ground');
 
     const startPoint = getWorldPoint(e.nativeEvent);
     const partOriginalPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
@@ -942,12 +1052,15 @@ export function usePartDrag(
       setIsDragging(true);
       beginMoveInteractionSession({
         affectedPartIds: moveSelection.affectedPartIds,
-        primaryPartId: part.id
+        primaryPartId: part.id,
+        moveOwner: 'part'
       });
       dragStart.current = {
         point: startPoint.clone(),
         partPos: anchorPos,
-        partOriginalPos: partOriginalPos
+        partOriginalPos: partOriginalPos,
+        // getDragPlaneInfo(anchorPos) above defaults to the ground plane.
+        planeMode: 'ground'
       };
       lastDragPosition.current = { x: partOriginalPos.x, y: partOriginalPos.y, z: partOriginalPos.z };
       dragFrameCounterRef.current = 0;

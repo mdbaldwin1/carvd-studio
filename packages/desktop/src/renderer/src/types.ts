@@ -26,6 +26,8 @@ export interface EmbeddedStock {
 
 // A part template within an assembly (position relative to assembly origin)
 export interface AssemblyPart {
+  /** Stable identity within this assembly; absent in legacy templates. */
+  localId?: string;
   // All Part fields except id (will be generated on placement) and position (stored as relative)
   name: string;
   length: number;
@@ -40,6 +42,7 @@ export interface AssemblyPart {
   notes?: string;
   extraLength?: number;
   extraWidth?: number;
+  features?: PartFeature[];
   // Embedded stock snapshot - allows assembly to recreate stock if original is unavailable
   embeddedStock?: EmbeddedStock;
 }
@@ -93,6 +96,157 @@ export interface Rotation3D {
   z: RotationAngle;
 }
 
+export type PartFeatureId = string;
+export type PartFeatureVersion = 1;
+export type PartFeatureKind = 'end_cut' | 'rect_cut' | 'circular_cut' | 'rounded_cut';
+
+export type FaceTarget = 'left_end' | 'right_end' | 'top_face' | 'bottom_face' | 'front_face' | 'back_face';
+
+export type EdgeTarget =
+  | 'top_front_edge'
+  | 'top_back_edge'
+  | 'top_left_edge'
+  | 'top_right_edge'
+  | 'bottom_front_edge'
+  | 'bottom_back_edge'
+  | 'bottom_left_edge'
+  | 'bottom_right_edge'
+  | 'front_left_edge'
+  | 'front_right_edge'
+  | 'back_left_edge'
+  | 'back_right_edge';
+
+export type CornerTarget = 'front_left_corner' | 'front_right_corner' | 'back_left_corner' | 'back_right_corner';
+
+export type PartFeatureTarget =
+  | { type: 'face'; face: FaceTarget }
+  | { type: 'edge'; edge: EdgeTarget }
+  | { type: 'corner'; corner: CornerTarget };
+
+export interface PartFeatureReference {
+  primaryFrom: 'min' | 'center' | 'max';
+  secondaryFrom?: 'min' | 'center' | 'max';
+  tertiaryFrom?: 'min' | 'center' | 'max';
+}
+
+// Feature metadata is open-ended, but the shapes we read back in code are
+// named here so callers get types instead of `unknown`.
+export interface PartFeatureMetadata {
+  dowelJoint?: DowelJointMetadata;
+  [key: string]: unknown;
+}
+
+export interface PartFeatureBase {
+  id: PartFeatureId;
+  kind: PartFeatureKind;
+  version: PartFeatureVersion;
+  enabled: boolean;
+  label?: string;
+  metadata?: PartFeatureMetadata;
+  target: PartFeatureTarget;
+  reference: PartFeatureReference;
+}
+
+export interface EndCutFeature extends PartFeatureBase {
+  kind: 'end_cut';
+  // left/right ends take mitre/bevel/compound cuts; front/back faces take
+  // long-edge (rip) bevels, which only use the vertical angle.
+  target: { type: 'face'; face: 'left_end' | 'right_end' | 'front_face' | 'back_face' };
+  cutType: 'mitre' | 'bevel' | 'compound';
+  lengthMode: 'long_point' | 'short_point' | 'centerline';
+  parameters: {
+    horizontalAngle: number;
+    horizontalFlip?: boolean;
+    verticalAngle?: number;
+    verticalFlip?: boolean;
+    reference?: {
+      mode: 'long_point' | 'short_point' | 'centerline';
+      value: number;
+    };
+  };
+}
+
+export interface RectCutFeature extends PartFeatureBase {
+  kind: 'rect_cut';
+  cutType:
+    | 'corner_notch'
+    | 'edge_notch'
+    | 'cutout'
+    | 'dado'
+    | 'stopped_dado'
+    | 'rabbet'
+    | 'groove'
+    | 'stopped_groove'
+    | 'mortise'
+    | 'tenon';
+  parameters: {
+    size: {
+      length: number;
+      width: number;
+    };
+    depthMode: 'through' | 'blind';
+    depth?: number;
+  };
+  placement: {
+    x: number;
+    z: number;
+  };
+}
+
+export type CircularPattern =
+  | { type: 'linear'; count: number; spacing: number; direction: number }
+  | {
+      type: 'grid';
+      rows: number;
+      columns: number;
+      rowSpacing: number;
+      columnSpacing: number;
+      rotation: number;
+    }
+  | { type: 'circular'; count: number; radius: number; startAngle: number };
+
+export interface DowelJointMetadata {
+  jointId: string;
+  matePartId: string;
+  memberIndex: number;
+  dowelDiameter: number;
+  dowelLength: number;
+  embedmentDepth: number;
+}
+
+export interface CircularCutFeature extends PartFeatureBase {
+  kind: 'circular_cut';
+  target: { type: 'face'; face: FaceTarget };
+  cutType: 'round_hole' | 'countersink' | 'counterbore';
+  placement: { primary: number; secondary: number; rotation: number };
+  parameters: {
+    diameter: number;
+    depthMode: 'through' | 'blind';
+    depth?: number;
+    tilt: number;
+    direction: number;
+    countersink?: { majorDiameter: number; includedAngle: number };
+    counterbore?: { diameter: number; depth: number };
+  };
+  pattern?: CircularPattern;
+}
+
+export interface RoundedCutFeature extends PartFeatureBase {
+  kind: 'rounded_cut';
+  target: { type: 'face'; face: FaceTarget };
+  cutType: 'rounded_slot' | 'rounded_rectangle';
+  placement: { primary: number; secondary: number; rotation: number };
+  parameters: {
+    length: number;
+    width: number;
+    cornerRadius: number;
+    depthMode: 'through' | 'blind';
+    depth?: number;
+  };
+}
+
+export type PartFeature = EndCutFeature | RectCutFeature | CircularCutFeature | RoundedCutFeature;
+
 export interface Part {
   id: string;
   name: string;
@@ -109,6 +263,7 @@ export interface Part {
   // Joinery adjustments - extra material for cut list (not shown in 3D view)
   extraLength?: number; // additional length for cut list (e.g., tenon material)
   extraWidth?: number; // additional width for cut list (e.g., dado insertion depth)
+  features?: PartFeature[];
   // Glue-up panel flag - wide panels made by edge-gluing multiple boards
   glueUpPanel?: boolean;
   // Ignore overlap flag - builder is aware of intentional overlap (e.g., shelf notched for legs)
@@ -327,7 +482,7 @@ export interface ReferenceRuler {
 export interface PartValidationIssue {
   partId: string;
   partName: string;
-  type: 'no_stock' | 'exceeds_dimensions' | 'exceeds_thickness' | 'grain_mismatch';
+  type: 'no_stock' | 'exceeds_dimensions' | 'exceeds_thickness' | 'grain_mismatch' | 'feature_validation';
   message: string;
   severity: 'error' | 'warning';
   canBypass?: boolean; // true for glue-up panels exceeding width
@@ -335,6 +490,7 @@ export interface PartValidationIssue {
 
 // Represents a single part's cut instructions
 export interface CutInstruction {
+  stage?: 'post_glue_up'; // Absent means a stock blank; retained for legacy cut lists.
   partId: string;
   partName: string;
   cutLength: number; // length + extraLength
@@ -346,6 +502,7 @@ export interface CutInstruction {
   canRotate: boolean; // true if part can be rotated for optimization
   isGlueUp: boolean; // true if this is a glue-up panel
   boardsNeeded?: number; // number of boards for glue-up panels
+  features?: PartFeature[];
   notes?: string;
 }
 
@@ -414,6 +571,9 @@ export interface CutList {
 
   // Per-part instructions
   instructions: CutInstruction[];
+  // Finished-panel machining, performed after assembling the optimized strips.
+  // Separate from stock blanks so it never consumes stock or multiplies per strip.
+  postGlueUpInstructions?: CutInstruction[];
 
   // Per-stock optimization results
   stockBoards: StockBoard[];
@@ -452,7 +612,12 @@ export interface CustomShoppingItem {
 // ============================================================
 
 // Current file format version - increment when making breaking changes
-export const CARVD_FILE_VERSION = 1;
+// Version 2 introduces part features (custom cuts). Files are written at the
+// lowest version that can represent them so plain projects stay openable in
+// older builds, while featured projects make old builds warn instead of
+// silently showing uncut boxes.
+export const CARVD_FILE_VERSION = 2;
+export const CARVD_FILE_VERSION_BASE = 1;
 
 // The .carvd file format - plain JSON structure
 export interface CarvdFile {

@@ -27,6 +27,22 @@ test.describe("Navigation", () => {
     await expect(page).toHaveURL("/docs");
   });
 
+  test("documents round cuts and paired dowel joinery without CNC promises", async ({
+    page,
+  }) => {
+    await page.goto("/docs/joinery");
+
+    await expect(
+      page.getByRole("heading", { name: "Round cuts and dowel joints" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/round holes, countersinks, counterbores/i),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/does not generate CNC or G-code/i),
+    ).toBeVisible();
+  });
+
   test("brand link returns to homepage", async ({ page }) => {
     await page.goto("/features");
     await page.click('header a[href="/"]');

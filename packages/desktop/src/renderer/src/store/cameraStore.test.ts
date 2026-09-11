@@ -2,6 +2,15 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { useCameraStore } from './cameraStore';
 
 describe('cameraStore', () => {
+  it('toggles derived dowel visibility independently of parts', () => {
+    useCameraStore.setState({ showDowels: true } as never);
+    const getDowelState = () =>
+      useCameraStore.getState() as unknown as { showDowels: boolean; toggleDowels: () => void };
+    getDowelState().toggleDowels();
+    expect(getDowelState().showDowels).toBe(false);
+    getDowelState().toggleDowels();
+    expect(getDowelState().showDowels).toBe(true);
+  });
   beforeEach(() => {
     useCameraStore.setState({
       centerCameraRequested: false,
@@ -25,21 +34,21 @@ describe('cameraStore', () => {
 
   describe('display state', () => {
     describe('setDisplayMode', () => {
-      it('changes display mode to exploded', () => {
+      it('changes display mode to wireframe', () => {
         const store = useCameraStore.getState();
 
-        store.setDisplayMode('exploded');
+        store.setDisplayMode('wireframe');
 
-        expect(useCameraStore.getState().displayMode).toBe('exploded');
+        expect(useCameraStore.getState().displayMode).toBe('wireframe');
       });
 
-      it('changes display mode to assembled', () => {
-        useCameraStore.setState({ displayMode: 'exploded' });
+      it('changes display mode to solid', () => {
+        useCameraStore.setState({ displayMode: 'wireframe' });
         const store = useCameraStore.getState();
 
-        store.setDisplayMode('assembled');
+        store.setDisplayMode('solid');
 
-        expect(useCameraStore.getState().displayMode).toBe('assembled');
+        expect(useCameraStore.getState().displayMode).toBe('solid');
       });
     });
 

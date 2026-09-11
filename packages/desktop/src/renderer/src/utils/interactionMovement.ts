@@ -51,6 +51,16 @@ export interface RotateBatchGroundingResult {
   updates: Array<{ partId: string; position: TranslationDelta; rotation: Rotation3D }>;
 }
 
+export type CanvasPartDragFallback = 'keep-group-owner' | 'start-group-owner' | 'start-part-owner';
+
+export function resolveCanvasPartDragFallback(params: {
+  isSelectedGroupHit: boolean;
+  activeMoveOwner: 'part' | 'group' | null;
+}): CanvasPartDragFallback {
+  if (!params.isSelectedGroupHit) return 'start-part-owner';
+  return params.activeMoveOwner === 'group' ? 'keep-group-owner' : 'start-group-owner';
+}
+
 // `calculatePartWorldHalfHeight` retired in §8b-group — the rotation-aware
 // world half-height math is now inside `groundConstraint` via `getPartAABB`.
 // Pre-allocated three.js objects (`_upVector` etc.) likewise removed.
@@ -232,13 +242,15 @@ export function resolveSinglePartReleaseMove({
   projectParts,
   proposedPosition,
   preventOverlap,
-  geometryCache
+  geometryCache,
+  mateHostPartId
 }: {
   part: Part;
   projectParts: Part[];
   proposedPosition: TranslationDelta;
   preventOverlap: boolean;
   geometryCache?: GeometryCache;
+  mateHostPartId?: string;
 }): SinglePartReleaseMoveResult {
   const proposedDelta = {
     x: proposedPosition.x - part.position.x,
@@ -250,14 +262,16 @@ export function resolveSinglePartReleaseMove({
       candidate: {
         kind: 'move',
         delta: proposedDelta,
-        positions: new Map([[part.id, proposedPosition]])
+        positions: new Map([[part.id, proposedPosition]]),
+        mateHostPartId
       },
       startingParts: [part],
       project: {
         parts: projectParts,
         stocks: [],
         groupMembers: [],
-        preventOverlap
+        preventOverlap,
+        mateHostPartId
       },
       geometryCache: geometryCache ?? createGeometryCache()
     },
@@ -400,5 +414,5 @@ export function resolveRotateBatchGrounding({
     return { updates };
   }
 
-  return { updates: result.adjusted.updates };
+  return { updates: [...result.adjusted.updates] };
 }

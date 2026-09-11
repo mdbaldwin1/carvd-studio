@@ -4,6 +4,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import {
   Part,
+  PartFeature,
   Stock,
   CutList,
   CutInstruction,
@@ -14,6 +15,7 @@ import {
   PartValidationIssue
 } from '../types';
 import { logger } from './logger';
+import { clonePartFeatures } from './partFeatures';
 
 // Internal types for the algorithm
 interface Rectangle {
@@ -33,6 +35,10 @@ interface PartToPlace {
   notes?: string;
   isGlueUp: boolean;
   boardsNeeded?: number;
+}
+
+function getEnabledPartFeatures(part: Part): PartFeature[] {
+  return clonePartFeatures((part.features ?? []).filter((feature) => feature.enabled));
 }
 
 interface PlacementResult {
@@ -59,6 +65,7 @@ export function generateOptimizedCutList(
   const partsByStock = groupPartsByStock(validParts, stocks);
 
   const instructions: CutInstruction[] = [];
+  const postGlueUpInstructions: CutInstruction[] = [];
   const stockBoards: StockBoard[] = [];
   const allSkippedParts: string[] = [];
 
@@ -70,6 +77,25 @@ export function generateOptimizedCutList(
     for (const part of stockParts) {
       const partInstructions = createInstructions(part, stock);
       instructions.push(...partInstructions);
+      const features = getEnabledPartFeatures(part);
+      if (part.glueUpPanel && features.length > 0) {
+        postGlueUpInstructions.push({
+          stage: 'post_glue_up',
+          partId: part.id,
+          partName: part.name,
+          cutLength: part.length,
+          cutWidth: part.width,
+          thickness: part.thickness,
+          stockId: stock.id,
+          stockName: stock.name,
+          grainSensitive: part.grainSensitive,
+          canRotate: false,
+          isGlueUp: true,
+          features,
+          notes:
+            'After glue-up: assemble the strips, then size the finished panel and perform these operations once on the complete panel.'
+        });
+      }
     }
 
     // Convert parts to placement format
@@ -93,6 +119,7 @@ export function generateOptimizedCutList(
     projectModifiedAt,
     isStale: false,
     instructions,
+    postGlueUpInstructions,
     stockBoards,
     statistics,
     bypassedIssues,
@@ -144,6 +171,7 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
         grainSensitive: part.grainSensitive,
         canRotate: !part.grainSensitive,
         isGlueUp: false,
+        features: getEnabledPartFeatures(part),
         notes: part.notes
       }
     ];
@@ -170,6 +198,7 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
       canRotate: false, // Glue-up strips should not rotate (need consistent grain)
       isGlueUp: true,
       boardsNeeded: numStrips,
+      features: [],
       notes:
         i === 0
           ? `Glue-up panel: ${numStrips} strips × ${stripWidth.toFixed(2)}" = ${cutWidth}" final width${part.notes ? '. ' + part.notes : ''}`

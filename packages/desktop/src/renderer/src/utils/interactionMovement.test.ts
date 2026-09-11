@@ -3,6 +3,7 @@ import type { GroupMember, Part } from '../types';
 import {
   applyGroundConstraintToDelta,
   resolveConstrainedMoveDelta,
+  resolveCanvasPartDragFallback,
   resolveGroupReleaseMove,
   resolveMoveSelection,
   resolveResizeReleaseMove,
@@ -61,6 +62,33 @@ const groupMembers: GroupMember[] = [
 ];
 
 describe('interactionMovement', () => {
+  it('keeps or restores group ownership before using the direct-part canvas fallback', () => {
+    expect(
+      resolveCanvasPartDragFallback({
+        isSelectedGroupHit: true,
+        activeMoveOwner: 'group'
+      })
+    ).toBe('keep-group-owner');
+    expect(
+      resolveCanvasPartDragFallback({
+        isSelectedGroupHit: true,
+        activeMoveOwner: null
+      })
+    ).toBe('start-group-owner');
+    expect(
+      resolveCanvasPartDragFallback({
+        isSelectedGroupHit: true,
+        activeMoveOwner: 'part'
+      })
+    ).toBe('start-group-owner');
+    expect(
+      resolveCanvasPartDragFallback({
+        isSelectedGroupHit: false,
+        activeMoveOwner: null
+      })
+    ).toBe('start-part-owner');
+  });
+
   it('uses the full transform selection to resolve affected parts and anchor', () => {
     const result = resolveMoveSelection(
       {

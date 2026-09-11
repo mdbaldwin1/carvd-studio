@@ -3,14 +3,19 @@
  * file recovery, and window title synchronization
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useProjectStore } from '../store/projectStore';
+import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 import { useUIStore } from '../store/uiStore';
 import {
   saveProject,
   saveProjectAs,
+  hasPendingProjectSaves,
+  waitForPendingProjectSaves,
   openProject,
   openProjectFromPath,
+  beginProjectReplacement,
   newProject,
   hasUnsavedChanges,
   updateWindowTitle,
@@ -31,6 +36,8 @@ interface UseFileOperationsOptions {
   // Assembly editing mode
   isEditingAssembly?: boolean;
   onSaveAssembly?: () => Promise<void>;
+  isEditingPartCuts?: boolean;
+  onSavePartCuts?: () => boolean;
   // Callback when returning to start screen
   onGoHome?: () => void;
 }
@@ -47,6 +54,8 @@ interface UseFileOperationsResult {
   handleSave: () => Promise<void>;
   handleSaveAs: () => Promise<void>;
   handleGoHome: () => Promise<void>;
+  handleReload: (ignoreCache: boolean) => Promise<void>;
+  isFileActionBusy: () => boolean;
   // Recent projects
   recentProjects: string[];
   refreshRecentProjects: () => Promise<void>;
@@ -57,8 +66,28 @@ type PendingAction = {
   execute: () => Promise<void>;
 } | null;
 
+function flushFocusedInput(): void {
+  flushSync(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+}
+
+function hasUnsavedCutChanges(): boolean {
+  const cuts = usePartCutsEditingStore.getState();
+  const sourceFeatures = useProjectStore.getState().parts.find((part) => part.id === cuts.sourcePartId)?.features;
+  return cuts.isEditingPartCuts && cuts.hasUnsavedDraftChanges(sourceFeatures);
+}
+
 export function useFileOperations(options: UseFileOperationsOptions = {}): UseFileOperationsResult {
-  const { isEditingTemplate = false, onSaveTemplate, isEditingAssembly = false, onSaveAssembly, onGoHome } = options;
+  const {
+    isEditingTemplate = false,
+    onSaveTemplate,
+    isEditingAssembly = false,
+    onSaveAssembly,
+    isEditingPartCuts = false,
+    onSavePartCuts,
+    onGoHome
+  } = options;
   const isDirty = useProjectStore((s) => s.isDirty);
   const projectName = useProjectStore((s) => s.projectName);
   const filePath = useProjectStore((s) => s.filePath);
@@ -66,7 +95,17 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
 
   // Dialog state
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
+  const [dialogSaveError, setDialogSaveError] = useState<string | null>(null);
+  const [isDialogSaving, setIsDialogSaving] = useState(false);
+  const dialogSavingRef = useRef(false);
   const [recentProjects, setRecentProjects] = useState<string[]>([]);
+
+  const blockPartCutsReplacement = useCallback(() => {
+    if (dialogSavingRef.current) return true;
+    if (!isEditingPartCuts && !usePartCutsEditingStore.getState().isEditingPartCuts) return false;
+    showToast('Save or discard part cuts before changing projects.', 'warning');
+    return true;
+  }, [isEditingPartCuts, showToast]);
 
   // File recovery state
   const [recoveryState, setRecoveryState] = useState<{
@@ -170,6 +209,8 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   // Handle relocating a missing file
   const handleRelocateFile = useCallback(
     async (originalPath: string, fileName: string) => {
+      if (blockPartCutsReplacement()) return;
+      const transaction = beginProjectReplacement();
       try {
         const result = await window.electronAPI.showOpenDialog({
           title: `Locate "${fileName}"`,
@@ -188,7 +229,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
         await window.electronAPI.updateRecentProjectPath(originalPath, newPath);
 
         // Open the file from the new location
-        const openResult = await openProjectFromPath(newPath);
+        const openResult = await openProjectFromPath(newPath, transaction);
 
         if (handleFileOperationResult(openResult)) {
           return; // Recovery modal will be shown
@@ -203,7 +244,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
         showToast(`Error relocating file: ${error}`, 'error');
       }
     },
-    [showToast, refreshRecentProjects, handleFileOperationResult]
+    [showToast, refreshRecentProjects, handleFileOperationResult, blockPartCutsReplacement]
   );
 
   // Update window title when relevant state changes
@@ -214,6 +255,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   // Handle open-project events from main process (file association)
   useEffect(() => {
     const handleOpenProjectEvent = async (openFilePath: string) => {
+      if (blockPartCutsReplacement()) return;
       if (hasUnsavedChanges()) {
         setPendingAction({
           type: 'open',
@@ -242,18 +284,35 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       }
     };
 
-    window.electronAPI.onOpenProject(handleOpenProjectEvent);
-  }, [showToast, refreshRecentProjects, handleFileOperationResult]);
+    return window.electronAPI.onOpenProject(handleOpenProjectEvent);
+  }, [showToast, refreshRecentProjects, handleFileOperationResult, blockPartCutsReplacement]);
 
   // Handle window close event from main process
   useEffect(() => {
-    const cleanup = window.electronAPI.onBeforeClose(() => {
-      if (hasUnsavedChanges()) {
+    const cleanup = window.electronAPI.onBeforeClose(async () => {
+      if (dialogSavingRef.current) return;
+      setDialogSaveError(null);
+      // Fraction inputs commit on blur. Read the live session after that commit,
+      // not only the project snapshot (Save Cut has not updated the project yet).
+      flushFocusedInput();
+      // A clean document may still have an explicitly requested write in
+      // flight. Do not destroy its renderer (or quit the process) mid-save.
+      if (!hasUnsavedChanges() && !hasUnsavedCutChanges() && hasPendingProjectSaves()) {
+        dialogSavingRef.current = true;
+        try {
+          await waitForPendingProjectSaves();
+        } finally {
+          dialogSavingRef.current = false;
+        }
+        flushFocusedInput();
+      }
+      if (hasUnsavedChanges() || hasUnsavedCutChanges()) {
         // Show the unsaved changes dialog
         setPendingAction({
           type: 'close',
           execute: async () => {
             // This executes after user chooses "Don't Save"
+            await waitForPendingProjectSaves();
             await window.electronAPI.confirmClose();
           }
         });
@@ -275,6 +334,15 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   }, []);
 
   const handleSave = useCallback(async () => {
+    if (dialogSavingRef.current || pendingAction) return;
+    // Each editing mode owns its own save and stops here, so Save always means
+    // "commit what this editor is editing". Cuts mode used to fall through and
+    // write the project as well, which made it the only mode whose Save did
+    // two things.
+    if (isEditingPartCuts && onSavePartCuts) {
+      onSavePartCuts();
+      return;
+    }
     // Check if we're in template or assembly editing mode
     if (isEditingTemplate && onSaveTemplate) {
       await onSaveTemplate();
@@ -294,9 +362,21 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       showToast(`Error saving: ${result.error}`, 'error');
     }
     // If canceled, do nothing
-  }, [showToast, refreshRecentProjects, isEditingTemplate, onSaveTemplate, isEditingAssembly, onSaveAssembly]);
+  }, [
+    showToast,
+    refreshRecentProjects,
+    isEditingTemplate,
+    onSaveTemplate,
+    isEditingAssembly,
+    onSaveAssembly,
+    isEditingPartCuts,
+    onSavePartCuts,
+    pendingAction
+  ]);
 
   const handleSaveAs = useCallback(async () => {
+    if (dialogSavingRef.current || pendingAction) return;
+    if (isEditingPartCuts && onSavePartCuts && !onSavePartCuts()) return;
     // "Save As" doesn't apply to template or assembly editing
     if (isEditingTemplate) {
       showToast('Use "Save Template" to save template changes', 'info');
@@ -315,9 +395,18 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       showToast(`Error saving: ${result.error}`, 'error');
     }
     // If canceled, do nothing
-  }, [showToast, refreshRecentProjects, isEditingTemplate, isEditingAssembly]);
+  }, [
+    showToast,
+    refreshRecentProjects,
+    isEditingTemplate,
+    isEditingAssembly,
+    isEditingPartCuts,
+    onSavePartCuts,
+    pendingAction
+  ]);
 
   const handleNew = useCallback(async () => {
+    if (blockPartCutsReplacement()) return;
     // Block when editing template or assembly
     if (isEditingTemplate) {
       showToast('Finish editing template first', 'warning');
@@ -338,9 +427,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
     } else {
       await createMenuProject();
     }
-  }, [showToast, isEditingTemplate, isEditingAssembly, createMenuProject]);
+  }, [showToast, isEditingTemplate, isEditingAssembly, createMenuProject, blockPartCutsReplacement]);
 
   const handleOpen = useCallback(async () => {
+    if (blockPartCutsReplacement()) return;
     // Block when editing template or assembly
     if (isEditingTemplate) {
       showToast('Finish editing template first', 'warning');
@@ -377,10 +467,18 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
         showToast(`Error: ${result.error}`, 'error');
       }
     }
-  }, [showToast, refreshRecentProjects, isEditingTemplate, isEditingAssembly, handleFileOperationResult]);
+  }, [
+    showToast,
+    refreshRecentProjects,
+    isEditingTemplate,
+    isEditingAssembly,
+    handleFileOperationResult,
+    blockPartCutsReplacement
+  ]);
 
   const handleOpenRecent = useCallback(
     async (openFilePath: string) => {
+      if (blockPartCutsReplacement()) return;
       // Block when editing template or assembly
       if (isEditingTemplate) {
         showToast('Finish editing template first', 'warning');
@@ -418,10 +516,18 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
         }
       }
     },
-    [showToast, refreshRecentProjects, isEditingTemplate, isEditingAssembly, handleFileOperationResult]
+    [
+      showToast,
+      refreshRecentProjects,
+      isEditingTemplate,
+      isEditingAssembly,
+      handleFileOperationResult,
+      blockPartCutsReplacement
+    ]
   );
 
   const handleGoHome = useCallback(async () => {
+    if (blockPartCutsReplacement()) return;
     // Block when editing template or assembly
     if (isEditingTemplate) {
       showToast('Finish editing template first', 'warning');
@@ -442,38 +548,119 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
     } else {
       onGoHome?.();
     }
-  }, [showToast, isEditingTemplate, isEditingAssembly, onGoHome]);
+  }, [showToast, isEditingTemplate, isEditingAssembly, onGoHome, blockPartCutsReplacement]);
 
   // Dialog handlers
+  const handleReload = useCallback(
+    async (ignoreCache: boolean) => {
+      if (dialogSavingRef.current) return;
+      if (isEditingTemplate || isEditingAssembly) {
+        showToast(`Save or discard the ${isEditingTemplate ? 'template' : 'assembly'} before reloading.`, 'warning');
+        return;
+      }
+      flushFocusedInput();
+      const execute = async () => {
+        await waitForPendingProjectSaves();
+        await window.electronAPI.reloadWindow(ignoreCache);
+      };
+      if (!hasUnsavedChanges() && !hasUnsavedCutChanges() && hasPendingProjectSaves()) {
+        dialogSavingRef.current = true;
+        try {
+          await waitForPendingProjectSaves();
+        } finally {
+          dialogSavingRef.current = false;
+        }
+        flushFocusedInput();
+      }
+      if (hasUnsavedChanges() || hasUnsavedCutChanges()) {
+        setDialogSaveError(null);
+        setPendingAction({ type: 'reload', execute });
+      } else await execute();
+    },
+    [isEditingTemplate, isEditingAssembly, showToast]
+  );
+
   const handleDialogSave = useCallback(async () => {
     const pending = pendingAction;
+    if (!pending || dialogSavingRef.current) return;
+    dialogSavingRef.current = true;
+    setIsDialogSaving(true);
     const isCloseAction = pending?.type === 'close';
-    setPendingAction(null);
-
-    const result = await saveProject();
-    if (result.success && pending) {
-      await pending.execute();
-    } else if (result.error) {
-      showToast(`Error saving: ${result.error}`, 'error');
-      // If save failed during close, cancel the close
-      if (isCloseAction) {
-        await window.electronAPI.cancelClose();
+    try {
+      // A rejected inspector edit must leave both the editor and pending close
+      // intact; the user can cancel the dialog to correct the specific error.
+      const previousToast = useUIStore.getState().toast;
+      if (isEditingPartCuts && onSavePartCuts && !onSavePartCuts()) {
+        const saveToast = useUIStore.getState().toast;
+        // The save callback reports the exact validation failure through the UI
+        // store. Repeat it inside the modal, since outside toasts are aria-hidden.
+        setDialogSaveError(
+          saveToast && saveToast !== previousToast
+            ? saveToast.message
+            : 'Cannot save this cut. Cancel and correct the highlighted operation.'
+        );
+        if (isCloseAction) await window.electronAPI.cancelClose();
+        return;
       }
-    } else if (result.canceled && isCloseAction) {
-      // User canceled save dialog during close - cancel the close
-      await window.electronAPI.cancelClose();
+      setDialogSaveError(null);
+      const result = await saveProject();
+      if (result.success) {
+        if (
+          result.documentChanged ||
+          result.pendingChanges ||
+          useProjectStore.getState().isDirty ||
+          hasUnsavedCutChanges()
+        ) {
+          setDialogSaveError('New changes were made while saving. Save again to include them.');
+          return;
+        }
+        await pending.execute();
+        setPendingAction(null);
+      } else if (result.error) {
+        showToast(`Error saving: ${result.error}`, 'error');
+        setDialogSaveError(`Error saving: ${result.error}`);
+        // If save failed during close, cancel the close
+        if (isCloseAction) {
+          await window.electronAPI.cancelClose();
+        }
+      } else if (result.canceled) {
+        setPendingAction(null);
+        // User canceled save dialog during close - cancel the close
+        if (isCloseAction) await window.electronAPI.cancelClose();
+      }
+    } catch (error) {
+      setDialogSaveError(`Error saving: ${String(error)}`);
+      if (isCloseAction) await window.electronAPI.cancelClose();
+    } finally {
+      dialogSavingRef.current = false;
+      setIsDialogSaving(false);
     }
-  }, [pendingAction, showToast]);
+  }, [pendingAction, showToast, isEditingPartCuts, onSavePartCuts]);
 
   const handleDialogDiscard = useCallback(async () => {
+    if (dialogSavingRef.current) return;
+    setDialogSaveError(null);
     const pending = pendingAction;
-    setPendingAction(null);
-    if (pending) {
+    if (!pending) return;
+    const drainsWrites = pending.type === 'close' || pending.type === 'reload';
+    if (drainsWrites) {
+      dialogSavingRef.current = true;
+      setIsDialogSaving(true);
+    } else setPendingAction(null);
+    try {
       await pending.execute();
+      setPendingAction(null);
+    } finally {
+      if (drainsWrites) {
+        dialogSavingRef.current = false;
+        setIsDialogSaving(false);
+      }
     }
   }, [pendingAction]);
 
   const handleDialogCancel = useCallback(async () => {
+    if (dialogSavingRef.current) return;
+    setDialogSaveError(null);
     const isCloseAction = pendingAction?.type === 'close';
     setPendingAction(null);
     // If this was a close action, notify main process that close was canceled
@@ -486,7 +673,10 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (
+        (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) &&
+        !(isEditingPartCuts && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's')
+      ) {
         return;
       }
 
@@ -518,7 +708,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSave, handleSaveAs, handleOpen, handleNew]);
+  }, [handleSave, handleSaveAs, handleOpen, handleNew, isEditingPartCuts]);
 
   // Dialog component
   const UnsavedChangesDialogComponent = useCallback(
@@ -526,12 +716,14 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       <UnsavedChangesDialog
         isOpen={pendingAction !== null}
         action={pendingAction?.type || 'custom'}
+        saveError={dialogSaveError}
+        isSaving={isDialogSaving}
         onSave={handleDialogSave}
         onDiscard={handleDialogDiscard}
         onCancel={handleDialogCancel}
       />
     ),
-    [pendingAction, handleDialogSave, handleDialogDiscard, handleDialogCancel]
+    [pendingAction, dialogSaveError, isDialogSaving, handleDialogSave, handleDialogDiscard, handleDialogCancel]
   );
 
   // File recovery modal component
@@ -561,6 +753,8 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
     handleSave,
     handleSaveAs,
     handleGoHome,
+    handleReload,
+    isFileActionBusy: () => dialogSavingRef.current,
     recentProjects,
     refreshRecentProjects
   };

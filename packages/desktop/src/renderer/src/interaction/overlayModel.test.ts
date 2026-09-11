@@ -127,6 +127,7 @@ describe('computeOverlayModel', () => {
         makeInput({
           activeSession: {
             kind: 'move',
+            moveOwner: 'part',
             affectedPartIds: ['a'],
             primaryPartId: 'a',
             delta: { x: 0, y: 0, z: 0 },

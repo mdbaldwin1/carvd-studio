@@ -1,13 +1,64 @@
 import { Part } from '../types';
-import { getPartOBB, obbsOverlap, type PartOBB } from './snapToPartsUtil';
+import { getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
+import {
+  hasRenderablePartFeatures,
+  partsOverlapOnYAxis,
+  partsOverlapInPlan,
+  partsOverlapInMaterial
+} from './partFeatureGeometry';
+import {
+  convexShapesOverlap,
+  detectFeatureMateSnaps,
+  getPartConvexShape,
+  getPartMaterialOBBs,
+  getPartOBB,
+  getPartSubOBBs,
+  obbsOverlap,
+  type PartOBB
+} from './snapToPartsUtil';
 import { dragDebug } from './dragDebug';
 import type { GeometryCache } from '../interaction/geometry/cache';
 
 const OBB_EPSILON = 1e-6;
 const OBB_SEPARATION_TOLERANCE = 1e-8;
+const CONTOUR_TOLERANCE = 1e-6;
 const SAFE_SEARCH_STEPS = 14;
 const MIN_DIRECTIONAL_FRACTION = 0.005;
 type TranslationDelta = { x: number; y: number; z: number };
+
+function hasAngledEndCuts(part: Part): boolean {
+  const profiles = getPartEndCutProfiles(part);
+  if (profiles.left.maxInset > 0 || profiles.right.maxInset > 0) return true;
+  // Long-edge bevels also remove material along Y, so they need the same
+  // convex-shape treatment to avoid ghost corners at the beveled face.
+  const edgeProfiles = getPartEdgeBevelProfiles(part);
+  return edgeProfiles.front.inset > 0 || edgeProfiles.back.inset > 0;
+}
+
+function hasVerticalCuts(part: Part): boolean {
+  const profiles = getPartEndCutProfiles(part);
+  if (profiles.left.verticalInset > 0 || profiles.right.verticalInset > 0) return true;
+  const edgeProfiles = getPartEdgeBevelProfiles(part);
+  return edgeProfiles.front.inset > 0 || edgeProfiles.back.inset > 0;
+}
+
+function hasNonRectangularContour(part: Part): boolean {
+  if (!hasRenderablePartFeatures(part)) return false;
+  const features = (part.features ?? []).filter((f) => f.enabled);
+  return features.some(
+    (f) => f.kind === 'rect_cut' && (f as { parameters: { depthMode: string } }).parameters.depthMode === 'through'
+  );
+}
+
+/** True when the part lies flat (only rotated around Y, if at all). */
+function isFlat(part: Part): boolean {
+  const rx = Math.abs(part.rotation.x % 360);
+  const rz = Math.abs(part.rotation.z % 360);
+  return (
+    (rx < 0.01 || Math.abs(rx - 180) < 0.01 || Math.abs(rx - 360) < 0.01) &&
+    (rz < 0.01 || Math.abs(rz - 180) < 0.01 || Math.abs(rz - 360) < 0.01)
+  );
+}
 
 export function overlapCheckEnabled(a: Part, b: Part): boolean {
   // If either part explicitly allows overlap, the pair is exempt.
@@ -16,6 +67,59 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
 
 export function partsOverlap(a: Part, b: Part, geometryCache?: GeometryCache): boolean {
   if (!overlapCheckEnabled(a, b)) return false;
+
+  if (
+    [a, b].some((part) =>
+      part.features?.some(
+        (feature) => feature.enabled && (feature.kind === 'circular_cut' || feature.kind === 'rounded_cut')
+      )
+    )
+  ) {
+    if (!obbsOverlap(getPartOBB(a), getPartOBB(b), OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false)) return false;
+    return partsOverlapInMaterial(a, b);
+  }
+
+  const hasAngledCuts = hasAngledEndCuts(a) || hasAngledEndCuts(b);
+
+  // Flat horizontal end cuts have an exact top-view contour. Prefer that to
+  // the 3D convex fallback so contact is accepted while a real intrusion is
+  // still rejected at the authored mitre plane.
+  if (hasAngledCuts && !hasVerticalCuts(a) && !hasVerticalCuts(b) && isFlat(a) && isFlat(b)) {
+    if (!partsOverlapOnYAxis(a, b, CONTOUR_TOLERANCE)) return false;
+    return partsOverlapInPlan(a, b, CONTOUR_TOLERANCE);
+  }
+
+  // Bevels, compounds, edge bevels, and tilted horizontal cuts require the
+  // full 3D convex shape.
+  if (hasAngledCuts) {
+    return convexShapesOverlap(getPartConvexShape(a), getPartConvexShape(b), OBB_SEPARATION_TOLERANCE, false);
+  }
+
+  // For flat parts with through-depth features (corner notches, edge notches, etc.),
+  // use strict triangle SAT on the actual contour components and holes.
+  // This is exact for any contour geometry — no sub-box approximation.
+  // Non-flat parts (rotated around X or Z) fall through to the sub-OBB path
+  // because the 2D contour projection doesn't work for tilted parts.
+  if (hasNonRectangularContour(a) || hasNonRectangularContour(b)) {
+    if (isFlat(a) && isFlat(b)) {
+      if (!partsOverlapOnYAxis(a, b, CONTOUR_TOLERANCE)) return false;
+      return partsOverlapInPlan(a, b, CONTOUR_TOLERANCE);
+    }
+
+    // Non-flat featured parts: use sub-OBB decomposition which handles 3D rotation
+    const obbsA = getPartSubOBBs(a);
+    const obbsB = getPartSubOBBs(b);
+    for (const obbA of obbsA) {
+      for (const obbB of obbsB) {
+        if (obbsOverlap(obbA, obbB, OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Simple rectangular parts: fast OBB test
   return obbsOverlap(
     getPartOBB(a, a.position, geometryCache),
     getPartOBB(b, b.position, geometryCache),
@@ -64,7 +168,8 @@ export function wouldTranslationCauseOverlap(
   parts: Part[],
   movingIds: Set<string>,
   delta: TranslationDelta,
-  geometryCache?: GeometryCache
+  geometryCache?: GeometryCache,
+  mateHostPartId?: string
 ): boolean {
   for (const p of parts) {
     if (!movingIds.has(p.id)) continue;
@@ -80,6 +185,7 @@ export function wouldTranslationCauseOverlap(
 
     for (const other of parts) {
       if (movingIds.has(other.id)) continue;
+      if (other.id === mateHostPartId && isCompatibleSocketMate(movedPart, other)) continue;
       if (existingOverlapDoesNotWorsen(p, movedPart, other, geometryCache)) {
         continue;
       }
@@ -92,6 +198,22 @@ export function wouldTranslationCauseOverlap(
   return false;
 }
 
+function isCompatibleSocketMate(movedPart: Part, hostPart: Part): boolean {
+  const mate = detectFeatureMateSnaps(movedPart, movedPart.position, [hostPart], [movedPart.id], 0.03);
+  if (mate.mateHostPartId !== hostPart.id) return false;
+  const isExactMate =
+    Math.abs(mate.adjustedPosition.x - movedPart.position.x) <= OBB_EPSILON &&
+    Math.abs(mate.adjustedPosition.y - movedPart.position.y) <= OBB_EPSILON &&
+    Math.abs(mate.adjustedPosition.z - movedPart.position.z) <= OBB_EPSILON;
+  if (!isExactMate) return false;
+
+  const movingMaterial = getPartMaterialOBBs(movedPart);
+  const hostMaterial = getPartMaterialOBBs(hostPart);
+  return !movingMaterial.some((movingCell) =>
+    hostMaterial.some((hostCell) => obbsOverlap(movingCell, hostCell, OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false))
+  );
+}
+
 function existingOverlapDoesNotWorsen(
   part: Part,
   movedPart: Part,
@@ -99,17 +221,40 @@ function existingOverlapDoesNotWorsen(
   geometryCache?: GeometryCache
 ): boolean {
   if (!overlapCheckEnabled(part, other)) return true;
-  const beforeDepth = getObbOverlapDepth(
-    getPartOBB(part, part.position, geometryCache),
-    getPartOBB(other, other.position, geometryCache)
-  );
+  // A coarse OBB is only the true overlap representation for an uncut board.
+  // Feature-bearing parts (custom cuts) interlock: their coarse OBBs overlap
+  // deeply and stably, so every translation would read as "not worsening" and
+  // skip the exact checks in partsOverlap. Measure those pairs over the
+  // material sub-OBBs instead, which respect the cuts. Refusing the exemption
+  // outright would strand a part seated in a dado -- it could never be dragged
+  // back out while Prevent Overlap is on.
+  const usesMaterialCells =
+    (part.features?.length ?? 0) > 0 || (other.features?.length ?? 0) > 0 || (movedPart.features?.length ?? 0) > 0;
+
+  const depthBetween = (a: Part, b: Part): number | null => {
+    if (!usesMaterialCells) {
+      return getObbOverlapDepth(getPartOBB(a, a.position, geometryCache), getPartOBB(b, b.position, geometryCache));
+    }
+    let deepest: number | null = null;
+    for (const aCell of getPartMaterialOBBs(a)) {
+      for (const bCell of getPartMaterialOBBs(b)) {
+        const depth = getObbOverlapDepth(aCell, bCell);
+        if (depth !== null) deepest = deepest === null ? depth : Math.max(deepest, depth);
+      }
+    }
+    return deepest;
+  };
+
+  const beforeDepth = depthBetween(part, other);
   if (beforeDepth === null) return false;
 
-  const afterDepth = getObbOverlapDepth(
-    getPartOBB(movedPart, movedPart.position, geometryCache),
-    getPartOBB(other, other.position, geometryCache)
-  );
-  return afterDepth !== null && afterDepth <= beforeDepth + OBB_EPSILON;
+  const afterDepth = depthBetween(movedPart, other);
+  if (!usesMaterialCells) return afterDepth !== null && afterDepth <= beforeDepth + OBB_EPSILON;
+
+  // Interlocked parts must *strictly* retreat to earn the exemption. Accepting
+  // "no worse" here would fire at zero delta too, masking a real overlap
+  // wherever this is asked about the current position rather than a move.
+  return afterDepth === null || afterDepth < beforeDepth - OBB_EPSILON;
 }
 
 function getObbOverlapDepth(a: PartOBB, b: PartOBB): number | null {
@@ -176,9 +321,10 @@ export function resolveSafeTranslationDelta(
   parts: Part[],
   movingIds: Set<string>,
   proposedDelta: TranslationDelta,
-  geometryCache?: GeometryCache
+  geometryCache?: GeometryCache,
+  mateHostPartId?: string
 ): TranslationDelta | null {
-  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta, geometryCache)) {
+  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta, geometryCache, mateHostPartId)) {
     return proposedDelta;
   }
 
@@ -193,7 +339,7 @@ export function resolveSafeTranslationDelta(
       y: proposedDelta.y * mid,
       z: proposedDelta.z * mid
     };
-    if (wouldTranslationCauseOverlap(parts, movingIds, candidate, geometryCache)) {
+    if (wouldTranslationCauseOverlap(parts, movingIds, candidate, geometryCache, mateHostPartId)) {
       high = mid;
     } else {
       low = mid;

@@ -4,6 +4,52 @@ import { FractionInput } from './FractionInput';
 import { useProjectStore } from '../../store/projectStore';
 
 describe('FractionInput', () => {
+  it.each(['imperial', 'metric'] as const)('UX announces the active measurement unit in %s', (units) => {
+    useProjectStore.setState({ units });
+    render(<FractionInput ariaLabel="Cut depth" value={0.755} onChange={vi.fn()} />);
+    expect(screen.getByRole('textbox', { name: 'Cut depth' })).toHaveAttribute(
+      'aria-description',
+      units === 'metric' ? 'Enter millimeters (mm).' : 'Enter inches; decimals or fractions are accepted.'
+    );
+  });
+  it.each(
+    (
+      [
+        { value: 0.755, imperial: '0.755', metric: '19.177' },
+        { value: 0.74, imperial: '0.74', metric: '18.796' }
+      ] as const
+    ).flatMap((row) =>
+      (['imperial', 'metric'] as const).flatMap((units) =>
+        [false, true].map((unmountFocused) => ({ ...row, units, unmountFocused }))
+      )
+    )
+  )('Q4 preserves exact $value on untouched blur/unmount in $units (unmount=$unmountFocused)', (row) => {
+    useProjectStore.setState({ units: row.units });
+    let stored: number = row.value;
+    const view = render(
+      <FractionInput
+        value={stored}
+        onChange={(next) => {
+          stored = next;
+        }}
+      />
+    );
+    const input = screen.getByRole('textbox');
+    expect.soft(input).toHaveValue(row[row.units]);
+    fireEvent.focus(input);
+    if (!row.unmountFocused) fireEvent.blur(input);
+    view.unmount();
+    expect.soft(stored).toBe(row.value);
+    render(
+      <FractionInput
+        value={stored}
+        onChange={(next) => {
+          stored = next;
+        }}
+      />
+    );
+    expect(screen.getByRole('textbox')).toHaveValue(row[row.units]);
+  });
   const mockOnChange = vi.fn();
 
   beforeEach(() => {

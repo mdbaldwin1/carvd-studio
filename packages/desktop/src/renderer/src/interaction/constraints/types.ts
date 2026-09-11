@@ -24,6 +24,8 @@ export type CandidateTransform =
       delta: Vec3;
       /** Final positions per part after the tool's raw work. */
       positions: ReadonlyMap<string, Vec3>;
+      /** Compatible feature-socket host selected by the mate snap solver. */
+      mateHostPartId?: string;
     }
   | {
       kind: 'resize';
@@ -60,6 +62,8 @@ export interface ProjectStateSlice {
    * that don't pass it through; preserves existing inline behavior).
    */
   preventOverlap?: boolean;
+  /** Compatible feature-socket host selected by the mate snap solver. */
+  mateHostPartId?: string;
 }
 
 export interface ConstraintContext {

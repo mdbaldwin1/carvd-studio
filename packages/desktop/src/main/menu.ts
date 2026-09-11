@@ -178,8 +178,18 @@ export function buildMenuTemplate(): MenuItemConstructorOptions[] {
         click: () => sendMenuCommand('reset-camera')
       },
       { type: 'separator' },
-      { role: 'reload' },
-      { role: 'forceReload' },
+      {
+        id: 'reload',
+        label: 'Reload',
+        accelerator: 'CmdOrCtrl+R',
+        click: () => sendMenuCommand('request-reload', false)
+      },
+      {
+        id: 'forceReload',
+        label: 'Force Reload',
+        accelerator: 'CmdOrCtrl+Shift+R',
+        click: () => sendMenuCommand('request-reload', true)
+      },
       { role: 'toggleDevTools' },
       { type: 'separator' },
       { role: 'resetZoom' },

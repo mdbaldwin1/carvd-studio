@@ -7,6 +7,7 @@ import {
   Assembly,
   CameraState,
   CARVD_FILE_VERSION,
+  CARVD_FILE_VERSION_BASE,
   CarvdFile,
   CutList,
   CustomShoppingItem,
@@ -20,6 +21,8 @@ import {
   Stock,
   StockConstraintSettings
 } from '../types';
+import { normalizeAssemblyPart, normalizePart, validateSerializedPartFeatures } from './partFeatures';
+import { validateAssemblyDowelRelationshipReferences, validateDowelRelationshipReferences } from './dowelJointUtils';
 
 // Default stock constraints for migration
 const DEFAULT_STOCK_CONSTRAINTS: StockConstraintSettings = {
@@ -53,8 +56,16 @@ export function serializeProject(state: {
   thumbnail?: ProjectThumbnail | null;
   cameraState?: CameraState | null;
 }): CarvdFile {
+  const partHasFeatures = (part: Part) => (part.features?.length ?? 0) > 0;
+  const usesPartFeatures =
+    state.parts.some(partHasFeatures) ||
+    state.assemblies.some((assembly) => assembly.parts.some((part) => (part.features?.length ?? 0) > 0));
+
   return {
-    version: CARVD_FILE_VERSION,
+    // Featured projects need version 2 so older builds warn instead of
+    // silently dropping cuts; plain projects stay at the base version for
+    // maximum backward compatibility.
+    version: usesPartFeatures ? CARVD_FILE_VERSION : CARVD_FILE_VERSION_BASE,
     project: {
       name: state.projectName,
       createdAt: state.createdAt,
@@ -94,11 +105,14 @@ export function deserializeToProject(file: CarvdFile): Project {
     overageFactor: file.project.overageFactor,
     projectNotes: file.project.projectNotes,
     stockConstraints: file.project.stockConstraints,
-    parts: file.parts,
+    parts: file.parts.map((part) => normalizePart(part)),
     stocks: file.stocks,
     groups: file.groups,
     groupMembers: file.groupMembers,
-    assemblies: file.assemblies,
+    assemblies: file.assemblies?.map((assembly) => ({
+      ...assembly,
+      parts: assembly.parts.map((part) => normalizeAssemblyPart(part))
+    })),
     snapGuides: file.snapGuides,
     customShoppingItems: file.customShoppingItems,
     cutList: file.cutList,
@@ -154,13 +168,55 @@ export function validateCarvdFile(data: unknown): FileValidationResult {
   if (!Array.isArray(obj.groupMembers)) {
     errors.push('Missing groupMembers array');
   }
+  if (obj.assemblies !== undefined && !Array.isArray(obj.assemblies)) {
+    errors.push('Invalid assemblies array');
+  }
 
   if (errors.length > 0) {
     return { valid: false, errors, warnings };
   }
 
+  let containsPartFeatures = false;
+  (obj.parts as unknown[]).forEach((part, index) => {
+    if (!part || typeof part !== 'object' || Array.isArray(part)) {
+      errors.push(`parts[${index}] is invalid`);
+      return;
+    }
+    const features = (part as Record<string, unknown>).features;
+    if (Array.isArray(features) && features.length > 0) containsPartFeatures = true;
+    errors.push(...validateSerializedPartFeatures(features, `parts[${index}].features`));
+  });
+  (obj.assemblies as unknown[] | undefined)?.forEach((assembly, assemblyIndex) => {
+    if (!assembly || typeof assembly !== 'object' || Array.isArray(assembly)) {
+      errors.push(`assemblies[${assemblyIndex}] is invalid`);
+      return;
+    }
+    const assemblyParts = (assembly as Record<string, unknown>).parts;
+    if (!Array.isArray(assemblyParts)) {
+      errors.push(`assemblies[${assemblyIndex}].parts must be an array`);
+      return;
+    }
+    assemblyParts.forEach((part, partIndex) => {
+      if (!part || typeof part !== 'object' || Array.isArray(part)) {
+        errors.push(`assemblies[${assemblyIndex}].parts[${partIndex}] is invalid`);
+        return;
+      }
+      const features = (part as Record<string, unknown>).features;
+      if (Array.isArray(features) && features.length > 0) containsPartFeatures = true;
+      errors.push(
+        ...validateSerializedPartFeatures(features, `assemblies[${assemblyIndex}].parts[${partIndex}].features`)
+      );
+    });
+  });
+  if (containsPartFeatures && typeof obj.version === 'number' && obj.version < 2) {
+    errors.push('Projects containing part cuts require file version 2 or newer');
+  }
+  if (errors.length > 0) return { valid: false, errors, warnings };
+
+  const candidateFile = obj as unknown as CarvdFile;
+
   // Migrate if needed
-  const migratedData = migrateFile(obj as CarvdFile);
+  const migratedData = migrateFile(candidateFile);
 
   // Validate referential integrity
   const integrityResult = validateReferentialIntegrity(migratedData);
@@ -183,6 +239,8 @@ function validateReferentialIntegrity(file: CarvdFile): { errors: string[]; warn
   const partIds = new Set(file.parts.map((p) => p.id));
   const stockIds = new Set(file.stocks.map((s) => s.id));
   const groupIds = new Set(file.groups.map((g) => g.id));
+
+  errors.push(...validateDowelRelationshipReferences(file.parts));
 
   // Check part stock references
   for (const part of file.parts) {
@@ -207,6 +265,11 @@ function validateReferentialIntegrity(file: CarvdFile): { errors: string[]; warn
   // Check assembly stock references (if present)
   if (file.assemblies) {
     for (const assembly of file.assemblies) {
+      errors.push(
+        ...validateAssemblyDowelRelationshipReferences(assembly.parts).map(
+          (error) => `Assembly "${assembly.name}": ${error}`
+        )
+      );
       for (const part of assembly.parts) {
         if (part.stockId && !stockIds.has(part.stockId)) {
           warnings.push(`Assembly "${assembly.name}" part references non-existent stock ID "${part.stockId}"`);
@@ -223,6 +286,10 @@ function validateReferentialIntegrity(file: CarvdFile): { errors: string[]; warn
  */
 function migrateFile(file: CarvdFile): CarvdFile {
   let migrated = { ...file };
+
+  // Version 1 -> 2: part features (custom cuts) were introduced. V1 files
+  // simply have no features; `normalizePart` on load seeds the field, so no
+  // structural rewrite is required.
 
   // Version 0 -> 1 migration (hypothetical, for future use)
   // if (migrated.version < 1) {
@@ -244,14 +311,24 @@ function migrateFile(file: CarvdFile): CarvdFile {
 
   // Ensure parts have all required fields
   migrated.parts = migrated.parts.map((part) => ({
-    ...part,
-    grainSensitive: part.grainSensitive ?? true,
-    grainDirection: part.grainDirection ?? 'length',
-    rotation: part.rotation ?? { x: 0, y: 0, z: 0 },
+    ...normalizePart(part),
     extraLength: part.extraLength ?? undefined,
     extraWidth: part.extraWidth ?? undefined,
     glueUpPanel: part.glueUpPanel ?? undefined
   }));
+
+  if (migrated.assemblies) {
+    migrated.assemblies = migrated.assemblies.map((assembly) => ({
+      ...assembly,
+      parts: assembly.parts.map((part) =>
+        normalizeAssemblyPart({
+          ...part,
+          extraLength: part.extraLength ?? undefined,
+          extraWidth: part.extraWidth ?? undefined
+        })
+      )
+    }));
+  }
 
   // Ensure stocks have all required fields
   migrated.stocks = migrated.stocks.map((stock) => ({
@@ -341,6 +418,49 @@ export function repairCarvdFile(jsonString: string): FileRepairResult {
   if (!Array.isArray(obj.groups)) obj.groups = [];
   if (!Array.isArray(obj.groupMembers)) obj.groupMembers = [];
 
+  // Repair the two scalar fields the full validation below insists on. Without
+  // this, recovery fails for exactly the corruption classes that make a file
+  // need recovering. A version *newer* than this build is left alone on
+  // purpose: that is a "please update Carvd Studio" condition, not damage.
+  if (typeof obj.version !== 'number') {
+    const hasPartFeatures = [
+      ...(obj.parts as unknown[]),
+      ...((obj.assemblies as { parts?: unknown[] }[] | undefined) ?? []).flatMap((assembly) => assembly?.parts ?? [])
+    ].some((part) => {
+      const features = (part as { features?: unknown })?.features;
+      return Array.isArray(features) && features.length > 0;
+    });
+    // Mirror how saves pick a version, so a project without cuts keeps the
+    // legacy version and stays readable by older builds.
+    obj.version = hasPartFeatures ? CARVD_FILE_VERSION : CARVD_FILE_VERSION_BASE;
+    repairActions.push(`Restored missing file version to ${obj.version}`);
+  }
+
+  const projectMetadata = obj.project as Record<string, unknown>;
+  if (typeof projectMetadata.name !== 'string') {
+    projectMetadata.name = 'Recovered Project';
+    repairActions.push('Restored missing project name');
+  }
+
+  const invalidCollectionEntries = [
+    ['parts', obj.parts],
+    ['stocks', obj.stocks],
+    ['groups', obj.groups],
+    ['groupMembers', obj.groupMembers]
+  ].flatMap(([name, entries]) =>
+    (entries as unknown[]).flatMap((entry, index) =>
+      entry && typeof entry === 'object' && !Array.isArray(entry) ? [] : [`${name}[${index}] is invalid`]
+    )
+  );
+  if (invalidCollectionEntries.length > 0) {
+    return {
+      success: false,
+      repairActions,
+      remainingErrors: invalidCollectionEntries,
+      warnings
+    };
+  }
+
   // Build ID sets for repair
   const partIds = new Set((obj.parts as Array<{ id: string }>).map((p) => p.id));
   const stockIds = new Set((obj.stocks as Array<{ id: string }>).map((s) => s.id));
@@ -381,25 +501,35 @@ export function repairCarvdFile(jsonString: string): FileRepairResult {
     }
   }
 
-  // Try to validate the repaired file
-  const migratedData = migrateFile(obj as CarvdFile);
-  const integrityResult = validateReferentialIntegrity(migratedData);
-
-  if (integrityResult.errors.length > 0) {
+  // Run the same complete schema, migration, and relationship validation as a
+  // normal load. Recovery must never claim success for data the app rejects.
+  let validation: FileValidationResult;
+  try {
+    validation = validateCarvdFile(obj);
+  } catch (error) {
     return {
       success: false,
       repairActions,
-      remainingErrors: integrityResult.errors,
-      warnings: [...warnings, ...integrityResult.warnings]
+      remainingErrors: [`Unable to safely repair file: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      warnings
+    };
+  }
+
+  if (!validation.valid || !validation.data) {
+    return {
+      success: false,
+      repairActions,
+      remainingErrors: validation.errors,
+      warnings: [...warnings, ...validation.warnings]
     };
   }
 
   return {
     success: true,
-    repairedData: migratedData,
+    repairedData: validation.data,
     repairActions,
     remainingErrors: [],
-    warnings: [...warnings, ...integrityResult.warnings]
+    warnings: [...warnings, ...validation.warnings]
   };
 }
 

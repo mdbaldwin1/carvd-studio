@@ -14,8 +14,8 @@ describe('lemonsqueezy-api', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
-    mockApp.getPath.mockReturnValue('/mock/user/data');
-    mockApp.getVersion.mockReturnValue('1.0.0');
+    vi.mocked(mockApp.getPath).mockReturnValue('/mock/user/data');
+    vi.mocked(mockApp.getVersion).mockReturnValue('1.0.0');
   });
 
   describe('getInstanceId', () => {
@@ -31,7 +31,7 @@ describe('lemonsqueezy-api', () => {
 
     it('changes when userData path changes', () => {
       const id1 = getInstanceId();
-      mockApp.getPath.mockReturnValue('/different/path');
+      vi.mocked(mockApp.getPath).mockReturnValue('/different/path');
       const id2 = getInstanceId();
       expect(id1).not.toBe(id2);
     });

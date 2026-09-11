@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { PartFeature } from '../types';
+import { getPartWorldHalfHeight } from './partFeatureGeometry';
 
 // Module-level reusable objects for ground constraint calculations.
 // Safe because JS is single-threaded and these are only used within
@@ -37,8 +39,20 @@ export function calculateWorldHalfHeightFromDegrees(
   rotation: { x: number; y: number; z: number },
   length: number,
   thickness: number,
-  width: number
+  width: number,
+  features?: PartFeature[]
 ): number {
+  if (features && features.some((feature) => feature.enabled)) {
+    return getPartWorldHalfHeight({
+      position: { x: 0, y: 0, z: 0 },
+      rotation,
+      length,
+      thickness,
+      width,
+      features
+    });
+  }
+
   _euler.set((rotation.x * Math.PI) / 180, (rotation.y * Math.PI) / 180, (rotation.z * Math.PI) / 180, 'XYZ');
   _quat.setFromEuler(_euler);
   return calculateWorldHalfHeight(_quat, length, thickness, width);

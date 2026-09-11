@@ -1,3 +1,4 @@
+import { createTestGroupMember, createTestPart } from '../../../../../tests/helpers/factories';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ContextMenu } from './ContextMenu';
@@ -66,15 +67,14 @@ describe('ContextMenu', () => {
         contextMenu: {
           type: 'part',
           x: 100,
-          y: 200,
-          partId: 'part-1'
+          y: 200
         }
       });
       useSelectionStore.setState({
         selectedPartIds: ['part-1']
       });
       useProjectStore.setState({
-        parts: [{ id: 'part-1', name: 'Part 1', stockId: null }]
+        parts: [createTestPart({ id: 'part-1', name: 'Part 1', stockId: null })]
       });
 
       render(<ContextMenu />);
@@ -121,7 +121,6 @@ describe('ContextMenu', () => {
         requestCenterCameraAtPosition: vi.fn()
       });
       useProjectStore.setState({
-        pasteAtPosition: vi.fn(),
         addSnapGuide: vi.fn(),
         clearSnapGuides: vi.fn()
       });
@@ -148,7 +147,7 @@ describe('ContextMenu', () => {
     it('shows Paste Here when clipboard has items', () => {
       useClipboardStore.setState({
         clipboard: {
-          parts: [{ id: 'part-1' }],
+          parts: [createTestPart(createTestPart({ id: 'part-1' }))],
           groups: [],
           groupMembers: []
         }
@@ -200,8 +199,7 @@ describe('ContextMenu', () => {
         contextMenu: {
           type: 'part',
           x: 100,
-          y: 200,
-          partId: 'part-1'
+          y: 200
         },
         closeContextMenu: vi.fn(),
         openSaveAssemblyModal: vi.fn(),
@@ -216,8 +214,8 @@ describe('ContextMenu', () => {
       });
       useProjectStore.setState({
         parts: [
-          { id: 'part-1', name: 'Part 1', stockId: 'stock-1' },
-          { id: 'part-2', name: 'Part 2', stockId: null }
+          createTestPart({ id: 'part-1', name: 'Part 1', stockId: 'stock-1' }),
+          createTestPart({ id: 'part-2', name: 'Part 2', stockId: null })
         ],
         deleteSelectedParts: vi.fn(),
         resetSelectedPartsToStock: vi.fn()
@@ -268,8 +266,8 @@ describe('ContextMenu', () => {
     it('disables Reset to Stock when no parts have stock', () => {
       useProjectStore.setState({
         parts: [
-          { id: 'part-1', name: 'Part 1', stockId: null },
-          { id: 'part-2', name: 'Part 2', stockId: null }
+          createTestPart({ id: 'part-1', name: 'Part 1', stockId: null }),
+          createTestPart({ id: 'part-2', name: 'Part 2', stockId: null })
         ]
       });
 
@@ -308,8 +306,7 @@ describe('ContextMenu', () => {
         contextMenu: {
           type: 'part',
           x: 100,
-          y: 200,
-          partId: 'part-1'
+          y: 200
         },
         closeContextMenu: vi.fn()
       });
@@ -318,10 +315,7 @@ describe('ContextMenu', () => {
         selectedGroupIds: []
       });
       useProjectStore.setState({
-        parts: [
-          { id: 'part-1', name: 'Part 1' },
-          { id: 'part-2', name: 'Part 2' }
-        ],
+        parts: [createTestPart({ id: 'part-1', name: 'Part 1' }), createTestPart({ id: 'part-2', name: 'Part 2' })],
         groups: [],
         groupMembers: [],
         createGroup: vi.fn()
@@ -337,8 +331,7 @@ describe('ContextMenu', () => {
         contextMenu: {
           type: 'part',
           x: 100,
-          y: 200,
-          partId: 'part-1'
+          y: 200
         },
         closeContextMenu: vi.fn()
       });
@@ -349,7 +342,7 @@ describe('ContextMenu', () => {
       useProjectStore.setState({
         parts: [],
         groups: [{ id: 'group-1', name: 'My Group' }],
-        groupMembers: [{ groupId: 'group-1', memberId: 'part-1', memberType: 'part' }],
+        groupMembers: [createTestGroupMember('group-1', 'part-1')],
         deleteGroup: vi.fn()
       });
 
@@ -363,8 +356,7 @@ describe('ContextMenu', () => {
         contextMenu: {
           type: 'part',
           x: 100,
-          y: 200,
-          partId: 'part-1'
+          y: 200
         },
         closeContextMenu: vi.fn()
       });
@@ -373,7 +365,7 @@ describe('ContextMenu', () => {
         selectedGroupIds: ['group-1']
       });
       useProjectStore.setState({
-        parts: [{ id: 'part-1', name: 'Part 1' }],
+        parts: [createTestPart({ id: 'part-1', name: 'Part 1' })],
         groups: [{ id: 'group-1', name: 'Group 1' }],
         groupMembers: []
       });
@@ -470,7 +462,7 @@ describe('ContextMenu', () => {
           type: 'background',
           x: 150,
           y: 250,
-          worldPosition: null
+          worldPosition: undefined
         }
       });
 
