@@ -457,6 +457,7 @@ export async function createBlankProject(window: Page, name = 'E2E Project'): Pr
   await expect(window.locator('.app-header')).toBeVisible({ timeout: 15000 });
   await expect(window.locator('.sidebar')).toBeVisible();
   await expect(window.locator('canvas')).toBeVisible();
+  await waitForCanvasLayout(window);
 
   // The dialog has no name field, so set the name for the tests that assert
   // it. Deliberately the store and not the header editor: this runs before
@@ -501,6 +502,7 @@ export async function ensureEditorReady(window: Page): Promise<void> {
   await expect(window.locator('.app-header')).toBeVisible({ timeout: 15000 });
   await expect(window.locator('.sidebar')).toBeVisible();
   await expect(window.locator('canvas')).toBeVisible();
+  await waitForCanvasLayout(window);
 }
 
 export async function addPartFromSidebar(window: Page): Promise<void> {
@@ -676,7 +678,31 @@ export async function seedProject(
   await window.waitForTimeout(500);
 }
 
+/**
+ * Wait until the 3D canvas has been laid out.
+ *
+ * A canvas element mounts at its intrinsic 300x150 and only takes the size of
+ * its container on a later layout pass. Anything measuring it before then gets
+ * a box a fifth of the real width, sitting under the toolbar rather than over
+ * the scene -- so a "background" click computed from it lands on a toolbar
+ * button and the test fails somewhere far from the cause.
+ */
+export async function waitForCanvasLayout(window: Page): Promise<void> {
+  await window.waitForFunction(
+    () => {
+      const canvas = document.querySelector('canvas');
+      if (!canvas) return false;
+      const rect = canvas.getBoundingClientRect();
+      // Anything above the 300x150 intrinsic box means a real layout pass ran.
+      return rect.width > 400 && rect.height > 300;
+    },
+    null,
+    { timeout: 15000 }
+  );
+}
+
 export async function getCanvasPoint(window: Page, xRatio = 0.5, yRatio = 0.5): Promise<{ x: number; y: number }> {
+  await waitForCanvasLayout(window);
   return window.locator('canvas').evaluate(
     (canvas, ratios) => {
       const rect = canvas.getBoundingClientRect();
