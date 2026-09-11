@@ -11,7 +11,7 @@ describe('K4 panel machining UI', () => {
     const cut: RoundedCutFeature = {
       id: 'slot',
       kind: 'rounded_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       label: 'Centered handhold',
       cutType: 'rounded_slot',

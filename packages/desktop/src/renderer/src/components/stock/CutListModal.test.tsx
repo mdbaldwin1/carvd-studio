@@ -44,6 +44,7 @@ const mockPart: Part = {
   position: { x: 0, y: 0, z: 0 },
   rotation: { x: 0, y: 0, z: 0 },
   stockId: 'stock-1',
+  grainSensitive: false,
   grainDirection: 'length',
   color: '#c4a574'
 };
@@ -61,6 +62,10 @@ const mockStock: Stock = {
 };
 
 const mockCutList: CutList = {
+  id: 'cut-list-1',
+  projectModifiedAt: '2024-01-01T00:00:00.000Z',
+  bypassedIssues: [],
+  kerfWidth: 0.125,
   instructions: [
     {
       partId: 'part-1',
@@ -71,6 +76,7 @@ const mockCutList: CutList = {
       stockId: 'stock-1',
       stockName: 'Plywood 3/4"',
       grainSensitive: true,
+      canRotate: true,
       isGlueUp: false,
       notes: ''
     },
@@ -83,6 +89,7 @@ const mockCutList: CutList = {
       stockId: 'stock-1',
       stockName: 'Plywood 3/4"',
       grainSensitive: true,
+      canRotate: true,
       isGlueUp: false,
       notes: ''
     }
@@ -95,6 +102,8 @@ const mockCutList: CutList = {
       stockWidth: 48,
       boardIndex: 1,
       utilizationPercent: 65.5,
+      usedArea: 3018.24,
+      wasteArea: 1589.76,
       placements: [
         {
           partId: 'part-1',
@@ -113,6 +122,7 @@ const mockCutList: CutList = {
     totalParts: 2,
     totalStockBoards: 1,
     totalBoardFeet: 4.5,
+    totalWasteSquareInches: 1589.76,
     wastePercentage: 34.5,
     estimatedCost: 50,
     totalWasteCost: 17.25,
@@ -127,6 +137,7 @@ const mockCutList: CutList = {
         actualBoardsUsed: 1,
         boardFeet: 4.5,
         linearFeet: 0,
+        wasteSquareInches: 1589.76,
         cost: 50,
         averageUtilization: 65.5,
         pricingUnit: 'per_item',
@@ -170,7 +181,7 @@ describe('CutListModal', () => {
       updateCustomShoppingItem: vi.fn(),
       deleteCustomShoppingItem: vi.fn(),
       projectName: 'Test Project',
-      notes: ''
+      projectNotes: ''
     });
     useUIStore.setState({
       showToast: vi.fn()
@@ -267,7 +278,7 @@ describe('CutListModal', () => {
               {
                 id: 'feature-1',
                 kind: 'rect_cut',
-                version: 1,
+                version: 1 as const,
                 enabled: true,
                 label: 'Oversized cutout',
                 target: { type: 'face', face: 'top_face' },
@@ -672,6 +683,7 @@ describe('CutListModal', () => {
           stockId: 'stock-1',
           stockName: 'Plywood 3/4"',
           grainSensitive: true,
+          canRotate: true,
           isGlueUp: false,
           notes: ''
         },
@@ -684,6 +696,7 @@ describe('CutListModal', () => {
           stockId: 'stock-1',
           stockName: 'Plywood 3/4"',
           grainSensitive: true,
+          canRotate: true,
           isGlueUp: false,
           notes: ''
         },
@@ -696,6 +709,7 @@ describe('CutListModal', () => {
           stockId: 'stock-1',
           stockName: 'Plywood 3/4"',
           grainSensitive: true,
+          canRotate: true,
           isGlueUp: false,
           notes: ''
         }
@@ -755,7 +769,7 @@ describe('CutListModal', () => {
       });
 
       useProjectStore.setState({
-        parts: [{ ...mockPart, stockId: undefined }], // Part without stock
+        parts: [{ ...mockPart, stockId: null }], // Part without stock
         stocks: [mockStock]
       });
 
@@ -920,6 +934,7 @@ describe('CutListModal', () => {
           stockId: 'stock-1',
           stockName: 'Plywood 3/4"',
           grainSensitive: false,
+          canRotate: true,
           isGlueUp: true,
           notes: 'Glue up 8 boards'
         }
@@ -1227,9 +1242,9 @@ describe('CutListModal', () => {
       });
     });
 
-    it('uses "Untitled Project" when projectName is null', async () => {
+    it('uses "Untitled Project" when projectName is empty', async () => {
       mockExportProjectReportToPdf.mockResolvedValueOnce({ success: true });
-      useProjectStore.setState({ projectName: null });
+      useProjectStore.setState({ projectName: '' });
 
       render(<CutListModal {...defaultProps} />);
 

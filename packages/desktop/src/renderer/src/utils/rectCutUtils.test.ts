@@ -24,7 +24,7 @@ function createRectCut(overrides?: {
   return {
     id: 'rect-cut-1',
     kind: 'rect_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     target: overrides?.target ?? { type: 'face', face: 'top_face' },
     reference: { primaryFrom: 'min' },
@@ -44,7 +44,7 @@ describe('rectCutUtils', () => {
       {
         id: 'feature-1',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'min' },
@@ -68,7 +68,7 @@ describe('rectCutUtils', () => {
       {
         id: 'feature-2',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'edge', edge: 'front_left_edge' },
         reference: { primaryFrom: 'min' },
@@ -91,7 +91,7 @@ describe('rectCutUtils', () => {
       {
         id: 'feature-3',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'min' },
@@ -113,7 +113,7 @@ describe('rectCutUtils', () => {
       {
         id: 'feature-4',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'edge', edge: 'top_front_edge' },
         reference: { primaryFrom: 'min' },
@@ -136,7 +136,7 @@ describe('rectCutUtils', () => {
       {
         id: 'feature-5',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'min' },
@@ -158,7 +158,7 @@ describe('rectCutUtils', () => {
       {
         id: 'feature-6',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'bottom_face' },
         reference: { primaryFrom: 'min' },
@@ -182,7 +182,7 @@ describe('rectCutUtils', () => {
       {
         id: 'feature-7',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'min' },
@@ -201,7 +201,7 @@ describe('rectCutUtils', () => {
       {
         id: 'feature-8',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'min' },
@@ -692,7 +692,7 @@ describe('rectCutUtils', () => {
       ({
         id: 'tenon-1',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         cutType: 'tenon',
         target: { type: 'face', face: 'right_end' },
@@ -753,7 +753,7 @@ describe('rectCutUtils', () => {
       ({
         id: 'v-1',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         cutType,
         target: { type: 'face', face: 'top_face' },
@@ -828,7 +828,7 @@ describe('regressions from the 2026-09-09 pre-release review', () => {
   const notch = (edge: EdgeTarget): RectCutFeature => ({
     id: `notch-${edge}`,
     kind: 'rect_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     cutType: 'edge_notch',
     target: { type: 'edge', edge },

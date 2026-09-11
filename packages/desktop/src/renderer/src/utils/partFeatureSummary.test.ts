@@ -19,7 +19,7 @@ function createEndCut(overrides?: {
   return {
     id: 'end-cut-1',
     kind: 'end_cut',
-    version: 1,
+    version: 1 as const,
     enabled: overrides?.enabled ?? true,
     label: overrides?.label,
     target: { type: 'face', face: overrides?.face ?? 'left_end' },
@@ -42,7 +42,7 @@ function createRectCut(overrides?: {
   return {
     id: 'rect-cut-1',
     kind: 'rect_cut',
-    version: 1,
+    version: 1 as const,
     enabled: overrides?.enabled ?? true,
     label: overrides?.label,
     target: overrides?.target ?? { type: 'face', face: 'top_face' },
@@ -61,7 +61,7 @@ function createCircularCut(overrides: Partial<CircularCutFeature> = {}): Circula
   return {
     id: 'hole-1',
     kind: 'circular_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     target: { type: 'face', face: 'top_face' },
     reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -76,7 +76,7 @@ function createRoundedCut(overrides: Partial<RoundedCutFeature> = {}): RoundedCu
   return {
     id: 'slot-1',
     kind: 'rounded_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     target: { type: 'face', face: 'top_face' },
     reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -439,7 +439,7 @@ describe('partFeatureSummary', () => {
       {
         id: 'eb-1',
         kind: 'end_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'front_face' },
         reference: { primaryFrom: 'min' },

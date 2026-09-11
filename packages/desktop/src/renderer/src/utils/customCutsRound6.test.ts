@@ -19,7 +19,7 @@ const blank = (features: Part['features'] = []): Part =>
 const hole = (): CircularCutFeature => ({
   id: 'hole',
   kind: 'circular_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: 'round_hole',
   target: { type: 'face', face: 'top_face' },
@@ -30,7 +30,7 @@ const hole = (): CircularCutFeature => ({
 const slot = (): RoundedCutFeature => ({
   id: 'slot',
   kind: 'rounded_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: 'rounded_slot',
   target: { type: 'face', face: 'top_face' },
@@ -47,7 +47,7 @@ const tenon = (
 ): RectCutFeature => ({
   id: `${face}-${length}-${offset}`,
   kind: 'rect_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: 'tenon',
   target: { type: 'face', face },
@@ -76,7 +76,7 @@ describe('full review round 3 remediation', () => {
     const end: EndCutFeature = {
       id: 'end',
       kind: 'end_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       cutType: 'mitre',
       target: { type: 'face', face: 'left_end' },
@@ -87,7 +87,7 @@ describe('full review round 3 remediation', () => {
     const dado: RectCutFeature = {
       id: 'dado',
       kind: 'rect_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       cutType: 'dado',
       target: { type: 'face', face: 'top_face' },
@@ -114,7 +114,7 @@ describe('full review round 3 remediation', () => {
     const end: EndCutFeature = {
       id: 'end',
       kind: 'end_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       cutType: 'compound',
       target: { type: 'face', face: 'right_end' },
@@ -173,7 +173,7 @@ describe('full review round 3 remediation', () => {
     const board = blank([kind === 'round' ? hole() : slot()]);
     const timber = createTestPart({ length: 0.25, width: 0.25, thickness: 2, position: { x: 0, y: 0, z: 0 } });
     expect(topHits(board, 0, 0)).toHaveLength(0);
-    expect(getPartFeatureConflicts(board.features, board)).toEqual([]);
+    expect(getPartFeatureConflicts(board.features ?? [], board)).toEqual([]);
     expect(partsOverlap(board, timber)).toBe(false);
     expect(partsOverlap(timber, board)).toBe(false);
   });

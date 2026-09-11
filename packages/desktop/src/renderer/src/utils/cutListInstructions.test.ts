@@ -9,7 +9,7 @@ describe('cutListInstructions', () => {
         {
           id: 'right-compound',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           label: 'Right frame corner',
           target: { type: 'face', face: 'right_end' },
@@ -55,7 +55,7 @@ describe('cutListInstructions', () => {
         {
           id: 'feature-1',
           kind: 'circular_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -99,7 +99,7 @@ describe('cutListInstructions', () => {
         {
           id: 'patterned-counterbores',
           kind: 'circular_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'bottom_face' },
           reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -146,7 +146,7 @@ describe('cutListInstructions', () => {
         {
           id: 'grid-holes',
           kind: 'circular_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -158,7 +158,7 @@ describe('cutListInstructions', () => {
         {
           id: 'radial-holes',
           kind: 'circular_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -292,7 +292,7 @@ describe('cutListInstructions', () => {
         {
           id: 'feature-1',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           label: 'Left mitre',
           target: { type: 'face', face: 'left_end' },
@@ -304,7 +304,7 @@ describe('cutListInstructions', () => {
         {
           id: 'feature-2',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           label: 'Top cutout',
           target: { type: 'face', face: 'top_face' },
@@ -350,7 +350,7 @@ describe('cutListInstructions', () => {
         {
           id: 'feature-1',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -365,7 +365,7 @@ describe('cutListInstructions', () => {
         {
           id: 'feature-2',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'edge', edge: 'top_front_edge' },
           reference: { primaryFrom: 'min' },
@@ -409,7 +409,7 @@ describe('cutListInstructions', () => {
         {
           id: 'feature-1',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -424,7 +424,7 @@ describe('cutListInstructions', () => {
         {
           id: 'feature-2',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -468,7 +468,7 @@ describe('cutListInstructions', () => {
         {
           id: 'feature-1',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -483,7 +483,7 @@ describe('cutListInstructions', () => {
         {
           id: 'feature-2',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'bottom_face' },
           reference: { primaryFrom: 'min' },

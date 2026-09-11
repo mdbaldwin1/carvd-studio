@@ -23,7 +23,7 @@ describe('usePartCutsEditing', () => {
     const circular: PartFeature = {
       id: 'hole',
       kind: 'circular_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face: 'top_face' },
       reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -34,7 +34,7 @@ describe('usePartCutsEditing', () => {
     const first: PartFeature = {
       id: 'a',
       kind: 'rect_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face: 'top_face' },
       reference: { primaryFrom: 'min' },
@@ -45,7 +45,7 @@ describe('usePartCutsEditing', () => {
     const end: PartFeature = {
       id: 'end',
       kind: 'end_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face: 'right_end' },
       reference: { primaryFrom: 'min' },
@@ -84,7 +84,7 @@ describe('usePartCutsEditing', () => {
             {
               id: 'tenon',
               kind: 'rect_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'left_end' },
               reference: { primaryFrom: 'min' },
@@ -109,7 +109,7 @@ describe('usePartCutsEditing', () => {
     const cut: PartFeature = {
       id: 'end',
       kind: 'end_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face: 'left_end' },
       reference: { primaryFrom: 'min' },
@@ -141,7 +141,7 @@ describe('usePartCutsEditing', () => {
             {
               id: 'feature-1',
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'left_end' },
               reference: { primaryFrom: 'min' },
@@ -205,7 +205,7 @@ describe('usePartCutsEditing', () => {
         {
           id: 'feature-2',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'right_end' },
           reference: { primaryFrom: 'max' },
@@ -251,7 +251,7 @@ describe('usePartCutsEditing', () => {
         {
           id: 'feature-1',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -262,7 +262,7 @@ describe('usePartCutsEditing', () => {
         {
           id: 'feature-2',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -291,7 +291,7 @@ describe('usePartCutsEditing', () => {
     const oversizedHole: PartFeature = {
       id: 'oversized-hole',
       kind: 'circular_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       label: 'Oversized hole',
       target: { type: 'face', face: 'top_face' },

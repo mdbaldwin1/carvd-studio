@@ -30,7 +30,7 @@ const blank = (features: Part['features'] = []): Part =>
 const end = (compound = false): EndCutFeature => ({
   id: 'end',
   kind: 'end_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: compound ? 'compound' : 'mitre',
   target: { type: 'face', face: 'right_end' },
@@ -41,7 +41,7 @@ const end = (compound = false): EndCutFeature => ({
 const cutout = (x = 4, z = 0, length = 2, width = 1): RectCutFeature => ({
   id: `cut-${x}-${z}`,
   kind: 'rect_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: 'cutout',
   target: { type: 'face', face: 'top_face' },
@@ -52,7 +52,7 @@ const cutout = (x = 4, z = 0, length = 2, width = 1): RectCutFeature => ({
 const holes = (rows = 1): CircularCutFeature => ({
   id: 'holes',
   kind: 'circular_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: 'round_hole',
   target: { type: 'face', face: 'top_face' },
@@ -74,7 +74,7 @@ describe('closure review disconnected stock and pattern performance', () => {
     const probe = createTestPart({ length: 0.1, width: 0.1, thickness: 0.1, position: { x: 0, y: 0, z: 1.5 } });
     expect(getPartMaterialVolume(before)).toBeCloseTo(35.85640646, 5);
     expect(getPartMaterialVolume(after)).toBeCloseTo(31.85640646, 5);
-    expect(getPartFeatureConflicts(after.features, after)).toEqual([]);
+    expect(getPartFeatureConflicts(after.features ?? [], after)).toEqual([]);
     expect(partsOverlap(before, probe)).toBe(false);
     expect(partsOverlap(after, probe)).toBe(false);
   });
@@ -124,7 +124,7 @@ describe('closure review disconnected stock and pattern performance', () => {
     cut.placement[coordinate] = NaN;
     const part = blank([cut]);
     expect.soft(validateRectCutFeature(cut, part)).toEqual(expect.stringMatching(/finite|valid number/i));
-    expect(() => getPartFeatureConflicts(part.features, part)).not.toThrow();
+    expect(() => getPartFeatureConflicts(part.features ?? [], part)).not.toThrow();
     expect(validatePartsForCutList([part], [])).toContainEqual(
       expect.objectContaining({ type: 'feature_validation', severity: 'error' })
     );
@@ -210,8 +210,7 @@ describe('closure review disconnected stock and pattern performance', () => {
             onDraftFeaturesChange: vi.fn(),
             onHoveredTargetChange: vi.fn(),
             onPendingTargetChange: vi.fn(),
-            onExit: vi.fn(),
-            onSave: vi.fn()
+            onExit: vi.fn()
           },
           createElement(CutsSection, { isCollapsed: false, onOpenChange: () => {} }),
           createElement(PartCutsWorkspace),
@@ -268,7 +267,9 @@ describe('closure review disconnected stock and pattern performance', () => {
       const downstreamAt = performance.now();
       const vertices = getPartLocalConvexVertices(part);
       expect(vertices.length).toBeGreaterThanOrEqual(8);
-      expect(getPartFeatureConflicts(part.features, part).filter((issue) => issue.severity === 'error')).toEqual([]);
+      expect(getPartFeatureConflicts(part.features ?? [], part).filter((issue) => issue.severity === 'error')).toEqual(
+        []
+      );
       expect(validatePartsForCutList([part], []).filter((issue) => issue.type === 'feature_validation')).toEqual([]);
       const downstreamMs = performance.now() - downstreamAt;
       console.info(`F ${16 * rows} holes collision/validation: ${downstreamMs.toFixed(1)}ms`);

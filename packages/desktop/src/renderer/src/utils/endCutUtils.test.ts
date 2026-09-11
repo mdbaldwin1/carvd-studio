@@ -22,7 +22,7 @@ function createEndCut(overrides?: {
   return {
     id: overrides?.id ?? 'end-cut-1',
     kind: 'end_cut',
-    version: 1,
+    version: 1 as const,
     enabled: overrides?.enabled ?? true,
     target: { type: 'face', face: overrides?.face ?? 'left_end' },
     reference: { primaryFrom: overrides?.face === 'right_end' ? 'max' : 'min' },
@@ -69,7 +69,7 @@ describe('endCutUtils', () => {
       const rectCut: PartFeature = {
         id: 'rect-1',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'min' },
@@ -337,7 +337,7 @@ describe('endCutUtils', () => {
       ({
         id: 'eb-1',
         kind: 'end_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'front_face' },
         reference: { primaryFrom: 'min' },

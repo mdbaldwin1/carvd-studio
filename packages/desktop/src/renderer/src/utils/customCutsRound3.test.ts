@@ -33,7 +33,7 @@ const end = (
 ): EndCutFeature => ({
   id: face,
   kind: 'end_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType,
   target: { type: 'face', face },
@@ -49,7 +49,7 @@ const end = (
 const pocket = (): RectCutFeature => ({
   id: 'pocket',
   kind: 'rect_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: 'mortise',
   target: { type: 'face', face: 'top_face' },
@@ -60,7 +60,7 @@ const pocket = (): RectCutFeature => ({
 const rounded = (): RoundedCutFeature => ({
   id: 'rounded',
   kind: 'rounded_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: 'rounded_rectangle',
   target: { type: 'face', face: 'top_face' },
@@ -71,7 +71,7 @@ const rounded = (): RoundedCutFeature => ({
 const bore = (): CircularCutFeature => ({
   id: 'bore',
   kind: 'circular_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: 'round_hole',
   target: { type: 'face', face: 'top_face' },
@@ -139,8 +139,7 @@ describe('independent review round 3', () => {
               onDraftFeaturesChange: vi.fn(),
               onHoveredTargetChange: vi.fn(),
               onPendingTargetChange: vi.fn(),
-              onExit: vi.fn(),
-              onSave: vi.fn()
+              onExit: vi.fn()
             },
             createElement(CutsSection, { isCollapsed: false, onOpenChange: () => {} }),
             createElement(PartCutsWorkspace),

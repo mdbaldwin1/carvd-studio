@@ -347,7 +347,7 @@ describe('workspaceUtils', () => {
           {
             id: 'feature-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'corner', corner: 'front_left_corner' },
             reference: { primaryFrom: 'min', secondaryFrom: 'min' },

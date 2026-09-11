@@ -1,3 +1,4 @@
+import { createTestPart } from '../../../../tests/helpers/factories';
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useProjectStore } from '../store/projectStore';
@@ -129,16 +130,7 @@ describe('useMenuCommands', () => {
     it('handles select-all command', async () => {
       const selectParts = vi.fn();
       useProjectStore.setState({
-        parts: [
-          {
-            id: 'p1',
-            name: 'Part 1'
-          },
-          {
-            id: 'p2',
-            name: 'Part 2'
-          }
-        ]
+        parts: [createTestPart({ id: 'p1', name: 'Part 1' }), createTestPart({ id: 'p2', name: 'Part 2' })]
       });
       useSelectionStore.setState({ selectParts });
 

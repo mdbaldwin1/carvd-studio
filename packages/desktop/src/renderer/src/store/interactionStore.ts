@@ -11,7 +11,7 @@ export interface ReferenceInteractionState {
   latchedAxis: 'x' | 'y' | 'z' | null;
 }
 
-function createEmptyReferenceInteractionState(): ReferenceInteractionState {
+export function createEmptyReferenceInteractionState(): ReferenceInteractionState {
   return {
     selectionEntities: [],
     referenceEntities: [],

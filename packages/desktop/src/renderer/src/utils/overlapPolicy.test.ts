@@ -425,7 +425,7 @@ describe('overlapPolicy', () => {
         {
           id: 'dado',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'dado',
           target: { type: 'face', face: 'top_face' },
@@ -477,7 +477,7 @@ describe('overlapPolicy', () => {
     ): RectCutFeature => ({
       id,
       kind: 'rect_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       cutType: 'dado',
       target: { type: 'face', face },
@@ -569,7 +569,7 @@ describe('overlapPolicy', () => {
           {
             id: `${cutType}-socket`,
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType,
             target: { type: 'face', face: 'top_face' },
@@ -620,7 +620,7 @@ describe('overlapPolicy', () => {
         {
           id: 'tenon-material-mortise',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'mortise',
           target: { type: 'face', face: 'top_face' },
@@ -641,7 +641,7 @@ describe('overlapPolicy', () => {
         {
           id: 'off-center-tenon-material-cut',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'tenon',
           target: { type: 'face', face: 'left_end' },
@@ -679,7 +679,7 @@ describe('overlapPolicy', () => {
       {
         id: `notch-${corner}`,
         kind: 'rect_cut' as const,
-        version: 1,
+        version: 1 as const,
         enabled: true,
         cutType: 'corner_notch' as const,
         target: { type: 'corner' as const, corner: corner as 'front_left_corner' },
@@ -736,7 +736,7 @@ describe('overlapPolicy', () => {
       {
         id: `notch-${corner}`,
         kind: 'rect_cut' as const,
-        version: 1,
+        version: 1 as const,
         enabled: true,
         cutType: 'corner_notch' as const,
         target: { type: 'corner' as const, corner: corner as 'front_left_corner' },
@@ -779,7 +779,7 @@ describe('overlapPolicy', () => {
       {
         id: `notch-${corner}`,
         kind: 'rect_cut' as const,
-        version: 1,
+        version: 1 as const,
         enabled: true,
         cutType: 'corner_notch' as const,
         target: { type: 'corner' as const, corner: corner as 'front_left_corner' },
@@ -821,7 +821,7 @@ describe('overlapPolicy', () => {
       {
         id: 'notch',
         kind: 'rect_cut' as const,
-        version: 1,
+        version: 1 as const,
         enabled: true,
         cutType: 'corner_notch' as const,
         target: { type: 'corner' as const, corner: 'front_left_corner' as const },
@@ -873,7 +873,7 @@ describe('overlapPolicy', () => {
       {
         id: 'notch',
         kind: 'rect_cut' as const,
-        version: 1,
+        version: 1 as const,
         enabled: true,
         cutType: 'corner_notch' as const,
         target: { type: 'corner' as const, corner: 'front_left_corner' as const },
@@ -917,7 +917,7 @@ describe('overlapPolicy', () => {
       {
         id: 'notch',
         kind: 'rect_cut' as const,
-        version: 1,
+        version: 1 as const,
         enabled: true,
         cutType: 'corner_notch' as const,
         target: { type: 'corner' as const, corner: 'front_left_corner' as const },
@@ -960,7 +960,7 @@ describe('overlapPolicy', () => {
       {
         id: 'notch',
         kind: 'rect_cut' as const,
-        version: 1,
+        version: 1 as const,
         enabled: true,
         cutType: 'corner_notch' as const,
         target: { type: 'corner' as const, corner: 'front_left_corner' as const },
@@ -1028,7 +1028,7 @@ describe('overlapPolicy', () => {
         {
           id: 'notch-a',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'corner_notch' as const,
           target: { type: 'corner' as const, corner: 'front_left_corner' as const },
@@ -1049,7 +1049,7 @@ describe('overlapPolicy', () => {
         {
           id: 'notch-b',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'corner_notch' as const,
           target: { type: 'corner' as const, corner: 'back_right_corner' as const },
@@ -1087,7 +1087,7 @@ describe('overlapPolicy', () => {
         {
           id: 'notch-a',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'corner_notch' as const,
           target: { type: 'corner' as const, corner: 'front_left_corner' as const },
@@ -1108,7 +1108,7 @@ describe('overlapPolicy', () => {
         {
           id: 'notch-b',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'corner_notch' as const,
           target: { type: 'corner' as const, corner: 'back_right_corner' as const },
@@ -1192,7 +1192,7 @@ describe('overlapPolicy', () => {
         {
           id: 'notch-a',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'corner_notch' as const,
           target: { type: 'corner' as const, corner: 'front_left_corner' as const },
@@ -1213,7 +1213,7 @@ describe('overlapPolicy', () => {
         {
           id: 'notch-b',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'corner_notch' as const,
           target: { type: 'corner' as const, corner: 'back_right_corner' as const },
@@ -1254,7 +1254,7 @@ describe('overlapPolicy', () => {
         {
           id: 'notch-a',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'corner_notch' as const,
           target: { type: 'corner' as const, corner: 'front_left_corner' as const },
@@ -1275,7 +1275,7 @@ describe('overlapPolicy', () => {
         {
           id: 'notch-b',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'corner_notch' as const,
           target: { type: 'corner' as const, corner: 'back_right_corner' as const },
@@ -1344,7 +1344,7 @@ describe('overlapPolicy', () => {
         {
           id: 'eb-1',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'front_face' },
           reference: { primaryFrom: 'min' },

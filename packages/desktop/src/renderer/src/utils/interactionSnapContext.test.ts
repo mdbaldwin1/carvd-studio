@@ -91,7 +91,7 @@ describe('interactionSnapContext', () => {
         {
           id: 'cutout-1',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'cutout',
           target: { type: 'face', face: 'top_face' },

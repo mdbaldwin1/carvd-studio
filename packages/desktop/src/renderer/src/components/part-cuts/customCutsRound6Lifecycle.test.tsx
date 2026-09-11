@@ -16,7 +16,7 @@ const feature: CircularCutFeature = {
   id: 'hole',
   label: 'Original hole',
   kind: 'circular_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: 'round_hole',
   target: { type: 'face', face: 'top_face' },
@@ -47,7 +47,6 @@ function Harness() {
             onHoveredTargetChange={session.setHoveredTarget}
             onPendingTargetChange={session.setPendingTarget}
             onExit={session.requestExit}
-            onSave={session.saveAndExit}
           >
             <CutsSection isCollapsed={false} onOpenChange={() => {}} />
             <PartCutsWorkspace />

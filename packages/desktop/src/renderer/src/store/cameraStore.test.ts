@@ -34,21 +34,21 @@ describe('cameraStore', () => {
 
   describe('display state', () => {
     describe('setDisplayMode', () => {
-      it('changes display mode to exploded', () => {
+      it('changes display mode to wireframe', () => {
         const store = useCameraStore.getState();
 
-        store.setDisplayMode('exploded');
+        store.setDisplayMode('wireframe');
 
-        expect(useCameraStore.getState().displayMode).toBe('exploded');
+        expect(useCameraStore.getState().displayMode).toBe('wireframe');
       });
 
-      it('changes display mode to assembled', () => {
-        useCameraStore.setState({ displayMode: 'exploded' });
+      it('changes display mode to solid', () => {
+        useCameraStore.setState({ displayMode: 'wireframe' });
         const store = useCameraStore.getState();
 
-        store.setDisplayMode('assembled');
+        store.setDisplayMode('solid');
 
-        expect(useCameraStore.getState().displayMode).toBe('assembled');
+        expect(useCameraStore.getState().displayMode).toBe('solid');
       });
     });
 

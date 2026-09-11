@@ -14,7 +14,7 @@ const hole: CircularCutFeature = {
   id: 'hole',
   label: 'Captured label',
   kind: 'circular_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: 'round_hole',
   target: { type: 'face', face: 'top_face' },

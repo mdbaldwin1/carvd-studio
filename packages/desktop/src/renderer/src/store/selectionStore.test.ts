@@ -378,7 +378,7 @@ describe('selectionStore', () => {
 
     describe('setSelectionBox', () => {
       it('sets selection box coordinates', () => {
-        const box = { x1: 0, y1: 0, x2: 100, y2: 100 };
+        const box = { start: { x: 0, y: 0 }, end: { x: 100, y: 100 } };
 
         useSelectionStore.getState().setSelectionBox(box);
 
@@ -386,7 +386,7 @@ describe('selectionStore', () => {
       });
 
       it('clears selection box when set to null', () => {
-        useSelectionStore.getState().setSelectionBox({ x1: 0, y1: 0, x2: 100, y2: 100 });
+        useSelectionStore.getState().setSelectionBox({ start: { x: 0, y: 0 }, end: { x: 100, y: 100 } });
 
         useSelectionStore.getState().setSelectionBox(null);
 

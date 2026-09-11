@@ -226,7 +226,7 @@ describe('projectStore', () => {
             {
               id: 'dado',
               kind: 'rect_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               cutType: 'dado',
               target: { type: 'face', face: 'top_face' },
@@ -274,7 +274,7 @@ describe('projectStore', () => {
             {
               id: 'dado',
               kind: 'rect_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               cutType: 'dado',
               target: { type: 'face', face: 'top_face' },
@@ -411,7 +411,7 @@ describe('projectStore', () => {
         const replacement: PartFeature = {
           id: 'replacement-mitre',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -729,7 +729,7 @@ describe('projectStore', () => {
             {
               id: 'feature-1',
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'left_end' },
               reference: { primaryFrom: 'min' },
@@ -799,7 +799,7 @@ describe('projectStore', () => {
           {
             id: 'mitre-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             label: 'Angled end',
             target: { type: 'face', face: 'left_end' },
@@ -811,7 +811,7 @@ describe('projectStore', () => {
           {
             id: 'dado-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -822,7 +822,7 @@ describe('projectStore', () => {
           {
             id: 'holes-1',
             kind: 'circular_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -841,7 +841,7 @@ describe('projectStore', () => {
           {
             id: 'slot-1',
             kind: 'rounded_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -1904,7 +1904,7 @@ describe('projectStore', () => {
             {
               id: 'feature-1',
               kind: 'rect_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'corner', corner: 'back_left_corner' },
               reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -1997,7 +1997,7 @@ describe('projectStore', () => {
             {
               id: 'feature-1',
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'right_end' },
               reference: { primaryFrom: 'max' },
@@ -2811,7 +2811,7 @@ describe('validatePartsForCutList', () => {
             {
               id: 'feature-1',
               kind: 'rect_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               label: 'Bad cutout',
               target: { type: 'face', face: 'top_face' },
@@ -2841,7 +2841,7 @@ describe('validatePartsForCutList', () => {
         feature: {
           id: 'oversized-hole',
           kind: 'circular_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           label: 'Oversized hole',
           target: { type: 'face', face: 'top_face' },
@@ -2857,7 +2857,7 @@ describe('validatePartsForCutList', () => {
         feature: {
           id: 'oversized-rounded-opening',
           kind: 'rounded_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           label: 'Oversized rounded opening',
           target: { type: 'face', face: 'top_face' },
@@ -2901,7 +2901,7 @@ describe('validatePartsForCutList', () => {
           {
             id: 'edge-cutout',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             label: 'Copied edge cutout',
             target: { type: 'face', face: 'top_face' },
@@ -2943,7 +2943,7 @@ describe('validatePartsForCutList', () => {
             {
               id: 'unstocked-edge-cutout',
               kind: 'rect_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               label: 'Copied edge cutout',
               target: { type: 'face', face: 'top_face' },
@@ -2985,7 +2985,7 @@ describe('validatePartsForCutList', () => {
             {
               id: 'feature-1',
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'left_end' },
               reference: { primaryFrom: 'min' },
@@ -2996,7 +2996,7 @@ describe('validatePartsForCutList', () => {
             {
               id: 'feature-2',
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'left_end' },
               reference: { primaryFrom: 'min' },

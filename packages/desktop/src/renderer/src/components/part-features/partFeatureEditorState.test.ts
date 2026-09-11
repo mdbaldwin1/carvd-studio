@@ -339,7 +339,7 @@ describe('partFeatureEditorState', () => {
       const feature: RectCutFeature = {
         id: 'rect-1',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: false,
         label: 'Shelf dado',
         target: { type: 'face', face: 'bottom_face' },
@@ -378,7 +378,7 @@ describe('partFeatureEditorState', () => {
       const cornerFeature: RectCutFeature = {
         id: 'corner-1',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'corner', corner: 'back_right_corner' },
         reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -398,7 +398,7 @@ describe('partFeatureEditorState', () => {
       const edgeFeature: RectCutFeature = {
         id: 'edge-1',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'edge', edge: 'top_back_edge' },
         reference: { primaryFrom: 'min' },
@@ -447,7 +447,7 @@ describe('partFeatureEditorState', () => {
       const feature: EndCutFeature = {
         id: 'end-1',
         kind: 'end_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'right_end' },
         reference: { primaryFrom: 'max' },
@@ -532,7 +532,7 @@ describe('partFeatureEditorState', () => {
       const feature: PartFeature = {
         id: 'rect-1',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'min' },
@@ -553,7 +553,7 @@ describe('partFeatureEditorState', () => {
       const feature: PartFeature = {
         id: 'dowel-1',
         kind: 'circular_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         metadata: {
           source: 'manual',

@@ -16,7 +16,7 @@ describe('partFeatureActions', () => {
     const cut: CircularCutFeature = {
       id: 'grid',
       kind: 'circular_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face },
       reference: { primaryFrom: reference, secondaryFrom: reference },
@@ -52,7 +52,7 @@ describe('partFeatureActions', () => {
       {
         id: 'feature-1',
         kind: 'end_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         label: 'Left mitre',
         target: { type: 'face', face: 'left_end' },
@@ -78,7 +78,7 @@ describe('partFeatureActions', () => {
       {
         id: 'feature-2',
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'min' },
@@ -104,7 +104,7 @@ describe('partFeatureActions', () => {
       {
         id: 'round-1',
         kind: 'circular_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -131,7 +131,7 @@ describe('partFeatureActions', () => {
       {
         id: 'rounded-1',
         kind: 'rounded_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'center', secondaryFrom: 'min' },
@@ -158,7 +158,7 @@ describe('partFeatureActions', () => {
     ({
       id: 'rc-1',
       kind: 'rect_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       reference: { primaryFrom: 'min', secondaryFrom: 'min' },
       parameters: { size: { length: 4, width: 2 }, depthMode: 'through' },
@@ -172,7 +172,7 @@ describe('partFeatureActions', () => {
         getAvailableMirrorActions({
           id: 'e',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -221,7 +221,7 @@ describe('partFeatureActions', () => {
       const endCut = {
         id: 'e',
         kind: 'end_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'left_end' },
         reference: { primaryFrom: 'min' },

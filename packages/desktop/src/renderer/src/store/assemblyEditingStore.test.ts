@@ -67,8 +67,8 @@ describe('assemblyEditingStore', () => {
 
     it('saves previous project state snapshot', () => {
       const projectStore = useProjectStore.getState();
-      projectStore.addPart({ name: 'Existing Part' });
-      projectStore.addStock({ name: 'Existing Stock' });
+      projectStore.addPart({ name: 'Existing Part' })!;
+      projectStore.addStock({ name: 'Existing Stock' })!;
 
       useAssemblyEditingStore
         .getState()
@@ -102,7 +102,7 @@ describe('assemblyEditingStore', () => {
             {
               id: 'feature-1',
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'right_end' },
               reference: { primaryFrom: 'max' },
@@ -124,7 +124,7 @@ describe('assemblyEditingStore', () => {
 
     it('merges embedded stocks with existing stocks', () => {
       const projectStore = useProjectStore.getState();
-      const existingStockId = projectStore.addStock({ name: 'Existing Stock' });
+      const existingStockId = projectStore.addStock({ name: 'Existing Stock' })!;
       const embeddedStock = createTestStock({ id: 'embedded-1', name: 'Embedded Stock' });
 
       useAssemblyEditingStore
@@ -158,7 +158,7 @@ describe('assemblyEditingStore', () => {
 
     it('clears selection and UI state when entering edit mode', () => {
       const projectStore = useProjectStore.getState();
-      const partId = projectStore.addPart({ name: 'Selected Part' });
+      const partId = projectStore.addPart({ name: 'Selected Part' })!;
       useSelectionStore.getState().selectPart(partId);
       useSnapStore.getState().addToReferences([partId]);
 
@@ -235,7 +235,7 @@ describe('assemblyEditingStore', () => {
         width: 48,
         thickness: 0.75,
         color: '#c4a574'
-      });
+      })!;
 
       const partWithStock = createTestPart({ stockId, name: 'Part with Stock' });
 
@@ -283,7 +283,7 @@ describe('assemblyEditingStore', () => {
             {
               id: 'feature-1',
               kind: 'rect_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'corner', corner: 'front_right_corner' },
               reference: { primaryFrom: 'max', secondaryFrom: 'min' },
@@ -327,7 +327,7 @@ describe('assemblyEditingStore', () => {
     });
 
     it('keeps snapshot for potential restore', () => {
-      useProjectStore.getState().addPart({ name: 'Original Part' });
+      useProjectStore.getState().addPart({ name: 'Original Part' })!;
       useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
 
       useAssemblyEditingStore.getState().cancelEditingAssembly();
@@ -342,9 +342,9 @@ describe('assemblyEditingStore', () => {
       const projectStore = useProjectStore.getState();
 
       // Set up initial state
-      projectStore.addPart({ name: 'Part A' });
-      projectStore.addPart({ name: 'Part B' });
-      projectStore.addStock({ name: 'Stock X' });
+      projectStore.addPart({ name: 'Part A' })!;
+      projectStore.addPart({ name: 'Part B' })!;
+      projectStore.addStock({ name: 'Stock X' })!;
 
       // Enter and exit editing mode
       useAssemblyEditingStore
@@ -365,7 +365,7 @@ describe('assemblyEditingStore', () => {
     });
 
     it('clears snapshot after restore', () => {
-      useProjectStore.getState().addPart({ name: 'Original' });
+      useProjectStore.getState().addPart({ name: 'Original' })!;
       useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
       useAssemblyEditingStore.getState().cancelEditingAssembly();
 
@@ -375,7 +375,7 @@ describe('assemblyEditingStore', () => {
     });
 
     it('clears assembly editing state', () => {
-      useProjectStore.getState().addPart({ name: 'Original' });
+      useProjectStore.getState().addPart({ name: 'Original' })!;
       useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
       useAssemblyEditingStore.getState().cancelEditingAssembly();
 
@@ -389,7 +389,7 @@ describe('assemblyEditingStore', () => {
 
   describe('startFreshAfterAssemblyEdit', () => {
     it('creates a new project', () => {
-      useProjectStore.getState().addPart({ name: 'Part A' });
+      useProjectStore.getState().addPart({ name: 'Part A' })!;
       useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
       useAssemblyEditingStore.getState().cancelEditingAssembly();
 

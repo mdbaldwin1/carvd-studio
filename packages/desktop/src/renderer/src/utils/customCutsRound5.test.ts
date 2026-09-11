@@ -26,7 +26,7 @@ vi.unmock('three');
 const cutout = (x = 2, z = 1, length = 1, width = 1): RectCutFeature => ({
   id: `cut-${x}-${z}`,
   kind: 'rect_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: 'cutout',
   target: { type: 'face', face: 'top_face' },
@@ -89,7 +89,7 @@ describe('closure review exact contact, XYZ axes, and hidden offsets', () => {
     const part = blank([cutout(4, 1, 2, 2), cutout(2, 0, 1, 4)]);
     part.rotation = rotation;
     expect(getPartMaterialVolume(part)).toBeCloseTo(32, 6);
-    expect(getPartFeatureConflicts(part.features, part)).toEqual([]);
+    expect(getPartFeatureConflicts(part.features ?? [], part)).toEqual([]);
     for (const [x, y, z, overlap] of [
       [0, 0, 1.5, true],
       [-4, 0, 0, true],
@@ -180,8 +180,7 @@ describe('closure review exact contact, XYZ axes, and hidden offsets', () => {
               onDraftFeaturesChange,
               onHoveredTargetChange: vi.fn(),
               onPendingTargetChange: vi.fn(),
-              onExit: vi.fn(),
-              onSave: vi.fn()
+              onExit: vi.fn()
             },
             createElement(CutsSection, { isCollapsed: false, onOpenChange: () => {} }),
             createElement(PartCutsWorkspace),

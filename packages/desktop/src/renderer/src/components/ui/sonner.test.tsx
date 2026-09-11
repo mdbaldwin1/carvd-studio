@@ -7,7 +7,7 @@ const setTheme = (theme: 'dark' | 'light' | 'system') =>
   useAppSettingsStore.setState((state) => ({ settings: { ...state.settings, theme } }));
 
 // Mock sonner so we can inspect props passed to Toaster
-const MockSonnerToaster = vi.fn(() => <div data-testid="sonner-toaster" />);
+const MockSonnerToaster = vi.fn((_props: Record<string, unknown>) => <div data-testid="sonner-toaster" />);
 vi.mock('sonner', () => ({
   Toaster: (props: Record<string, unknown>) => MockSonnerToaster(props),
   toast: Object.assign(vi.fn(), {

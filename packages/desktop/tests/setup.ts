@@ -47,7 +47,8 @@ global.window.electronAPI = {
   onSaveProject: vi.fn(() => () => {}),
   onUndo: vi.fn(() => () => {}),
   onRedo: vi.fn(() => () => {})
-};
+  // A partial stand-in: individual suites add whatever else they exercise.
+} as unknown as typeof window.electronAPI;
 
 // Mock Three.js for component tests
 vi.mock('three', () => ({

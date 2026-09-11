@@ -22,8 +22,8 @@ describe('useCustomColors', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(window.electronAPI.getCustomColors).mockResolvedValue([]);
-    vi.mocked(window.electronAPI.addCustomColor).mockResolvedValue(undefined);
-    vi.mocked(window.electronAPI.removeCustomColor).mockResolvedValue(undefined);
+    vi.mocked(window.electronAPI.addCustomColor).mockResolvedValue(true);
+    vi.mocked(window.electronAPI.removeCustomColor).mockResolvedValue({ success: true });
   });
 
   describe('initialization', () => {

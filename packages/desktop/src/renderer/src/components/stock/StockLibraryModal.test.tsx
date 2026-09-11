@@ -1,3 +1,4 @@
+import { createTestAssemblyPart } from '../../../../../tests/helpers/factories';
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { StockLibraryModal } from './StockLibraryModal';
@@ -44,8 +45,8 @@ describe('StockLibraryModal', () => {
       name: 'Drawer Assembly',
       description: 'Standard drawer with dovetails',
       parts: [
-        { id: 'p1', name: 'Front', length: 18, width: 6, thickness: 0.75 },
-        { id: 'p2', name: 'Back', length: 18, width: 6, thickness: 0.75 }
+        createTestAssemblyPart(createTestAssemblyPart({ name: 'Front', length: 18, width: 6, thickness: 0.75 })),
+        createTestAssemblyPart(createTestAssemblyPart({ name: 'Back', length: 18, width: 6, thickness: 0.75 }))
       ],
       groups: [],
       groupMembers: [],
@@ -407,7 +408,7 @@ describe('StockLibraryModal', () => {
         id: 'assembly-1',
         name: 'Drawer Assembly',
         description: 'Standard drawer',
-        parts: [{ name: 'Front', length: 18, width: 6, thickness: 0.75 }],
+        parts: [createTestAssemblyPart({ name: 'Front', length: 18, width: 6, thickness: 0.75 })],
         groups: [],
         groupMembers: [],
         createdAt: '2024-01-01T00:00:00.000Z',
@@ -417,7 +418,7 @@ describe('StockLibraryModal', () => {
         id: 'assembly-2',
         name: 'Cabinet Box',
         description: 'Basic cabinet',
-        parts: [{ name: 'Side', length: 24, width: 18, thickness: 0.75 }],
+        parts: [createTestAssemblyPart({ name: 'Side', length: 24, width: 18, thickness: 0.75 })],
         groups: [],
         groupMembers: [],
         createdAt: '2024-01-01T00:00:00.000Z',
@@ -619,7 +620,7 @@ describe('StockLibraryModal', () => {
       {
         id: 'assembly-1',
         name: 'Complex Assembly',
-        parts: [{ name: 'Part', length: 12, width: 6, thickness: 0.75 }],
+        parts: [createTestAssemblyPart({ name: 'Part', length: 12, width: 6, thickness: 0.75 })],
         groups: [
           { originalId: 'g1', name: 'Group 1' },
           { originalId: 'g2', name: 'Group 2' }

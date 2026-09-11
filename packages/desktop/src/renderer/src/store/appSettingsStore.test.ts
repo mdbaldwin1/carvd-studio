@@ -75,7 +75,7 @@ beforeAll(() => {
     readRecoveryFile: vi.fn(),
     deleteRecoveryFile: vi.fn(),
     listRecoveryFiles: vi.fn()
-  };
+  } as unknown as typeof window.electronAPI;
 });
 
 // Setup mock before each test

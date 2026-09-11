@@ -53,7 +53,7 @@ function createMortiseFeature(overrides: Partial<RectCutFeature> = {}): RectCutF
   return {
     id: 'rect-1',
     kind: 'rect_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     target: { type: 'face', face: 'top_face' },
     reference: { primaryFrom: 'min' },
@@ -68,7 +68,7 @@ function createEndCutFeature(overrides: Partial<EndCutFeature> = {}): EndCutFeat
   return {
     id: 'end-1',
     kind: 'end_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     target: { type: 'face', face: 'left_end' },
     reference: { primaryFrom: 'min' },

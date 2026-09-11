@@ -20,24 +20,29 @@ function makePart(overrides?: Partial<Part>): Part {
 }
 
 const SETTINGS: AppSettings = {
-  units: 'imperial',
-  defaultStock: 'plywood',
+  defaultUnits: 'imperial',
+  defaultGridSize: 0.0625,
   theme: 'dark',
-  gridSize: 0.0625,
-  snapDistance: 0.125,
-  snapEnabled: false,
-  snapSensitivity: 1.0,
-  showGrid: true,
+  confirmBeforeDelete: true,
+  showHotkeyHints: true,
+  stockConstraints: {
+    constrainDimensions: true,
+    constrainGrain: true,
+    constrainColor: true,
+    preventOverlap: true
+  },
+  liveGridSnap: false,
+  snapSensitivity: 'normal',
+  snapToOrigin: false,
+  dimensionSnapSameTypeOnly: false,
   enableAxisLegacySnaps: false,
   enableSurfaceAnchors: false,
   enableFractionalAnchors: false,
   enableGoldenRatioAnchors: false,
   enableFeatureAnchors: false,
-  snapToOrigin: false,
-  displayMode: 'solid',
   lightingMode: 'default',
   brightnessMultiplier: 1.0
-} as AppSettings;
+};
 
 const NO_GUIDES: SnapGuide[] = [];
 

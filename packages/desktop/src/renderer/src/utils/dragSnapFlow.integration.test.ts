@@ -66,7 +66,7 @@ describe('drag snap flow integration', () => {
         {
           id: 'dado-socket',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'dado',
           target: { type: 'face', face: 'top_face' },
@@ -153,7 +153,7 @@ describe('drag snap flow integration', () => {
         {
           id: 'offset-dado-socket',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'dado',
           target: { type: 'face', face: 'top_face' },
@@ -208,7 +208,7 @@ describe('drag snap flow integration', () => {
         {
           id: 'off-grid-dado-socket',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'dado',
           target: { type: 'face', face: 'top_face' },
@@ -258,7 +258,7 @@ describe('drag snap flow integration', () => {
         {
           id: 'zero-delta-dado-socket',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'dado',
           target: { type: 'face', face: 'top_face' },
@@ -308,7 +308,7 @@ describe('drag snap flow integration', () => {
         {
           id: 'multi-dado-socket',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'dado',
           target: { type: 'face', face: 'top_face' },
@@ -357,7 +357,7 @@ describe('drag snap flow integration', () => {
         {
           id: 'selected-group-dado-socket',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'dado',
           target: { type: 'face', face: 'top_face' },
@@ -418,7 +418,7 @@ describe('drag snap flow integration', () => {
         {
           id: 'mortise-socket',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'mortise',
           target: { type: 'face', face: 'top_face' },
@@ -439,7 +439,7 @@ describe('drag snap flow integration', () => {
         {
           id: 'rail-tenon',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'tenon',
           target: { type: 'face', face: 'left_end' },

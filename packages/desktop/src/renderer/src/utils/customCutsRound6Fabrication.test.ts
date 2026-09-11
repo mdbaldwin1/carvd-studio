@@ -13,7 +13,7 @@ const slot: RoundedCutFeature = {
   id: 'panel-slot',
   label: 'Centered handhold',
   kind: 'rounded_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   cutType: 'rounded_slot',
   target: { type: 'face', face: 'top_face' },

@@ -883,7 +883,7 @@ describe('part cuts mode', () => {
     ({
       id,
       kind: 'rect_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       cutType: 'mortise',
       target: { type: 'face', face: 'top_face' },

@@ -20,7 +20,7 @@ const blank = () => createTestPart({ length: 10, width: 4, thickness: 1 });
 const circular = (): CircularCutFeature => ({
   id: 'hole',
   kind: 'circular_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   target: { type: 'face', face: 'top_face' },
   reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -31,7 +31,7 @@ const circular = (): CircularCutFeature => ({
 const rounded = (): RoundedCutFeature => ({
   id: 'rounded',
   kind: 'rounded_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   target: { type: 'face', face: 'bottom_face' },
   reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -42,7 +42,7 @@ const rounded = (): RoundedCutFeature => ({
 const rect = (): RectCutFeature => ({
   id: 'rect',
   kind: 'rect_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   target: { type: 'face', face: 'top_face' },
   reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -207,7 +207,7 @@ describe('whole-branch custom cut regression findings', () => {
     const cut: EndCutFeature = {
       id: 'end-reflection',
       kind: 'end_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face },
       reference: { primaryFrom: 'min' },
@@ -298,7 +298,7 @@ describe('whole-branch custom cut regression findings', () => {
     const cut: EndCutFeature = {
       id: 'end',
       kind: 'end_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face: 'left_end' },
       reference: { primaryFrom: 'min' },
@@ -446,7 +446,7 @@ describe('whole-branch custom cut regression findings', () => {
     const cut: EndCutFeature = {
       id: 'end',
       kind: 'end_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face: 'left_end' },
       reference: { primaryFrom: 'min' },

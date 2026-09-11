@@ -58,7 +58,9 @@ describe('interactionSession', () => {
       }
     });
 
-    expect(useInteractionStore.getState().activeSession?.delta).toEqual({ x: 1, y: 2, z: 3 });
+    const activeSession = useInteractionStore.getState().activeSession;
+    expect(activeSession?.kind).toBe('move');
+    expect(activeSession?.kind === 'move' ? activeSession.delta : null).toEqual({ x: 1, y: 2, z: 3 });
     expect(useInteractionStore.getState().activeSession?.referenceState).toEqual({
       selectionEntities: [{ id: 'sel', kind: 'part', partIds: ['p1'] }],
       referenceEntities: [{ id: 'ref', kind: 'part', partIds: ['p2'] }],

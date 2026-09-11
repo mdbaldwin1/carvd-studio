@@ -77,7 +77,7 @@ describe('fileFormat', () => {
           {
             id: 'feature-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -98,7 +98,7 @@ describe('fileFormat', () => {
           {
             id: 'counterbore-1',
             kind: 'circular_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -199,7 +199,7 @@ describe('fileFormat', () => {
                 {
                   id: 'feature-1',
                   kind: 'end_cut',
-                  version: 1,
+                  version: 1 as const,
                   enabled: true,
                   target: { type: 'face', face: 'left_end' },
                   reference: { primaryFrom: 'min' },
@@ -429,7 +429,7 @@ describe('fileFormat', () => {
                 {
                   id: 'feature-1',
                   kind: 'rect_cut',
-                  version: 1,
+                  version: 1 as const,
                   enabled: true,
                   target: { type: 'face', face: 'top_face' },
                   reference: { primaryFrom: 'min' },
@@ -561,7 +561,7 @@ describe('fileFormat', () => {
               {
                 id: 'broken-cut',
                 kind: 'rect_cut',
-                version: 1,
+                version: 1 as const,
                 enabled: true,
                 cutType: 'cutout',
                 reference: { primaryFrom: 'min' },
@@ -601,7 +601,7 @@ describe('fileFormat', () => {
               {
                 id: 'end-cut',
                 kind: 'end_cut',
-                version: 1,
+                version: 1 as const,
                 enabled: true,
                 target: { type: 'face', face: 'left_end' },
                 reference: { primaryFrom: 'min' },
@@ -716,7 +716,7 @@ describe('fileFormat', () => {
           {
             id: 'hole-1',
             kind: 'circular_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             metadata: {
               dowelJoint: {
@@ -754,7 +754,7 @@ describe('fileFormat', () => {
               {
                 id: 'hole-1',
                 kind: 'circular_cut',
-                version: 1,
+                version: 1 as const,
                 enabled: true,
                 metadata: {
                   dowelJoint: {
@@ -1106,7 +1106,7 @@ describe('fileFormat', () => {
               {
                 id: 'broken-cut',
                 kind: 'rect_cut',
-                version: 1,
+                version: 1 as const,
                 enabled: true,
                 cutType: 'cutout',
                 reference: { primaryFrom: 'min' },
@@ -1158,14 +1158,14 @@ describe('fileFormat', () => {
     });
 
     it('fails when project metadata is missing', () => {
-      const result = repairCarvdFile(JSON.stringify({ version: 1 }));
+      const result = repairCarvdFile(JSON.stringify({ version: 1 as const }));
 
       expect(result.success).toBe(false);
       expect(result.remainingErrors).toContain('Missing project metadata - cannot repair');
     });
 
     it('fails when project is not an object', () => {
-      const result = repairCarvdFile(JSON.stringify({ version: 1, project: 'not an object' }));
+      const result = repairCarvdFile(JSON.stringify({ version: 1 as const, project: 'not an object' }));
 
       expect(result.success).toBe(false);
       expect(result.remainingErrors).toContain('Missing project metadata - cannot repair');
@@ -1185,7 +1185,7 @@ describe('fileFormat', () => {
 
     it('adds missing arrays (parts, stocks, groups, groupMembers)', () => {
       const data = {
-        version: 1,
+        version: 1 as const,
         project: {
           name: 'Test',
           createdAt: '2024-01-01T00:00:00.000Z',
@@ -1466,7 +1466,7 @@ describe('fileFormat', () => {
 
 describe('repair regressions from the 2026-09-09 pre-release review', () => {
   const sound = {
-    version: 1,
+    version: 1 as const,
     project: { name: 'P', units: 'imperial' },
     parts: [],
     stocks: [],

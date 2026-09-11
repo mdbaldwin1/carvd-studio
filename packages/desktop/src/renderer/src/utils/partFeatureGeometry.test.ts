@@ -32,7 +32,7 @@ describe('partFeatureGeometry', () => {
           {
             id: `hole-${depthMode}`,
             kind: 'circular_cut' as const,
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face' as const, face: 'top_face' as const },
             reference: { primaryFrom: 'center' as const, secondaryFrom: 'center' as const },
@@ -177,7 +177,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'slot-1',
             kind: 'rounded_cut' as const,
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face' as const, face: 'top_face' as const },
             reference: { primaryFrom: 'center' as const, secondaryFrom: 'center' as const },
@@ -204,7 +204,7 @@ describe('partFeatureGeometry', () => {
             {
               id: 'feature-1',
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'left_end' },
               reference: { primaryFrom: 'min' },
@@ -224,7 +224,7 @@ describe('partFeatureGeometry', () => {
         {
           id: 'feature-1',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'right_end' },
           reference: { primaryFrom: 'max' },
@@ -247,7 +247,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'first',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'right_end' },
             reference: { primaryFrom: 'max' },
@@ -267,7 +267,7 @@ describe('partFeatureGeometry', () => {
             {
               id: `feature-${angle}`,
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'right_end' },
               reference: { primaryFrom: 'max' },
@@ -298,7 +298,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -401,7 +401,7 @@ describe('partFeatureGeometry', () => {
           {
             id: `long-point-${face}-${cutType}-${horizontalAngle}-${horizontalFlip}`,
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face },
             reference: { primaryFrom: face === 'left_end' ? 'min' : 'max' },
@@ -447,7 +447,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -474,7 +474,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -509,7 +509,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -530,7 +530,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -582,7 +582,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -620,7 +620,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -641,7 +641,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -692,7 +692,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -728,7 +728,7 @@ describe('partFeatureGeometry', () => {
         {
           id: 'feature-1',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -739,7 +739,7 @@ describe('partFeatureGeometry', () => {
         {
           id: 'feature-2',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -789,7 +789,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'min' },
@@ -820,7 +820,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'min' },
@@ -835,7 +835,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-2',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'bottom_face' },
             reference: { primaryFrom: 'min' },
@@ -866,7 +866,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'corner', corner: 'front_left_corner' },
             reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -897,7 +897,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'min' },
@@ -936,7 +936,7 @@ describe('partFeatureGeometry', () => {
           {
             id: `${cutType}-off-center`,
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -966,7 +966,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'edge', edge: 'top_front_edge' },
             reference: { primaryFrom: 'min' },
@@ -1004,7 +1004,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'min' },
@@ -1019,7 +1019,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-2',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'edge', edge: 'top_front_edge' },
             reference: { primaryFrom: 'min' },
@@ -1051,7 +1051,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'min' },
@@ -1066,7 +1066,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-2',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'min' },
@@ -1096,7 +1096,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'feature-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -1122,7 +1122,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'notch',
             kind: 'rect_cut' as const,
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'corner_notch' as const,
             target: { type: 'corner' as const, corner: 'front_left_corner' as const },
@@ -1176,7 +1176,7 @@ describe('partFeatureGeometry', () => {
             {
               id: 'edge-notch',
               kind: 'rect_cut' as const,
-              version: 1,
+              version: 1 as const,
               enabled: true,
               cutType: 'edge_notch' as const,
               target: { type: 'edge' as const, edge: 'top_front_edge' as const },
@@ -1204,7 +1204,7 @@ describe('partFeatureGeometry', () => {
             {
               id: 'edge-notch',
               kind: 'rect_cut' as const,
-              version: 1,
+              version: 1 as const,
               enabled: true,
               cutType: 'edge_notch' as const,
               target: { type: 'edge' as const, edge: 'top_front_edge' as const },
@@ -1229,7 +1229,7 @@ describe('partFeatureGeometry', () => {
             {
               id: 'edge-notch',
               kind: 'rect_cut' as const,
-              version: 1,
+              version: 1 as const,
               enabled: true,
               cutType: 'edge_notch' as const,
               target: { type: 'edge' as const, edge: 'top_front_edge' as const },
@@ -1256,7 +1256,7 @@ describe('partFeatureGeometry', () => {
             {
               id: 'cutout',
               kind: 'rect_cut' as const,
-              version: 1,
+              version: 1 as const,
               enabled: true,
               cutType: 'cutout' as const,
               target: { type: 'face' as const, face: 'top_face' as const },
@@ -1281,7 +1281,7 @@ describe('partFeatureGeometry', () => {
             {
               id: 'cutout',
               kind: 'rect_cut' as const,
-              version: 1,
+              version: 1 as const,
               enabled: true,
               cutType: 'cutout' as const,
               target: { type: 'face' as const, face: 'top_face' as const },
@@ -1308,7 +1308,7 @@ describe('partFeatureGeometry', () => {
             {
               id: 'cutout',
               kind: 'rect_cut' as const,
-              version: 1,
+              version: 1 as const,
               enabled: true,
               cutType: 'cutout' as const,
               target: { type: 'face' as const, face: 'top_face' as const },
@@ -1334,7 +1334,7 @@ describe('partFeatureGeometry', () => {
         feature: {
           id: 'f1',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'corner_notch' as const,
           target: { type: 'corner' as const, corner: 'front_left_corner' as const },
@@ -1348,7 +1348,7 @@ describe('partFeatureGeometry', () => {
         feature: {
           id: 'f2',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'edge_notch' as const,
           target: { type: 'edge' as const, edge: 'top_front_edge' as const },
@@ -1362,7 +1362,7 @@ describe('partFeatureGeometry', () => {
         feature: {
           id: 'f3',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'edge_notch' as const,
           target: { type: 'edge' as const, edge: 'top_left_edge' as const },
@@ -1376,7 +1376,7 @@ describe('partFeatureGeometry', () => {
         feature: {
           id: 'f4',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'cutout' as const,
           target: { type: 'face' as const, face: 'top_face' as const },
@@ -1390,7 +1390,7 @@ describe('partFeatureGeometry', () => {
         feature: {
           id: 'f5',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'cutout' as const,
           target: { type: 'face' as const, face: 'top_face' as const },
@@ -1404,7 +1404,7 @@ describe('partFeatureGeometry', () => {
         feature: {
           id: 'f6',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'dado' as const,
           target: { type: 'face' as const, face: 'top_face' as const },
@@ -1418,7 +1418,7 @@ describe('partFeatureGeometry', () => {
         feature: {
           id: 'f7',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'stopped_dado' as const,
           target: { type: 'face' as const, face: 'top_face' as const },
@@ -1432,7 +1432,7 @@ describe('partFeatureGeometry', () => {
         feature: {
           id: 'f8',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'rabbet' as const,
           target: { type: 'edge' as const, edge: 'top_front_edge' as const },
@@ -1446,7 +1446,7 @@ describe('partFeatureGeometry', () => {
         feature: {
           id: 'f9',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'groove' as const,
           target: { type: 'face' as const, face: 'top_face' as const },
@@ -1460,7 +1460,7 @@ describe('partFeatureGeometry', () => {
         feature: {
           id: 'f10',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'stopped_groove' as const,
           target: { type: 'face' as const, face: 'top_face' as const },
@@ -1474,7 +1474,7 @@ describe('partFeatureGeometry', () => {
         feature: {
           id: 'f11',
           kind: 'rect_cut' as const,
-          version: 1,
+          version: 1 as const,
           enabled: true,
           cutType: 'mortise' as const,
           target: { type: 'face' as const, face: 'top_face' as const },
@@ -1513,7 +1513,7 @@ describe('partFeatureGeometry', () => {
     const middleDado: PartFeature = {
       id: 'dado-1',
       kind: 'rect_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face: 'top_face' },
       reference: { primaryFrom: 'min' },
@@ -1532,7 +1532,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'bevel-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -1582,7 +1582,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'bevel-right',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'right_end' },
             reference: { primaryFrom: 'max' },
@@ -1626,7 +1626,7 @@ describe('partFeatureGeometry', () => {
       circular: {
         id: 'hole-1',
         kind: 'circular_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -1637,7 +1637,7 @@ describe('partFeatureGeometry', () => {
       rounded: {
         id: 'slot-1',
         kind: 'rounded_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -1713,7 +1713,7 @@ describe('partFeatureGeometry', () => {
             {
               id: `compound-${face}-${horizontalFlip}-${verticalFlip}-${secondary}`,
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face },
               reference: { primaryFrom: face === 'left_end' ? 'min' : 'max' },
@@ -1777,7 +1777,7 @@ describe('partFeatureGeometry', () => {
             {
               id: 'bevel-1',
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'left_end' },
               reference: { primaryFrom: 'min' },
@@ -1805,7 +1805,7 @@ describe('partFeatureGeometry', () => {
             {
               id: 'compound-1',
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'right_end' },
               reference: { primaryFrom: 'max' },
@@ -1845,7 +1845,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'mitre-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'right_end' },
             reference: { primaryFrom: 'max' },
@@ -1869,7 +1869,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'eb-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'front_face' },
             reference: { primaryFrom: 'min' },
@@ -1923,7 +1923,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'sm-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'mortise',
             target: { type: 'face', face: 'front_face' },
@@ -1982,7 +1982,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'tenon-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'tenon',
             target: { type: 'face', face: 'right_end' },
@@ -2049,7 +2049,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 't-left',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'tenon',
             target: { type: 'face', face: 'left_end' },
@@ -2060,7 +2060,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 't-right',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'tenon',
             target: { type: 'face', face: 'right_end' },
@@ -2108,7 +2108,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'bevel',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face },
             reference: { primaryFrom: 'min' },
@@ -2119,7 +2119,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'hole',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'cutout',
             target: { type: 'face', face: 'top_face' },
@@ -2168,7 +2168,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'back-pocket',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'mortise',
             target: { type: 'face', face: 'back_face' },
@@ -2199,7 +2199,7 @@ describe('partFeatureGeometry', () => {
           {
             id: 'right-notch',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'edge_notch',
             target: { type: 'edge', edge: 'top_right_edge' },

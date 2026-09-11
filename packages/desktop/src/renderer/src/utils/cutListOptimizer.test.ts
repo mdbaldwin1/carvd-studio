@@ -125,7 +125,7 @@ describe('cutListOptimizer', () => {
           {
             id: 'feature-enabled',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -138,7 +138,7 @@ describe('cutListOptimizer', () => {
           {
             id: 'feature-disabled',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: false,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'min' },

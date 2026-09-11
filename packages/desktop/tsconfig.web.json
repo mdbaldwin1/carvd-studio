@@ -21,6 +21,7 @@
     "src/renderer/**/*.json",
     "tests/setup.ts",
     "tests/helpers/**/*",
-    "tests/fixtures/**/*"
+    "tests/fixtures/**/*",
+    "tests/fixtures/**/*.json"
   ]
 }

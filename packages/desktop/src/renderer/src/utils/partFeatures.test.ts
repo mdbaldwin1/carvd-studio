@@ -13,7 +13,7 @@ function createEndCutFeature(): EndCutFeature {
   return {
     id: 'end-cut-1',
     kind: 'end_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     label: 'Left mitre',
     metadata: { source: 'test' },
@@ -29,7 +29,7 @@ function createRectCutFeature(target?: RectCutFeature['target']): RectCutFeature
   return {
     id: 'rect-cut-1',
     kind: 'rect_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     target: target ?? { type: 'corner', corner: 'front_left_corner' },
     reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -43,7 +43,7 @@ function createCircularCutFeature(overrides: Record<string, unknown> = {}): Reco
   return {
     id: 'round-hole-1',
     kind: 'circular_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     target: { type: 'face', face: 'top_face' },
     reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -63,7 +63,7 @@ function createRoundedCutFeature(overrides: Record<string, unknown> = {}): Recor
   return {
     id: 'rounded-slot-1',
     kind: 'rounded_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     target: { type: 'face', face: 'front_face' },
     reference: { primaryFrom: 'center', secondaryFrom: 'center' },

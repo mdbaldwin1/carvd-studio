@@ -132,7 +132,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'feature-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'corner', corner: 'front_left_corner' },
             reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -2011,7 +2011,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'dado-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'dado',
             target: { type: 'face', face: 'top_face' },
@@ -2047,7 +2047,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'rabbet-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'rabbet',
             target: { type: 'edge', edge: 'top_front_edge' },
@@ -2072,7 +2072,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'dado-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: false,
             cutType: 'dado',
             target: { type: 'face', face: 'top_face' },
@@ -2102,7 +2102,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'dado',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'dado',
             target: { type: 'face', face: 'top_face' },
@@ -2137,7 +2137,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'stopped-groove',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'stopped_groove',
             target: { type: 'face', face: 'top_face' },
@@ -2173,7 +2173,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'mortise',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'mortise',
             target: { type: 'face', face: 'top_face' },
@@ -2193,7 +2193,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'tenon',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'tenon',
             target: { type: 'face', face: 'left_end' },
@@ -2238,7 +2238,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'centered-mortise',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'mortise',
             target: { type: 'face', face: 'top_face' },
@@ -2259,7 +2259,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'off-center-tenon',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'tenon',
             target: { type: 'face', face: 'left_end' },
@@ -2281,7 +2281,7 @@ describe('snapToPartsUtil', () => {
       const halfLap = (id: string, face: 'top_face' | 'bottom_face', depth: number) => ({
         id,
         kind: 'rect_cut' as const,
-        version: 1,
+        version: 1 as const,
         enabled: true,
         cutType: 'dado' as const,
         target: { type: 'face' as const, face },
@@ -2327,7 +2327,7 @@ describe('snapToPartsUtil', () => {
       const blindCut = (id: string, face: 'top_face' | 'bottom_face', z: number) => ({
         id,
         kind: 'rect_cut' as const,
-        version: 1,
+        version: 1 as const,
         enabled: true,
         cutType: 'cutout' as const,
         target: { type: 'face' as const, face },
@@ -2369,7 +2369,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'cutout-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'cutout',
             target: { type: 'face', face: 'top_face' },
@@ -2414,7 +2414,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'cutout-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'cutout',
             target: { type: 'face', face: 'top_face' },
@@ -2452,7 +2452,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'cutout-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'cutout',
             target: { type: 'face', face: 'top_face' },
@@ -2496,7 +2496,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'mortise-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'mortise',
             target: { type: 'face', face: 'top_face' },
@@ -2541,7 +2541,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'cutout-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'cutout',
             target: { type: 'face', face: 'top_face' },
@@ -2656,7 +2656,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'notch-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'corner_notch',
             target: { type: 'corner', corner: 'front_left_corner' },
@@ -2707,7 +2707,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'bottom-pocket',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'mortise',
             target: { type: 'face', face: 'bottom_face' },
@@ -2718,7 +2718,7 @@ describe('snapToPartsUtil', () => {
           {
             id: 'zero-depth',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'mortise',
             target: { type: 'face', face: 'top_face' },

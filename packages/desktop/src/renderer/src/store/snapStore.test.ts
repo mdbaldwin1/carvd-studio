@@ -56,7 +56,15 @@ describe('snapStore', () => {
 
   describe('setActiveSnapLines', () => {
     it('sets active snap lines', () => {
-      const snapLines = [{ start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 0, z: 0 }, color: '#ff0000' }];
+      const snapLines = [
+        {
+          axis: 'x' as const,
+          type: 'edge' as const,
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 10, y: 0, z: 0 },
+          snapValue: 0
+        }
+      ];
 
       useSnapStore.getState().setActiveSnapLines(snapLines);
 
@@ -64,9 +72,15 @@ describe('snapStore', () => {
     });
 
     it('clears active snap lines', () => {
-      useSnapStore
-        .getState()
-        .setActiveSnapLines([{ start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 0, z: 0 }, color: '#ff0000' }]);
+      useSnapStore.getState().setActiveSnapLines([
+        {
+          axis: 'x' as const,
+          type: 'edge' as const,
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 10, y: 0, z: 0 },
+          snapValue: 0
+        }
+      ]);
 
       useSnapStore.getState().setActiveSnapLines([]);
 
@@ -98,7 +112,15 @@ describe('snapStore', () => {
 
   describe('setSnapIndicators', () => {
     it('sets both snap lines and reference distances in a single call', () => {
-      const snapLines = [{ start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 0, z: 0 }, color: '#ff0000' }];
+      const snapLines = [
+        {
+          axis: 'x' as const,
+          type: 'edge' as const,
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 10, y: 0, z: 0 },
+          snapValue: 0
+        }
+      ];
       const distances = [
         {
           id: 'dist-1',
@@ -121,7 +143,15 @@ describe('snapStore', () => {
 
     it('clears both snap lines and reference distances', () => {
       useSnapStore.setState({
-        activeSnapLines: [{ start: { x: 0, y: 0, z: 0 }, end: { x: 1, y: 0, z: 0 }, color: '#ff0000' }],
+        activeSnapLines: [
+          {
+            axis: 'x' as const,
+            type: 'edge' as const,
+            start: { x: 0, y: 0, z: 0 },
+            end: { x: 1, y: 0, z: 0 },
+            snapValue: 0
+          }
+        ],
         activeReferenceDistances: [
           {
             id: 'dist-1',
@@ -366,7 +396,15 @@ describe('snapStore', () => {
     it('newProject resets snap state', () => {
       useSnapStore.setState({
         referencePartIds: ['p1', 'p2'],
-        activeSnapLines: [{ start: { x: 0, y: 0, z: 0 }, end: { x: 1, y: 0, z: 0 }, color: '#f00' }],
+        activeSnapLines: [
+          {
+            axis: 'x' as const,
+            type: 'edge' as const,
+            start: { x: 0, y: 0, z: 0 },
+            end: { x: 1, y: 0, z: 0 },
+            snapValue: 0
+          }
+        ],
         activeReferenceDistances: [
           {
             id: 'd1',
@@ -404,6 +442,7 @@ describe('snapStore', () => {
           rotation: { x: 0, y: 0, z: 0 },
           color: '#8B4513',
           stockId: null,
+          grainSensitive: false,
           grainDirection: 'length'
         }
       ]);

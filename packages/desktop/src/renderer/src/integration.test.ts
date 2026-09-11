@@ -168,7 +168,7 @@ describe('Workflow: Part creation → stock assignment → cut list generation',
         {
           id: 'feature-1',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },

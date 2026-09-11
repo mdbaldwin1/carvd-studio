@@ -75,7 +75,12 @@ export function useTutorial(steps: TutorialStep[]) {
     }));
   }, []);
 
-  const currentStep = state.steps[state.currentStepIndex];
+  // An out-of-range index (or an empty step list) yields undefined here, which
+  // is why every consumer guards on it.
+  // `at` reports the miss that an out-of-range index (or an empty step list)
+  // really produces; indexing would claim a step is always there, and every
+  // consumer already guards on it.
+  const currentStep: TutorialStep | undefined = state.steps.at(state.currentStepIndex);
   const isFirstStep = state.currentStepIndex === 0;
   const isLastStep = state.currentStepIndex === state.steps.length - 1;
   const progress = state.steps.length > 0 ? ((state.currentStepIndex + 1) / state.steps.length) * 100 : 0;

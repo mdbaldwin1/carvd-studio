@@ -66,7 +66,7 @@ describe('dowelJointUtils', () => {
         {
           id: 'hole-1',
           kind: 'circular_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           metadata: {
             dowelJoint: {

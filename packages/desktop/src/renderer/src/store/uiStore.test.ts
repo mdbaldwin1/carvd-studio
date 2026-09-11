@@ -73,13 +73,13 @@ describe('uiStore', () => {
         expect(useUIStore.getState().contextMenu).toEqual(menuData);
       });
 
-      it('opens context menu with group data', () => {
+      it('opens context menu with guide data', () => {
         const store = useUIStore.getState();
         const menuData = {
-          type: 'group' as const,
+          type: 'guide' as const,
           x: 150,
           y: 250,
-          groupId: 'group-456'
+          guideId: 'guide-456'
         };
 
         store.openContextMenu(menuData);
@@ -94,8 +94,7 @@ describe('uiStore', () => {
         store.openContextMenu({
           type: 'part',
           x: 100,
-          y: 200,
-          partId: 'part-123'
+          y: 200
         });
 
         store.closeContextMenu();

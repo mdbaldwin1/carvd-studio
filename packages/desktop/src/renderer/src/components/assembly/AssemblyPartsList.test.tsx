@@ -9,16 +9,21 @@ describe('AssemblyPartsList', () => {
         units="imperial"
         parts={[
           {
-            id: 'part-1',
             name: 'Front Rail',
             length: 24,
             width: 2,
             thickness: 0.75,
+            relativePosition: { x: 0, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            stockId: null,
+            grainSensitive: false,
+            grainDirection: 'length',
+            color: '#c4a574',
             features: [
               {
                 id: 'feature-1',
                 kind: 'end_cut',
-                version: 1,
+                version: 1 as const,
                 enabled: true,
                 target: { type: 'face', face: 'left_end' },
                 reference: { primaryFrom: 'min' },
@@ -31,11 +36,16 @@ describe('AssemblyPartsList', () => {
             ]
           },
           {
-            id: 'part-2',
             name: 'Back Rail',
             length: 24,
             width: 2,
-            thickness: 0.75
+            thickness: 0.75,
+            relativePosition: { x: 0, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            stockId: null,
+            grainSensitive: false,
+            grainDirection: 'length',
+            color: '#c4a574'
           }
         ]}
       />

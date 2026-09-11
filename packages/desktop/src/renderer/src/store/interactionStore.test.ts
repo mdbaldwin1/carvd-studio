@@ -56,7 +56,9 @@ describe('interactionStore', () => {
 
     useInteractionStore.getState().updateMoveSessionDelta({ x: 1, y: 2, z: 3 });
 
-    expect(useInteractionStore.getState().activeSession?.delta).toEqual({ x: 1, y: 2, z: 3 });
+    const session = useInteractionStore.getState().activeSession;
+    expect(session?.kind).toBe('move');
+    expect(session?.kind === 'move' ? session.delta : null).toEqual({ x: 1, y: 2, z: 3 });
   });
 
   it('ends the active session', () => {

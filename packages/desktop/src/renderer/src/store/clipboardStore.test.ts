@@ -113,7 +113,7 @@ describe('clipboardStore', () => {
           {
             id: 'feature-1',
             kind: 'end_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'left_end' },
             reference: { primaryFrom: 'min' },
@@ -184,7 +184,7 @@ describe('clipboardStore', () => {
           {
             id: 'feature-1',
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'corner', corner: 'back_left_corner' },
             reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -225,7 +225,7 @@ describe('clipboardStore', () => {
           {
             id: 'counterbore-1',
             kind: 'circular_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -244,7 +244,7 @@ describe('clipboardStore', () => {
           {
             id: 'slot-1',
             kind: 'rounded_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             target: { type: 'face', face: 'top_face' },
             reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -285,7 +285,7 @@ describe('clipboardStore', () => {
           {
             id: 'hole-1',
             kind: 'circular_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             metadata: {
               dowelJoint: {
@@ -323,7 +323,7 @@ describe('clipboardStore', () => {
             {
               id: `hole-${id}`,
               kind: 'circular_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               metadata: {
                 dowelJoint: {
@@ -774,7 +774,7 @@ describe('clipboardStore', () => {
     const dado = {
       id: 'dado-1',
       kind: 'rect_cut' as const,
-      version: 1,
+      version: 1 as const,
       enabled: true,
       cutType: 'dado' as const,
       target: { type: 'face' as const, face: 'top_face' as const },
@@ -812,7 +812,7 @@ describe('clipboardStore', () => {
       const pairedHole = (id: string, matePartId: string, face: 'top_face' | 'bottom_face'): PartFeature => ({
         id,
         kind: 'circular_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         label: 'Dowel hole 1',
         metadata: {

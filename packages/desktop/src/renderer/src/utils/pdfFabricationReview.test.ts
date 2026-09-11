@@ -26,7 +26,7 @@ function reviewDowel(length: number, jointId: string): CircularCutFeature {
   return {
     id: jointId,
     kind: 'circular_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     target: { type: 'face', face: 'top_face' },
     reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -101,7 +101,7 @@ describe('scoped review fabrication regressions', () => {
         (edge, index): RectCutFeature => ({
           id: `notch-${index}`,
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'edge', edge },
           reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -191,7 +191,7 @@ describe('R13 complete identified fabrication in actual PDF bytes', () => {
             id: `${panel}-${index}`,
             label: `Panel ${panel + 1} operation ${index + 1} full detail`,
             kind: 'rect_cut',
-            version: 1,
+            version: 1 as const,
             enabled: true,
             cutType: 'cutout',
             target: { type: 'face', face: 'top_face' },

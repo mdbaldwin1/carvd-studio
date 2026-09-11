@@ -10,7 +10,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'dado',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -21,7 +21,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'hole',
           kind: 'circular_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -32,7 +32,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'cutout',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -68,7 +68,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'hole-1',
           kind: 'circular_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -79,7 +79,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'hole-2',
           kind: 'circular_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -105,7 +105,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'pattern-1',
           kind: 'circular_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -117,7 +117,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'pattern-2',
           kind: 'circular_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -143,7 +143,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-1',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -154,7 +154,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-2',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -177,7 +177,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-1',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -191,7 +191,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-2',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -218,7 +218,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-1',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -232,7 +232,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-2',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -263,7 +263,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-1',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -277,7 +277,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-2',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'edge', edge: 'top_front_edge' },
           reference: { primaryFrom: 'min' },
@@ -308,7 +308,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-1',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -323,7 +323,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-2',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'bottom_face' },
           reference: { primaryFrom: 'min' },
@@ -352,7 +352,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-1',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -367,7 +367,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-2',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'bottom_face' },
           reference: { primaryFrom: 'min' },
@@ -399,7 +399,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-0',
           kind: 'rect_cut',
-          version: 1,
+          version: 1 as const,
           enabled: false,
           target: { type: 'face', face: 'top_face' },
           reference: { primaryFrom: 'min' },
@@ -413,7 +413,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-1',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -424,7 +424,7 @@ describe('getPartFeatureConflicts', () => {
         {
           id: 'feature-2',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -449,7 +449,7 @@ describe('getPartFeatureConflicts', () => {
     ({
       id,
       kind: 'rect_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       cutType,
       target,

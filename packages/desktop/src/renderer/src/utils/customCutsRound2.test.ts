@@ -18,7 +18,7 @@ const tenon = (): RectCutFeature => ({
   id: 'tenon',
   label: 'Rail tenon',
   kind: 'rect_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   target: { type: 'face', face: 'left_end' },
   reference: { primaryFrom: 'min' },
@@ -29,7 +29,7 @@ const tenon = (): RectCutFeature => ({
 const hole = (id = 'hole'): CircularCutFeature => ({
   id,
   kind: 'circular_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   target: { type: 'face', face: 'top_face' },
   reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -40,7 +40,7 @@ const hole = (id = 'hole'): CircularCutFeature => ({
 const endCut = (face: 'left_end' | 'right_end', cutType: EndCutFeature['cutType']): EndCutFeature => ({
   id: 'end',
   kind: 'end_cut',
-  version: 1,
+  version: 1 as const,
   enabled: true,
   target: { type: 'face', face },
   reference: { primaryFrom: 'min' },
@@ -99,7 +99,7 @@ describe('independent review round 2', () => {
     const cut: RectCutFeature = {
       id: 'empty',
       kind: 'rect_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face: 'top_face' },
       reference: { primaryFrom: 'min' },
@@ -157,7 +157,7 @@ describe('independent review round 2', () => {
           getPartFeatureConflicts([removal, cut], part).some((c) => c.featureId === cut.id && c.severity === 'error')
         )
         .toBe(true);
-      expect(validatePartsForCutList([part]).some((error) => error.type === 'feature_validation')).toBe(true);
+      expect(validatePartsForCutList([part], []).some((error) => error.type === 'feature_validation')).toBe(true);
     }
   });
   it('Q9 contains the entire blind bore, not only its entry, against a bevel plane', () => {
@@ -171,7 +171,7 @@ describe('independent review round 2', () => {
     const cut: RectCutFeature = {
       id: 'empty',
       kind: 'rect_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       cutType,
       target:
@@ -186,13 +186,13 @@ describe('independent review round 2', () => {
     };
     expect.soft(validateRectCutFeature(cut, blank())).toMatch(/entire|no material/i);
     expect.soft(getPartFeatureConflicts([cut], blank()).some((c) => c.severity === 'error')).toBe(true);
-    expect(validatePartsForCutList([blank([cut])]).some((error) => error.type === 'feature_validation')).toBe(true);
+    expect(validatePartsForCutList([blank([cut])], []).some((error) => error.type === 'feature_validation')).toBe(true);
   });
   it('Q10 blocks cumulative removal of the blank, while retaining a thin web', () => {
     const a: RectCutFeature = {
       id: 'a',
       kind: 'rect_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       cutType: 'cutout',
       target: { type: 'face', face: 'top_face' },
@@ -211,7 +211,7 @@ describe('independent review round 2', () => {
       )
       .toBe(true);
     expect
-      .soft(validatePartsForCutList([blank([a, b])]).some((error) => error.type === 'feature_validation'))
+      .soft(validatePartsForCutList([blank([a, b])], []).some((error) => error.type === 'feature_validation'))
       .toBe(true);
     b.placement.x = 5.0001;
     b.parameters = { ...b.parameters, size: { length: 4.9999, width: 4 } };
@@ -460,7 +460,7 @@ describe('independent review round 2', () => {
     const cut: RoundedCutFeature = {
       id: 'slot',
       kind: 'rounded_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face: 'top_face' },
       reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -478,7 +478,7 @@ describe('independent review round 2', () => {
     const cut: RoundedCutFeature = {
       id: 'rounded',
       kind: 'rounded_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face: 'top_face' },
       reference: { primaryFrom: 'center', secondaryFrom: 'center' },

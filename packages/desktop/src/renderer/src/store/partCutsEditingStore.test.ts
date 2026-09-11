@@ -171,7 +171,7 @@ describe('partCutsEditingStore', () => {
       ({
         id,
         kind: 'rect_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         cutType: 'dado',
         target: { type: 'face', face: 'top_face' },
@@ -216,7 +216,7 @@ describe('partCutsEditingStore', () => {
       const roundFeature = (spacing: number): PartFeature => ({
         id: 'round-1',
         kind: 'circular_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -249,7 +249,7 @@ describe('partCutsEditingStore', () => {
       const round: PartFeature = {
         id: 'round',
         kind: 'circular_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'min', secondaryFrom: 'min' },
@@ -268,7 +268,7 @@ describe('partCutsEditingStore', () => {
       const rounded: PartFeature = {
         id: 'rounded',
         kind: 'rounded_cut',
-        version: 1,
+        version: 1 as const,
         enabled: true,
         target: { type: 'face', face: 'top_face' },
         reference: { primaryFrom: 'center', secondaryFrom: 'center' },

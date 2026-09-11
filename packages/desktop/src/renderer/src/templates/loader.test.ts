@@ -210,7 +210,7 @@ describe('loader', () => {
                 {
                   id: 'feature-1',
                   kind: 'end_cut',
-                  version: 1,
+                  version: 1 as const,
                   enabled: true,
                   target: { type: 'face', face: 'left_end' },
                   reference: { primaryFrom: 'min' },
@@ -501,7 +501,7 @@ describe('loader', () => {
                 {
                   id: 'feature-1',
                   kind: 'rect_cut',
-                  version: 1,
+                  version: 1 as const,
                   enabled: true,
                   target: { type: 'corner', corner: 'back_left_corner' },
                   reference: { primaryFrom: 'min', secondaryFrom: 'min' },

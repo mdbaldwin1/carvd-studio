@@ -17,7 +17,7 @@ export interface PartCutsEditorProviderProps {
   onPendingTargetChange: (target: PartFeatureTarget | null) => void;
   onExit: () => void;
   hasUnsavedChanges: boolean;
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 /**

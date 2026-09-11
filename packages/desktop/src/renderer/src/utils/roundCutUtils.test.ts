@@ -9,7 +9,7 @@ function hole(overrides: Partial<CircularCutFeature> = {}): CircularCutFeature {
   return {
     id: 'hole-1',
     kind: 'circular_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     target: { type: 'face', face: 'top_face' },
     reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -24,7 +24,7 @@ function rounded(overrides: Partial<RoundedCutFeature> = {}): RoundedCutFeature 
   return {
     id: 'rounded-1',
     kind: 'rounded_cut',
-    version: 1,
+    version: 1 as const,
     enabled: true,
     target: { type: 'face', face: 'top_face' },
     reference: { primaryFrom: 'center', secondaryFrom: 'center' },

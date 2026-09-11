@@ -135,7 +135,7 @@ describe('exportCutListToCsv', () => {
             {
               id: 'feature-1',
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'left_end' },
               reference: { primaryFrom: 'min' },
@@ -152,7 +152,7 @@ describe('exportCutListToCsv', () => {
             {
               id: 'feature-2',
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'right_end' },
               reference: { primaryFrom: 'max' },
@@ -208,7 +208,7 @@ describe('exportCutListToCsv', () => {
             {
               id: 'feature-1',
               kind: 'end_cut',
-              version: 1,
+              version: 1 as const,
               enabled: true,
               target: { type: 'face', face: 'left_end' },
               reference: { primaryFrom: 'min' },
