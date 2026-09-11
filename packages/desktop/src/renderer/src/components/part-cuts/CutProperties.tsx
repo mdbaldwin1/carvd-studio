@@ -166,6 +166,11 @@ export function CutProperties() {
       inspectorDraft.cutType
     );
 
+  // Bound once so the narrowing survives into the callbacks below; narrowing
+  // `inspectorDraft.pattern` inline is lost inside a map.
+  const gridPattern =
+    inspectorDraft.mode === 'circular_cut' && inspectorDraft.pattern?.type === 'grid' ? inspectorDraft.pattern : null;
+
   return (
     // Named so the panel's own alert is distinguishable from the sidebar's
     // blocking-conflicts summary, which is also an alert.
@@ -934,7 +939,7 @@ export function CutProperties() {
             </>
           )}
 
-          {inspectorDraft.pattern?.type === 'grid' && (
+          {gridPattern && (
             <>
               {(['rows', 'columns'] as const).map((field) => (
                 <div className="property-group" key={field}>
@@ -944,14 +949,14 @@ export function CutProperties() {
                     type="number"
                     min={1}
                     max={128}
-                    value={inspectorDraft.pattern![field]}
+                    value={gridPattern[field]}
                     onChange={(event) =>
                       setDraft({
                         ...inspectorDraft,
                         pattern: {
-                          ...inspectorDraft.pattern!,
+                          ...gridPattern,
                           [field]: Number(event.target.value)
-                        } as never
+                        }
                       })
                     }
                   />
@@ -961,11 +966,11 @@ export function CutProperties() {
                 <Label>Row Spacing</Label>
                 <FractionInput
                   ariaLabel="Row Spacing"
-                  value={inspectorDraft.pattern.rowSpacing}
+                  value={gridPattern.rowSpacing}
                   onChange={(rowSpacing) =>
                     setDraft({
                       ...inspectorDraft,
-                      pattern: { ...inspectorDraft.pattern!, rowSpacing } as never
+                      pattern: { ...gridPattern, rowSpacing }
                     })
                   }
                   min={0.001}
@@ -975,11 +980,11 @@ export function CutProperties() {
                 <Label>Column Spacing</Label>
                 <FractionInput
                   ariaLabel="Column Spacing"
-                  value={inspectorDraft.pattern.columnSpacing}
+                  value={gridPattern.columnSpacing}
                   onChange={(columnSpacing) =>
                     setDraft({
                       ...inspectorDraft,
-                      pattern: { ...inspectorDraft.pattern!, columnSpacing } as never
+                      pattern: { ...gridPattern, columnSpacing }
                     })
                   }
                   min={0.001}
@@ -990,14 +995,14 @@ export function CutProperties() {
                 <Input
                   id="grid-rotation"
                   type="number"
-                  value={inspectorDraft.pattern.rotation}
+                  value={gridPattern.rotation}
                   onChange={(event) =>
                     setDraft({
                       ...inspectorDraft,
                       pattern: {
-                        ...inspectorDraft.pattern!,
+                        ...gridPattern,
                         rotation: Number(event.target.value)
-                      } as never
+                      }
                     })
                   }
                 />

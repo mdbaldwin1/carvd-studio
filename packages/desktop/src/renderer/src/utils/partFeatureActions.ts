@@ -120,11 +120,10 @@ export function getMirrorActionLabel(action: MirrorAction): string {
   }
 }
 
-export function mirrorFeature(
-  feature: PartFeature,
-  action: MirrorAction,
-  part?: Pick<{ length: number; width: number; thickness: number }, 'length' | 'width' | 'thickness'>
-): PartFeature {
+// The shared start of every mirror: a fresh clone with its own id and label,
+// and no dowel relationship carried over. Generic so each branch below keeps
+// the narrowed feature kind it matched on.
+function beginMirror<T extends PartFeature>(feature: T, action: MirrorAction): T {
   const mirrored = clonePartFeature(feature);
   mirrored.id = generateFeatureId();
   mirrored.label = getMirroredLabel(feature.label, action);
@@ -132,8 +131,16 @@ export function mirrorFeature(
     delete mirrored.metadata.dowelJoint;
     if (Object.keys(mirrored.metadata).length === 0) mirrored.metadata = undefined;
   }
+  return mirrored;
+}
 
+export function mirrorFeature(
+  feature: PartFeature,
+  action: MirrorAction,
+  part?: Pick<{ length: number; width: number; thickness: number }, 'length' | 'width' | 'thickness'>
+): PartFeature {
   if (feature.kind === 'end_cut') {
+    const mirrored = beginMirror(feature, action);
     if (feature.target.face === 'front_face' || feature.target.face === 'back_face') {
       if (action !== 'across_width') throw new Error('Edge bevels mirror across width.');
       mirrored.target = { type: 'face', face: feature.target.face === 'front_face' ? 'back_face' : 'front_face' };
@@ -167,6 +174,7 @@ export function mirrorFeature(
   }
 
   if (feature.kind === 'circular_cut' || feature.kind === 'rounded_cut') {
+    const mirrored = beginMirror(feature, action);
     const face = feature.target.face;
     const targetFace =
       action === 'across_length'
@@ -205,7 +213,8 @@ export function mirrorFeature(
           : feature.placement.rotation
     };
 
-    if (feature.kind === 'circular_cut') {
+    // `mirrored` is a clone, so testing its kind narrows both it and `feature`.
+    if (mirrored.kind === 'circular_cut' && feature.kind === 'circular_cut') {
       const angleAction = reflectPrimary ? 'across_length' : reflectSecondary ? 'across_width' : null;
       if (angleAction) {
         mirrored.parameters.direction = mirrorPlanarAngle(feature.parameters.direction, angleAction);
@@ -229,6 +238,7 @@ export function mirrorFeature(
     return mirrored;
   }
 
+  const mirrored = beginMirror(feature, action);
   const resolved = getResolvedRectCutFeature(feature, part);
   if (isSideFaceTarget(resolved)) {
     const face = resolved.target.type === 'face' ? resolved.target.face : 'front_face';

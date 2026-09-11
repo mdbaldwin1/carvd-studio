@@ -28,9 +28,6 @@ import {
   removeFavoriteProject,
   isFavoriteProject,
   setFavoriteProjects,
-  getNewProjectDefaults,
-  setNewProjectDefaults,
-  NewProjectDefaults,
   getHasCompletedWelcome,
   setHasCompletedWelcome,
   getUserTemplates,
@@ -104,7 +101,7 @@ function getQueuedTestSaveDialogResult(): Electron.SaveDialogReturnValue | null 
 
   const filePath = queuedTestSaveDialogPaths.shift();
   if (!filePath) {
-    return { canceled: true, filePath: undefined };
+    return { canceled: true, filePath: '' };
   }
 
   return { canceled: false, filePath };
@@ -1163,16 +1160,6 @@ ipcMain.handle('reorder-favorite-projects', (_event, filePaths: string[]) => {
   return { success: true };
 });
 
-// New project defaults (for "remember these choices" feature)
-ipcMain.handle('get-new-project-defaults', () => {
-  return getNewProjectDefaults();
-});
-
-ipcMain.handle('set-new-project-defaults', (_event, defaults: Partial<NewProjectDefaults>) => {
-  setNewProjectDefaults(defaults);
-  return { success: true };
-});
-
 // Window title
 ipcMain.handle('set-window-title', (event, title: string) => {
   const win = BrowserWindow.fromWebContents(event.sender);
@@ -1404,7 +1391,8 @@ app.whenReady().then(async () => {
     const appIconPath = resolveAppIconPath();
     if (appIconPath) {
       try {
-        app.dock.setIcon(appIconPath);
+        // `dock` is only present on macOS, which this branch already checks.
+        app.dock?.setIcon(appIconPath);
       } catch (error) {
         log.warn('[Main] Failed to set dock icon:', error);
       }

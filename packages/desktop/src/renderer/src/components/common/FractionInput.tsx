@@ -10,6 +10,7 @@ interface FractionInputProps {
   className?: string;
   id?: string;
   ariaLabel?: string;
+  disabled?: boolean;
 }
 
 const formatInputMeasurement = (value: number, units: 'imperial' | 'metric') =>
@@ -20,7 +21,7 @@ const formatInputMeasurement = (value: number, units: 'imperial' | 'metric') =>
  * or as millimeters (metric), based on project settings.
  * All values are stored internally as inches.
  */
-export function FractionInput({ value, onChange, min = 0, className, id, ariaLabel }: FractionInputProps) {
+export function FractionInput({ value, onChange, min = 0, className, id, ariaLabel, disabled }: FractionInputProps) {
   const units = useProjectStore((s) => s.units);
 
   // Display value formatted according to units when not editing
@@ -121,6 +122,7 @@ export function FractionInput({ value, onChange, min = 0, className, id, ariaLab
   return (
     <Input
       id={id}
+      disabled={disabled}
       aria-label={ariaLabel}
       aria-description={
         units === 'metric' ? 'Enter millimeters (mm).' : 'Enter inches; decimals or fractions are accepted.'

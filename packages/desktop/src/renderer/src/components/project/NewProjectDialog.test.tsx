@@ -38,8 +38,6 @@ describe('NewProjectDialog', () => {
     window.electronAPI = {
       getPreference: vi.fn(),
       setPreference: vi.fn(),
-      getNewProjectDefaults: vi.fn(),
-      setNewProjectDefaults: vi.fn(),
       onMenuCommand: vi.fn(),
       removeMenuCommandListener: vi.fn()
     } as unknown as typeof window.electronAPI;
@@ -48,13 +46,6 @@ describe('NewProjectDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(window.electronAPI.getPreference).mockResolvedValue(mockStockLibrary);
-    vi.mocked(window.electronAPI.getNewProjectDefaults).mockResolvedValue({
-      units: 'imperial',
-      addCommonMaterials: true,
-      selectedMaterials: [],
-      skipSetupDialog: false
-    });
-    vi.mocked(window.electronAPI.setNewProjectDefaults).mockResolvedValue(undefined);
   });
 
   describe('rendering', () => {
@@ -220,17 +211,12 @@ describe('NewProjectDialog', () => {
   describe('the retired skip preference', () => {
     it('still shows the dialog for a profile that had skipSetupDialog set', async () => {
       const onCreateProject = vi.fn();
-      vi.mocked(window.electronAPI.getNewProjectDefaults).mockResolvedValue({
-        units: 'metric',
-        addCommonMaterials: false,
-        selectedMaterials: [],
-        skipSetupDialog: true
-      });
 
       render(<NewProjectDialog {...defaultProps} onCreateProject={onCreateProject} />);
 
-      // The checkbox that set this is gone and nothing else could clear it,
-      // so honouring it would suppress the dialog forever for these users.
+      // The preference and the checkbox that set it are both gone, and nothing
+      // could have cleared a value already written to an existing profile, so
+      // reading it again would suppress the dialog forever for those users.
       await waitFor(() => {
         expect(screen.getByText('Starting Materials')).toBeInTheDocument();
       });

@@ -312,11 +312,17 @@ function cloneFeatureMetadata(metadata: PartFeature['metadata']): PartFeature['m
   };
 }
 
-export function clonePartFeature(feature: PartFeature): PartFeature {
+// Cloning never changes a feature's kind, so callers get back the same
+// narrowed type they passed in rather than the widened union.
+export function clonePartFeature<T extends PartFeature>(feature: T): T {
+  return clonePartFeatureOfAnyKind(feature) as T;
+}
+
+function clonePartFeatureOfAnyKind(feature: PartFeature): PartFeature {
   if (feature.kind === 'end_cut') {
     return {
       ...feature,
-      target: cloneFeatureTarget(feature.target) as PartFeature['target'],
+      target: cloneFeatureTarget(feature.target) as typeof feature.target,
       reference: cloneFeatureReference(feature.reference),
       metadata: feature.metadata ? { ...feature.metadata } : undefined,
       parameters: {
@@ -355,7 +361,7 @@ export function clonePartFeature(feature: PartFeature): PartFeature {
 
   return {
     ...feature,
-    target: cloneFeatureTarget(feature.target) as PartFeature['target'],
+    target: cloneFeatureTarget(feature.target) as typeof feature.target,
     reference: cloneFeatureReference(feature.reference),
     metadata: feature.metadata ? { ...feature.metadata } : undefined,
     parameters: {

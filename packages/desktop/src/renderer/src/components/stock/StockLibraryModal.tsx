@@ -28,7 +28,7 @@ interface StockLibraryModalProps {
   assemblies: Assembly[];
   onUpdateAssembly: (id: string, updates: Partial<Assembly>) => void;
   onDeleteAssembly: (id: string) => void;
-  onDuplicateAssembly?: (assembly: Assembly) => Promise<void>;
+  onDuplicateAssembly?: (assembly: Assembly) => Promise<unknown>;
   onEditAssemblyIn3D?: (assembly: Assembly) => Promise<boolean>;
   onCreateNewAssembly?: () => Promise<boolean>;
 }

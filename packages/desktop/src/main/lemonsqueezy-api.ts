@@ -129,7 +129,7 @@ export async function validateLicense(
       })
     });
 
-    const data = await response.json();
+    const data = (await response.json()) as LemonSqueezyLicenseValidationResponse;
 
     if (!response.ok) {
       log.error('[LemonSqueezy] Validation failed:', data);
@@ -187,7 +187,7 @@ export async function activateLicense(licenseKey: string): Promise<LemonSqueezyA
       })
     });
 
-    const data = await response.json();
+    const data = (await response.json()) as LemonSqueezyActivationResponse;
 
     if (!response.ok) {
       log.error('[LemonSqueezy] Activation failed:', data);
@@ -244,7 +244,7 @@ export async function deactivateLicense(
       })
     });
 
-    const data = await response.json();
+    const data = (await response.json()) as { success?: boolean; error?: string };
 
     if (!response.ok) {
       log.error('[LemonSqueezy] Deactivation failed:', data);

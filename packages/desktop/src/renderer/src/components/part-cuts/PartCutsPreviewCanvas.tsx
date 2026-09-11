@@ -2,8 +2,11 @@ import { Edges, Html, Line, OrbitControls } from '@react-three/drei';
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import {
   buildFeatureFromDraft,
+  CircularCutDraft,
   FeatureDraft,
-  getFeatureDraftTarget
+  getFeatureDraftTarget,
+  RectCutDraft,
+  RoundedCutDraft
 } from '@renderer/components/part-features/partFeatureEditorState';
 import { Button } from '@renderer/components/ui/button';
 import { CardDescription } from '@renderer/components/ui/card';
@@ -147,7 +150,11 @@ export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export function supportsPreviewHandles(draft: FeatureDraft | null): boolean {
+// The drafts that can carry drag handles. End cuts never can, so narrowing to
+// this set is what lets callers reach the placement and size fields directly.
+export type HandleDraft = RectCutDraft | CircularCutDraft | RoundedCutDraft;
+
+export function supportsPreviewHandles(draft: FeatureDraft | null): draft is HandleDraft {
   if (!draft) return false;
   if (draft.mode === 'end_cut') return false;
   if (draft.mode === 'circular_cut' || draft.mode === 'rounded_cut')
@@ -597,20 +604,23 @@ export function applyHandleDelta(
     const primarySign = feature.reference.primaryFrom === 'max' ? -1 : 1;
     const secondarySign = (feature.reference.secondaryFrom === 'max' ? -1 : 1) * frame.secondaryAxis.z;
     const nextDraft = { ...startDraft };
+    // Narrowing on the copy rather than the source keeps the mode-specific
+    // fields reachable; each branch reads its field before writing it, so the
+    // value is still the one the drag started from.
     if (kind === 'move') {
       nextDraft.placementPrimary += deltaX * primarySign;
       nextDraft.placementSecondary += deltaZ * secondarySign;
-    } else if (startDraft.mode === 'circular_cut' && kind === 'length') {
-      nextDraft.diameter = Math.max(MIN_DIMENSION, startDraft.diameter + deltaX);
-    } else if (startDraft.mode === 'rounded_cut' && kind === 'length') {
-      const angle = (startDraft.rotation * Math.PI) / 180;
+    } else if (nextDraft.mode === 'circular_cut' && kind === 'length') {
+      nextDraft.diameter = Math.max(MIN_DIMENSION, nextDraft.diameter + deltaX);
+    } else if (nextDraft.mode === 'rounded_cut' && kind === 'length') {
+      const angle = (nextDraft.rotation * Math.PI) / 180;
       nextDraft.length = Math.max(
         MIN_DIMENSION,
-        startDraft.length + deltaX * Math.cos(angle) + deltaZ * Math.sin(angle)
+        nextDraft.length + deltaX * Math.cos(angle) + deltaZ * Math.sin(angle)
       );
-    } else if (startDraft.mode === 'rounded_cut' && kind === 'width') {
-      const angle = (startDraft.rotation * Math.PI) / 180;
-      nextDraft.width = Math.max(MIN_DIMENSION, startDraft.width - deltaX * Math.sin(angle) + deltaZ * Math.cos(angle));
+    } else if (nextDraft.mode === 'rounded_cut' && kind === 'width') {
+      const angle = (nextDraft.rotation * Math.PI) / 180;
+      nextDraft.width = Math.max(MIN_DIMENSION, nextDraft.width - deltaX * Math.sin(angle) + deltaZ * Math.cos(angle));
     }
     if (isHandleDraftValid(part, nextDraft)) return nextDraft;
     let low = 0;
@@ -624,12 +634,14 @@ export function applyHandleDelta(
           startDraft.placementPrimary + (nextDraft.placementPrimary - startDraft.placementPrimary) * ratio;
         candidate.placementSecondary =
           startDraft.placementSecondary + (nextDraft.placementSecondary - startDraft.placementSecondary) * ratio;
-      } else if (candidate.mode === 'circular_cut') {
-        candidate.diameter = startDraft.diameter + (nextDraft.diameter - startDraft.diameter) * ratio;
-      } else if (kind === 'length') {
-        candidate.length = startDraft.length + (nextDraft.length - startDraft.length) * ratio;
-      } else {
-        candidate.width = startDraft.width + (nextDraft.width - startDraft.width) * ratio;
+      } else if (candidate.mode === 'circular_cut' && nextDraft.mode === 'circular_cut') {
+        candidate.diameter = candidate.diameter + (nextDraft.diameter - candidate.diameter) * ratio;
+      } else if (candidate.mode === 'rounded_cut' && nextDraft.mode === 'rounded_cut') {
+        if (kind === 'length') {
+          candidate.length = candidate.length + (nextDraft.length - candidate.length) * ratio;
+        } else {
+          candidate.width = candidate.width + (nextDraft.width - candidate.width) * ratio;
+        }
       }
       if (isHandleDraftValid(part, candidate)) {
         low = ratio;

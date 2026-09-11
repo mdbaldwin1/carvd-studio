@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Deleting a group no longer fails silently** — Confirming a group deletion, or deleting one with "confirm before delete" turned off, called a store action that did not exist and threw. Groups now delete with their contents in one undoable step.
+- **Project notes reach the project report** — The PDF report read the wrong store field, so the Notes section was always empty.
+- **Toast notifications follow the app theme** — The toast container read a theme value that never existed and always fell back to its own default.
+- **Saving a template records the project name** — Template saves read the wrong store field and stored an empty name.
+- **Reaching the free stock limit no longer clears part stock** — Creating a stock from the properties panel when the licence limit blocked it assigned the failed result to every selected part, clearing their stock instead of doing nothing.
+- **Disabled cut fields are actually disabled** — Several Custom Cuts measurement inputs passed a `disabled` flag the input component ignored, leaving them editable when they should not have been.
+
 - **Assembly and recovery integrity** — Invalid or misaligned paired dowels can no longer be saved inside reusable assemblies or project files. File recovery now applies the same Custom Cuts schema and joinery validation as a normal load and reports malformed data safely instead of accepting an unusable repair.
 - **Round-opening joinery collision** — Timber can pass through circular and rounded openings on rotated parts. Collision checks use the remaining wood, distinguish wall contact from intrusion, and avoid solid-boolean stalls when overlapping copied multi-cut parts.
 - **Composed tenon shoulders** — Every accepted tenon removes its own shoulders, including multiple cuts on one end and opposing cuts whose lengths meet or overlap. A later cut never restores material removed earlier.

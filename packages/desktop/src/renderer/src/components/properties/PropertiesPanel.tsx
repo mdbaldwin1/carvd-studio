@@ -119,8 +119,12 @@ export function PropertiesPanel() {
       addLibraryStock(newStock);
       actualStockId = newStock.id;
     } else {
-      // addProjectStock returns the actual ID of the created stock
-      actualStockId = addProjectStock(stockData);
+      // addProjectStock returns the actual ID of the created stock, or null when
+      // the licence limit blocks it (it raises its own toast). Assigning that
+      // null onward would clear the stock on every selected part instead.
+      const createdStockId = addProjectStock(stockData);
+      if (!createdStockId) return;
+      actualStockId = createdStockId;
     }
 
     // Assign to all selected parts using the actual stock ID
@@ -400,7 +404,7 @@ export function PropertiesPanel() {
   }
 
   // Constraint enforcement helpers
-  const assignedStock = selectedPart.stockId ? stocks.find((s) => s.id === selectedPart.stockId) : null;
+  const assignedStock = (selectedPart.stockId ? stocks.find((s) => s.id === selectedPart.stockId) : null) ?? null;
   const isDimensionConstrained = constraints.constrainDimensions && !!assignedStock;
   const isGrainConstrained = constraints.constrainGrain && !!assignedStock && assignedStock.grainDirection !== 'none';
   const isColorConstrained = constraints.constrainColor && !!assignedStock;

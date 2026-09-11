@@ -72,7 +72,7 @@ function hasDialogTitle(children: ReactNode): boolean {
       return true;
     }
 
-    if (hasDialogTitle(child.props?.children)) {
+    if (hasDialogTitle((child.props as { children?: React.ReactNode } | undefined)?.children)) {
       return true;
     }
   }

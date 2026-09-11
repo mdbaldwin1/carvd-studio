@@ -275,8 +275,10 @@ export const RotationHandle = memo(
     const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
       if (e.nativeEvent.button !== 0) return;
       e.stopPropagation();
-      if (typeof e.target.setPointerCapture === 'function') {
-        e.target.setPointerCapture(e.pointerId);
+      // `target` is typed as a bare EventTarget; only elements capture pointers.
+      const captureTarget = e.target as HTMLElement | null;
+      if (typeof captureTarget?.setPointerCapture === 'function') {
+        captureTarget.setPointerCapture(e.pointerId);
       }
       const group = groupRef.current;
       const centerObject = group?.parent ?? group;
@@ -522,14 +524,14 @@ export const RotationHandle = memo(
 
         <group quaternion={faceQuaternion}>
           {/* Connector from ring to external grab handle */}
-          <line
+          <threeLine
             geometry={connectorGeometry}
             userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}
             onPointerDown={stopWorkspaceSelection}
             onClick={stopWorkspaceSelection}
           >
             <lineBasicMaterial color={grabColor} transparent opacity={0.85} />
-          </line>
+          </threeLine>
 
           {/* External grab handle for drag rotation */}
           <group position={grabPosition}>

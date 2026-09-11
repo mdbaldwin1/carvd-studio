@@ -3,6 +3,7 @@ import { createAxisSnapWinners, tryApplyAxisSnap } from './snapPriority';
 import { applyGroupAxisCandidate } from './groupDragSnapArbitration';
 import { createPartSnapContext, createGroupProxySnapContext, detectFaceSnapForContext } from './interactionSnapContext';
 import { solveDeltaSnapStages, solvePositionSnapStages, type LatchedFaceSnapState } from './interactionSnap';
+import type { SnapStage } from './snapPriority';
 import {
   createGuideSnapLine,
   createOriginSnapLine,
@@ -166,7 +167,13 @@ export function solvePartMoveSnapPreview(params: {
               },
               surface: () => getSnapContext().advancedDetectors.surface(),
               fraction: () => getSnapContext().advancedDetectors.fraction(),
-              feature: () => getSnapContext().advancedDetectors.feature(),
+              feature: () => {
+                // This context is built with a resolveFeatureStage, so the
+                // staged form is what comes back; the bare form only occurs
+                // for contexts created without a resolver.
+                const detected = getSnapContext().advancedDetectors.feature();
+                return 'stage' in detected ? detected : { result: detected, stage: 'feature' as SnapStage };
+              },
               axis: getSnapContext().advancedDetectors.axis
                 ? () => getSnapContext().advancedDetectors.axis!()
                 : undefined

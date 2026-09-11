@@ -11,7 +11,8 @@ import { useInteractionStore } from '../../store/interactionStore';
 import {
   calculateSnapThreshold,
   calculateReferenceDistances,
-  calculateGroupReferenceDistances
+  calculateGroupReferenceDistances,
+  type SnapResult
 } from '../../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
 import { LiveDimensions, resolveLiveGridReleasePosition, snapToGrid } from './partTypes';
@@ -534,7 +535,11 @@ export function usePartDrag(
             settings: appSettings,
             snapThreshold,
             latchedFaceSnap: latchedFaceSnapRef.current,
-            resolveFeatureStage: (featureSnapResult, currentPosition) => {
+            // toolInput is a bare literal, so these get no contextual type.
+            resolveFeatureStage: (
+              featureSnapResult: SnapResult,
+              currentPosition: { x: number; y: number; z: number }
+            ) => {
               const featureDelta = {
                 x: featureSnapResult.adjustedPosition.x - currentPosition.x,
                 y: featureSnapResult.adjustedPosition.y - currentPosition.y,

@@ -15,8 +15,6 @@ import {
   removeFavoriteProject,
   isFavoriteProject,
   setFavoriteProjects,
-  getNewProjectDefaults,
-  setNewProjectDefaults,
   getWindowBounds,
   setWindowBounds,
   getStockLibrary,
@@ -535,27 +533,6 @@ describe('store', () => {
     it('sets completed', () => {
       setHasCompletedWelcome(true);
       expect(getHasCompletedWelcome()).toBe(true);
-    });
-  });
-
-  // ============================
-  // New Project Defaults
-  // ============================
-
-  describe('new project defaults', () => {
-    it('has default values', () => {
-      const defaults = getNewProjectDefaults();
-      expect(defaults.units).toBe('imperial');
-      expect(defaults.addCommonMaterials).toBe(true);
-      expect(defaults.skipSetupDialog).toBe(false);
-    });
-
-    it('updates partial defaults', () => {
-      setNewProjectDefaults({ units: 'metric', skipSetupDialog: true });
-      const defaults = getNewProjectDefaults();
-      expect(defaults.units).toBe('metric');
-      expect(defaults.skipSetupDialog).toBe(true);
-      expect(defaults.addCommonMaterials).toBe(true); // unchanged
     });
   });
 

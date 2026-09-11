@@ -47,7 +47,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
   const licenseMode = useLicenseStore((s) => s.licenseMode);
   const showToast = useUIStore((s) => s.showToast);
   const projectName = useProjectStore((s) => s.projectName);
-  const projectNotes = useProjectStore((s) => s.notes);
+  const projectNotes = useProjectStore((s) => s.projectNotes);
   const customShoppingItems = useProjectStore((s) => s.customShoppingItems);
 
   // Get feature limits based on license mode

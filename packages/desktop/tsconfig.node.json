@@ -8,11 +8,7 @@
     "lib": ["ESNext"],
     "outDir": "./out",
     "rootDir": ".",
-    "types": ["node"]
+    "types": ["node", "electron-vite/node"]
   },
-  "include": [
-    "src/main/**/*",
-    "src/preload/**/*",
-    "electron.vite.config.ts"
-  ]
+  "include": ["src/main/**/*", "src/shared/**/*", "src/preload/**/*", "electron.vite.config.ts"]
 }

@@ -347,12 +347,9 @@ export function DowelJointDialog({
                 setError(null);
                 setStep((current) => current + 1);
               }}
-              disabled={step === 1 && !secondPart}
-              {...(step === 2
-                ? { disabled: !!faceValidationError }
-                : step === 3
-                  ? { disabled: !!validationError }
-                  : {})}
+              disabled={
+                step === 1 ? !secondPart : step === 2 ? !!faceValidationError : step === 3 ? !!validationError : false
+              }
             >
               Next
             </Button>

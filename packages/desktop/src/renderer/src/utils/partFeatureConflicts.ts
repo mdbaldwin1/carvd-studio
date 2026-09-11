@@ -1,4 +1,4 @@
-import { CircularCutFeature, Part, PartFeature, RectCutFeature } from '@renderer/types';
+import { CircularCutFeature, EndCutFeature, Part, PartFeature, RectCutFeature } from '@renderer/types';
 import { getFeatureTargetLabel } from '@renderer/utils/partFeatureSummary';
 import {
   getResolvedRectCutFeature,
@@ -353,7 +353,12 @@ export function getPartFeatureConflicts(
   const enabledFeatures = features
     .map((feature, index) => ({ feature, index }))
     .filter(({ feature }) => feature.enabled);
-  const endCutsByFace = new Map<'left_end' | 'right_end', { featureId: string; featureIndex: number; label: string }>();
+  // Keyed by every face an end cut can target: the ends plus the front and back
+  // faces that carry long-edge bevels.
+  const endCutsByFace = new Map<
+    EndCutFeature['target']['face'],
+    { featureId: string; featureIndex: number; label: string }
+  >();
   const priorRectCuts: Array<{ feature: RectCutFeature; index: number }> = [];
   const priorCircularCuts: Array<{ feature: CircularCutFeature; index: number }> = [];
 

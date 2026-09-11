@@ -249,17 +249,18 @@ export function Workspace() {
         return projectWorld(world);
       },
       getPartMaterialScreenPoints: (partId) => {
-        let partMesh: THREE.Mesh | null = null;
+        const partMeshes: THREE.Mesh[] = [];
         scene.traverse((object) => {
           if (
-            !partMesh &&
+            partMeshes.length === 0 &&
             object instanceof THREE.Mesh &&
             object.userData.partId === partId &&
             object.userData.hitTarget?.kind === 'part-body'
           ) {
-            partMesh = object;
+            partMeshes.push(object);
           }
         });
+        const partMesh = partMeshes[0];
         if (!partMesh) return [];
 
         scene.updateMatrixWorld(true);
@@ -294,12 +295,17 @@ export function Workspace() {
       },
       getWorldScreenPoint: (point) => projectWorld(world.set(point.x, point.y, point.z)),
       getPartRenderedWorldPosition: (partId: string) => {
-        let renderedPart: THREE.Object3D | null = null;
+        const renderedParts: THREE.Object3D[] = [];
         scene.traverse((object) => {
-          if (!renderedPart && object.userData.partId === partId && object.userData.hitTarget?.kind === 'part-body') {
-            renderedPart = object;
+          if (
+            renderedParts.length === 0 &&
+            object.userData.partId === partId &&
+            object.userData.hitTarget?.kind === 'part-body'
+          ) {
+            renderedParts.push(object);
           }
         });
+        const renderedPart = renderedParts[0];
         if (!renderedPart) return null;
         scene.updateMatrixWorld(true);
         renderedPart.getWorldPosition(world);

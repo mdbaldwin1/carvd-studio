@@ -1192,7 +1192,7 @@ describe('CutListModal', () => {
 
     it('passes project notes when available', async () => {
       mockExportProjectReportToPdf.mockResolvedValueOnce({ success: true });
-      useProjectStore.setState({ notes: 'Build notes here' });
+      useProjectStore.setState({ projectNotes: 'Build notes here' });
 
       render(<CutListModal {...defaultProps} />);
 

@@ -15,9 +15,9 @@ import {
   CARVD_FILE_FILTER,
   getProjectNameFromPath,
   repairCarvdFile,
-  FileRepairResult,
-  CarvdFile
+  FileRepairResult
 } from './fileFormat';
+import type { CarvdFile } from '../types';
 import { logger } from './logger';
 import { analytics } from './analytics';
 import { bucketCount } from '../../../shared/analytics';

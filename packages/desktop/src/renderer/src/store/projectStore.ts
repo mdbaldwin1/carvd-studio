@@ -100,6 +100,7 @@ interface ProjectState {
   deletePart: (id: string) => void;
   deleteSelectedParts: () => void;
   confirmDeleteParts: () => void;
+  confirmDeleteGroups: () => void;
   duplicatePart: (id: string) => string | null;
   duplicateSelectedParts: () => string[];
   resetSelectedPartsToStock: () => void;
@@ -871,6 +872,19 @@ export const useProjectStore = create<ProjectState>()(
           referencePartIds: state.referencePartIds.filter((id) => !pendingDeletePartIds.includes(id))
         }));
         useUIStore.getState().cancelDeleteParts();
+        get().markCutListStale();
+      },
+
+      confirmDeleteGroups: () => {
+        const { pendingDeleteGroupIds } = useUIStore.getState();
+        if (!pendingDeleteGroupIds || pendingDeleteGroupIds.length === 0) return;
+        // The confirmation offers to delete each group "and all its contents",
+        // so this is the recursive delete, which already reconciles members,
+        // selection and snap references for every descendant.
+        for (const groupId of pendingDeleteGroupIds) {
+          get().deleteGroup(groupId, 'recursive');
+        }
+        useUIStore.getState().cancelDeleteGroups();
         get().markCutListStale();
       },
 

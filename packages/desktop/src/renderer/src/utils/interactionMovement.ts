@@ -414,5 +414,5 @@ export function resolveRotateBatchGrounding({
     return { updates };
   }
 
-  return { updates: result.adjusted.updates };
+  return { updates: [...result.adjusted.updates] };
 }

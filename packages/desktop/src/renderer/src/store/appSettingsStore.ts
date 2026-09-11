@@ -97,7 +97,9 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
           const relevantChanges: Partial<AppSettings> = {};
           for (const key of appSettingsKeys) {
             if (key in changes) {
-              relevantChanges[key] = changes[key] as AppSettings[typeof key];
+              // A union key makes the per-key value type unresolvable here;
+              // appSettingsKeys guarantees the key belongs to AppSettings.
+              (relevantChanges as Record<string, unknown>)[key] = changes[key];
             }
           }
 

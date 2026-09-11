@@ -95,77 +95,83 @@ export type OperationPreset =
 
 type EndCutReference = NonNullable<EndCutFeature['parameters']['reference']>;
 
-export type FeatureDraft =
-  | {
-      mode: 'end_cut';
-      featureId: string | null;
-      label: string;
-      enabled: boolean;
-      targetFace: 'left_end' | 'right_end';
-      cutType: EndCutFeature['cutType'];
-      lengthMode: EndCutFeature['lengthMode'];
-      referenceMode: EndCutReference['mode'] | null;
-      referenceValue: number | null;
-      horizontalAngle: number;
-      horizontalFlip: boolean;
-      verticalAngle: number;
-      verticalFlip: boolean;
-    }
-  | {
-      mode: 'rect_cut';
-      featureId: string | null;
-      label: string;
-      enabled: boolean;
-      cutType: RectCutFeature['cutType'];
-      faceTarget: FaceTarget;
-      edgeTarget: EdgeTarget;
-      cornerTarget: CornerTarget;
-      sizeLength: number;
-      sizeWidth: number;
-      depthMode: RectCutFeature['parameters']['depthMode'];
-      depth: number;
-      placementX: number;
-      placementZ: number;
-    }
-  | {
-      mode: 'circular_cut';
-      reference?: CircularCutFeature['reference'];
-      featureId: string | null;
-      label: string;
-      enabled: boolean;
-      cutType: CircularCutFeature['cutType'];
-      faceTarget: FaceTarget;
-      diameter: number;
-      depthMode: CircularCutFeature['parameters']['depthMode'];
-      depth: number;
-      tilt: number;
-      direction: number;
-      placementPrimary: number;
-      placementSecondary: number;
-      rotation: number;
-      countersinkMajorDiameter: number;
-      countersinkIncludedAngle: number;
-      counterboreDiameter: number;
-      counterboreDepth: number;
-      pattern?: CircularPattern;
-    }
-  | {
-      mode: 'rounded_cut';
-      reference?: RoundedCutFeature['reference'];
-      featureId: string | null;
-      label: string;
-      enabled: boolean;
-      cutType: RoundedCutFeature['cutType'];
-      faceTarget: FaceTarget;
-      length: number;
-      width: number;
-      cornerRadius: number;
-      depthMode: RoundedCutFeature['parameters']['depthMode'];
-      depth: number;
-      placementPrimary: number;
-      placementSecondary: number;
-      rotation: number;
-    };
+export interface EndCutDraft {
+  mode: 'end_cut';
+  featureId: string | null;
+  label: string;
+  enabled: boolean;
+  // Ends take mitre/bevel/compound; the front and back faces take long-edge
+  // bevels, so the draft carries the same face set as the feature itself.
+  targetFace: EndCutFeature['target']['face'];
+  cutType: EndCutFeature['cutType'];
+  lengthMode: EndCutFeature['lengthMode'];
+  referenceMode: EndCutReference['mode'] | null;
+  referenceValue: number | null;
+  horizontalAngle: number;
+  horizontalFlip: boolean;
+  verticalAngle: number;
+  verticalFlip: boolean;
+}
+
+export interface RectCutDraft {
+  mode: 'rect_cut';
+  featureId: string | null;
+  label: string;
+  enabled: boolean;
+  cutType: RectCutFeature['cutType'];
+  faceTarget: FaceTarget;
+  edgeTarget: EdgeTarget;
+  cornerTarget: CornerTarget;
+  sizeLength: number;
+  sizeWidth: number;
+  depthMode: RectCutFeature['parameters']['depthMode'];
+  depth: number;
+  placementX: number;
+  placementZ: number;
+}
+
+export interface CircularCutDraft {
+  mode: 'circular_cut';
+  reference?: CircularCutFeature['reference'];
+  featureId: string | null;
+  label: string;
+  enabled: boolean;
+  cutType: CircularCutFeature['cutType'];
+  faceTarget: FaceTarget;
+  diameter: number;
+  depthMode: CircularCutFeature['parameters']['depthMode'];
+  depth: number;
+  tilt: number;
+  direction: number;
+  placementPrimary: number;
+  placementSecondary: number;
+  rotation: number;
+  countersinkMajorDiameter: number;
+  countersinkIncludedAngle: number;
+  counterboreDiameter: number;
+  counterboreDepth: number;
+  pattern?: CircularPattern;
+}
+
+export interface RoundedCutDraft {
+  mode: 'rounded_cut';
+  reference?: RoundedCutFeature['reference'];
+  featureId: string | null;
+  label: string;
+  enabled: boolean;
+  cutType: RoundedCutFeature['cutType'];
+  faceTarget: FaceTarget;
+  length: number;
+  width: number;
+  cornerRadius: number;
+  depthMode: RoundedCutFeature['parameters']['depthMode'];
+  depth: number;
+  placementPrimary: number;
+  placementSecondary: number;
+  rotation: number;
+}
+
+export type FeatureDraft = EndCutDraft | RectCutDraft | CircularCutDraft | RoundedCutDraft;
 
 type DraftPartDefaults = { partLength?: number; partWidth?: number; partThickness?: number };
 

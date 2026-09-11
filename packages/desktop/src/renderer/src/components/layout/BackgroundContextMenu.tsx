@@ -5,7 +5,7 @@ import { useCameraStore } from '../../store/cameraStore';
 import { MenuPanel, MenuItemButton, MenuSeparator, MenuLabel } from '../ui/context-menu';
 
 interface BackgroundContextMenuProps {
-  menuRef: React.RefObject<HTMLDivElement>;
+  menuRef: React.RefObject<HTMLDivElement | null>;
   x: number;
   y: number;
   onClose: () => void;

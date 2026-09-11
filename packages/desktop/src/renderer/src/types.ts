@@ -129,13 +129,20 @@ export interface PartFeatureReference {
   tertiaryFrom?: 'min' | 'center' | 'max';
 }
 
+// Feature metadata is open-ended, but the shapes we read back in code are
+// named here so callers get types instead of `unknown`.
+export interface PartFeatureMetadata {
+  dowelJoint?: DowelJointMetadata;
+  [key: string]: unknown;
+}
+
 export interface PartFeatureBase {
   id: PartFeatureId;
   kind: PartFeatureKind;
   version: PartFeatureVersion;
   enabled: boolean;
   label?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: PartFeatureMetadata;
   target: PartFeatureTarget;
   reference: PartFeatureReference;
 }

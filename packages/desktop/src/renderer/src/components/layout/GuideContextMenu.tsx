@@ -2,7 +2,7 @@ import { useProjectStore } from '../../store/projectStore';
 import { MenuPanel, MenuItemButton, MenuLabel } from '../ui/context-menu';
 
 interface GuideContextMenuProps {
-  menuRef: React.RefObject<HTMLDivElement>;
+  menuRef: React.RefObject<HTMLDivElement | null>;
   x: number;
   y: number;
   onClose: () => void;

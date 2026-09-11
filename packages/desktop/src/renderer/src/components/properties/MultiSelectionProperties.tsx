@@ -45,7 +45,7 @@ export function MultiSelectionProperties({
         <h2>Properties</h2>
         <div className="properties-card">
           <p className="text-sm mb-3 text-text">
-            {selectedPartIds.length} part{selectedPartIds.length !== 1 ? 's' : ''}, {selectedGroupIds.length} group
+            {selectedPartIds.length} parts, {selectedGroupIds.length} group
             {selectedGroupIds.length !== 1 ? 's' : ''} selected
           </p>
           <p className="text-[11px] text-text-muted mt-1">

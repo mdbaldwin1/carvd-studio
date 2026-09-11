@@ -14,7 +14,7 @@ import { getContainingGroupId, resolveExplicitSelectedPartIds } from '../../util
 import { MenuPanel, MenuItemButton, MenuSeparator, MenuLabel, MenuSub } from '../ui/context-menu';
 
 interface PartContextMenuProps {
-  menuRef: React.RefObject<HTMLDivElement>;
+  menuRef: React.RefObject<HTMLDivElement | null>;
   x: number;
   y: number;
   onClose: () => void;

@@ -11,6 +11,8 @@ type SnapPositionResult = {
   snappedY: boolean;
   snappedZ: boolean;
   snapLines: SnapLine[];
+  /** Nearest compatible candidate distance, used for snap hysteresis below. */
+  closestDistance?: number;
 };
 
 type GuideSnapCandidate = {

@@ -129,7 +129,7 @@ export function usePartResize(
     // Get constraint settings from store
     const stockConstraints = useProjectStore.getState().stockConstraints;
     const stocks = useProjectStore.getState().stocks;
-    const assignedStock = part.stockId ? stocks.find((s) => s.id === part.stockId) : null;
+    const assignedStock = part.stockId ? stocks.find((s) => s.id === part.stockId) : undefined;
 
     // Apply dimension matching snap if enabled
     const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled;
@@ -209,7 +209,7 @@ export function usePartResize(
 
     const stockConstraints = useProjectStore.getState().stockConstraints;
     const stocks = useProjectStore.getState().stocks;
-    const assignedStock = part.stockId ? stocks.find((s) => s.id === part.stockId) : null;
+    const assignedStock = part.stockId ? stocks.find((s) => s.id === part.stockId) : undefined;
     const isDimensionConstrained = stockConstraints.constrainDimensions && !!assignedStock;
 
     const maxLength = isDimensionConstrained && assignedStock ? assignedStock.length : Infinity;

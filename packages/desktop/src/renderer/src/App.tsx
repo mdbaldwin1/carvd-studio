@@ -59,7 +59,7 @@ import { useAssemblyEditingStore } from './store/assemblyEditingStore';
 import { useLicenseStore } from './store/licenseStore';
 import { useProjectStore } from './store/projectStore';
 import { useUIStore } from './store/uiStore';
-import { Project, Stock } from './types';
+import { Assembly, Project, Stock } from './types';
 import { EXTERNAL_LINKS } from './utils/externalLinks';
 import { logger } from './utils/logger';
 import { analytics } from './utils/analytics';
@@ -769,7 +769,9 @@ function App() {
         const exists = assemblyLibrary.some((a) => a.name === templateAssembly.name);
         if (!exists) {
           try {
-            const currentAssemblies = (await window.electronAPI.getPreference('assemblyLibrary')) || [];
+            // getPreference is untyped; this key holds the saved assembly list.
+            const currentAssemblies =
+              ((await window.electronAPI.getPreference('assemblyLibrary')) as Assembly[] | null) ?? [];
             await window.electronAPI.setPreference('assemblyLibrary', [...currentAssemblies, templateAssembly]);
           } catch (error) {
             logger.error('Failed to add template assembly to library:', error);

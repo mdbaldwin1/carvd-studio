@@ -1,3 +1,6 @@
+// Registers the matchers at runtime. Their types come from the @vitest/expect
+// augmentation in src/renderer/src/ambient.d.ts: jest-dom's own /vitest entry
+// cannot resolve vitest from the hoisted root in this workspace layout.
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 

@@ -194,7 +194,7 @@ export function usePartCutsEditorState({
   }, [draft, part, draftFeatures]);
 
   const endCutPreviewMeasurements = useMemo(() => {
-    if (!draftPreviewFeature || draftPreviewFeature.kind !== 'end_cut') return null;
+    if (!draft || !draftPreviewFeature || draftPreviewFeature.kind !== 'end_cut') return null;
     if (isEdgeBevelTarget(draftPreviewFeature.target.face)) return null;
 
     const nextFeatures = draft.featureId
@@ -212,7 +212,7 @@ export function usePartCutsEditorState({
   }, [draft, draftFeatures, draftPreviewFeature, part.length, part.thickness, part.width]);
 
   const edgeBevelPreviewMeasurements = useMemo(() => {
-    if (!draftPreviewFeature || draftPreviewFeature.kind !== 'end_cut') return null;
+    if (!draft || !draftPreviewFeature || draftPreviewFeature.kind !== 'end_cut') return null;
     if (!isEdgeBevelTarget(draftPreviewFeature.target.face)) return null;
 
     const nextFeatures = draft.featureId
@@ -238,10 +238,7 @@ export function usePartCutsEditorState({
 
   // Shared with the header Save button so the two cannot disagree about
   // whether this draft is savable.
-  const draftStatus = useMemo(
-    () => getPartCutsDraftStatus(part, draftFeatures, hasUnsavedChanges),
-    [part, draftFeatures, hasUnsavedChanges]
-  );
+  const draftStatus = useMemo(() => getPartCutsDraftStatus(part, draftFeatures), [part, draftFeatures]);
   const featureConflicts = draftStatus.conflicts;
   const operationIssues = draftStatus.issues;
   const firstInvalidIndex = draftStatus.firstInvalidIndex;
