@@ -258,8 +258,14 @@ describe('supportsPreviewHandles', () => {
     expect(supportsPreviewHandles(createRoundedDraft('rounded_rectangle'))).toBe(true);
   });
 
-  it('rejects unsupported cut types and side faces', () => {
-    expect(supportsPreviewHandles(createRectDraft('dado'))).toBe(false);
+  it('accepts the channels that have a free placement axis', () => {
+    expect(supportsPreviewHandles(createRectDraft('dado'))).toBe(true);
+    expect(supportsPreviewHandles(createRectDraft('groove'))).toBe(true);
+  });
+
+  it('rejects cuts with no free axis, and side faces', () => {
+    expect(supportsPreviewHandles(createRectDraft('corner_notch'))).toBe(false);
+    expect(supportsPreviewHandles(createRectDraft('rabbet'))).toBe(false);
     expect(supportsPreviewHandles(createRectDraft('mortise', { faceTarget: 'front_face' }))).toBe(false);
   });
 });
@@ -469,18 +475,72 @@ describe('getEditableHandleOverlay', () => {
     expect(overlay?.widthHandle).toBeNull();
   });
 
-  it('builds a handle-free overlay for unsupported rect cuts', () => {
-    const overlay = getEditableHandleOverlay(part, createRectDraft('dado'));
+  it('builds a handle-free overlay for cuts with no free axis', () => {
+    const overlay = getEditableHandleOverlay(part, createRectDraft('corner_notch'));
 
     expect(overlay?.center).toBeUndefined();
     expect(overlay?.lengthHandle).toBeUndefined();
     expect(overlay?.areaPosition).toBeDefined();
-    expect(overlay?.operationLabel).toBe('dado');
+    expect(overlay?.operationLabel).toBe('corner notch');
+  });
+
+  it('offers a dado only the length axis, since it spans the width', () => {
+    const overlay = getEditableHandleOverlay(part, createRectDraft('dado'));
+
+    expect(overlay?.center).toBeDefined();
+    expect(overlay?.lengthHandle).toBeDefined();
+    expect(overlay?.widthHandle).toBeNull();
+  });
+
+  it('offers a groove only the width axis, since it spans the length', () => {
+    const overlay = getEditableHandleOverlay(part, createRectDraft('groove'));
+
+    expect(overlay?.center).toBeDefined();
+    expect(overlay?.lengthHandle).toBeUndefined();
+    expect(overlay?.widthHandle).toBeDefined();
   });
 });
 
 describe('applyHandleDelta', () => {
   const part = createTestPart({ length: 24, width: 12, thickness: 0.75 });
+
+  it('nudges a groove across the width, the axis it leaves free', () => {
+    const draft = createRectDraft('groove', { placementX: 0, placementZ: 2 });
+    const nudged = sameMode(draft, nudgeDraft(part, draft, 'move', 1));
+
+    expect(nudged.placementX).toBe(0);
+    expect(nudged.placementZ).toBeCloseTo(2.25);
+  });
+
+  it('moves a dado along the length and pins it across the width', () => {
+    const draft = createRectDraft('dado', { placementX: 4, placementZ: 0 });
+    const moved = sameMode(draft, applyHandleDelta(part, draft, 'move', 2, 3));
+
+    expect(moved.placementX).toBeCloseTo(6);
+    expect(moved.placementZ).toBe(0);
+  });
+
+  it('leaves a dado width alone, since it spans the board', () => {
+    const draft = createRectDraft('dado', { sizeWidth: 12 });
+    const resized = sameMode(draft, applyHandleDelta(part, draft, 'width', 0, 3));
+
+    expect(resized.sizeWidth).toBe(draft.sizeWidth);
+  });
+
+  it('moves a groove across the width and pins it along the length', () => {
+    const draft = createRectDraft('groove', { placementX: 0, placementZ: 2 });
+    const moved = sameMode(draft, applyHandleDelta(part, draft, 'move', 3, 1.5));
+
+    expect(moved.placementX).toBe(0);
+    expect(moved.placementZ).toBeCloseTo(3.5);
+  });
+
+  it('leaves a groove length alone, since it runs the board', () => {
+    const draft = createRectDraft('groove', { sizeLength: 24 });
+    const resized = sameMode(draft, applyHandleDelta(part, draft, 'length', 3, 0));
+
+    expect(resized.sizeLength).toBe(draft.sizeLength);
+  });
 
   it('returns the draft unchanged for unsupported drafts', () => {
     const draft = createEndCutDraft();

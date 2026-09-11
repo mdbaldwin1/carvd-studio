@@ -138,7 +138,28 @@ const HANDLE_SIZE = 0.24;
 const MIN_DIMENSION = 0.125;
 const HANDLE_COLOR = '#f59e0b';
 const AREA_COLOR = '#2563eb';
-const SUPPORTED_HANDLE_TYPES = new Set(['cutout', 'mortise', 'stopped_dado', 'stopped_groove']);
+
+/**
+ * Which placement axes each rectangular cut leaves free, and therefore which
+ * handles the preview may offer.
+ *
+ * A dado spans the board's width, so only its position along the length moves
+ * and only its channel width (the length axis) resizes. A groove is the mirror
+ * of that. Pockets are free in both. Anything absent here is fully derived from
+ * its target and is edited through the inspector.
+ */
+const RECT_HANDLE_AXES: Partial<Record<RectCutDraft['cutType'], { moveX: boolean; moveZ: boolean }>> = {
+  cutout: { moveX: true, moveZ: true },
+  mortise: { moveX: true, moveZ: true },
+  stopped_groove: { moveX: true, moveZ: true },
+  stopped_dado: { moveX: true, moveZ: false },
+  dado: { moveX: true, moveZ: false },
+  groove: { moveX: false, moveZ: true }
+};
+
+export function getRectHandleAxes(cutType: RectCutDraft['cutType']): { moveX: boolean; moveZ: boolean } | null {
+  return RECT_HANDLE_AXES[cutType] ?? null;
+}
 
 function shouldUseFallbackPreview(): boolean {
   return (
@@ -160,7 +181,7 @@ export function supportsPreviewHandles(draft: FeatureDraft | null): draft is Han
   if (draft.mode === 'circular_cut' || draft.mode === 'rounded_cut')
     return draft.faceTarget === 'top_face' || draft.faceTarget === 'bottom_face';
   return (
-    SUPPORTED_HANDLE_TYPES.has(draft.cutType) && (draft.faceTarget === 'top_face' || draft.faceTarget === 'bottom_face')
+    getRectHandleAxes(draft.cutType) !== null && (draft.faceTarget === 'top_face' || draft.faceTarget === 'bottom_face')
   );
 }
 
@@ -576,11 +597,15 @@ export function getEditableHandleOverlay(
   // Interactive handles only for supported face-targeted types
   const hasHandles = supportsPreviewHandles(draft);
 
+  // A cut pinned across one axis spans the board there, so neither its
+  // position nor its size on that axis is draggable.
+  const axes = hasHandles ? getRectHandleAxes(draft.cutType) : null;
+
   return {
     mode: 'rect',
     center: hasHandles ? [(x0 + x1) / 2, y, (cz0 + cz1) / 2] : undefined,
-    lengthHandle: hasHandles ? [x1, y, (cz0 + cz1) / 2] : undefined,
-    widthHandle: hasHandles ? (draft.cutType === 'stopped_dado' ? null : [(x0 + x1) / 2, y, cz1]) : undefined,
+    lengthHandle: hasHandles && axes?.moveX ? [x1, y, (cz0 + cz1) / 2] : undefined,
+    widthHandle: hasHandles ? (axes?.moveZ ? [(x0 + x1) / 2, y, cz1] : null) : undefined,
     areaPosition: [(x0 + x1) / 2, y, (cz0 + cz1) / 2],
     areaSize: [cutLength, 0.02, cutWidth],
     dimensionLines: lines,
@@ -655,21 +680,25 @@ export function applyHandleDelta(
   const maxLength = Math.max(MIN_DIMENSION, part.length - startDraft.placementX);
   const maxWidth = Math.max(MIN_DIMENSION, part.width - startDraft.placementZ);
 
+  const axes = getRectHandleAxes(startDraft.cutType);
+
   if (kind === 'move') {
-    nextDraft.placementX = clamp(startDraft.placementX + deltaX, 0, Math.max(0, part.length - startDraft.sizeLength));
-    nextDraft.placementZ =
-      startDraft.cutType === 'stopped_dado'
-        ? 0
-        : clamp(startDraft.placementZ + deltaZ, 0, Math.max(0, part.width - startDraft.sizeWidth));
+    nextDraft.placementX = axes?.moveX
+      ? clamp(startDraft.placementX + deltaX, 0, Math.max(0, part.length - startDraft.sizeLength))
+      : startDraft.placementX;
+    nextDraft.placementZ = axes?.moveZ
+      ? clamp(startDraft.placementZ + deltaZ, 0, Math.max(0, part.width - startDraft.sizeWidth))
+      : 0;
     return nextDraft;
   }
 
   if (kind === 'length') {
+    if (!axes?.moveX) return nextDraft;
     nextDraft.sizeLength = clamp(startDraft.sizeLength + deltaX, MIN_DIMENSION, maxLength);
     return nextDraft;
   }
 
-  if (startDraft.cutType === 'stopped_dado') return nextDraft;
+  if (!axes?.moveZ) return nextDraft;
   nextDraft.sizeWidth = clamp(startDraft.sizeWidth + deltaZ, MIN_DIMENSION, maxWidth);
   return nextDraft;
 }
@@ -686,15 +715,20 @@ export function nudgeDraft(part: Part, draft: FeatureDraft, kind: HandleKind, di
       kind === 'length' ? step * Math.sin(angle) : step * Math.cos(angle)
     );
   }
-  // 'move' drives the Move Left / Move Right buttons, so it travels along the
-  // length only. Sending `step` on both axes slid the cut diagonally across
-  // the board width as well, with no control to bring it back.
+  // 'move' drives the Move Left / Move Right buttons, so it travels along one
+  // axis only. Sending `step` on both slid the cut diagonally across the board
+  // width as well, with no control to bring it back. A cut pinned along the
+  // length -- a groove -- takes the step across the width instead, so the
+  // buttons reach the axis it does leave free.
+  const movesAcrossWidth =
+    kind === 'move' && draft.mode === 'rect_cut' && getRectHandleAxes(draft.cutType)?.moveX === false;
+
   return applyHandleDelta(
     part,
     draft,
     kind,
-    kind === 'move' || kind === 'length' ? step : 0,
-    kind === 'width' ? step : 0
+    (kind === 'move' && !movesAcrossWidth) || kind === 'length' ? step : 0,
+    kind === 'width' || movesAcrossWidth ? step : 0
   );
 }
 
