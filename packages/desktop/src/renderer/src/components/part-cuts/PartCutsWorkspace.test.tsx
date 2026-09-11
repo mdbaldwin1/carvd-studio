@@ -1,7 +1,6 @@
 import { SidebarProvider } from '@renderer/components/ui/sidebar';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ComponentProps } from 'react';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 import type { CircularCutFeature, EndCutFeature, RectCutFeature } from '@renderer/types';
@@ -14,11 +13,13 @@ import { getEditableHandleOverlay } from './PartCutsPreviewCanvas';
 import { getPartCutsDraftStatus } from '@renderer/utils/partCutsDraftStatus';
 import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
 import { CutProperties } from '@renderer/components/part-cuts/CutProperties';
-import { PartCutsEditorProvider } from './PartCutsEditorContext';
+import { PartCutsEditorProvider, type PartCutsEditorProviderProps } from './PartCutsEditorContext';
 import { PartCutsWorkspace } from './PartCutsWorkspace';
 vi.unmock('three');
 
-type WorkspaceProps = ComponentProps<typeof PartCutsWorkspace>;
+// PartCutsWorkspace takes no props of its own; everything comes from the
+// editor context, so the harness is typed by what the provider needs.
+type WorkspaceProps = Omit<PartCutsEditorProviderProps, 'children'>;
 
 function renderWorkspace(overrides: Partial<WorkspaceProps> = {}) {
   const props: WorkspaceProps = {
@@ -33,7 +34,6 @@ function renderWorkspace(overrides: Partial<WorkspaceProps> = {}) {
     onHoveredTargetChange: vi.fn(),
     onPendingTargetChange: vi.fn(),
     onExit: vi.fn(),
-    onSave: vi.fn(),
     hasUnsavedChanges: false,
     ...overrides
   };
@@ -207,7 +207,7 @@ describe('PartCutsWorkspace', () => {
     const cut: CircularCutFeature = {
       id: 'grid',
       kind: 'circular_cut',
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face', face: 'top_face' },
       reference: { primaryFrom: 'center', secondaryFrom: 'center' },
@@ -400,7 +400,7 @@ describe('PartCutsWorkspace', () => {
     const pairedHole = {
       id: 'paired-hole',
       kind: 'circular_cut' as const,
-      version: 1,
+      version: 1 as const,
       enabled: true,
       label: 'Dowel hole 1',
       metadata: {
@@ -516,7 +516,7 @@ describe('PartCutsWorkspace', () => {
     const invalid = {
       id: 'invalid-round-pattern',
       kind: 'circular_cut' as const,
-      version: 1,
+      version: 1 as const,
       enabled: true,
       target: { type: 'face' as const, face: 'top_face' as const },
       reference: { primaryFrom: 'center' as const, secondaryFrom: 'center' as const },
@@ -719,7 +719,6 @@ describe('PartCutsWorkspace', () => {
           onHoveredTargetChange={vi.fn()}
           onPendingTargetChange={vi.fn()}
           onExit={vi.fn()}
-          onSave={vi.fn()}
           hasUnsavedChanges={false}
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
@@ -752,7 +751,6 @@ describe('PartCutsWorkspace', () => {
           onHoveredTargetChange={vi.fn()}
           onPendingTargetChange={vi.fn()}
           onExit={vi.fn()}
-          onSave={vi.fn()}
           hasUnsavedChanges={false}
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
@@ -788,7 +786,7 @@ describe('PartCutsWorkspace', () => {
         {
           id: 'feature-1',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -813,7 +811,6 @@ describe('PartCutsWorkspace', () => {
           onHoveredTargetChange={vi.fn()}
           onPendingTargetChange={vi.fn()}
           onExit={vi.fn()}
-          onSave={vi.fn()}
           hasUnsavedChanges={true}
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
@@ -844,7 +841,6 @@ describe('PartCutsWorkspace', () => {
           onHoveredTargetChange={vi.fn()}
           onPendingTargetChange={vi.fn()}
           onExit={vi.fn()}
-          onSave={vi.fn()}
           hasUnsavedChanges={false}
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
@@ -880,7 +876,6 @@ describe('PartCutsWorkspace', () => {
           onHoveredTargetChange={vi.fn()}
           onPendingTargetChange={vi.fn()}
           onExit={vi.fn()}
-          onSave={vi.fn()}
           hasUnsavedChanges={false}
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
@@ -912,7 +907,6 @@ describe('PartCutsWorkspace', () => {
           onHoveredTargetChange={vi.fn()}
           onPendingTargetChange={vi.fn()}
           onExit={vi.fn()}
-          onSave={vi.fn()}
           hasUnsavedChanges={false}
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
@@ -951,7 +945,6 @@ describe('PartCutsWorkspace', () => {
           onHoveredTargetChange={vi.fn()}
           onPendingTargetChange={vi.fn()}
           onExit={vi.fn()}
-          onSave={vi.fn()}
           hasUnsavedChanges={false}
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
@@ -984,7 +977,6 @@ describe('PartCutsWorkspace', () => {
           onHoveredTargetChange={vi.fn()}
           onPendingTargetChange={vi.fn()}
           onExit={vi.fn()}
-          onSave={vi.fn()}
           hasUnsavedChanges={false}
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
@@ -1011,7 +1003,7 @@ describe('PartCutsWorkspace', () => {
         {
           id: 'feature-1',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -1022,7 +1014,7 @@ describe('PartCutsWorkspace', () => {
         {
           id: 'feature-2',
           kind: 'end_cut',
-          version: 1,
+          version: 1 as const,
           enabled: true,
           target: { type: 'face', face: 'left_end' },
           reference: { primaryFrom: 'min' },
@@ -1047,7 +1039,6 @@ describe('PartCutsWorkspace', () => {
           onHoveredTargetChange={vi.fn()}
           onPendingTargetChange={vi.fn()}
           onExit={vi.fn()}
-          onSave={vi.fn()}
           hasUnsavedChanges={true}
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />
@@ -1076,7 +1067,6 @@ describe('PartCutsWorkspace', () => {
           onHoveredTargetChange={vi.fn()}
           onPendingTargetChange={vi.fn()}
           onExit={vi.fn()}
-          onSave={vi.fn()}
           hasUnsavedChanges
         >
           <CutsSection isCollapsed={false} onOpenChange={() => {}} />

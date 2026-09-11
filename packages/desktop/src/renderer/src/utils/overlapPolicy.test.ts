@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Part } from '../types';
+import { Part, RectCutFeature } from '../types';
 import {
   overlapCheckEnabled,
   partsOverlap,
@@ -350,9 +350,11 @@ describe('overlapPolicy', () => {
         {
           id: 'bevel-left',
           kind: 'end_cut' as const,
+          version: 1 as const,
           cutType: 'bevel' as const,
           enabled: true,
-          target: { face: 'left_end' as const },
+          target: { type: 'face' as const, face: 'left_end' as const },
+          reference: { primaryFrom: 'min' as const },
           lengthMode: 'long_point' as const,
           parameters: {
             horizontalAngle: 0,
@@ -388,9 +390,11 @@ describe('overlapPolicy', () => {
         {
           id: 'bevel-left',
           kind: 'end_cut' as const,
+          version: 1 as const,
           cutType: 'bevel' as const,
           enabled: true,
-          target: { face: 'left_end' as const },
+          target: { type: 'face' as const, face: 'left_end' as const },
+          reference: { primaryFrom: 'min' as const },
           lengthMode: 'long_point' as const,
           parameters: {
             horizontalAngle: 0,
@@ -470,7 +474,7 @@ describe('overlapPolicy', () => {
       width = 2,
       x = (6 - length) / 2,
       z = (2 - width) / 2
-    ): NonNullable<Part['features']>[number] => ({
+    ): RectCutFeature => ({
       id,
       kind: 'rect_cut',
       version: 1,
@@ -684,7 +688,7 @@ describe('overlapPolicy', () => {
         parameters: {
           size: { length: 2, width: 2 },
           depthMode: 'through' as const,
-          depth: null
+          depth: undefined
         }
       }
     ];
@@ -741,7 +745,7 @@ describe('overlapPolicy', () => {
         parameters: {
           size: { length: 2, width: 2 },
           depthMode: 'through' as const,
-          depth: null
+          depth: undefined
         }
       }
     ];
@@ -784,7 +788,7 @@ describe('overlapPolicy', () => {
         parameters: {
           size: { length: 2, width: 2 },
           depthMode: 'through' as const,
-          depth: null
+          depth: undefined
         }
       }
     ];
@@ -826,7 +830,7 @@ describe('overlapPolicy', () => {
         parameters: {
           size: { length: 2, width: 2 },
           depthMode: 'through' as const,
-          depth: null
+          depth: undefined
         }
       }
     ];
@@ -878,7 +882,7 @@ describe('overlapPolicy', () => {
         parameters: {
           size: { length: 2, width: 2 },
           depthMode: 'through' as const,
-          depth: null
+          depth: undefined
         }
       }
     ];
@@ -922,7 +926,7 @@ describe('overlapPolicy', () => {
         parameters: {
           size: { length: 2, width: 2 },
           depthMode: 'through' as const,
-          depth: null
+          depth: undefined
         }
       }
     ];
@@ -965,7 +969,7 @@ describe('overlapPolicy', () => {
         parameters: {
           size: { length: 2, width: 2 },
           depthMode: 'through' as const,
-          depth: null
+          depth: undefined
         }
       }
     ];
@@ -1030,7 +1034,7 @@ describe('overlapPolicy', () => {
           target: { type: 'corner' as const, corner: 'front_left_corner' as const },
           reference: { primaryFrom: 'min' as const },
           placement: { x: 0, z: 0 },
-          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: null }
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
         }
       ]
     });
@@ -1051,7 +1055,7 @@ describe('overlapPolicy', () => {
           target: { type: 'corner' as const, corner: 'back_right_corner' as const },
           reference: { primaryFrom: 'min' as const },
           placement: { x: 0, z: 0 },
-          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: null }
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
         }
       ]
     });
@@ -1089,7 +1093,7 @@ describe('overlapPolicy', () => {
           target: { type: 'corner' as const, corner: 'front_left_corner' as const },
           reference: { primaryFrom: 'min' as const },
           placement: { x: 0, z: 0 },
-          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: null }
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
         }
       ]
     });
@@ -1110,7 +1114,7 @@ describe('overlapPolicy', () => {
           target: { type: 'corner' as const, corner: 'back_right_corner' as const },
           reference: { primaryFrom: 'min' as const },
           placement: { x: 0, z: 0 },
-          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: null }
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
         }
       ]
     });
@@ -1194,7 +1198,7 @@ describe('overlapPolicy', () => {
           target: { type: 'corner' as const, corner: 'front_left_corner' as const },
           reference: { primaryFrom: 'min' as const },
           placement: { x: 0, z: 0 },
-          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: null }
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
         }
       ]
     });
@@ -1215,7 +1219,7 @@ describe('overlapPolicy', () => {
           target: { type: 'corner' as const, corner: 'back_right_corner' as const },
           reference: { primaryFrom: 'min' as const },
           placement: { x: 0, z: 0 },
-          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: null }
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
         }
       ]
     });
@@ -1256,7 +1260,7 @@ describe('overlapPolicy', () => {
           target: { type: 'corner' as const, corner: 'front_left_corner' as const },
           reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
           placement: { x: 0, z: 0 },
-          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: null }
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
         }
       ]
     });
@@ -1277,7 +1281,7 @@ describe('overlapPolicy', () => {
           target: { type: 'corner' as const, corner: 'back_right_corner' as const },
           reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
           placement: { x: 0, z: 0 },
-          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: null }
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
         }
       ]
     });

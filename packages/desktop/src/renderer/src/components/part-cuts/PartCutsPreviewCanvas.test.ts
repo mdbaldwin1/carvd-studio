@@ -77,6 +77,15 @@ function createRoundedDraft(
   return { ...(buildDraftFromPreset(preset, PART_DEFAULTS) as RoundedDraft), ...overrides };
 }
 
+// applyHandleDelta and nudgeDraft always return a draft of the same mode they
+// were given; this narrows the result back to that member of the union.
+function sameMode<T extends FeatureDraft>(original: T, next: FeatureDraft): T {
+  if (next.mode !== original.mode) {
+    throw new Error(`expected a ${original.mode} draft, got ${next.mode}`);
+  }
+  return next as T;
+}
+
 describe('buildPreviewPart', () => {
   it('includes a new unsaved end-cut draft in the preview part', () => {
     const part = createTestPart({ length: 24, width: 4, thickness: 0.75 });
@@ -88,9 +97,13 @@ describe('buildPreviewPart', () => {
       enabled: true,
       targetFace: 'left_end',
       cutType: 'mitre',
+      lengthMode: 'long_point',
+      referenceMode: null,
+      referenceValue: null,
       horizontalAngle: 45,
       horizontalFlip: false,
-      verticalAngle: 0
+      verticalAngle: 0,
+      verticalFlip: false
     });
 
     expect(previewPart.features).toHaveLength(1);
@@ -131,9 +144,13 @@ describe('buildPreviewPart', () => {
       enabled: true,
       targetFace: 'left_end',
       cutType: 'compound',
+      lengthMode: 'long_point',
+      referenceMode: null,
+      referenceValue: null,
       horizontalAngle: 30,
       horizontalFlip: true,
-      verticalAngle: 10
+      verticalAngle: 10,
+      verticalFlip: false
     });
 
     expect(previewPart.features).toHaveLength(1);
@@ -468,7 +485,7 @@ describe('applyHandleDelta', () => {
   it('returns the draft unchanged for unsupported drafts', () => {
     const draft = createEndCutDraft();
 
-    expect(applyHandleDelta(part, draft, 'move', 1, 1)).toBe(draft);
+    expect(sameMode(draft, applyHandleDelta(part, draft, 'move', 1, 1))).toBe(draft);
   });
 
   it.each([
@@ -479,23 +496,28 @@ describe('applyHandleDelta', () => {
     ['rounded slot', createRoundedDraft('rounded_slot')],
     ['rounded rectangle', createRoundedDraft('rounded_rectangle')]
   ] as const)('moves and resizes the %s through preview handles', (_label, draft) => {
-    const moved = applyHandleDelta(part, draft, 'move', 1, 0.5);
-    const resized = applyHandleDelta(part, moved, 'length', 0.5, 0);
+    const moved = sameMode(draft, applyHandleDelta(part, draft, 'move', 1, 0.5));
+    const resized = sameMode(moved, applyHandleDelta(part, moved, 'length', 0.5, 0));
 
     expect(moved.placementPrimary).toBeCloseTo(draft.placementPrimary + 1);
     expect(moved.placementSecondary).toBeCloseTo(draft.placementSecondary + 0.5);
-    if (resized.mode === 'circular_cut') expect(resized.diameter).toBeCloseTo(draft.diameter + 0.5);
-    else expect(resized.length).toBeCloseTo(draft.length + 0.5);
+    if (draft.mode === 'circular_cut' && resized.mode === 'circular_cut') {
+      expect(resized.diameter).toBeCloseTo(draft.diameter + 0.5);
+    } else if (draft.mode === 'rounded_cut' && resized.mode === 'rounded_cut') {
+      expect(resized.length).toBeCloseTo(draft.length + 0.5);
+    }
   });
 
   it('clamps circular and rotated rounded handle drags at their valid physical edge', () => {
     const circular = createCircularDraft({ placementPrimary: 11, placementSecondary: 0 });
-    const circularAtEdge = applyHandleDelta(part, circular, 'move', 100, 0);
+    const circularAtEdge = sameMode(circular, applyHandleDelta(part, circular, 'move', 100, 0));
     expect(circularAtEdge.placementPrimary).toBeCloseTo(11.875);
-    expect(applyHandleDelta(part, circularAtEdge, 'move', 1, 0).placementPrimary).toBeCloseTo(11.875);
+    expect(sameMode(circularAtEdge, applyHandleDelta(part, circularAtEdge, 'move', 1, 0)).placementPrimary).toBeCloseTo(
+      11.875
+    );
 
     const rotated = createRoundedDraft('rounded_rectangle', { rotation: 90 });
-    const lengthened = applyHandleDelta(part, rotated, 'length', 0, 1);
+    const lengthened = sameMode(rotated, applyHandleDelta(part, rotated, 'length', 0, 1));
     expect(lengthened.length).toBeCloseTo(rotated.length + 1);
     const overlay = getEditableHandleOverlay(part, rotated);
     expect(overlay?.lengthHandle?.[0]).toBeCloseTo(0);
@@ -504,25 +526,25 @@ describe('applyHandleDelta', () => {
 
   it('clamps rounded moves and resizes at the exact physical edge', () => {
     const rounded = createRoundedDraft('rounded_rectangle');
-    const moved = applyHandleDelta(part, rounded, 'move', 100, 0);
+    const moved = sameMode(rounded, applyHandleDelta(part, rounded, 'move', 100, 0));
     expect(moved.placementPrimary).toBeCloseTo(10.5);
-    expect(applyHandleDelta(part, moved, 'move', 1, 0).placementPrimary).toBeCloseTo(10.5);
-    const resized = applyHandleDelta(part, rounded, 'length', 100, 0);
+    expect(sameMode(moved, applyHandleDelta(part, moved, 'move', 1, 0)).placementPrimary).toBeCloseTo(10.5);
+    const resized = sameMode(rounded, applyHandleDelta(part, rounded, 'length', 100, 0));
     expect(resized.length).toBeCloseTo(part.length);
   });
 
   it('moves the pocket and clamps to the part bounds', () => {
     const draft = createRectDraft('mortise', { placementX: 4, placementZ: 3 });
 
-    const moved = applyHandleDelta(part, draft, 'move', 2, 1);
+    const moved = sameMode(draft, applyHandleDelta(part, draft, 'move', 2, 1));
     expect(moved.placementX).toBeCloseTo(6);
     expect(moved.placementZ).toBeCloseTo(4);
 
-    const clampedHigh = applyHandleDelta(part, draft, 'move', 100, 100);
+    const clampedHigh = sameMode(draft, applyHandleDelta(part, draft, 'move', 100, 100));
     expect(clampedHigh.placementX).toBeCloseTo(24 - draft.sizeLength);
     expect(clampedHigh.placementZ).toBeCloseTo(12 - draft.sizeWidth);
 
-    const clampedLow = applyHandleDelta(part, draft, 'move', -100, -100);
+    const clampedLow = sameMode(draft, applyHandleDelta(part, draft, 'move', -100, -100));
     expect(clampedLow.placementX).toBe(0);
     expect(clampedLow.placementZ).toBe(0);
   });
@@ -530,7 +552,7 @@ describe('applyHandleDelta', () => {
   it('pins stopped dado moves to the front of the board', () => {
     const draft = createRectDraft('stopped_dado', { placementX: 2 });
 
-    const moved = applyHandleDelta(part, draft, 'move', 1, 5);
+    const moved = sameMode(draft, applyHandleDelta(part, draft, 'move', 1, 5));
 
     expect(moved.placementX).toBeCloseTo(3);
     expect(moved.placementZ).toBe(0);
@@ -539,17 +561,23 @@ describe('applyHandleDelta', () => {
   it('resizes the run and clamps to the available length', () => {
     const draft = createRectDraft('mortise', { placementX: 4 });
 
-    expect(applyHandleDelta(part, draft, 'length', 1, 0).sizeLength).toBeCloseTo(draft.sizeLength + 1);
-    expect(applyHandleDelta(part, draft, 'length', -100, 0).sizeLength).toBeCloseTo(0.125);
-    expect(applyHandleDelta(part, draft, 'length', 100, 0).sizeLength).toBeCloseTo(24 - draft.placementX);
+    expect(sameMode(draft, applyHandleDelta(part, draft, 'length', 1, 0)).sizeLength).toBeCloseTo(draft.sizeLength + 1);
+    expect(sameMode(draft, applyHandleDelta(part, draft, 'length', -100, 0)).sizeLength).toBeCloseTo(0.125);
+    expect(sameMode(draft, applyHandleDelta(part, draft, 'length', 100, 0)).sizeLength).toBeCloseTo(
+      24 - draft.placementX
+    );
   });
 
   it('resizes the width but ignores width drags for stopped dados', () => {
     const mortise = createRectDraft('mortise');
-    expect(applyHandleDelta(part, mortise, 'width', 0, 0.5).sizeWidth).toBeCloseTo(mortise.sizeWidth + 0.5);
+    expect(sameMode(mortise, applyHandleDelta(part, mortise, 'width', 0, 0.5)).sizeWidth).toBeCloseTo(
+      mortise.sizeWidth + 0.5
+    );
 
     const stoppedDado = createRectDraft('stopped_dado');
-    expect(applyHandleDelta(part, stoppedDado, 'width', 0, 0.5).sizeWidth).toBe(stoppedDado.sizeWidth);
+    expect(sameMode(stoppedDado, applyHandleDelta(part, stoppedDado, 'width', 0, 0.5)).sizeWidth).toBe(
+      stoppedDado.sizeWidth
+    );
   });
 
   it.each([
@@ -560,9 +588,9 @@ describe('applyHandleDelta', () => {
   ] as const)('keeps %s handle moves and resizes inside the blank', (cutType, hasWidthHandle) => {
     const draft = createRectDraft(cutType, { placementX: 20, placementZ: 9, sizeLength: 2, sizeWidth: 1 });
 
-    const moved = applyHandleDelta(part, draft, 'move', 100, 100);
-    const lengthened = applyHandleDelta(part, moved, 'length', 100, 0);
-    const widened = applyHandleDelta(part, moved, 'width', 0, 100);
+    const moved = sameMode(draft, applyHandleDelta(part, draft, 'move', 100, 100));
+    const lengthened = sameMode(moved, applyHandleDelta(part, moved, 'length', 100, 0));
+    const widened = sameMode(moved, applyHandleDelta(part, moved, 'width', 0, 100));
 
     expect(moved.placementX + moved.sizeLength).toBeCloseTo(part.length);
     expect(moved.placementZ + moved.sizeWidth).toBeLessThanOrEqual(part.width);
@@ -578,11 +606,11 @@ describe('nudgeDraft', () => {
   it('nudges moves along the length only, matching the Move Left/Right buttons', () => {
     const draft = createRectDraft('mortise', { placementX: 4, placementZ: 3 });
 
-    const nudged = nudgeDraft(part, draft, 'move', 1);
+    const nudged = sameMode(draft, nudgeDraft(part, draft, 'move', 1));
     expect(nudged.placementX).toBeCloseTo(4.25);
     expect(nudged.placementZ).toBeCloseTo(3);
 
-    const nudgedBack = nudgeDraft(part, draft, 'move', -1);
+    const nudgedBack = sameMode(draft, nudgeDraft(part, draft, 'move', -1));
     expect(nudgedBack.placementX).toBeCloseTo(3.75);
     expect(nudgedBack.placementZ).toBeCloseTo(3);
   });
@@ -590,15 +618,15 @@ describe('nudgeDraft', () => {
   it('nudges the run length and width independently', () => {
     const draft = createRectDraft('mortise');
 
-    expect(nudgeDraft(part, draft, 'length', 1).sizeLength).toBeCloseTo(draft.sizeLength + 0.25);
-    expect(nudgeDraft(part, draft, 'length', -1).sizeLength).toBeCloseTo(draft.sizeLength - 0.25);
-    expect(nudgeDraft(part, draft, 'width', 1).sizeWidth).toBeCloseTo(draft.sizeWidth + 0.25);
+    expect(sameMode(draft, nudgeDraft(part, draft, 'length', 1)).sizeLength).toBeCloseTo(draft.sizeLength + 0.25);
+    expect(sameMode(draft, nudgeDraft(part, draft, 'length', -1)).sizeLength).toBeCloseTo(draft.sizeLength - 0.25);
+    expect(sameMode(draft, nudgeDraft(part, draft, 'width', 1)).sizeWidth).toBeCloseTo(draft.sizeWidth + 0.25);
   });
 
   it.each([90, 37])('nudges rotated rounded dimensions by the full local step at %i°', (rotation) => {
     const draft = createRoundedDraft('rounded_rectangle', { rotation });
-    expect(nudgeDraft(part, draft, 'length', 1).length).toBeCloseTo(draft.length + 0.25);
-    expect(nudgeDraft(part, draft, 'width', 1).width).toBeCloseTo(draft.width + 0.25);
+    expect(sameMode(draft, nudgeDraft(part, draft, 'length', 1)).length).toBeCloseTo(draft.length + 0.25);
+    expect(sameMode(draft, nudgeDraft(part, draft, 'width', 1)).width).toBeCloseTo(draft.width + 0.25);
   });
 });
 

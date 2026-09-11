@@ -47,7 +47,7 @@ describe('selectionStore', () => {
   describe('selection', () => {
     describe('selectPart', () => {
       it('selects a single part', () => {
-        const partId = useProjectStore.getState().addPart();
+        const partId = useProjectStore.getState().addPart()!;
         useSelectionStore.getState().clearSelection();
 
         useSelectionStore.getState().selectPart(partId);
@@ -56,8 +56,8 @@ describe('selectionStore', () => {
       });
 
       it('replaces previous selection', () => {
-        const part1Id = useProjectStore.getState().addPart();
-        const part2Id = useProjectStore.getState().addPart();
+        const part1Id = useProjectStore.getState().addPart()!;
+        const part2Id = useProjectStore.getState().addPart()!;
 
         useSelectionStore.getState().selectPart(part1Id);
         useSelectionStore.getState().selectPart(part2Id);
@@ -66,7 +66,7 @@ describe('selectionStore', () => {
       });
 
       it('clears selection when called with null', () => {
-        const partId = useProjectStore.getState().addPart();
+        const partId = useProjectStore.getState().addPart()!;
         useSelectionStore.getState().selectPart(partId);
 
         useSelectionStore.getState().selectPart(null);
@@ -77,8 +77,8 @@ describe('selectionStore', () => {
 
     describe('togglePartSelection', () => {
       it('adds a part to selection if not selected', () => {
-        const part1Id = useProjectStore.getState().addPart();
-        const part2Id = useProjectStore.getState().addPart();
+        const part1Id = useProjectStore.getState().addPart()!;
+        const part2Id = useProjectStore.getState().addPart()!;
 
         useSelectionStore.getState().selectPart(part1Id);
         useSelectionStore.getState().togglePartSelection(part2Id);
@@ -88,8 +88,8 @@ describe('selectionStore', () => {
       });
 
       it('removes a part from selection if already selected', () => {
-        const part1Id = useProjectStore.getState().addPart();
-        const part2Id = useProjectStore.getState().addPart();
+        const part1Id = useProjectStore.getState().addPart()!;
+        const part2Id = useProjectStore.getState().addPart()!;
 
         useSelectionStore.getState().selectParts([part1Id, part2Id]);
         useSelectionStore.getState().togglePartSelection(part1Id);
@@ -101,9 +101,9 @@ describe('selectionStore', () => {
 
     describe('selectParts', () => {
       it('selects multiple parts', () => {
-        const part1Id = useProjectStore.getState().addPart();
-        const part2Id = useProjectStore.getState().addPart();
-        const part3Id = useProjectStore.getState().addPart();
+        const part1Id = useProjectStore.getState().addPart()!;
+        const part2Id = useProjectStore.getState().addPart()!;
+        const part3Id = useProjectStore.getState().addPart()!;
 
         useSelectionStore.getState().selectParts([part1Id, part2Id]);
 
@@ -116,8 +116,8 @@ describe('selectionStore', () => {
 
     describe('clearSelection', () => {
       it('clears all selected parts', () => {
-        useProjectStore.getState().addPart();
-        useProjectStore.getState().addPart();
+        useProjectStore.getState().addPart()!;
+        useProjectStore.getState().addPart()!;
 
         useSelectionStore.getState().clearSelection();
 
@@ -134,8 +134,8 @@ describe('selectionStore', () => {
     describe('group selection', () => {
       it('toggles group selection', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart({ name: 'Test Part' })!;
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         useSelectionStore.getState().clearSelection();
         useSelectionStore.getState().toggleGroupSelection(groupId);
@@ -149,8 +149,8 @@ describe('selectionStore', () => {
 
       it('clears group selection', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart({ name: 'Test Part' })!;
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         useSelectionStore.getState().selectGroup(groupId);
         expect(useSelectionStore.getState().selectedGroupIds).toHaveLength(1);
@@ -162,8 +162,8 @@ describe('selectionStore', () => {
 
       it('keeps editing context when selecting the currently edited group', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart({ name: 'Test Part' })!;
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         useSelectionStore.getState().enterGroup(groupId);
         useSelectionStore.getState().selectGroup(groupId);
@@ -173,16 +173,16 @@ describe('selectionStore', () => {
 
       it('keeps parent editing context when shift-selecting nested groups', () => {
         const store = useProjectStore.getState();
-        const partA = store.addPart({ name: 'Part A' });
-        const partB = store.addPart({ name: 'Part B' });
-        const partC = store.addPart({ name: 'Part C' });
-        const childA = store.createGroup('Child A', [{ id: partA, type: 'part' }]);
-        const childB = store.createGroup('Child B', [{ id: partB, type: 'part' }]);
+        const partA = store.addPart({ name: 'Part A' })!;
+        const partB = store.addPart({ name: 'Part B' })!;
+        const partC = store.addPart({ name: 'Part C' })!;
+        const childA = store.createGroup('Child A', [{ id: partA, type: 'part' }])!;
+        const childB = store.createGroup('Child B', [{ id: partB, type: 'part' }])!;
         const parent = store.createGroup('Parent', [
           { id: childA, type: 'group' },
           { id: childB, type: 'group' },
           { id: partC, type: 'part' }
-        ]);
+        ])!;
 
         useSelectionStore.getState().enterGroup(parent);
         useSelectionStore.getState().toggleGroupSelection(childA);
@@ -198,8 +198,8 @@ describe('selectionStore', () => {
     describe('group editing mode', () => {
       it('enters group editing mode', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart({ name: 'Test Part' })!;
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         useSelectionStore.getState().enterGroup(groupId);
 
@@ -211,8 +211,8 @@ describe('selectionStore', () => {
 
       it('exits group editing mode', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart({ name: 'Test Part' })!;
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         useSelectionStore.getState().enterGroup(groupId);
         useSelectionStore.getState().exitGroup();
@@ -222,8 +222,8 @@ describe('selectionStore', () => {
 
       it('clears part selection when exiting group', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart({ name: 'Test Part' })!;
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         useSelectionStore.getState().enterGroup(groupId);
         useSelectionStore.getState().selectPart(partId);
@@ -236,8 +236,8 @@ describe('selectionStore', () => {
     describe('group expand/collapse', () => {
       it('toggles group expanded state', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart({ name: 'Test Part' })!;
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         // First collapse if auto-expanded
         useSelectionStore.getState().collapseGroup(groupId);
@@ -254,8 +254,8 @@ describe('selectionStore', () => {
 
       it('expands a specific group', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart({ name: 'Test Part' })!;
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         useSelectionStore.getState().expandGroup(groupId);
 
@@ -264,8 +264,8 @@ describe('selectionStore', () => {
 
       it('does not duplicate when expanding already expanded group', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart({ name: 'Test Part' })!;
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         useSelectionStore.getState().expandGroup(groupId);
         useSelectionStore.getState().expandGroup(groupId);
@@ -276,8 +276,8 @@ describe('selectionStore', () => {
 
       it('collapses a specific group', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Test Part' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart({ name: 'Test Part' })!;
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         useSelectionStore.getState().expandGroup(groupId);
         useSelectionStore.getState().collapseGroup(groupId);
@@ -287,10 +287,10 @@ describe('selectionStore', () => {
 
       it('expands all groups', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        const group1Id = store.createGroup('Group 1', [{ id: part1Id, type: 'part' }]);
-        const group2Id = store.createGroup('Group 2', [{ id: part2Id, type: 'part' }]);
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
+        const group1Id = store.createGroup('Group 1', [{ id: part1Id, type: 'part' }])!;
+        const group2Id = store.createGroup('Group 2', [{ id: part2Id, type: 'part' }])!;
 
         useSelectionStore.getState().expandAllGroups();
 
@@ -301,10 +301,10 @@ describe('selectionStore', () => {
 
       it('collapses all groups', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        store.createGroup('Group 1', [{ id: part1Id, type: 'part' }]);
-        store.createGroup('Group 2', [{ id: part2Id, type: 'part' }]);
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
+        store.createGroup('Group 1', [{ id: part1Id, type: 'part' }])!;
+        store.createGroup('Group 2', [{ id: part2Id, type: 'part' }])!;
 
         useSelectionStore.getState().expandAllGroups();
         useSelectionStore.getState().collapseAllGroups();
@@ -321,7 +321,7 @@ describe('selectionStore', () => {
   describe('UI state', () => {
     describe('setHoveredPart', () => {
       it('sets the hovered part ID', () => {
-        const partId = useProjectStore.getState().addPart();
+        const partId = useProjectStore.getState().addPart()!;
 
         useSelectionStore.getState().setHoveredPart(partId);
 
@@ -329,7 +329,7 @@ describe('selectionStore', () => {
       });
 
       it('clears hovered part when set to null', () => {
-        const partId = useProjectStore.getState().addPart();
+        const partId = useProjectStore.getState().addPart()!;
         useSelectionStore.getState().setHoveredPart(partId);
 
         useSelectionStore.getState().setHoveredPart(null);

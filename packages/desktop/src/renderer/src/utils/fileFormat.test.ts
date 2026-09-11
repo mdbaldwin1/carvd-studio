@@ -11,7 +11,7 @@ import {
   CARVD_FILE_EXTENSION,
   CARVD_FILE_FILTER
 } from './fileFormat';
-import { CARVD_FILE_VERSION, CARVD_FILE_VERSION_BASE, GroupMember } from '../types';
+import { CARVD_FILE_VERSION, CARVD_FILE_VERSION_BASE, GroupMember, RectCutFeature } from '../types';
 import {
   createTestPart,
   createTestStock,
@@ -26,7 +26,8 @@ import {
 // Helper to create valid CarvdFile structure
 // ============================================================
 
-function createValidCarvdFile(overrides?: Partial<ReturnType<typeof serializeProject>>) {
+// The overrides merge into serializeProject's flat input, not its nested output.
+function createValidCarvdFile(overrides?: Partial<Parameters<typeof serializeProject>[0]>) {
   const defaults = {
     projectName: 'Test Project',
     createdAt: '2024-01-01T00:00:00.000Z',
@@ -326,7 +327,7 @@ describe('fileFormat', () => {
 
     it('normalizes missing part features to an empty array', () => {
       const part = createTestPart();
-      delete (part as Record<string, unknown>).features;
+      delete (part as unknown as Record<string, unknown>).features;
 
       const file = createValidCarvdFile({ parts: [part] });
       const project = deserializeToProject(file);
@@ -439,7 +440,7 @@ describe('fileFormat', () => {
                     depth: 0.375
                   },
                   placement: { x: 4, z: 0 }
-                }
+                } satisfies RectCutFeature
               ]
             }
           ],
@@ -544,7 +545,7 @@ describe('fileFormat', () => {
 
     it('rejects future version numbers', () => {
       const file = createValidCarvdFile();
-      (file as Record<string, unknown>).version = CARVD_FILE_VERSION + 1;
+      (file as unknown as Record<string, unknown>).version = CARVD_FILE_VERSION + 1;
 
       const result = validateCarvdFile(file);
 
@@ -632,7 +633,7 @@ describe('fileFormat', () => {
 
     it('rejects missing project name', () => {
       const file = createValidCarvdFile();
-      (file.project as Record<string, unknown>).name = undefined;
+      (file.project as unknown as Record<string, unknown>).name = undefined;
 
       const result = validateCarvdFile(file);
 
@@ -642,7 +643,7 @@ describe('fileFormat', () => {
 
     it('warns about invalid units', () => {
       const file = createValidCarvdFile();
-      (file.project as Record<string, unknown>).units = 'invalid';
+      (file.project as unknown as Record<string, unknown>).units = 'invalid';
 
       const result = validateCarvdFile(file);
 
@@ -870,7 +871,7 @@ describe('fileFormat', () => {
     it('warns about assembly parts referencing non-existent stocks', () => {
       const file = createValidCarvdFile();
       // Add an assembly with a part that references a non-existent stock
-      (file as Record<string, unknown>).assemblies = [
+      (file as unknown as Record<string, unknown>).assemblies = [
         {
           id: 'assembly-1',
           name: 'Test Assembly',
@@ -944,7 +945,7 @@ describe('fileFormat', () => {
   describe('migration', () => {
     it('adds default kerfWidth if missing', () => {
       const file = createValidCarvdFile();
-      delete (file.project as Record<string, unknown>).kerfWidth;
+      delete (file.project as unknown as Record<string, unknown>).kerfWidth;
 
       const result = validateCarvdFile(file);
 
@@ -954,7 +955,7 @@ describe('fileFormat', () => {
 
     it('adds default overageFactor if missing', () => {
       const file = createValidCarvdFile();
-      delete (file.project as Record<string, unknown>).overageFactor;
+      delete (file.project as unknown as Record<string, unknown>).overageFactor;
 
       const result = validateCarvdFile(file);
 
@@ -964,7 +965,7 @@ describe('fileFormat', () => {
 
     it('adds default stockConstraints if missing', () => {
       const file = createValidCarvdFile();
-      delete (file.project as Record<string, unknown>).stockConstraints;
+      delete (file.project as unknown as Record<string, unknown>).stockConstraints;
 
       const result = validateCarvdFile(file);
 
@@ -975,7 +976,7 @@ describe('fileFormat', () => {
 
     it('adds default grainSensitive to parts if missing', () => {
       const part = createTestPart();
-      delete (part as Record<string, unknown>).grainSensitive;
+      delete (part as unknown as Record<string, unknown>).grainSensitive;
 
       const file = createValidCarvdFile({ parts: [part] });
 
@@ -987,7 +988,7 @@ describe('fileFormat', () => {
 
     it('adds default grainDirection to parts if missing', () => {
       const part = createTestPart();
-      delete (part as Record<string, unknown>).grainDirection;
+      delete (part as unknown as Record<string, unknown>).grainDirection;
 
       const file = createValidCarvdFile({ parts: [part] });
 
@@ -999,7 +1000,7 @@ describe('fileFormat', () => {
 
     it('adds default rotation to parts if missing', () => {
       const part = createTestPart();
-      delete (part as Record<string, unknown>).rotation;
+      delete (part as unknown as Record<string, unknown>).rotation;
 
       const file = createValidCarvdFile({ parts: [part] });
 
@@ -1011,7 +1012,7 @@ describe('fileFormat', () => {
 
     it('adds default features to parts if missing', () => {
       const part = createTestPart();
-      delete (part as Record<string, unknown>).features;
+      delete (part as unknown as Record<string, unknown>).features;
 
       const file = createValidCarvdFile({ parts: [part] });
       const result = validateCarvdFile(file);
@@ -1022,7 +1023,7 @@ describe('fileFormat', () => {
 
     it('adds default pricingUnit to stocks if missing', () => {
       const stock = createTestStock();
-      delete (stock as Record<string, unknown>).pricingUnit;
+      delete (stock as unknown as Record<string, unknown>).pricingUnit;
 
       const file = createValidCarvdFile({ stocks: [stock] });
 
@@ -1388,17 +1389,17 @@ describe('fileFormat', () => {
 
     it('applies migration during repair', () => {
       const part = createTestPart();
-      delete (part as Record<string, unknown>).grainSensitive;
-      delete (part as Record<string, unknown>).rotation;
+      delete (part as unknown as Record<string, unknown>).grainSensitive;
+      delete (part as unknown as Record<string, unknown>).rotation;
 
       const stock = createTestStock();
-      delete (stock as Record<string, unknown>).pricingUnit;
+      delete (stock as unknown as Record<string, unknown>).pricingUnit;
 
       const file = createValidCarvdFile({
         parts: [part],
         stocks: [stock]
       });
-      delete (file.project as Record<string, unknown>).kerfWidth;
+      delete (file.project as unknown as Record<string, unknown>).kerfWidth;
       const json = stringifyCarvdFile(file);
 
       const result = repairCarvdFile(json);

@@ -37,9 +37,8 @@ describe('cutListInstructions', () => {
           stockId: 'stock-1',
           stockName: 'Maple',
           grainSensitive: false,
-          grainDirection: 'length',
+          canRotate: true,
           isGlueUp: false,
-          quantity: 1,
           features: part.features,
           notes: ''
         },
@@ -83,9 +82,8 @@ describe('cutListInstructions', () => {
       stockId: 'stock-1',
       stockName: 'Maple',
       grainSensitive: false,
-      grainDirection: 'length' as const,
+      canRotate: true,
       isGlueUp: false,
-      quantity: 1,
       features: part.features,
       notes: ''
     };
@@ -130,9 +128,8 @@ describe('cutListInstructions', () => {
           stockId: 'stock-1',
           stockName: 'Maple',
           grainSensitive: false,
-          grainDirection: 'length',
+          canRotate: true,
           isGlueUp: false,
-          quantity: 1,
           features: part.features,
           notes: ''
         },
@@ -184,9 +181,8 @@ describe('cutListInstructions', () => {
           stockId: 'stock-1',
           stockName: 'Maple',
           grainSensitive: false,
-          grainDirection: 'length',
+          canRotate: true,
           isGlueUp: false,
-          quantity: 1,
           features: part.features,
           notes: ''
         },
@@ -231,9 +227,8 @@ describe('cutListInstructions', () => {
       stockId: 'stock-1',
       stockName: 'Maple',
       grainSensitive: false,
-      grainDirection: 'length' as const,
+      canRotate: true,
       isGlueUp: false,
-      quantity: 1,
       features,
       notes: ''
     };
@@ -262,9 +257,8 @@ describe('cutListInstructions', () => {
       stockId: 'stock-1',
       stockName: 'Maple',
       grainSensitive: false,
-      grainDirection: 'length' as const,
+      canRotate: true,
       isGlueUp: false,
-      quantity: 1,
       notes: ''
     };
     const feature = {
@@ -335,9 +329,8 @@ describe('cutListInstructions', () => {
         stockId: 'stock-1',
         stockName: 'Maple',
         grainSensitive: false,
-        grainDirection: 'length',
+        canRotate: true,
         isGlueUp: false,
-        quantity: 1,
         features: part.features,
         notes: ''
       },
@@ -397,9 +390,8 @@ describe('cutListInstructions', () => {
         stockId: 'stock-1',
         stockName: 'Maple',
         grainSensitive: false,
-        grainDirection: 'length',
+        canRotate: true,
         isGlueUp: false,
-        quantity: 1,
         features: part.features,
         notes: ''
       },
@@ -457,9 +449,8 @@ describe('cutListInstructions', () => {
         stockId: 'stock-1',
         stockName: 'Maple',
         grainSensitive: false,
-        grainDirection: 'length',
+        canRotate: true,
         isGlueUp: false,
-        quantity: 1,
         features: part.features,
         notes: ''
       },
@@ -517,9 +508,8 @@ describe('cutListInstructions', () => {
         stockId: 'stock-1',
         stockName: 'Maple',
         grainSensitive: false,
-        grainDirection: 'length',
+        canRotate: true,
         isGlueUp: false,
-        quantity: 1,
         features: part.features,
         notes: ''
       },

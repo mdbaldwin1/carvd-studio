@@ -1,3 +1,4 @@
+import { createTestGroup, createTestGroupMember, createTestPart } from '../../../../../tests/helpers/factories';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PartContextMenu } from './PartContextMenu';
@@ -13,31 +14,9 @@ import React from 'react';
 
 const createRef = () => React.createRef<HTMLDivElement>();
 
-const part1 = {
-  id: 'p1',
-  name: 'Part 1',
-  width: 10,
-  height: 20,
-  depth: 2,
-  x: 0,
-  y: 10,
-  z: 0,
-  color: '#cccccc',
-  stockId: 'stock-1',
-  rotation: { x: 0, y: 0, z: 0 },
-  grain: 'none' as const,
-  jointAllowances: { left: 0, right: 0, front: 0, back: 0, top: 0, bottom: 0 },
-  edgeBanding: null
-};
-
-const part2 = {
-  ...part1,
-  id: 'p2',
-  name: 'Part 2',
-  stockId: null
-};
-
-const group1 = { id: 'g1', name: 'Group 1', color: '#ff0000', isExpanded: true };
+const part1 = createTestPart({ id: 'p1', name: 'Part 1', stockId: 'stock-1' });
+const part2 = createTestPart({ id: 'p2', name: 'Part 2', stockId: null });
+const group1 = createTestGroup({ id: 'g1', name: 'Group 1' });
 const group2 = { id: 'g2', name: 'Group 2', color: '#00ff00', isExpanded: true };
 
 beforeEach(() => {
@@ -102,7 +81,7 @@ describe('PartContextMenu', () => {
   it('shows group selection count', () => {
     useProjectStore.setState({
       groups: [group1],
-      groupMembers: [{ groupId: 'g1', memberId: 'p1', memberType: 'part' }]
+      groupMembers: [createTestGroupMember('g1', 'p1', 'part')]
     });
     useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1'] });
     render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={vi.fn()} />);
@@ -112,7 +91,7 @@ describe('PartContextMenu', () => {
   it('shows mixed selection count', () => {
     useProjectStore.setState({
       groups: [group1],
-      groupMembers: [{ groupId: 'g1', memberId: 'p2', memberType: 'part' }]
+      groupMembers: [createTestGroupMember('g1', 'p2', 'part')]
     });
     useSelectionStore.setState({ selectedPartIds: ['p1'], selectedGroupIds: ['g1'] });
     render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={vi.fn()} />);
@@ -258,7 +237,7 @@ describe('PartContextMenu', () => {
     it('shows Ungroup when single group selected', () => {
       useProjectStore.setState({
         groups: [group1],
-        groupMembers: [{ groupId: 'g1', memberId: 'p1', memberType: 'part' }]
+        groupMembers: [createTestGroupMember('g1', 'p1', 'part')]
       });
       useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1'] });
       render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={vi.fn()} />);
@@ -268,10 +247,7 @@ describe('PartContextMenu', () => {
     it('shows Merge Groups when 2+ groups selected', () => {
       useProjectStore.setState({
         groups: [group1, group2],
-        groupMembers: [
-          { groupId: 'g1', memberId: 'p1', memberType: 'part' },
-          { groupId: 'g2', memberId: 'p2', memberType: 'part' }
-        ]
+        groupMembers: [createTestGroupMember('g1', 'p1', 'part'), createTestGroupMember('g2', 'p2', 'part')]
       });
       useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1', 'g2'] });
       render(<PartContextMenu menuRef={createRef()} x={100} y={200} onClose={vi.fn()} />);
@@ -295,7 +271,7 @@ describe('PartContextMenu', () => {
   it('calls requestDeleteGroups when groups selected', () => {
     useProjectStore.setState({
       groups: [group1],
-      groupMembers: [{ groupId: 'g1', memberId: 'p1', memberType: 'part' }],
+      groupMembers: [createTestGroupMember('g1', 'p1', 'part')],
       deleteGroup: vi.fn()
     });
     useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1'] });
@@ -308,7 +284,7 @@ describe('PartContextMenu', () => {
 
   it('positions menu at given coordinates', () => {
     render(<PartContextMenu menuRef={createRef()} x={150} y={250} onClose={vi.fn()} />);
-    const menu = screen.getByText('Center View').closest('.context-menu')!;
+    const menu = screen.getByText('Center View').closest<HTMLElement>('.context-menu')!;
     expect(menu.style.left).toBe('150px');
     expect(menu.style.top).toBe('250px');
   });

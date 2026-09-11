@@ -102,7 +102,7 @@ describe('projectStore', () => {
     describe('addPart', () => {
       it('creates a new part with default values', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
 
         const state = useProjectStore.getState();
         expect(state.parts).toHaveLength(1);
@@ -120,7 +120,7 @@ describe('projectStore', () => {
           length: 48,
           width: 24,
           thickness: 1.5
-        });
+        })!;
 
         const state = useProjectStore.getState();
         const part = state.parts.find((p) => p.id === partId);
@@ -132,7 +132,7 @@ describe('projectStore', () => {
 
       it('selects the new part after creation', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
 
         expect(useSelectionStore.getState().selectedPartIds).toContain(partId);
       });
@@ -141,7 +141,7 @@ describe('projectStore', () => {
         const store = useProjectStore.getState();
         expect(store.isDirty).toBe(false);
 
-        store.addPart();
+        store.addPart()!;
 
         const state = useProjectStore.getState();
         expect(state.isDirty).toBe(true);
@@ -151,7 +151,7 @@ describe('projectStore', () => {
     describe('updatePart', () => {
       it('updates a single part property', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Original' });
+        const partId = store.addPart({ name: 'Original' })!;
 
         store.updatePart(partId, { name: 'Updated' });
 
@@ -162,7 +162,7 @@ describe('projectStore', () => {
 
       it('updates multiple properties at once', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
 
         store.updatePart(partId, {
           name: 'Updated Part',
@@ -179,8 +179,8 @@ describe('projectStore', () => {
 
       it('does not affect other parts', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
 
         store.updatePart(part1Id, { name: 'Updated Part 1' });
 
@@ -198,14 +198,14 @@ describe('projectStore', () => {
           length: 10,
           width: 10,
           thickness: 1
-        });
+        })!;
         store.addPart({
           name: 'B',
           position: { x: 12, y: 0.5, z: 0 },
           length: 10,
           width: 10,
           thickness: 1
-        });
+        })!;
 
         store.updatePart(partAId, { length: 30 });
 
@@ -235,7 +235,7 @@ describe('projectStore', () => {
               placement: { x: 5.6225, z: 0 }
             }
           ]
-        });
+        })!;
         const dividerId = store.addPart({
           name: 'Divider',
           length: 4,
@@ -243,7 +243,7 @@ describe('projectStore', () => {
           thickness: 0.75,
           position: { x: 0, y: 2.8, z: 0 },
           rotation: { x: 0, y: 0, z: 90 }
-        });
+        })!;
 
         expect(store.updatePart(dividerId, { position: { x: 0, y: 2.375, z: 0 } }, { mateHostPartId: hostId })).toBe(
           true
@@ -256,7 +256,7 @@ describe('projectStore', () => {
           width: 6,
           thickness: 0.5,
           position: { x: 0, y: 0.5, z: 0 }
-        });
+        })!;
         expect(store.updatePart(dividerId, { position: { x: 0, y: 2.3, z: 0 } }, { mateHostPartId: hostId })).toBe(
           false
         );
@@ -283,7 +283,7 @@ describe('projectStore', () => {
               placement: { x: 5.6225, z: 0 }
             }
           ]
-        });
+        })!;
         const dividerId = store.addPart({
           name: 'Divider',
           length: 4,
@@ -291,7 +291,7 @@ describe('projectStore', () => {
           thickness: 0.75,
           position: { x: 0, y: 2.8, z: 0 },
           rotation: { x: 0, y: 0, z: 90 }
-        });
+        })!;
 
         expect(
           store.updatePart(
@@ -310,8 +310,8 @@ describe('projectStore', () => {
     describe('updateParts', () => {
       it('updates multiple parts with the same changes', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
 
         store.updateParts([part1Id, part2Id], { color: '#ff0000' });
 
@@ -331,7 +331,7 @@ describe('projectStore', () => {
           length: 10,
           width: 10,
           thickness: 1
-        });
+        })!;
         const part2Id = store.addPart({
           name: 'Part 2',
           color: '#ffffff',
@@ -339,7 +339,7 @@ describe('projectStore', () => {
           length: 10,
           width: 10,
           thickness: 1
-        });
+        })!;
 
         store.batchUpdateParts([
           { id: part1Id, changes: { color: '#ff0000', length: 30 } },
@@ -357,7 +357,7 @@ describe('projectStore', () => {
 
       it('marks project as dirty', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
         store.markClean();
 
         store.batchUpdateParts([{ id: partId, changes: { name: 'Updated' } }]);
@@ -367,7 +367,7 @@ describe('projectStore', () => {
 
       it('ignores updates for non-existent parts', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Real Part' });
+        const partId = store.addPart({ name: 'Real Part' })!;
 
         store.batchUpdateParts([
           { id: partId, changes: { name: 'Updated' } },
@@ -388,14 +388,14 @@ describe('projectStore', () => {
           length: 10,
           width: 10,
           thickness: 1
-        });
+        })!;
         store.addPart({
           name: 'B',
           position: { x: 12, y: 0.5, z: 0 },
           length: 10,
           width: 10,
           thickness: 1
-        });
+        })!;
 
         store.batchUpdateParts([{ id: partAId, changes: { length: 30 } }]);
 
@@ -447,7 +447,7 @@ describe('projectStore', () => {
           width: 4,
           thickness: 1,
           position: { x: 0, y: 0, z: 0 }
-        });
+        })!;
         const secondPartId = store.addPart({
           name: 'Upper rail',
           length: 10,
@@ -498,14 +498,14 @@ describe('projectStore', () => {
           width: 4,
           thickness: 1,
           position: { x: 0, y: 0, z: 0 }
-        });
+        })!;
         const secondPartId = store.addPart({
           name: 'Upper rail',
           length: 10,
           width: 4,
           thickness: 1,
           position: { x: 0, y: 1, z: 0 }
-        });
+        })!;
         store.addDowelJoint({
           firstPartId,
           firstFace: 'top_face',
@@ -545,9 +545,8 @@ describe('projectStore', () => {
               stockId: 'stock-1',
               stockName: 'Test stock',
               grainSensitive: false,
-              grainDirection: 'length',
+              canRotate: true,
               isGlueUp: false,
-              quantity: 1,
               features: survivingHole ? [survivingHole] : [],
               notes: ''
             },
@@ -569,7 +568,7 @@ describe('projectStore', () => {
     describe('deletePart', () => {
       it('removes a part from the store', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
 
         expect(useProjectStore.getState().parts).toHaveLength(1);
 
@@ -580,7 +579,7 @@ describe('projectStore', () => {
 
       it('removes the part from selection', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
 
         expect(useSelectionStore.getState().selectedPartIds).toContain(partId);
 
@@ -591,7 +590,7 @@ describe('projectStore', () => {
 
       it('removes the part from reference parts', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
         useSnapStore.getState().addToReferences([partId]);
 
         expect(useSnapStore.getState().referencePartIds).toContain(partId);
@@ -603,8 +602,8 @@ describe('projectStore', () => {
 
       it('removes the part from group memberships', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
-        store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart()!;
+        store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         expect(useProjectStore.getState().groupMembers).toHaveLength(1);
 
@@ -641,9 +640,9 @@ describe('projectStore', () => {
     describe('deleteSelectedParts', () => {
       it('removes all selected parts', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        store.addPart({ name: 'Part 3' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
+        store.addPart({ name: 'Part 3' })!;
 
         useSelectionStore.getState().selectParts([part1Id, part2Id]);
         store.deleteSelectedParts();
@@ -655,7 +654,7 @@ describe('projectStore', () => {
 
       it('does nothing when no parts are selected', () => {
         const store = useProjectStore.getState();
-        store.addPart();
+        store.addPart()!;
         useSelectionStore.getState().clearSelection();
 
         store.deleteSelectedParts();
@@ -668,9 +667,9 @@ describe('projectStore', () => {
       describe('confirmDeleteParts', () => {
         it('deletes pending parts', () => {
           const store = useProjectStore.getState();
-          const part1Id = store.addPart({ name: 'Part 1' });
-          const part2Id = store.addPart({ name: 'Part 2' });
-          store.addPart({ name: 'Part 3' });
+          const part1Id = store.addPart({ name: 'Part 1' })!;
+          const part2Id = store.addPart({ name: 'Part 2' })!;
+          store.addPart({ name: 'Part 3' })!;
           useUIStore.getState().requestDeleteParts([part1Id, part2Id]);
 
           store.confirmDeleteParts();
@@ -682,7 +681,7 @@ describe('projectStore', () => {
 
         it('clears pending delete list', () => {
           const store = useProjectStore.getState();
-          const partId = store.addPart();
+          const partId = store.addPart()!;
           useUIStore.getState().requestDeleteParts([partId]);
 
           store.confirmDeleteParts();
@@ -692,7 +691,7 @@ describe('projectStore', () => {
 
         it('does nothing when no pending parts', () => {
           const store = useProjectStore.getState();
-          store.addPart();
+          store.addPart()!;
 
           store.confirmDeleteParts();
 
@@ -708,9 +707,9 @@ describe('projectStore', () => {
           name: 'Original',
           length: 30,
           width: 15
-        });
+        })!;
 
-        const duplicateId = store.duplicatePart(originalId);
+        const duplicateId = store.duplicatePart(originalId)!;
 
         const state = useProjectStore.getState();
         expect(state.parts).toHaveLength(2);
@@ -739,9 +738,9 @@ describe('projectStore', () => {
               parameters: { horizontalAngle: 45 }
             }
           ]
-        });
+        })!;
 
-        const duplicateId = store.duplicatePart(originalId);
+        const duplicateId = store.duplicatePart(originalId)!;
         const duplicate = useProjectStore.getState().parts.find((p) => p.id === duplicateId);
 
         const originalFeatures = useProjectStore.getState().parts.find((p) => p.id === originalId)?.features;
@@ -852,7 +851,7 @@ describe('projectStore', () => {
           }
         ];
         const store = useProjectStore.getState();
-        const originalId = store.addPart({ name: 'All feature families', features });
+        const originalId = store.addPart({ name: 'All feature families', features })!;
 
         const duplicateId = store.duplicatePart(originalId)!;
         const [original, duplicate] = useProjectStore
@@ -882,11 +881,11 @@ describe('projectStore', () => {
 
       it('generates smart copy names', () => {
         const store = useProjectStore.getState();
-        const originalId = store.addPart({ name: 'Test Part' });
+        const originalId = store.addPart({ name: 'Test Part' })!;
 
-        const copy1Id = store.duplicatePart(originalId);
-        const copy2Id = store.duplicatePart(copy1Id!);
-        const copy3Id = store.duplicatePart(copy2Id!);
+        const copy1Id = store.duplicatePart(originalId)!;
+        const copy2Id = store.duplicatePart(copy1Id!)!;
+        const copy3Id = store.duplicatePart(copy2Id!)!;
 
         const state = useProjectStore.getState();
         expect(state.parts.find((p) => p.id === copy1Id)?.name).toBe('Test Part (copy)');
@@ -904,8 +903,8 @@ describe('projectStore', () => {
     describe('duplicateSelectedParts', () => {
       it('duplicates all selected parts', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
 
         useSelectionStore.getState().selectParts([part1Id, part2Id]);
         const newIds = store.duplicateSelectedParts();
@@ -977,7 +976,7 @@ describe('projectStore', () => {
     describe('addStock', () => {
       it('creates a new stock with default values', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock();
+        const stockId = store.addStock()!;
 
         const state = useProjectStore.getState();
         expect(state.stocks).toHaveLength(1);
@@ -992,7 +991,7 @@ describe('projectStore', () => {
           length: 96,
           width: 48,
           thickness: 0.75
-        });
+        })!;
 
         const state = useProjectStore.getState();
         const stock = state.stocks.find((s) => s.id === stockId);
@@ -1005,7 +1004,7 @@ describe('projectStore', () => {
     describe('updateStock', () => {
       it('updates stock properties', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock({ name: 'Original' });
+        const stockId = store.addStock({ name: 'Original' })!;
 
         store.updateStock(stockId, { name: 'Updated', pricePerUnit: 10 });
 
@@ -1019,7 +1018,7 @@ describe('projectStore', () => {
     describe('deleteStock', () => {
       it('removes a stock from the store', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock();
+        const stockId = store.addStock()!;
 
         store.deleteStock(stockId);
 
@@ -1028,8 +1027,8 @@ describe('projectStore', () => {
 
       it('unassigns stock from parts using it', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock();
-        const partId = store.addPart({ stockId });
+        const stockId = store.addStock()!;
+        const partId = store.addPart({ stockId })!;
 
         store.deleteStock(stockId);
 
@@ -1041,9 +1040,9 @@ describe('projectStore', () => {
     describe('assignStockToSelectedParts', () => {
       it('assigns stock to all selected parts', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock({ color: '#ff0000' });
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
+        const stockId = store.addStock({ color: '#ff0000' })!;
+        const part1Id = store.addPart()!;
+        const part2Id = store.addPart()!;
 
         useSelectionStore.getState().selectParts([part1Id, part2Id]);
         store.assignStockToSelectedParts(stockId);
@@ -1055,8 +1054,8 @@ describe('projectStore', () => {
 
       it('updates part color to match stock', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock({ color: '#ff0000' });
-        const partId = store.addPart({ color: '#000000' });
+        const stockId = store.addStock({ color: '#ff0000' })!;
+        const partId = store.addPart({ color: '#000000' })!;
 
         useSelectionStore.getState().selectPart(partId);
         store.assignStockToSelectedParts(stockId);
@@ -1067,8 +1066,8 @@ describe('projectStore', () => {
 
       it('unassigns stock when called with null', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock();
-        const partId = store.addPart({ stockId });
+        const stockId = store.addStock()!;
+        const partId = store.addPart({ stockId })!;
 
         useSelectionStore.getState().selectPart(partId);
         store.assignStockToSelectedParts(null);
@@ -1087,13 +1086,13 @@ describe('projectStore', () => {
     describe('createGroup', () => {
       it('creates a group with specified members', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
 
         const groupId = store.createGroup('Test Group', [
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
 
         const state = useProjectStore.getState();
         expect(state.groups).toHaveLength(1);
@@ -1104,9 +1103,9 @@ describe('projectStore', () => {
 
       it('selects the new group after creation', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
+        const partId = store.addPart()!;
 
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
 
         expect(useSelectionStore.getState().selectedGroupIds).toContain(groupId);
       });
@@ -1115,8 +1114,8 @@ describe('projectStore', () => {
     describe('renameGroup', () => {
       it('updates the group name', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart();
-        const groupId = store.createGroup('Original Name', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart()!;
+        const groupId = store.createGroup('Original Name', [{ id: partId, type: 'part' }])!;
 
         store.renameGroup(groupId, 'New Name');
 
@@ -1128,12 +1127,12 @@ describe('projectStore', () => {
     describe('deleteGroup - ungroup mode', () => {
       it('removes the group but keeps parts', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
+        const part1Id = store.addPart()!;
+        const part2Id = store.addPart()!;
         const groupId = store.createGroup('Test Group', [
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
 
         store.deleteGroup(groupId, 'ungroup');
 
@@ -1147,12 +1146,12 @@ describe('projectStore', () => {
     describe('deleteGroup - recursive mode', () => {
       it('removes the group and all nested parts', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart();
-        const part2Id = store.addPart();
+        const part1Id = store.addPart()!;
+        const part2Id = store.addPart()!;
         const groupId = store.createGroup('Test Group', [
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
 
         store.deleteGroup(groupId, 'recursive');
 
@@ -1165,14 +1164,14 @@ describe('projectStore', () => {
     describe('nested groups', () => {
       it('supports groups containing other groups', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
 
-        const innerGroupId = store.createGroup('Inner Group', [{ id: part1Id, type: 'part' }]);
+        const innerGroupId = store.createGroup('Inner Group', [{ id: part1Id, type: 'part' }])!;
         store.createGroup('Outer Group', [
           { id: innerGroupId, type: 'group' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
 
         const state = useProjectStore.getState();
         expect(state.groups).toHaveLength(2);
@@ -1183,10 +1182,10 @@ describe('projectStore', () => {
     describe('addToGroup', () => {
       it('adds parts to an existing group', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        const part3Id = store.addPart({ name: 'Part 3' });
-        const groupId = store.createGroup('Test Group', [{ id: part1Id, type: 'part' }]);
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
+        const part3Id = store.addPart({ name: 'Part 3' })!;
+        const groupId = store.createGroup('Test Group', [{ id: part1Id, type: 'part' }])!;
 
         store.addToGroup(groupId, [part2Id, part3Id], 'part');
 
@@ -1199,10 +1198,10 @@ describe('projectStore', () => {
 
       it('adds a group to another group', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
-        const innerGroupId = store.createGroup('Inner Group', [{ id: part1Id, type: 'part' }]);
-        const outerGroupId = store.createGroup('Outer Group', [{ id: part2Id, type: 'part' }]);
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
+        const innerGroupId = store.createGroup('Inner Group', [{ id: part1Id, type: 'part' }])!;
+        const outerGroupId = store.createGroup('Outer Group', [{ id: part2Id, type: 'part' }])!;
 
         store.addToGroup(outerGroupId, [innerGroupId], 'group');
 
@@ -1213,8 +1212,8 @@ describe('projectStore', () => {
 
       it('does not add duplicates', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Part 1' });
-        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }]);
+        const partId = store.addPart({ name: 'Part 1' })!;
+        const groupId = store.createGroup('Test Group', [{ id: partId, type: 'part' }])!;
         const initialMemberCount = useProjectStore.getState().groupMembers.length;
 
         store.addToGroup(groupId, [partId], 'part');
@@ -1226,12 +1225,12 @@ describe('projectStore', () => {
     describe('removeFromGroup', () => {
       it('removes parts from their group', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
         const groupId = store.createGroup('Test Group', [
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
 
         store.removeFromGroup([part1Id], 'part');
 
@@ -1243,9 +1242,9 @@ describe('projectStore', () => {
 
       it('removes groups from their parent group', () => {
         const store = useProjectStore.getState();
-        const partId = store.addPart({ name: 'Part 1' });
-        const innerGroupId = store.createGroup('Inner Group', [{ id: partId, type: 'part' }]);
-        const outerGroupId = store.createGroup('Outer Group', [{ id: innerGroupId, type: 'group' }]);
+        const partId = store.addPart({ name: 'Part 1' })!;
+        const innerGroupId = store.createGroup('Inner Group', [{ id: partId, type: 'part' }])!;
+        const outerGroupId = store.createGroup('Outer Group', [{ id: innerGroupId, type: 'group' }])!;
 
         store.removeFromGroup([innerGroupId], 'group');
 
@@ -1270,8 +1269,8 @@ describe('projectStore', () => {
     describe('newProject', () => {
       it('resets the store to initial state', () => {
         const store = useProjectStore.getState();
-        store.addPart();
-        store.addStock();
+        store.addPart()!;
+        store.addStock()!;
         store.markDirty();
 
         store.newProject();
@@ -1638,7 +1637,7 @@ describe('projectStore', () => {
       const store = useProjectStore.getState();
       const partId = store.addPart({
         position: { x: 0, y: 0, z: 0 }
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.moveSelectedParts({ x: 5, y: 10, z: 15 });
@@ -1649,12 +1648,12 @@ describe('projectStore', () => {
 
     it('moves all parts in a selected group', () => {
       const store = useProjectStore.getState();
-      const part1Id = store.addPart({ position: { x: 0, y: 0, z: 0 } });
-      const part2Id = store.addPart({ position: { x: 10, y: 0, z: 0 } });
+      const part1Id = store.addPart({ position: { x: 0, y: 0, z: 0 } })!;
+      const part2Id = store.addPart({ position: { x: 10, y: 0, z: 0 } })!;
       const groupId = store.createGroup('Test Group', [
         { id: part1Id, type: 'part' },
         { id: part2Id, type: 'part' }
-      ]);
+      ])!;
 
       useSelectionStore.getState().clearSelection();
       useSelectionStore.getState().selectGroup(groupId);
@@ -1823,13 +1822,13 @@ describe('projectStore', () => {
           length: 24,
           width: 12,
           position: { x: 0, y: 0, z: 0 }
-        });
+        })!;
         const part2Id = store.addPart({
           name: 'Part 2',
           length: 24,
           width: 12,
           position: { x: 30, y: 0, z: 0 }
-        });
+        })!;
 
         useSelectionStore.getState().selectParts([part1Id, part2Id]);
         const assembly = store.createAssemblyFromSelection('My Assembly', 'A test assembly');
@@ -1844,13 +1843,13 @@ describe('projectStore', () => {
         const store = useProjectStore.getState();
         const part1Id = store.addPart({
           position: { x: 10, y: 0, z: 0 }
-        });
+        })!;
         const part2Id = store.addPart({
           position: { x: 30, y: 0, z: 0 }
-        });
+        })!;
 
         useSelectionStore.getState().selectParts([part1Id, part2Id]);
-        const assembly = store.createAssemblyFromSelection('Test');
+        const assembly = store.createAssemblyFromSelection('Test')!;
 
         // Parts should be centered around origin
         // Original center was (20, 0, 0), so:
@@ -1871,16 +1870,16 @@ describe('projectStore', () => {
 
       it('includes groups and group members in the assembly', () => {
         const store = useProjectStore.getState();
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
         const groupId = store.createGroup('Test Group', [
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
 
         useSelectionStore.getState().clearSelection();
         useSelectionStore.getState().selectGroup(groupId);
-        const assembly = store.createAssemblyFromSelection('Grouped Assembly');
+        const assembly = store.createAssemblyFromSelection('Grouped Assembly')!;
 
         expect(assembly!.groups.length).toBeGreaterThan(0);
         expect(assembly!.groupMembers.length).toBeGreaterThan(0);
@@ -1888,11 +1887,11 @@ describe('projectStore', () => {
 
       it('stores stock ID reference in assembly parts', () => {
         const store = useProjectStore.getState();
-        const stockId = store.addStock({ name: 'Test Stock' });
-        store.addPart({ name: 'Part with Stock' });
+        const stockId = store.addStock({ name: 'Test Stock' })!;
+        store.addPart({ name: 'Part with Stock' })!;
         store.assignStockToSelectedParts(stockId); // Part is auto-selected on creation
 
-        const assembly = store.createAssemblyFromSelection('Stock Assembly');
+        const assembly = store.createAssemblyFromSelection('Stock Assembly')!;
 
         expect(assembly!.parts[0].stockId).toBe(stockId);
       });
@@ -1917,10 +1916,10 @@ describe('projectStore', () => {
               placement: { x: 0, z: 0 }
             }
           ]
-        });
+        })!;
 
         useSelectionStore.getState().selectParts([partId]);
-        const assembly = store.createAssemblyFromSelection('Featured Assembly');
+        const assembly = store.createAssemblyFromSelection('Featured Assembly')!;
 
         expect(assembly?.parts[0].features).toHaveLength(1);
         expect(assembly?.parts[0].features?.[0].kind).toBe('rect_cut');
@@ -1935,9 +1934,9 @@ describe('projectStore', () => {
         const part1Id = store.addPart({
           name: 'Shelf',
           position: { x: 0, y: 0, z: 0 }
-        });
+        })!;
         useSelectionStore.getState().selectParts([part1Id]);
-        const assembly = store.createAssemblyFromSelection('Shelf Assembly');
+        const assembly = store.createAssemblyFromSelection('Shelf Assembly')!;
         store.addAssembly(assembly!);
 
         // Clear workspace
@@ -1972,9 +1971,9 @@ describe('projectStore', () => {
           color: '#ff0000',
           grainSensitive: true,
           grainDirection: 'width'
-        });
+        })!;
         useSelectionStore.getState().selectParts([partId]);
-        const assembly = store.createAssemblyFromSelection('Custom Assembly');
+        const assembly = store.createAssemblyFromSelection('Custom Assembly')!;
         store.addAssembly(assembly!);
         store.deletePart(partId);
 
@@ -2007,9 +2006,9 @@ describe('projectStore', () => {
               parameters: { horizontalAngle: 0, verticalAngle: 10 }
             }
           ]
-        });
+        })!;
         useSelectionStore.getState().selectParts([partId]);
-        const assembly = store.createAssemblyFromSelection('Featured Assembly');
+        const assembly = store.createAssemblyFromSelection('Featured Assembly')!;
         store.addAssembly(assembly!);
         store.deletePart(partId);
 
@@ -2023,15 +2022,15 @@ describe('projectStore', () => {
       it('creates new groups when placing grouped assembly', () => {
         const store = useProjectStore.getState();
 
-        const part1Id = store.addPart({ name: 'Part 1' });
-        const part2Id = store.addPart({ name: 'Part 2' });
+        const part1Id = store.addPart({ name: 'Part 1' })!;
+        const part2Id = store.addPart({ name: 'Part 2' })!;
         const groupId = store.createGroup('Test Group', [
           { id: part1Id, type: 'part' },
           { id: part2Id, type: 'part' }
-        ]);
+        ])!;
         useSelectionStore.getState().clearSelection();
         useSelectionStore.getState().selectGroup(groupId);
-        const assembly = store.createAssemblyFromSelection('Grouped');
+        const assembly = store.createAssemblyFromSelection('Grouped')!;
         store.addAssembly(assembly!);
 
         // Clear workspace
@@ -2059,12 +2058,12 @@ describe('projectStore', () => {
         name: 'Red Stock',
         color: '#ff0000',
         grainDirection: 'length'
-      });
+      })!;
       const partId = store.addPart({
         name: 'Custom Color Part',
         stockId,
         color: '#0000ff' // Different color
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
@@ -2079,12 +2078,12 @@ describe('projectStore', () => {
         name: 'Length Grain Stock',
         color: '#d4a574',
         grainDirection: 'length'
-      });
+      })!;
       const partId = store.addPart({
         name: 'Width Grain Part',
         stockId,
         grainDirection: 'width' // Different grain
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
@@ -2102,14 +2101,14 @@ describe('projectStore', () => {
         thickness: 0.75,
         color: '#d4a574',
         grainDirection: 'length'
-      });
+      })!;
       const partId = store.addPart({
         name: 'Trimmed Part',
         stockId,
         length: 24,
         width: 6,
         thickness: 0.5
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
@@ -2126,12 +2125,12 @@ describe('projectStore', () => {
         name: 'MDF',
         color: '#d4a574',
         grainDirection: 'none'
-      });
+      })!;
       const partId = store.addPart({
         name: 'Grain Part',
         stockId,
         grainDirection: 'width'
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
@@ -2142,12 +2141,12 @@ describe('projectStore', () => {
 
     it('does nothing when no parts are selected', () => {
       const store = useProjectStore.getState();
-      const stockId = store.addStock({ name: 'Stock', color: '#ff0000' });
+      const stockId = store.addStock({ name: 'Stock', color: '#ff0000' })!;
       const partId = store.addPart({
         name: 'Part',
         stockId,
         color: '#0000ff'
-      });
+      })!;
 
       useSelectionStore.getState().clearSelection();
       store.resetSelectedPartsToStock();
@@ -2162,7 +2161,7 @@ describe('projectStore', () => {
         name: 'No Stock Part',
         stockId: null,
         color: '#0000ff'
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
@@ -2177,7 +2176,7 @@ describe('projectStore', () => {
         name: 'Bad Stock Part',
         stockId: 'non-existent-stock',
         color: '#0000ff'
-      });
+      })!;
 
       useSelectionStore.getState().selectPart(partId);
       store.resetSelectedPartsToStock();
@@ -2192,9 +2191,9 @@ describe('projectStore', () => {
         name: 'Stock',
         color: '#ff0000',
         grainDirection: 'length'
-      });
-      const partId1 = store.addPart({ name: 'Part 1', stockId, color: '#0000ff' });
-      const partId2 = store.addPart({ name: 'Part 2', stockId, color: '#00ff00' });
+      })!;
+      const partId1 = store.addPart({ name: 'Part 1', stockId, color: '#0000ff' })!;
+      const partId2 = store.addPart({ name: 'Part 2', stockId, color: '#00ff00' })!;
 
       useSelectionStore.getState().selectParts([partId1, partId2]);
       store.resetSelectedPartsToStock();
@@ -2215,7 +2214,7 @@ describe('projectStore', () => {
         thickness: 1,
         color: '#ff0000',
         grainDirection: 'length'
-      });
+      })!;
       const partId = store.addPart({
         name: 'Grouped Part',
         stockId,
@@ -2224,8 +2223,8 @@ describe('projectStore', () => {
         thickness: 0.5,
         color: '#0000ff',
         grainDirection: 'width'
-      });
-      const groupId = store.createGroup('Reset Group', [{ id: partId, type: 'part' }]);
+      })!;
+      const groupId = store.createGroup('Reset Group', [{ id: partId, type: 'part' }])!;
 
       useSelectionStore.getState().selectGroup(groupId);
       store.resetSelectedPartsToStock();
@@ -2251,9 +2250,9 @@ describe('projectStore', () => {
     describe('top-level mode', () => {
       it('merges two groups into a new group', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'Part 1' });
-        const p2 = store.addPart({ name: 'Part 2' });
-        const g1 = store.createGroup('Group A', [{ id: p1, type: 'part' }]);
+        const p1 = store.addPart({ name: 'Part 1' })!;
+        const p2 = store.addPart({ name: 'Part 2' })!;
+        const g1 = store.createGroup('Group A', [{ id: p1, type: 'part' }])!;
         const g2 = store.createGroup('Group B', [{ id: p2, type: 'part' }]);
 
         const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
@@ -2271,12 +2270,12 @@ describe('projectStore', () => {
 
       it('names merged group from 2 groups with both names', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const g1 = store.createGroup('Alpha', [{ id: p1, type: 'part' }]);
-        const g2 = store.createGroup('Beta', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const g1 = store.createGroup('Alpha', [{ id: p1, type: 'part' }])!;
+        const g2 = store.createGroup('Beta', [{ id: p2, type: 'part' }])!;
 
-        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level')!;
 
         const merged = useProjectStore.getState().groups.find((g) => g.id === mergedId);
         expect(merged?.name).toBe('Alpha & Beta Merged');
@@ -2284,14 +2283,14 @@ describe('projectStore', () => {
 
       it('names merged group from 3+ groups with count', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const p3 = store.addPart({ name: 'P3' });
-        const g1 = store.createGroup('Alpha', [{ id: p1, type: 'part' }]);
-        const g2 = store.createGroup('Beta', [{ id: p2, type: 'part' }]);
-        const g3 = store.createGroup('Gamma', [{ id: p3, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const p3 = store.addPart({ name: 'P3' })!;
+        const g1 = store.createGroup('Alpha', [{ id: p1, type: 'part' }])!;
+        const g2 = store.createGroup('Beta', [{ id: p2, type: 'part' }])!;
+        const g3 = store.createGroup('Gamma', [{ id: p3, type: 'part' }])!;
 
-        const mergedId = store.mergeGroups([g1!, g2!, g3!], 'top-level');
+        const mergedId = store.mergeGroups([g1!, g2!, g3!], 'top-level')!;
 
         const merged = useProjectStore.getState().groups.find((g) => g.id === mergedId);
         expect(merged?.name).toBe('Alpha & 2 others Merged');
@@ -2299,13 +2298,13 @@ describe('projectStore', () => {
 
       it('preserves nested groups in top-level mode', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }]);
-        const g1 = store.createGroup('Outer', [{ id: inner!, type: 'group' }]);
-        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }])!;
+        const g1 = store.createGroup('Outer', [{ id: inner!, type: 'group' }])!;
+        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }])!;
 
-        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level')!;
 
         const state = useProjectStore.getState();
         // Inner group should still exist as a member of the merged group
@@ -2316,7 +2315,7 @@ describe('projectStore', () => {
 
       it('returns null when fewer than 2 groups provided', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
+        const p1 = store.addPart({ name: 'P1' })!;
         const g1 = store.createGroup('Only One', [{ id: p1, type: 'part' }]);
 
         expect(store.mergeGroups([g1!], 'top-level')).toBeNull();
@@ -2325,12 +2324,12 @@ describe('projectStore', () => {
 
       it('selects and expands the merged group', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }]);
-        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }])!;
+        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }])!;
 
-        const mergedId = store.mergeGroups([g1!, g2!], 'top-level');
+        const mergedId = store.mergeGroups([g1!, g2!], 'top-level')!;
 
         const { selectedGroupIds, expandedGroupIds } = useSelectionStore.getState();
         expect(selectedGroupIds).toContain(mergedId);
@@ -2339,13 +2338,13 @@ describe('projectStore', () => {
 
       it('marks project as dirty', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }]);
-        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }])!;
+        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }])!;
         useProjectStore.setState({ isDirty: false });
 
-        store.mergeGroups([g1!, g2!], 'top-level');
+        store.mergeGroups([g1!, g2!], 'top-level')!;
 
         expect(useProjectStore.getState().isDirty).toBe(true);
       });
@@ -2354,13 +2353,13 @@ describe('projectStore', () => {
     describe('deep mode', () => {
       it('flattens nested groups into parts', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'Inner Part' });
-        const p2 = store.addPart({ name: 'Outer Part' });
-        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }]);
-        const g1 = store.createGroup('Outer', [{ id: inner!, type: 'group' }]);
-        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'Inner Part' })!;
+        const p2 = store.addPart({ name: 'Outer Part' })!;
+        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }])!;
+        const g1 = store.createGroup('Outer', [{ id: inner!, type: 'group' }])!;
+        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }])!;
 
-        const mergedId = store.mergeGroups([g1!, g2!], 'deep');
+        const mergedId = store.mergeGroups([g1!, g2!], 'deep')!;
 
         const state = useProjectStore.getState();
         // Inner group should be removed in deep mode
@@ -2373,13 +2372,13 @@ describe('projectStore', () => {
 
       it('removes original groups and nested groups', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }]);
-        const g1 = store.createGroup('Wrapper', [{ id: inner!, type: 'group' }]);
-        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const inner = store.createGroup('Inner', [{ id: p1, type: 'part' }])!;
+        const g1 = store.createGroup('Wrapper', [{ id: inner!, type: 'group' }])!;
+        const g2 = store.createGroup('Other', [{ id: p2, type: 'part' }])!;
 
-        store.mergeGroups([g1!, g2!], 'deep');
+        store.mergeGroups([g1!, g2!], 'deep')!;
 
         const state = useProjectStore.getState();
         expect(state.groups.find((g) => g.id === g1)).toBeUndefined();
@@ -2391,10 +2390,10 @@ describe('projectStore', () => {
     describe('license checks', () => {
       it('blocks merge in free mode', () => {
         const store = useProjectStore.getState();
-        const p1 = store.addPart({ name: 'P1' });
-        const p2 = store.addPart({ name: 'P2' });
-        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }]);
-        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }]);
+        const p1 = store.addPart({ name: 'P1' })!;
+        const p2 = store.addPart({ name: 'P2' })!;
+        const g1 = store.createGroup('G1', [{ id: p1, type: 'part' }])!;
+        const g2 = store.createGroup('G2', [{ id: p2, type: 'part' }])!;
 
         useLicenseStore.setState({ licenseMode: 'free' });
 
@@ -2416,8 +2415,8 @@ describe('projectStore', () => {
   describe('removeFromGroup - empty group cleanup', () => {
     it('removes the group when last member is removed', () => {
       const store = useProjectStore.getState();
-      const partId = store.addPart({ name: 'Solo Part' });
-      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      const partId = store.addPart({ name: 'Solo Part' })!;
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }])!;
 
       store.removeFromGroup([partId], 'part');
 
@@ -2428,8 +2427,8 @@ describe('projectStore', () => {
 
     it('deselects the removed empty group', () => {
       const store = useProjectStore.getState();
-      const partId = store.addPart({ name: 'Solo Part' });
-      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      const partId = store.addPart({ name: 'Solo Part' })!;
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }])!;
       useSelectionStore.setState({ selectedGroupIds: [groupId!] });
 
       store.removeFromGroup([partId], 'part');
@@ -2439,8 +2438,8 @@ describe('projectStore', () => {
 
     it('clears editingGroupId if the empty group was being edited', () => {
       const store = useProjectStore.getState();
-      const partId = store.addPart({ name: 'Solo Part' });
-      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      const partId = store.addPart({ name: 'Solo Part' })!;
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }])!;
       useSelectionStore.setState({ editingGroupId: groupId! });
 
       store.removeFromGroup([partId], 'part');
@@ -2450,8 +2449,8 @@ describe('projectStore', () => {
 
     it('removes empty group from expandedGroupIds', () => {
       const store = useProjectStore.getState();
-      const partId = store.addPart({ name: 'Solo Part' });
-      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }]);
+      const partId = store.addPart({ name: 'Solo Part' })!;
+      const groupId = store.createGroup('Singleton Group', [{ id: partId, type: 'part' }])!;
       useSelectionStore.setState({ expandedGroupIds: [groupId!] });
 
       store.removeFromGroup([partId], 'part');
@@ -2461,12 +2460,12 @@ describe('projectStore', () => {
 
     it('keeps non-empty groups when one member is removed', () => {
       const store = useProjectStore.getState();
-      const p1 = store.addPart({ name: 'Part 1' });
-      const p2 = store.addPart({ name: 'Part 2' });
+      const p1 = store.addPart({ name: 'Part 1' })!;
+      const p2 = store.addPart({ name: 'Part 2' })!;
       const groupId = store.createGroup('Multi', [
         { id: p1, type: 'part' },
         { id: p2, type: 'part' }
-      ]);
+      ])!;
 
       store.removeFromGroup([p1], 'part');
 
@@ -2679,7 +2678,7 @@ describe('validatePartsForCutList', () => {
           length: 48, // Fits within stock length
           width: 36, // Exceeds stock width but glue-up
           thickness: 0.75,
-          glueUpPanel: { boardCount: 3, boardWidth: 12 }
+          glueUpPanel: true
         })
       ];
 
@@ -2703,7 +2702,7 @@ describe('validatePartsForCutList', () => {
           length: 60, // Exceeds stock length
           width: 36,
           thickness: 0.75,
-          glueUpPanel: { boardCount: 3, boardWidth: 12 }
+          glueUpPanel: true
         })
       ];
 
@@ -2891,7 +2890,7 @@ describe('validatePartsForCutList', () => {
 
     it('keeps the source intact and identifies the copied cut after a resize makes it no longer fit', () => {
       const store = useProjectStore.getState();
-      const stockId = store.addStock({ name: 'Feature stock', length: 96, width: 48, thickness: 0.75 });
+      const stockId = store.addStock({ name: 'Feature stock', length: 96, width: 48, thickness: 0.75 })!;
       const sourceId = store.addPart({
         name: 'Cutout source',
         length: 24,
@@ -2912,7 +2911,7 @@ describe('validatePartsForCutList', () => {
             placement: { x: 8, z: 0 }
           }
         ]
-      });
+      })!;
       const sourceBefore = JSON.stringify(
         useProjectStore.getState().parts.find((part) => part.id === sourceId)?.features
       );

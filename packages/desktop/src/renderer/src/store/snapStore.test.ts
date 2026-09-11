@@ -150,8 +150,8 @@ describe('snapStore', () => {
 
   describe('setReferencePartIds', () => {
     it('sets reference part IDs directly', () => {
-      const part1Id = useProjectStore.getState().addPart();
-      const part2Id = useProjectStore.getState().addPart();
+      const part1Id = useProjectStore.getState().addPart()!;
+      const part2Id = useProjectStore.getState().addPart()!;
 
       useSnapStore.getState().setReferencePartIds([part1Id, part2Id]);
 
@@ -159,9 +159,9 @@ describe('snapStore', () => {
     });
 
     it('replaces existing reference part IDs', () => {
-      const part1Id = useProjectStore.getState().addPart();
-      const part2Id = useProjectStore.getState().addPart();
-      const part3Id = useProjectStore.getState().addPart();
+      const part1Id = useProjectStore.getState().addPart()!;
+      const part2Id = useProjectStore.getState().addPart()!;
+      const part3Id = useProjectStore.getState().addPart()!;
       useSnapStore.getState().setReferencePartIds([part1Id, part2Id]);
 
       useSnapStore.getState().setReferencePartIds([part3Id]);
@@ -172,8 +172,8 @@ describe('snapStore', () => {
 
   describe('addToReferences', () => {
     it('adds parts to reference list', () => {
-      const part1Id = useProjectStore.getState().addPart();
-      const part2Id = useProjectStore.getState().addPart();
+      const part1Id = useProjectStore.getState().addPart()!;
+      const part2Id = useProjectStore.getState().addPart()!;
 
       useSnapStore.getState().addToReferences([part1Id, part2Id]);
 
@@ -182,7 +182,7 @@ describe('snapStore', () => {
     });
 
     it('does not add duplicate references', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.getState().addToReferences([partId]);
 
       useSnapStore.getState().addToReferences([partId]);
@@ -193,7 +193,7 @@ describe('snapStore', () => {
 
   describe('removeFromReferences', () => {
     it('removes parts from reference list', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.getState().addToReferences([partId]);
 
       useSnapStore.getState().removeFromReferences([partId]);
@@ -202,7 +202,7 @@ describe('snapStore', () => {
     });
 
     it('is a no-op when removing parts not in references', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
 
       useSnapStore.getState().removeFromReferences([partId]);
 
@@ -212,7 +212,7 @@ describe('snapStore', () => {
 
   describe('toggleReference', () => {
     it('adds parts to references when none are references', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
 
       useSnapStore.getState().toggleReference([partId]);
 
@@ -220,7 +220,7 @@ describe('snapStore', () => {
     });
 
     it('removes parts from references when all are references', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.getState().toggleReference([partId]);
 
       useSnapStore.getState().toggleReference([partId]);
@@ -229,8 +229,8 @@ describe('snapStore', () => {
     });
 
     it('adds all parts when only some are references', () => {
-      const part1Id = useProjectStore.getState().addPart();
-      const part2Id = useProjectStore.getState().addPart();
+      const part1Id = useProjectStore.getState().addPart()!;
+      const part2Id = useProjectStore.getState().addPart()!;
       useSnapStore.getState().addToReferences([part1Id]);
 
       useSnapStore.getState().toggleReference([part1Id, part2Id]);
@@ -242,8 +242,8 @@ describe('snapStore', () => {
 
   describe('clearReferences', () => {
     it('clears all reference parts', () => {
-      const part1Id = useProjectStore.getState().addPart();
-      const part2Id = useProjectStore.getState().addPart();
+      const part1Id = useProjectStore.getState().addPart()!;
+      const part2Id = useProjectStore.getState().addPart()!;
       useSnapStore.getState().addToReferences([part1Id, part2Id]);
 
       useSnapStore.getState().clearReferences();
@@ -281,7 +281,7 @@ describe('snapStore', () => {
 
   describe('updateReferenceDistances', () => {
     it('clears distances when no references are set', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSelectionStore.setState({ selectedPartIds: [partId] });
 
       useSnapStore.getState().updateReferenceDistances();
@@ -290,7 +290,7 @@ describe('snapStore', () => {
     });
 
     it('clears distances when nothing is selected', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.setState({ referencePartIds: [partId] });
       useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: [] });
 
@@ -300,7 +300,7 @@ describe('snapStore', () => {
     });
 
     it('clears distances when selected part is also the reference', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.setState({ referencePartIds: [partId] });
       useSelectionStore.setState({ selectedPartIds: [partId] });
 
@@ -317,14 +317,14 @@ describe('snapStore', () => {
         length: 10,
         width: 5,
         thickness: 0.75
-      });
+      })!;
       const selPartId = useProjectStore.getState().addPart({
         name: 'Sel',
         position: { x: 15, y: 0.375, z: 0 },
         length: 10,
         width: 5,
         thickness: 0.75
-      });
+      })!;
 
       useSnapStore.setState({ referencePartIds: [refPartId] });
       useSelectionStore.setState({ selectedPartIds: [selPartId] });
@@ -342,7 +342,7 @@ describe('snapStore', () => {
 
   describe('cross-store cleanup', () => {
     it('deletePart removes part from references', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.getState().addToReferences([partId]);
 
       expect(useSnapStore.getState().referencePartIds).toContain(partId);
@@ -353,8 +353,8 @@ describe('snapStore', () => {
     });
 
     it('deleteSelectedParts removes parts from references', () => {
-      const part1Id = useProjectStore.getState().addPart({ name: 'Part 1' });
-      const part2Id = useProjectStore.getState().addPart({ name: 'Part 2' });
+      const part1Id = useProjectStore.getState().addPart({ name: 'Part 1' })!;
+      const part2Id = useProjectStore.getState().addPart({ name: 'Part 2' })!;
       useSnapStore.getState().addToReferences([part1Id, part2Id]);
       useSelectionStore.getState().selectParts([part1Id, part2Id]);
 
@@ -390,7 +390,7 @@ describe('snapStore', () => {
     });
 
     it('startEditingAssembly clears references', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.getState().addToReferences([partId]);
 
       useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test Assembly', [

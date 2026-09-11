@@ -10,7 +10,9 @@ describe('StartScreen', () => {
     onRelocateFile: vi.fn(),
     onSelectTemplate: vi.fn(),
     onStartTutorial: vi.fn(),
-    onViewAllTemplates: vi.fn()
+    onViewAllTemplates: vi.fn(),
+    onOpenSettings: vi.fn(),
+    onOpenLibrary: vi.fn()
   };
 
   beforeAll(() => {
