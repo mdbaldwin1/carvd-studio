@@ -431,8 +431,8 @@ describe('independent review round 2', () => {
     a.pattern = { type: 'linear', count: 3, spacing: 1, direction: 0 };
     b.pattern = { type: 'linear', count: 3, spacing: 1, direction: 90 };
     const conflicts = getPartFeatureConflicts([a, b], blank());
-    expect(conflicts.filter((c) => c.severity === 'error')).toEqual([]);
-    expect(conflicts.some((c) => c.code === 'round_overlap')).toBe(true);
+    // Merely overlapping patterns are ordinary, so nothing is reported.
+    expect(conflicts).toEqual([]);
   });
   it.each([true, false])('Q5 compares complete counterbore recesses (coaxial=$coaxial)', (coaxial) => {
     const a = hole('a');
@@ -442,8 +442,7 @@ describe('independent review round 2', () => {
     b.parameters.counterbore = { diameter: coaxial ? 0.5 : 1, depth: 0.5 };
     if (!coaxial) b.placement.primary = 0.8;
     const conflicts = getPartFeatureConflicts([a, b], blank());
-    expect(conflicts.filter((c) => c.severity === 'error')).toEqual([]);
-    expect(conflicts.some((c) => c.code === 'round_overlap')).toBe(true);
+    expect(conflicts).toEqual([]);
   });
   it('Q5 still rejects the same complete member set described in reverse order', () => {
     const a = hole('a');

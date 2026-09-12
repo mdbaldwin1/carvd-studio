@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
-import { getPartFeatureConflicts } from './partFeatureConflicts';
+import { getPartFeatureConflicts, getRectFeatureBounds } from './partFeatureConflicts';
+import { getPartMaterialVolume } from './partFeatureGeometry';
+import type { RectCutFeature } from '../types';
 vi.unmock('three');
 
 describe('getPartFeatureConflicts', () => {
@@ -43,23 +45,14 @@ describe('getPartFeatureConflicts', () => {
       ]
     });
 
+    // The bore overlapping the dado is ordinary and reported as nothing; the
+    // cutout starting inside material the dado already removed is the real
+    // fault, and is still an error.
     const conflicts = getPartFeatureConflicts(part.features ?? [], part);
-    expect(conflicts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          featureId: 'dado',
-          relatedFeatureId: 'hole',
-          code: 'round_rect_overlap',
-          severity: 'warning'
-        }),
-        expect.objectContaining({
-          featureId: 'hole',
-          relatedFeatureId: 'dado',
-          code: 'round_rect_overlap',
-          severity: 'warning'
-        })
-      ])
+    expect(conflicts.every((conflict) => conflict.code === 'rect_consumed' && conflict.severity === 'error')).toBe(
+      true
     );
+    expect(conflicts.map((conflict) => conflict.featureId).sort()).toEqual(['cutout', 'dado']);
   });
 
   it('flags duplicate coaxial circular cuts on the same face', () => {
@@ -128,13 +121,9 @@ describe('getPartFeatureConflicts', () => {
       ]
     });
 
-    const conflicts = getPartFeatureConflicts(part.features ?? [], part);
-    expect(conflicts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ featureId: 'pattern-1', code: 'round_overlap', severity: 'warning' }),
-        expect.objectContaining({ featureId: 'pattern-2', code: 'round_overlap', severity: 'warning' })
-      ])
-    );
+    // Overlapping bores that are not exact duplicates are ordinary -- two
+    // holes meeting to form a slot, say -- so nothing is reported.
+    expect(getPartFeatureConflicts(part.features ?? [], part)).toEqual([]);
   });
 
   it('flags duplicate enabled end cuts on the same end', () => {
@@ -171,7 +160,34 @@ describe('getPartFeatureConflicts', () => {
     );
   });
 
-  it('flags overlapping rectangular removals', () => {
+  it('reports nothing for overlapping removals because they commute', () => {
+    // The premise of the old "order now matters" warning. Removals are built
+    // in the authored blank coordinates and composed as a single subtraction,
+    // so every ordering yields the same solid -- which is why an overlap on
+    // its own is not worth reporting.
+    const part = createTestPart({ length: 12, width: 6, thickness: 1 });
+    const dado = (id: string, depth: number, x: number) =>
+      ({
+        id,
+        kind: 'rect_cut' as const,
+        version: 1 as const,
+        enabled: true,
+        cutType: 'dado' as const,
+        target: { type: 'face' as const, face: 'top_face' as const },
+        reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+        parameters: { size: { length: 4, width: 6 }, depthMode: 'blind' as const, depth },
+        placement: { x, z: 0 }
+      }) satisfies RectCutFeature;
+
+    const a = dado('a', 0.25, 2);
+    const b = dado('b', 0.75, 4);
+    expect(getPartMaterialVolume({ ...part, features: [a, b] })).toBe(
+      getPartMaterialVolume({ ...part, features: [b, a] })
+    );
+    expect(getPartFeatureConflicts([a, b], part)).toEqual([]);
+  });
+
+  it('accepts overlapping rectangular removals', () => {
     const part = createTestPart({
       features: [
         {
@@ -205,10 +221,9 @@ describe('getPartFeatureConflicts', () => {
       ]
     });
 
-    const conflicts = getPartFeatureConflicts(part.features ?? [], part);
-    expect(conflicts.some((conflict) => conflict.featureId === 'feature-1' && conflict.severity === 'warning')).toBe(
-      true
-    );
+    // Two through cutouts meeting at a corner just make an L-shaped opening.
+    // Removals commute, so the result is well defined and needs no warning.
+    expect(getPartFeatureConflicts(part.features ?? [], part)).toEqual([]);
   });
 
   it('flags later removals that start inside previously removed material', () => {
@@ -630,7 +645,10 @@ describe('regressions from the 2026-09-09 pre-release review', () => {
       placement: { x: 4, z: 2 }
     };
 
-    const conflicts = getPartFeatureConflicts([topMortise, frontMortise], part);
-    expect(conflicts.length).toBeGreaterThan(0);
+    // A front-face pocket reaches in from the front edge by its depth. Reading
+    // placement.z as a position across the width would instead put it at
+    // z 2..3, clear of the top mortise.
+    expect(getRectFeatureBounds(frontMortise, part)).toEqual({ minX: 4, maxX: 6, minZ: 0, maxZ: 2 });
+    expect(getRectFeatureBounds(topMortise, part)).toEqual({ minX: 4, maxX: 6, minZ: 0, maxZ: 1 });
   });
 });

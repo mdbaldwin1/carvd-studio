@@ -75,11 +75,15 @@ export function CutsSection({ isCollapsed, onOpenChange }: CutsSectionProps) {
               </Button>
             </div>
           </CollapsibleTrigger>
-          <CollapsibleContent className="flex min-h-0 flex-1 flex-col">
+          {/* Mirrors Parts. The open state must set display explicitly:
+              CollapsibleContent's own data-[state=open]:block otherwise wins
+              over a plain "flex", leaving the list with no flex context, so it
+              grew to its content height and the ScrollArea never scrolled. */}
+          <CollapsibleContent className="min-h-0 flex-1 overflow-hidden data-[state=open]:flex data-[state=open]:flex-col">
             {/* No summary strip: the enabled count is visible in the rows'
                 checkboxes, and the header's Save and Exit/Cancel already say
                 whether there are unsaved changes, as they do for a project. */}
-            <div className="flex min-h-0 flex-1 flex-col gap-3 p-4 pt-3">
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4 pt-3">
               <ScrollArea className="min-h-0 flex-1">
                 <div className="space-y-3 pr-1">
                   {draftFeatures.length === 0 ? (

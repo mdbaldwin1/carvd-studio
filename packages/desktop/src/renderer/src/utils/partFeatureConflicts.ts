@@ -19,9 +19,6 @@ export interface PartFeatureConflict {
   code:
     | 'duplicate_end_cut'
     | 'duplicate_round_cut'
-    | 'round_overlap'
-    | 'round_rect_overlap'
-    | 'rect_overlap'
     | 'rect_consumed'
     | 'rect_anchor_removed'
     | 'rect_depth_intersection'
@@ -54,7 +51,8 @@ function contains(container: RectBounds, candidate: RectBounds): boolean {
   );
 }
 
-function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length' | 'width'>): RectBounds | null {
+/** Exported so the side-face branch can be asserted directly rather than through a conflict. */
+export function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length' | 'width'>): RectBounds | null {
   const resolvedFeature = getResolvedRectCutFeature(feature, { ...part, thickness: 1 });
   const sizeLength = resolvedFeature.parameters.size.length;
   const sizeWidth = resolvedFeature.parameters.size.width;
@@ -298,53 +296,6 @@ function circularMembersOverlap(
   };
 }
 
-function circularOverlapsRect(
-  circular: CircularCutFeature,
-  rect: RectCutFeature,
-  part: Pick<Part, 'length' | 'width' | 'thickness'>
-): boolean {
-  if (circular.target.face !== 'top_face' && circular.target.face !== 'bottom_face') return false;
-  if (rect.target.type !== 'face' || rect.target.face !== circular.target.face) return false;
-  const bounds = getRectFeatureBounds(rect, part);
-  if (!bounds) return false;
-  const radius = circular.parameters.diameter / 2;
-  return expandCircularCut(circular, part as Part).some(({ entryPoint }) => {
-    const x = entryPoint.x + part.length / 2;
-    const z = entryPoint.z + part.width / 2;
-    const nearestX = Math.max(bounds.minX, Math.min(x, bounds.maxX));
-    const nearestZ = Math.max(bounds.minZ, Math.min(z, bounds.maxZ));
-    return Math.hypot(x - nearestX, z - nearestZ) < radius - 1e-9;
-  });
-}
-
-function addRoundRectOverlapConflict(
-  conflicts: PartFeatureConflict[],
-  circular: { feature: CircularCutFeature; index: number },
-  rect: { feature: RectCutFeature; index: number }
-) {
-  const message = `Operation ${circular.index + 1} overlaps Operation ${rect.index + 1}. The resulting removal stack is allowed, but order now matters.`;
-  conflicts.push(
-    {
-      featureId: circular.feature.id,
-      featureIndex: circular.index,
-      relatedFeatureId: rect.feature.id,
-      relatedFeatureIndex: rect.index,
-      code: 'round_rect_overlap',
-      severity: 'warning',
-      message
-    },
-    {
-      featureId: rect.feature.id,
-      featureIndex: rect.index,
-      relatedFeatureId: circular.feature.id,
-      relatedFeatureIndex: circular.index,
-      code: 'round_rect_overlap',
-      severity: 'warning',
-      message
-    }
-  );
-}
-
 export function getPartFeatureConflicts(
   features: PartFeature[],
   part: Pick<Part, 'length' | 'width' | 'thickness'>
@@ -417,18 +368,14 @@ export function getPartFeatureConflicts(
     }
 
     if (feature.kind === 'circular_cut') {
-      for (const prior of priorRectCuts) {
-        if (circularOverlapsRect(feature, prior.feature, part))
-          addRoundRectOverlapConflict(conflicts, { feature, index }, prior);
-      }
       for (const prior of priorCircularCuts) {
         const result = circularMembersOverlap(prior.feature, feature, part as Part);
-        if (!result.overlaps) continue;
-        const code: PartFeatureConflict['code'] = result.duplicate ? 'duplicate_round_cut' : 'round_overlap';
-        const severity: PartFeatureConflict['severity'] = result.duplicate ? 'error' : 'warning';
-        const message = result.duplicate
-          ? `Operation ${index + 1} duplicates the axis and removal of Operation ${prior.index + 1}.`
-          : `Operation ${index + 1} overlaps Operation ${prior.index + 1}. The resulting round-cut stack is allowed, but order now matters.`;
+        // Overlapping round cuts are ordinary -- two bores meeting to form a
+        // slot, say. Only an exact duplicate is worth reporting.
+        if (!result.overlaps || !result.duplicate) continue;
+        const code: PartFeatureConflict['code'] = 'duplicate_round_cut';
+        const severity: PartFeatureConflict['severity'] = 'error';
+        const message = `Operation ${index + 1} duplicates the axis and removal of Operation ${prior.index + 1}.`;
         conflicts.push({
           featureId: prior.feature.id,
           featureIndex: prior.index,
@@ -453,10 +400,6 @@ export function getPartFeatureConflicts(
     }
 
     if (feature.kind !== 'rect_cut') continue;
-    for (const prior of priorCircularCuts) {
-      if (circularOverlapsRect(prior.feature, feature, part))
-        addRoundRectOverlapConflict(conflicts, prior, { feature, index });
-    }
     const currentBounds = getRectFeatureBounds(feature, part);
     if (!currentBounds) {
       priorRectCuts.push({ feature, index });
@@ -469,25 +412,28 @@ export function getPartFeatureConflicts(
       const b = currentBounds;
       if (!a || !b || !overlaps(a, b)) continue;
 
-      let code: PartFeatureConflict['code'] = 'rect_overlap';
-      let severity: PartFeatureConflict['severity'] = 'warning';
-      let message = `Operation ${index + 1} overlaps Operation ${prior.index + 1}. The resulting removal stack is allowed, but order now matters.`;
+      // Removals are built in the authored blank coordinates and composed as
+      // one subtraction, so overlapping cuts commute: a back groove crossing
+      // four shelf dadoes is ordinary joinery with a well-defined result.
+      // Only report an overlap that actually breaks something.
+      let code: PartFeatureConflict['code'] | null = null;
+      let severity: PartFeatureConflict['severity'] = 'error';
+      let message = '';
 
       if (sharesReachableSurface(prior.feature, feature, part)) {
         if (isAnchorDependent(feature)) {
           code = 'rect_anchor_removed';
-          severity = 'error';
           message = `Operation ${index + 1} depends on ${getFeatureTargetLabel(feature)}, but Operation ${prior.index + 1} already removes that anchor material.`;
         } else if (contains(a, b)) {
           code = 'rect_consumed';
-          severity = 'error';
           message = `Operation ${index + 1} starts inside material already removed by Operation ${prior.index + 1}.`;
         }
       } else if (isOpposingBlindIntersection(prior.feature, feature, part)) {
         code = 'rect_depth_intersection';
-        severity = 'error';
         message = `Operation ${index + 1} intersects Operation ${prior.index + 1} from the opposite face. Combined depths remove the same interior material.`;
       }
+
+      if (!code) continue;
 
       conflicts.push({
         featureId: prior.feature.id,

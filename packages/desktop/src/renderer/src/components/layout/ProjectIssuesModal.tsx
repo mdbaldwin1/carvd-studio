@@ -77,11 +77,11 @@ export function ProjectIssuesModal(): React.JSX.Element | null {
         </DialogHeader>
 
         {summary.total === 0 ? (
-          <p className="py-8 text-center text-sm text-text-muted">
+          <p className="px-5 py-8 text-center text-sm text-text-muted">
             No errors or warnings. Every part validates against its stock and its operations.
           </p>
         ) : (
-          <ScrollArea className="max-h-[60vh] pr-3">
+          <ScrollArea className="max-h-[60vh] px-5 py-4">
             <div className="flex flex-col gap-4">
               {summary.groups.map((group) => (
                 <div key={group.partId} ref={group.partId === focusPartId ? focusRef : undefined}>
