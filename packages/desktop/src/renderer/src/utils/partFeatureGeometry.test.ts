@@ -2224,3 +2224,53 @@ describe('partFeatureGeometry', () => {
     });
   });
 });
+
+describe('a half-typed measurement never reaches triangulation', () => {
+  // A measurement is momentarily NaN while it is being typed. The clipper
+  // throws "Tried to create degenerate segment" on one, and that throw lands
+  // inside React's render: the editor unmounts and the session ends up back at
+  // the home screen with no warning. Editing a cut's run and then immediately
+  // its width was enough to trigger it.
+  const part = createTestPart({ length: 24, width: 12, thickness: 0.75 });
+  const unusable = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY];
+
+  function cutout(overrides: Partial<{ length: number; width: number; depth: number }>): PartFeature {
+    return {
+      id: 'cutout',
+      kind: 'rect_cut',
+      version: 1,
+      enabled: true,
+      cutType: 'cutout',
+      target: { type: 'face', face: 'top_face' },
+      reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+      parameters: {
+        size: { length: overrides.length ?? 8, width: overrides.width ?? 4 },
+        depthMode: 'through',
+        depth: overrides.depth
+      },
+      placement: { x: 0, z: 0 }
+    };
+  }
+
+  it.each(unusable)('survives a non-finite run of %p', (value) => {
+    expect(() => getPartRenderGeometry({ ...part, features: [cutout({ length: value })] })).not.toThrow();
+  });
+
+  it.each(unusable)('survives a non-finite width of %p', (value) => {
+    expect(() => getPartRenderGeometry({ ...part, features: [cutout({ width: value })] })).not.toThrow();
+  });
+
+  it('falls back to the uncut blank rather than a partial cut', () => {
+    const geometry = getPartRenderGeometry({ ...part, features: [cutout({ width: Number.NaN })] });
+    geometry.computeBoundingBox();
+    const box = geometry.boundingBox!;
+    expect(box.max.x - box.min.x).toBeCloseTo(part.length);
+    expect(box.max.z - box.min.z).toBeCloseTo(part.width);
+  });
+
+  it('still cuts once the measurement is finite again', () => {
+    const cut = getPartRenderGeometry({ ...part, features: [cutout({})] });
+    const blank = getPartRenderGeometry({ ...part, features: [cutout({ width: Number.NaN })] });
+    expect(cut.getAttribute('position').count).not.toBe(blank.getAttribute('position').count);
+  });
+});

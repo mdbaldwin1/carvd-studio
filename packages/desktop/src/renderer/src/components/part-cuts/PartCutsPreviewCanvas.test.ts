@@ -784,7 +784,7 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
 
     const preview = screen.getByRole('img', { name: 'Part cuts geometry preview' });
     const before = preview.getAttribute('data-geometry-signature');
-    fireEvent.click(within(preview).getByRole('button', { name: resize }));
+    fireEvent.click(screen.getByRole('button', { name: resize }));
 
     expect(preview.getAttribute('data-geometry-signature')).not.toBe(before);
   });

@@ -55,11 +55,59 @@ function featureKey(part: Part): string {
   });
 }
 
+/**
+ * Every number this feature contributes to triangulation.
+ *
+ * A half-typed measurement is momentarily NaN, and the clipper throws
+ * "Tried to create degenerate segment" on one -- inside React's render, which
+ * unmounts the editor and drops the user at the home screen with no warning.
+ * Placement was already screened; the sizes were not, so editing a cut's run
+ * or width was enough to take the session down.
+ */
+function hasFiniteGeometry(feature: PartFeature): boolean {
+  // An absent value is not a malformed one: a through cut carries no depth,
+  // and older files store that as null rather than undefined.
+  const finite = (...values: Array<number | null | undefined>) =>
+    values.every((value) => value === null || value === undefined || Number.isFinite(value));
+
+  if (feature.kind === 'rect_cut') {
+    return (
+      hasFiniteRectCutPlacement(feature) &&
+      finite(feature.parameters.size.length, feature.parameters.size.width, feature.parameters.depth)
+    );
+  }
+  if (feature.kind === 'circular_cut') {
+    return finite(
+      feature.placement.primary,
+      feature.placement.secondary,
+      feature.placement.rotation,
+      feature.parameters.diameter,
+      feature.parameters.depth,
+      feature.parameters.tilt,
+      feature.parameters.direction
+    );
+  }
+  if (feature.kind === 'rounded_cut') {
+    return finite(
+      feature.placement.primary,
+      feature.placement.secondary,
+      feature.placement.rotation,
+      feature.parameters.length,
+      feature.parameters.width,
+      feature.parameters.cornerRadius,
+      feature.parameters.depth
+    );
+  }
+  return finite(
+    feature.parameters.horizontalAngle,
+    feature.parameters.verticalAngle,
+    feature.parameters.reference?.value
+  );
+}
+
 function getEnabledFeatures(part: Part): PartFeature[] {
   // Invalid authored data remains editable, but must never enter triangulation.
-  return (part.features ?? []).filter(
-    (feature) => feature.enabled && (feature.kind !== 'rect_cut' || hasFiniteRectCutPlacement(feature))
-  );
+  return (part.features ?? []).filter((feature) => feature.enabled && hasFiniteGeometry(feature));
 }
 
 export function hasRenderablePartFeatures(part: Part): boolean {

@@ -1473,18 +1473,19 @@ export function PartCutsPreviewCanvas({
 
   if (fallback) {
     return (
-      <div
-        role="img"
-        aria-label="Part cuts geometry preview"
-        data-geometry-signature={previewGeometrySignature}
-        className="flex min-h-[320px] flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-gradient-to-br from-bg-secondary to-bg px-6 py-8 text-center"
-      >
+      <div className="flex min-h-[320px] flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-gradient-to-br from-bg-secondary to-bg px-6 py-8 text-center">
         <div className="max-w-xl space-y-4">
-          <div className="text-lg font-semibold text-text">{part.name}</div>
-          <CardDescription>
-            Direct 3D picking is active in the app runtime. The test fallback keeps target state readable without a
-            WebGL canvas.
-          </CardDescription>
+          {/* role="img" makes an element a leaf in the accessibility tree, so
+              anything inside it is never exposed. It therefore has to cover the
+              rendered geometry alone -- the controls beside it are real buttons
+              and have to stay reachable. */}
+          <div role="img" aria-label="Part cuts geometry preview" data-geometry-signature={previewGeometrySignature}>
+            <div className="text-lg font-semibold text-text">{part.name}</div>
+            <CardDescription>
+              Direct 3D picking is active in the app runtime. The test fallback keeps target state readable without a
+              WebGL canvas.
+            </CardDescription>
+          </div>
           {selectedFeatureSummary && (
             <div className="rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-left text-sm text-text">
               <div className="font-medium">Preview Selection</div>
@@ -1538,25 +1539,32 @@ export function PartCutsPreviewCanvas({
   }
 
   return (
-    <div
-      role="img"
-      aria-label="Part cuts geometry preview"
-      data-geometry-signature={previewGeometrySignature}
-      className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),_transparent_40%),linear-gradient(180deg,_rgba(24,24,27,0.12),_rgba(12,12,14,0.02))]"
-    >
-      <Canvas camera={{ position: [maxDimension * 2.2, maxDimension * 1.6, maxDimension * 2.4], fov: 38 }}>
-        <PartCutsPreviewScene
-          previewPart={previewPart}
-          units={units}
-          draft={draft}
-          hoveredTarget={hoveredTarget}
-          pendingTarget={pendingTarget}
-          onHoverTarget={onHoverTarget}
-          onActivateTarget={onActivateTarget}
-          onDraftChange={onDraftChange}
-          frameNonce={frameNonce}
-        />
-      </Canvas>
+    <div className="absolute inset-0 overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),_transparent_40%),linear-gradient(180deg,_rgba(24,24,27,0.12),_rgba(12,12,14,0.02))]">
+      {/* role="img" makes an element a leaf in the accessibility tree, so
+          everything inside it is hidden from assistive technology. It used to
+          wrap this whole panel, which is why the Preview Handles buttons --
+          real, focusable buttons -- never reached the accessibility tree even
+          though the DOM contained them. It now covers the canvas alone. */}
+      <div
+        role="img"
+        aria-label="Part cuts geometry preview"
+        data-geometry-signature={previewGeometrySignature}
+        className="absolute inset-0"
+      >
+        <Canvas camera={{ position: [maxDimension * 2.2, maxDimension * 1.6, maxDimension * 2.4], fov: 38 }}>
+          <PartCutsPreviewScene
+            previewPart={previewPart}
+            units={units}
+            draft={draft}
+            hoveredTarget={hoveredTarget}
+            pendingTarget={pendingTarget}
+            onHoverTarget={onHoverTarget}
+            onActivateTarget={onActivateTarget}
+            onDraftChange={onDraftChange}
+            frameNonce={frameNonce}
+          />
+        </Canvas>
+      </div>
 
       {supportsHandles && draft && handleOverlay && (
         <div className="absolute bottom-3 right-3 max-w-[min(88%,24rem)]">

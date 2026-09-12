@@ -442,9 +442,9 @@ describe('PartCutsWorkspace', () => {
       startCut(preset);
 
       const preview = screen.getByRole('img', { name: 'Part cuts geometry preview' });
-      expect(within(preview).getByText('Preview Handles')).toBeInTheDocument();
-      fireEvent.click(within(preview).getByRole('button', { name: 'Move Right' }));
-      fireEvent.click(within(preview).getByRole('button', { name: resize }));
+      expect(screen.getByText('Preview Handles')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Move Right' }));
+      fireEvent.click(screen.getByRole('button', { name: resize }));
 
       // Move Right travels along the face only; the across-face offset is
       // reached through its own field, not by nudging diagonally.
@@ -485,13 +485,13 @@ describe('PartCutsWorkspace', () => {
       fireEvent.change(screen.getByLabelText('Rotation (degrees)'), { target: { value: String(rotation) } });
 
       const preview = screen.getByRole('img', { name: 'Part cuts geometry preview' });
-      fireEvent.click(within(preview).getByRole('button', { name: 'Extend Length' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Extend Length' }));
       expect(screen.getByLabelText('Opening Length')).toHaveValue('3 1/4');
       expect(screen.getByLabelText('Opening Width')).toHaveValue('1');
       expect(screen.getByLabelText('Offset Along Face')).toHaveValue('0');
       expect(screen.getByLabelText('Offset Across Face')).toHaveValue('0');
 
-      fireEvent.click(within(preview).getByRole('button', { name: 'Widen' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Widen' }));
       expect(screen.getByLabelText('Opening Length')).toHaveValue('3 1/4');
       expect(screen.getByLabelText('Opening Width')).toHaveValue('1 1/4');
       expect(screen.getByLabelText('Offset Along Face')).toHaveValue('0');
