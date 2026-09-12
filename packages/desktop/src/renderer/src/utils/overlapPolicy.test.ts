@@ -583,6 +583,58 @@ describe('overlapPolicy', () => {
     expect(partsOverlap(stile, rail)).toBe(partsOverlap(rail, stile));
   });
 
+  it('lets an already-overlapping assembly be moved without trapping it', () => {
+    // Two boards driven into each other. However they got that way -- an
+    // import, an older file, a cut edited after the fact -- the guard must not
+    // strand them there.
+    const a = createPart({ id: 'aaa', length: 12, width: 6, thickness: 0.75, position: { x: 0, y: 0.375, z: 0 } });
+    const b = createPart({ id: 'bbb', length: 12, width: 6, thickness: 0.75, position: { x: 4, y: 0.375, z: 0 } });
+    expect(partsOverlap(a, b)).toBe(true);
+
+    // carried together by one rigid move: their relationship is untouched
+    const together = new Map([
+      ['aaa', { ...a, position: { x: 0, y: 20, z: 0 } }],
+      ['bbb', { ...b, position: { x: 4, y: 20, z: 0 } }]
+    ]);
+    expect(wouldTransformedPartsOverlap([a, b], together)).toBe(false);
+
+    // one of them worked free on its own
+    const apart = new Map([['bbb', { ...b, position: { x: 14, y: 0.375, z: 0 } }]]);
+    expect(wouldTransformedPartsOverlap([a, b], apart)).toBe(false);
+  });
+
+  it('still refuses driving an existing overlap deeper', () => {
+    // Stacked faces, biting 1/8" into one another.
+    const a = createPart({ id: 'aaa', length: 12, width: 6, thickness: 0.75, position: { x: 0, y: 0.375, z: 0 } });
+    const b = createPart({ id: 'bbb', length: 12, width: 6, thickness: 0.75, position: { x: 0, y: 1, z: 0 } });
+    expect(partsOverlap(a, b)).toBe(true);
+
+    // backing out is allowed
+    const out = new Map([['bbb', { ...b, position: { x: 0, y: 1.1, z: 0 } }]]);
+    expect(wouldTransformedPartsOverlap([a, b], out)).toBe(false);
+
+    // pressing further in is not
+    const deeper = new Map([['bbb', { ...b, position: { x: 0, y: 0.9, z: 0 } }]]);
+    expect(wouldTransformedPartsOverlap([a, b], deeper)).toBe(true);
+  });
+
+  it('still refuses a move that creates a new overlap', () => {
+    const a = createPart({ id: 'aaa', length: 12, width: 6, thickness: 0.75, position: { x: 0, y: 0.375, z: 0 } });
+    const b = createPart({ id: 'bbb', length: 12, width: 6, thickness: 0.75, position: { x: 20, y: 0.375, z: 0 } });
+    expect(partsOverlap(a, b)).toBe(false);
+
+    const into = new Map([['bbb', { ...b, position: { x: 4, y: 0.375, z: 0 } }]]);
+    expect(wouldTransformedPartsOverlap([a, b], into)).toBe(true);
+
+    // and a rigid move of the pair that drives one of them into a third part
+    const c = createPart({ id: 'ccc', length: 12, width: 6, thickness: 0.75, position: { x: 40, y: 0.375, z: 0 } });
+    const slide = new Map([
+      ['aaa', { ...a, position: { x: 28, y: 0.375, z: 0 } }],
+      ['bbb', { ...b, position: { x: 48, y: 0.375, z: 0 } }]
+    ]);
+    expect(wouldTransformedPartsOverlap([a, b, c], slide)).toBe(true);
+  });
+
   it('accepts housed joinery that the full-thickness contour cannot express', () => {
     // A blind dado removes nothing in plan, so the contour decomposition
     // carried the housed part at full thickness and every correctly seated

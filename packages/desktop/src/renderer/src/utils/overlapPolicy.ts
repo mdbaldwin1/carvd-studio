@@ -183,6 +183,28 @@ export function wouldOverlapWithAny(part: Part, parts: Part[], geometryCache?: G
   return false;
 }
 
+/**
+ * True when a change carries both parts by the very same rigid move, leaving
+ * their shapes and their relationship to each other untouched.
+ */
+function movesRigidlyTogether(originalA: Part, movedA: Part, originalB: Part, movedB: Part): boolean {
+  const sameShape = (before: Part, after: Part) =>
+    before.length === after.length &&
+    before.width === after.width &&
+    before.thickness === after.thickness &&
+    before.rotation.x === after.rotation.x &&
+    before.rotation.y === after.rotation.y &&
+    before.rotation.z === after.rotation.z &&
+    before.features === after.features &&
+    before.ignoreOverlap === after.ignoreOverlap;
+  if (!sameShape(originalA, movedA) || !sameShape(originalB, movedB)) return false;
+  return (
+    Math.abs(movedA.position.x - originalA.position.x - (movedB.position.x - originalB.position.x)) <= OBB_EPSILON &&
+    Math.abs(movedA.position.y - originalA.position.y - (movedB.position.y - originalB.position.y)) <= OBB_EPSILON &&
+    Math.abs(movedA.position.z - originalA.position.z - (movedB.position.z - originalB.position.z)) <= OBB_EPSILON
+  );
+}
+
 export function wouldTransformedPartsOverlap(
   parts: Part[],
   transformedPartsById: Map<string, Part>,
@@ -191,8 +213,10 @@ export function wouldTransformedPartsOverlap(
   if (transformedPartsById.size === 0) return false;
 
   const effectivePartsById = new Map(parts.map((p) => [p.id, transformedPartsById.get(p.id) ?? p]));
+  const originalPartsById = new Map(parts.map((p) => [p.id, p]));
 
   for (const [transformedId, transformedPart] of transformedPartsById) {
+    const originalPart = originalPartsById.get(transformedId);
     for (const other of parts) {
       if (other.id === transformedId) continue;
 
@@ -201,9 +225,37 @@ export function wouldTransformedPartsOverlap(
       if (other.id < transformedId && transformedPartsById.has(other.id)) continue;
 
       const effectiveOther = effectivePartsById.get(other.id);
-      if (effectiveOther && partsOverlap(transformedPart, effectiveOther, geometryCache)) {
-        return true;
+      if (!effectiveOther) continue;
+      const originalOther = originalPartsById.get(other.id);
+
+      // Two parts carried by the same rigid move keep their exact
+      // relationship, so that pair is not this move's business. Without this a
+      // group whose members already touch -- a mitred door frame, say -- could
+      // never be dragged anywhere, because its own internal pairs vetoed every
+      // destination.
+      if (
+        originalPart &&
+        originalOther &&
+        transformedPartsById.has(other.id) &&
+        movesRigidlyTogether(originalPart, transformedPart, originalOther, effectiveOther)
+      ) {
+        continue;
       }
+
+      if (!partsOverlap(transformedPart, effectiveOther, geometryCache)) continue;
+
+      // An overlap that already exists must not become a trap. The drag-time
+      // guard lets a part strictly work itself free; commits have to agree, or
+      // the drag previews fine and then snaps back on release.
+      if (
+        originalPart &&
+        originalOther &&
+        existingOverlapDoesNotWorsen(originalPart, transformedPart, effectiveOther, geometryCache, originalOther)
+      ) {
+        continue;
+      }
+
+      return true;
     }
   }
 
@@ -264,7 +316,9 @@ function existingOverlapDoesNotWorsen(
   part: Part,
   movedPart: Part,
   other: Part,
-  geometryCache?: GeometryCache
+  geometryCache?: GeometryCache,
+  /** The other part as it was before this change, when it moves too. */
+  originalOther: Part = other
 ): boolean {
   if (!overlapCheckEnabled(part, other)) return true;
   // A coarse OBB is only the true overlap representation for an uncut board.
@@ -291,7 +345,7 @@ function existingOverlapDoesNotWorsen(
     return deepest;
   };
 
-  const beforeDepth = depthBetween(part, other);
+  const beforeDepth = depthBetween(part, originalOther);
   if (beforeDepth === null) return false;
 
   const afterDepth = depthBetween(movedPart, other);
