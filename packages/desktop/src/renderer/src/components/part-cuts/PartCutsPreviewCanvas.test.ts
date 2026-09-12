@@ -839,7 +839,7 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
     // One merged overlay card: what the cut is, where it sits, and what to do.
     expect(screen.getByText('Mortise on Top Face')).toBeInTheDocument();
     expect(screen.getByText('On Top Face')).toBeInTheDocument();
-    expect(screen.getByText(/drag the handles to size it/i)).toBeInTheDocument();
+    expect(screen.getByText(/drag the handles to position and size it/i)).toBeInTheDocument();
     // Base part mesh plus move/length/width handles and the area overlay
     expect(container.querySelectorAll('mesh').length).toBeGreaterThanOrEqual(5);
   });
@@ -906,9 +906,9 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
     // Committed target is the top face; the pointer is over the bottom face.
     renderCanvas(draft, { hoveredTarget: { type: 'face', face: 'bottom_face' } });
 
-    expect(screen.getByText(/Click to move this cut to the Bottom Face/i)).toBeInTheDocument();
+    expect(screen.getByText(/Click to retarget this cut to the Bottom Face/i)).toBeInTheDocument();
     // The generic instruction is replaced while a move is on offer.
-    expect(screen.queryByText(/drag the handles to size it/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/drag the handles to position and size it/i)).not.toBeInTheDocument();
   });
   describe('computePreviewCameraFit', () => {
     const viewport = { fov: 38, aspect: 16 / 9 };

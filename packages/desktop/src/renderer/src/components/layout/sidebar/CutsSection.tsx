@@ -32,6 +32,7 @@ export function CutsSection({ isCollapsed, onOpenChange }: CutsSectionProps) {
     units,
     draftFeatures,
     liveFeatures,
+    inspectorDraft,
     conflictsByFeatureId,
     featureConflicts,
     operationIssues,
@@ -44,6 +45,17 @@ export function CutsSection({ isCollapsed, onOpenChange }: CutsSectionProps) {
     handleMoveFeature,
     onDraftFeaturesChange
   } = usePartCutsEditor();
+
+  // firstInvalidIndex points into the live list, which carries the open draft
+  // and so can be one longer than the saved one. Reading the saved list at that
+  // index was undefined for a brand-new cut. "Fix" only appears for a cut that
+  // is already saved: re-opening the one being edited would rebuild its draft
+  // from the saved feature and silently throw away the change that made it
+  // invalid -- retarget a cut to another face and Fix would put it back.
+  const invalidFeature = firstInvalidIndex >= 0 ? liveFeatures[firstInvalidIndex] : undefined;
+  const savedInvalidFeature = invalidFeature
+    ? draftFeatures.find((feature) => feature.id === invalidFeature.id && feature.id !== inspectorDraft?.featureId)
+    : undefined;
 
   return (
     <>
@@ -198,27 +210,24 @@ export function CutsSection({ isCollapsed, onOpenChange }: CutsSectionProps) {
                 </div>
               </ScrollArea>
 
-              {firstInvalidIndex >= 0 && (
+              {invalidFeature && (
                 <div
                   id="part-cuts-save-errors"
                   role="alert"
                   className="rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger"
                 >
                   <p>
-                    {draftFeatures[firstInvalidIndex].label || `Cut ${firstInvalidIndex + 1}`}:{' '}
-                    {operationIssues.get(draftFeatures[firstInvalidIndex].id) ||
+                    {invalidFeature.label || `Cut ${firstInvalidIndex + 1}`}:{' '}
+                    {operationIssues.get(invalidFeature.id) ||
                       featureConflicts.find(
-                        (conflict) =>
-                          conflict.featureId === draftFeatures[firstInvalidIndex].id && conflict.severity === 'error'
+                        (conflict) => conflict.featureId === invalidFeature.id && conflict.severity === 'error'
                       )?.message}
                   </p>
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={() => handleEditFeature(draftFeatures[firstInvalidIndex])}
-                  >
-                    Fix cut {firstInvalidIndex + 1}
-                  </Button>
+                  {savedInvalidFeature && (
+                    <Button variant="outline" size="xs" onClick={() => handleEditFeature(savedInvalidFeature)}>
+                      Fix cut {firstInvalidIndex + 1}
+                    </Button>
+                  )}
                 </div>
               )}
             </div>

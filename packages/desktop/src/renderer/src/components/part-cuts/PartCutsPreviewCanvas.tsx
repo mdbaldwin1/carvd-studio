@@ -1507,6 +1507,9 @@ export function PartCutsPreviewCanvas({
     [draft, previewPart, units]
   );
   const supportsHandles = supportsPreviewHandles(draft);
+  // A cut that has never been committed is still choosing its target; an
+  // existing one is changing the target it already has.
+  const isNewDraft = !!draft && !draft.featureId;
   // Panning and a wide zoom range mean the part can end up off screen. The
   // project canvas answers F and Home through these camera requests, so the
   // preview honours the same ones instead of owning a button.
@@ -1634,11 +1637,22 @@ export function PartCutsPreviewCanvas({
           )}
           {draft && (
             <div className="mt-1.5 text-xs text-text-muted">
-              {activeTargetLabel && activeTargetLabel !== selectedFeatureTargetLabel
-                ? `Click to move this cut to the ${activeTargetLabel}.`
-                : supportsHandles
-                  ? 'Click a highlighted face on the part to place this cut, then drag the handles to size it.'
-                  : 'Click a highlighted face, edge, or corner on the part to move this cut there.'}
+              {/* Clicking a plane chooses which face, edge or corner the cut
+                  belongs to; it never positions the cut within that target.
+                  Saying "place this cut" invited clicks on the current face
+                  expecting the cut to move there, which is correctly a no-op.
+                  Where it goes on the target is set by the handles, the nudge
+                  controls, the arrow keys, or the inspector's offsets. */}
+              {activeTargetLabel && activeTargetLabel !== selectedFeatureTargetLabel ? (
+                `Click to retarget this cut to the ${activeTargetLabel}.`
+              ) : (
+                <>
+                  {isNewDraft
+                    ? 'Click a highlighted face, edge, or corner to choose the cut target.'
+                    : 'Click a highlighted face, edge, or corner to retarget this cut.'}
+                  {supportsHandles && ' Drag the handles to position and size it.'}
+                </>
+              )}
             </div>
           )}
         </div>
