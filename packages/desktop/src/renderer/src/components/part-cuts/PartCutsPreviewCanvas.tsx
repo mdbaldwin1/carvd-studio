@@ -1507,9 +1507,6 @@ export function PartCutsPreviewCanvas({
     [draft, previewPart, units]
   );
   const supportsHandles = supportsPreviewHandles(draft);
-  // A cut that has never been committed is still choosing its target; an
-  // existing one is changing the target it already has.
-  const isNewDraft = !!draft && !draft.featureId;
   // Panning and a wide zoom range mean the part can end up off screen. The
   // project canvas answers F and Home through these camera requests, so the
   // preview honours the same ones instead of owning a button.
@@ -1647,9 +1644,10 @@ export function PartCutsPreviewCanvas({
                 `Click to retarget this cut to the ${activeTargetLabel}.`
               ) : (
                 <>
-                  {isNewDraft
-                    ? 'Click a highlighted face, edge, or corner to choose the cut target.'
-                    : 'Click a highlighted face, edge, or corner to retarget this cut.'}
+                  {/* Always "retarget": choosing a preset commits the cut and
+                      gives it a default target before the inspector opens, so
+                      a draft never exists without one. */}
+                  Click a highlighted face, edge, or corner to retarget this cut.
                   {supportsHandles && ' Drag the handles to position and size it.'}
                 </>
               )}
