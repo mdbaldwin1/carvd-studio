@@ -486,6 +486,8 @@ export interface PartValidationIssue {
   message: string;
   severity: 'error' | 'warning';
   canBypass?: boolean; // true for glue-up panels exceeding width
+  /** The operation at fault, so an issue can be opened straight in the cuts editor. */
+  featureId?: string;
 }
 
 // Represents a single part's cut instructions

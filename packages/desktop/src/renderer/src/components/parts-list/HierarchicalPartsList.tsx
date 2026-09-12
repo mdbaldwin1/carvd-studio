@@ -1,4 +1,5 @@
 import { Badge } from '@renderer/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@renderer/components/ui/tooltip';
 import { Button } from '@renderer/components/ui/button';
 import { getFeatureBadgeLabel, getPrimaryFeatureText } from '@renderer/utils/partFeatureSummary';
 import { AlertTriangle, ChevronDown, ChevronRight, Layers } from 'lucide-react';
@@ -255,6 +256,7 @@ interface PartItemProps {
   onPartClick: (partId: string, e: React.MouseEvent) => void;
   onDuplicate: (partId: string) => void;
   onDelete: (partId: string) => void;
+  onIssueClick: (partId: string) => void;
 }
 
 const PartItem = React.memo(function PartItem({
@@ -267,12 +269,15 @@ const PartItem = React.memo(function PartItem({
   units,
   onPartClick,
   onDuplicate,
-  onDelete
+  onDelete,
+  onIssueClick
 }: PartItemProps) {
   const dimsText = `${formatMeasurementWithUnit(part.length, units)} × ${formatMeasurementWithUnit(part.width, units)} × ${formatMeasurementWithUnit(part.thickness, units)}`;
   const featureBadge = getFeatureBadgeLabel(part.features);
   const featureSummary = getPrimaryFeatureText(part.features, units);
-  const titleText = `${part.name}\n${dimsText}${featureSummary ? `\n${featureSummary}` : ''}${issueMessages ? '\n\n⚠ ' + issueMessages : ''}`;
+  // Issues get their own tooltip on the icon below, so they are left out of
+  // the row's title to avoid two tooltips saying the same thing.
+  const titleText = `${part.name}\n${dimsText}${featureSummary ? `\n${featureSummary}` : ''}`;
 
   return (
     <li
@@ -283,12 +288,25 @@ const PartItem = React.memo(function PartItem({
     >
       <span className="part-color w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: part.color }} />
       {(hasError || hasWarning) && (
-        <span
-          className={`part-warning-icon inline-flex items-center justify-center mr-1 shrink-0 ${hasError ? 'error text-danger' : 'warning text-warning'}`}
-          title={issueMessages}
-        >
-          <AlertTriangle size={12} />
-        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label={`${hasError ? 'Errors' : 'Warnings'} on ${part.name}. Open project issues.`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onIssueClick(part.id);
+              }}
+              className={`part-warning-icon inline-flex items-center justify-center mr-1 shrink-0 ${hasError ? 'error text-danger' : 'warning text-warning'}`}
+            >
+              <AlertTriangle size={12} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-xs whitespace-pre-line text-left">
+            {issueMessages}
+            <span className="mt-1 block text-text-muted">Click to open project issues</span>
+          </TooltipContent>
+        </Tooltip>
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -343,6 +361,7 @@ interface GroupItemProps {
   onGroupDoubleClick: (groupId: string) => void;
   onGroupContextMenu: (groupId: string, e: React.MouseEvent) => void;
   onExpandToggle: (groupId: string) => void;
+  onIssueClick: () => void;
 }
 
 const GroupItem = React.memo(function GroupItem({
@@ -357,7 +376,8 @@ const GroupItem = React.memo(function GroupItem({
   onGroupClick,
   onGroupDoubleClick,
   onGroupContextMenu,
-  onExpandToggle
+  onExpandToggle,
+  onIssueClick
 }: GroupItemProps) {
   return (
     <li className="list-none">
@@ -367,7 +387,7 @@ const GroupItem = React.memo(function GroupItem({
         onClick={(e) => onGroupClick(group.id, e)}
         onDoubleClick={() => onGroupDoubleClick(group.id)}
         onContextMenu={(e) => onGroupContextMenu(group.id, e)}
-        title={`${group.name} (${childCount} part${childCount === 1 ? '' : 's'})${hasChildError || hasChildWarning ? '\n\n⚠ Contains parts with validation issues' : ''}`}
+        title={`${group.name} (${childCount} part${childCount === 1 ? '' : 's'})`}
       >
         <Button
           variant="ghost"
@@ -385,12 +405,25 @@ const GroupItem = React.memo(function GroupItem({
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </Button>
         {(hasChildError || hasChildWarning) && (
-          <span
-            className={`group-warning-icon inline-flex items-center justify-center shrink-0 ${hasChildError ? 'error text-danger' : 'warning text-warning'}`}
-            title="Contains parts with validation issues"
-          >
-            <AlertTriangle size={12} />
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label={`${group.name} contains parts with issues. Open project issues.`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onIssueClick();
+                }}
+                className={`group-warning-icon inline-flex items-center justify-center shrink-0 ${hasChildError ? 'error text-danger' : 'warning text-warning'}`}
+              >
+                <AlertTriangle size={12} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="max-w-xs text-left">
+              Contains parts with {hasChildError ? 'errors' : 'warnings'}
+              <span className="mt-1 block text-text-muted">Click to open project issues</span>
+            </TooltipContent>
+          </Tooltip>
         )}
         <Layers size={14} className="text-text-muted shrink-0" />
         <span className="flex-1 truncate">{group.name}</span>
@@ -556,6 +589,10 @@ export function HierarchicalPartsList({
     [enterGroup]
   );
 
+  const openIssuesModal = useUIStore((s) => s.openIssuesModal);
+  const handleIssueClick = useCallback((partId: string) => openIssuesModal(partId), [openIssuesModal]);
+  const handleGroupIssueClick = useCallback(() => openIssuesModal(), [openIssuesModal]);
+
   const handleGroupContextMenu = useCallback(
     (groupId: string, e: React.MouseEvent) => {
       e.stopPropagation();
@@ -597,6 +634,7 @@ export function HierarchicalPartsList({
             issueMessages={issueMessages}
             units={units}
             onPartClick={onPartClick}
+            onIssueClick={handleIssueClick}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
           />
@@ -616,6 +654,7 @@ export function HierarchicalPartsList({
           onGroupClick={handleGroupClick}
           onGroupDoubleClick={handleGroupDoubleClick}
           onGroupContextMenu={handleGroupContextMenu}
+          onIssueClick={handleGroupIssueClick}
           onExpandToggle={handleExpandToggle}
         />
       );
@@ -630,7 +669,9 @@ export function HierarchicalPartsList({
       handleGroupClick,
       handleGroupDoubleClick,
       handleGroupContextMenu,
-      handleExpandToggle
+      handleExpandToggle,
+      handleIssueClick,
+      handleGroupIssueClick
     ]
   );
 
@@ -647,10 +688,15 @@ export function HierarchicalPartsList({
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto">
-      {flatItems.map((item, index) => (
-        <React.Fragment key={`${item.type}-${item.data.id}-${index}`}>{itemContent(index, item)}</React.Fragment>
-      ))}
-    </div>
+    // The rows carry issue tooltips, so the list supplies its own provider
+    // rather than depending on an ancestor that a test or future embedding
+    // may not have. Nested providers are supported and cost nothing.
+    <TooltipProvider>
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {flatItems.map((item, index) => (
+          <React.Fragment key={`${item.type}-${item.data.id}-${index}`}>{itemContent(index, item)}</React.Fragment>
+        ))}
+      </div>
+    </TooltipProvider>
   );
 }

@@ -8,6 +8,7 @@ import { AnalyticsConsentDialog } from './components/analytics/AnalyticsConsentD
 import { AppHorizontalLogo } from './components/common/AppHorizontalLogo';
 import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { AppSidebar } from './components/layout/AppSidebar';
+import { ProjectIssuesModal } from './components/layout/ProjectIssuesModal';
 import { ContextMenu } from './components/layout/ContextMenu';
 import { UndoRedoButtons } from './components/layout/UndoRedoButtons';
 import { PartCutsEditingExitDialog } from './components/part-cuts/PartCutsEditingExitDialog';
@@ -1208,6 +1209,9 @@ function App() {
             <LazyCutListModalWrapper />
           </Suspense>
         )}
+
+        {/* Project Issues Modal - self-gating on uiStore */}
+        <ProjectIssuesModal />
 
         {/* Unsaved Changes Dialog */}
         <UnsavedChangesDialogComponent />

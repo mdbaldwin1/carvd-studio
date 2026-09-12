@@ -38,6 +38,9 @@ interface UIState {
   // Modal visibility
   cutListModalOpen: boolean;
   saveAssemblyModalOpen: boolean;
+  issuesModalOpen: boolean;
+  /** When set, the issues modal opens scrolled to this part. */
+  issuesModalFocusPartId: string | null;
   selectedSidebarStockId: string | null;
 
   // Manual thumbnail capture
@@ -72,6 +75,8 @@ interface UIState {
   // Actions - Modals
   openCutListModal: () => void;
   closeCutListModal: () => void;
+  openIssuesModal: (focusPartId?: string) => void;
+  closeIssuesModal: () => void;
   openSaveAssemblyModal: () => void;
   closeSaveAssemblyModal: () => void;
   setSelectedSidebarStockId: (stockId: string | null) => void;
@@ -89,6 +94,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   pendingDeleteGroupIds: null,
   cutListModalOpen: false,
   saveAssemblyModalOpen: false,
+  issuesModalOpen: false,
+  issuesModalFocusPartId: null,
   selectedSidebarStockId: null,
   manualThumbnail: null,
 
@@ -174,6 +181,8 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   openCutListModal: () => set({ cutListModalOpen: true }),
   closeCutListModal: () => set({ cutListModalOpen: false }),
+  openIssuesModal: (focusPartId) => set({ issuesModalOpen: true, issuesModalFocusPartId: focusPartId ?? null }),
+  closeIssuesModal: () => set({ issuesModalOpen: false, issuesModalFocusPartId: null }),
 
   openSaveAssemblyModal: () => {
     const { licenseMode } = useLicenseStore.getState();

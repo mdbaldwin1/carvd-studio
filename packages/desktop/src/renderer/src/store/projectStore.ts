@@ -415,7 +415,8 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
         partName: part.name,
         type: 'feature_validation',
         message: `Operation "${featureLabel}" is invalid: ${featureIssue}`,
-        severity: 'error'
+        severity: 'error',
+        featureId: feature.id
       });
     }
 
@@ -430,7 +431,8 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
         partName: part.name,
         type: 'feature_validation',
         message: conflict.message,
-        severity: conflict.severity
+        severity: conflict.severity,
+        featureId: conflict.featureId
       });
     }
   }

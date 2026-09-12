@@ -9,6 +9,7 @@ import { EditStockModal } from '@renderer/components/stock/EditStockModal';
 import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { AssembliesSection } from '@renderer/components/layout/sidebar/AssembliesSection';
 import { PartsSection } from '@renderer/components/layout/sidebar/PartsSection';
+import { ProjectIssuesSummary } from '@renderer/components/layout/ProjectIssuesSummary';
 import { StockSection } from '@renderer/components/layout/sidebar/StockSection';
 import { CutsSection } from '@renderer/components/layout/sidebar/CutsSection';
 import { STOCK_COLORS } from '@renderer/constants';
@@ -371,6 +372,7 @@ export function AppSidebar({
       {/* Bottom Section - hidden during assembly editing */}
       {!isEditingAssembly && (
         <SidebarFooter>
+          <ProjectIssuesSummary />
           <Button size="sm" className="flex w-full justify-center" onClick={onOpenCutList}>
             {!cutList ? 'Generate Cut List' : cutList.isStale ? 'Regenerate Cut List' : 'View Cut List'}
           </Button>
