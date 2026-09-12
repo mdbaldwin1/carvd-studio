@@ -134,7 +134,6 @@ interface ActiveDragState {
 
 const _localPoint = new THREE.Vector3();
 const HANDLE_EPSILON = 0.08;
-const HANDLE_SIZE = 0.24;
 const MIN_DIMENSION = 0.125;
 const HANDLE_COLOR = '#f59e0b';
 const HANDLE_HOVER_COLOR = '#fcd34d';
@@ -210,8 +209,24 @@ function PreviewHandleControls({
   handleOverlay: EditableHandleOverlay;
   onDraftChange: (draft: FeatureDraft) => void;
 }) {
+  // The canvas handles are three.js meshes, so they have no DOM node and never
+  // reach the accessibility tree. These buttons are their keyboard and screen
+  // reader equivalent, so every handle needs one here -- including the across
+  // axis, which had no control at all.
+  const rectAxes = draft.mode === 'rect_cut' ? getRectHandleAxes(draft.cutType) : null;
+  const movesAlong = draft.mode !== 'rect_cut' || (rectAxes?.moveX ?? false);
+  const movesAcross = draft.mode !== 'rect_cut' || (rectAxes?.moveZ ?? false);
+  // A cut pinned along the length already takes Move Left/Right across the
+  // width, so a second pair would just duplicate it.
+  const showAcross = movesAlong && movesAcross;
+  const operation = handleOverlay.operationLabel ?? 'cut';
+
   return (
-    <div className="rounded-md border border-border bg-bg px-3 py-3 text-left">
+    <div
+      role="group"
+      aria-label={`Preview handle controls for ${operation}`}
+      className="rounded-md border border-border bg-bg px-3 py-3 text-left"
+    >
       <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Preview Handles</div>
       <div className="mb-2 text-sm text-text">{handleOverlay.operationLabel}</div>
       <div className="flex flex-wrap gap-2">
@@ -231,6 +246,26 @@ function PreviewHandleControls({
         >
           Move Right
         </Button>
+        {showAcross && (
+          <>
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              onClick={() => onDraftChange(nudgeDraft(part, draft, 'move', 1, 'across'))}
+            >
+              Move Back
+            </Button>
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              onClick={() => onDraftChange(nudgeDraft(part, draft, 'move', -1, 'across'))}
+            >
+              Move Front
+            </Button>
+          </>
+        )}
         {draft.mode === 'rect_cut' || draft.mode === 'rounded_cut' ? (
           <Button
             type="button"
@@ -710,8 +745,21 @@ export function applyHandleDelta(
   return nextDraft;
 }
 
-export function nudgeDraft(part: Part, draft: FeatureDraft, kind: HandleKind, direction: 1 | -1): FeatureDraft {
+export function nudgeDraft(
+  part: Part,
+  draft: FeatureDraft,
+  kind: HandleKind,
+  direction: 1 | -1,
+  axis: 'along' | 'across' = 'along'
+): FeatureDraft {
   const step = 0.25 * direction;
+  if (kind === 'move' && axis === 'across') {
+    // Round and rounded cuts place on the part's own frame, where a rising
+    // secondary moves toward the front; a rect cut places in contour space,
+    // measured from the front, so the same sign moves it the other way.
+    // Negate for the former so one button means one physical direction.
+    return applyHandleDelta(part, draft, 'move', 0, draft.mode === 'rect_cut' ? step : -step);
+  }
   if (draft.mode === 'rounded_cut' && kind !== 'move') {
     const angle = (draft.rotation * Math.PI) / 180;
     return applyHandleDelta(
@@ -739,59 +787,119 @@ export function nudgeDraft(part: Part, draft: FeatureDraft, kind: HandleKind, di
   );
 }
 
+/** Handle sizes in screen pixels, so zoom and part size cannot shrink them. */
+const HANDLE_PIXEL_RADIUS = 6;
+const HANDLE_HIT_PIXEL_RADIUS = 17;
+const MIN_HANDLE_SEPARATION_PX = 34;
+
+const _handleWorld = new THREE.Vector3();
+
 /**
- * A preview handle: what you see, plus a much larger invisible sphere that
- * actually takes the pointer.
+ * The move and resize handles, sized and separated in screen space.
  *
- * The visible dot has to stay small or it hides the cut underneath it, but a
- * ~5mm target is very easy to miss -- and a miss lands on the canvas behind,
- * which starts a camera orbit. That mode error is far worse than a slightly
- * imprecise grab, so the grab radius is roughly three times the drawn one and
- * the handle brightens and grows on hover to say it is live.
+ * Sizing them in world units meant a handle was only a few pixels wide
+ * whenever the part was large or the view zoomed out, and the resize handle
+ * sits a half-dimension from the centre -- so on a small cut the two landed on
+ * top of each other. Between them that made a grab land on resize, move, the
+ * camera, or nothing depending on a few pixels.
+ *
+ * Each handle is therefore scaled every frame to a fixed pixel radius, and a
+ * resize handle that would sit closer than MIN_HANDLE_SEPARATION_PX is pushed
+ * out along its own axis until it clears the centre. The push is presentation
+ * only: the drag still reads the pointer against the cut's real geometry.
  */
-function PreviewHandle({
-  kind,
-  position,
-  shape,
-  hovered,
-  hitRadius,
+function PreviewHandles({
+  overlay,
+  hoveredHandle,
   onHoverChange,
   onGrab
 }: {
-  kind: HandleKind;
-  position: [number, number, number];
-  shape: 'sphere' | 'box';
-  hovered: boolean;
-  hitRadius: number;
+  overlay: EditableHandleOverlay;
+  hoveredHandle: HandleKind | null;
   onHoverChange: (kind: HandleKind | null) => void;
   onGrab: (kind: HandleKind, event: ThreeEvent<PointerEvent>) => void;
 }) {
-  const grab = (event: ThreeEvent<PointerEvent>) => onGrab(kind, event);
-  const scale = hovered ? 1.35 : 1;
+  const centerRef = useRef<THREE.Group>(null);
+  const lengthRef = useRef<THREE.Group>(null);
+  const widthRef = useRef<THREE.Group>(null);
+
+  useFrame(({ camera, size }) => {
+    const perspective = camera as THREE.PerspectiveCamera;
+    const fovScale = (2 * Math.tan((perspective.fov * Math.PI) / 360)) / size.height;
+
+    const seat = (group: THREE.Group | null, base: [number, number, number] | null | undefined) => {
+      if (!group || !base) return 0;
+      group.position.set(base[0], base[1], base[2]);
+      group.getWorldPosition(_handleWorld);
+      const worldPerPixel = camera.position.distanceTo(_handleWorld) * fovScale;
+      group.scale.setScalar(worldPerPixel);
+      return worldPerPixel;
+    };
+
+    seat(centerRef.current, overlay.center);
+
+    for (const ref of [lengthRef, widthRef]) {
+      const base = ref === lengthRef ? overlay.lengthHandle : overlay.widthHandle;
+      const worldPerPixel = seat(ref.current, base);
+      if (!ref.current || !base || !overlay.center || worldPerPixel === 0) continue;
+      const dx = base[0] - overlay.center[0];
+      const dy = base[1] - overlay.center[1];
+      const dz = base[2] - overlay.center[2];
+      const spread = Math.hypot(dx, dy, dz);
+      if (spread < 1e-9) continue;
+      const minimum = MIN_HANDLE_SEPARATION_PX * worldPerPixel;
+      if (spread >= minimum) continue;
+      const push = minimum / spread;
+      ref.current.position.set(
+        overlay.center[0] + dx * push,
+        overlay.center[1] + dy * push,
+        overlay.center[2] + dz * push
+      );
+    }
+  });
+
+  const handle = (
+    kind: HandleKind,
+    ref: React.RefObject<THREE.Group | null>,
+    base: [number, number, number] | null | undefined,
+    shape: 'sphere' | 'box'
+  ) => {
+    if (!base) return null;
+    const hovered = hoveredHandle === kind;
+    const drawn = HANDLE_PIXEL_RADIUS * (hovered ? 1.35 : 1);
+    return (
+      <group ref={ref}>
+        {/* The real target: invisible, and far larger than the dot it guards. */}
+        <mesh
+          renderOrder={8}
+          onPointerDown={(event) => onGrab(kind, event)}
+          onPointerOver={(event) => {
+            event.stopPropagation();
+            onHoverChange(kind);
+          }}
+          onPointerOut={() => onHoverChange(null)}
+        >
+          <sphereGeometry args={[HANDLE_HIT_PIXEL_RADIUS, 12, 12]} />
+          <meshBasicMaterial visible={false} depthWrite={false} />
+        </mesh>
+        <mesh renderOrder={7} raycast={() => {}}>
+          {shape === 'sphere' ? (
+            <sphereGeometry args={[drawn, 18, 18]} />
+          ) : (
+            <boxGeometry args={[drawn * 1.7, drawn * 1.7, drawn * 1.7]} />
+          )}
+          <meshBasicMaterial color={hovered ? HANDLE_HOVER_COLOR : HANDLE_COLOR} depthTest={false} />
+        </mesh>
+      </group>
+    );
+  };
+
   return (
-    <group position={position}>
-      {/* The real hit target. Invisible, always the same generous size. */}
-      <mesh
-        renderOrder={8}
-        onPointerDown={grab}
-        onPointerOver={(event) => {
-          event.stopPropagation();
-          onHoverChange(kind);
-        }}
-        onPointerOut={() => onHoverChange(null)}
-      >
-        <sphereGeometry args={[hitRadius, 12, 12]} />
-        <meshBasicMaterial visible={false} depthWrite={false} />
-      </mesh>
-      <mesh renderOrder={7} raycast={() => {}}>
-        {shape === 'sphere' ? (
-          <sphereGeometry args={[HANDLE_SIZE * 0.55 * scale, 18, 18]} />
-        ) : (
-          <boxGeometry args={[HANDLE_SIZE * scale, HANDLE_SIZE * scale, HANDLE_SIZE * scale]} />
-        )}
-        <meshBasicMaterial color={hovered ? HANDLE_HOVER_COLOR : HANDLE_COLOR} />
-      </mesh>
-    </group>
+    <>
+      {handle('move', centerRef, overlay.center, 'sphere')}
+      {handle('length', lengthRef, overlay.lengthHandle, 'box')}
+      {handle('width', widthRef, overlay.widthHandle, 'box')}
+    </>
   );
 }
 
@@ -1001,26 +1109,10 @@ function PartCutsPreviewScene({
     () => getEditableHandleOverlay(previewPart, draft, previewPart.features ?? [], units),
     [draft, previewPart, units]
   );
-  // A generous grab radius, but never so generous that neighbouring handles
-  // overlap: on a small cut the centre and resize handles sit almost on top of
-  // one another, and grabbing the wrong one silently resizes a cut you meant
-  // to move. Half the nearest separation keeps them distinct.
-  const handleHitRadius = useMemo(() => {
-    const points = [handleOverlay?.center, handleOverlay?.lengthHandle, handleOverlay?.widthHandle].filter(
-      (p): p is [number, number, number] => Array.isArray(p)
-    );
-    let nearest = Infinity;
-    for (let i = 0; i < points.length; i += 1) {
-      for (let j = i + 1; j < points.length; j += 1) {
-        const dx = points[i][0] - points[j][0];
-        const dy = points[i][1] - points[j][1];
-        const dz = points[i][2] - points[j][2];
-        nearest = Math.min(nearest, Math.hypot(dx, dy, dz));
-      }
-    }
-    return clamp(nearest * 0.45, HANDLE_SIZE * 0.6, HANDLE_SIZE * 1.7);
-  }, [handleOverlay]);
-
+  const viewsUnderside =
+    !!draft &&
+    (draft.mode === 'rect_cut' || draft.mode === 'circular_cut' || draft.mode === 'rounded_cut') &&
+    draft.faceTarget === 'bottom_face';
   const groupRef = useRef<THREE.Group>(null);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const activeDragRef = useRef<ActiveDragState | null>(null);
@@ -1076,6 +1168,19 @@ function PartCutsPreviewScene({
   // it. Letting go over the side panel, or anywhere above the horizon, would
   // otherwise leave the drag live: OrbitControls stays disabled and moving the
   // cursor back over the preview with no button held keeps resizing the cut.
+  // Orbit is the default action anywhere on the canvas, so a grab that lands
+  // just outside a handle spins the camera instead -- a mode error far worse
+  // than an imprecise grab. Hovering a handle now suspends orbit, so pressing
+  // anywhere inside its generous hit area edits rather than orbits.
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls || isDraggingHandle) return;
+    controls.enabled = hoveredHandle === null;
+    return () => {
+      controls.enabled = true;
+    };
+  }, [hoveredHandle, isDraggingHandle]);
+
   useEffect(() => {
     if (!isDraggingHandle) return;
     const finishDrag = (event: PointerEvent) => {
@@ -1099,7 +1204,10 @@ function PartCutsPreviewScene({
       <directionalLight position={[maxDimension * 1.6, maxDimension * 2.1, maxDimension * 1.4]} intensity={1.1} />
       <directionalLight position={[-maxDimension * 1.2, maxDimension * 0.8, -maxDimension * 1.2]} intensity={0.45} />
 
-      <group ref={groupRef} rotation={[-0.35, 0.68, 0]}>
+      {/* Turn the board over for a cut on the underside. The preview's fixed
+          three-quarter view otherwise leaves a bottom-face cut, and every
+          handle on it, hidden beneath the board with no way to reach them. */}
+      <group ref={groupRef} rotation={[viewsUnderside ? Math.PI - 0.35 : -0.35, 0.68, 0]}>
         <mesh geometry={geometry}>
           <meshStandardMaterial color="#d6c3a1" metalness={0.05} roughness={0.82} />
           <Edges geometry={geometry} threshold={15} color="#433225" raycast={() => {}} renderOrder={4} scale={1.002} />
@@ -1131,39 +1239,12 @@ function PartCutsPreviewScene({
                 <meshBasicMaterial color={AREA_COLOR} transparent opacity={0.18} depthWrite={false} />
               </mesh>
             )}
-            {handleOverlay.center && (
-              <PreviewHandle
-                kind="move"
-                position={handleOverlay.center}
-                shape="sphere"
-                hovered={hoveredHandle === 'move'}
-                hitRadius={handleHitRadius}
-                onHoverChange={setHoveredHandle}
-                onGrab={beginDrag}
-              />
-            )}
-            {handleOverlay.lengthHandle && (
-              <PreviewHandle
-                kind="length"
-                position={handleOverlay.lengthHandle}
-                shape="box"
-                hovered={hoveredHandle === 'length'}
-                hitRadius={handleHitRadius}
-                onHoverChange={setHoveredHandle}
-                onGrab={beginDrag}
-              />
-            )}
-            {handleOverlay.widthHandle && (
-              <PreviewHandle
-                kind="width"
-                position={handleOverlay.widthHandle}
-                shape="box"
-                hovered={hoveredHandle === 'width'}
-                hitRadius={handleHitRadius}
-                onHoverChange={setHoveredHandle}
-                onGrab={beginDrag}
-              />
-            )}
+            <PreviewHandles
+              overlay={handleOverlay}
+              hoveredHandle={hoveredHandle}
+              onHoverChange={setHoveredHandle}
+              onGrab={beginDrag}
+            />
             {handleOverlay.mode === 'rect' &&
               handleOverlay.dimensionLines?.map((dim, i) => {
                 const mid: [number, number, number] = [

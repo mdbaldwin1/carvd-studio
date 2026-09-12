@@ -666,6 +666,30 @@ describe('applyHandleDelta', () => {
 describe('nudgeDraft', () => {
   const part = createTestPart({ length: 24, width: 12, thickness: 0.75 });
 
+  it('nudges across the width when asked, and keeps one physical direction for both families', () => {
+    // A rect cut places in contour space, measured from the front, so moving
+    // back raises placementZ. A round cut places on the part's own frame,
+    // where a rising secondary moves toward the front, so the same button has
+    // to lower it. Both buttons mean "toward the back".
+    const pocket = createRectDraft('mortise', { placementX: 4, placementZ: 3 });
+    const pocketBack = sameMode(pocket, nudgeDraft(part, pocket, 'move', 1, 'across'));
+    expect(pocketBack.placementZ).toBeCloseTo(3.25);
+    expect(pocketBack.placementX).toBeCloseTo(4);
+    expect(sameMode(pocket, nudgeDraft(part, pocket, 'move', -1, 'across')).placementZ).toBeCloseTo(2.75);
+
+    const hole = createCircularDraft({ placementPrimary: 6, placementSecondary: 2 });
+    const holeBack = sameMode(hole, nudgeDraft(part, hole, 'move', 1, 'across'));
+    expect(holeBack.placementSecondary).toBeCloseTo(1.75);
+    expect(holeBack.placementPrimary).toBeCloseTo(6);
+    expect(sameMode(hole, nudgeDraft(part, hole, 'move', -1, 'across')).placementSecondary).toBeCloseTo(2.25);
+  });
+
+  it('leaves a pinned axis alone when nudged across it', () => {
+    // A dado spans the board, so it has no across-width freedom to give.
+    const dado = createRectDraft('dado', { placementX: 4 });
+    expect(sameMode(dado, nudgeDraft(part, dado, 'move', 1, 'across')).placementZ).toBeCloseTo(0);
+  });
+
   it('nudges moves along the length only, matching the Move Left/Right buttons', () => {
     const draft = createRectDraft('mortise', { placementX: 4, placementZ: 3 });
 
