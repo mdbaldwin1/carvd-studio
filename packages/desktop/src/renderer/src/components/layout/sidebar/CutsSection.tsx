@@ -31,6 +31,7 @@ export function CutsSection({ isCollapsed, onOpenChange }: CutsSectionProps) {
   const {
     units,
     draftFeatures,
+    liveFeatures,
     conflictsByFeatureId,
     featureConflicts,
     operationIssues,
@@ -93,6 +94,11 @@ export function CutsSection({ isCollapsed, onOpenChange }: CutsSectionProps) {
                     <p className="text-xs italic text-text-muted">No cuts yet. Click + to add.</p>
                   ) : (
                     draftFeatures.map((feature, index) => {
+                      // The card describes what the canvas is showing, so an
+                      // open draft is read from the live list. Every action
+                      // below still keys off the saved feature's id, so
+                      // nothing is committed by merely looking at it.
+                      const displayFeature = liveFeatures.find((live) => live.id === feature.id) ?? feature;
                       const conflicts = conflictsByFeatureId.get(feature.id) ?? [];
                       const issue = operationIssues.get(feature.id);
                       return (
@@ -118,10 +124,10 @@ export function CutsSection({ isCollapsed, onOpenChange }: CutsSectionProps) {
                             <div className="flex items-start justify-between gap-3">
                               <div>
                                 <div className="text-sm font-medium text-text">
-                                  {index + 1}. {feature.label?.trim() || getFeatureSummary(feature, units)}
+                                  {index + 1}. {feature.label?.trim() || getFeatureSummary(displayFeature, units)}
                                 </div>
                                 <div className="mt-1 text-[11px] text-text-muted">
-                                  Target: {getFeatureTargetLabel(feature)}
+                                  Target: {getFeatureTargetLabel(displayFeature)}
                                 </div>
                               </div>
                               <div className="flex flex-wrap justify-end gap-1">

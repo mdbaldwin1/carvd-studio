@@ -17,6 +17,7 @@ import {
   clamp,
   computePreviewCameraFit,
   getEditableHandleOverlay,
+  quantizeHandleDraft,
   getPreviewGeometrySignature,
   nudgeDraft,
   PartCutsPreviewCanvas,
@@ -660,6 +661,46 @@ describe('applyHandleDelta', () => {
     expect(lengthened.placementX + lengthened.sizeLength).toBeCloseTo(part.length);
     if (hasWidthHandle) expect(widened.placementZ + widened.sizeWidth).toBeCloseTo(part.width);
     else expect(widened.sizeWidth).toBe(draft.sizeWidth);
+  });
+});
+
+describe('quantizeHandleDraft', () => {
+  const part = createTestPart({ length: 24, width: 12, thickness: 0.75 });
+  const onGrid = (value: number) => Math.abs(value / (1 / 64) - Math.round(value / (1 / 64))) < 1e-9;
+
+  it('lands a dragged hole on a sixty-fourth', () => {
+    // Free dragging and the boundary search produce values like
+    // 0.499999999894, which reached the inspector fields and the summaries.
+    const dragged = sameMode(
+      createCircularDraft(),
+      applyHandleDelta(part, createCircularDraft(), 'move', 2.50838590325, -1.4999999998)
+    );
+    const snapped = sameMode(dragged, quantizeHandleDraft(part, dragged));
+    expect(onGrid(snapped.placementPrimary)).toBe(true);
+    expect(onGrid(snapped.placementSecondary)).toBe(true);
+    expect(snapped.placementPrimary).toBeCloseTo(2.5, 1);
+  });
+
+  it('rounds a dragged pocket on every axis it owns', () => {
+    const dragged = sameMode(
+      createRectDraft('mortise'),
+      applyHandleDelta(part, createRectDraft('mortise'), 'move', 1.333333, 0.777777)
+    );
+    const snapped = sameMode(dragged, quantizeHandleDraft(part, dragged));
+    expect(onGrid(snapped.placementX)).toBe(true);
+    expect(onGrid(snapped.placementZ)).toBe(true);
+    expect(onGrid(snapped.sizeLength)).toBe(true);
+    expect(onGrid(snapped.sizeWidth)).toBe(true);
+  });
+
+  it('keeps the unrounded value rather than stepping past a limit', () => {
+    // Pushed hard against the end of the board: rounding outward would put the
+    // cut past the blank, so the exact boundary value has to survive.
+    const start = createCircularDraft();
+    const atEdge = sameMode(start, applyHandleDelta(part, start, 'move', 500, 0));
+    const snapped = sameMode(atEdge, quantizeHandleDraft(part, atEdge));
+    expect(snapped.placementPrimary).toBeLessThanOrEqual(part.length / 2);
+    expect(snapped.placementPrimary).toBeCloseTo(atEdge.placementPrimary, 5);
   });
 });
 

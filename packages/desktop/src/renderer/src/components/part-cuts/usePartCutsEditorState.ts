@@ -25,6 +25,7 @@ import {
 } from '@renderer/utils/endCutUtils';
 import { isTargetValidForDraft, partFeatureTargetEquals } from '@renderer/utils/partCutPicking';
 import { getAvailableMirrorActions, mirrorFeature } from '@renderer/utils/partFeatureActions';
+import { buildPreviewPart } from '@renderer/components/part-cuts/PartCutsPreviewCanvas';
 import { getPartFeatureConflicts } from '@renderer/utils/partFeatureConflicts';
 import { getPartCutsDraftStatus } from '@renderer/utils/partCutsDraftStatus';
 import { clonePartFeature } from '@renderer/utils/partFeatures';
@@ -236,9 +237,20 @@ export function usePartCutsEditorState({
     highPoint: 'top' | 'bottom'
   ): boolean => (targetFace === 'right_end' ? highPoint !== 'top' : highPoint === 'top');
 
+  // The canvas renders the open draft spliced into the saved list, so the
+  // cards and conflicts have to read the same list. Reading the saved list
+  // alone left them describing geometry that was no longer on screen: retarget
+  // a cut to another face and the summary kept naming the old face and the old
+  // conflict, and a size that had just become impossible on the new face
+  // raised nothing until the edit was committed.
+  const liveFeatures = useMemo(
+    () => buildPreviewPart(part, draftFeatures, draft).features ?? [],
+    [draft, draftFeatures, part]
+  );
+
   // Shared with the header Save button so the two cannot disagree about
   // whether this draft is savable.
-  const draftStatus = useMemo(() => getPartCutsDraftStatus(part, draftFeatures), [part, draftFeatures]);
+  const draftStatus = useMemo(() => getPartCutsDraftStatus(part, liveFeatures), [part, liveFeatures]);
   const featureConflicts = draftStatus.conflicts;
   const operationIssues = draftStatus.issues;
   const firstInvalidIndex = draftStatus.firstInvalidIndex;
@@ -541,6 +553,7 @@ export function usePartCutsEditorState({
     projectParts,
     addDowelJoint,
     draftPreviewFeature,
+    liveFeatures,
     availableCornerTargets,
     availableEdgeTargets,
     availableFaceTargets,

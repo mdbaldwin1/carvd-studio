@@ -656,6 +656,50 @@ export function getEditableHandleOverlay(
   };
 }
 
+/**
+ * Drag results land on a clean fraction.
+ *
+ * Free dragging and the boundary search both produce values like
+ * 0.499999999894 and 5.75000000067, which reach the inspector fields and the
+ * cut summaries. Rounding to a sixty-fourth is finer than the preview can
+ * show and keeps a measurement readable. If a rounded value would step past a
+ * limit the unrounded one is kept, so this can never turn a valid drag into an
+ * invalid cut.
+ */
+const HANDLE_QUANTUM = 1 / 64;
+
+export function quantizeHandleDraft(part: Part, dragged: FeatureDraft): FeatureDraft {
+  const snap = (value: number) => Math.round(value / HANDLE_QUANTUM) * HANDLE_QUANTUM;
+  let candidate: FeatureDraft;
+  if (dragged.mode === 'rect_cut') {
+    candidate = {
+      ...dragged,
+      placementX: snap(dragged.placementX),
+      placementZ: snap(dragged.placementZ),
+      sizeLength: snap(dragged.sizeLength),
+      sizeWidth: snap(dragged.sizeWidth)
+    };
+  } else if (dragged.mode === 'circular_cut') {
+    candidate = {
+      ...dragged,
+      placementPrimary: snap(dragged.placementPrimary),
+      placementSecondary: snap(dragged.placementSecondary),
+      diameter: snap(dragged.diameter)
+    };
+  } else if (dragged.mode === 'rounded_cut') {
+    candidate = {
+      ...dragged,
+      placementPrimary: snap(dragged.placementPrimary),
+      placementSecondary: snap(dragged.placementSecondary),
+      length: snap(dragged.length),
+      width: snap(dragged.width)
+    };
+  } else {
+    return dragged;
+  }
+  return isHandleDraftValid(part, candidate) ? candidate : dragged;
+}
+
 export function applyHandleDelta(
   part: Part,
   startDraft: FeatureDraft,
@@ -1152,7 +1196,12 @@ function PartCutsPreviewScene({
     // the handle's own plane, so a conversion in there would flip the nudges.
     const renderedDeltaZ = _localPoint.z - activeDrag.startPoint.z;
     const deltaZ = activeDrag.startDraft.mode === 'rect_cut' ? -renderedDeltaZ : renderedDeltaZ;
-    onDraftChange(applyHandleDelta(previewPart, activeDrag.startDraft, activeDrag.kind, deltaX, deltaZ));
+    onDraftChange(
+      quantizeHandleDraft(
+        previewPart,
+        applyHandleDelta(previewPart, activeDrag.startDraft, activeDrag.kind, deltaX, deltaZ)
+      )
+    );
   };
 
   const endDrag = (event: ThreeEvent<PointerEvent>) => {
