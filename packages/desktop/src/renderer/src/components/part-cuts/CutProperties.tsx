@@ -65,7 +65,7 @@ export function CutProperties() {
   const rectCutNote = !isRect
     ? null
     : inspectorDraft.cutType === 'cutout'
-      ? 'Face cutouts target the top or bottom face.'
+      ? 'Cutout opens through or into a face. Top and bottom cut across the board; front and back sink into its width.'
       : inspectorDraft.cutType === 'dado'
         ? 'Dado spans the full board width. Set the channel width along the blank and the blind depth.'
         : inspectorDraft.cutType === 'stopped_dado'

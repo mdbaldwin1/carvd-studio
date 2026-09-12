@@ -461,16 +461,19 @@ describe('PartCutsWorkspace', () => {
     }
   );
 
+  // Handle Z is reported on the part's own frame, where +Z is the front. It
+  // used to be negated as if it were contour space, which mirrored every round
+  // and rounded handle across the board's centreline.
   it.each([
     {
       rotation: 90,
-      lengthHandle: [0, 0.455, -1.625],
+      lengthHandle: [0, 0.455, 1.625],
       widthHandle: [-0.625, 0.455, 0]
     },
     {
       rotation: 37,
-      lengthHandle: [1.297783, 0.455, -0.977949],
-      widthHandle: [-0.376134, 0.455, -0.499147]
+      lengthHandle: [1.297783, 0.455, 0.977949],
+      widthHandle: [-0.376134, 0.455, 0.499147]
     }
   ])(
     'keeps the production rounded preview controls on authored local axes at $rotation°',
@@ -502,7 +505,7 @@ describe('PartCutsWorkspace', () => {
       });
 
       const overlay = getEditableHandleOverlay(part, buildDraftFromFeature(savedFeature), [savedFeature]);
-      expect(overlay?.center).toEqual([0, 0.455, -0]);
+      expect(overlay?.center).toEqual([0, 0.455, 0]);
       expect(overlay?.lengthHandle?.[0]).toBeCloseTo(lengthHandle[0], 5);
       expect(overlay?.lengthHandle?.[1]).toBeCloseTo(lengthHandle[1], 5);
       expect(overlay?.lengthHandle?.[2]).toBeCloseTo(lengthHandle[2], 5);

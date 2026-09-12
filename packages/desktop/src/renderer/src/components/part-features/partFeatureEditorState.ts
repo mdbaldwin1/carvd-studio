@@ -358,9 +358,24 @@ export function normalizeRectCutDraft(
     // A rabbet runs along one horizontal edge; `includes` would also match the
     // vertical corner edges and rip it the wrong way across the blank.
     const alongLength = isLengthwiseEdgeTarget(normalized.edgeTarget);
-    const shoulder = alongLength
-      ? Math.max(0.125, normalized.sizeWidth || 0.5)
-      : Math.max(0.125, normalized.sizeLength || 0.5);
+    // The shoulder lives in whichever slot the run does not: sizeWidth while
+    // the rabbet runs along the length, sizeLength while it runs across. On an
+    // orientation change the slots have to swap, so read the shoulder from the
+    // layout the draft still holds rather than the one it is moving to --
+    // otherwise switching edges reads the outgoing *run* as the new shoulder
+    // and a 1/2" rabbet silently becomes a 24" one that eats the whole face.
+    // Normalization always pins the run to exactly partLength or partWidth,
+    // so which slot holds it is unambiguous.
+    const heldAlongLength = Math.abs(normalized.sizeLength - partLength) < 1e-9;
+    const heldAcrossWidth = Math.abs(normalized.sizeWidth - partWidth) < 1e-9;
+    const previousShoulder = heldAlongLength
+      ? normalized.sizeWidth
+      : heldAcrossWidth
+        ? normalized.sizeLength
+        : alongLength
+          ? normalized.sizeWidth
+          : normalized.sizeLength;
+    const shoulder = Math.max(0.125, previousShoulder || 0.5);
     if (alongLength) {
       normalized.sizeLength = partLength;
       normalized.sizeWidth = shoulder;

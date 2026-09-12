@@ -5,6 +5,7 @@ import { useWorkspaceSceneGraph } from '../interaction/useWorkspaceSceneGraph';
 import { useClipboardStore } from '../store/clipboardStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useSnapStore } from '../store/snapStore';
+import { getRectHandleAxes } from '@renderer/components/part-cuts/PartCutsPreviewCanvas';
 import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
@@ -20,15 +21,45 @@ import { resolveRotateBatchGrounding } from '../utils/interactionMovement';
  * `placement.primary`. End cuts have no along-length placement to move.
  * Offsets never go negative, matching the inspector's own bound.
  */
-function nudgeFeatureAlong(feature: PartFeature, step: number): PartFeature {
+/**
+ * Step a cut along one of the two axes of the face it sits on.
+ *
+ * `horizontal` asks for the length axis and vertical for the width axis, but a
+ * channel pinned across one of them takes every step on the axis it does leave
+ * free -- which is what the preview's Move controls already do. Without that a
+ * groove, whose only free axis is the width, could not be nudged at all.
+ *
+ * Offsets measured from an edge cannot go negative; one measured from the
+ * centre can, so it is only clamped when its reference is an edge.
+ */
+function nudgeFeature(feature: PartFeature, horizontal: boolean, step: number): PartFeature {
   if (feature.kind === 'rect_cut') {
-    return { ...feature, placement: { ...feature.placement, x: Math.max(0, feature.placement.x + step) } };
+    const axes = getRectHandleAxes(feature.cutType);
+    const freeX = axes ? axes.moveX : true;
+    const freeZ = axes ? axes.moveZ : true;
+    const useX = horizontal ? freeX || !freeZ : !freeZ && freeX;
+    return useX
+      ? { ...feature, placement: { ...feature.placement, x: Math.max(0, feature.placement.x + step) } }
+      : { ...feature, placement: { ...feature.placement, z: Math.max(0, feature.placement.z + step) } };
   }
   if (feature.kind === 'circular_cut' || feature.kind === 'rounded_cut') {
-    return {
-      ...feature,
-      placement: { ...feature.placement, primary: Math.max(0, feature.placement.primary + step) }
-    };
+    const clampAt = (value: number, from: 'min' | 'center' | 'max' | undefined) =>
+      from === 'center' ? value : Math.max(0, value);
+    return horizontal
+      ? {
+          ...feature,
+          placement: {
+            ...feature.placement,
+            primary: clampAt(feature.placement.primary + step, feature.reference.primaryFrom)
+          }
+        }
+      : {
+          ...feature,
+          placement: {
+            ...feature.placement,
+            secondary: clampAt(feature.placement.secondary + step, feature.reference.secondaryFrom)
+          }
+        };
   }
   return feature;
 }
@@ -129,12 +160,19 @@ export function useKeyboardShortcuts() {
           break;
 
         case 'arrowleft':
-        case 'arrowright': {
-          // Nudge along the length, matching the preview's Move controls.
+        case 'arrowright':
+        case 'arrowup':
+        case 'arrowdown': {
+          // Both axes, matching the preview's Move controls. Only the
+          // horizontal pair used to be handled, so the width axis was
+          // unreachable from the keyboard and a groove could not move at all.
           if (!selected) break;
           e.preventDefault();
-          const step = (e.shiftKey ? 1 : 0.25) * (key === 'arrowright' ? 1 : -1);
-          cuts.setDraftFeatures(cuts.draftFeatures.map((f) => (f.id === selected.id ? nudgeFeatureAlong(f, step) : f)));
+          const horizontal = key === 'arrowleft' || key === 'arrowright';
+          const step = (e.shiftKey ? 1 : 0.25) * (key === 'arrowright' || key === 'arrowup' ? 1 : -1);
+          cuts.setDraftFeatures(
+            cuts.draftFeatures.map((f) => (f.id === selected.id ? nudgeFeature(f, horizontal, step) : f))
+          );
           break;
         }
 

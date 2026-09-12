@@ -579,9 +579,12 @@ describe('applyHandleDelta', () => {
     const rotated = createRoundedDraft('rounded_rectangle', { rotation: 90 });
     const lengthened = sameMode(rotated, applyHandleDelta(part, rotated, 'length', 0, 1));
     expect(lengthened.length).toBeCloseTo(rotated.length + 1);
+    // At 90 degrees the opening's long axis lies along the frame's secondary
+    // axis, so its end handle sits at +length/2 -- on the opening. It used to
+    // be reported mirrored across the board's centreline.
     const overlay = getEditableHandleOverlay(part, rotated);
     expect(overlay?.lengthHandle?.[0]).toBeCloseTo(0);
-    expect(overlay?.lengthHandle?.[2]).toBeCloseTo(-rotated.length / 2);
+    expect(overlay?.lengthHandle?.[2]).toBeCloseTo(rotated.length / 2);
   });
 
   it('clamps rounded moves and resizes at the exact physical edge', () => {
