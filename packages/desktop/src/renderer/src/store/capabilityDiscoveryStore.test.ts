@@ -146,6 +146,18 @@ describe('dismiss', () => {
     expect(useCapabilityDiscoveryStore.getState().usage.dismissed).toEqual(['snap_guides']);
   });
 
+  it('can be taken back when it was a slip', async () => {
+    await useCapabilityDiscoveryStore.getState().dismiss('snap_guides');
+    await useCapabilityDiscoveryStore.getState().undismiss('snap_guides');
+    expect(useCapabilityDiscoveryStore.getState().usage.dismissed).toEqual([]);
+  });
+
+  it('ignores taking back something that was never refused', async () => {
+    setPreference.mockClear();
+    await useCapabilityDiscoveryStore.getState().undismiss('snap_guides');
+    expect(setPreference).not.toHaveBeenCalled();
+  });
+
   it('does not record the same refusal twice', async () => {
     await useCapabilityDiscoveryStore.getState().dismiss('snap_guides');
     setPreference.mockClear();

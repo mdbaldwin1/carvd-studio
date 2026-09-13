@@ -31,6 +31,8 @@ interface CapabilityDiscoveryState {
   markSuggested: () => Promise<void>;
   /** Stop offering this one, for good. */
   dismiss: (capability: Capability) => Promise<void>;
+  /** Take back a refusal, for when it was a misclick. */
+  undismiss: (capability: Capability) => Promise<void>;
 }
 
 async function persist(next: StoredShape): Promise<void> {
@@ -84,6 +86,17 @@ export const useCapabilityDiscoveryStore = create<CapabilityDiscoveryState>((set
 
   markSuggested: async () => {
     const usage = { ...get().usage, lastSuggestedAt: new Date().toISOString() };
+    set({ usage });
+    await persist({ usage, seen: get().seen });
+  },
+
+  undismiss: async (capability) => {
+    const current = get().usage;
+    if (!current.dismissed.includes(capability)) return;
+    const usage = {
+      ...current,
+      dismissed: current.dismissed.filter((entry) => entry !== capability)
+    };
     set({ usage });
     await persist({ usage, seen: get().seen });
   },

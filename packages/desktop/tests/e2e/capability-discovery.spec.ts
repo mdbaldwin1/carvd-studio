@@ -69,8 +69,9 @@ test.describe('capability discovery', () => {
     await expect(pitch).toBeVisible();
     await expect(window.getByRole('button', { name: 'Show me how' })).toBeVisible();
 
-    // Shown once, then it waits a week: the stamp is what makes it weekly
-    // rather than every time the start screen is opened.
+    // The week is spent only once the card has genuinely been on screen for
+    // long enough to read, so a card that flashes past during a reload or a
+    // launch straight into a recent project does not use it up.
     await expect
       .poll(async () =>
         window.evaluate(async () => {
@@ -81,6 +82,26 @@ test.describe('capability discovery', () => {
         })
       )
       .not.toBeNull();
+  });
+
+  test('can take back a refusal made by mistake', async () => {
+    const { window } = running;
+    await seedSeasonedUsage();
+
+    await window.getByRole('button', { name: "Don't suggest this" }).click();
+    await expect(window.getByText(/Guides won't be suggested again/)).toBeVisible();
+    await window.getByRole('button', { name: 'Undo' }).click();
+
+    await expect
+      .poll(async () =>
+        window.evaluate(async () => {
+          const stored = (await window.electronAPI.getPreference('capabilityUsage')) as {
+            usage?: { dismissed?: string[] };
+          } | null;
+          return stored?.usage?.dismissed ?? null;
+        })
+      )
+      .toEqual([]);
   });
 
   test('stays gone once it is turned down, across a restart', async () => {

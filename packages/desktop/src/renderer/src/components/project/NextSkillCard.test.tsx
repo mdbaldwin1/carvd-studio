@@ -1,5 +1,5 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useCapabilityDiscoveryStore } from '@renderer/store/capabilityDiscoveryStore';
 import { EMPTY_CAPABILITY_USAGE, type CapabilityUsage } from '@renderer/utils/capabilityDiscovery';
@@ -9,15 +9,60 @@ const getPreference = vi.fn();
 const setPreference = vi.fn();
 const openExternal = vi.fn();
 
+/** Observers created by the card, so a test can say what is on screen. */
+let observers: Array<{ callback: IntersectionObserverCallback; disconnected: boolean }> = [];
+
+class TestIntersectionObserver {
+  constructor(private callback: IntersectionObserverCallback) {
+    observers.push({ callback, disconnected: false });
+  }
+  observe = (): void => {};
+  unobserve = (): void => {};
+  disconnect = (): void => {
+    const entry = observers.find((candidate) => candidate.callback === this.callback);
+    if (entry) entry.disconnected = true;
+  };
+  takeRecords = (): IntersectionObserverEntry[] => [];
+  root = null;
+  rootMargin = '';
+  thresholds = [];
+}
+
+/** Tell the card whether it is on screen. */
+function setOnScreen(isIntersecting: boolean): void {
+  act(() => {
+    for (const observer of observers) {
+      if (!observer.disconnected) {
+        observer.callback([{ isIntersecting } as IntersectionObserverEntry], null as never);
+      }
+    }
+  });
+}
+
+/** Let the impression timer run out. */
+function waitOutImpression(): void {
+  act(() => {
+    vi.advanceTimersByTime(2000);
+  });
+}
+
 beforeAll(() => {
   window.electronAPI = { getPreference, setPreference, openExternal } as never;
 });
 
 beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  observers = [];
+  vi.stubGlobal('IntersectionObserver', TestIntersectionObserver);
   getPreference.mockReset().mockResolvedValue(undefined);
   setPreference.mockReset().mockResolvedValue(undefined);
   openExternal.mockReset();
   useCapabilityDiscoveryStore.setState({ usage: EMPTY_CAPABILITY_USAGE, seen: {}, loaded: false });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 /** Someone with six projects behind them who has never dropped a guide plane. */
@@ -58,7 +103,48 @@ describe('NextSkillCard', () => {
     getPreference.mockResolvedValue({ usage: seasoned(), seen: {} });
     render(<NextSkillCard />);
     await screen.findByText('Guides');
+
+    setOnScreen(true);
+    waitOutImpression();
     await waitFor(() => expect(useCapabilityDiscoveryStore.getState().usage.lastSuggestedAt).toBeTruthy());
+  });
+
+  it('does not spend the week on a card nobody saw', async () => {
+    // Mounting behind another window, scrolled out of view, or flashing past
+    // on the way into a recent project is not a suggestion delivered.
+    getPreference.mockResolvedValue({ usage: seasoned(), seen: {} });
+    render(<NextSkillCard />);
+    await screen.findByText('Guides');
+
+    setOnScreen(false);
+    waitOutImpression();
+    expect(useCapabilityDiscoveryStore.getState().usage.lastSuggestedAt).toBeUndefined();
+  });
+
+  it('does not spend the week on a glance too brief to read', async () => {
+    getPreference.mockResolvedValue({ usage: seasoned(), seen: {} });
+    render(<NextSkillCard />);
+    await screen.findByText('Guides');
+
+    setOnScreen(true);
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    setOnScreen(false);
+    waitOutImpression();
+    expect(useCapabilityDiscoveryStore.getState().usage.lastSuggestedAt).toBeUndefined();
+  });
+
+  it('does not spend the week while the window is hidden', async () => {
+    getPreference.mockResolvedValue({ usage: seasoned(), seen: {} });
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    render(<NextSkillCard />);
+    await screen.findByText('Guides');
+
+    setOnScreen(true);
+    waitOutImpression();
+    expect(useCapabilityDiscoveryStore.getState().usage.lastSuggestedAt).toBeUndefined();
+    visibility.mockRestore();
   });
 
   it('opens the right page of the docs', async () => {
@@ -71,7 +157,7 @@ describe('NextSkillCard', () => {
   it('goes away for now without holding it against the capability', async () => {
     getPreference.mockResolvedValue({ usage: seasoned(), seen: {} });
     render(<NextSkillCard />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Not now' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Maybe later' }));
     await waitFor(() => expect(screen.queryByText('Guides')).toBeNull());
     expect(useCapabilityDiscoveryStore.getState().usage.dismissed).toEqual([]);
   });
@@ -97,7 +183,26 @@ describe('NextSkillCard', () => {
     // Two dismissals that differ only in wording read as clutter on a card
     // whose whole job is to be easy to wave away.
     expect(screen.queryByRole('button', { name: 'Hide suggestion' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Not now' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Maybe later' })).toBeTruthy();
+  });
+
+  it('lets a misclicked refusal be taken back', async () => {
+    // "Don't suggest this" is for good, which is exactly why it needs a way
+    // back when it was a slip.
+    getPreference.mockResolvedValue({ usage: seasoned(), seen: {} });
+    render(<NextSkillCard />);
+    await userEvent.click(await screen.findByRole('button', { name: /don.t suggest this/i }));
+    await waitFor(() => expect(useCapabilityDiscoveryStore.getState().usage.dismissed).toEqual(['snap_guides']));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(useCapabilityDiscoveryStore.getState().usage.dismissed).toEqual([]));
+  });
+
+  it('gives the suggestion a region a screen reader can find', async () => {
+    getPreference.mockResolvedValue({ usage: seasoned(), seen: {} });
+    render(<NextSkillCard />);
+    expect(await screen.findByRole('region', { name: 'Guides' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Guides' })).toBeTruthy();
   });
 
   it('holds still once shown, even as the store settles', async () => {
