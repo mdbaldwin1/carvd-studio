@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { CircularPattern, PartFeature } from '../types';
+import type { CircularPattern, PartFeature, RectCutFeature } from '../types';
 import { duplicateFeature } from '../components/part-features/partFeatureEditorState';
 import { mirrorFeature } from '../utils/partFeatureActions';
 import { useCameraStore } from './cameraStore';
@@ -380,6 +380,75 @@ describe('partCutsEditingStore', () => {
       });
       expect(redoneDuplicate?.pattern).not.toBe(redoneOriginal?.pattern);
       expect(redoneDuplicate?.parameters.counterbore).not.toBe(redoneOriginal?.parameters.counterbore);
+    });
+  });
+
+  describe('clean and dirty against the saved cuts', () => {
+    // A stopped dado exactly as it comes back out of a .carvd file, with the key
+    // order JSON.parse produces.
+    const fromFile = JSON.parse(
+      JSON.stringify({
+        id: 'cut-1',
+        kind: 'rect_cut',
+        version: 1,
+        enabled: true,
+        cutType: 'stopped_dado',
+        label: 'Shelf dado',
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        parameters: { size: { length: 8, width: 12 }, depthMode: 'blind', depth: 0.25 },
+        placement: { x: 6, z: 0 }
+      })
+    ) as RectCutFeature;
+
+    /** The same cut, written by the editor rather than read from the file. */
+    const rebuilt = (length: number): RectCutFeature =>
+      ({
+        kind: 'rect_cut',
+        id: 'cut-1',
+        version: 1,
+        enabled: true,
+        cutType: 'stopped_dado',
+        label: 'Shelf dado',
+        placement: { x: 6, z: 0 },
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        parameters: { size: { length, width: 12 }, depthMode: 'blind', depth: 0.25 }
+      }) as RectCutFeature;
+
+    it('opens clean', () => {
+      usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Side', [fromFile]);
+      expect(usePartCutsEditingStore.getState().hasUnsavedDraftChanges([fromFile])).toBe(false);
+    });
+
+    it('goes clean again when a resize is undone', () => {
+      usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Side', [fromFile]);
+      usePartCutsEditingStore.getState().setDraftFeatures([rebuilt(10)]);
+      expect(usePartCutsEditingStore.getState().hasUnsavedDraftChanges([fromFile])).toBe(true);
+
+      usePartCutsEditingStore.getState().undoDraft();
+      expect(usePartCutsEditingStore.getState().hasUnsavedDraftChanges([fromFile])).toBe(false);
+    });
+
+    it('does not call a cut changed for being written in a different key order', () => {
+      // The editor rebuilds a cut as a fresh object every time it writes one, so
+      // comparing serialised text would leave a session dirty for good and an
+      // exit prompt that cannot be answered honestly.
+      usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Side', [fromFile]);
+      usePartCutsEditingStore.getState().setDraftFeatures([rebuilt(8)]);
+      expect(usePartCutsEditingStore.getState().hasUnsavedDraftChanges([fromFile])).toBe(false);
+    });
+
+    it('still notices a real change', () => {
+      usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Side', [fromFile]);
+      usePartCutsEditingStore.getState().setDraftFeatures([rebuilt(8.0625)]);
+      expect(usePartCutsEditingStore.getState().hasUnsavedDraftChanges([fromFile])).toBe(true);
+    });
+
+    it('notices a cut being removed or added', () => {
+      usePartCutsEditingStore.getState().startEditingPartCuts('part-1', 'Side', [fromFile]);
+      usePartCutsEditingStore.getState().setDraftFeatures([]);
+      expect(usePartCutsEditingStore.getState().hasUnsavedDraftChanges([fromFile])).toBe(true);
     });
   });
 });

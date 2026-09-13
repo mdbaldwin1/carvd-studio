@@ -77,7 +77,7 @@ export function CutProperties() {
               : inspectorDraft.cutType === 'stopped_groove'
                 ? 'Stopped groove uses a limited run and explicit placement. Set run length, groove width, offsets, and blind depth.'
                 : inspectorDraft.cutType === 'mortise'
-                  ? 'Mortise is a blind face pocket. Set pocket size, placement, and blind depth.'
+                  ? 'Mortise is a face pocket for a tenon. Set pocket size and placement, and choose a blind depth or take it through for a wedged or exposed tenon.'
                   : inspectorDraft.cutType === 'tenon'
                     ? 'Tenon leaves a tongue on the end, centred in the board thickness. Size it to the mortise it fits — the board length already includes the tenon, so no extra allowance is needed.'
                     : null;

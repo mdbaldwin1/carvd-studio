@@ -6,6 +6,8 @@ import {
   formatMeasurementWithUnit,
   parseInput,
   decimalToFraction,
+  decimalToExactFraction,
+  formatFabricationMeasurement,
   fractionToDecimal
 } from './fractions';
 
@@ -284,5 +286,39 @@ describe('Real-world woodworking scenarios', () => {
     const spacing = fractionToDecimal('1 7/16');
     expect(spacing).toBeCloseTo(1.4375, 4);
     expect(decimalToFraction(spacing!)).toBe('1 7/16');
+  });
+});
+
+describe('exact 32nds and 64ths', () => {
+  it.each([
+    [0.78125, '25/32'],
+    [3.984375, '3 63/64'],
+    [3.03125, '3 1/32'],
+    [2.984375, '2 63/64'],
+    [0.015625, '1/64'],
+    [0.75, '3/4']
+  ])('writes %p as %s rather than rounding it away', (value, expected) => {
+    // These are the values a mortise-and-tenon project actually produces, and
+    // a woodworker can find every one of them on a rule.
+    expect(decimalToExactFraction(value)).toBe(expected);
+    expect(decimalToFraction(value)).toBe(expected);
+    expect(formatFabricationMeasurement(value, 'imperial')).toBe(`${expected}"`);
+  });
+
+  it('refuses to call a value a fraction it is not', () => {
+    // 0.7813 is near 25/32 but is not 25/32, and a shop measurement that is
+    // only nearly right is worse than one written as a decimal.
+    expect(decimalToExactFraction(0.7813)).toBeNull();
+    expect(formatFabricationMeasurement(0.7813, 'imperial')).toBe('0.7813"');
+  });
+
+  it('still rounds an unrepresentable value for ordinary display', () => {
+    expect(decimalToFraction(0.7813)).toBe('13/16');
+  });
+
+  it('handles negatives and whole numbers', () => {
+    expect(decimalToExactFraction(-0.78125)).toBe('-25/32');
+    expect(decimalToExactFraction(4)).toBe('4');
+    expect(decimalToExactFraction(Number.NaN)).toBeNull();
   });
 });

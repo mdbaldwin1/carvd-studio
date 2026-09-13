@@ -180,9 +180,28 @@ const BLIND_ONLY_RECT_CUT_TYPES: RectCutFeature['cutType'][] = [
   'stopped_dado',
   'rabbet',
   'groove',
-  'stopped_groove',
-  'mortise'
+  'stopped_groove'
 ];
+
+/**
+ * Cuts that start blind but may be taken through.
+ *
+ * A mortise is usually blind, and that is what a new one should be. But a
+ * through mortise is an ordinary joint -- a wedged tenon needs one -- and
+ * forcing it to be drawn as a Cutout instead costs the cut its identity in the
+ * summary and the cut list, and the joint any chance of being understood as
+ * one. Through mortises are only available on the top and bottom faces, since
+ * a pocket cut into an edge has nowhere to come out.
+ */
+const BLIND_BY_DEFAULT_RECT_CUT_TYPES: RectCutFeature['cutType'][] = [...BLIND_ONLY_RECT_CUT_TYPES, 'mortise'];
+
+/** Whether this cut, as targeted, can only ever be blind. */
+export function rectCutIsBlindOnly(cutType: RectCutFeature['cutType'], faceTarget?: FaceTarget): boolean {
+  if (BLIND_ONLY_RECT_CUT_TYPES.includes(cutType)) return true;
+  // A pocket cut into the front or back face runs across the thickness, so it
+  // has no far side to break out of.
+  return cutType === 'mortise' && (faceTarget === 'front_face' || faceTarget === 'back_face');
+}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -220,7 +239,7 @@ function getDefaultRectDraft(cutType: RectCutFeature['cutType']): Extract<Featur
           : cutType === 'stopped_dado'
             ? 0
             : 0.75,
-    depthMode: BLIND_ONLY_RECT_CUT_TYPES.includes(cutType) ? 'blind' : 'through',
+    depthMode: BLIND_BY_DEFAULT_RECT_CUT_TYPES.includes(cutType) ? 'blind' : 'through',
     depth: 0.25,
     placementX: 0,
     placementZ: 0
@@ -255,7 +274,7 @@ export function normalizeRectCutDraft(
     return normalized;
   };
 
-  normalized.depthMode = BLIND_ONLY_RECT_CUT_TYPES.includes(normalized.cutType) ? 'blind' : normalized.depthMode;
+  normalized.depthMode = rectCutIsBlindOnly(normalized.cutType, normalized.faceTarget) ? 'blind' : normalized.depthMode;
   normalized.depth = sanitizeFinite(normalized.depth, 0.25);
   if (normalized.depthMode === 'blind') {
     normalized.depth = clamp(

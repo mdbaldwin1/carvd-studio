@@ -15,7 +15,8 @@ import {
   isEdgeBevelTarget,
   normalizeEndCutDraft,
   normalizeRectCutDraft,
-  OperationPreset
+  OperationPreset,
+  rectCutIsBlindOnly
 } from '@renderer/components/part-features/partFeatureEditorState';
 import { PartFeature, PartFeatureTarget } from '@renderer/types';
 import {
@@ -513,8 +514,7 @@ export function usePartCutsEditorState({
       : inspectorDraft.sizeLength
     : null;
   const inspectorUsesBlindOnlyDepth =
-    inspectorDraft?.mode === 'rect_cut' &&
-    ['dado', 'stopped_dado', 'rabbet', 'groove', 'stopped_groove', 'mortise'].includes(inspectorDraft.cutType);
+    inspectorDraft?.mode === 'rect_cut' && rectCutIsBlindOnly(inspectorDraft.cutType, inspectorDraft.faceTarget);
   const inspectorHidesDepthSelector =
     inspectorUsesBlindOnlyDepth ||
     (inspectorDraft?.mode === 'rect_cut' &&

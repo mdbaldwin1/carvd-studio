@@ -335,7 +335,7 @@ describe('rectCutUtils', () => {
       expect(resolved.parameters.size.length).toBe(24);
     });
 
-    it('forces blind depth for stopped grooves and mortises without moving placement', () => {
+    it('forces blind depth for stopped grooves, and lets a mortise go through, without moving placement', () => {
       const stoppedGroove = getResolvedRectCutFeature(
         createRectCut({
           cutType: 'stopped_groove',
@@ -349,12 +349,15 @@ describe('rectCutUtils', () => {
       expect(stoppedGroove.parameters.depthMode).toBe('blind');
       expect(stoppedGroove.placement).toEqual({ x: 4, z: 2 });
 
+      // A mortise on a face keeps the depth it was given: a wedged tenon
+      // needs a through mortise, and one that resolves to blind would be
+      // machined shut while the inspector says otherwise.
       const mortise = getResolvedRectCutFeature(
         createRectCut({ cutType: 'mortise', depthMode: 'through', placement: { x: 3, z: 1 } }),
         PART
       );
       expect(mortise.target).toEqual({ type: 'face', face: 'top_face' });
-      expect(mortise.parameters.depthMode).toBe('blind');
+      expect(mortise.parameters.depthMode).toBe('through');
       expect(mortise.placement).toEqual({ x: 3, z: 1 });
     });
 
@@ -855,5 +858,68 @@ describe('regressions from the 2026-09-09 pre-release review', () => {
     expect(getRectCutPlanBounds(notch('top_left_edge'), part).minX).toBeCloseTo(0);
     expect(getRectCutPlanBounds(notch('top_right_edge'), part).maxX).toBeCloseTo(part.length);
     expect(getRectCutPlanBounds(notch('top_back_edge'), part).maxZ).toBeCloseTo(part.width);
+  });
+});
+
+describe('through mortises', () => {
+  it('accepts a mortise taken through a face', () => {
+    // A wedged through tenon needs one, and authoring it as a Cutout instead
+    // costs the cut its identity in the summary and the cut list.
+    expect(
+      validateRectCutFeature(
+        createRectCut({
+          cutType: 'mortise',
+          target: { type: 'face', face: 'top_face' },
+          size: { length: 2, width: 1 },
+          depthMode: 'through',
+          placement: { x: 4, z: 3 }
+        }),
+        PART
+      )
+    ).toBeNull();
+  });
+
+  it('keeps a pocket cut into an edge face blind', () => {
+    // Cut into the front face, a pocket runs across the thickness and has no
+    // far side to come out of. The editor does not offer Through there, and a
+    // file that asks for it is settled quietly rather than refused.
+    const sideFace = createRectCut({
+      cutType: 'mortise',
+      target: { type: 'face', face: 'front_face' },
+      size: { length: 2, width: 0.5 },
+      depthMode: 'through',
+      placement: { x: 4, z: 0.125 }
+    });
+    expect(getResolvedRectCutFeature(sideFace, PART).parameters.depthMode).toBe('blind');
+    expect(validateRectCutFeature(sideFace, PART)).toBeNull();
+  });
+
+  it('cuts a through mortise through, rather than quietly leaving it blind', () => {
+    // The resolver is what the preview and the cut list read, so a mortise
+    // that says through has to resolve that way or the board is machined
+    // blind while the inspector claims otherwise.
+    const through = createRectCut({
+      cutType: 'mortise',
+      target: { type: 'face', face: 'top_face' },
+      size: { length: 2, width: 1 },
+      depthMode: 'through',
+      placement: { x: 4, z: 3 }
+    });
+    expect(getResolvedRectCutFeature(through, PART).parameters.depthMode).toBe('through');
+  });
+
+  it('still refuses a mortise that would remove the whole blank', () => {
+    expect(
+      validateRectCutFeature(
+        createRectCut({
+          cutType: 'mortise',
+          target: { type: 'face', face: 'top_face' },
+          size: { length: 24, width: 8 },
+          depthMode: 'through',
+          placement: { x: 0, z: 0 }
+        }),
+        PART
+      )
+    ).toBe('This cut removes the entire blank. Reduce its size so some material remains.');
   });
 });

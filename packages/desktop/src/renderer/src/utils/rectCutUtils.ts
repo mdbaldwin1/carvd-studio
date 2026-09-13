@@ -211,12 +211,18 @@ export function getResolvedRectCutFeature(
   if (feature.cutType === 'mortise') {
     const target =
       feature.target.type === 'face' ? { type: 'face' as const, face: feature.target.face } : feature.target;
+    // A mortise is usually blind but may be taken through, as a wedged or
+    // exposed tenon needs. Cut into the front or back face it runs across the
+    // thickness, where there is no far side to come out of, so that stays
+    // blind whatever was authored.
+    const sideFace = target.type === 'face' && (target.face === 'front_face' || target.face === 'back_face');
+    const depthMode = sideFace ? 'blind' : feature.parameters.depthMode;
     return {
       ...cloneRectCutFeature(feature),
       target,
       parameters: {
         ...feature.parameters,
-        depthMode: 'blind',
+        depthMode,
         depth: feature.parameters.depth
       }
     };
@@ -435,7 +441,8 @@ export function validateRectCutFeature(
     ) {
       return 'Mortise must target the top, bottom, front, or back face.';
     }
-    if (resolvedFeature.parameters.depthMode !== 'blind') return 'Mortise currently uses blind depth only.';
+    // A through mortise is an ordinary joint. Side-face pockets are still
+    // blind-only, which the shared pocket rules below enforce.
   }
 
   if (

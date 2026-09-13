@@ -50,11 +50,42 @@ export function formatMeasurementWithUnit(inches: number, units: 'imperial' | 'm
   return `${decimalToFraction(inches)}"`;
 }
 
+/**
+ * The finest division a rule is marked in, and the limit of what is worth
+ * writing as a fraction.
+ */
+const FINEST_DENOMINATOR = 64;
+
+/**
+ * Write a measurement as a fraction only if it is exactly one.
+ *
+ * Returns null rather than the nearest fraction. A shop measurement of 25/32
+ * is a real dimension a woodworker can find on a rule, but 0.7813 is not 25/32
+ * and must never be shown as though it were.
+ */
+export function decimalToExactFraction(decimal: number, maxDenominator = FINEST_DENOMINATOR): string | null {
+  if (!Number.isFinite(decimal)) return null;
+  if (decimal < 0) {
+    const magnitude = decimalToExactFraction(-decimal, maxDenominator);
+    return magnitude === null ? null : `-${magnitude}`;
+  }
+  const scaled = decimal * maxDenominator;
+  if (Math.abs(scaled - Math.round(scaled)) > 1e-9) return null;
+
+  const whole = Math.floor(decimal + 1e-9);
+  const parts = Math.round((decimal - whole) * maxDenominator);
+  if (parts === 0) return String(whole);
+
+  const divisor = gcd(parts, maxDenominator);
+  const fraction = `${parts / divisor}/${maxDenominator / divisor}`;
+  return whole === 0 ? fraction : `${whole} ${fraction}`;
+}
+
 /** Fabrication must not round a clearance or a bit size to a nearby fraction. */
 export function formatFabricationMeasurement(inches: number, units: 'imperial' | 'metric'): string {
   if (units === 'metric') return `${Number((inches * INCHES_TO_MM).toPrecision(12))}mm`;
-  const exactSixteenth = Math.abs(inches * 16 - Math.round(inches * 16)) < 1e-9;
-  return `${exactSixteenth ? decimalToFraction(inches) : Number(inches.toPrecision(12))}"`;
+  const exact = decimalToExactFraction(inches);
+  return `${exact ?? Number(inches.toPrecision(12))}"`;
 }
 
 /**
@@ -102,10 +133,16 @@ export function decimalToFraction(decimal: number): string {
     return '-' + decimalToFraction(-decimal);
   }
 
+  // A value that is exactly a 32nd or a 64th is a dimension in its own right,
+  // and rounding it to the nearest 16th would report a size that is off by as
+  // much as a 32nd -- on the canvas, next to the cut it describes.
+  const exact = decimalToExactFraction(decimal);
+  if (exact !== null) return exact;
+
   const wholePart = Math.floor(decimal);
   const fractionalPart = decimal - wholePart;
 
-  // Convert to 16ths and round to nearest
+  // Anything finer than the rule is marked still rounds to the nearest 16th.
   const sixteenths = Math.round(fractionalPart * 16);
 
   // Handle case where rounding gives us 16/16

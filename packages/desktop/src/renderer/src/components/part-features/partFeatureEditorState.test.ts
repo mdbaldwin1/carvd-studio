@@ -143,13 +143,30 @@ describe('partFeatureEditorState', () => {
     });
 
     it('replaces non-positive or non-finite blind depths with usable values', () => {
-      expect(normalizeRectCutDraft(createRectDraft({ cutType: 'mortise', depth: 0 }), PART_DEFAULTS).depth).toBe(0.25);
+      // Stated outright rather than relying on the cut type to force it: a
+      // mortise may now be taken through, so only a blind one is sanitised.
+      const blindMortise = (depth: number) => createRectDraft({ cutType: 'mortise', depthMode: 'blind', depth });
+      expect(normalizeRectCutDraft(blindMortise(0), PART_DEFAULTS).depth).toBe(0.25);
+      expect(normalizeRectCutDraft(blindMortise(Number.NaN), PART_DEFAULTS).depth).toBe(0.25);
+      expect(normalizeRectCutDraft(blindMortise(0.01), PART_DEFAULTS).depth).toBe(0.125);
+    });
+
+    it('lets a mortise be taken through, but not one cut into an edge', () => {
+      // A wedged tenon needs a through mortise, and drawing it as a Cutout
+      // instead costs the cut its identity everywhere it is later described.
       expect(
-        normalizeRectCutDraft(createRectDraft({ cutType: 'mortise', depth: Number.NaN }), PART_DEFAULTS).depth
-      ).toBe(0.25);
-      expect(normalizeRectCutDraft(createRectDraft({ cutType: 'mortise', depth: 0.01 }), PART_DEFAULTS).depth).toBe(
-        0.125
-      );
+        normalizeRectCutDraft(createRectDraft({ cutType: 'mortise', depthMode: 'through' }), PART_DEFAULTS).depthMode
+      ).toBe('through');
+      // A pocket cut into the front face runs across the thickness and has no
+      // far side to break out of.
+      expect(
+        normalizeRectCutDraft(
+          createRectDraft({ cutType: 'mortise', faceTarget: 'front_face', depthMode: 'through' }),
+          PART_DEFAULTS
+        ).depthMode
+      ).toBe('blind');
+      // A new mortise is still blind, which is what one usually is.
+      expect(normalizeRectCutDraft(createRectDraft({ cutType: 'mortise' }), PART_DEFAULTS).depth).toBeGreaterThan(0);
     });
 
     it('sanitizes sizes and negative offsets but preserves malformed offsets for explicit correction', () => {

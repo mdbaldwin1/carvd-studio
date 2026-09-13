@@ -4,8 +4,38 @@ import { clearPartGeometryCache } from '../utils/partFeatureGeometry';
 import { clonePartFeatures } from '../utils/partFeatures';
 import { useCameraStore } from './cameraStore';
 
+/**
+ * Deep equality that does not care what order an object's keys are written in.
+ *
+ * The editor rebuilds a cut as a fresh object whenever it writes one, and the
+ * keys land in the order that code happens to use rather than the order the
+ * file was read in. Comparing the serialised text would then call a cut that
+ * has been put back exactly as it was "changed", leaving a session dirty with
+ * no way back to clean and an exit prompt that cannot be honestly answered.
+ * Feature order within the list is real and is still respected.
+ */
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) {
+    // NaN never equals itself, and two absent depths must still compare equal.
+    return Number.isNaN(a) && Number.isNaN(b);
+  }
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, index) => valuesEqual(item, b[index]));
+  }
+  const aKeys = Object.keys(a as Record<string, unknown>);
+  const bKeys = Object.keys(b as Record<string, unknown>);
+  if (aKeys.length !== bKeys.length) return false;
+  return aKeys.every(
+    (key) =>
+      Object.prototype.hasOwnProperty.call(b, key) &&
+      valuesEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])
+  );
+}
+
 function featuresEqual(a: PartFeature[], b: PartFeature[]): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return valuesEqual(a, b);
 }
 
 interface PartCutsEditingState {
