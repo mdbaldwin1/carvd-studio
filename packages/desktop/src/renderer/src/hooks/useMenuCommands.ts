@@ -45,6 +45,7 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
   // Store options in a ref so the effect doesn't re-run when they change.
   // The handler always reads the latest options via the ref.
   const optionsRef = useRef(options);
+  const saveCommandBusyRef = useRef(false);
   optionsRef.current = options;
 
   useEffect(() => {
@@ -144,6 +145,7 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
         }
 
         case 'save-project': {
+          if (saveCommandBusyRef.current) break;
           if (opts.isEditingPartCuts && opts.onSavePartCuts) {
             await opts.onSavePartCuts();
             break;
@@ -158,16 +160,22 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
             break;
           }
           // Normal project save
-          const result = await saveProject();
-          if (result.success) {
-            showToast('Project saved', 'success');
-          } else if (result.error) {
-            showToast(result.error, 'error');
+          saveCommandBusyRef.current = true;
+          try {
+            const result = await saveProject();
+            if (result.success) {
+              showToast('Project saved', 'success');
+            } else if (result.error) {
+              showToast(result.error, 'error');
+            }
+          } finally {
+            saveCommandBusyRef.current = false;
           }
           break;
         }
 
         case 'save-project-as': {
+          if (saveCommandBusyRef.current) break;
           // "Save As" doesn't apply to focused editing modes
           if (opts.isEditingPartCuts) {
             if (opts.onSavePartCutsAs) await opts.onSavePartCutsAs();
@@ -182,11 +190,16 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
             showToast('Use "Save Assembly" to save assembly changes', 'info');
             break;
           }
-          const result = await saveProjectAs();
-          if (result.success) {
-            showToast('Project saved', 'success');
-          } else if (result.error) {
-            showToast(result.error, 'error');
+          saveCommandBusyRef.current = true;
+          try {
+            const result = await saveProjectAs();
+            if (result.success) {
+              showToast('Project saved', 'success');
+            } else if (result.error) {
+              showToast(result.error, 'error');
+            }
+          } finally {
+            saveCommandBusyRef.current = false;
           }
           break;
         }

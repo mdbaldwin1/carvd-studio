@@ -354,14 +354,19 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
     }
 
     // Normal project save
-    const result = await saveProject();
-    if (result.success) {
-      showToast('Project saved', 'success');
-      refreshRecentProjects();
-    } else if (result.error) {
-      showToast(`Error saving: ${result.error}`, 'error');
+    dialogSavingRef.current = true;
+    try {
+      const result = await saveProject();
+      if (result.success) {
+        showToast('Project saved', 'success');
+        refreshRecentProjects();
+      } else if (result.error) {
+        showToast(`Error saving: ${result.error}`, 'error');
+      }
+      // If canceled, do nothing
+    } finally {
+      dialogSavingRef.current = false;
     }
-    // If canceled, do nothing
   }, [
     showToast,
     refreshRecentProjects,
@@ -387,14 +392,19 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       return;
     }
 
-    const result = await saveProjectAs();
-    if (result.success) {
-      showToast('Project saved', 'success');
-      refreshRecentProjects();
-    } else if (result.error) {
-      showToast(`Error saving: ${result.error}`, 'error');
+    dialogSavingRef.current = true;
+    try {
+      const result = await saveProjectAs();
+      if (result.success) {
+        showToast('Project saved', 'success');
+        refreshRecentProjects();
+      } else if (result.error) {
+        showToast(`Error saving: ${result.error}`, 'error');
+      }
+      // If canceled, do nothing
+    } finally {
+      dialogSavingRef.current = false;
     }
-    // If canceled, do nothing
   }, [
     showToast,
     refreshRecentProjects,

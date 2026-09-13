@@ -207,6 +207,24 @@ describe('useMenuCommands', () => {
       expect(showToast).toHaveBeenCalledWith('Project saved', 'success');
     });
 
+    it('ignores a repeated native-menu save while the first save is unresolved', async () => {
+      let finishSave!: (value: { success: boolean; canceled?: boolean }) => void;
+      (saveProject as ReturnType<typeof vi.fn>).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finishSave = resolve;
+          })
+      );
+      renderHook(() => useMenuCommands());
+
+      const first = menuCommandHandler('save-project');
+      await menuCommandHandler('save-project');
+      expect(saveProject).toHaveBeenCalledTimes(1);
+
+      finishSave({ success: false, canceled: true });
+      await first;
+    });
+
     it('routes save-project to part cuts save when active', async () => {
       const onSavePartCuts = vi.fn();
 

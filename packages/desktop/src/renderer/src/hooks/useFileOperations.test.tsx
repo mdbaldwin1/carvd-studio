@@ -487,6 +487,31 @@ describe('useFileOperations', () => {
       expect(showToast).toHaveBeenCalledWith('Project saved', 'success');
     });
 
+    it('ignores another save while the current save dialog is unresolved', async () => {
+      let finishSave!: (value: { success: boolean; canceled?: boolean }) => void;
+      vi.mocked(saveProject).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finishSave = resolve;
+          })
+      );
+      const { result } = renderHook(() => useFileOperations());
+
+      let first!: Promise<void>;
+      act(() => {
+        first = result.current.handleSave();
+      });
+      await act(async () => {
+        await result.current.handleSave();
+      });
+      expect(saveProject).toHaveBeenCalledTimes(1);
+
+      finishSave({ success: false, canceled: true });
+      await act(async () => {
+        await first;
+      });
+    });
+
     it('shows error toast on save failure', async () => {
       (saveProject as ReturnType<typeof vi.fn>).mockResolvedValue({
         success: false,

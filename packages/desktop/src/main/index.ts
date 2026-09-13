@@ -274,6 +274,11 @@ const windows: Set<BrowserWindow> = new Set();
 // Track windows that are allowed to close (after user confirmed or chose to discard)
 const windowsAllowedToClose: Set<BrowserWindow> = new Set();
 
+// Native file choosers must belong to the renderer window that requested them.
+// Keeping one chooser per WebContents also prevents repeated shortcuts from
+// creating a backlog of native dialogs while the first chooser is unresolved.
+const pendingSaveDialogs = new Map<number, Promise<Electron.SaveDialogReturnValue>>();
+
 // Electron cancels app.quit() when a close listener prevents the first close.
 // Keep the user's intent until every window approves, or any renderer cancels.
 let quitRequested = false;
@@ -443,6 +448,26 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     }
   });
 
+  let recoveringRenderer = false;
+  newWindow.webContents.on('render-process-gone', (_event, details) => {
+    log.error(`[Main] Renderer exited (${details.reason}, code ${details.exitCode}); reloading document window`);
+    if (details.reason === 'clean-exit' || recoveringRenderer || newWindow.isDestroyed()) return;
+    recoveringRenderer = true;
+    pendingSaveDialogs.delete(newWindow.webContents.id);
+    // A reload preserves the BrowserWindow and lets the renderer's existing
+    // auto-recovery flow offer the latest recoverable document state.
+    newWindow.webContents.reload();
+  });
+  newWindow.webContents.on('did-finish-load', () => {
+    recoveringRenderer = false;
+  });
+  newWindow.on('unresponsive', () => {
+    log.error('[Main] Document window became unresponsive');
+  });
+  newWindow.on('responsive', () => {
+    log.info('[Main] Document window became responsive again');
+  });
+
   // Fallback: force-show after 5s if ready-to-show never fires.
   // Works around Electron bug on Windows where titleBarOverlay + show:false
   // can prevent the event from firing (electron/electron#42409).
@@ -523,20 +548,39 @@ ipcMain.handle('set-preference', (_event, key: string, value: unknown) => {
   store.set(key as keyof typeof store.store, value as never);
 });
 
-ipcMain.handle('show-save-dialog', async (_event, options) => {
+ipcMain.handle('show-save-dialog', async (event, options) => {
   const queuedResult = getQueuedTestSaveDialogResult();
   if (queuedResult) {
     return queuedResult;
   }
-  return dialog.showSaveDialog(options);
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) {
+    throw new Error('Cannot show Save dialog without an active document window');
+  }
+  const existing = pendingSaveDialogs.get(event.sender.id);
+  if (existing) return existing;
+
+  const pending = showSaveDialog(win, options);
+  pendingSaveDialogs.set(event.sender.id, pending);
+  try {
+    return await pending;
+  } finally {
+    if (pendingSaveDialogs.get(event.sender.id) === pending) {
+      pendingSaveDialogs.delete(event.sender.id);
+    }
+  }
 });
 
-ipcMain.handle('show-open-dialog', async (_event, options) => {
+ipcMain.handle('show-open-dialog', async (event, options) => {
   const queuedResult = getQueuedTestOpenDialogResult();
   if (queuedResult) {
     return queuedResult;
   }
-  return dialog.showOpenDialog(options);
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) {
+    throw new Error('Cannot show Open dialog without an active document window');
+  }
+  return showOpenDialog(win, options);
 });
 
 ipcMain.handle('queue-test-save-dialog-path', (_event, filePath: string | null) => {

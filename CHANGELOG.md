@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed a macOS first-save failure where an unowned native file dialog and a renderer exit could leave Electron consuming excessive CPU and swap; save dialogs are now window-owned and single-flight, with renderer recovery logging and reload behavior.
+
 ### Added
 
 - **Round cuts and editable hole patterns** — Custom Cuts now supports through and blind round holes, angled bores, countersinks, counterbores, rounded openings, and linear, grid, or circular hole patterns with validated 3D geometry and unit-aware fabrication instructions.
