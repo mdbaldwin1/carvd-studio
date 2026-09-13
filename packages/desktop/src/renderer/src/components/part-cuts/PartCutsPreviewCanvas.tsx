@@ -1,6 +1,16 @@
 import { Edges, Html, Line, OrbitControls } from '@react-three/drei';
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import {
+  getCutFaceBox,
+  getCutSnapThreshold,
+  getFaceSizes,
+  faceCoordinateToReference,
+  referenceToFaceCoordinate,
+  resolveCutSnap,
+  type CutFaceBox,
+  type CutSnapGuide
+} from '@renderer/utils/cutSnap';
+import {
   buildFeatureFromDraft,
   CircularCutDraft,
   FeatureDraft,
@@ -10,7 +20,8 @@ import {
 } from '@renderer/components/part-features/partFeatureEditorState';
 import { Button } from '@renderer/components/ui/button';
 import { CardDescription } from '@renderer/components/ui/card';
-import { Part, PartFeature, PartFeatureTarget } from '@renderer/types';
+import { useAppSettings } from '@renderer/hooks/useAppSettings';
+import { AppSettings, Part, PartFeature, PartFeatureTarget } from '@renderer/types';
 import { getPartEndCutProfiles } from '@renderer/utils/endCutUtils';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import {
@@ -137,6 +148,9 @@ const HANDLE_EPSILON = 0.08;
 const MIN_DIMENSION = 0.125;
 const HANDLE_COLOR = '#f59e0b';
 const HANDLE_HOVER_COLOR = '#fcd34d';
+// Distinct from the amber handles and the dimension lines: a guide explains a
+// pull, it is not a measurement.
+const SNAP_GUIDE_COLOR = '#38bdf8';
 const AREA_COLOR = '#2563eb';
 
 /**
@@ -668,6 +682,97 @@ export function getEditableHandleOverlay(
  */
 const HANDLE_QUANTUM = 1 / 64;
 
+/**
+ * Pull a dragged cut onto the nearest anchor on its face.
+ *
+ * Returns the adjusted draft and the guides that explain the pull, so the
+ * canvas can show why a cut stopped where it did. A cut that snaps keeps the
+ * anchor's exact value rather than being rounded afterwards: landing on the
+ * centre of a board means the centre, not the nearest sixty-fourth to it.
+ */
+function applyCutSnap(
+  part: Part,
+  dragged: FeatureDraft,
+  otherFeatures: PartFeature[],
+  settings: AppSettings
+): { draft: FeatureDraft; guides: CutSnapGuide[] } {
+  if (dragged.mode === 'end_cut') return { draft: dragged, guides: [] };
+  const moving = getCutFaceBox(part, buildFeatureFromDraft(dragged));
+  if (!moving) return { draft: dragged, guides: [] };
+
+  const others = otherFeatures
+    .filter((feature) => feature.enabled && feature.id !== dragged.featureId)
+    .map((feature) => getCutFaceBox(part, feature))
+    .filter((box): box is CutFaceBox => box !== null);
+
+  const { primaryDelta, secondaryDelta, guides } = resolveCutSnap({
+    part,
+    moving,
+    others,
+    settings,
+    threshold: getCutSnapThreshold(part, settings.snapSensitivity),
+    movingEdges: dragged.mode === 'circular_cut' ? ['center'] : undefined
+  });
+  if (primaryDelta === 0 && secondaryDelta === 0) return { draft: dragged, guides };
+
+  if (dragged.mode === 'rect_cut') {
+    return {
+      draft: {
+        ...dragged,
+        placementX: dragged.placementX + primaryDelta,
+        placementZ: dragged.placementZ + secondaryDelta
+      },
+      guides
+    };
+  }
+  const sizes = getFaceSizes(part);
+  const feature = buildFeatureFromDraft(dragged);
+  const primary = referenceToFaceCoordinate(dragged.placementPrimary, sizes.primary, feature.reference.primaryFrom);
+  const secondary = referenceToFaceCoordinate(
+    dragged.placementSecondary,
+    sizes.secondary,
+    feature.reference.secondaryFrom
+  );
+  return {
+    draft: {
+      ...dragged,
+      placementPrimary: faceCoordinateToReference(primary + primaryDelta, sizes.primary, feature.reference.primaryFrom),
+      placementSecondary: faceCoordinateToReference(
+        secondary + secondaryDelta,
+        sizes.secondary,
+        feature.reference.secondaryFrom
+      )
+    },
+    guides
+  };
+}
+
+/** Take each axis from the snapped draft or the rounded one, per what caught. */
+function mergeSnappedAxes(rounded: FeatureDraft, snapped: FeatureDraft, guides: CutSnapGuide[]): FeatureDraft {
+  const caughtPrimary = guides.some((guide) => guide.axis === 'primary');
+  const caughtSecondary = guides.some((guide) => guide.axis === 'secondary');
+  if (!caughtPrimary && !caughtSecondary) return rounded;
+  if (rounded.mode === 'rect_cut' && snapped.mode === 'rect_cut') {
+    return {
+      ...rounded,
+      placementX: caughtPrimary ? snapped.placementX : rounded.placementX,
+      placementZ: caughtSecondary ? snapped.placementZ : rounded.placementZ
+    };
+  }
+  if (
+    (rounded.mode === 'circular_cut' || rounded.mode === 'rounded_cut') &&
+    snapped.mode === rounded.mode &&
+    (snapped.mode === 'circular_cut' || snapped.mode === 'rounded_cut')
+  ) {
+    return {
+      ...rounded,
+      placementPrimary: caughtPrimary ? snapped.placementPrimary : rounded.placementPrimary,
+      placementSecondary: caughtSecondary ? snapped.placementSecondary : rounded.placementSecondary
+    };
+  }
+  return rounded;
+}
+
 export function quantizeHandleDraft(part: Part, dragged: FeatureDraft): FeatureDraft {
   const snap = (value: number) => Math.round(value / HANDLE_QUANTUM) * HANDLE_QUANTUM;
   let candidate: FeatureDraft;
@@ -1162,6 +1267,8 @@ function PartCutsPreviewScene({
   const activeDragRef = useRef<ActiveDragState | null>(null);
   const [isDraggingHandle, setIsDraggingHandle] = useState(false);
   const [hoveredHandle, setHoveredHandle] = useState<HandleKind | null>(null);
+  const [snapGuides, setSnapGuides] = useState<CutSnapGuide[]>([]);
+  const { settings: appSettings } = useAppSettings();
 
   const beginDrag = (kind: HandleKind, event: ThreeEvent<PointerEvent>) => {
     if (!supportsPreviewHandles(draft)) return;
@@ -1196,12 +1303,20 @@ function PartCutsPreviewScene({
     // the handle's own plane, so a conversion in there would flip the nudges.
     const renderedDeltaZ = _localPoint.z - activeDrag.startPoint.z;
     const deltaZ = activeDrag.startDraft.mode === 'rect_cut' ? -renderedDeltaZ : renderedDeltaZ;
-    onDraftChange(
-      quantizeHandleDraft(
-        previewPart,
-        applyHandleDelta(previewPart, activeDrag.startDraft, activeDrag.kind, deltaX, deltaZ)
-      )
-    );
+    const moved = applyHandleDelta(previewPart, activeDrag.startDraft, activeDrag.kind, deltaX, deltaZ);
+    // Only a move is pulled onto an anchor. Snapping a resize to a board's
+    // centreline is not something a maker asks for, and it would fight the
+    // size handles.
+    const snapped =
+      activeDrag.kind === 'move'
+        ? applyCutSnap(previewPart, moved, previewPart.features ?? [], appSettings)
+        : { draft: moved, guides: [] as CutSnapGuide[] };
+    setSnapGuides(snapped.guides);
+    // The axis that caught an anchor keeps that anchor's exact value, so
+    // landing on the centre of a board means the centre. The other axis is
+    // still a free drag and is rounded, or it would carry the raw pointer
+    // float into the measurements.
+    onDraftChange(mergeSnappedAxes(quantizeHandleDraft(previewPart, moved), snapped.draft, snapped.guides));
   };
 
   const endDrag = (event: ThreeEvent<PointerEvent>) => {
@@ -1210,6 +1325,7 @@ function PartCutsPreviewScene({
     event.stopPropagation();
     activeDragRef.current = null;
     setIsDraggingHandle(false);
+    setSnapGuides([]);
     if (controlsRef.current) controlsRef.current.enabled = true;
   };
 
@@ -1237,6 +1353,7 @@ function PartCutsPreviewScene({
       if (activeDrag && activeDrag.pointerId !== event.pointerId) return;
       activeDragRef.current = null;
       setIsDraggingHandle(false);
+      setSnapGuides([]);
       if (controlsRef.current) controlsRef.current.enabled = true;
     };
     window.addEventListener('pointerup', finishDrag);
@@ -1294,6 +1411,40 @@ function PartCutsPreviewScene({
               onHoverChange={setHoveredHandle}
               onGrab={beginDrag}
             />
+            {snapGuides.map((guide, i) => {
+              // A guide spans the face across the axis it locks, drawn in the
+              // part's own coordinates: the primary axis runs along the board's
+              // length, the secondary across its width. Rendered Z is the
+              // negated contour axis, the same convention the rect overlay uses.
+              const y = handleOverlay.center?.[1] ?? previewPart.thickness / 2 + HANDLE_EPSILON;
+              const alongLength = guide.axis === 'primary';
+              const at = guide.position - (alongLength ? previewPart.length : previewPart.width) / 2;
+              const half = (alongLength ? previewPart.width : previewPart.length) / 2;
+              const start: [number, number, number] = alongLength ? [at, y, -half] : [-half, y, -at];
+              const end: [number, number, number] = alongLength ? [at, y, half] : [half, y, -at];
+              return (
+                <group key={`snap-${i}`}>
+                  <Line
+                    points={[start, end]}
+                    color={SNAP_GUIDE_COLOR}
+                    lineWidth={1.5}
+                    renderOrder={9}
+                    depthWrite={false}
+                    dashed
+                    dashSize={0.12}
+                    gapSize={0.08}
+                  />
+                  <Html position={start} center zIndexRange={[0, 60]} style={{ pointerEvents: 'none' }}>
+                    <div
+                      className="whitespace-nowrap rounded px-1 py-0.5 text-[9px] font-semibold shadow-sm"
+                      style={{ backgroundColor: SNAP_GUIDE_COLOR, color: '#fff' }}
+                    >
+                      {guide.label}
+                    </div>
+                  </Html>
+                </group>
+              );
+            })}
             {handleOverlay.mode === 'rect' &&
               handleOverlay.dimensionLines?.map((dim, i) => {
                 const mid: [number, number, number] = [
