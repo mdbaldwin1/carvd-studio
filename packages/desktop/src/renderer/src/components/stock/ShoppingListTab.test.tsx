@@ -254,6 +254,7 @@ describe('ShoppingListTab', () => {
       render(<ShoppingListTab {...defaultProps} />);
       const checkboxes = screen.getAllByRole('checkbox');
       expect(checkboxes[0]).not.toBeChecked();
+      expect(screen.getByRole('checkbox', { name: 'Mark Plywood as purchased' })).toBeInTheDocument();
     });
 
     it('toggles checkbox on click', () => {

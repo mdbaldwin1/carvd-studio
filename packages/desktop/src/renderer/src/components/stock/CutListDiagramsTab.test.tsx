@@ -152,6 +152,21 @@ describe('CutListDiagramsTab', () => {
       expect(screen.getByText('Plywood - Board #1')).toBeInTheDocument();
     });
 
+    it('opens board detail from the keyboard and identifies placements with full dimensions', async () => {
+      const user = userEvent.setup();
+      render(<CutListDiagramsTab {...defaultProps} />);
+
+      const board = screen.getByRole('button', { name: 'Open Board #1 cutting diagram details' });
+      board.focus();
+      await user.keyboard('{Enter}');
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      const placement = screen.getByRole('button', { name: 'Top, 24" × 12"' });
+      placement.focus();
+      await user.keyboard(' ');
+      expect(screen.getByText(/Selected: Top \(24" x 12"\)/)).toBeInTheDocument();
+    });
+
     it('renders utilization percentage', () => {
       render(<CutListDiagramsTab {...defaultProps} />);
       expect(screen.getByText('8.8% used')).toBeInTheDocument();
@@ -503,22 +518,19 @@ describe('CutListDiagramsTab', () => {
       const zoomLabel = () => document.querySelector('span.min-w-14')!;
       expect(zoomLabel().textContent).toBe('100%');
 
-      const buttons = screen.getAllByRole('button');
-      const plus = buttons.find((b) => b.querySelector('svg.lucide-plus'));
-      const minus = buttons.find((b) => b.querySelector('svg.lucide-minus'));
-      expect(plus).toBeDefined();
-      expect(minus).toBeDefined();
+      const plus = screen.getByRole('button', { name: 'Zoom in' });
+      const minus = screen.getByRole('button', { name: 'Zoom out' });
 
-      await user.click(plus!);
+      await user.click(plus);
       expect(zoomLabel().textContent).toBe('125%');
 
-      await user.click(minus!);
-      await user.click(minus!);
+      await user.click(minus);
+      await user.click(minus);
       expect(zoomLabel().textContent).toBe('75%');
 
       // Clamp at the minimum
-      await user.click(minus!);
-      await user.click(minus!);
+      await user.click(minus);
+      await user.click(minus);
       expect(zoomLabel().textContent).toBe('50%');
 
       await user.click(screen.getByRole('button', { name: 'Reset' }));

@@ -132,7 +132,8 @@ export function CutListDiagramsTab({
               {cutList.stockBoards.length} board{cutList.stockBoards.length !== 1 ? 's' : ''} needed
             </span>
             <span className="text-[11px] text-text-muted">
-              Diagrams show blank breakdown only. Apply operations after cutting blanks to size.
+              Select a board for part dimensions and detail. Diagrams show blank breakdown only; apply operations after
+              cutting blanks to size.
             </span>
           </div>
           <DropdownButton label="Download" icon={<Download size={14} />} items={downloadItems} />
@@ -178,11 +179,21 @@ export function CutListDiagramsTab({
             <div className="flex-1 min-h-0 flex flex-col gap-3 px-5 py-4 bg-bg-alt">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-text-muted">Zoom</span>
-                <Button size="sm" variant="secondary" onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  aria-label="Zoom out"
+                  onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
+                >
                   <Minus size={14} />
                 </Button>
                 <span className="min-w-14 text-center text-xs font-medium">{Math.round(zoom * 100)}%</span>
-                <Button size="sm" variant="secondary" onClick={() => setZoom((z) => Math.min(4, z + 0.25))}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  aria-label="Zoom in"
+                  onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
+                >
                   <Plus size={14} />
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setZoom(1)}>

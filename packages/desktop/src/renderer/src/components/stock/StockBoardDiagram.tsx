@@ -76,6 +76,19 @@ export function StockBoardDiagram({
         className
       )}
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `Open Board #${board.boardIndex} cutting diagram details` : undefined}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
     >
       <div className="flex items-center gap-3 py-2 px-3 bg-bg text-[12px]">
         <span className="font-semibold text-text">Board #{board.boardIndex}</span>
@@ -120,9 +133,11 @@ export function StockBoardDiagram({
           const rotatedOffset = Math.max(7, partLabelFontSize * 0.85);
           const canRenderRotatedLabel =
             placement.rotated && ph >= partLabelFontSize + rotatedLabelFontSize + PART_LABEL_VERTICAL_PADDING;
+          const placementDescription = `${placement.partName}, ${formatMeasurementWithUnit(placement.width, units)} × ${formatMeasurementWithUnit(placement.height, units)}${placement.rotated ? ', rotated' : ''}`;
 
           return (
             <g key={placement.partId}>
+              <title>{placementDescription}</title>
               <rect
                 x={px}
                 y={py}
@@ -132,11 +147,25 @@ export function StockBoardDiagram({
                 stroke={selectedPartId === placement.partId ? '#ffffff' : '#333'}
                 strokeWidth={selectedPartId === placement.partId ? 1.5 : 0.5}
                 className={onPlacementClick ? 'cursor-pointer' : undefined}
+                role={onPlacementClick ? 'button' : undefined}
+                tabIndex={onPlacementClick ? 0 : undefined}
+                aria-label={onPlacementClick ? placementDescription : undefined}
                 onClick={
                   onPlacementClick
                     ? (e) => {
                         e.stopPropagation();
                         onPlacementClick(placement);
+                      }
+                    : undefined
+                }
+                onKeyDown={
+                  onPlacementClick
+                    ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onPlacementClick(placement);
+                        }
                       }
                     : undefined
                 }

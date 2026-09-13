@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added descriptive accessible names to stock and custom-item shopping-list checkboxes.
+
+- Made cutting-diagram boards and parts keyboard accessible, added descriptive part tooltips, named the zoom controls, and clarified how to open diagram details.
+
 - Fixed dimension and rotation edits being silently discarded when overlap prevention blocks the change; the editor now explains why the update was rejected.
 
 - Clarify that cut-list board counts describe optimized boards used while board-foot totals include purchasing overage.
