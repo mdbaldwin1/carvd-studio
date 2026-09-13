@@ -364,8 +364,8 @@ describe('CutListModal', () => {
       render(<CutListModal {...defaultProps} />);
 
       expect(screen.getByText('Parts')).toBeInTheDocument();
-      expect(screen.getByText('Boards')).toBeInTheDocument();
-      expect(screen.getByText('Board Feet')).toBeInTheDocument();
+      expect(screen.getByText('Boards Used')).toBeInTheDocument();
+      expect(screen.getByText('Purchase Board Feet')).toBeInTheDocument();
       expect(screen.getByText('Waste')).toBeInTheDocument();
       expect(screen.getByText('Est. Cost')).toBeInTheDocument();
     });
