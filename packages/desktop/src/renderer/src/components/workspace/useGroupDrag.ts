@@ -285,8 +285,9 @@ export function useGroupDrag(
         const settings = useAppSettingsStore.getState().settings;
         if (settings.liveGridSnap) {
           // Quantize along virtual group drag basis instead of world axes.
-          uAmount = snapToGrid(uAmount);
-          vAmount = snapToGrid(vAmount);
+          const gridSize = useProjectStore.getState().gridSize;
+          uAmount = snapToGrid(uAmount, gridSize);
+          vAmount = snapToGrid(vAmount, gridSize);
         }
 
         const projectedDelta = _groupProjectedV

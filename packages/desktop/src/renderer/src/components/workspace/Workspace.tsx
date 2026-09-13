@@ -2,7 +2,6 @@ import { Grid, OrbitControls } from '@react-three/drei';
 import { ThreeEvent, useThree } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { GRID_SIZE } from '../../constants';
 import { useProjectStore } from '../../store/projectStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useInteractionStore } from '../../store/interactionStore';
@@ -111,6 +110,8 @@ export function Workspace() {
   };
 
   const parts = useProjectStore((s) => s.parts);
+  // The drawn grid is the grid everything snaps to, so it reads the same value.
+  const gridSize = useProjectStore((s) => s.gridSize);
   const units = useProjectStore((s) => s.units);
   const groupMembers = useProjectStore((s) => s.groupMembers);
   // ADR-005: overlay model derivation reads snap state here once instead of
@@ -1134,7 +1135,7 @@ export function Workspace() {
       {showGrid && (
         <Grid
           args={[200, 200]}
-          cellSize={GRID_SIZE}
+          cellSize={gridSize}
           cellThickness={0.5}
           cellColor={effectiveTheme === 'light' ? '#c0b8a8' : '#4a4a4a'}
           sectionSize={12}

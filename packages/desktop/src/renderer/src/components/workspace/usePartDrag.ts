@@ -443,8 +443,9 @@ export function usePartDrag(
 
         if (useAppSettingsStore.getState().settings.liveGridSnap) {
           // Quantize movement along the drag plane's virtual basis (part-aligned at angles).
-          uAmount = snapToGrid(uAmount);
-          vAmount = snapToGrid(vAmount);
+          const gridSize = useProjectStore.getState().gridSize;
+          uAmount = snapToGrid(uAmount, gridSize);
+          vAmount = snapToGrid(vAmount, gridSize);
         }
 
         const projectedDelta = _tempProjectedDelta.current
@@ -765,7 +766,12 @@ export function usePartDrag(
         const rawZ = lastDragPosition.current.z;
 
         const gridReleasePosition = {
-          ...resolveLiveGridReleasePosition({ x: rawX, y: rawY, z: rawZ }, wasSnappedByParts.current, liveGridSnap),
+          ...resolveLiveGridReleasePosition(
+            { x: rawX, y: rawY, z: rawZ },
+            wasSnappedByParts.current,
+            liveGridSnap,
+            useProjectStore.getState().gridSize
+          ),
           // This drag runs on the ground plane, so Y is never a drag axis and
           // must not be quantized on release. On stock that is not a multiple
           // of the grid (18mm = 0.7087") that nudges the part into the one

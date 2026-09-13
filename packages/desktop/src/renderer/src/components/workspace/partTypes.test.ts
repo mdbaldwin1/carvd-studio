@@ -16,6 +16,34 @@ import {
 // ============================================================
 
 describe('partTypes', () => {
+  describe('the project grid', () => {
+    it('rounds to whatever increment the project carries', () => {
+      // Grid Size used to govern only arrow-key nudging: dragging, resizing
+      // and the drawn grid were all pinned to a sixteenth regardless.
+      expect(snapToGrid(3.92, 1 / 4)).toBeCloseTo(4);
+      expect(snapToGrid(3.92, 1 / 8)).toBeCloseTo(3.875);
+      expect(snapToGrid(3.92, 1 / 32)).toBeCloseTo(3.90625);
+    });
+
+    it('falls back to the sixteenth for a caller with no project in hand', () => {
+      expect(snapToGrid(3.92)).toBeCloseTo(snapToGrid(3.92, 1 / 16));
+    });
+
+    it('ignores a nonsensical increment rather than dividing by zero', () => {
+      expect(snapToGrid(3.92, 0)).toBeCloseTo(snapToGrid(3.92, 1 / 16));
+      expect(snapToGrid(3.92, -1)).toBeCloseTo(snapToGrid(3.92, 1 / 16));
+    });
+
+    it('carries the increment through to the release position', () => {
+      const free = { x: false, y: false, z: false };
+      expect(resolveLiveGridReleasePosition({ x: 3.92, y: 1.1, z: 0.3 }, free, true, 1 / 4)).toEqual({
+        x: 4,
+        y: 1,
+        z: 0.25
+      });
+    });
+  });
+
   describe('snapToGrid', () => {
     it('snaps exact grid values to themselves', () => {
       expect(snapToGrid(0)).toBe(0);

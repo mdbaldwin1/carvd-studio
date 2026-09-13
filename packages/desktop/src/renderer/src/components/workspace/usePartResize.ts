@@ -218,17 +218,18 @@ export function usePartResize(
 
     // Preserve live snapped dimensions on commit; otherwise fall back to grid snapping.
     const snappedDimensions = snappedDimensionsRef.current;
+    const gridSize = useProjectStore.getState().gridSize;
     let newLength = Math.min(
       maxLength,
-      Math.max(0.5, snappedDimensions.length ? liveDims.length : snapToGrid(liveDims.length))
+      Math.max(0.5, snappedDimensions.length ? liveDims.length : snapToGrid(liveDims.length, gridSize))
     );
     let newWidth = Math.min(
       maxWidth,
-      Math.max(0.5, snappedDimensions.width ? liveDims.width : snapToGrid(liveDims.width))
+      Math.max(0.5, snappedDimensions.width ? liveDims.width : snapToGrid(liveDims.width, gridSize))
     );
     let newThickness = Math.min(
       maxThickness,
-      Math.max(0.25, snappedDimensions.thickness ? liveDims.thickness : snapToGrid(liveDims.thickness))
+      Math.max(0.25, snappedDimensions.thickness ? liveDims.thickness : snapToGrid(liveDims.thickness, gridSize))
     );
 
     _tempLocalOffset.current.set(
@@ -242,9 +243,9 @@ export function usePartResize(
     let newY = partPos.y + _tempWorldOffset.current.y;
     let newZ = partPos.z + _tempWorldOffset.current.z;
 
-    newX = snapToGrid(newX);
-    newY = snapToGrid(newY);
-    newZ = snapToGrid(newZ);
+    newX = snapToGrid(newX, gridSize);
+    newY = snapToGrid(newY, gridSize);
+    newZ = snapToGrid(newZ, gridSize);
 
     // ADR-006: ground clamp runs through the constraint pipeline. The
     // groundConstraint computes the resized part's world-space minY via the
