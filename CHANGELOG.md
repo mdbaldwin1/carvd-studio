@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed dimension and rotation edits being silently discarded when overlap prevention blocks the change; the editor now explains why the update was rejected.
+
 - Clarify that cut-list board counts describe optimized boards used while board-foot totals include purchasing overage.
 
 - Fixed a macOS first-save failure where an unowned native file dialog and a renderer exit could leave Electron consuming excessive CPU and swap; save dialogs are now window-owned and single-flight, with renderer recovery logging and reload behavior.

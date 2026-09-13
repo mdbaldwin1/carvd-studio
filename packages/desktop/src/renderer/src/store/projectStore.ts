@@ -259,6 +259,15 @@ function maybeShowOverlapClampToast() {
   useUIStore.getState().showToast('Movement limited to avoid overlap', 'info', { duration: 1200 });
 }
 
+function showOverlapUpdateBlockedToast(updates: Partial<Part>) {
+  const isDimensionChange =
+    updates.length !== undefined || updates.width !== undefined || updates.thickness !== undefined;
+  const label = isDimensionChange ? 'Size' : updates.rotation !== undefined ? 'Rotation' : 'Update';
+  useUIStore
+    .getState()
+    .showToast(`${label} update blocked: it would overlap another part.`, 'info', { duration: 3000 });
+}
+
 const getSceneGraphDescendantPartIds = ({
   groupId,
   parts,
@@ -530,6 +539,7 @@ export const useProjectStore = create<ProjectState>()(
                 updates.position !== undefined && Object.keys(updates).every((key) => key === 'position');
               if (!isPositionOnlyMove) {
                 dragDebug('projectStore:updatePart:rejectOverlap', { id, updates });
+                showOverlapUpdateBlockedToast(updates);
                 return state;
               }
 

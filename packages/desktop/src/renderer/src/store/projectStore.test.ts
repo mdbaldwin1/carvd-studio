@@ -207,11 +207,13 @@ describe('projectStore', () => {
           thickness: 1
         })!;
 
-        store.updatePart(partAId, { length: 30 });
+        const didUpdate = store.updatePart(partAId, { length: 30 });
 
         const state = useProjectStore.getState();
         const partA = state.parts.find((p) => p.id === partAId);
+        expect(didUpdate).toBe(false);
         expect(partA?.length).toBe(10);
+        expect(useUIStore.getState().toast?.message).toBe('Size update blocked: it would overlap another part.');
       });
 
       it('commits a validated feature mate host without disabling other overlap checks', () => {
