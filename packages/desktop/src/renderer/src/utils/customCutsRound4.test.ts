@@ -23,6 +23,7 @@ import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 import { CutProperties } from '@renderer/components/part-cuts/CutProperties';
 import { PartCutsEditorProvider } from '@renderer/components/part-cuts/PartCutsEditorContext';
 import { PartCutsWorkspace } from '../components/part-cuts/PartCutsWorkspace';
+import { budgetMs } from '../../../../tests/helpers/perf';
 
 vi.unmock('three');
 const blank = (features: Part['features'] = []): Part =>
@@ -236,7 +237,7 @@ describe('closure review disconnected stock and pattern performance', () => {
       const geometry = getPartRenderGeometry(part);
       const elapsed = performance.now() - started;
       console.info(`F cold ${16 * rows} holes: ${elapsed.toFixed(1)}ms`);
-      expect.soft(elapsed).toBeLessThan(1000);
+      expect.soft(elapsed).toBeLessThan(budgetMs(1000));
       const polygonArea = 8 * 0.05 ** 2 * Math.sin(Math.PI / 8);
       expect(getPartMaterialVolume(part)).toBeCloseTo(
         40 - 8 * Math.tan(Math.PI / 12) - 2 * Math.tan(Math.PI / 9) - 16 * rows * polygonArea,
@@ -263,7 +264,7 @@ describe('closure review disconnected stock and pattern performance', () => {
           features: part.features!.map((cut) => ({ ...cut, id: `${cut.id}-copy`, label: 'Renamed' }))
         })
       ).toBe(geometry);
-      expect(performance.now() - cachedAt).toBeLessThan(50);
+      expect(performance.now() - cachedAt).toBeLessThan(budgetMs(50));
       const downstreamAt = performance.now();
       const vertices = getPartLocalConvexVertices(part);
       expect(vertices.length).toBeGreaterThanOrEqual(8);
@@ -273,7 +274,7 @@ describe('closure review disconnected stock and pattern performance', () => {
       expect(validatePartsForCutList([part], []).filter((issue) => issue.type === 'feature_validation')).toEqual([]);
       const downstreamMs = performance.now() - downstreamAt;
       console.info(`F ${16 * rows} holes collision/validation: ${downstreamMs.toFixed(1)}ms`);
-      expect(downstreamMs).toBeLessThan(1000);
+      expect(downstreamMs).toBeLessThan(budgetMs(1000));
       mesh.material.dispose();
     },
     30000
@@ -292,7 +293,7 @@ describe('closure review disconnected stock and pattern performance', () => {
     getPartRenderGeometry(part);
     const elapsed = performance.now() - start;
     console.info(`F near-meeting planes: ${elapsed.toFixed(1)}ms`);
-    expect.soft(elapsed).toBeLessThan(1000);
+    expect.soft(elapsed).toBeLessThan(budgetMs(1000));
     expect(getPartMaterialVolume(part)).toBeCloseTo(20.02 - 16 * 8 * 0.05 ** 2 * Math.sin(Math.PI / 8), 5);
   }, 30000);
   it.each(
@@ -320,7 +321,7 @@ describe('closure review disconnected stock and pattern performance', () => {
       expect(validateCircularCut(feature, part)).toBeNull();
       const started = performance.now();
       const geometry = getPartRenderGeometry(part);
-      expect(performance.now() - started).toBeLessThan(1000);
+      expect(performance.now() - started).toBeLessThan(budgetMs(1000));
       const pilot = 8 * 0.05 ** 2 * Math.sin(Math.PI / 8);
       const major = 8 * 0.1 ** 2 * Math.sin(Math.PI / 8);
       expect(getPartMaterialVolume(part)).toBeCloseTo(

@@ -4,6 +4,7 @@ import type { AssemblyPart, CircularCutFeature, EndCutFeature, Part, RectCutFeat
 import {
   clonePartFeature,
   clonePartFeatures,
+  clonePartFeaturesForCopy,
   normalizeAssemblyPart,
   normalizePart,
   validateSerializedPartFeatures
@@ -366,5 +367,219 @@ describe('partFeatures', () => {
       expect(normalized.features).toEqual(features);
       expect(normalized.features?.[0]).not.toBe(features[0]);
     });
+  });
+});
+
+describe('clonePartFeaturesForCopy', () => {
+  const doweled = (id: string, jointId: string, matePartId: string): RectCutFeature =>
+    ({
+      id,
+      kind: 'rect_cut',
+      version: 1,
+      enabled: true,
+      cutType: 'cutout',
+      target: { type: 'face', face: 'top_face' },
+      reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+      parameters: { size: { length: 1, width: 1 }, depthMode: 'through' },
+      placement: { x: 1, z: 1 },
+      metadata: { dowelJoint: { jointId, matePartId, role: 'a' } }
+    }) as unknown as RectCutFeature;
+
+  it('gives every copied cut an identity of its own', () => {
+    const original = doweled('cut-1', 'joint-1', 'part-b');
+    const [copy] = clonePartFeaturesForCopy([original], new Map([['part-b', 'part-b-copy']]), new Map())!;
+    expect(copy.id).not.toBe('cut-1');
+  });
+
+  it('keeps the joint when the other half is copied too, pointing at the copy', () => {
+    const copied = clonePartFeaturesForCopy(
+      [doweled('cut-1', 'joint-1', 'part-b')],
+      new Map([['part-b', 'part-b-copy']]),
+      new Map()
+    )!;
+    const dowel = copied[0].metadata!.dowelJoint!;
+    expect(dowel.matePartId).toBe('part-b-copy');
+    // A fresh joint, so the copies are married to each other rather than to
+    // the boards they were copied from.
+    expect(dowel.jointId).not.toBe('joint-1');
+  });
+
+  it('gives both halves of one joint the same new joint id', () => {
+    const jointIds = new Map<string, string>();
+    const first = clonePartFeaturesForCopy([doweled('a', 'joint-1', 'part-b')], new Map([['part-b', 'b2']]), jointIds)!;
+    const second = clonePartFeaturesForCopy(
+      [doweled('b', 'joint-1', 'part-b')],
+      new Map([['part-b', 'b2']]),
+      jointIds
+    )!;
+    expect(second[0].metadata!.dowelJoint!.jointId).toBe(first[0].metadata!.dowelJoint!.jointId);
+  });
+
+  it('drops the joint when its other half was left behind', () => {
+    // A dowel pointing at a board that was not copied is a reference to
+    // nothing, and keeping it would leave the copy joined to the original.
+    const copied = clonePartFeaturesForCopy([doweled('cut-1', 'joint-1', 'part-b')], new Map(), new Map())!;
+    expect(copied[0].metadata?.dowelJoint).toBeUndefined();
+  });
+
+  it('leaves no empty metadata behind when the joint was all it held', () => {
+    const copied = clonePartFeaturesForCopy([doweled('cut-1', 'joint-1', 'part-b')], new Map(), new Map())!;
+    expect(copied[0].metadata).toBeUndefined();
+  });
+
+  it('keeps other metadata when only the joint has to go', () => {
+    const feature = doweled('cut-1', 'joint-1', 'part-b');
+    (feature.metadata as Record<string, unknown>).note = 'scribe to fit';
+    const copied = clonePartFeaturesForCopy([feature], new Map(), new Map())!;
+    expect(copied[0].metadata).toEqual({ note: 'scribe to fit' });
+  });
+
+  it('copies a cut with no joint at all, untouched', () => {
+    const plain = { ...doweled('cut-1', 'joint-1', 'part-b'), metadata: undefined };
+    const copied = clonePartFeaturesForCopy([plain], new Map(), new Map())!;
+    expect(copied[0].metadata).toBeUndefined();
+  });
+
+  it('has nothing to say about a part with no cuts', () => {
+    expect(clonePartFeaturesForCopy(undefined, new Map(), new Map())).toBeUndefined();
+  });
+});
+
+describe('validateSerializedPartFeatures', () => {
+  const valid = () => ({
+    id: 'cut-1',
+    kind: 'rect_cut',
+    version: 1,
+    enabled: true,
+    cutType: 'cutout',
+    target: { type: 'face', face: 'top_face' },
+    reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+    parameters: { size: { length: 2, width: 1 }, depthMode: 'through' },
+    placement: { x: 1, z: 1 }
+  });
+
+  const errorsFor = (feature: unknown) => validateSerializedPartFeatures([feature], 'parts[0].features');
+
+  it('passes a well-formed cut', () => {
+    expect(errorsFor(valid())).toEqual([]);
+  });
+
+  it('rejects a cut that is not an object at all', () => {
+    expect(errorsFor('a dado')).toEqual(['parts[0].features[0] is invalid']);
+  });
+
+  it('names the file position of the cut at fault', () => {
+    const errors = validateSerializedPartFeatures([valid(), { ...valid(), id: '' }], 'parts[3].features');
+    expect(errors[0]).toContain('parts[3].features[1]');
+  });
+
+  it('refuses two cuts sharing an id', () => {
+    const errors = validateSerializedPartFeatures([valid(), valid()], 'features');
+    expect(errors.some((error) => error.includes('duplicate feature id'))).toBe(true);
+  });
+
+  it.each([
+    ['id', { id: 42 }],
+    ['version', { version: 2 }],
+    ['enabled', { enabled: 'yes' }],
+    ['label', { label: 7 }],
+    ['metadata', { metadata: 'notes' }],
+    ['target', { target: { type: 'nowhere' } }],
+    ['cutType', { cutType: 'nonsense' }],
+    ['parameters', { parameters: 'big' }],
+    ['placement', { placement: { x: 'left', z: 0 } }]
+  ])('rejects a bad %s', (field, override) => {
+    const errors = errorsFor({ ...valid(), ...override });
+    expect(errors.some((error) => error.includes(field))).toBe(true);
+  });
+
+  it('rejects a blind cut with no depth', () => {
+    // Without one the pocket loads clean and renders as nothing, turning up
+    // much later as an editor conflict rather than an import error.
+    const errors = errorsFor({ ...valid(), parameters: { size: { length: 2, width: 1 }, depthMode: 'blind' } });
+    expect(errors.some((error) => error.includes('depth'))).toBe(true);
+  });
+
+  it('rejects a cut of no known kind', () => {
+    expect(errorsFor({ ...valid(), kind: 'sawdust' }).some((error) => error.includes('kind'))).toBe(true);
+  });
+
+  it('rejects a rounded cut whose corners are larger than the opening', () => {
+    const errors = errorsFor({
+      id: 'slot',
+      kind: 'rounded_cut',
+      version: 1,
+      enabled: true,
+      cutType: 'rounded_rectangle',
+      target: { type: 'face', face: 'top_face' },
+      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      placement: { primary: 0, secondary: 0, rotation: 0 },
+      parameters: { length: 4, width: 2, cornerRadius: 3, depthMode: 'through' }
+    });
+    expect(errors.some((error) => error.includes('cornerRadius'))).toBe(true);
+  });
+});
+
+describe('validating a hole read back from a file', () => {
+  const hole = (overrides: Record<string, unknown> = {}, parameters: Record<string, unknown> = {}) => ({
+    id: 'hole-1',
+    kind: 'circular_cut',
+    version: 1,
+    enabled: true,
+    cutType: 'round_hole',
+    target: { type: 'face', face: 'top_face' },
+    reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+    placement: { primary: 0, secondary: 0, rotation: 0 },
+    parameters: { diameter: 0.5, depthMode: 'through', tilt: 0, direction: 0, ...parameters },
+    ...overrides
+  });
+
+  const errorsFor = (feature: unknown) => validateSerializedPartFeatures([feature], 'features');
+
+  it('passes an ordinary hole', () => {
+    expect(errorsFor(hole())).toEqual([]);
+  });
+
+  it.each([
+    ['diameter', { diameter: 0 }],
+    ['depthMode', { depthMode: 'halfway' }],
+    ['tilt', { tilt: 90 }],
+    ['direction', { direction: 'north' }]
+  ])('rejects a bad %s', (field, parameters) => {
+    expect(errorsFor(hole({}, parameters)).some((error) => error.includes(field))).toBe(true);
+  });
+
+  it('rejects a blind hole with no depth', () => {
+    expect(errorsFor(hole({}, { depthMode: 'blind' })).some((error) => error.includes('depth'))).toBe(true);
+  });
+
+  it('rejects a hole of no known kind', () => {
+    expect(errorsFor(hole({ cutType: 'wormhole' })).some((error) => error.includes('cutType'))).toBe(true);
+  });
+
+  it('rejects parameters that are not a record at all', () => {
+    expect(errorsFor(hole({ parameters: 'big' })).some((error) => error.includes('parameters'))).toBe(true);
+  });
+
+  it('rejects a countersink whose head is no wider than its shank', () => {
+    // A countersink that does not widen is just a hole, and a screw head
+    // would stand proud of the surface.
+    const errors = errorsFor(
+      hole({ cutType: 'countersink' }, { countersink: { majorDiameter: 0.5, includedAngle: 82 } })
+    );
+    expect(errors.some((error) => error.includes('countersink'))).toBe(true);
+  });
+
+  it('rejects a countersink cut flat rather than conical', () => {
+    const errors = errorsFor(
+      hole({ cutType: 'countersink' }, { countersink: { majorDiameter: 1, includedAngle: 180 } })
+    );
+    expect(errors.some((error) => error.includes('countersink'))).toBe(true);
+  });
+
+  it('accepts a proper countersink', () => {
+    expect(
+      errorsFor(hole({ cutType: 'countersink' }, { countersink: { majorDiameter: 1, includedAngle: 82 } }))
+    ).toEqual([]);
   });
 });

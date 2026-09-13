@@ -217,3 +217,76 @@ describe('referenceRelations', () => {
     expect(result.activeRelation?.toEntityId).toBe('ref-group');
   });
 });
+
+describe('typing a new distance into a reference measurement', () => {
+  const relation = (overrides: Record<string, unknown> = {}) =>
+    ({
+      id: 'rel-1',
+      kind: 'gap',
+      axis: 'x',
+      fromEntityId: 'a',
+      toEntityId: 'b',
+      fromAnchorId: 'a:max',
+      toAnchorId: 'b:min',
+      value: 4,
+      editMode: 'move',
+      priority: 0,
+      source: 'reference',
+      indicatorType: 'edge-to-edge',
+      start: { x: 0, y: 0, z: 0 },
+      end: { x: 4, y: 0, z: 0 },
+      labelPosition: { x: 2, y: 0, z: 0 },
+      ...overrides
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
+
+  it('stays put when the number did not really change', () => {
+    expect(calculateMoveDeltaForReferenceRelation(relation(), 4)).toEqual({ x: 0, y: 0, z: 0 });
+  });
+
+  it('moves along the axis the measurement runs on', () => {
+    // Widening a 4" gap to 6" moves the part 2" further away, against the
+    // direction the measurement points in.
+    expect(calculateMoveDeltaForReferenceRelation(relation(), 6)).toEqual({ x: -2, y: 0, z: 0 });
+  });
+
+  it('moves the other way when the measurement points the other way', () => {
+    const backwards = relation({ start: { x: 4, y: 0, z: 0 }, end: { x: 0, y: 0, z: 0 } });
+    expect(calculateMoveDeltaForReferenceRelation(backwards, 6)).toEqual({ x: 2, y: 0, z: 0 });
+  });
+
+  it.each(['y', 'z'] as const)('moves along %s when that is the axis measured', (axis) => {
+    const along = relation({
+      axis,
+      start: { x: 0, y: 0, z: 0 },
+      end: { x: 0, y: axis === 'y' ? 4 : 0, z: axis === 'z' ? 4 : 0 }
+    });
+    const delta = calculateMoveDeltaForReferenceRelation(along, 6)!;
+    expect(delta[axis]).toBe(-2);
+  });
+
+  it('refuses a measurement with no length to take a direction from', () => {
+    // Two ends in the same place say nothing about which way to move.
+    const collapsed = relation({ start: { x: 2, y: 0, z: 0 }, end: { x: 2, y: 0, z: 0 } });
+    expect(calculateMoveDeltaForReferenceRelation(collapsed, 6)).toBeNull();
+  });
+
+  it('follows a diagonal measurement along its own line', () => {
+    const diagonal = relation({ axis: null, start: { x: 0, y: 0, z: 0 }, end: { x: 3, y: 4, z: 0 }, value: 5 });
+    const delta = calculateMoveDeltaForReferenceRelation(diagonal, 10)!;
+    // Five inches further along a 3-4-5 line.
+    expect(delta.x).toBeCloseTo(-3);
+    expect(delta.y).toBeCloseTo(-4);
+    expect(delta.z).toBeCloseTo(0);
+  });
+
+  it('refuses a diagonal measurement of no length', () => {
+    const collapsed = relation({ axis: null, start: { x: 1, y: 1, z: 1 }, end: { x: 1, y: 1, z: 1 } });
+    expect(calculateMoveDeltaForReferenceRelation(collapsed, 6)).toBeNull();
+  });
+
+  it('describes a relation with no axis as running along x', () => {
+    // The indicator has to be drawn somewhere, and x is the fallback.
+    expect(referenceRelationToIndicator(relation({ axis: null })).axis).toBe('x');
+  });
+});

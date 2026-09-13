@@ -6,6 +6,7 @@ import {
   clearPartGeometryCache,
   getPartGeometryCacheSizeForTests,
   getPartLocalBoundingBox,
+  worldContoursOverlap,
   getPartLocalConvexVertices,
   getPartLocalCorners,
   getPartRenderGeometry,
@@ -2272,5 +2273,78 @@ describe('a half-typed measurement never reaches triangulation', () => {
     const cut = getPartRenderGeometry({ ...part, features: [cutout({})] });
     const blank = getPartRenderGeometry({ ...part, features: [cutout({ width: Number.NaN })] });
     expect(cut.getAttribute('position').count).not.toBe(blank.getAttribute('position').count);
+  });
+});
+
+describe('worldContoursOverlap', () => {
+  /** A rectangle on the floor, given by its opposite corners. */
+  const rect = (x1: number, z1: number, x2: number, z2: number) => [
+    { x: x1, z: z1 },
+    { x: x2, z: z1 },
+    { x: x2, z: z2 },
+    { x: x1, z: z2 }
+  ];
+
+  it('sees two boards crossing each other', () => {
+    expect(worldContoursOverlap(rect(0, 0, 10, 2), rect(4, -3, 6, 5))).toBe(true);
+  });
+
+  it('sees a small part sitting wholly inside a larger one', () => {
+    // No edge crosses another here, so containment is the only thing that
+    // can catch it.
+    expect(worldContoursOverlap(rect(0, 0, 10, 10), rect(3, 3, 4, 4))).toBe(true);
+    expect(worldContoursOverlap(rect(3, 3, 4, 4), rect(0, 0, 10, 10))).toBe(true);
+  });
+
+  it('leaves two boards butted edge to edge alone', () => {
+    // Touching is how joinery is supposed to look. Calling it an overlap is
+    // what froze every part of the spice cabinet.
+    expect(worldContoursOverlap(rect(0, 0, 10, 2), rect(10, 0, 20, 2))).toBe(false);
+  });
+
+  it('leaves two boards meeting at a single corner alone', () => {
+    expect(worldContoursOverlap(rect(0, 0, 10, 2), rect(10, 2, 20, 4))).toBe(false);
+  });
+
+  it('leaves boards that are nowhere near each other alone', () => {
+    expect(worldContoursOverlap(rect(0, 0, 1, 1), rect(50, 50, 51, 51))).toBe(false);
+  });
+
+  it('catches an interlock whose every corner lies on the other outline', () => {
+    // Two L-shapes sharing their inner faces: no corner is strictly inside
+    // the other, and no edge properly crosses, yet they plainly share floor.
+    const first = [
+      { x: 0, z: 0 },
+      { x: 4, z: 0 },
+      { x: 4, z: 4 },
+      { x: 0, z: 4 }
+    ];
+    const second = [
+      { x: 1, z: 0 },
+      { x: 3, z: 0 },
+      { x: 3, z: 4 },
+      { x: 1, z: 4 }
+    ];
+    expect(worldContoursOverlap(first, second)).toBe(true);
+  });
+
+  it('sees an overlap of only a sliver', () => {
+    expect(worldContoursOverlap(rect(0, 0, 10, 2), rect(9.99, 0.5, 20, 1.5))).toBe(true);
+  });
+
+  it('treats a hair of contact as touching when told to be that forgiving', () => {
+    // A generous tolerance is how a joint cut to the thousandth stays a
+    // joint rather than becoming an error.
+    expect(worldContoursOverlap(rect(0, 0, 10, 2), rect(9.9999, 0, 20, 2), 0.01)).toBe(false);
+  });
+
+  it('handles a triangle against a rectangle', () => {
+    const wedge = [
+      { x: 0, z: 0 },
+      { x: 6, z: 0 },
+      { x: 0, z: 6 }
+    ];
+    expect(worldContoursOverlap(wedge, rect(1, 1, 2, 2))).toBe(true);
+    expect(worldContoursOverlap(wedge, rect(5, 5, 6, 6))).toBe(false);
   });
 });

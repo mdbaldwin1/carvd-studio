@@ -12,6 +12,7 @@ import { createDowelJoint, validateDowelRelationships } from './dowelJointUtils'
 import { useProjectStore, validatePartsForCutList } from '../store/projectStore';
 import { deserializeToProject, parseCarvdFile, serializeProject } from './fileFormat';
 import { mirrorFeature } from './partFeatureActions';
+import { budgetMs } from '../../../../tests/helpers/perf';
 
 vi.unmock('three');
 const blank = (features: Part['features'] = []): Part =>
@@ -108,7 +109,7 @@ describe('full review round 3 remediation', () => {
     expect(partsOverlap(copy, part)).toBe(true);
     const elapsed = performance.now() - start;
     console.info(`K1 copied four-family solids: ${elapsed.toFixed(1)} ms`);
-    expect(elapsed).toBeLessThan(1000);
+    expect(elapsed).toBeLessThan(budgetMs(1000));
   });
   it.each([1, 8])('K1 bounds cold material collision for a %s-row compound grid', (rows) => {
     const end: EndCutFeature = {
@@ -134,7 +135,7 @@ describe('full review round 3 remediation', () => {
     expect(partsOverlap(timber, part)).toBe(false);
     const elapsed = performance.now() - start;
     console.info(`K1 ${rows * 16} holes cold collision: ${elapsed.toFixed(1)} ms`);
-    expect(elapsed).toBeLessThan(1000);
+    expect(elapsed).toBeLessThan(budgetMs(1000));
     expect(topHits(part, -4, -1.5)).toHaveLength(0);
     const polygonArea = 8 * 0.05 * 0.05 * Math.sin(Math.PI / 8); // Literal adaptive 16-sided small bore.
     expect(getPartMaterialVolume(part)).toBeCloseTo(

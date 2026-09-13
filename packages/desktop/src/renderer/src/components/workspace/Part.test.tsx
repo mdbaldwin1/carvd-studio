@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestPart } from '../../../../../tests/helpers/factories';
@@ -101,6 +101,100 @@ describe('Part render ownership', () => {
     await waitFor(() => {
       expect(container.querySelector('group')?.getAttribute('position')).toBe('11,7,1');
       expect(container.querySelector('boxgeometry')?.getAttribute('args')).toBe('10,1,4');
+    });
+  });
+
+  /** The part's own body, which is the first mesh rendered. */
+  const body = (container: HTMLElement) => container.querySelectorAll('mesh')[0];
+
+  it('selects the part when it is clicked', () => {
+    const part = createTestPart({ id: 'clickable' });
+    useProjectStore.setState({ parts: [part] });
+    const { container } = render(createElement(Part, { part }));
+
+    fireEvent.click(body(container));
+    expect(useSelectionStore.getState().selectedPartIds).toContain('clickable');
+  });
+
+  it('marks the part as hovered, and lets go again', () => {
+    const part = createTestPart({ id: 'hoverable' });
+    useProjectStore.setState({ parts: [part] });
+    const { container } = render(createElement(Part, { part }));
+
+    fireEvent.pointerOver(body(container));
+    expect(useSelectionStore.getState().hoveredPartId).toBe('hoverable');
+
+    fireEvent.pointerOut(body(container));
+    expect(useSelectionStore.getState().hoveredPartId).toBeNull();
+  });
+
+  it('leaves the cursor alone while a drag is under way', () => {
+    // This fixture holds the part mid-drag. Hovering must not take the
+    // grabbing cursor away and make the drag look finished.
+    document.body.style.cursor = 'grabbing';
+    const part = createTestPart({ id: 'dragging' });
+    useProjectStore.setState({ parts: [part] });
+    const { container } = render(createElement(Part, { part }));
+
+    fireEvent.pointerOver(body(container));
+    expect(document.body.style.cursor).toBe('grabbing');
+
+    fireEvent.pointerOut(body(container));
+    expect(document.body.style.cursor).toBe('grabbing');
+  });
+
+  it('selects the part on a double-click too', () => {
+    const part = createTestPart({ id: 'double' });
+    useProjectStore.setState({ parts: [part] });
+    const { container } = render(createElement(Part, { part }));
+
+    fireEvent.doubleClick(body(container));
+    expect(useSelectionStore.getState().selectedPartIds).toContain('double');
+  });
+
+  describe('turning a selected part', () => {
+    const selectedPart = () => {
+      const part = createTestPart({
+        id: 'turnable',
+        length: 10,
+        width: 4,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 }
+      });
+      useProjectStore.setState({ parts: [part] });
+      useSelectionStore.setState({ selectedPartIds: [part.id] });
+      return part;
+    };
+
+    it('offers a rotation handle for each axis once a part is the only one selected', () => {
+      const part = selectedPart();
+      const { container } = render(createElement(Part, { part }));
+      // Three rings, one per axis, each with its own grab handle on a stalk.
+      expect(container.querySelectorAll('spheregeometry').length).toBeGreaterThanOrEqual(6);
+    });
+
+    it('turns the part a quarter turn when a ring is clicked', () => {
+      // This is the rotate control itself, from the part's side of it.
+      const part = selectedPart();
+      const { container } = render(createElement(Part, { part }));
+
+      const rings = Array.from(container.querySelectorAll('mesh')).filter(
+        (mesh) => mesh.getAttribute('userdata') !== null && !mesh.querySelector('spheregeometry')
+      );
+      fireEvent.click(rings[rings.length - 1]);
+
+      const turned = useProjectStore.getState().parts.find((candidate) => candidate.id === 'turnable')!;
+      const { x, y, z } = turned.rotation;
+      expect(Math.abs(x) + Math.abs(y) + Math.abs(z)).toBeGreaterThan(0);
+    });
+
+    it('does not turn a part that is one of several selected', () => {
+      // Rotating a multi-selection is the group handle's job, not this one's.
+      const part = selectedPart();
+      useSelectionStore.setState({ selectedPartIds: [part.id, 'another'] });
+      const { container } = render(createElement(Part, { part }));
+      expect(container.querySelectorAll('spheregeometry').length).toBe(0);
     });
   });
 });

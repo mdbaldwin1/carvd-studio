@@ -402,4 +402,128 @@ describe('PartContextMenu', () => {
       expect(showToast).toHaveBeenCalledWith('Finish editing part cuts first', 'warning');
     });
   });
+
+  describe('copying cuts between parts', () => {
+    const cut = {
+      id: 'cut-1',
+      kind: 'rect_cut',
+      version: 1,
+      enabled: true,
+      cutType: 'stopped_dado',
+      target: { type: 'face', face: 'top_face' },
+      reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+      parameters: { size: { length: 4, width: 8 }, depthMode: 'blind', depth: 0.25 },
+      placement: { x: 2, z: 0 }
+    };
+
+    it('offers to copy cuts only from a part that has some', () => {
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={vi.fn()} />);
+      expect(screen.queryByText('Copy Cuts')).not.toBeInTheDocument();
+    });
+
+    it('copies the cuts and says how many', () => {
+      const copyPartCuts = vi.fn().mockReturnValue(true);
+      useProjectStore.setState({ parts: [{ ...part1, features: [cut] }, part2] as never });
+      useClipboardStore.setState({ copyPartCuts } as never);
+      const onClose = vi.fn();
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={onClose} />);
+
+      fireEvent.click(screen.getByText('Copy Cuts'));
+
+      expect(copyPartCuts).toHaveBeenCalledWith('p1');
+      expect(useUIStore.getState().showToast).toHaveBeenCalledWith(expect.stringContaining('1 cut'), 'success');
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('says so plainly when there was nothing to copy', () => {
+      useProjectStore.setState({ parts: [{ ...part1, features: [cut] }, part2] as never });
+      useClipboardStore.setState({ copyPartCuts: vi.fn().mockReturnValue(false) } as never);
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={vi.fn()} />);
+
+      fireEvent.click(screen.getByText('Copy Cuts'));
+      expect(useUIStore.getState().showToast).toHaveBeenCalledWith(expect.stringContaining('no cuts'), 'warning');
+    });
+
+    it('pastes onto every selected part and says how many took them', () => {
+      useClipboardStore.setState({
+        cutsClipboard: [cut],
+        pastePartCutsToParts: vi.fn().mockReturnValue(2)
+      } as never);
+      useSelectionStore.setState({ selectedPartIds: ['p1', 'p2'] });
+      const onClose = vi.fn();
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={onClose} />);
+
+      fireEvent.click(screen.getByText(/Paste Cuts/));
+
+      expect(useUIStore.getState().showToast).toHaveBeenCalledWith(expect.stringContaining('2 parts'), 'success');
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('warns rather than claiming success when nothing received them', () => {
+      useClipboardStore.setState({
+        cutsClipboard: [cut],
+        pastePartCutsToParts: vi.fn().mockReturnValue(0)
+      } as never);
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={vi.fn()} />);
+
+      fireEvent.click(screen.getByText(/Paste Cuts/));
+      expect(useUIStore.getState().showToast).toHaveBeenCalledWith(expect.stringContaining('No parts'), 'warning');
+    });
+  });
+
+  describe('grouping', () => {
+    it('gathers the selected parts into a new group', () => {
+      useSelectionStore.setState({ selectedPartIds: ['p1', 'p2'] });
+      const onClose = vi.fn();
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={onClose} />);
+
+      fireEvent.click(screen.getByText('Create Group (G)'));
+
+      expect(useProjectStore.getState().createGroup).toHaveBeenCalledWith('Group 1', [
+        { id: 'p1', type: 'part' },
+        { id: 'p2', type: 'part' }
+      ]);
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('adds loose parts to the one group on offer', () => {
+      useProjectStore.setState({
+        groups: [group1],
+        groupMembers: [createTestGroupMember('g1', 'p2', 'part')]
+      });
+      useSelectionStore.setState({ selectedPartIds: ['p1'], selectedGroupIds: ['g1'] });
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={vi.fn()} />);
+
+      fireEvent.click(screen.getByText(/Add to "Group 1"/));
+      expect(useProjectStore.getState().addToGroup).toHaveBeenCalledWith('g1', ['p1'], 'part');
+    });
+
+    it('takes a part back out of its group while editing one', () => {
+      useProjectStore.setState({
+        groups: [group1],
+        groupMembers: [createTestGroupMember('g1', 'p1', 'part')]
+      });
+      useSelectionStore.setState({ selectedPartIds: ['p1'], selectedGroupIds: [], editingGroupId: 'g1' });
+      const onClose = vi.fn();
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={onClose} />);
+
+      fireEvent.click(screen.getByText(/Remove from Group/));
+      expect(useProjectStore.getState().removeFromGroup).toHaveBeenCalledWith(['p1'], 'part');
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('breaks a group apart, leaving its parts behind', () => {
+      const deleteGroup = vi.fn();
+      useProjectStore.setState({
+        groups: [group1],
+        groupMembers: [createTestGroupMember('g1', 'p1', 'part')],
+        deleteGroup
+      });
+      useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: ['g1'] });
+      render(<PartContextMenu menuRef={createRef()} x={0} y={0} onClose={vi.fn()} />);
+
+      fireEvent.click(screen.getByText(/Ungroup/));
+      expect(deleteGroup).toHaveBeenCalledWith('g1', 'ungroup', null);
+    });
+  });
 });

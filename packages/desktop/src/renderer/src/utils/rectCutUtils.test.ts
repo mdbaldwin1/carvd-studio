@@ -923,3 +923,157 @@ describe('through mortises', () => {
     ).toBe('This cut removes the entire blank. Reduce its size so some material remains.');
   });
 });
+
+describe('what a cut refuses, and what it says', () => {
+  it.each([
+    [
+      'a groove asked for on an edge',
+      { cutType: 'groove' as const, target: { type: 'edge' as const, edge: 'top_front_edge' as const } },
+      'Groove must target the top or bottom face.'
+    ],
+    [
+      'a stopped groove asked for on an edge',
+      { cutType: 'stopped_groove' as const, target: { type: 'edge' as const, edge: 'top_front_edge' as const } },
+      'Stopped groove must target the top or bottom face.'
+    ]
+  ])('refuses %s', (_name, overrides, message) => {
+    expect(validateRectCutFeature(createRectCut(overrides), PART)).toBe(message);
+  });
+
+  it.each([
+    ['a dado', 'dado', { type: 'edge', edge: 'top_front_edge' }, { type: 'face', face: 'top_face' }],
+    ['a stopped dado', 'stopped_dado', { type: 'edge', edge: 'top_front_edge' }, { type: 'face', face: 'top_face' }],
+    ['a tenon', 'tenon', { type: 'face', face: 'top_face' }, { type: 'face', face: 'right_end' }],
+    ['a rabbet', 'rabbet', { type: 'face', face: 'top_face' }, { type: 'edge', edge: 'top_front_edge' }]
+  ])('puts %s asked for in the wrong place onto somewhere it can go', (_name, cutType, given, expected) => {
+    // These families are settled by the resolver before anything validates
+    // them, so a misaddressed cut is corrected rather than refused.
+    const misaddressed = createRectCut({ cutType, target: given } as Parameters<typeof createRectCut>[0]);
+    expect(getResolvedRectCutFeature(misaddressed, PART).target).toEqual(expected);
+  });
+
+  describe('a tenon', () => {
+    const tenon = (overrides: Parameters<typeof createRectCut>[0]) =>
+      createRectCut({
+        cutType: 'tenon',
+        target: { type: 'face', face: 'right_end' },
+        size: { length: 1, width: 2 },
+        depth: 0.25,
+        placement: { x: 0, z: 1 },
+        ...overrides
+      });
+
+    it('must have a tongue thick enough to exist', () => {
+      expect(validateRectCutFeature(tenon({ depth: 0 }), PART)).toBe('Blind depth must be greater than zero.');
+    });
+
+    it('cannot be as thick as the board it is cut from', () => {
+      // At full thickness there are no shoulders left, so it is not a tenon.
+      expect(validateRectCutFeature(tenon({ depth: PART.thickness }), PART)).toBe(
+        'Blind depth must stay less than part thickness.'
+      );
+    });
+
+    it('cannot be as long as the whole board', () => {
+      expect(validateRectCutFeature(tenon({ size: { length: PART.length, width: 2 } }), PART)).toBe(
+        'Tenon length must stay less than part length.'
+      );
+    });
+
+    it('cannot be pushed off the end of the blank', () => {
+      expect(validateRectCutFeature(tenon({ placement: { x: 0, z: PART.width } }), PART)).toBe(
+        'Tenon offset pushes the tongue past the blank.'
+      );
+    });
+
+    it('accepts an ordinary one', () => {
+      expect(validateRectCutFeature(tenon({}), PART)).toBeNull();
+    });
+  });
+
+  describe('a pocket cut into an edge face', () => {
+    const sideFace = (overrides: Parameters<typeof createRectCut>[0]) =>
+      createRectCut({
+        cutType: 'mortise',
+        target: { type: 'face', face: 'front_face' },
+        size: { length: 2, width: 0.25 },
+        depth: 0.25,
+        placement: { x: 4, z: 0.25 },
+        ...overrides
+      });
+
+    it('measures its height across the thickness, not the width', () => {
+      // 0.75 thick stock cannot take a pocket standing 1" tall.
+      expect(validateRectCutFeature(sideFace({ size: { length: 2, width: 1 } }), PART)).toBe(
+        'Pocket height runs past the board thickness.'
+      );
+    });
+
+    it('accepts one that fits within the thickness', () => {
+      expect(validateRectCutFeature(sideFace({}), PART)).toBeNull();
+    });
+  });
+});
+
+describe('an edge notch against the size of the blank', () => {
+  const notch = (edge: EdgeTarget, overrides: Parameters<typeof createRectCut>[0] = {}) =>
+    createRectCut({
+      cutType: 'edge_notch',
+      target: { type: 'edge', edge },
+      size: { length: 2, width: 1 },
+      depthMode: 'through',
+      placement: { x: 1, z: 0 },
+      ...overrides
+    });
+
+  it('refuses to run past the end of a corner-post edge', () => {
+    // A notch on a vertical edge is pinned in both plan axes, so its extents
+    // are bounded outright rather than by where it starts.
+    expect(validateRectCutFeature(notch('front_left_edge', { size: { length: 99, width: 1 } }), PART)).toBe(
+      'Edge notch length runs past the blank.'
+    );
+    expect(validateRectCutFeature(notch('front_left_edge', { size: { length: 2, width: 99 } }), PART)).toBe(
+      'Edge notch width runs past the blank.'
+    );
+  });
+
+  it('refuses to run off the end of a lengthwise edge from where it starts', () => {
+    expect(validateRectCutFeature(notch('top_front_edge', { placement: { x: PART.length - 1, z: 0 } }), PART)).toBe(
+      'Edge notch length runs past the blank.'
+    );
+  });
+
+  it('refuses a negative offset', () => {
+    expect(validateRectCutFeature(notch('top_front_edge', { placement: { x: -1, z: 0 } }), PART)).toBe(
+      'Notch offsets cannot be negative.'
+    );
+  });
+
+  it('accepts one that fits', () => {
+    expect(validateRectCutFeature(notch('top_front_edge'), PART)).toBeNull();
+  });
+});
+
+describe('a corner notch against the size of the blank', () => {
+  const cornerNotch = (size: { length: number; width: number }) =>
+    createRectCut({
+      cutType: 'corner_notch',
+      target: { type: 'corner', corner: 'back_right_corner' },
+      size,
+      depthMode: 'through',
+      placement: { x: 0, z: 0 }
+    });
+
+  it('refuses one larger than the board it is cut from', () => {
+    expect(validateRectCutFeature(cornerNotch({ length: PART.length + 1, width: 1 }), PART)).toBe(
+      'Corner notch size runs past the blank.'
+    );
+    expect(validateRectCutFeature(cornerNotch({ length: 1, width: PART.width + 1 }), PART)).toBe(
+      'Corner notch size runs past the blank.'
+    );
+  });
+
+  it('accepts one that leaves material behind', () => {
+    expect(validateRectCutFeature(cornerNotch({ length: 2, width: 2 }), PART)).toBeNull();
+  });
+});
