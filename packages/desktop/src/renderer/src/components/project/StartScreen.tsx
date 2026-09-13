@@ -6,6 +6,7 @@ import { UserTemplate } from '../../templates';
 import { Project } from '../../types';
 import { AppHorizontalLogo } from '../common/AppHorizontalLogo';
 import { TemplatesSection } from './TemplatesSection';
+import { NextSkillCard } from './NextSkillCard';
 import { RecentsTab } from './RecentsTab';
 import { FavoritesTab } from './FavoritesTab';
 
@@ -196,6 +197,8 @@ export function StartScreen({
             )}
           </div>
         </div>
+
+        <NextSkillCard />
 
         <TemplatesSection
           userTemplates={userTemplates}

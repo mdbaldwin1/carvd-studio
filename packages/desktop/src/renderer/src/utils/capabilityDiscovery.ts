@@ -1,5 +1,20 @@
 import type { DocsSection } from './docsLinks';
-import type { PartFeature, Project } from '../types';
+import type { Assembly, Group, Part, PartFeature, SnapGuide } from '../types';
+
+/**
+ * Just the parts of a project this reads.
+ *
+ * Narrower than Project on purpose: the live store holds the same fields flat
+ * rather than wrapped, so asking for only what is inspected lets a saved file
+ * and the open project both be folded in without converting either.
+ */
+export interface CapabilitySource {
+  parts?: Part[];
+  groups?: Group[];
+  assemblies?: Assembly[];
+  snapGuides?: SnapGuide[];
+  cutList?: unknown;
+}
 
 /**
  * What a maker has actually built with, derived from their own work.
@@ -107,7 +122,7 @@ function isJoinery(feature: PartFeature): boolean {
 }
 
 /** Which capabilities this project is evidence of. */
-export function detectCapabilities(project: Project): Set<Capability> {
+export function detectCapabilities(project: CapabilitySource): Set<Capability> {
   const found = new Set<Capability>();
   const parts = project.parts ?? [];
 
@@ -132,8 +147,16 @@ export interface CapabilityUsage {
   projectsSeen: number;
   /** Projects that used each capability, so "never, in 14" can be said. */
   usedIn: Partial<Record<Capability, number>>;
-  /** The largest project seen, used to judge whether a suggestion is apt. */
-  largestPartCount: number;
+  /**
+   * Part counts of recent projects, newest last, used to judge whether a
+   * suggestion is apt.
+   *
+   * A list rather than a running maximum because the maximum is set once and
+   * never comes down: a single 2,000-part stress file would say forever that
+   * this maker builds at a scale that makes every capability worth raising,
+   * when their actual work is eight-part desks.
+   */
+  recentPartCounts: number[];
   /** Capabilities the maker has told us to stop offering. */
   dismissed: Capability[];
   /** ISO timestamp of the last suggestion shown. */
@@ -143,41 +166,78 @@ export interface CapabilityUsage {
 export const EMPTY_CAPABILITY_USAGE: CapabilityUsage = {
   projectsSeen: 0,
   usedIn: {},
-  largestPartCount: 0,
+  recentPartCounts: [],
   dismissed: []
 };
+
+/** How many projects are remembered individually. */
+const SEEN_PROJECT_LIMIT = 50;
+
+/** What each remembered project has already been credited for. */
+export type SeenProjects = Record<string, Capability[]>;
 
 /**
  * Fold one project into what is known.
  *
- * Counted per project rather than per save, so leaving a file open does not
- * make one afternoon look like a habit.
+ * A capability counts once per project rather than once per save, so leaving a
+ * file open all afternoon does not make one sitting look like a habit. What is
+ * remembered is per project, not merely that the project was seen: someone who
+ * finally tries a guide plane in a design they have been saving for weeks has
+ * used guides, and must be credited for it the moment they do.
+ *
+ * Returns the previous values untouched when there is nothing new, so the
+ * caller can tell an ordinary save from something worth writing to disk.
  */
 export function recordProjectUsage(
   previous: CapabilityUsage,
-  project: Project,
+  project: CapabilitySource,
   projectKey: string,
-  seenKeys: string[] = []
-): { usage: CapabilityUsage; seenKeys: string[] } {
-  const alreadySeen = seenKeys.includes(projectKey);
+  seen: SeenProjects = {}
+): { usage: CapabilityUsage; seen: SeenProjects } {
+  const credited = seen[projectKey];
+  const isNewProject = credited === undefined;
   const found = detectCapabilities(project);
-  const usedIn = { ...previous.usedIn };
+  const fresh = [...found].filter((capability) => !credited?.includes(capability));
 
-  for (const capability of found) {
-    // A capability counts once per project, however many times it is saved.
-    if (alreadySeen) continue;
+  if (!isNewProject && fresh.length === 0) return { usage: previous, seen };
+
+  const usedIn = { ...previous.usedIn };
+  for (const capability of fresh) {
     usedIn[capability] = (usedIn[capability] ?? 0) + 1;
   }
+
+  const nextSeen = { ...seen, [projectKey]: [...(credited ?? []), ...fresh] };
+  // Oldest first, so trimming drops the project touched longest ago.
+  const keys = Object.keys(nextSeen);
+  for (const key of keys.slice(0, Math.max(0, keys.length - SEEN_PROJECT_LIMIT))) delete nextSeen[key];
 
   return {
     usage: {
       ...previous,
-      projectsSeen: alreadySeen ? previous.projectsSeen : previous.projectsSeen + 1,
+      projectsSeen: isNewProject ? previous.projectsSeen + 1 : previous.projectsSeen,
       usedIn,
-      largestPartCount: Math.max(previous.largestPartCount, project.parts?.length ?? 0)
+      recentPartCounts: isNewProject
+        ? [...previous.recentPartCounts, project.parts?.length ?? 0].slice(-RECENT_PROJECT_WINDOW)
+        : previous.recentPartCounts
     },
-    seenKeys: alreadySeen ? seenKeys : [...seenKeys, projectKey].slice(-50)
+    seen: nextSeen
   };
+}
+
+/** How many recent projects the size judgement is made from. */
+const RECENT_PROJECT_WINDOW = 20;
+
+/**
+ * The size of project this maker typically builds.
+ *
+ * The median, so one outsized file -- a stress test, an inherited plan opened
+ * once -- does not stand in for the work they actually do.
+ */
+export function typicalPartCount(usage: CapabilityUsage): number {
+  const counts = [...usage.recentPartCounts].sort((a, b) => a - b);
+  if (counts.length === 0) return 0;
+  const middle = Math.floor(counts.length / 2);
+  return counts.length % 2 === 0 ? (counts[middle - 1] + counts[middle]) / 2 : counts[middle];
 }
 
 export interface CapabilitySuggestion {
@@ -201,10 +261,11 @@ export function suggestCapability(
   const minimumProjects = options.minimumProjects ?? 3;
   if (usage.projectsSeen < minimumProjects) return null;
 
+  const typicalSize = typicalPartCount(usage);
   const candidates = ALL_CAPABILITIES.filter((capability) => {
     if (usage.dismissed.includes(capability)) return false;
     if ((usage.usedIn[capability] ?? 0) > 0) return false;
-    return usage.largestPartCount >= CAPABILITY_INFO[capability].relevantAtParts;
+    return typicalSize >= CAPABILITY_INFO[capability].relevantAtParts;
   });
   if (candidates.length === 0) return null;
 

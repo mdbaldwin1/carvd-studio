@@ -441,7 +441,6 @@ describe('PartCutsWorkspace', () => {
       renderWorkspace({ onDraftFeaturesChange });
       startCut(preset);
 
-      const preview = screen.getByRole('img', { name: 'Part cuts geometry preview' });
       expect(screen.getByText('Preview Handles')).toBeInTheDocument();
       fireEvent.click(screen.getByRole('button', { name: 'Move Right' }));
       fireEvent.click(screen.getByRole('button', { name: resize }));
@@ -484,7 +483,6 @@ describe('PartCutsWorkspace', () => {
       startCut('Rounded Rectangle');
       fireEvent.change(screen.getByLabelText('Rotation (degrees)'), { target: { value: String(rotation) } });
 
-      const preview = screen.getByRole('img', { name: 'Part cuts geometry preview' });
       fireEvent.click(screen.getByRole('button', { name: 'Extend Length' }));
       expect(screen.getByLabelText('Opening Length')).toHaveValue('3 1/4');
       expect(screen.getByLabelText('Opening Width')).toHaveValue('1');

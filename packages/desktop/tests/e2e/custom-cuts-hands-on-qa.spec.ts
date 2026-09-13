@@ -763,7 +763,9 @@ test.describe('hands-on custom cuts qualification', () => {
     await window.getByLabel('Label (optional)', { exact: true }).fill('Post corner clearance');
     await fillMeasurement(window, 'Run Along Blank', '40');
     await fillMeasurement(window, 'Cross-Cut Width', '2');
-    await expect(window.getByText('Corner notch size runs past the blank.')).toBeVisible();
+    // Scoped to the editor panel: the same warning also rides along on the
+    // cut's entry in the list, which is what the issues surface is for.
+    await expect(cutPanel(window).getByText('Corner notch size runs past the blank.')).toBeVisible();
     await expect(cutPanel(window).getByRole('alert')).toBeVisible();
     await fillMeasurement(window, 'Run Along Blank', '2 1/2');
     await expectCutAccepted(window);

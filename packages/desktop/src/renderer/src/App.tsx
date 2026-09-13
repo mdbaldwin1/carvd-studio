@@ -20,6 +20,7 @@ import { ImportToLibraryDialog } from './components/parts-list/ImportToLibraryDi
 import { NewProjectDialog } from './components/project/NewProjectDialog';
 import { RecoveryDialog } from './components/project/RecoveryDialog';
 import { StartScreen } from './components/project/StartScreen';
+import { useCapabilityDiscoveryStore } from './store/capabilityDiscoveryStore';
 import { PropertiesPanel } from './components/properties/PropertiesPanel';
 import {
   TemplateDiscardDialog,
@@ -578,6 +579,21 @@ function App() {
   const projectName = useProjectStore((s) => s.projectName);
   const setProjectName = useProjectStore((s) => s.setProjectName);
   const isDirty = useProjectStore((s) => s.isDirty);
+
+  // Fold each saved project into what the maker has actually built with, so a
+  // suggestion can be about a capability they have never reached for rather
+  // than a guess. Runs on open and after every save; the recorder counts a
+  // project once, so saving all afternoon does not look like a habit. Nothing
+  // leaves the machine -- the evidence is the project itself.
+  const recordProjectCapabilities = useCapabilityDiscoveryStore((s) => s.recordProject);
+  const loadCapabilityUsage = useCapabilityDiscoveryStore((s) => s.load);
+  useEffect(() => {
+    if (!filePath || isDirty) return;
+    void (async () => {
+      await loadCapabilityUsage();
+      await recordProjectCapabilities(useProjectStore.getState(), filePath);
+    })();
+  }, [filePath, isDirty, loadCapabilityUsage, recordProjectCapabilities]);
   const markDirty = useProjectStore((s) => s.markDirty);
   const [isHeaderNameEditing, setIsHeaderNameEditing] = useState(false);
   const [headerNameDraft, setHeaderNameDraft] = useState('');
