@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added stable accessible names to every custom shopping-item field.
+
 - Added descriptive accessible names to stock and custom-item shopping-list checkboxes.
 
 - Made cutting-diagram boards and parts keyboard accessible, added descriptive part tooltips, named the zoom controls, and clarified how to open diagram details.

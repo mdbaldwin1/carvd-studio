@@ -265,6 +265,19 @@ describe('ShoppingListTab', () => {
     });
   });
 
+  it('gives every custom-item field a stable accessible name', async () => {
+    const user = userEvent.setup();
+    render(<ShoppingListTab {...defaultProps} />);
+
+    await user.click(screen.getByRole('button', { name: '+ Add Item' }));
+
+    expect(screen.getByRole('textbox', { name: 'Item name' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Description (optional)' })).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Quantity' })).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Unit price' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Category' })).toBeInTheDocument();
+  });
+
   describe('high utilization warnings', () => {
     it('shows warning for stocks with >90% utilization', () => {
       const cutList = createCutList({
