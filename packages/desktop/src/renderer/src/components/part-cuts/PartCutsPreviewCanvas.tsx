@@ -21,6 +21,7 @@ import {
 import { Button } from '@renderer/components/ui/button';
 import { CardDescription } from '@renderer/components/ui/card';
 import { useAppSettings } from '@renderer/hooks/useAppSettings';
+import { useProjectStore } from '@renderer/store/projectStore';
 import { AppSettings, Part, PartFeature, PartFeatureTarget } from '@renderer/types';
 import { getPartEndCutProfiles } from '@renderer/utils/endCutUtils';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
@@ -695,10 +696,11 @@ function applyCutSnap(
   dragged: FeatureDraft,
   otherFeatures: PartFeature[],
   settings: AppSettings
-): { draft: FeatureDraft; guides: CutSnapGuide[] } {
-  if (dragged.mode === 'end_cut') return { draft: dragged, guides: [] };
+): { draft: FeatureDraft; guides: CutSnapGuide[]; caughtPrimary: boolean; caughtSecondary: boolean } {
+  const none = { draft: dragged, guides: [] as CutSnapGuide[], caughtPrimary: false, caughtSecondary: false };
+  if (dragged.mode === 'end_cut') return none;
   const moving = getCutFaceBox(part, buildFeatureFromDraft(dragged));
-  if (!moving) return { draft: dragged, guides: [] };
+  if (!moving) return none;
 
   const others = otherFeatures
     .filter((feature) => feature.enabled && feature.id !== dragged.featureId)
@@ -713,7 +715,12 @@ function applyCutSnap(
     threshold: getCutSnapThreshold(part, settings.snapSensitivity),
     movingEdges: dragged.mode === 'circular_cut' ? ['center'] : undefined
   });
-  if (primaryDelta === 0 && secondaryDelta === 0) return { draft: dragged, guides };
+  // A cut already sitting on an anchor still draws its guide, but it has not
+  // been pulled anywhere -- so it must not be treated as caught, or it would
+  // suppress the grid rounding the rest of the drag depends on.
+  const caughtPrimary = primaryDelta !== 0;
+  const caughtSecondary = secondaryDelta !== 0;
+  if (!caughtPrimary && !caughtSecondary) return { draft: dragged, guides, caughtPrimary, caughtSecondary };
 
   if (dragged.mode === 'rect_cut') {
     return {
@@ -722,7 +729,9 @@ function applyCutSnap(
         placementX: dragged.placementX + primaryDelta,
         placementZ: dragged.placementZ + secondaryDelta
       },
-      guides
+      guides,
+      caughtPrimary,
+      caughtSecondary
     };
   }
   const sizes = getFaceSizes(part);
@@ -743,14 +752,19 @@ function applyCutSnap(
         feature.reference.secondaryFrom
       )
     },
-    guides
+    guides,
+    caughtPrimary,
+    caughtSecondary
   };
 }
 
 /** Take each axis from the snapped draft or the rounded one, per what caught. */
-function mergeSnappedAxes(rounded: FeatureDraft, snapped: FeatureDraft, guides: CutSnapGuide[]): FeatureDraft {
-  const caughtPrimary = guides.some((guide) => guide.axis === 'primary');
-  const caughtSecondary = guides.some((guide) => guide.axis === 'secondary');
+function mergeSnappedAxes(
+  rounded: FeatureDraft,
+  snapped: FeatureDraft,
+  caughtPrimary: boolean,
+  caughtSecondary: boolean
+): FeatureDraft {
   if (!caughtPrimary && !caughtSecondary) return rounded;
   if (rounded.mode === 'rect_cut' && snapped.mode === 'rect_cut') {
     return {
@@ -773,8 +787,8 @@ function mergeSnappedAxes(rounded: FeatureDraft, snapped: FeatureDraft, guides: 
   return rounded;
 }
 
-export function quantizeHandleDraft(part: Part, dragged: FeatureDraft): FeatureDraft {
-  const snap = (value: number) => Math.round(value / HANDLE_QUANTUM) * HANDLE_QUANTUM;
+export function quantizeHandleDraft(part: Part, dragged: FeatureDraft, quantum = HANDLE_QUANTUM): FeatureDraft {
+  const snap = (value: number) => Math.round(value / quantum) * quantum;
   let candidate: FeatureDraft;
   if (dragged.mode === 'rect_cut') {
     candidate = {
@@ -1239,7 +1253,8 @@ function PartCutsPreviewScene({
   onHoverTarget,
   onActivateTarget,
   onDraftChange,
-  frameNonce
+  frameNonce,
+  dragQuantum
 }: {
   previewPart: Part;
   units: 'imperial' | 'metric';
@@ -1250,6 +1265,7 @@ function PartCutsPreviewScene({
   onHoverTarget: (target: PartFeatureTarget | null) => void;
   onActivateTarget: (target: PartFeatureTarget | null) => void;
   onDraftChange: (draft: FeatureDraft) => void;
+  dragQuantum: number;
 }) {
   const geometry = useMemo(() => getPartRenderGeometry(previewPart), [previewPart]);
   const pickTargets = useMemo(() => getValidPickableTargets(previewPart, draft), [draft, previewPart]);
@@ -1310,13 +1326,20 @@ function PartCutsPreviewScene({
     const snapped =
       activeDrag.kind === 'move'
         ? applyCutSnap(previewPart, moved, previewPart.features ?? [], appSettings)
-        : { draft: moved, guides: [] as CutSnapGuide[] };
+        : { draft: moved, guides: [] as CutSnapGuide[], caughtPrimary: false, caughtSecondary: false };
     setSnapGuides(snapped.guides);
     // The axis that caught an anchor keeps that anchor's exact value, so
     // landing on the centre of a board means the centre. The other axis is
     // still a free drag and is rounded, or it would carry the raw pointer
     // float into the measurements.
-    onDraftChange(mergeSnappedAxes(quantizeHandleDraft(previewPart, moved), snapped.draft, snapped.guides));
+    onDraftChange(
+      mergeSnappedAxes(
+        quantizeHandleDraft(previewPart, moved, dragQuantum),
+        snapped.draft,
+        snapped.caughtPrimary,
+        snapped.caughtSecondary
+      )
+    );
   };
 
   const endDrag = (event: ThreeEvent<PointerEvent>) => {
@@ -1658,6 +1681,14 @@ export function PartCutsPreviewCanvas({
     [draft, previewPart, units]
   );
   const supportsHandles = supportsPreviewHandles(draft);
+  // The project's own grid drives a free drag when grid snapping is on -- the
+  // same setting that governs a part drag. With it off a drag stays free and is
+  // only rounded enough to keep the raw pointer float out of the measurements.
+  // Resolved here rather than inside the canvas: R3F renders its children with
+  // a separate reconciler, and the scene should not reach for stores itself.
+  const { settings: previewSettings } = useAppSettings();
+  const projectGridSize = useProjectStore((state) => state.gridSize);
+  const dragQuantum = previewSettings.liveGridSnap && projectGridSize > 0 ? projectGridSize : HANDLE_QUANTUM;
   // Panning and a wide zoom range mean the part can end up off screen. The
   // project canvas answers F and Home through these camera requests, so the
   // preview honours the same ones instead of owning a button.
@@ -1762,6 +1793,7 @@ export function PartCutsPreviewCanvas({
             onActivateTarget={onActivateTarget}
             onDraftChange={onDraftChange}
             frameNonce={frameNonce}
+            dragQuantum={dragQuantum}
           />
         </Canvas>
       </div>

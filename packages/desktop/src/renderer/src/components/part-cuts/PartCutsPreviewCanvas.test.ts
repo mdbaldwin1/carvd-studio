@@ -693,6 +693,17 @@ describe('quantizeHandleDraft', () => {
     expect(onGrid(snapped.sizeWidth)).toBe(true);
   });
 
+  it('lands on whatever increment it is given', () => {
+    // A free drag rounds to a sixty-fourth; with grid snapping on, the
+    // project's own grid takes over, so an eighth-inch grid means eighths.
+    const start = createRectDraft('mortise');
+    const dragged = sameMode(start, applyHandleDelta(part, start, 'move', 1.3333, 0.7777));
+    expect(sameMode(dragged, quantizeHandleDraft(part, dragged)).placementX % (1 / 64)).toBeCloseTo(0, 9);
+    const onEighths = sameMode(dragged, quantizeHandleDraft(part, dragged, 1 / 8));
+    expect(onEighths.placementX % (1 / 8)).toBeCloseTo(0, 9);
+    expect(onEighths.placementX).toBeCloseTo(1.375, 5);
+  });
+
   it('keeps the unrounded value rather than stepping past a limit', () => {
     // Pushed hard against the end of the board: rounding outward would put the
     // cut past the blank, so the exact boundary value has to survive.
