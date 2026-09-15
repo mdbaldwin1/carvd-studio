@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed a dragged part appearing to snap into place and then jumping back when overlap prevention limited the move; the preview now shows the position that will actually be kept.
+
 - Fixed parts drifting a fraction of an inch along the view axis when dragged in a straight-on view; the drag plane now locks to that axis exactly.
 
 - Hardened router-profile geometry and inert importers with aggregate evaluation/import caps, bounded canonical serialization, linear-time DXF contour joining, structured malformed-limit handling, and deterministic seeded adversarial coverage.

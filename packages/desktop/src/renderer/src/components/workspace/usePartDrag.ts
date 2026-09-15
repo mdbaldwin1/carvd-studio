@@ -760,6 +760,27 @@ export function usePartDrag(
           y: newY - dragStart.current.partPos.y,
           z: newZ - dragStart.current.partPos.z
         };
+        // The preview published above is the snapped proposal. Overlap
+        // prevention may then clamp or refuse it, and release commits the
+        // clamped position, not the proposal. Republishing keeps the screen
+        // honest: without it a part visibly snapped into a joint and jumped
+        // back out on release, because the view showed the proposal while the
+        // commit used the clamp.
+        if (
+          Math.abs(effectiveDelta.x - previewDelta.x) > 1e-9 ||
+          Math.abs(effectiveDelta.y - previewDelta.y) > 1e-9 ||
+          Math.abs(effectiveDelta.z - previewDelta.z) > 1e-9
+        ) {
+          publishMoveInteractionPreview({
+            delta: effectiveDelta,
+            snapLines,
+            moveOwner: 'part',
+            referenceDistances,
+            referenceState,
+            publishSelectionDragDelta: false
+          });
+        }
+
         const partLiveX = dragStart.current.partOriginalPos.x + effectiveDelta.x;
         const partLiveY = dragStart.current.partOriginalPos.y + effectiveDelta.y;
         const partLiveZ = dragStart.current.partOriginalPos.z + effectiveDelta.z;
