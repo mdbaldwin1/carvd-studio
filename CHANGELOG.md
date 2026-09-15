@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Hardened router-profile geometry and inert importers with aggregate evaluation/import caps, bounded canonical serialization, linear-time DXF contour joining, structured malformed-limit handling, and deterministic seeded adversarial coverage.
+- Added bounded transactional undo/redo to the router-profile definition dialog and validated one-step batch smoothing with explicit eligible/skipped join review.
+
+- Added router-profile continuity markers, neutral intentional-corner diagnostics, smooth-authoring guidance, and aligned/mirrored tangent locks backed by the shared analyzer and enforcer.
+
+- Added scale-aware G0/G1/G2 continuity diagnostics for canonical router-profile joins and immutable tangent-alignment helpers for line/cubic editing, while keeping intentional sharp corners valid.
+- Added interactive custom router-profile handles with precise SVG coordinate mapping, snapping, modifiers, keyboard nudging, drag measurements, and cubic control reset.
+
+- Added signed router-catalog verification review with explicit unsigned/untrusted acknowledgement, trusted publisher key confirmation, and bounded signature details.
+
+- Added optional offline Ed25519 integrity verification and a capped public-key-only trusted publisher library for router catalog bundles.
+- Added deterministic router-catalog export and complete router-data backup with explicit selection, search/filtering, automatic immutable profile dependency closure, stale-review protection, and production-validated round trips.
+- Added atomic, optimistic-concurrency-safe installation of router profile and tool catalog libraries through a narrow validated desktop bridge.
+- Added accessible certified-profile linking and scaling bounds for physical router tools, compatibility-ranked tool choices, and conflict-reviewed atomic router-catalog installation with optimistic concurrency protection and rollback-safe failure handling.
+- Added exact immutable tool-to-profile production links, graded geometry-aware compatibility, atomic versioned router catalog bundles, and deterministic non-mutating catalog import plans.
+- Added in-app router interchange format guidance, production-serialized profile/tool examples, actionable categorized import diagnostics, and unobtrusive format-version and revision details in both router libraries.
+- Published strict, versioned JSON interchange schemas, conformance fixtures, checksum vectors, and an integration guide for `.carvd-profile` and `.carvd-tool` files.
+- Added an optional measured router-tool envelope editor with axial cutter, neck, shank, and stackable-bearing sections, an accessible bit silhouette, inferred starting sections for review, and clear detailed-versus-estimated feasibility status.
+- Added versioned axial router-tool envelopes with explicit cutter, neck, shank, and bearing spans, deterministic radial-envelope queries, lossless project/tool-file persistence, and stronger proven tool-clearance and reach checks while retaining conservative legacy-tool guidance.
+- Added live physical-router-tool feasibility summaries to edge-profile properties and the cross-section inspector, with grouped remedies and analysis assumptions.
+- Added deterministic physical router-tool feasibility checks for edge profiles, including cutting engagement, declared cutter reach, stock-face limits, shank/neck and bearing cautions, compatibility, project issues, and fabrication remedies without changing modeled geometry.
+- Added an enlarged, evaluator-accurate cross-section inspector for selected edge-profile cuts, including orientation, dimensions, tool, provenance, and material-removal context.
+- Added safe SVG router-profile import with explicit contour choice, unit review, transforms, fidelity provenance, shared topology preview, and library/apply workflows.
+- Added a resource-bounded, inert SVG router-profile importer with exact line, cubic, quadratic, and axis-aligned arc conversion; common transforms and physical units; explicit curved-arc approximation fidelity; and rejection of active or external content.
+- Added numeric cubic Bézier editing for custom router profiles and clear DXF fidelity reporting for exact versus approximated spline imports.
+- Added canonical cubic Bezier router-profile curves with bounded adaptive evaluation shared by previews and modeled cuts, plus exact clamped-cubic and explicit bounded-approximation support for planar ASCII DXF SPLINE entities.
+- Added an atomic “Update All Matching Cuts” profile-revision workflow scoped to the current part, with an affected-cut review, stale-target reporting, and one-step undo/redo.
+- Added explicit custom router-profile revision status and side-by-side comparison so projects keep immutable snapshots until a user chooses to update a cut.
+- Added a physical Router Tools library with validated create, edit, duplicate, import, export, and delete workflows, plus per-edge-profile tool assignment and advisory compatibility warnings.
+
+- Added revisioned router-profile snapshots and a separate physical router-tool library, preserving project geometry while detecting changed or deleted library entries and reporting assigned catalog tooling in fabrication output.
+- Added a numeric custom router-profile editor for semantic lines, circular arcs, and elliptical arcs, plus strict lossless `.carvd-profile` import/export and editable copies of built-in profiles.
+- Replaced hard-coded edge-profile shape branches with a typed, data-driven registry whose semantic line and arc definitions share one evaluator with custom router profiles, while preserving exact circular roundovers and coves for unequal dimensions.
+- Added a DXF router-profile import wizard with contour selection, scale and orientation controls, shared material-removal previews, reusable App Library profiles, and durable custom edge-profile snapshots.
+- Wired embedded custom router-profile snapshots into edge-profile CSG through a shared chord-error evaluator for semantic lines, circular arcs, and elliptical arcs, with bounded tessellation, winding normalization, snapshot-aware caching, and consistent orientation on every stock edge.
+- Added a dependency-free, resource-bounded ASCII DXF importer for custom router profiles, including line, arc, circle, lightweight/classic polyline and bulge geometry, unit normalization, contour repair, transforms, and basic geometry validation without loading blocks or external references.
+- Added a versioned custom router-profile model with semantic line and arc boundaries, embedded edge-profile snapshots for durable project geometry, and a synchronized app-level profile library foundation.
+- Unified every edge-profile selector diagram and modeled cut around the same sampled cross-section, with distinct Bead and Ogee geometry instead of approximate look-alikes.
+- Fixed Edge Profile front/back geometry and selection highlights using opposite conventions, and replaced its remaining face-sized pick slabs with narrow edge targets. Routed Path remains face-targeted.
+- Added a persistent high-contrast selected-edge indicator for edge profiles and reduced routed-segment label collisions on compact paths.
+- Added actionable routed-path validation for impossible bit depths, oversized undercut shanks, shallow undercut cavities, off-face points, and blind cuts deeper than the material; profile switches now choose physically valid default depths.
+- Fixed deleting a point from a minimal closed route so it reopens cleanly instead of leaving an invalid two-point loop.
+- Fixed asymmetric edge-profile dimensions being silently collapsed to the smaller value, and increased router-bit diagram contrast.
+- Fixed mirrored edge-profile cutter geometry that could leave roundovers and other profiles visibly uncut on selected edges.
+- Added a distinct Edge Profile routing operation with its own visual selector for roundover, cove, chamfer, rabbet, bead, ogee, and thumbnail profiles.
+- Added live routed-path point-to-edge dimensions, segment lengths and angles, 45-degree direction snapping, center/edge snapping, point-to-point alignment, and visible alignment guides.
+- Consolidated routed-path bit choices by modeled cut geometry, replacing duplicate flat-bottom, round-bottom, and V-shaped bit cards with one clear profile choice each while retaining older project compatibility.
+- Added a visual router-bit selector with cross-section previews for every routed-path profile.
+- Added draggable routed-path points directly on the part preview, with clear start and route-point guidance.
+- Added Ball Nose and Engraving routed-path profiles with real swept geometry and visual selector previews.
+- Added Mortising, Spiral Upcut, Spiral Downcut, Compression, and Surfacing routed-path bit choices while preserving each bit's identity in saved projects and fabrication summaries.
+
+- Added face-based routed paths to Custom Cuts: author open or closed polylines, choose straight, core-box, or V bits, and set blind or through depth. Routed paths render as true swept subtractive geometry on every face, persist safely in project files, and appear in cut summaries and fabrication instructions.
+- Added per-point routed-path corner radii with tangent fillets, automatic radius clamping on short neighboring spans, open/closed-path support, and optimized interactive geometry generation.
+- Added routed dovetail, T-slot, and keyhole bits with narrow shank openings, wider subsurface cavities, keyhole starting plunge pockets, profile-specific validation, editor controls, and fabrication dimensions.
+- Added joinery-aware rigid-group and keyboard-nudge snapping: grouped tenons, housed joints, and complementary half-laps now retain their authored mate features, multiple joints must agree on one transform, and paired dowel holes snap back to exact coaxial seated alignment.
+- Rigid joinery snapping now evaluates every eligible joint on each member, allowing both ends of an apron to select one shared assembly transform even when a closer unrelated socket competes for either tenon.
+- Direct single-part drags now apply the same multi-joint consensus as rigid groups, preventing an apron or dowelled member from snapping one connector while another in-range connector demands a different position.
+- Releasing a direct drag with conflicting in-range joinery now explains that snapping was refused, including the connector count and measured positional disagreement.
+- Multi-dowel joints now require every paired hole on the moving member to agree on one coaxial seating transform; a misaligned secondary dowel blocks the mate instead of being silently ignored.
+- Explicit dowel relationships now find their named mate even in crowded assemblies where the host falls outside the generic nearest-parts candidate cap.
+- Complementary mitre, bevel, and compound-cut faces now produce holistic joinery mates that align the full cut-face center on all three axes, while incompatible cut profiles are ignored.
+
+- Added an actionable joinery warning when matching joints in a rigid group demand conflicting transforms, including the measured alignment disagreement.
+
+- Added distinct purple joinery snap guides and labels for mortise-and-tenon, dowel, half-lap, dado, groove, and rabbet mates.
+
+- Tightened joinery compatibility so tenons only enter mortises from the physically valid direction, complementary half-laps require matching remaining-stock and pocket depths, and unrelated cut families cannot attract each other merely because their dimensions are similar.
+
+- Fixed blocked part and group drags being committed in overlapping positions when overlap prevention is enabled.
+
+- Added shoulder-flush feature snapping for tenons entering front- and back-face mortises, including deeper mortises with bottom clearance.
+
+- Fixed single-part dragging in straight-on views so screen-vertical movement follows world Y; hold Shift to constrain movement to the ground plane.
+
 - Added stable accessible names to every custom shopping-item field.
 
 - Added descriptive accessible names to stock and custom-item shopping-list checkboxes.
