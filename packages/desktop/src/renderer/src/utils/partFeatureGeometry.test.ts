@@ -583,7 +583,9 @@ describe('partFeatureGeometry', () => {
         mesh
       )[0];
       expect(hit.point.z).toBeCloseTo(2.5, 3);
-    });
+      // Rounded-corner sweep plus a raycast is the heaviest case in this file;
+      // it fits the default budget normally but not under coverage instrumentation.
+    }, 30000);
 
     it('cuts the closing span of a closed polyline', () => {
       const part = routedPart('straight');

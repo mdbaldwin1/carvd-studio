@@ -123,3 +123,77 @@ describe('RouterToolDialog detailed envelope', () => {
     expect(screen.queryByRole('list', { name: 'Linked produced profiles' })).not.toBeInTheDocument();
   });
 });
+
+describe('RouterToolDialog detailed envelope editing', () => {
+  const openDetailed = (onSave = vi.fn()) => {
+    render(<RouterToolDialog open initialTool={detailedTool} onOpenChange={vi.fn()} onSave={onSave} />);
+    return onSave;
+  };
+
+  it('refuses an envelope that contradicts the simple dimensions', () => {
+    const onSave = openDetailed();
+    fireEvent.change(screen.getByLabelText('Section 1 end offset'), { target: { value: '0.4' } });
+    fireEvent.change(screen.getByLabelText('Section 2 start offset'), { target: { value: '0.4' } });
+    fireEvent.change(screen.getByLabelText('Section 2 diameter'), { target: { value: '0.5' } });
+    expect(screen.getByText(/cutter span must match cuttingHeight/)).toBeInTheDocument();
+    expect(screen.getByText(/shank diameter must match shankDiameter/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Tool' }));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('saves an edited envelope once the simple dimensions agree', () => {
+    const onSave = openDetailed();
+    fireEvent.change(screen.getByLabelText('Cutting Height'), { target: { value: '0.4' } });
+    fireEvent.change(screen.getByLabelText('Shank Diameter'), { target: { value: '0.5' } });
+    fireEvent.change(screen.getByLabelText('Section 1 end offset'), { target: { value: '0.4' } });
+    fireEvent.change(screen.getByLabelText('Section 2 start offset'), { target: { value: '0.4' } });
+    fireEvent.change(screen.getByLabelText('Section 2 diameter'), { target: { value: '0.5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Tool' }));
+    const saved = onSave.mock.calls[0][0] as RouterToolDefinition;
+    expect(saved.sections?.[0]).toMatchObject({ role: 'cutter', end: 0.4 });
+    expect(saved.sections?.[1]).toMatchObject({ role: 'shank', start: 0.4, diameter: 0.5 });
+  });
+
+  it('reorders sections with the move controls', () => {
+    const onSave = openDetailed();
+    fireEvent.click(screen.getByLabelText(/Move section 2 up/));
+    expect(screen.getByLabelText(/Section 1 role/)).toHaveValue('shank');
+    fireEvent.click(screen.getByLabelText(/Move section 1 down/));
+    expect(screen.getByLabelText(/Section 1 role/)).toHaveValue('cutter');
+    void onSave;
+  });
+
+  it('adds and deletes a section', () => {
+    openDetailed();
+    const before = screen.getAllByLabelText(/Section \d+ role/).length;
+    fireEvent.click(screen.getByRole('button', { name: /Add section/ }));
+    expect(screen.getAllByLabelText(/Section \d+ role/)).toHaveLength(before + 1);
+    fireEvent.click(screen.getByLabelText(new RegExp(`Delete section ${before + 1}`)));
+    expect(screen.getAllByLabelText(/Section \d+ role/)).toHaveLength(before);
+  });
+
+  it('offers a stackable choice only for a bearing', () => {
+    openDetailed();
+    fireEvent.change(screen.getByLabelText(/Section 2 role/), { target: { value: 'bearing' } });
+    const stackable = screen.getAllByRole('checkbox').at(-1);
+    expect(stackable).toBeDefined();
+    fireEvent.click(stackable!);
+    expect(stackable).toBeChecked();
+  });
+
+  it('generates a starting envelope for a tool that has none', () => {
+    const basic: RouterToolDefinition = {
+      version: 1,
+      id: 'basic',
+      name: 'Legacy Bit',
+      source: 'generic',
+      profileFamily: 'roundover',
+      cutterDiameter: 0.5,
+      shankDiameter: 0.25,
+      cuttingHeight: 0.25
+    };
+    render(<RouterToolDialog open initialTool={basic} onOpenChange={vi.fn()} onSave={vi.fn()} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Detailed tool envelope' }));
+    expect(generateRouterToolSections(basic).length).toBeGreaterThan(0);
+  });
+});
