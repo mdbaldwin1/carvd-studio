@@ -1,0 +1,31 @@
+{
+  "format": "carvd-router-profile",
+  "version": 1,
+  "profile": {
+    "version": 1,
+    "id": "vendor-svg-bead",
+    "name": "Vendor SVG Bead",
+    "family": "bead",
+    "source": "manufacturer",
+    "manufacturer": "Example Tool Co",
+    "sku": "SVG-18",
+    "sourceUrl": "https://example.invalid/catalog/SVG-18",
+    "parameters": {
+      "provenanceFormat": "SVG",
+      "sourceChecksum": "sha256:example-svg-vector",
+      "fidelity": "exact-cubic",
+      "sourceUnits": "inch"
+    },
+    "boundary": {
+      "start": { "u": 0, "v": 0.375 },
+      "segments": [
+        {
+          "kind": "cubicBezier",
+          "control1": { "u": 0.12, "v": 0.375 },
+          "control2": { "u": 0.375, "v": 0.12 },
+          "to": { "u": 0.375, "v": 0 }
+        }
+      ]
+    }
+  }
+}

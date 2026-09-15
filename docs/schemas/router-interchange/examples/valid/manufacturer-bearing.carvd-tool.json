@@ -1,0 +1,27 @@
+{
+  "format": "carvd-router-tool",
+  "version": 1,
+  "tool": {
+    "version": 1,
+    "id": "vendor-bearing-42",
+    "name": "Bearing Roundover 42",
+    "source": "manufacturer",
+    "manufacturer": "Example Tool Co",
+    "sku": "BR-42",
+    "sourceUrl": "https://example.invalid/catalog/BR-42",
+    "profileFamily": "roundover",
+    "routerProfileId": "generic-roundover",
+    "cutterDiameter": 1,
+    "shankDiameter": 0.5,
+    "cuttingHeight": 0.5,
+    "bearingDiameter": 0.375,
+    "envelopeVersion": 1,
+    "sections": [
+      { "role": "bearing", "start": -0.2, "end": 0, "diameter": 0.375 },
+      { "role": "cutter", "start": 0, "end": 0.5, "diameter": 1 },
+      { "role": "shank", "start": 0.5, "end": 2, "diameter": 0.5 }
+    ],
+    "overallLength": 3,
+    "safeColletInsertion": 1
+  }
+}

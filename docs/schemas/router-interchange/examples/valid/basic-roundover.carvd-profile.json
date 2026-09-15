@@ -1,0 +1,23 @@
+{
+  "format": "carvd-router-profile",
+  "version": 1,
+  "profile": {
+    "version": 1,
+    "id": "generic-roundover",
+    "name": "Generic Roundover",
+    "family": "roundover",
+    "source": "generic",
+    "parameters": { "radius": 0.25 },
+    "boundary": {
+      "start": { "u": 0, "v": 0.25 },
+      "segments": [
+        {
+          "kind": "arc",
+          "to": { "u": 0.25, "v": 0 },
+          "radius": 0.25,
+          "clockwise": true
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "format": "carvd-router-profile",
+  "version": 1,
+  "profile": {
+    "version": 1,
+    "id": "vendor-ogee-123",
+    "name": "Catalog Ogee 123",
+    "family": "ogee",
+    "source": "manufacturer",
+    "manufacturer": "Example Tool Co",
+    "sku": "OG-123",
+    "sourceUrl": "https://example.invalid/catalog/OG-123",
+    "parameters": {
+      "provenanceFormat": "DXF",
+      "sourceChecksum": "sha256:example-vector",
+      "fidelity": "exact-reconstruction",
+      "sourceUnits": "inch"
+    },
+    "boundary": {
+      "start": { "u": 0, "v": 0.5 },
+      "segments": [
+        {
+          "kind": "ellipseArc",
+          "to": { "u": 0.25, "v": 0.25 },
+          "radiusU": 0.25,
+          "radiusV": 0.2,
+          "clockwise": true
+        },
+        {
+          "kind": "arc",
+          "to": { "u": 0.5, "v": 0 },
+          "radius": 0.25,
+          "clockwise": false
+        }
+      ]
+    }
+  }
+}
