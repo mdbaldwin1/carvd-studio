@@ -93,6 +93,8 @@ export function getAvailableMirrorActions(feature: PartFeature): MirrorAction[] 
     return feature.target.face === 'front_face' || feature.target.face === 'back_face'
       ? ['across_width']
       : ['opposite_end'];
+  if (feature.kind === 'routed_path') return ['across_length', 'across_width'];
+  if (feature.kind === 'edge_profile') return ['across_length', 'across_width'];
   switch (feature.cutType) {
     case 'dado':
     case 'stopped_dado':
@@ -171,6 +173,28 @@ export function mirrorFeature(
 
   if (!part) {
     throw new Error('Part dimensions are required to mirror removal operations');
+  }
+
+  if (feature.kind === 'routed_path') {
+    const mirrored = beginMirror(feature, action);
+    const frame = getFaceFrame(part, feature.target.face);
+    const mirrorPrimary = action === 'across_length';
+    const size = mirrorPrimary ? frame.primarySize : frame.secondarySize;
+    mirrored.path.points = feature.path.points.map((point) => ({
+      primary: mirrorPrimary
+        ? mirrorReferencedCoordinate(point.primary, size, feature.reference.primaryFrom)
+        : point.primary,
+      secondary: mirrorPrimary
+        ? point.secondary
+        : mirrorReferencedCoordinate(point.secondary, size, feature.reference.secondaryFrom)
+    }));
+    return mirrored;
+  }
+
+  if (feature.kind === 'edge_profile') {
+    const mirrored = beginMirror(feature, action);
+    mirrored.target = { type: 'edge', edge: mirrorEdgeTarget(feature.target.edge, action) };
+    return mirrored;
   }
 
   if (feature.kind === 'circular_cut' || feature.kind === 'rounded_cut') {

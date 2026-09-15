@@ -801,7 +801,7 @@ describe('clipboardStore', () => {
       const t2Features = parts.find((p) => p.id === 't2')!.features!;
       expect(t1Features).toHaveLength(1);
       expect(t2Features).toHaveLength(1);
-      expect(t1Features[0].cutType).toBe('dado');
+      expect(t1Features[0]).toMatchObject({ kind: 'rect_cut', cutType: 'dado' });
       // Fresh ids per target, independent of the source and each other
       expect(t1Features[0].id).not.toBe('dado-1');
       expect(t1Features[0].id).not.toBe(t2Features[0].id);

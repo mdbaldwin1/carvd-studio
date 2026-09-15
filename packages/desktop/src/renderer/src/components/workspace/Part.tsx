@@ -10,7 +10,11 @@ import { useInteractionStore } from '../../store/interactionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { Part as PartType } from '../../types';
 import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
-import { getPartRenderGeometry, hasRenderablePartFeatures } from '../../utils/partFeatureGeometry';
+import {
+  getPartOutlineGeometry,
+  getPartRenderGeometry,
+  hasRenderablePartFeatures
+} from '../../utils/partFeatureGeometry';
 import {
   beginRotateInteractionSession,
   clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances,
@@ -313,6 +317,10 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
 
   const renderGeometry = useMemo(() => getPartRenderGeometry(part), [part]);
   const isFeaturePart = hasRenderablePartFeatures(part);
+  const outlineGeometry = useMemo(
+    () => (isFeaturePart ? getPartOutlineGeometry(part) : undefined),
+    [isFeaturePart, part]
+  );
 
   const interactionPreview = resolvePartInteractionPreview(part, activeSession);
   const localPartOwnsInteraction =
@@ -465,6 +473,7 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             displayMode === 'wireframe' ||
             displayMode === 'translucent') && (
             <Edges
+              geometry={outlineGeometry}
               scale={1.002}
               threshold={15}
               raycast={NOOP_RAYCAST}

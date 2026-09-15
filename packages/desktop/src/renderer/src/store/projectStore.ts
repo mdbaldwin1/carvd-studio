@@ -27,7 +27,7 @@ import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useClipboardStore } from './clipboardStore';
 import { useLicenseStore } from './licenseStore';
-import { getPartBounds } from '../utils/snapToPartsUtil';
+import { detectGroupFeatureMateSnaps, getPartBounds } from '../utils/snapToPartsUtil';
 import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
 import {
   clonePartFeaturesForCopy,
@@ -40,6 +40,7 @@ import { validateEndCutFeature } from '../utils/endCutUtils';
 import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
 import { getPartFeatureConflicts } from '../utils/partFeatureConflicts';
 import { getFeatureTargetLabel } from '../utils/partFeatureSummary';
+import { analyzeEdgeProfileToolFeasibility } from '../utils/edgeProfileToolFeasibility';
 import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
 import { rotationTool } from '../interaction/tools/rotationTool';
 import { resolveSelectedGroupIdsWithDescendants, resolveTransformSelectedPartIds } from '../utils/interactionSelection';
@@ -407,6 +408,20 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
     for (const feature of part.features ?? []) {
       if (!feature.enabled) continue;
 
+      if (feature.kind === 'edge_profile') {
+        for (const finding of analyzeEdgeProfileToolFeasibility(feature, part)) {
+          if (finding.severity === 'info') continue;
+          issues.push({
+            partId: part.id,
+            partName: part.name,
+            type: 'feature_validation',
+            message: `Router tool feasibility: ${finding.message}`,
+            severity: finding.severity,
+            featureId: feature.id
+          });
+        }
+      }
+
       const featureIssue =
         feature.kind === 'rect_cut'
           ? validateRectCutFeature(feature, part)
@@ -414,11 +429,14 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
             ? validateCircularCut(feature, part)
             : feature.kind === 'rounded_cut'
               ? validateRoundedCut(feature, part)
-              : validateEndCutFeature(feature, part);
+              : feature.kind === 'end_cut'
+                ? validateEndCutFeature(feature, part)
+                : null;
       if (!featureIssue) continue;
 
       const featureLabel =
-        feature.label?.trim() || `${feature.cutType.replace(/_/g, ' ')} on ${getFeatureTargetLabel(feature)}`;
+        feature.label?.trim() ||
+        `${feature.kind === 'routed_path' ? 'routed path' : feature.kind === 'edge_profile' ? feature.profile.replace(/_/g, ' ') : feature.cutType.replace(/_/g, ' ')} on ${getFeatureTargetLabel(feature)}`;
       issues.push({
         partId: part.id,
         partName: part.name,
@@ -719,8 +737,34 @@ export const useProjectStore = create<ProjectState>()(
         if (partIdsToMove.size === 0) return;
 
         let effectiveDelta = delta;
+        if (useSnapStore.getState().snapToPartsEnabled) {
+          const movingParts = parts.filter((part) => partIdsToMove.has(part.id));
+          const anchorPart = movingParts[0];
+          if (anchorPart) {
+            const anchorPosition = {
+              x: anchorPart.position.x + delta.x,
+              y: anchorPart.position.y + delta.y,
+              z: anchorPart.position.z + delta.z
+            };
+            const mate = detectGroupFeatureMateSnaps(
+              movingParts,
+              delta,
+              anchorPosition,
+              parts.filter((part) => !partIdsToMove.has(part.id)),
+              [...partIdsToMove],
+              0.5
+            );
+            if (mate.mateHostPartId) {
+              effectiveDelta = {
+                x: delta.x + mate.adjustedPosition.x - anchorPosition.x,
+                y: delta.y + mate.adjustedPosition.y - anchorPosition.y,
+                z: delta.z + mate.adjustedPosition.z - anchorPosition.z
+              };
+            }
+          }
+        }
         if (stockConstraints.preventOverlap) {
-          const safeDelta = resolveSafeTranslationDelta(parts, partIdsToMove, delta);
+          const safeDelta = resolveSafeTranslationDelta(parts, partIdsToMove, effectiveDelta);
           if (!safeDelta) {
             dragDebug('projectStore:moveSelectedParts:noSafeDelta', {
               requestedDelta: delta,
@@ -729,9 +773,9 @@ export const useProjectStore = create<ProjectState>()(
             return;
           }
           if (
-            Math.abs(safeDelta.x - delta.x) > 1e-6 ||
-            Math.abs(safeDelta.y - delta.y) > 1e-6 ||
-            Math.abs(safeDelta.z - delta.z) > 1e-6
+            Math.abs(safeDelta.x - effectiveDelta.x) > 1e-6 ||
+            Math.abs(safeDelta.y - effectiveDelta.y) > 1e-6 ||
+            Math.abs(safeDelta.z - effectiveDelta.z) > 1e-6
           ) {
             maybeShowOverlapClampToast();
             dragDebug('projectStore:moveSelectedParts:clampedToSafeDelta', {

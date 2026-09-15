@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
-import type { AssemblyPart, CircularCutFeature, EndCutFeature, Part, RectCutFeature } from '../types';
+import type {
+  AssemblyPart,
+  CircularCutFeature,
+  EdgeProfileFeature,
+  EndCutFeature,
+  Part,
+  RectCutFeature,
+  RoutedPathFeature
+} from '../types';
 import {
   clonePartFeature,
   clonePartFeatures,
@@ -81,6 +89,27 @@ function createRoundedCutFeature(overrides: Record<string, unknown> = {}): Recor
   };
 }
 
+function createRoutedPathFeature(overrides: Partial<RoutedPathFeature> = {}): RoutedPathFeature {
+  return {
+    id: 'route-1',
+    kind: 'routed_path',
+    version: 1,
+    enabled: true,
+    label: 'Stopped center groove',
+    target: { type: 'face', face: 'top_face' },
+    reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+    path: {
+      points: [
+        { primary: -3, secondary: 0 },
+        { primary: 3, secondary: 0 }
+      ]
+    },
+    bit: { profile: 'straight', diameter: 0.25 },
+    parameters: { depthMode: 'blind', depth: 0.375 },
+    ...overrides
+  };
+}
+
 describe('partFeatures', () => {
   describe('validateSerializedPartFeatures', () => {
     it.each([
@@ -114,6 +143,7 @@ describe('partFeatures', () => {
         })
       ],
       ['rounded slot', createRoundedCutFeature()],
+      ['routed path', createRoutedPathFeature()],
       [
         'rounded rectangle',
         createRoundedCutFeature({
@@ -260,6 +290,206 @@ describe('partFeatures', () => {
       expect(original.placement.x).toBe(0);
     });
 
+    it('deep-clones routed paths, points, and bit profiles', () => {
+      const original = createRoutedPathFeature({
+        path: {
+          closed: true,
+          points: [
+            { primary: 0, secondary: 0 },
+            { primary: 2, secondary: 1 }
+          ]
+        },
+        bit: { profile: 'v_bit', diameter: 0.5, includedAngle: 90 },
+        parameters: { depthMode: 'blind', depth: 0.2 }
+      });
+      const clone = clonePartFeature(original);
+
+      expect(clone).toEqual(original);
+      expect(clone.path).not.toBe(original.path);
+      expect(clone.path.points).not.toBe(original.path.points);
+      expect(clone.path.points[0]).not.toBe(original.path.points[0]);
+      expect(clone.parameters).not.toBe(original.parameters);
+      expect(clone.bit).not.toBe(original.bit);
+
+      clone.path.points[0].primary = 99;
+      clone.bit.diameter = 2;
+      expect(original.path.points[0].primary).toBe(0);
+      expect(original.bit.diameter).toBe(0.5);
+    });
+
+    it.each([
+      ['a one-point path', { path: { points: [{ primary: 0, secondary: 0 }] } }, 'path.points'],
+      [
+        'a non-finite point',
+        {
+          path: {
+            points: [
+              { primary: 0, secondary: 0 },
+              { primary: Infinity, secondary: 0 }
+            ]
+          }
+        },
+        'path.points'
+      ],
+      ['an edge target', { target: { type: 'edge', edge: 'top_front_edge' } }, 'target'],
+      ['an unknown bit', { bit: { profile: 'laser', diameter: 0.25 } }, 'bit.profile'],
+      ['a zero diameter', { bit: { profile: 'straight', diameter: 0 } }, 'diameter'],
+      ['a V-bit without angle', { bit: { profile: 'v_bit', diameter: 0.5 } }, 'includedAngle'],
+      ['a 180-degree V-bit', { bit: { profile: 'v_bit', diameter: 0.5, includedAngle: 180 } }, 'includedAngle'],
+      [
+        'a blind route without depth',
+        { bit: { profile: 'core_box', diameter: 0.5 }, parameters: { depthMode: 'blind' } },
+        'depth'
+      ]
+    ])('rejects routed-path data with %s', (_name, override, expectedError) => {
+      const candidate = { ...createRoutedPathFeature(), ...override };
+      expect(validateSerializedPartFeatures([candidate], 'features').join('\n')).toContain(expectedError);
+    });
+
+    it('preserves and validates routed-path data across JSON serialization', () => {
+      const original = createRoutedPathFeature({
+        path: {
+          closed: true,
+          points: [
+            { primary: -1, secondary: -1, cornerRadius: 0.25 },
+            { primary: 1, secondary: -1 },
+            { primary: 0, secondary: 1 }
+          ]
+        },
+        bit: { profile: 'core_box', diameter: 0.375 },
+        parameters: { depthMode: 'through' }
+      });
+
+      const restored = JSON.parse(JSON.stringify(original)) as unknown;
+      expect(validateSerializedPartFeatures([restored], 'features')).toEqual([]);
+      expect(restored).toEqual(original);
+    });
+
+    it('accepts legacy routed points with no corner radius and an explicit sharp corner', () => {
+      const omitted = createRoutedPathFeature();
+      const explicitSharp = createRoutedPathFeature({
+        path: {
+          points: [
+            { primary: 0, secondary: 0, cornerRadius: 0 },
+            { primary: 1, secondary: 0 }
+          ]
+        }
+      });
+
+      expect(validateSerializedPartFeatures([omitted], 'features')).toEqual([]);
+      expect(validateSerializedPartFeatures([explicitSharp], 'features')).toEqual([]);
+    });
+
+    it.each([
+      { profile: 'dovetail', diameter: 0.5, shankDiameter: 0.25, includedAngle: 14 },
+      { profile: 't_slot', diameter: 0.75, shankDiameter: 0.25, cutterHeight: 0.125 },
+      { profile: 'keyhole', diameter: 0.375, shankDiameter: 0.125, cutterHeight: 0.2 }
+    ] as const)('accepts and round-trips a $profile bit', (bit) => {
+      const original = createRoutedPathFeature({ bit });
+      const restored = JSON.parse(JSON.stringify(original)) as unknown;
+
+      expect(validateSerializedPartFeatures([restored], 'features')).toEqual([]);
+      expect(restored).toEqual(original);
+    });
+
+    it.each([
+      ['missing dovetail shank', { profile: 'dovetail', diameter: 0.5, includedAngle: 14 }, 'shankDiameter'],
+      [
+        'equal dovetail shank',
+        { profile: 'dovetail', diameter: 0.5, shankDiameter: 0.5, includedAngle: 14 },
+        'shankDiameter'
+      ],
+      [
+        'negative T-slot shank',
+        { profile: 't_slot', diameter: 0.5, shankDiameter: -0.1, cutterHeight: 0.1 },
+        'shankDiameter'
+      ],
+      ['missing T-slot height', { profile: 't_slot', diameter: 0.5, shankDiameter: 0.25 }, 'cutterHeight'],
+      [
+        'zero keyhole height',
+        { profile: 'keyhole', diameter: 0.5, shankDiameter: 0.25, cutterHeight: 0 },
+        'cutterHeight'
+      ],
+      [
+        'zero dovetail angle',
+        { profile: 'dovetail', diameter: 0.5, shankDiameter: 0.25, includedAngle: 0 },
+        'includedAngle'
+      ],
+      [
+        'flat dovetail angle',
+        { profile: 'dovetail', diameter: 0.5, shankDiameter: 0.25, includedAngle: 180 },
+        'includedAngle'
+      ]
+    ])('rejects $0', (_name, bit, expectedError) => {
+      const feature = createRoutedPathFeature({ bit: bit as RoutedPathFeature['bit'] });
+      expect(validateSerializedPartFeatures([feature], 'features').join('\n')).toContain(expectedError);
+    });
+
+    it.each(['t_slot', 'keyhole'] as const)('requires a blind %s route to reach the cutter height', (profile) => {
+      const feature = createRoutedPathFeature({
+        bit: { profile, diameter: 0.5, shankDiameter: 0.25, cutterHeight: 0.25 },
+        parameters: { depthMode: 'blind', depth: 0.125 }
+      });
+      expect(validateSerializedPartFeatures([feature], 'features').join('\n')).toContain(
+        'depth must be at least the bit cutterHeight'
+      );
+
+      feature.parameters.depth = 0.25;
+      expect(validateSerializedPartFeatures([feature], 'features')).toEqual([]);
+    });
+
+    it('deep-clones undercut bit dimensions', () => {
+      const original = createRoutedPathFeature({
+        bit: { profile: 't_slot', diameter: 0.75, shankDiameter: 0.25, cutterHeight: 0.125 }
+      });
+      const clone = clonePartFeature(original);
+      if (clone.bit.profile !== 't_slot') throw new Error('expected T-slot bit');
+
+      clone.bit.shankDiameter = 0.2;
+      clone.bit.cutterHeight = 0.1;
+      expect(original.bit).toEqual({
+        profile: 't_slot',
+        diameter: 0.75,
+        shankDiameter: 0.25,
+        cutterHeight: 0.125
+      });
+    });
+
+    it.each([Number.NaN, Infinity, -0.01])('rejects an invalid corner radius of %s', (cornerRadius) => {
+      const feature = createRoutedPathFeature({
+        path: {
+          points: [
+            { primary: 0, secondary: 0, cornerRadius },
+            { primary: 1, secondary: 0 }
+          ]
+        }
+      });
+      expect(validateSerializedPartFeatures([feature], 'features').join('\n')).toContain('path.points');
+    });
+
+    it('rejects degenerate and underspecified closed paths', () => {
+      const repeated = createRoutedPathFeature({
+        path: {
+          points: [
+            { primary: 1, secondary: 1 },
+            { primary: 1, secondary: 1 }
+          ]
+        }
+      });
+      const twoPointLoop = createRoutedPathFeature({
+        path: {
+          closed: true,
+          points: [
+            { primary: 0, secondary: 0 },
+            { primary: 1, secondary: 0 }
+          ]
+        }
+      });
+
+      expect(validateSerializedPartFeatures([repeated], 'features').join('\n')).toContain('non-zero segment');
+      expect(validateSerializedPartFeatures([twoPointLoop], 'features').join('\n')).toContain('at least three');
+    });
+
     it('clones face and edge targets by value', () => {
       const faceClone = clonePartFeature(createRectCutFeature({ type: 'face', face: 'top_face' }));
       expect(faceClone.target).toEqual({ type: 'face', face: 'top_face' });
@@ -367,6 +597,129 @@ describe('partFeatures', () => {
       expect(normalized.features).toEqual(features);
       expect(normalized.features?.[0]).not.toBe(features[0]);
     });
+  });
+});
+
+describe('edge profile persistence', () => {
+  const feature: EdgeProfileFeature = {
+    id: 'edge-profile-1',
+    kind: 'edge_profile',
+    version: 1,
+    enabled: true,
+    target: { type: 'edge', edge: 'top_front_edge' },
+    reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+    profile: 'ogee',
+    parameters: { size: 0.5, depth: 0.25 }
+  };
+
+  it('validates, round-trips, and deep-clones an edge profile', () => {
+    const restored = JSON.parse(JSON.stringify(feature)) as unknown;
+    expect(validateSerializedPartFeatures([restored], 'features')).toEqual([]);
+    expect(restored).toEqual(feature);
+    const clone = clonePartFeature(feature);
+    expect(clone).toEqual(feature);
+    expect(clone).not.toBe(feature);
+    expect(clone.parameters).not.toBe(feature.parameters);
+  });
+
+  it('persists a custom profile reference and independent canonical snapshot', () => {
+    const custom: EdgeProfileFeature = {
+      ...feature,
+      profile: 'custom',
+      routerProfileId: 'shop-ogee',
+      routerProfileSnapshot: {
+        version: 1,
+        id: 'shop-ogee',
+        name: 'Shop Ogee',
+        family: 'ogee',
+        source: 'generic',
+        parameters: { radius: 0.25 },
+        boundary: {
+          start: { u: 0, v: 0.5 },
+          segments: [{ kind: 'arc', to: { u: 0.5, v: 0 }, radius: 0.5, clockwise: true }]
+        }
+      },
+      routerToolId: 'ogee-tool',
+      routerToolSnapshot: {
+        version: 1,
+        id: 'ogee-tool',
+        name: 'Shop Ogee Bit',
+        source: 'generic',
+        profileFamily: 'ogee',
+        routerProfileId: 'shop-ogee',
+        cutterDiameter: 0.75,
+        shankDiameter: 0.5,
+        cuttingHeight: 0.5,
+        envelopeVersion: 1,
+        sections: [
+          { role: 'cutter', start: 0, end: 0.5, diameter: 0.75 },
+          { role: 'shank', start: 0.5, end: 1.5, diameter: 0.5 }
+        ],
+        overallLength: 2,
+        safeColletInsertion: 0.75
+      }
+    };
+    expect(validateSerializedPartFeatures([custom], 'features')).toEqual([]);
+    const clone = clonePartFeature(custom);
+    expect(clone.routerProfileSnapshot).not.toBe(custom.routerProfileSnapshot);
+    expect(clone.routerProfileSnapshot?.boundary.segments[0]).not.toBe(
+      custom.routerProfileSnapshot?.boundary.segments[0]
+    );
+    expect(clone.routerToolSnapshot).not.toBe(custom.routerToolSnapshot);
+    expect(clone.routerToolSnapshot?.sections).not.toBe(custom.routerToolSnapshot?.sections);
+  });
+
+  it('keeps legacy built-in edge profiles valid without a library reference', () => {
+    expect(validateSerializedPartFeatures([feature], 'features')).toEqual([]);
+  });
+
+  it('requires custom profile references and snapshots to agree', () => {
+    const invalid = { ...feature, profile: 'custom', routerProfileId: 'missing', routerProfileSnapshot: undefined };
+    expect(validateSerializedPartFeatures([invalid], 'features').join('\n')).toContain('routerProfileSnapshot');
+  });
+
+  it('rejects incompatible assigned tools and stale explicit revisions', () => {
+    const snapshot = {
+      version: 1 as const,
+      id: 'shop-cove',
+      name: 'Shop Cove',
+      family: 'cove',
+      source: 'generic' as const,
+      parameters: {},
+      boundary: {
+        start: { u: 0, v: 0.5 },
+        segments: [{ kind: 'arc' as const, to: { u: 0.5, v: 0 }, radius: 0.5, clockwise: true }]
+      }
+    };
+    const candidate = {
+      ...feature,
+      profile: 'custom',
+      routerProfileId: snapshot.id,
+      routerProfileRevision: 'stale',
+      routerProfileSnapshot: snapshot,
+      routerToolId: 'wrong-tool',
+      routerToolSnapshot: {
+        version: 1,
+        id: 'wrong-tool',
+        name: 'Ogee Tool',
+        source: 'generic',
+        profileFamily: 'ogee',
+        cutterDiameter: 1,
+        shankDiameter: 0.5,
+        cuttingHeight: 0.5
+      }
+    };
+    const errors = validateSerializedPartFeatures([candidate], 'features').join('\n');
+    expect(errors).toContain('routerProfileRevision does not match');
+    expect(errors).toContain('incompatible with the selected profile');
+  });
+
+  it.each([
+    [{ profile: 'unknown' }, 'profile'],
+    [{ parameters: { size: 0, depth: 0.25 } }, 'parameters.size'],
+    [{ target: { type: 'face', face: 'top_face' } }, 'target']
+  ])('rejects malformed edge profile data', (override, error) => {
+    expect(validateSerializedPartFeatures([{ ...feature, ...override }], 'features').join('\n')).toContain(error);
   });
 });
 

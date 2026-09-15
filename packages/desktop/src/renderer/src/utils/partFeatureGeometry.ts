@@ -1,11 +1,20 @@
 import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
 import { Brush, Evaluator, INTERSECTION, SUBTRACTION } from 'three-bvh-csg';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { getEdgeProfileFeatureBoundary, type EdgeProfilePoint } from './edgeProfileShape';
 import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js';
 import { Earcut } from 'three/src/extras/Earcut.js';
 import { MeshBVH } from 'three-mesh-bvh';
-import { CircularCutFeature, Part, PartFeature, RectCutFeature, RoundedCutFeature } from '../types';
+import {
+  CircularCutFeature,
+  EdgeProfileFeature,
+  Part,
+  PartFeature,
+  RectCutFeature,
+  RoundedCutFeature,
+  RoutedPathFeature
+} from '../types';
 import {
   getEdgeBevelInsetAt,
   getEndCutInsetAt,
@@ -30,6 +39,7 @@ type Point2 = { x: number; z: number };
 const geometryCache = new Map<string, THREE.BufferGeometry>();
 const planTriangleCache = new Map<string, Point2[][]>();
 const convexVertexCache = new WeakMap<THREE.BufferGeometry, Array<{ x: number; y: number; z: number }>>();
+const outlineGeometryCache = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry>();
 const MAX_GEOMETRY_CACHE_ENTRIES = 128;
 const _worldAabbPosition = new THREE.Vector3();
 const _worldAabbQuaternion = new THREE.Quaternion();
@@ -43,15 +53,27 @@ function featureKey(part: Part): string {
     thickness: part.thickness,
     features: (part.features ?? [])
       .filter((feature) => feature.enabled)
-      .map((feature) => ({
-        kind: feature.kind,
-        cutType: feature.cutType,
-        target: feature.target,
-        reference: feature.reference,
-        parameters: feature.parameters,
-        ...(feature.kind === 'end_cut' ? { lengthMode: feature.lengthMode } : { placement: feature.placement }),
-        ...(feature.kind === 'circular_cut' ? { pattern: feature.pattern } : {})
-      }))
+      .map((feature) => {
+        const common = {
+          kind: feature.kind,
+          target: feature.target,
+          reference: feature.reference,
+          parameters: feature.parameters
+        };
+        if (feature.kind === 'routed_path') return { ...common, path: feature.path, bit: feature.bit };
+        if (feature.kind === 'edge_profile')
+          return {
+            ...common,
+            profile: feature.profile,
+            routerProfileSnapshot: feature.profile === 'custom' ? feature.routerProfileSnapshot : undefined
+          };
+        return {
+          ...common,
+          cutType: feature.cutType,
+          ...(feature.kind === 'end_cut' ? { lengthMode: feature.lengthMode } : { placement: feature.placement }),
+          ...(feature.kind === 'circular_cut' ? { pattern: feature.pattern } : {})
+        };
+      })
   });
 }
 
@@ -97,6 +119,22 @@ function hasFiniteGeometry(feature: PartFeature): boolean {
       feature.parameters.cornerRadius,
       feature.parameters.depth
     );
+  }
+  if (feature.kind === 'routed_path') {
+    return (
+      feature.path.points.length >= 2 &&
+      feature.path.points.every((point) => finite(point.primary, point.secondary, point.cornerRadius)) &&
+      finite(
+        feature.bit.diameter,
+        feature.bit.includedAngle,
+        'shankDiameter' in feature.bit ? feature.bit.shankDiameter : undefined,
+        'cutterHeight' in feature.bit ? feature.bit.cutterHeight : undefined,
+        feature.parameters.depth
+      )
+    );
+  }
+  if (feature.kind === 'edge_profile') {
+    return finite(feature.parameters.size, feature.parameters.depth);
   }
   return finite(
     feature.parameters.horizontalAngle,
@@ -525,7 +563,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
       layer.dispose();
       layer = clipped.geometry;
     }
-    layerGeometries.push(subtractSolidCircularCuts(layer, part));
+    layerGeometries.push(subtractEdgeProfiles(subtractRoutedPaths(subtractSolidCircularCuts(layer, part), part), part));
   }
   stock?.geometry.dispose();
 
@@ -809,6 +847,381 @@ function subtractSolidCircularCuts(baseGeometry: THREE.BufferGeometry, part: Par
   return current.geometry;
 }
 
+function routedPoint(
+  feature: RoutedPathFeature,
+  frame: ReturnType<typeof getFaceFrame>,
+  point: RoutedPathFeature['path']['points'][number]
+): THREE.Vector3 {
+  const primary = referencedFeatureOffset(point.primary, frame.primarySize, feature.reference.primaryFrom);
+  const secondary = referencedFeatureOffset(point.secondary, frame.secondarySize, feature.reference.secondaryFrom);
+  return new THREE.Vector3(frame.origin.x, frame.origin.y, frame.origin.z)
+    .addScaledVector(new THREE.Vector3(frame.primaryAxis.x, frame.primaryAxis.y, frame.primaryAxis.z), primary)
+    .addScaledVector(new THREE.Vector3(frame.secondaryAxis.x, frame.secondaryAxis.y, frame.secondaryAxis.z), secondary);
+}
+
+interface RoutedCorner {
+  incoming: THREE.Vector3;
+  outgoing: THREE.Vector3;
+  arc: THREE.Vector3[];
+}
+
+function getRoutedCorner(
+  previous: THREE.Vector3,
+  corner: THREE.Vector3,
+  next: THREE.Vector3,
+  requestedRadius: number,
+  faceNormal: THREE.Vector3
+): RoutedCorner | null {
+  if (!(requestedRadius > 0)) return null;
+  const towardPrevious = previous.clone().sub(corner);
+  const towardNext = next.clone().sub(corner);
+  const previousLength = towardPrevious.length();
+  const nextLength = towardNext.length();
+  if (previousLength <= 1e-9 || nextLength <= 1e-9) return null;
+  towardPrevious.divideScalar(previousLength);
+  towardNext.divideScalar(nextLength);
+  const angle = Math.acos(THREE.MathUtils.clamp(towardPrevious.dot(towardNext), -1, 1));
+  const tangent = Math.tan(angle / 2);
+  if (Math.abs(towardPrevious.dot(towardNext)) > 1 - 1e-9 || !(tangent > 1e-9)) return null;
+
+  // Each end may consume at most half its adjacent span. Consequently two
+  // neighboring fillets can never cross, even when both radii are oversized.
+  const requestedTrim = requestedRadius / tangent;
+  const trim = Math.min(requestedTrim, previousLength * 0.499, nextLength * 0.499);
+  if (!(trim > 1e-9)) return null;
+  const radius = trim * tangent;
+  const incoming = corner.clone().addScaledVector(towardPrevious, trim);
+  const outgoing = corner.clone().addScaledVector(towardNext, trim);
+  const bisector = towardPrevious.clone().add(towardNext).normalize();
+  const center = corner.clone().addScaledVector(bisector, radius / Math.sin(angle / 2));
+  const radialStart = incoming.clone().sub(center);
+  const radialEnd = outgoing.clone().sub(center);
+  const signedSweep = Math.atan2(
+    faceNormal.dot(new THREE.Vector3().crossVectors(radialStart, radialEnd)),
+    radialStart.dot(radialEnd)
+  );
+  // Four samples per half-turn is visually smooth at furniture scale while
+  // keeping the sequential CSG cost bounded for closed multi-corner paths.
+  const steps = Math.max(1, Math.ceil(Math.abs(signedSweep) / (Math.PI / 4)));
+  const arc: THREE.Vector3[] = [];
+  for (let step = 1; step <= steps; step += 1) {
+    arc.push(
+      radialStart
+        .clone()
+        .applyAxisAngle(faceNormal, (signedSweep * step) / steps)
+        .add(center)
+    );
+  }
+  return { incoming, outgoing, arc };
+}
+
+function expandRoutedPath(feature: RoutedPathFeature, part: Part): THREE.Vector3[] {
+  const frame = getFaceFrame(part, feature.target.face);
+  const normal = new THREE.Vector3(frame.inwardNormal.x, frame.inwardNormal.y, frame.inwardNormal.z).normalize();
+  const authored = feature.path.points.map((point) => routedPoint(feature, frame, point));
+  const cornerAt = (index: number): RoutedCorner | null => {
+    if (!feature.path.closed && (index === 0 || index === authored.length - 1)) return null;
+    return getRoutedCorner(
+      authored[(index - 1 + authored.length) % authored.length],
+      authored[index],
+      authored[(index + 1) % authored.length],
+      feature.path.points[index].cornerRadius ?? 0,
+      normal
+    );
+  };
+  const corners = authored.map((_, index) => cornerAt(index));
+  if (!feature.path.closed) {
+    const expanded = [authored[0]];
+    for (let index = 1; index < authored.length - 1; index += 1) {
+      const corner = corners[index];
+      if (corner) expanded.push(corner.incoming, ...corner.arc);
+      else expanded.push(authored[index]);
+    }
+    expanded.push(authored[authored.length - 1]);
+    return expanded;
+  }
+  const expanded: THREE.Vector3[] = [];
+  for (let index = 0; index < authored.length; index += 1) {
+    const corner = corners[index];
+    if (corner) expanded.push(corner.incoming, ...corner.arc);
+    else expanded.push(authored[index]);
+  }
+  expanded.push(expanded[0].clone());
+  return expanded;
+}
+
+/** Subtract a router bit swept along each straight path span. The MVP path is
+ * polyline based; adjoining cutters overlap so corners remain watertight. */
+function subtractRoutedPaths(baseGeometry: THREE.BufferGeometry, part: Part): THREE.BufferGeometry {
+  const features = getEnabledFeatures(part).filter(
+    (feature): feature is RoutedPathFeature => feature.kind === 'routed_path' && feature.target.type === 'face'
+  );
+  if (features.length === 0) return baseGeometry;
+
+  const evaluator = new Evaluator();
+  evaluator.attributes = ['position', 'normal'];
+  evaluator.useGroups = false;
+  let current = new Brush(baseGeometry);
+  current.updateMatrixWorld(true);
+  const diagonal = Math.hypot(part.length, part.width, part.thickness);
+
+  const subtract = (geometry: THREE.BufferGeometry, position?: THREE.Vector3, quaternion?: THREE.Quaternion) => {
+    const cutter = new Brush(geometry);
+    if (position) cutter.position.copy(position);
+    if (quaternion) cutter.quaternion.copy(quaternion);
+    cutter.updateMatrixWorld(true);
+    const result = evaluator.evaluate(current, cutter, SUBTRACTION) as Brush;
+    result.geometry.computeVertexNormals();
+    if (current.geometry !== baseGeometry) current.geometry.dispose();
+    geometry.dispose();
+    current = result;
+    current.updateMatrixWorld(true);
+  };
+
+  for (const feature of features) {
+    const frame = getFaceFrame(part, feature.target.face);
+    const normal = new THREE.Vector3(frame.inwardNormal.x, frame.inwardNormal.y, frame.inwardNormal.z).normalize();
+    const points = expandRoutedPath(feature, part);
+    const diameter = feature.bit.diameter;
+    const requestedDepth =
+      feature.parameters.depthMode === 'through' ? diagonal * 2 : Number(feature.parameters.depth ?? 0);
+    if (!(diameter > 0) || !(requestedDepth > 0)) continue;
+
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const start = points[index];
+      const end = points[index + 1];
+      const tangent = end.clone().sub(start);
+      const length = tangent.length();
+      if (length <= 1e-9) continue;
+      tangent.divideScalar(length);
+      const center = start.clone().add(end).multiplyScalar(0.5);
+      const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
+      const padding = 0.002;
+
+      if (feature.bit.profile === 'dovetail' || feature.bit.profile === 't_slot' || feature.bit.profile === 'keyhole') {
+        const shankDiameter = feature.bit.shankDiameter;
+        if (!(shankDiameter > 0) || shankDiameter >= diameter) continue;
+        let cavityHeight: number;
+        if (feature.bit.profile === 'dovetail') {
+          const halfAngle = THREE.MathUtils.degToRad(feature.bit.includedAngle) / 2;
+          if (!(halfAngle > 0) || halfAngle >= Math.PI / 2) continue;
+          cavityHeight = (diameter - shankDiameter) / 2 / Math.tan(halfAngle);
+        } else {
+          cavityHeight = feature.bit.cutterHeight;
+        }
+        if (!(cavityHeight > 0) || cavityHeight > requestedDepth) continue;
+        const cavityTop = requestedDepth - cavityHeight;
+        const shankHalf = shankDiameter / 2;
+        const cutterHalf = diameter / 2;
+        const profile = new THREE.Shape();
+        profile.moveTo(-shankHalf, -padding);
+        profile.lineTo(shankHalf, -padding);
+        profile.lineTo(shankHalf, cavityTop);
+        if (feature.bit.profile !== 'dovetail') profile.lineTo(cutterHalf, cavityTop);
+        profile.lineTo(cutterHalf, requestedDepth);
+        profile.lineTo(-cutterHalf, requestedDepth);
+        if (feature.bit.profile !== 'dovetail') profile.lineTo(-cutterHalf, cavityTop);
+        profile.lineTo(-shankHalf, cavityTop);
+        profile.closePath();
+        const geometry = new THREE.ExtrudeGeometry(profile, {
+          depth: length,
+          bevelEnabled: false,
+          steps: 1,
+          curveSegments: 1
+        });
+        geometry.applyMatrix4(new THREE.Matrix4().makeBasis(bitangent, normal, tangent).setPosition(start));
+        subtract(geometry);
+
+        const capRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+        for (const endpoint of index === 0 ? [start, end] : [end]) {
+          subtract(
+            new THREE.CylinderGeometry(shankHalf, shankHalf, requestedDepth + padding, 24, 1, false),
+            endpoint.clone().addScaledVector(normal, (requestedDepth - padding) / 2),
+            capRotation
+          );
+          const cavityCap =
+            feature.bit.profile === 'dovetail'
+              ? new THREE.CylinderGeometry(cutterHalf, shankHalf, cavityHeight, 24, 1, false)
+              : new THREE.CylinderGeometry(cutterHalf, cutterHalf, cavityHeight, 24, 1, false);
+          subtract(cavityCap, endpoint.clone().addScaledVector(normal, requestedDepth - cavityHeight / 2), capRotation);
+        }
+        if (feature.bit.profile === 'keyhole' && index === 0) {
+          const plungePoint = routedPoint(feature, frame, feature.path.points[0]);
+          subtract(
+            new THREE.CylinderGeometry(cutterHalf, cutterHalf, requestedDepth + padding, 24, 1, false),
+            plungePoint.addScaledVector(normal, (requestedDepth - padding) / 2),
+            capRotation
+          );
+        }
+        continue;
+      }
+
+      if (feature.bit.profile === 'core_box' || feature.bit.profile === 'ball_nose') {
+        const radius = diameter / 2;
+        const depth = Math.min(requestedDepth, radius);
+        const axisCenter = center.clone().addScaledVector(normal, radius - depth);
+        const cylinder = new THREE.CylinderGeometry(radius, radius, length, 32, 1, false);
+        const rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
+        subtract(cylinder, axisCenter, rotation);
+        for (const endpoint of index === 0 ? [start, end] : [end]) {
+          subtract(new THREE.SphereGeometry(radius, 24, 12), endpoint.clone().addScaledVector(normal, radius - depth));
+        }
+        continue;
+      }
+
+      const isTaperedPoint = feature.bit.profile === 'v_bit' || feature.bit.profile === 'engraving';
+      const depth =
+        isTaperedPoint && feature.bit.includedAngle
+          ? Math.min(requestedDepth, diameter / (2 * Math.tan(THREE.MathUtils.degToRad(feature.bit.includedAngle) / 2)))
+          : requestedDepth;
+      const topWidth =
+        isTaperedPoint && feature.bit.includedAngle
+          ? Math.min(diameter, 2 * depth * Math.tan(THREE.MathUtils.degToRad(feature.bit.includedAngle) / 2))
+          : diameter;
+      const halfWidth = topWidth / 2;
+      const profile = new THREE.Shape();
+      profile.moveTo(-halfWidth, -padding);
+      profile.lineTo(halfWidth, -padding);
+      if (isTaperedPoint) {
+        profile.lineTo(0, depth);
+      } else {
+        profile.lineTo(halfWidth, depth);
+        profile.lineTo(-halfWidth, depth);
+      }
+      profile.closePath();
+      const geometry = new THREE.ExtrudeGeometry(profile, {
+        depth: length,
+        bevelEnabled: false,
+        steps: 1,
+        curveSegments: 1
+      });
+      // ExtrudeGeometry axes are profile X/Y and sweep Z. Map those to the
+      // face's across/inward directions and the path tangent respectively.
+      geometry.applyMatrix4(new THREE.Matrix4().makeBasis(bitangent, normal, tangent).setPosition(start));
+      subtract(geometry);
+      const capHeight = depth + padding;
+      const capRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+      for (const endpoint of index === 0 ? [start, end] : [end]) {
+        const cap = isTaperedPoint
+          ? new THREE.ConeGeometry(halfWidth, capHeight, 32, 1, false)
+          : new THREE.CylinderGeometry(halfWidth, halfWidth, capHeight, 32, 1, false);
+        subtract(cap, endpoint.clone().addScaledVector(normal, (depth - padding) / 2), capRotation);
+      }
+    }
+  }
+  if (current.geometry !== baseGeometry) baseGeometry.dispose();
+  return current.geometry;
+}
+
+function getEdgeProfileFrame(part: Part, feature: EdgeProfileFeature) {
+  const edge = feature.target.edge;
+  const half = { x: part.length / 2, y: part.thickness / 2, z: part.width / 2 };
+  const named = edge.split('_');
+  const inward = (name: string) =>
+    name === 'top'
+      ? new THREE.Vector3(0, -1, 0)
+      : name === 'bottom'
+        ? new THREE.Vector3(0, 1, 0)
+        : name === 'front'
+          ? new THREE.Vector3(0, 0, -1)
+          : name === 'back'
+            ? new THREE.Vector3(0, 0, 1)
+            : name === 'left'
+              ? new THREE.Vector3(1, 0, 0)
+              : new THREE.Vector3(-1, 0, 0);
+  const firstInward = inward(named[0]);
+  const secondInward = inward(named[1]);
+  // CSG requires a consistently right-handed cutter basis. Using an
+  // arbitrary positive edge direction mirrors half of the cutters, which
+  // makes their winding face inward and causes subtraction to leave the
+  // original sharp corner untouched.
+  const tangent = new THREE.Vector3().crossVectors(firstInward, secondInward).normalize();
+  const run = tangent.x ? part.length : tangent.y ? part.thickness : part.width;
+  const anchor = new THREE.Vector3(
+    tangent.x ? (tangent.x > 0 ? -half.x : half.x) : edge.includes('left') ? -half.x : half.x,
+    tangent.y ? (tangent.y > 0 ? -half.y : half.y) : edge.includes('top') ? half.y : -half.y,
+    tangent.z ? (tangent.z > 0 ? -half.z : half.z) : edge.includes('front') ? half.z : -half.z
+  );
+  return { anchor, tangent, run, firstInward, secondInward };
+}
+
+function edgeRemovalShape(feature: EdgeProfileFeature): THREE.Shape | null {
+  let boundary = getEdgeProfileFeatureBoundary(feature);
+  if (boundary.length < 2 || boundary.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y)))
+    return null;
+  const polygon = [{ x: 0, y: 0 }, ...boundary];
+  const orientation = (a: EdgeProfilePoint, b: EdgeProfilePoint, c: EdgeProfilePoint) =>
+    (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  for (let first = 0; first < polygon.length; first += 1) {
+    const firstNext = (first + 1) % polygon.length;
+    for (let second = first + 2; second < polygon.length; second += 1) {
+      const secondNext = (second + 1) % polygon.length;
+      if (first === secondNext || firstNext === second) continue;
+      if (
+        orientation(polygon[first], polygon[firstNext], polygon[second]) *
+          orientation(polygon[first], polygon[firstNext], polygon[secondNext]) <
+          0 &&
+        orientation(polygon[second], polygon[secondNext], polygon[first]) *
+          orientation(polygon[second], polygon[secondNext], polygon[firstNext]) <
+          0
+      )
+        return null;
+    }
+  }
+  const area =
+    polygon.reduce((sum, point, index) => {
+      const next = polygon[(index + 1) % polygon.length];
+      return sum + point.x * next.y - next.x * point.y;
+    }, 0) / 2;
+  if (Math.abs(area) <= 1e-10) return null;
+  if (area < 0) boundary = [...boundary].reverse();
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  for (const point of boundary) {
+    shape.lineTo(point.x, point.y);
+  }
+  shape.closePath();
+  return shape;
+}
+
+function subtractEdgeProfiles(baseGeometry: THREE.BufferGeometry, part: Part): THREE.BufferGeometry {
+  const features = getEnabledFeatures(part).filter(
+    (feature): feature is EdgeProfileFeature => feature.kind === 'edge_profile'
+  );
+  if (!features.length) return baseGeometry;
+  const evaluator = new Evaluator();
+  evaluator.attributes = ['position', 'normal'];
+  evaluator.useGroups = false;
+  let current = new Brush(baseGeometry);
+  current.updateMatrixWorld(true);
+  for (const feature of features) {
+    const removalShape = edgeRemovalShape(feature);
+    if (!removalShape) continue;
+    const { anchor, tangent, run, firstInward, secondInward } = getEdgeProfileFrame(part, feature);
+    const padding = 0.004;
+    const cutterGeometry = new THREE.ExtrudeGeometry(removalShape, {
+      depth: run + padding * 2,
+      bevelEnabled: false,
+      steps: 1,
+      curveSegments: 1
+    });
+    cutterGeometry.applyMatrix4(
+      new THREE.Matrix4()
+        .makeBasis(firstInward, secondInward, tangent)
+        .setPosition(anchor.clone().addScaledVector(tangent, -padding))
+    );
+    const cutter = new Brush(cutterGeometry);
+    cutter.updateMatrixWorld(true);
+    const result = evaluator.evaluate(current, cutter, SUBTRACTION) as Brush;
+    result.geometry.computeVertexNormals();
+    if (current.geometry !== baseGeometry) current.geometry.dispose();
+    cutterGeometry.dispose();
+    current = result;
+  }
+  if (current.geometry !== baseGeometry) baseGeometry.dispose();
+  return current.geometry;
+}
+
 /**
  * Shoulder removals for a layer of a tenoned part.
  *
@@ -901,6 +1314,26 @@ export function getPartRenderGeometry(part: Part): THREE.BufferGeometry {
   }
   geometryCache.set(key, geometry);
   return geometry;
+}
+
+/**
+ * Weld the position-only topology used by the outline pass.
+ *
+ * CSG emits a non-indexed triangle soup. Drei's Edges correctly treats every
+ * unshared triangle side as a boundary, which exposes the hidden top-face
+ * triangulation as long spokes. Welding equal positions restores adjacency;
+ * the render geometry keeps its authored normals and remains untouched.
+ */
+export function getPartOutlineGeometry(part: Part): THREE.BufferGeometry {
+  const renderGeometry = getPartRenderGeometry(part);
+  const cached = outlineGeometryCache.get(renderGeometry);
+  if (cached) return cached;
+  const positionOnly = new THREE.BufferGeometry();
+  positionOnly.setAttribute('position', renderGeometry.getAttribute('position').clone());
+  const welded = mergeVertices(positionOnly, 1e-5);
+  positionOnly.dispose();
+  outlineGeometryCache.set(renderGeometry, welded);
+  return welded;
 }
 
 export function getPartGeometryCacheSizeForTests(): number {

@@ -166,6 +166,44 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
     );
   }
 
+  if (feature.kind === 'routed_path') {
+    const diameter = formatMeasurementWithUnit(feature.bit.diameter, units);
+    const profile =
+      feature.bit.profile === 'v_bit'
+        ? `V-Bit ${feature.bit.includedAngle}°`
+        : feature.bit.profile === 'dovetail'
+          ? `Dovetail ${feature.bit.includedAngle}° · ${formatMeasurementWithUnit(feature.bit.shankDiameter, units)} shank`
+          : feature.bit.profile === 't_slot' || feature.bit.profile === 'keyhole'
+            ? `${toTitleCase(feature.bit.profile)} · ${formatMeasurementWithUnit(feature.bit.shankDiameter, units)} shank × ${formatMeasurementWithUnit(feature.bit.cutterHeight, units)} cutter height`
+            : feature.bit.profile === 'straight'
+              ? 'Flat Bottom'
+              : feature.bit.profile === 'core_box' || feature.bit.profile === 'ball_nose'
+                ? 'Round Bottom'
+                : toTitleCase(feature.bit.profile);
+    const termination =
+      feature.parameters.depthMode === 'through'
+        ? 'Through'
+        : `${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+    const pathType = feature.path.closed ? 'Closed' : 'Open';
+    const roundedCorners = feature.path.points.filter((point) => (point.cornerRadius ?? 0) > 0).length;
+    const cornerText =
+      roundedCorners > 0 ? ` · ${roundedCorners} rounded ${roundedCorners === 1 ? 'corner' : 'corners'}` : '';
+    const diameterLabel =
+      feature.bit.profile === 'dovetail' || feature.bit.profile === 't_slot' || feature.bit.profile === 'keyhole'
+        ? `${diameter} max diameter`
+        : `${diameter} diameter`;
+    return `Routed Path on ${getFeatureTargetLabel(feature)} · ${pathType} ${feature.path.points.length}-point path${cornerText} · ${profile}, ${diameterLabel} · ${termination}`;
+  }
+
+  if (feature.kind === 'edge_profile') {
+    const tool = feature.routerToolSnapshot;
+    const toolText = tool
+      ? `Tool: ${tool.name}${tool.manufacturer ? ` (${tool.manufacturer}${tool.sku ? ` ${tool.sku}` : ''})` : ''}${tool.sections?.length ? ` · ${tool.sections.length} axial sections${tool.overallLength ? ` · ${formatMeasurementWithUnit(tool.overallLength, units)} overall` : ''}` : ' · legacy axial envelope'}`
+      : 'Generic profile / no physical tool assigned';
+    const profileName = feature.routerProfileSnapshot?.name ?? toTitleCase(feature.profile);
+    return `${profileName} Edge Profile on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size, units)} size × ${formatMeasurementWithUnit(feature.parameters.depth, units)} depth · ${toolText}`;
+  }
+
   if (feature.cutType === 'tenon') {
     const tongueThickness = feature.parameters.depth ?? 0;
     return `Tenon on ${getFeatureTargetLabel(feature)} \u00b7 ${formatMeasurementWithUnit(feature.parameters.size.length, units)} long \u00d7 ${formatMeasurementWithUnit(feature.parameters.size.width, units)} wide \u00d7 ${formatMeasurementWithUnit(tongueThickness, units)} thick`;
@@ -215,6 +253,13 @@ export function getAuthoredFeatureCount(features?: PartFeature[]): number {
 export function getFeaturePlacementSummary(feature: PartFeature, units: 'imperial' | 'metric'): string | null {
   const measure = (value: number) => formatMeasurementWithUnit(value, units);
   if (feature.kind === 'end_cut') return null;
+  if (feature.kind === 'routed_path') {
+    const first = feature.path.points[0];
+    const last = feature.path.points.at(-1);
+    if (!first || !last) return null;
+    return `${feature.path.points.length} points · starts at (${measure(first.primary)}, ${measure(first.secondary)}) · ends at (${measure(last.primary)}, ${measure(last.secondary)})`;
+  }
+  if (feature.kind === 'edge_profile') return 'Full run along the selected edge';
   if (feature.kind === 'rect_cut') {
     if (feature.cutType === 'rabbet') return 'Full run along the selected edge';
     if (feature.target.type === 'edge') {

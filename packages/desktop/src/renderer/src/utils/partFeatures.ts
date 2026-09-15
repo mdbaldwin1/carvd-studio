@@ -1,5 +1,19 @@
-import { AssemblyPart, Part, PartFeature, PartFeatureReference, PartFeatureTarget } from '../types';
+import {
+  AssemblyPart,
+  Part,
+  PartFeature,
+  PartFeatureReference,
+  PartFeatureTarget,
+  RouterProfileDefinition,
+  RouterToolDefinition
+} from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  cloneRouterProfileDefinition,
+  getRouterProfileRevision,
+  validateRouterProfileDefinition
+} from './routerProfiles';
+import { cloneRouterToolDefinition, getRouterToolRevision, validateRouterToolDefinition } from './routerTools';
 
 const FACE_TARGETS = new Set(['left_end', 'right_end', 'top_face', 'bottom_face', 'front_face', 'back_face']);
 const EDGE_TARGETS = new Set([
@@ -34,7 +48,24 @@ const END_CUT_FACES = new Set(['left_end', 'right_end', 'front_face', 'back_face
 const LENGTH_MODES = new Set(['long_point', 'short_point', 'centerline']);
 const CIRCULAR_CUT_TYPES = new Set(['round_hole', 'countersink', 'counterbore']);
 const ROUNDED_CUT_TYPES = new Set(['rounded_slot', 'rounded_rectangle']);
+const ROUTER_BIT_TYPES = new Set([
+  'straight',
+  'mortising',
+  'spiral_upcut',
+  'spiral_downcut',
+  'compression',
+  'surfacing',
+  'core_box',
+  'ball_nose',
+  'v_bit',
+  'engraving',
+  'dovetail',
+  't_slot',
+  'keyhole'
+]);
+const EDGE_PROFILE_TYPES = new Set(['roundover', 'cove', 'chamfer', 'rabbet', 'bead', 'ogee', 'thumbnail', 'custom']);
 const MAX_PATTERN_MEMBERS = 128;
+const MAX_ROUTED_PATH_POINTS = 2048;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -247,6 +278,196 @@ export function validateSerializedPartFeatures(value: unknown, path: string): st
       }
       return;
     }
+    if (candidate.kind === 'routed_path') {
+      if (
+        !isRecord(candidate.target) ||
+        candidate.target.type !== 'face' ||
+        !FACE_TARGETS.has(String(candidate.target.face))
+      )
+        errors.push(`${featurePath}.target is invalid for a routed path`);
+
+      const path = candidate.path;
+      if (
+        !isRecord(path) ||
+        !Array.isArray(path.points) ||
+        path.points.length < 2 ||
+        path.points.length > MAX_ROUTED_PATH_POINTS
+      ) {
+        errors.push(`${featurePath}.path.points is invalid`);
+      } else {
+        const points = path.points;
+        const validPoints = points.every(
+          (point) =>
+            isRecord(point) &&
+            isFiniteNumber(point.primary) &&
+            isFiniteNumber(point.secondary) &&
+            (point.cornerRadius === undefined || (isFiniteNumber(point.cornerRadius) && point.cornerRadius >= 0))
+        );
+        if (!validPoints) errors.push(`${featurePath}.path.points is invalid`);
+        else {
+          const hasNonZeroSegment = points.some((point, index) => {
+            if (index === 0) return false;
+            const previous = points[index - 1] as Record<string, number>;
+            const current = point as Record<string, number>;
+            return current.primary !== previous.primary || current.secondary !== previous.secondary;
+          });
+          if (!hasNonZeroSegment) errors.push(`${featurePath}.path.points must contain a non-zero segment`);
+        }
+        if (!isOptionalBoolean(path.closed)) errors.push(`${featurePath}.path.closed is invalid`);
+        if (path.closed === true && points.length < 3)
+          errors.push(`${featurePath}.path.points must contain at least three points when closed`);
+      }
+
+      const parameters = candidate.parameters;
+      if (!isRecord(parameters)) {
+        errors.push(`${featurePath}.parameters are invalid`);
+      } else {
+        if (!['through', 'blind'].includes(String(parameters.depthMode)))
+          errors.push(`${featurePath}.parameters.depthMode is invalid`);
+        if (parameters.depthMode === 'blind' && !isPositiveFiniteNumber(parameters.depth))
+          errors.push(`${featurePath}.parameters.depth is invalid`);
+        if (parameters.depth !== undefined && !isPositiveFiniteNumber(parameters.depth))
+          errors.push(`${featurePath}.parameters.depth is invalid`);
+      }
+      const bit = candidate.bit;
+      if (!isRecord(bit)) {
+        errors.push(`${featurePath}.bit is invalid`);
+      } else {
+        if (!ROUTER_BIT_TYPES.has(String(bit.profile))) errors.push(`${featurePath}.bit.profile is invalid`);
+        if (!isPositiveFiniteNumber(bit.diameter)) errors.push(`${featurePath}.bit.diameter is invalid`);
+        if (
+          (bit.profile === 'v_bit' || bit.profile === 'engraving' || bit.profile === 'dovetail') &&
+          (!isPositiveFiniteNumber(bit.includedAngle) || bit.includedAngle >= 180)
+        )
+          errors.push(`${featurePath}.bit.includedAngle is invalid`);
+        if (
+          bit.profile !== 'v_bit' &&
+          bit.profile !== 'engraving' &&
+          bit.profile !== 'dovetail' &&
+          bit.includedAngle !== undefined
+        )
+          errors.push(`${featurePath}.bit.includedAngle is invalid`);
+        if (bit.profile === 'dovetail' || bit.profile === 't_slot' || bit.profile === 'keyhole') {
+          if (
+            !isPositiveFiniteNumber(bit.shankDiameter) ||
+            !isPositiveFiniteNumber(bit.diameter) ||
+            bit.shankDiameter >= bit.diameter
+          )
+            errors.push(`${featurePath}.bit.shankDiameter is invalid`);
+        } else if (bit.shankDiameter !== undefined) {
+          errors.push(`${featurePath}.bit.shankDiameter is invalid`);
+        }
+        if (bit.profile === 't_slot' || bit.profile === 'keyhole') {
+          if (!isPositiveFiniteNumber(bit.cutterHeight)) errors.push(`${featurePath}.bit.cutterHeight is invalid`);
+          if (
+            isRecord(parameters) &&
+            parameters.depthMode === 'blind' &&
+            isPositiveFiniteNumber(parameters.depth) &&
+            isPositiveFiniteNumber(bit.cutterHeight) &&
+            parameters.depth < bit.cutterHeight
+          )
+            errors.push(`${featurePath}.parameters.depth must be at least the bit cutterHeight`);
+        } else if (bit.cutterHeight !== undefined) {
+          errors.push(`${featurePath}.bit.cutterHeight is invalid`);
+        }
+      }
+      return;
+    }
+    if (candidate.kind === 'edge_profile') {
+      if (
+        !isRecord(candidate.target) ||
+        candidate.target.type !== 'edge' ||
+        !EDGE_TARGETS.has(String(candidate.target.edge))
+      )
+        errors.push(`${featurePath}.target is invalid for an edge profile`);
+      if (!EDGE_PROFILE_TYPES.has(String(candidate.profile))) errors.push(`${featurePath}.profile is invalid`);
+      if (
+        candidate.routerProfileId !== undefined &&
+        (typeof candidate.routerProfileId !== 'string' || candidate.routerProfileId.length === 0)
+      )
+        errors.push(`${featurePath}.routerProfileId is invalid`);
+      if (
+        candidate.routerProfileRevision !== undefined &&
+        (typeof candidate.routerProfileRevision !== 'string' || candidate.routerProfileRevision.length === 0)
+      )
+        errors.push(`${featurePath}.routerProfileRevision is invalid`);
+      if (candidate.routerProfileSnapshot !== undefined) {
+        errors.push(
+          ...validateRouterProfileDefinition(candidate.routerProfileSnapshot, `${featurePath}.routerProfileSnapshot`)
+        );
+        if (
+          typeof candidate.routerProfileRevision === 'string' &&
+          isRecord(candidate.routerProfileSnapshot) &&
+          candidate.routerProfileRevision !==
+            getRouterProfileRevision(candidate.routerProfileSnapshot as unknown as RouterProfileDefinition)
+        )
+          errors.push(`${featurePath}.routerProfileRevision does not match routerProfileSnapshot`);
+      }
+      if (candidate.profile === 'custom') {
+        if (typeof candidate.routerProfileId !== 'string' || candidate.routerProfileId.length === 0)
+          errors.push(`${featurePath}.routerProfileId is required for a custom profile`);
+        if (candidate.routerProfileSnapshot === undefined)
+          errors.push(`${featurePath}.routerProfileSnapshot is required for a custom profile`);
+        else if (
+          isRecord(candidate.routerProfileSnapshot) &&
+          typeof candidate.routerProfileId === 'string' &&
+          candidate.routerProfileSnapshot.id !== candidate.routerProfileId
+        )
+          errors.push(`${featurePath}.routerProfileSnapshot.id must match routerProfileId`);
+      }
+      if (
+        candidate.routerToolId !== undefined &&
+        (typeof candidate.routerToolId !== 'string' || candidate.routerToolId.length === 0)
+      )
+        errors.push(`${featurePath}.routerToolId is invalid`);
+      if (
+        candidate.routerToolRevision !== undefined &&
+        (typeof candidate.routerToolRevision !== 'string' || candidate.routerToolRevision.length === 0)
+      )
+        errors.push(`${featurePath}.routerToolRevision is invalid`);
+      if (candidate.routerToolSnapshot !== undefined) {
+        errors.push(...validateRouterToolDefinition(candidate.routerToolSnapshot, `${featurePath}.routerToolSnapshot`));
+        if (
+          typeof candidate.routerToolRevision === 'string' &&
+          isRecord(candidate.routerToolSnapshot) &&
+          candidate.routerToolRevision !==
+            getRouterToolRevision(candidate.routerToolSnapshot as unknown as RouterToolDefinition)
+        )
+          errors.push(`${featurePath}.routerToolRevision does not match routerToolSnapshot`);
+      }
+      if (typeof candidate.routerToolId === 'string') {
+        if (!isRecord(candidate.routerToolSnapshot))
+          errors.push(`${featurePath}.routerToolSnapshot is required when a tool is assigned`);
+        else if (candidate.routerToolSnapshot.id !== candidate.routerToolId)
+          errors.push(`${featurePath}.routerToolSnapshot.id must match routerToolId`);
+      }
+      if (
+        isRecord(candidate.routerToolSnapshot) &&
+        validateRouterToolDefinition(candidate.routerToolSnapshot).length === 0
+      ) {
+        const expectedFamily =
+          isRecord(candidate.routerProfileSnapshot) && typeof candidate.routerProfileSnapshot.family === 'string'
+            ? candidate.routerProfileSnapshot.family
+            : candidate.profile;
+        const exactProfileId =
+          typeof candidate.routerToolSnapshot.routerProfileId === 'string'
+            ? candidate.routerToolSnapshot.routerProfileId
+            : undefined;
+        if (
+          candidate.routerToolSnapshot.profileFamily !== expectedFamily ||
+          (exactProfileId !== undefined && exactProfileId !== candidate.routerProfileId)
+        )
+          errors.push(`${featurePath}.routerToolSnapshot is incompatible with the selected profile`);
+      }
+      if (!isRecord(candidate.parameters)) errors.push(`${featurePath}.parameters are invalid`);
+      else {
+        if (!isPositiveFiniteNumber(candidate.parameters.size))
+          errors.push(`${featurePath}.parameters.size is invalid`);
+        if (!isPositiveFiniteNumber(candidate.parameters.depth))
+          errors.push(`${featurePath}.parameters.depth is invalid`);
+      }
+      return;
+    }
     if (candidate.kind !== 'rect_cut') {
       errors.push(`${featurePath}.kind is invalid`);
       return;
@@ -356,6 +577,35 @@ function clonePartFeatureOfAnyKind(feature: PartFeature): PartFeature {
       metadata: cloneFeatureMetadata(feature.metadata),
       parameters: { ...feature.parameters },
       placement: { ...feature.placement }
+    };
+  }
+
+  if (feature.kind === 'routed_path') {
+    return {
+      ...feature,
+      target: cloneFeatureTarget(feature.target) as typeof feature.target,
+      reference: cloneFeatureReference(feature.reference),
+      metadata: cloneFeatureMetadata(feature.metadata),
+      path: {
+        ...feature.path,
+        points: feature.path.points.map((point) => ({ ...point }))
+      },
+      bit: { ...feature.bit },
+      parameters: { ...feature.parameters }
+    };
+  }
+
+  if (feature.kind === 'edge_profile') {
+    return {
+      ...feature,
+      target: cloneFeatureTarget(feature.target) as typeof feature.target,
+      reference: cloneFeatureReference(feature.reference),
+      metadata: cloneFeatureMetadata(feature.metadata),
+      parameters: { ...feature.parameters },
+      routerProfileSnapshot: feature.routerProfileSnapshot
+        ? cloneRouterProfileDefinition(feature.routerProfileSnapshot)
+        : undefined,
+      routerToolSnapshot: feature.routerToolSnapshot ? cloneRouterToolDefinition(feature.routerToolSnapshot) : undefined
     };
   }
 

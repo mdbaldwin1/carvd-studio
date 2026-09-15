@@ -9,6 +9,7 @@ import {
   worldContoursOverlap,
   getPartLocalConvexVertices,
   getPartLocalCorners,
+  getPartOutlineGeometry,
   getPartRenderGeometry,
   getPartWorldAABB,
   getPartWorldContour,
@@ -21,6 +22,324 @@ vi.unmock('three');
 describe('partFeatureGeometry', () => {
   afterEach(() => {
     clearPartGeometryCache();
+  });
+
+  describe('edge profile geometry', () => {
+    const customSnapshot = {
+      version: 1 as const,
+      id: 'embedded-quarter-round',
+      name: 'Embedded Quarter Round',
+      family: 'roundover',
+      source: 'generic' as const,
+      parameters: {},
+      boundary: {
+        start: { u: 0, v: 0.25 },
+        segments: [{ kind: 'arc' as const, to: { u: 0.25, v: 0 }, radius: 0.25, clockwise: true }]
+      }
+    };
+    it.each(['roundover', 'cove', 'chamfer', 'rabbet', 'bead', 'ogee', 'thumbnail'] as const)(
+      'subtracts a finite %s profile along the selected edge',
+      (profile) => {
+        const part = createTestPart({
+          length: 8,
+          width: 4,
+          thickness: 1,
+          features: [
+            {
+              id: `edge-${profile}`,
+              kind: 'edge_profile',
+              version: 1,
+              enabled: true,
+              target: { type: 'edge', edge: 'top_front_edge' },
+              reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+              profile,
+              parameters: { size: 0.25, depth: 0.25 }
+            }
+          ]
+        });
+        const geometry = getPartRenderGeometry(part);
+        const positions = geometry.getAttribute('position');
+        expect(positions.count).toBeGreaterThan(0);
+        expect(Array.from(positions.array)).toSatisfy((values: number[]) => values.every(Number.isFinite));
+        if (profile === 'roundover') {
+          const cornerVertices = Array.from({ length: positions.count }, (_, index) => ({
+            x: positions.getX(index),
+            y: positions.getY(index),
+            z: positions.getZ(index)
+          })).filter(({ y, z }) => Math.abs(y - 0.5) < 1e-5 && Math.abs(z - 2) < 1e-5);
+          expect(cornerVertices).toHaveLength(0);
+        }
+      }
+    );
+
+    it.each([
+      'top_front_edge',
+      'top_back_edge',
+      'top_left_edge',
+      'top_right_edge',
+      'bottom_front_edge',
+      'bottom_back_edge',
+      'bottom_left_edge',
+      'bottom_right_edge',
+      'front_left_edge',
+      'front_right_edge',
+      'back_left_edge',
+      'back_right_edge'
+    ] as const)('actually removes the sharp corner along %s', (edge) => {
+      const part = createTestPart({
+        length: 8,
+        width: 4,
+        thickness: 1,
+        features: [
+          {
+            id: `roundover-${edge}`,
+            kind: 'edge_profile',
+            version: 1,
+            enabled: true,
+            target: { type: 'edge', edge },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            profile: 'roundover',
+            parameters: { size: 0.25, depth: 0.25 }
+          }
+        ]
+      });
+      const positions = getPartRenderGeometry(part).getAttribute('position');
+      const fixedCoordinates: Array<readonly ['x' | 'y' | 'z', number]> = [];
+      if (edge.includes('left')) fixedCoordinates.push(['x', -4]);
+      else if (edge.includes('right')) fixedCoordinates.push(['x', 4]);
+      if (edge.includes('top')) fixedCoordinates.push(['y', 0.5]);
+      else if (edge.includes('bottom')) fixedCoordinates.push(['y', -0.5]);
+      if (edge.includes('front')) fixedCoordinates.push(['z', 2]);
+      else if (edge.includes('back')) fixedCoordinates.push(['z', -2]);
+      const sharpCornerRemains = Array.from({ length: positions.count }, (_, index) => ({
+        x: positions.getX(index),
+        y: positions.getY(index),
+        z: positions.getZ(index)
+      })).some((point) => fixedCoordinates.every(([axis, value]) => Math.abs(point[axis] - value) < 1e-5));
+      expect(sharpCornerRemains).toBe(false);
+    });
+
+    it.each([
+      'top_front_edge',
+      'top_back_edge',
+      'top_left_edge',
+      'top_right_edge',
+      'bottom_front_edge',
+      'bottom_back_edge',
+      'bottom_left_edge',
+      'bottom_right_edge',
+      'front_left_edge',
+      'front_right_edge',
+      'back_left_edge',
+      'back_right_edge'
+    ] as const)('applies one authoritative custom snapshot on %s', (edge) => {
+      const part = createTestPart({
+        length: 8,
+        width: 4,
+        thickness: 1,
+        features: [
+          {
+            id: `custom-${edge}`,
+            kind: 'edge_profile',
+            version: 1,
+            enabled: true,
+            target: { type: 'edge', edge },
+            reference: { primaryFrom: 'min' },
+            profile: 'custom',
+            routerProfileId: customSnapshot.id,
+            routerProfileSnapshot: customSnapshot,
+            // These deliberately disagree with the snapshot: custom rendering
+            // must never rescale or replace its embedded canonical definition.
+            parameters: { size: 0.49, depth: 0.49 }
+          }
+        ]
+      });
+      const positions = getPartRenderGeometry(part).getAttribute('position');
+      expect(positions.count).toBeGreaterThan(0);
+      expect(Array.from(positions.array).every(Number.isFinite)).toBe(true);
+      const fixedCoordinates: Array<readonly ['x' | 'y' | 'z', number]> = [];
+      if (edge.includes('left')) fixedCoordinates.push(['x', -4]);
+      else if (edge.includes('right')) fixedCoordinates.push(['x', 4]);
+      if (edge.includes('top')) fixedCoordinates.push(['y', 0.5]);
+      else if (edge.includes('bottom')) fixedCoordinates.push(['y', -0.5]);
+      if (edge.includes('front')) fixedCoordinates.push(['z', 2]);
+      else if (edge.includes('back')) fixedCoordinates.push(['z', -2]);
+      expect(
+        Array.from({ length: positions.count }, (_, index) => ({
+          x: positions.getX(index),
+          y: positions.getY(index),
+          z: positions.getZ(index)
+        })).some((point) => fixedCoordinates.every(([axis, value]) => Math.abs(point[axis] - value) < 1e-5))
+      ).toBe(false);
+    });
+
+    it('keys cached custom geometry by snapshot content, not only library identity', () => {
+      const part = createTestPart({
+        features: [
+          {
+            id: 'custom-cache',
+            kind: 'edge_profile',
+            version: 1,
+            enabled: true,
+            target: { type: 'edge', edge: 'top_front_edge' },
+            reference: { primaryFrom: 'min' },
+            profile: 'custom',
+            routerProfileId: customSnapshot.id,
+            routerProfileSnapshot: customSnapshot,
+            parameters: { size: 0.25, depth: 0.25 }
+          }
+        ]
+      });
+      const first = getPartRenderGeometry(part);
+      const changed = JSON.parse(JSON.stringify(part)) as typeof part;
+      const feature = changed.features?.[0];
+      if (!feature || feature.kind !== 'edge_profile' || !feature.routerProfileSnapshot)
+        throw new Error('expected snapshot');
+      feature.routerProfileSnapshot.boundary.segments[0].to.u = 0.15;
+      const second = getPartRenderGeometry(changed);
+      expect(second).not.toBe(first);
+    });
+
+    it('invalidates cached geometry when a cubic control point changes', () => {
+      const part = createTestPart({
+        features: [
+          {
+            id: 'cubic-cache',
+            kind: 'edge_profile',
+            version: 1,
+            enabled: true,
+            target: { type: 'edge', edge: 'top_front_edge' },
+            reference: { primaryFrom: 'min' },
+            profile: 'custom',
+            routerProfileId: 'cubic-cache',
+            routerProfileSnapshot: {
+              version: 1,
+              id: 'cubic-cache',
+              name: 'Cubic',
+              family: 'freeform',
+              source: 'generic',
+              parameters: {},
+              boundary: {
+                start: { u: 0, v: 0.3 },
+                segments: [
+                  {
+                    kind: 'cubicBezier',
+                    control1: { u: 0.08, v: 0.3 },
+                    control2: { u: 0.3, v: 0.08 },
+                    to: { u: 0.3, v: 0 }
+                  }
+                ]
+              }
+            },
+            parameters: { size: 0.3, depth: 0.3 }
+          }
+        ]
+      });
+      const first = getPartRenderGeometry(part);
+      const changed = JSON.parse(JSON.stringify(part)) as typeof part;
+      const feature = changed.features?.[0];
+      if (!feature || feature.kind !== 'edge_profile' || !feature.routerProfileSnapshot)
+        throw new Error('expected snapshot');
+      const segment = feature.routerProfileSnapshot.boundary.segments[0];
+      if (segment.kind !== 'cubicBezier') throw new Error('expected cubic');
+      segment.control1.u = 0.12;
+      expect(getPartRenderGeometry(changed)).not.toBe(first);
+    });
+
+    it('subtracts a concave undercut-style custom removal polygon safely', () => {
+      const part = createTestPart({
+        features: [
+          {
+            id: 'custom-undercut',
+            kind: 'edge_profile',
+            version: 1,
+            enabled: true,
+            target: { type: 'edge', edge: 'top_front_edge' },
+            reference: { primaryFrom: 'min' },
+            profile: 'custom',
+            routerProfileId: 'undercut',
+            routerProfileSnapshot: {
+              version: 1,
+              id: 'undercut',
+              name: 'Undercut',
+              family: 'undercut',
+              source: 'generic',
+              parameters: {},
+              boundary: {
+                start: { u: 0, v: 0.3 },
+                segments: [
+                  { kind: 'line', to: { u: 0.12, v: 0.3 } },
+                  { kind: 'line', to: { u: 0.12, v: 0.12 } },
+                  { kind: 'line', to: { u: 0.35, v: 0.12 } },
+                  { kind: 'line', to: { u: 0.35, v: 0 } }
+                ]
+              }
+            },
+            parameters: { size: 0.1, depth: 0.1 }
+          }
+        ]
+      });
+      const positions = getPartRenderGeometry(part).getAttribute('position');
+      expect(positions.count).toBeGreaterThan(0);
+      expect(Array.from(positions.array).every(Number.isFinite)).toBe(true);
+    });
+
+    it('honors independent profile size and depth instead of collapsing both to the smaller value', () => {
+      const part = createTestPart({
+        length: 8,
+        width: 4,
+        thickness: 1,
+        features: [
+          {
+            id: 'asymmetric-roundover',
+            kind: 'edge_profile',
+            version: 1,
+            enabled: true,
+            target: { type: 'edge', edge: 'top_front_edge' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            profile: 'roundover',
+            parameters: { size: 0.4, depth: 0.2 }
+          }
+        ]
+      });
+      const positions = getPartRenderGeometry(part).getAttribute('position');
+      const vertices = Array.from({ length: positions.count }, (_, index) => ({
+        y: positions.getY(index),
+        z: positions.getZ(index)
+      }));
+      expect(vertices.some(({ y, z }) => Math.abs(y - 0.1) < 1e-5 && Math.abs(z - 2) < 1e-5)).toBe(true);
+      expect(vertices.some(({ y, z }) => Math.abs(y - 0.5) < 1e-5 && Math.abs(z - 1.8) < 1e-5)).toBe(true);
+    });
+  });
+
+  it('welds CSG triangle soup before generating visible outlines', () => {
+    const part = createTestPart({
+      length: 8,
+      width: 4,
+      thickness: 1,
+      features: [
+        {
+          id: 'outlined-route',
+          kind: 'routed_path',
+          version: 1,
+          enabled: true,
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          path: {
+            points: [
+              { primary: -2, secondary: 0 },
+              { primary: 2, secondary: 0 }
+            ]
+          },
+          bit: { profile: 'straight', diameter: 0.25 },
+          parameters: { depthMode: 'blind', depth: 0.25 }
+        }
+      ]
+    });
+    const render = getPartRenderGeometry(part);
+    const outline = getPartOutlineGeometry(part);
+    expect(outline.index).not.toBeNull();
+    expect(outline.getAttribute('position').count).toBeLessThan(render.getAttribute('position').count);
   });
 
   describe('circular cut geometry', () => {
@@ -193,6 +512,239 @@ describe('partFeatureGeometry', () => {
       expect(
         new THREE.Raycaster(new THREE.Vector3(0, 3, 0), new THREE.Vector3(0, -1, 0)).intersectObject(mesh)
       ).toHaveLength(0);
+    });
+  });
+
+  describe('routed path geometry', () => {
+    const routedPart = (profile: 'straight' | 'core_box' | 'v_bit') =>
+      createTestPart({
+        length: 8,
+        width: 6,
+        thickness: 2,
+        features: [
+          {
+            id: `route-${profile}`,
+            kind: 'routed_path' as const,
+            version: 1 as const,
+            enabled: true,
+            target: { type: 'face' as const, face: 'top_face' as const },
+            reference: { primaryFrom: 'center' as const, secondaryFrom: 'center' as const },
+            path: {
+              points: [
+                { primary: -2, secondary: 0 },
+                { primary: 2, secondary: 0 }
+              ]
+            },
+            bit: profile === 'v_bit' ? { profile, diameter: 1, includedAngle: 90 } : { profile, diameter: 1 },
+            parameters: { depthMode: 'blind' as const, depth: 0.5 }
+          }
+        ]
+      });
+
+    const firstTopHit = (part: ReturnType<typeof routedPart>, x: number, z: number) => {
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      return new THREE.Raycaster(new THREE.Vector3(x, 3, z), new THREE.Vector3(0, -1, 0)).intersectObject(mesh)[0]
+        ?.point.y;
+    };
+
+    it('sweeps a flat-bottomed straight bit through the middle of a face', () => {
+      const part = routedPart('straight');
+      expect(firstTopHit(part, 0, 0)).toBeCloseTo(0.5, 3);
+      expect(firstTopHit(part, 0, 0.6)).toBeCloseTo(1, 3);
+    });
+
+    it('sweeps a core-box bit with a curved cross-section', () => {
+      const part = routedPart('core_box');
+      expect(firstTopHit(part, 0, 0)).toBeCloseTo(0.5, 2);
+      expect(firstTopHit(part, 0, 0.4)).toBeCloseTo(0.7, 2);
+    });
+
+    it('sweeps a V-bit to a narrow point at the authored depth', () => {
+      const part = routedPart('v_bit');
+      expect(firstTopHit(part, 0, 0)).toBeCloseTo(0.5, 2);
+      expect(firstTopHit(part, 0, 0.2)).toBeCloseTo(0.7, 2);
+      expect(firstTopHit(part, 0, 0.55)).toBeCloseTo(1, 2);
+    });
+
+    it('uses the selected face frame for a rounded front-face route', () => {
+      const part = routedPart('straight');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'routed_path') throw new Error('expected routed path');
+      feature.target = { type: 'face', face: 'front_face' };
+      feature.path.points = [
+        { primary: -2, secondary: 0 },
+        { primary: 0, secondary: 0, cornerRadius: 0.75 },
+        { primary: 0, secondary: 1 }
+      ];
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      const hit = new THREE.Raycaster(new THREE.Vector3(-0.22, 0.22, 5), new THREE.Vector3(0, 0, -1)).intersectObject(
+        mesh
+      )[0];
+      expect(hit.point.z).toBeCloseTo(2.5, 3);
+    });
+
+    it('cuts the closing span of a closed polyline', () => {
+      const part = routedPart('straight');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'routed_path') throw new Error('expected routed path');
+      feature.path = {
+        closed: true,
+        points: [
+          { primary: -2, secondary: -1 },
+          { primary: 2, secondary: -1 },
+          { primary: 0, secondary: 1 }
+        ]
+      };
+      expect(firstTopHit(part, -1, 0)).toBeCloseTo(0.5, 3);
+    });
+
+    it('routes completely through stock when depth mode is through', () => {
+      const part = routedPart('straight');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'routed_path') throw new Error('expected routed path');
+      feature.parameters = { depthMode: 'through' };
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      expect(
+        new THREE.Raycaster(new THREE.Vector3(0, 3, 0), new THREE.Vector3(0, -1, 0)).intersectObject(mesh)
+      ).toHaveLength(0);
+    });
+
+    it.each(['straight', 'core_box', 'v_bit'] as const)(
+      'trims an open-path corner and sweeps a tangent fillet arc for a %s bit',
+      (profile) => {
+        const part = routedPart(profile);
+        const feature = part.features?.[0];
+        if (!feature || feature.kind !== 'routed_path') throw new Error('expected routed path');
+        feature.bit.diameter = 0.2;
+        feature.path.points = [
+          { primary: -2, secondary: 0 },
+          { primary: 0, secondary: 0, cornerRadius: 0.75 },
+          { primary: 0, secondary: 2 }
+        ];
+        expect(firstTopHit(part, -0.22, 0.22)).toBeCloseTo(profile === 'straight' ? 0.5 : 0.9, 1);
+        if (profile === 'straight') expect(firstTopHit(part, 0, 0)).toBeCloseTo(1, 2);
+      }
+    );
+
+    it('clamps an oversized corner radius to the available adjacent spans', () => {
+      const part = routedPart('straight');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'routed_path') throw new Error('expected routed path');
+      feature.bit.diameter = 0.1;
+      feature.path.points = [
+        { primary: -1, secondary: 0 },
+        { primary: 0, secondary: 0, cornerRadius: 100 },
+        { primary: 0, secondary: 1 }
+      ];
+      expect(firstTopHit(part, -0.146, 0.146)).toBeCloseTo(0.5, 2);
+      expect(firstTopHit(part, 0, 0)).toBeCloseTo(1, 2);
+    });
+
+    it('fillets the first and last corners of a closed path', () => {
+      const part = routedPart('straight');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'routed_path') throw new Error('expected routed path');
+      feature.bit.diameter = 0.15;
+      feature.path = {
+        closed: true,
+        points: [
+          { primary: -1, secondary: -1, cornerRadius: 0.4 },
+          { primary: 1, secondary: -1 },
+          { primary: 1, secondary: 1 },
+          { primary: -1, secondary: 1, cornerRadius: 0.4 }
+        ]
+      };
+      expect(firstTopHit(part, -0.883, -0.883)).toBeCloseTo(0.5, 2);
+      expect(firstTopHit(part, -1, -1)).toBeCloseTo(1, 2);
+    });
+
+    it.each(['dovetail', 't_slot', 'keyhole'] as const)(
+      'keeps a narrow surface slot above the wider %s cavity',
+      (profile) => {
+        const part = routedPart('straight');
+        const feature = part.features?.[0];
+        if (!feature || feature.kind !== 'routed_path') throw new Error('expected routed path');
+        feature.bit =
+          profile === 'dovetail'
+            ? { profile, diameter: 1, shankDiameter: 0.25, includedAngle: 90 }
+            : { profile, diameter: 1, shankDiameter: 0.25, cutterHeight: 0.2 };
+        feature.parameters.depth = 0.6;
+        const mesh = new THREE.Mesh(
+          getPartRenderGeometry(part),
+          new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })
+        );
+        mesh.updateMatrixWorld(true);
+        const surfaceWall = new THREE.Raycaster(
+          new THREE.Vector3(0, 0.9, 0),
+          new THREE.Vector3(0, 0, 1)
+        ).intersectObject(mesh)[0].point.z;
+        const cavityWall = new THREE.Raycaster(
+          new THREE.Vector3(0, 0.45, 0),
+          new THREE.Vector3(0, 0, 1)
+        ).intersectObject(mesh)[0].point.z;
+        expect(surfaceWall).toBeCloseTo(0.125, 2);
+        expect(cavityWall).toBeGreaterThan(0.35);
+      }
+    );
+
+    it('adds a full-diameter plunge pocket only at the keyhole path start', () => {
+      const part = routedPart('straight');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'routed_path') throw new Error('expected routed path');
+      feature.bit = { profile: 'keyhole', diameter: 1, shankDiameter: 0.2, cutterHeight: 0.2 };
+      feature.parameters.depth = 0.6;
+      expect(firstTopHit(part, -2, 0.4)).toBeCloseTo(0.4, 2);
+      expect(firstTopHit(part, 0, 0.4)).toBeCloseTo(1, 2);
+    });
+
+    it('carries an undercut profile around a rounded side-face path', () => {
+      const part = routedPart('straight');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'routed_path') throw new Error('expected routed path');
+      feature.target = { type: 'face', face: 'front_face' };
+      feature.bit = { profile: 't_slot', diameter: 0.6, shankDiameter: 0.15, cutterHeight: 0.15 };
+      feature.parameters.depth = 0.4;
+      feature.path.points = [
+        { primary: -2, secondary: 0 },
+        { primary: 0, secondary: 0, cornerRadius: 0.75 },
+        { primary: 0, secondary: 0.75 }
+      ];
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      const cavityWall = new THREE.Raycaster(
+        new THREE.Vector3(-0.22, 0.22, 2.7),
+        new THREE.Vector3(1, 0, 0)
+      ).intersectObject(mesh)[0];
+      expect(cavityWall).toBeDefined();
+      expect(cavityWall.point.x).toBeLessThan(0.3);
+    });
+
+    it.each([
+      {
+        title: 'an oversized shank',
+        bit: { profile: 't_slot', diameter: 0.5, shankDiameter: 0.75, cutterHeight: 0.2 }
+      },
+      {
+        title: 'a zero-height cutter',
+        bit: { profile: 'keyhole', diameter: 0.5, shankDiameter: 0.2, cutterHeight: 0 }
+      },
+      {
+        title: 'a cutter taller than its route depth',
+        bit: { profile: 't_slot', diameter: 0.5, shankDiameter: 0.2, cutterHeight: 1 }
+      },
+      {
+        title: 'an invalid dovetail angle',
+        bit: { profile: 'dovetail', diameter: 0.5, shankDiameter: 0.2, includedAngle: 180 }
+      }
+    ] as const)('safely skips $title', ({ bit }) => {
+      const part = routedPart('straight');
+      const feature = part.features?.[0];
+      if (!feature || feature.kind !== 'routed_path') throw new Error('expected routed path');
+      feature.bit = bit;
+      expect(firstTopHit(part, 0, 0)).toBeCloseTo(1, 3);
     });
   });
 

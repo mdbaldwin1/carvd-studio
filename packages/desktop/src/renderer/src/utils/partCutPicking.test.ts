@@ -18,6 +18,21 @@ describe('partCutPicking', () => {
     expect(new Set(targets.map((target) => target.key)).size).toBe(22);
   });
 
+  it('uses narrow edge volumes rather than full side surfaces', () => {
+    const part = createTestPart({ length: 24, width: 6, thickness: 0.75 });
+    const targets = getPickableTargetDefinitions(part);
+    const topFront = targets.find((target) => target.key === 'edge:top_front_edge');
+    const topLeft = targets.find((target) => target.key === 'edge:top_left_edge');
+
+    expect(topFront?.size[0]).toBe(24);
+    expect(topFront?.size[1]).toBeLessThan(0.75);
+    expect(topFront?.size[2]).toBeLessThan(0.75);
+    expect(topFront?.position[2]).toBeGreaterThan(3);
+    expect(topLeft?.size[0]).toBeLessThan(0.75);
+    expect(topLeft?.size[1]).toBeLessThan(0.75);
+    expect(topLeft?.size[2]).toBe(6);
+  });
+
   it('limits end cuts to the two end faces', () => {
     const draft = buildDraftFromPreset('end_cut');
 

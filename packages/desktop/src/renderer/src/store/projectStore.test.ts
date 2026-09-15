@@ -1668,6 +1668,45 @@ describe('projectStore', () => {
       expect(part1?.position).toEqual({ x: 5, y: 5, z: 5 });
       expect(part2?.position).toEqual({ x: 15, y: 5, z: 5 });
     });
+
+    it('finishes a keyboard nudge with the same semantic joint mate used by dragging', () => {
+      const host = createTestPart({
+        id: 'nudge-host',
+        length: 12,
+        width: 6,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [
+          {
+            id: 'nudge-dado',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'dado',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            placement: { x: 5.6225, z: 0 },
+            parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 }
+          }
+        ]
+      });
+      const divider = createTestPart({
+        id: 'nudge-divider',
+        length: 0.75,
+        width: 6,
+        thickness: 4,
+        position: { x: 0.0725, y: 2.8, z: 0 }
+      });
+      useProjectStore.setState({ parts: [host, divider] });
+      useSelectionStore.getState().selectPart(divider.id);
+
+      useProjectStore.getState().moveSelectedParts({ x: -0.0625, y: 0, z: 0 });
+
+      const seated = useProjectStore.getState().parts.find(({ id }) => id === divider.id)!;
+      expect(seated.position.x).toBeCloseTo(0);
+      expect(seated.position.y).toBeCloseTo(2.375);
+      expect(seated.position.z).toBeCloseTo(0);
+    });
   });
 
   // ============================================================

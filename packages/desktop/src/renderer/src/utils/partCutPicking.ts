@@ -148,10 +148,9 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.top_front_edge,
       priority: 2,
-      // Also used as face-style "Front Side" pick target for edge notches
-      position: [centerX, centerY, frontZ + faceDepth / 3],
+      position: [centerX, max.y + edgeThickness / 3, frontZ + edgeThickness / 3],
       rotation: [0, 0, 0],
-      size: [length, thickness, faceDepth],
+      size: [length, edgeThickness, edgeThickness],
       color: EDGE_COLOR
     },
     {
@@ -160,10 +159,9 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.top_back_edge,
       priority: 2,
-      // Also used as face-style "Back Side" pick target for edge notches
-      position: [centerX, centerY, backZ - faceDepth / 3],
+      position: [centerX, max.y + edgeThickness / 3, backZ - edgeThickness / 3],
       rotation: [0, 0, 0],
-      size: [length, thickness, faceDepth],
+      size: [length, edgeThickness, edgeThickness],
       color: EDGE_COLOR
     },
     {
@@ -194,10 +192,9 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.top_left_edge,
       priority: 2,
-      // Also used as face-style "Left Side" pick target for edge notches
-      position: [min.x - faceDepth / 3, centerY, centerZ],
+      position: [min.x - edgeThickness / 3, max.y + edgeThickness / 3, centerZ],
       rotation: [0, 0, 0],
-      size: [faceDepth, thickness, width],
+      size: [edgeThickness, edgeThickness, width],
       color: EDGE_COLOR
     },
     {
@@ -206,10 +203,9 @@ export function getPickableTargetDefinitions(part: Part): PickableTargetDefiniti
       family: 'edge',
       label: EDGE_LABELS.top_right_edge,
       priority: 2,
-      // Also used as face-style "Right Side" pick target for edge notches
-      position: [max.x + faceDepth / 3, centerY, centerZ],
+      position: [max.x + edgeThickness / 3, max.y + edgeThickness / 3, centerZ],
       rotation: [0, 0, 0],
-      size: [faceDepth, thickness, width],
+      size: [edgeThickness, edgeThickness, width],
       color: EDGE_COLOR
     },
     {
@@ -354,6 +350,12 @@ export function isTargetValidForDraft(target: PartFeatureTarget, draft: FeatureD
     // edited neither in the canvas nor in the panel.
     return target.type === 'face' && (target.face === 'top_face' || target.face === 'bottom_face');
   }
+
+  if (draft.mode === 'routed_path') {
+    return target.type === 'face';
+  }
+
+  if (draft.mode === 'edge_profile') return target.type === 'edge';
 
   if (draft.cutType === 'corner_notch') {
     // Every CornerTarget is front/back + left/right; none contains "top" or

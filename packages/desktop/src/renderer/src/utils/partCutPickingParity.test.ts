@@ -69,7 +69,9 @@ describe('pick pane parity', () => {
             ? settled.cornerTarget
             : settled.mode === 'rect_cut' && (settled.cutType === 'edge_notch' || settled.cutType === 'rabbet')
               ? settled.edgeTarget
-              : settled.faceTarget;
+              : settled.mode === 'edge_profile'
+                ? settled.edgeTarget
+                : settled.faceTarget;
 
       expect(current, `${preset}: ${targetName(pick.target)} did not survive normalization`).toBe(
         targetName(pick.target)

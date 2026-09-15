@@ -98,7 +98,7 @@ export interface Rotation3D {
 
 export type PartFeatureId = string;
 export type PartFeatureVersion = 1;
-export type PartFeatureKind = 'end_cut' | 'rect_cut' | 'circular_cut' | 'rounded_cut';
+export type PartFeatureKind = 'end_cut' | 'rect_cut' | 'circular_cut' | 'rounded_cut' | 'routed_path' | 'edge_profile';
 
 export type FaceTarget = 'left_end' | 'right_end' | 'top_face' | 'bottom_face' | 'front_face' | 'back_face';
 
@@ -245,7 +245,185 @@ export interface RoundedCutFeature extends PartFeatureBase {
   };
 }
 
-export type PartFeature = EndCutFeature | RectCutFeature | CircularCutFeature | RoundedCutFeature;
+export interface RoutedPathPoint {
+  /** Coordinate along the selected face's primary axis. */
+  primary: number;
+  /** Coordinate along the selected face's secondary axis. */
+  secondary: number;
+  /** Optional face-plane fillet radius. Omitted or zero keeps the corner sharp. */
+  cornerRadius?: number;
+}
+
+export type RouterBit =
+  | { profile: 'straight'; diameter: number; includedAngle?: never }
+  | { profile: 'mortising'; diameter: number; includedAngle?: never }
+  | { profile: 'spiral_upcut'; diameter: number; includedAngle?: never }
+  | { profile: 'spiral_downcut'; diameter: number; includedAngle?: never }
+  | { profile: 'compression'; diameter: number; includedAngle?: never }
+  | { profile: 'surfacing'; diameter: number; includedAngle?: never }
+  | { profile: 'core_box'; diameter: number; includedAngle?: never }
+  | { profile: 'ball_nose'; diameter: number; includedAngle?: never }
+  | { profile: 'v_bit'; diameter: number; includedAngle: number }
+  | { profile: 'engraving'; diameter: number; includedAngle: number }
+  | { profile: 'dovetail'; diameter: number; shankDiameter: number; includedAngle: number }
+  | { profile: 't_slot'; diameter: number; shankDiameter: number; cutterHeight: number; includedAngle?: never }
+  | { profile: 'keyhole'; diameter: number; shankDiameter: number; cutterHeight: number; includedAngle?: never };
+
+/** A router bit swept along a face-local polyline. */
+export interface RoutedPathFeature extends PartFeatureBase {
+  kind: 'routed_path';
+  target: { type: 'face'; face: FaceTarget };
+  path: {
+    points: RoutedPathPoint[];
+    /** Close the final segment back to the first point. */
+    closed?: boolean;
+  };
+  bit: RouterBit;
+  parameters: {
+    depthMode: 'through' | 'blind';
+    depth?: number;
+  };
+}
+
+export type EdgeProfile = 'roundover' | 'cove' | 'chamfer' | 'rabbet' | 'bead' | 'ogee' | 'thumbnail' | 'custom';
+
+export interface RouterProfilePoint {
+  u: number;
+  v: number;
+}
+
+export type RouterProfileSegment =
+  | { kind: 'line'; to: RouterProfilePoint }
+  | {
+      kind: 'cubicBezier';
+      control1: RouterProfilePoint;
+      control2: RouterProfilePoint;
+      to: RouterProfilePoint;
+    }
+  | { kind: 'arc'; to: RouterProfilePoint; radius: number; clockwise: boolean }
+  | {
+      kind: 'ellipseArc';
+      to: RouterProfilePoint;
+      radiusU: number;
+      radiusV: number;
+      clockwise: boolean;
+    };
+
+export interface RouterProfileDefinition {
+  version: 1;
+  /** Deterministic checksum of all definition content except this field. */
+  revision?: string;
+  id: string;
+  name: string;
+  family: string;
+  source: 'generic' | 'manufacturer';
+  manufacturer?: string;
+  sku?: string;
+  sourceUrl?: string;
+  parameters: Record<string, number | string>;
+  boundary: {
+    start: RouterProfilePoint;
+    segments: RouterProfileSegment[];
+  };
+}
+
+/** Physical router tooling is separate from its idealized cut-envelope profile. */
+export interface RouterToolDefinition {
+  version: 1;
+  /** Deterministic checksum of all definition content except this field. */
+  revision?: string;
+  id: string;
+  name: string;
+  source: 'generic' | 'manufacturer';
+  manufacturer?: string;
+  sku?: string;
+  sourceUrl?: string;
+  /** Profile family this tool is capable of producing. */
+  profileFamily: string;
+  /** Optionally restrict the tool to one exact canonical profile. */
+  routerProfileId?: string;
+  /** Immutable profiles this physical tool is certified to produce. */
+  producedProfiles?: RouterToolProducedProfile[];
+  cutterDiameter: number;
+  shankDiameter: number;
+  cuttingHeight: number;
+  neckDiameter?: number;
+  bearingDiameter?: number;
+  /**
+   * Optional precise axial envelope. Offsets are measured from the cutter tip
+   * toward the collet; bearings below the tip may use negative offsets.
+   */
+  envelopeVersion?: 1;
+  sections?: RouterToolAxialSection[];
+  /** Tip-to-end physical length, when known. */
+  overallLength?: number;
+  /** Minimum shank length that must remain captured by the collet. */
+  safeColletInsertion?: number;
+}
+
+export interface RouterToolProducedProfile {
+  profileId: string;
+  profileRevision: string;
+  profileSnapshot: RouterProfileDefinition;
+  nominalSize?: number;
+  applicability?: {
+    /** Explicitly permits uniform scaling of the certified profile geometry. */
+    scalable: boolean;
+    minScale?: number;
+    maxScale?: number;
+  };
+}
+
+export interface RouterCatalogDefinition {
+  version: 1;
+  id: string;
+  name: string;
+  source: 'generic' | 'manufacturer';
+  manufacturer?: string;
+  sourceUrl?: string;
+  profiles: RouterProfileDefinition[];
+  tools: RouterToolDefinition[];
+}
+
+export type RouterToolSectionRole = 'cutter' | 'neck' | 'shank' | 'bearing';
+
+export interface RouterToolAxialSection {
+  role: RouterToolSectionRole;
+  start: number;
+  end: number;
+  diameter: number;
+  /** Required when a bearing intentionally occupies the same axial span as another section. */
+  stackable?: boolean;
+}
+
+/** A bearing-guided router profile applied continuously along one stock edge. */
+export interface EdgeProfileFeature extends PartFeatureBase {
+  kind: 'edge_profile';
+  target: { type: 'edge'; edge: EdgeTarget };
+  profile: EdgeProfile;
+  /** Library identity used to refresh the embedded definition while authoring. */
+  routerProfileId?: string;
+  routerProfileRevision?: string;
+  /** Immutable-at-use definition so project geometry survives library edits or deletion. */
+  routerProfileSnapshot?: RouterProfileDefinition;
+  routerToolId?: string;
+  routerToolRevision?: string;
+  routerToolSnapshot?: RouterToolDefinition;
+  parameters: {
+    /** Primary profile size: radius for curved profiles, width for chamfers/rabbets. */
+    size: number;
+    /** Secondary cut depth used by rabbets and decorative profiles. */
+    depth: number;
+  };
+}
+
+export type PartFeature =
+  | EndCutFeature
+  | RectCutFeature
+  | CircularCutFeature
+  | RoundedCutFeature
+  | RoutedPathFeature
+  | EdgeProfileFeature;
 
 export interface Part {
   id: string;
@@ -418,6 +596,7 @@ export interface SnapLine {
     | 'face'
     | 'surface-anchor'
     | 'surface-fraction'
+    | 'joinery'
     | 'feature'
     | 'equal-spacing'
     | 'dimension-match'

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { CircularCutFeature, EndCutFeature, PartFeature, RectCutFeature, RoundedCutFeature } from '../types';
+import type {
+  CircularCutFeature,
+  EdgeProfileFeature,
+  EndCutFeature,
+  PartFeature,
+  RectCutFeature,
+  RoundedCutFeature,
+  RoutedPathFeature
+} from '../types';
 import {
   getAuthoredFeatureCount,
   getEnabledFeatureCount,
@@ -83,6 +91,27 @@ function createRoundedCut(overrides: Partial<RoundedCutFeature> = {}): RoundedCu
     cutType: 'rounded_slot',
     placement: { primary: 0, secondary: 0, rotation: 0 },
     parameters: { length: 3, width: 1, cornerRadius: 0.5, depthMode: 'through' },
+    ...overrides
+  };
+}
+
+function createRoutedPath(overrides: Partial<RoutedPathFeature> = {}): RoutedPathFeature {
+  return {
+    id: 'route-1',
+    kind: 'routed_path',
+    version: 1,
+    enabled: true,
+    target: { type: 'face', face: 'top_face' },
+    reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+    path: {
+      points: [
+        { primary: -2, secondary: 0 },
+        { primary: 0, secondary: 1 },
+        { primary: 2, secondary: 0 }
+      ]
+    },
+    bit: { profile: 'straight', diameter: 0.25 },
+    parameters: { depthMode: 'blind', depth: 0.125 },
     ...overrides
   };
 }
@@ -386,6 +415,139 @@ describe('partFeatureSummary', () => {
           'metric'
         )
       ).toBe('Rounded Rectangle on Top Face · 101.6mm × 50.8mm · 6.35mm radius × 12.7mm deep');
+    });
+  });
+
+  describe('getFeatureSummary — routed paths', () => {
+    it('keeps omitted and zero-radius corners visually sharp in the summary', () => {
+      expect(getFeatureSummary(createRoutedPath(), 'imperial')).toBe(
+        'Routed Path on Top Face · Open 3-point path · Flat Bottom, 1/4" diameter · 1/8" deep'
+      );
+      expect(
+        getFeatureSummary(
+          createRoutedPath({
+            path: {
+              points: [
+                { primary: -2, secondary: 0, cornerRadius: 0 },
+                { primary: 0, secondary: 1 },
+                { primary: 2, secondary: 0 }
+              ]
+            }
+          }),
+          'imperial'
+        )
+      ).not.toContain('rounded');
+    });
+
+    it('reports the number of rounded corners', () => {
+      expect(
+        getFeatureSummary(
+          createRoutedPath({
+            path: {
+              points: [
+                { primary: -2, secondary: 0, cornerRadius: 0.25 },
+                { primary: 0, secondary: 1, cornerRadius: 0.5 },
+                { primary: 2, secondary: 0 }
+              ]
+            }
+          }),
+          'imperial'
+        )
+      ).toContain('2 rounded corners');
+    });
+
+    it.each([
+      [
+        { profile: 'dovetail', diameter: 0.5, shankDiameter: 0.25, includedAngle: 14 } as const,
+        'Dovetail 14° · 1/4" shank'
+      ],
+      [
+        { profile: 't_slot', diameter: 0.75, shankDiameter: 0.25, cutterHeight: 0.125 } as const,
+        'T Slot · 1/4" shank × 1/8" cutter height'
+      ],
+      [
+        { profile: 'keyhole', diameter: 0.375, shankDiameter: 0.125, cutterHeight: 0.25 } as const,
+        'Keyhole · 1/8" shank × 1/4" cutter height'
+      ]
+    ])('summarizes undercut bit dimensions', (bit, expected) => {
+      const summary = getFeatureSummary(createRoutedPath({ bit }), 'imperial');
+      expect(summary).toContain(expected);
+      expect(summary).toContain('max diameter');
+    });
+  });
+
+  describe('getFeatureSummary — edge-profile tools', () => {
+    const edge = (routerToolSnapshot?: EdgeProfileFeature['routerToolSnapshot']): EdgeProfileFeature => ({
+      id: 'edge-1',
+      kind: 'edge_profile',
+      version: 1,
+      enabled: true,
+      target: { type: 'edge', edge: 'top_front_edge' },
+      reference: { primaryFrom: 'min' },
+      profile: 'cove',
+      parameters: { size: 0.5, depth: 0.5 },
+      routerToolSnapshot
+    });
+
+    it('states explicitly when no physical tool is assigned', () => {
+      expect(getFeatureSummary(edge(), 'imperial')).toContain('Generic profile / no physical tool assigned');
+    });
+
+    it('includes assigned manufacturer and SKU metadata', () => {
+      expect(
+        getFeatureSummary(
+          edge({
+            version: 1,
+            id: 'tool-1',
+            name: 'Catalog Cove',
+            source: 'manufacturer',
+            manufacturer: 'Example Tool Co',
+            sku: 'CV-100',
+            profileFamily: 'cove',
+            cutterDiameter: 1,
+            shankDiameter: 0.5,
+            cuttingHeight: 0.5
+          }),
+          'imperial'
+        )
+      ).toContain('Tool: Catalog Cove (Example Tool Co CV-100)');
+    });
+
+    it('distinguishes detailed axial tooling from a legacy envelope', () => {
+      const legacy = getFeatureSummary(
+        edge({
+          version: 1,
+          id: 'legacy',
+          name: 'Legacy',
+          source: 'generic',
+          profileFamily: 'cove',
+          cutterDiameter: 1,
+          shankDiameter: 0.5,
+          cuttingHeight: 0.5
+        }),
+        'imperial'
+      );
+      const detailed = getFeatureSummary(
+        edge({
+          version: 1,
+          id: 'detailed',
+          name: 'Detailed',
+          source: 'generic',
+          profileFamily: 'cove',
+          cutterDiameter: 1,
+          shankDiameter: 0.5,
+          cuttingHeight: 0.5,
+          envelopeVersion: 1,
+          sections: [
+            { role: 'cutter', start: 0, end: 0.5, diameter: 1 },
+            { role: 'shank', start: 0.5, end: 2, diameter: 0.5 }
+          ],
+          overallLength: 3
+        }),
+        'imperial'
+      );
+      expect(legacy).toContain('legacy axial envelope');
+      expect(detailed).toContain('2 axial sections · 3" overall');
     });
   });
 

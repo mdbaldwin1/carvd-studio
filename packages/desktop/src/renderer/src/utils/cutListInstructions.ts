@@ -2,6 +2,7 @@ import { CutInstruction, DowelJointMetadata, PartFeature } from '../types';
 import { getReferenceMode } from './endCutUtils';
 import { formatFabricationMeasurement as formatMeasurementWithUnit } from './fractions';
 import { getFeaturePlacementSummary, getFeatureSummary } from './partFeatureSummary';
+import { analyzeEdgeProfileToolFeasibility } from './edgeProfileToolFeasibility';
 
 export interface GroupedCutInstruction {
   key: string;
@@ -29,6 +30,36 @@ function getFeatureGroupingKey(feature: PartFeature, jointGroups: Map<string, nu
       // differ only in legacy lengthMode vs stored reference group together.
       lengthMode: getReferenceMode(feature),
       parameters: feature.parameters
+    });
+  }
+
+  if (feature.kind === 'routed_path') {
+    return JSON.stringify({
+      kind: feature.kind,
+      enabled: feature.enabled,
+      label: feature.label ?? '',
+      target: feature.target,
+      reference: feature.reference,
+      path: feature.path,
+      bit: feature.bit,
+      parameters: feature.parameters
+    });
+  }
+  if (feature.kind === 'edge_profile') {
+    return JSON.stringify({
+      kind: feature.kind,
+      enabled: feature.enabled,
+      label: feature.label ?? '',
+      target: feature.target,
+      reference: feature.reference,
+      profile: feature.profile,
+      parameters: feature.parameters,
+      routerProfileId: feature.routerProfileId,
+      routerProfileRevision: feature.routerProfileRevision,
+      routerProfileSnapshot: feature.routerProfileSnapshot,
+      routerToolId: feature.routerToolId,
+      routerToolRevision: feature.routerToolRevision,
+      routerToolSnapshot: feature.routerToolSnapshot
     });
   }
 
@@ -81,6 +112,18 @@ export function getInstructionFabricationLines(instruction: CutInstruction, unit
       .join(' · ');
     const label = feature.label?.trim();
     descriptions.push(label ? `${label} — ${summary}` : summary);
+    if (feature.kind === 'edge_profile') {
+      const findings = analyzeEdgeProfileToolFeasibility(feature, {
+        length: instruction.cutLength,
+        width: instruction.cutWidth,
+        thickness: instruction.thickness
+      });
+      for (const finding of findings) {
+        const prefix =
+          finding.severity === 'error' ? 'TOOL ERROR' : finding.severity === 'warning' ? 'Tool warning' : 'Tool note';
+        descriptions.push(`${prefix}: ${finding.message}`);
+      }
+    }
   }
   const lines = descriptions.map((description, index) => `${index + 1}. ${description}`);
   const note = instruction.notes?.trim();

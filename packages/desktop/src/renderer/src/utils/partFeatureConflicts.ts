@@ -323,7 +323,9 @@ export function getPartFeatureConflicts(
           ? validateRoundedCut(feature, candidate)
           : feature.kind === 'rect_cut'
             ? validateRectCutFeature(feature, candidate)
-            : validateEndCutFeature(feature, candidate);
+            : feature.kind === 'end_cut'
+              ? validateEndCutFeature(feature, candidate)
+              : null;
     featureIssues.set(feature, materialIssue);
     if (materialIssue?.includes('remaining material'))
       conflicts.push({

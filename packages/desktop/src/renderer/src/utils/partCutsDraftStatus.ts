@@ -47,7 +47,9 @@ export function getPartCutsDraftStatus(part: Part | null, draftFeatures: PartFea
             ? validateCircularCut(feature, candidate)
             : feature.kind === 'rounded_cut'
               ? validateRoundedCut(feature, candidate)
-              : validateEndCutFeature(feature, candidate)
+              : feature.kind === 'end_cut'
+                ? validateEndCutFeature(feature, candidate)
+                : null
       ])
   );
 
