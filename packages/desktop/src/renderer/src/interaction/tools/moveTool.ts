@@ -65,6 +65,8 @@ export interface MoveToolPreview {
   nextLatchedFaceSnap: LatchedFaceSnapState | null;
   /** Socket host whose validated mate snap produced this preview. */
   mateHostPartId?: string;
+  /** In-range authored joints that cannot agree on one rigid translation. */
+  mateConflict?: { candidateCount: number; maxDisagreement: number };
   /** Constraint-pipeline input that exactly matches this preview. */
   candidate: Extract<CandidateTransform, { kind: 'move' }>;
 }
@@ -107,6 +109,7 @@ function buildPreviewFromSolve(
     snappedAxes: solverResult.snappedAxes,
     nextLatchedFaceSnap,
     mateHostPartId: solverResult.mateHostPartId,
+    mateConflict: solverResult.mateConflict,
     candidate: {
       kind: 'move',
       delta,

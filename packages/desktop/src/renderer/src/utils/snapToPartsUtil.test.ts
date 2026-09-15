@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Part, SnapGuide } from '../types';
 import paulDeckFixture from '../../../../tests/fixtures/paul-deck-snap-regression.json';
+import { createDowelJoint } from './dowelJointUtils';
 import {
   calculateGroupReferenceDistances,
   calculateReferenceDistances,
@@ -15,6 +16,7 @@ import {
   detectFeatureMateSnaps,
   detectFeatureSnaps,
   detectGuideSnaps,
+  detectGroupFeatureMateSnaps,
   detectOriginSnaps,
   detectSnaps,
   getNearestParts,
@@ -1622,6 +1624,42 @@ describe('snapToPartsUtil', () => {
       expect(result.adjustedPosition.z).toBeCloseTo(assembledPosition.z, 3);
     });
 
+    it('emits a holistic joinery mate for complementary mitre faces', () => {
+      const horizontal = createTestPart({
+        id: 'semantic-mitre-host',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 45, horizontalFlip: true })]
+      });
+      const moving = createTestPart({
+        id: 'semantic-mitre-moving',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 4.2, y: 0.55, z: 4.2 },
+        rotation: { x: 0, y: 90, z: 0 },
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 45, horizontalFlip: false })]
+      });
+
+      const result = detectFeatureMateSnaps(moving, moving.position, [horizontal], [moving.id], 0.5);
+      expect(result.mateHostPartId).toBe(horizontal.id);
+      expect(result.adjustedPosition.x).toBeCloseTo(4);
+      expect(result.adjustedPosition.y).toBeCloseTo(0.5);
+      expect(result.adjustedPosition.z).toBeCloseTo(4);
+      expect(result.snappedX && result.snappedY && result.snappedZ).toBe(true);
+      expect(result.snapLines[0]).toMatchObject({ family: 'joinery', subtype: 'mitre' });
+
+      const incompatible = {
+        ...moving,
+        features: [endCut('right_end', 'mitre', { horizontalAngle: 30, horizontalFlip: false })]
+      };
+      expect(
+        detectFeatureMateSnaps(incompatible, incompatible.position, [horizontal], [moving.id], 0.5).mateHostPartId
+      ).toBeUndefined();
+    });
+
     it('recomputes shaped snap planes after a mitre angle edit', () => {
       const editedHost = createTestPart({
         id: 'edited-host',
@@ -2087,6 +2125,116 @@ describe('snapToPartsUtil', () => {
   });
 
   describe('detectFeatureMateSnaps', () => {
+    it('snaps a separated paired dowel joint back to coaxial seated faces', () => {
+      const lower = createTestPart({
+        id: 'dowel-lower',
+        length: 10,
+        width: 4,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 }
+      });
+      const upper = createTestPart({
+        id: 'dowel-upper',
+        length: 10,
+        width: 4,
+        thickness: 1,
+        position: { x: 0, y: 1.5, z: 0 }
+      });
+      const joint = createDowelJoint({
+        firstPart: lower,
+        firstFace: 'top_face',
+        secondPart: upper,
+        secondFace: 'bottom_face',
+        diameter: 0.375,
+        dowelLength: 0.75,
+        firstEmbedmentDepth: 0.375,
+        secondEmbedmentDepth: 0.375,
+        count: 2,
+        spacing: 2,
+        firstPrimary: -1,
+        firstSecondary: 0
+      });
+      const host = { ...lower, features: joint.firstFeatures };
+      const displaced = {
+        ...upper,
+        features: joint.secondFeatures,
+        position: { x: 0.1, y: 1.7, z: -0.1 }
+      };
+
+      const result = detectFeatureMateSnaps(displaced, displaced.position, [host], [displaced.id], 0.5);
+      expect(result.mateHostPartId).toBe(host.id);
+      expect(result.adjustedPosition.x).toBeCloseTo(0);
+      expect(result.adjustedPosition.y).toBeCloseTo(1.5);
+      expect(result.adjustedPosition.z).toBeCloseTo(0);
+      expect(result.snappedX && result.snappedY && result.snappedZ).toBe(true);
+      expect(result.snapLines[0]).toMatchObject({ family: 'joinery', subtype: 'dowel' });
+
+      const nearbyClutter = Array.from({ length: 11 }, (_, index) =>
+        createTestPart({
+          id: `clutter-${index}`,
+          length: 0.25,
+          width: 0.25,
+          thickness: 0.25,
+          position: { x: displaced.position.x, y: displaced.position.y, z: displaced.position.z }
+        })
+      );
+      const throughClutter = detectFeatureMateSnaps(
+        displaced,
+        displaced.position,
+        [...nearbyClutter, host],
+        [displaced.id],
+        0.5
+      );
+      expect(throughClutter.mateHostPartId).toBe(host.id);
+      expect(throughClutter.adjustedPosition.y).toBeCloseTo(1.5);
+
+      const groupedResult = detectGroupFeatureMateSnaps(
+        [displaced],
+        { x: 0, y: 0, z: 0 },
+        displaced.position,
+        [host],
+        [displaced.id],
+        0.5
+      );
+      expect(groupedResult.mateHostPartId).toBe(host.id);
+      expect(groupedResult.adjustedPosition.x).toBeCloseTo(result.adjustedPosition.x);
+      expect(groupedResult.adjustedPosition.y).toBeCloseTo(result.adjustedPosition.y);
+      expect(groupedResult.adjustedPosition.z).toBeCloseTo(result.adjustedPosition.z);
+      expect(groupedResult.snapLines).toHaveLength(2);
+
+      const misalignedFeatures = joint.secondFeatures.map((feature, index) =>
+        index === 1
+          ? { ...feature, placement: { ...feature.placement, primary: feature.placement.primary + 0.2 } }
+          : feature
+      );
+      const misaligned = { ...displaced, features: misalignedFeatures };
+      const directlyConflicted = detectFeatureMateSnaps(misaligned, misaligned.position, [host], [misaligned.id], 0.5);
+      expect(directlyConflicted.mateHostPartId).toBeUndefined();
+      expect(directlyConflicted.mateConflict?.candidateCount).toBe(2);
+      expect(directlyConflicted.mateConflict?.maxDisagreement).toBeCloseTo(0.2);
+
+      const conflicted = detectGroupFeatureMateSnaps(
+        [misaligned],
+        { x: 0, y: 0, z: 0 },
+        misaligned.position,
+        [host],
+        [misaligned.id],
+        0.5
+      );
+      expect(conflicted.mateHostPartId).toBeUndefined();
+      expect(conflicted.mateConflict?.candidateCount).toBe(2);
+      expect(conflicted.mateConflict?.maxDisagreement).toBeCloseTo(0.2);
+
+      const rotated = detectFeatureMateSnaps(
+        { ...displaced, rotation: { x: 0, y: 0, z: 90 } },
+        displaced.position,
+        [host],
+        [displaced.id],
+        0.5
+      );
+      expect(rotated.mateHostPartId).toBeUndefined();
+    });
+
     it.each([
       ['nominal', 0.75, true],
       ['clearance', 0.74, true],
@@ -2125,6 +2273,64 @@ describe('snapToPartsUtil', () => {
       expect(result.mateHostPartId === hostPart.id).toBe(shouldFit);
       if (shouldFit) expect(result.adjustedPosition.y).toBeCloseTo(2.375);
     });
+
+    it.each(['groove', 'stopped_groove', 'rabbet'] as const)(
+      'seats a board edge exactly into a %s socket',
+      (cutType) => {
+        const hostPart = createTestPart({
+          id: `${cutType}-host`,
+          length: 12,
+          width: 6,
+          thickness: 0.75,
+          position: { x: 0, y: 0.375, z: 0 },
+          features: [
+            {
+              id: `${cutType}-socket`,
+              kind: 'rect_cut',
+              version: 1 as const,
+              enabled: true,
+              cutType,
+              target:
+                cutType === 'rabbet'
+                  ? { type: 'edge' as const, edge: 'top_front_edge' as const }
+                  : { type: 'face' as const, face: 'top_face' as const },
+              reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+              parameters: {
+                size: { length: cutType === 'stopped_groove' ? 6 : 12, width: 0.755 },
+                depthMode: 'blind' as const,
+                depth: 0.375
+              },
+              placement: { x: cutType === 'stopped_groove' ? 3 : 0, z: cutType === 'rabbet' ? 0 : 2.6225 }
+            }
+          ]
+        });
+        const socket = getPartFeatureSockets(hostPart)[0];
+        const edgeBoard = createTestPart({
+          id: `${cutType}-mate`,
+          length: 4,
+          width: 0.75,
+          thickness: 1
+        });
+        const seatedOffset = edgeBoard.thickness / 2 - socket.depth;
+        const seatedCenter = {
+          x: socket.openingCenter.x + socket.openingNormal.x * seatedOffset,
+          y: socket.openingCenter.y + socket.openingNormal.y * seatedOffset,
+          z: socket.openingCenter.z + socket.openingNormal.z * seatedOffset
+        };
+        const startingPosition = {
+          x: seatedCenter.x + socket.openingNormal.x * 0.2,
+          y: seatedCenter.y + socket.openingNormal.y * 0.2,
+          z: seatedCenter.z + socket.openingNormal.z * 0.2
+        };
+
+        const result = detectFeatureMateSnaps(edgeBoard, startingPosition, [hostPart], [edgeBoard.id], 0.5);
+        expect(result.mateHostPartId).toBe(hostPart.id);
+        expect(result.adjustedPosition.x).toBeCloseTo(seatedCenter.x);
+        expect(result.adjustedPosition.y).toBeCloseTo(seatedCenter.y);
+        expect(result.adjustedPosition.z).toBeCloseTo(seatedCenter.z);
+        expect(result.snapLines[0]).toMatchObject({ family: 'joinery', subtype: cutType });
+      }
+    );
 
     it('keeps a shorter mate contained within both stopped-groove terminations', () => {
       const hostPart = createTestPart({
@@ -2213,6 +2419,28 @@ describe('snapToPartsUtil', () => {
       );
       expect(matched.mateHostPartId).toBe(hostPart.id);
       expect(matched.adjustedPosition.y).toBeCloseTo(2.25);
+      expect(matched.snapLines[0]).toMatchObject({ family: 'joinery', subtype: 'mortise-tenon' });
+
+      const backwardsTenon = createTestPart({
+        ...tenonedRail,
+        id: 'backwards-tenon',
+        rotation: { x: 0, y: 0, z: -90 }
+      });
+      expect(
+        detectFeatureMateSnaps(backwardsTenon, { x: 0.01, y: 3.2, z: 0.01 }, [hostPart], [backwardsTenon.id], 0.5)
+          .mateHostPartId
+      ).toBeUndefined();
+
+      const wrongJointFamily = createTestPart({
+        ...hostPart,
+        features: hostPart.features?.map((feature) =>
+          feature.kind === 'rect_cut' ? { ...feature, cutType: 'dado' as const } : feature
+        )
+      });
+      expect(
+        detectFeatureMateSnaps(tenonedRail, { x: 0.01, y: 3.2, z: 0.01 }, [wrongJointFamily], [tenonedRail.id], 0.5)
+          .mateHostPartId
+      ).toBeUndefined();
 
       const shallowMortise = createTestPart({
         ...hostPart,
@@ -2226,6 +2454,68 @@ describe('snapToPartsUtil', () => {
         detectFeatureMateSnaps(tenonedRail, { x: 0.01, y: 3.2, z: 0.01 }, [shallowMortise], [tenonedRail.id], 0.5)
           .mateHostPartId
       ).toBeUndefined();
+    });
+
+    it('requires both end tenons on a directly dragged apron to agree with both leg mortises', () => {
+      const mortisedLeg = (id: string, x: number, rotationZ: number) =>
+        createTestPart({
+          id,
+          length: 6,
+          width: 2,
+          thickness: 1,
+          position: { x, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: rotationZ },
+          features: [
+            {
+              id: `${id}-mortise`,
+              kind: 'rect_cut' as const,
+              version: 1 as const,
+              enabled: true,
+              cutType: 'mortise' as const,
+              target: { type: 'face' as const, face: 'top_face' as const },
+              reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+              parameters: { size: { length: 0.51, width: 1.01 }, depthMode: 'blind' as const, depth: 0.75 },
+              placement: { x: 2.745, z: 0.495 }
+            }
+          ]
+        });
+      const leftLeg = mortisedLeg('left-leg', -4.75, -90);
+      const rightLeg = mortisedLeg('right-leg', 4.75, 90);
+      const tenon = (id: string, face: 'left_end' | 'right_end') => ({
+        id,
+        kind: 'rect_cut' as const,
+        version: 1 as const,
+        enabled: true,
+        cutType: 'tenon' as const,
+        target: { type: 'face' as const, face },
+        reference: {
+          primaryFrom: face === 'left_end' ? ('min' as const) : ('max' as const),
+          secondaryFrom: 'min' as const
+        },
+        parameters: { size: { length: 0.75, width: 1 }, depthMode: 'blind' as const, depth: 0.5 },
+        placement: { x: 0, z: 0.5 }
+      });
+      const apron = createTestPart({
+        id: 'double-tenoned-apron',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0.1, y: 0.1, z: 0.1 },
+        features: [tenon('left-tenon', 'left_end'), tenon('right-tenon', 'right_end')]
+      });
+
+      const fitted = detectFeatureMateSnaps(apron, apron.position, [leftLeg, rightLeg], [apron.id], 0.5);
+      expect(fitted.mateHostPartId).toBeDefined();
+      expect(fitted.adjustedPosition.x).toBeCloseTo(0);
+      expect(fitted.adjustedPosition.y).toBeCloseTo(0);
+      expect(fitted.adjustedPosition.z).toBeCloseTo(0);
+      expect(fitted.snapLines).toHaveLength(2);
+
+      const misalignedRightLeg = { ...rightLeg, position: { ...rightLeg.position, y: 0.2 } };
+      const conflicted = detectFeatureMateSnaps(apron, apron.position, [leftLeg, misalignedRightLeg], [apron.id], 0.5);
+      expect(conflicted.mateHostPartId).toBeUndefined();
+      expect(conflicted.mateConflict?.candidateCount).toBe(2);
+      expect(conflicted.mateConflict?.maxDisagreement).toBeCloseTo(0.2);
     });
 
     it('places an off-center tenon tongue on its rendered cross-width side', () => {
@@ -2320,6 +2610,15 @@ describe('snapToPartsUtil', () => {
       });
       expect(
         detectFeatureMateSnaps(mismatchedPart, mismatchedPart.position, [hostPart], [mismatchedPart.id], 0.5)
+          .mateHostPartId
+      ).toBeUndefined();
+
+      const overlyDeepHost = createTestPart({
+        ...hostPart,
+        features: [halfLap('host-cut', 'top_face', 0.5)]
+      });
+      expect(
+        detectFeatureMateSnaps(crossingPart, crossingPart.position, [overlyDeepHost], [crossingPart.id], 0.5)
           .mateHostPartId
       ).toBeUndefined();
     });

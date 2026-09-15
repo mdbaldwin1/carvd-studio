@@ -3,6 +3,7 @@ import { isAxisAlignedRotation } from './rotation';
 import {
   detectFaceSnaps,
   detectFeatureMateSnaps,
+  detectGroupFeatureMateSnaps,
   detectFeatureSnaps,
   detectFractionalFaceSnaps,
   detectGuideSnaps,
@@ -178,7 +179,8 @@ export function createGroupProxySnapContext(params: {
     guideSnaps: snapGuides.length > 0 ? detectGuideSnaps(guideBounds, snapGuides, snapThreshold) : undefined,
     originSnaps: snapToOrigin ? detectOriginSnaps(guideBounds, snapThreshold) : undefined,
     advancedDetectors: {
-      mate: () => detectFeatureMateSnaps(subjectPart, featurePosition, referenceParts, movingPartIds, snapThreshold),
+      mate: () =>
+        detectGroupFeatureMateSnaps(movingParts, delta, featurePosition, referenceParts, movingPartIds, snapThreshold),
       surface: () =>
         detectSurfaceAnchorSnaps(subjectPart, featurePosition, referenceParts, movingPartIds, snapThreshold),
       fraction: () =>

@@ -80,6 +80,104 @@ describe('interactionSnapContext', () => {
     expect(context.originBounds.centerX).toBe(7);
     expect(typeof context.advancedDetectors.surface).toBe('function');
   });
+
+  it('mates multiple grouped parts with one consensus rigid translation', () => {
+    const socket = (id: string) => ({
+      id,
+      kind: 'rect_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      cutType: 'mortise' as const,
+      target: { type: 'face' as const, face: 'top_face' as const },
+      reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+      parameters: { size: { length: 2, width: 2 }, depthMode: 'blind' as const, depth: 0.5 },
+      placement: { x: 2, z: 1 }
+    });
+    const hosts = [-4, 4].map((x) =>
+      part({
+        id: `host-${x}`,
+        length: 6,
+        width: 4,
+        thickness: 1,
+        position: { x, y: 0.5, z: 0 },
+        features: [socket(`socket-${x}`)]
+      })
+    );
+    const movingParts = [-4, 4].map((x) =>
+      part({ id: `moving-${x}`, length: 2, width: 2, thickness: 2, position: { x, y: 1.2, z: 0 } })
+    );
+
+    const context = createGroupProxySnapContext({
+      initialBounds: {
+        id: 'group',
+        minX: -5,
+        maxX: 5,
+        minY: 0.2,
+        maxY: 2.2,
+        minZ: -1,
+        maxZ: 1,
+        centerX: 0,
+        centerY: 1.2,
+        centerZ: 0
+      },
+      anchorPosition: { x: 0, y: 1.2, z: 0 },
+      delta: { x: 0, y: 0, z: 0 },
+      referenceParts: hosts,
+      movingPartIds: movingParts.map(({ id }) => id),
+      movingParts,
+      snapGuides: [],
+      snapThreshold: 0.5,
+      snapToOrigin: false,
+      enableGoldenRatioAnchors: false,
+      enableAxisLegacySnaps: false
+    });
+
+    const mate = context.advancedDetectors.mate();
+    expect(mate.mateHostPartId).toBeDefined();
+    expect(mate.snappedY).toBe(true);
+    expect(mate.adjustedPosition.y).toBeCloseTo(1.5);
+    expect(mate.snapLines).toHaveLength(2);
+
+    const closerDecoy = {
+      ...hosts[0],
+      id: 'closer-decoy',
+      position: { ...hosts[0].position, y: 0.3 }
+    };
+    const mateWithAmbiguousFirstJoint = createGroupProxySnapContext({
+      initialBounds: context.originBounds,
+      anchorPosition: { x: 0, y: 1.2, z: 0 },
+      delta: { x: 0, y: 0, z: 0 },
+      referenceParts: [closerDecoy, ...hosts],
+      movingPartIds: movingParts.map(({ id }) => id),
+      movingParts,
+      snapGuides: [],
+      snapThreshold: 0.5,
+      snapToOrigin: false,
+      enableGoldenRatioAnchors: false,
+      enableAxisLegacySnaps: false
+    }).advancedDetectors.mate();
+    expect(mateWithAmbiguousFirstJoint.mateHostPartId).toBeDefined();
+    expect(mateWithAmbiguousFirstJoint.adjustedPosition.y).toBeCloseTo(1.5);
+    expect(mateWithAmbiguousFirstJoint.snapLines).toHaveLength(2);
+
+    const conflicted = createGroupProxySnapContext({
+      initialBounds: context.originBounds,
+      anchorPosition: { x: 0, y: 1.2, z: 0 },
+      delta: { x: 0, y: 0, z: 0 },
+      referenceParts: [hosts[0], { ...hosts[1], position: { ...hosts[1].position, y: 0.7 } }],
+      movingPartIds: movingParts.map(({ id }) => id),
+      movingParts,
+      snapGuides: [],
+      snapThreshold: 0.5,
+      snapToOrigin: false,
+      enableGoldenRatioAnchors: false,
+      enableAxisLegacySnaps: false
+    }).advancedDetectors.mate();
+    expect(conflicted.mateHostPartId).toBeUndefined();
+    expect(conflicted.snapLines).toEqual([]);
+    expect(conflicted.mateConflict?.candidateCount).toBe(2);
+    expect(conflicted.mateConflict?.maxDisagreement).toBeCloseTo(0.2);
+  });
   it('exposes a mate detector that snaps a part into a matching socket', () => {
     const hostPart = part({
       id: 'host',

@@ -8,7 +8,7 @@ import {
   wouldTranslationCauseOverlap
 } from './overlapPolicy';
 import { getPartContourSubBoxes } from './partFeatureGeometry';
-import { detectFeatureMateSnaps, getPartSubOBBs } from './snapToPartsUtil';
+import { detectFeatureMateSnaps, getPartFeatureSockets, getPartSubOBBs } from './snapToPartsUtil';
 
 // Overlap for tenoned and round-cut parts is settled against the real
 // material, so this suite needs the actual three.js geometry classes.
@@ -892,6 +892,66 @@ describe('overlapPolicy', () => {
         host.id
       )
     ).toBe(true);
+
+    const shoulderIntrusion = { x: 0.02, y: 0, z: 0.25 };
+    const safeShoulderMove = resolveSafeTranslationDelta(
+      [host, tenonedRail],
+      new Set([tenonedRail.id]),
+      shoulderIntrusion
+    );
+    expect(safeShoulderMove).not.toEqual(shoulderIntrusion);
+  });
+
+  it('snaps a tenon into a deeper side-face mortise until its shoulder is flush', () => {
+    const host = createPart({
+      id: 'side-mortise-leg',
+      length: 29.25,
+      width: 1.75,
+      thickness: 1.75,
+      position: { x: -21.625, y: 14.625, z: -5.8125 },
+      rotation: { x: 0, y: 0, z: 90 },
+      features: [
+        {
+          id: 'side-mortise',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'mortise',
+          target: { type: 'face', face: 'front_face' },
+          reference: { primaryFrom: 'min' },
+          parameters: { size: { length: 2, width: 0.5 }, depthMode: 'blind', depth: 0.5625 },
+          placement: { x: 26.75, z: 0.625 }
+        }
+      ]
+    });
+    const seatedZ = 3.3125;
+    const apron = createPart({
+      id: 'side-apron',
+      length: 17.5,
+      width: 3,
+      thickness: 0.75,
+      position: { x: -21.625, y: 27.75, z: seatedZ + 0.05 },
+      rotation: { x: 90, y: 0, z: 90 },
+      features: [
+        {
+          id: 'apron-tenon',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'tenon',
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          parameters: { size: { length: 0.5, width: 2 }, depthMode: 'blind', depth: 0.5 },
+          placement: { x: 0, z: 0.5 }
+        }
+      ]
+    });
+
+    expect(getPartFeatureSockets(host)).toHaveLength(1);
+    const mate = detectFeatureMateSnaps(apron, apron.position, [host], [apron.id], 0.1);
+    expect(mate.mateHostPartId).toBe(host.id);
+    expect(mate.adjustedPosition.z).toBeCloseTo(seatedZ);
+    expect(partsOverlap({ ...apron, position: mate.adjustedPosition }, host)).toBe(false);
   });
 
   it('decomposes corner notch contour into correct sub-boxes', () => {

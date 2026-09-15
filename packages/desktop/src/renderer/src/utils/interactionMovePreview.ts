@@ -26,18 +26,11 @@ export interface PartMovePreviewResult extends MovePreviewResult {
   position: Position3D;
   nextLatchedFaceSnap: LatchedFaceSnapState | null;
   mateHostPartId?: string;
+  mateConflict?: { candidateCount: number; maxDisagreement: number };
 }
 
 export interface GroupMovePreviewResult extends MovePreviewResult {
   delta: Position3D;
-}
-
-function getSnappedAxes(snapLines: SnapLine[]) {
-  return {
-    x: snapLines.some((line) => line.axis === 'x'),
-    y: snapLines.some((line) => line.axis === 'y'),
-    z: snapLines.some((line) => line.axis === 'z')
-  };
 }
 
 export function solvePartMoveSnapPreview(params: {
@@ -232,7 +225,8 @@ export function solvePartMoveSnapPreview(params: {
       y: winners.y !== null,
       z: winners.z !== null
     },
-    mateHostPartId: mateHostPartId && !mateWasRejectedOnAnyAxis ? mateHostPartId : undefined
+    mateHostPartId: mateHostPartId && !mateWasRejectedOnAnyAxis ? mateHostPartId : undefined,
+    mateConflict: mateResult?.mateConflict
   };
 }
 
@@ -278,6 +272,7 @@ export function solveGroupMoveSnapPreview(params: {
 
   const snapLines: SnapLine[] = [];
   const winners = createAxisSnapWinners();
+  let groupMateResult: MateSnapResult | undefined;
   let workingDelta = { ...delta };
   let movingBounds = offsetBounds(initialBounds, workingDelta);
   const getSnapContext = () =>
@@ -342,6 +337,10 @@ export function solveGroupMoveSnapPreview(params: {
       enableGoldenRatioAnchors: settings.enableGoldenRatioAnchors ?? false,
       enableFeatureAnchors: settings.enableFeatureAnchors ?? true,
       detectors: {
+        mate: () => {
+          groupMateResult = getSnapContext().advancedDetectors.mate();
+          return groupMateResult;
+        },
         surface: () => getSnapContext().advancedDetectors.surface(),
         fraction: () => getSnapContext().advancedDetectors.fraction(),
         feature: () => getSnapContext().advancedDetectors.feature() as SnapResult,
@@ -350,9 +349,28 @@ export function solveGroupMoveSnapPreview(params: {
     }
   });
 
+  // A rigid mate is holistic: even when the camera drag plane exposes only
+  // two axes, the joint may need to center its cross-section on the third.
+  // Fill only axes that no higher-priority snap already owns.
+  if (groupMateResult?.mateHostPartId) {
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const mateSnapped =
+        axis === 'x' ? groupMateResult.snappedX : axis === 'y' ? groupMateResult.snappedY : groupMateResult.snappedZ;
+      if (!mateSnapped || winners[axis]) continue;
+      workingDelta[axis] = groupMateResult.adjustedPosition[axis] - anchorPosition[axis];
+      tryApplyAxisSnap(
+        axis,
+        'mate',
+        winners,
+        snapLines,
+        groupMateResult.snapLines.filter((line) => line.axis === axis)
+      );
+    }
+  }
+
   return {
     delta: workingDelta,
     snapLines,
-    snappedAxes: getSnappedAxes(snapLines)
+    snappedAxes: { x: winners.x !== null, y: winners.y !== null, z: winners.z !== null }
   };
 }

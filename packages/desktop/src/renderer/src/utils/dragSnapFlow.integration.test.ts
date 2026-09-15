@@ -60,6 +60,59 @@ const socketSettings: AppSettings = {
 };
 
 describe('drag snap flow integration', () => {
+  it('keeps a complementary mitre mate holistic through preview and collision validation', () => {
+    const mitre = (id: string, horizontalFlip: boolean) => ({
+      id,
+      kind: 'end_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      cutType: 'mitre' as const,
+      target: { type: 'face' as const, face: 'right_end' as const },
+      reference: { primaryFrom: 'max' as const },
+      lengthMode: 'long_point' as const,
+      parameters: { horizontalAngle: 45, horizontalFlip }
+    });
+    const host = createPart({
+      id: 'mitre-host',
+      length: 10,
+      width: 2,
+      thickness: 1,
+      position: { x: 0, y: 0.5, z: 0 },
+      features: [mitre('host-mitre', true)]
+    });
+    const moving = createPart({
+      id: 'mitre-moving',
+      length: 10,
+      width: 2,
+      thickness: 1,
+      position: { x: 4.2, y: 0.55, z: 4.2 },
+      rotation: { x: 0, y: 90, z: 0 },
+      features: [mitre('moving-mitre', false)]
+    });
+    const preview = solvePartMoveSnapPreview({
+      part: moving,
+      position: moving.position,
+      axes: { x: true, y: false, z: true },
+      worldHalfHeight: 0.5,
+      referenceParts: [host],
+      movingPartIds: [moving.id],
+      snapGuides: [],
+      settings: socketSettings,
+      snapThreshold: 0.5,
+      latchedFaceSnap: null,
+      resolveFeatureStage: () => 'feature'
+    });
+
+    expect(preview.position).toEqual({ x: 4, y: 0.5, z: 4 });
+    expect(preview.mateHostPartId).toBe(host.id);
+    const delta = {
+      x: preview.position.x - moving.position.x,
+      y: preview.position.y - moving.position.y,
+      z: preview.position.z - moving.position.z
+    };
+    expect(resolveSafeTranslationDelta([host, moving], new Set([moving.id]), delta, undefined, host.id)).toEqual(delta);
+  });
+
   it('keeps a compatible dado mate seated through overlap prevention without exempting unrelated solids', () => {
     const host = createPart({
       id: 'dado-host',
@@ -354,7 +407,7 @@ describe('drag snap flow integration', () => {
     expect(preview.position.y).not.toBeCloseTo(2.375);
   });
 
-  it('keeps a selected one-member group preview and release on the ordinary collision path', () => {
+  it('mates a selected group through its real member features and accepts the snapped release', () => {
     const host = createPart({
       id: 'selected-group-dado-host',
       length: 12,
@@ -393,7 +446,7 @@ describe('drag snap flow integration', () => {
       initialBounds: getCombinedBounds(moveSelection.affectedParts),
       anchorPosition: moveSelection.anchorPosition,
       delta: { x: -1.99, y: 0, z: 0 },
-      axes: { x: true, y: true, z: true },
+      axes: { x: true, y: false, z: false },
       referenceParts: parts,
       movingPartIds: moveSelection.affectedPartIds,
       movingParts: moveSelection.affectedParts,
@@ -410,7 +463,7 @@ describe('drag snap flow integration', () => {
       preventOverlap: true
     });
     expect(moveSelection.affectedPartIds).toEqual([groupedDivider.id]);
-    expect(groupedDivider.position.y + preview.delta.y).not.toBeCloseTo(2.375);
+    expect(groupedDivider.position.y + preview.delta.y).toBeCloseTo(2.375);
     expect(release.constrained.delta).toEqual(preview.delta);
     expect(release.constrained.overlapBlocked).toBe(false);
   });

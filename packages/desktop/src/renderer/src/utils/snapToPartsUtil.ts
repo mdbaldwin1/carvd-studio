@@ -1,5 +1,15 @@
 import * as THREE from 'three';
-import { Part, RectCutFeature, ReferenceDistanceIndicator, SnapDistanceIndicator, SnapGuide, SnapLine } from '../types';
+import {
+  CircularCutFeature,
+  DowelJointMetadata,
+  EndCutFeature,
+  Part,
+  RectCutFeature,
+  ReferenceDistanceIndicator,
+  SnapDistanceIndicator,
+  SnapGuide,
+  SnapLine
+} from '../types';
 import { getEndCutInsetAt, getPartEndCutProfiles } from './endCutUtils';
 import {
   getPartContourSubBoxes,
@@ -16,6 +26,7 @@ import {
   isTopTarget
 } from './rectCutUtils';
 import type { GeometryCache } from '../interaction/geometry/cache';
+import { expandCircularCut } from './roundCutUtils';
 
 // Module-level reusable objects for getPartBounds calculations.
 // Safe because JS is single-threaded and callers only see the returned plain PartBounds object.
@@ -2786,6 +2797,22 @@ function addEndCutSnapFaces(
   }
 }
 
+function getAuthoredEndCutFaces(part: Part, position: Vec3): Array<{ feature: EndCutFeature; face: OrientedFace }> {
+  const obb = getPartOBB(part, position);
+  const faces: OrientedFace[] = [];
+  addEndCutSnapFaces(faces, part, position, obb.axes[0], obb.axes[1], obb.axes[2]);
+  const features = (part.features ?? []).filter(
+    (feature): feature is EndCutFeature =>
+      feature.enabled &&
+      feature.kind === 'end_cut' &&
+      (feature.target.face === 'left_end' || feature.target.face === 'right_end')
+  );
+  const orderedFeatures = (['left_end', 'right_end'] as const).flatMap((target) =>
+    features.filter((feature) => feature.target.face === target)
+  );
+  return orderedFeatures.flatMap((feature, index) => (faces[index] ? [{ feature, face: faces[index] }] : []));
+}
+
 function projectFaceInterval(face: OrientedFace, axis: Vec3): { min: number; max: number } {
   const centerProjection = dotVec(face.center, axis);
   const radius =
@@ -3573,6 +3600,7 @@ export interface FeatureSocket {
   halfExtent2: number;
   /** Depth of the socket (along -openingNormal) */
   depth: number;
+  mateKind: RectCutFeature['cutType'];
 }
 
 // Tolerance for dimension matching (inches) — parts whose dimension is within
@@ -3584,7 +3612,7 @@ const MATE_ALIGN_THRESHOLD = 0.85;
 
 /**
  * Compute feature sockets for a part's enabled rect_cut features.
- * Currently handles features targeting top / bottom faces.
+ * Handles pockets targeting top, bottom, front, and back faces.
  * The architecture allows future feature types (dowels, dovetails) to
  * generate sockets through the same FeatureSocket interface.
  */
@@ -3631,14 +3659,42 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
     const rectFeature = feature as RectCutFeature;
     const resolved = getResolvedRectCutFeature(rectFeature, part);
 
-    // Sockets currently open through the top or bottom surface. This includes
-    // rabbets authored against a supported top/bottom edge.
+    // Sockets open through a horizontal or side surface. This includes
+    // mortises cut into apron-leg faces as well as top/bottom housed joints.
     const isTop = isTopTarget(resolved);
     const isBottom = !isTop && isBottomTarget(resolved);
-    if (!isTop && !isBottom) continue;
+    const isFront = resolved.target.type === 'face' && resolved.target.face === 'front_face';
+    const isBack = resolved.target.type === 'face' && resolved.target.face === 'back_face';
+    const isSide = isFront || isBack;
+    if (!isTop && !isBottom && !isSide) continue;
 
-    const depth = getRectCutDepth(resolved, part.thickness);
+    const depth = getRectCutDepth(resolved, isSide ? part.width : part.thickness);
     if (depth <= 0) continue;
+
+    if (isSide) {
+      const localCenterX = -halfLength + resolved.placement.x + resolved.parameters.size.length / 2;
+      const localCenterY = -halfThick + resolved.placement.z + resolved.parameters.size.width / 2;
+      const localCenterZ = isFront ? part.width / 2 : -part.width / 2;
+      const openingNormal = isFront ? axZ : mulVec(axZ, -1);
+
+      sockets.push({
+        hostPartId: part.id,
+        featureId: feature.id,
+        openingCenter: {
+          x: part.position.x + axX.x * localCenterX + axY.x * localCenterY + axZ.x * localCenterZ,
+          y: part.position.y + axX.y * localCenterX + axY.y * localCenterY + axZ.y * localCenterZ,
+          z: part.position.z + axX.z * localCenterX + axY.z * localCenterY + axZ.z * localCenterZ
+        },
+        openingNormal,
+        tangent1: axX,
+        tangent2: axY,
+        halfExtent1: resolved.parameters.size.length / 2,
+        halfExtent2: resolved.parameters.size.width / 2,
+        depth,
+        mateKind: resolved.cutType
+      });
+      continue;
+    }
 
     // Local-space opening rectangle
     const bounds = getRectCutPlanBounds(resolved, part);
@@ -3668,7 +3724,8 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
       tangent2: axZ, // along part width
       halfExtent1: resolved.parameters.size.length / 2,
       halfExtent2: resolved.parameters.size.width / 2,
-      depth
+      depth,
+      mateKind: resolved.cutType
     });
   }
 
@@ -3677,15 +3734,34 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
 
 export interface MateSnapResult extends SnapResult {
   mateHostPartId?: string;
+  mateConflict?: { candidateCount: number; maxDisagreement: number };
 }
+
+/** Maximum disagreement allowed between independently detected joints in a
+ * rigid selection. This is an interaction tolerance, not manufacturing
+ * clearance: the resulting transform remains exact and collision-validated. */
+const GROUP_MATE_CONSENSUS_TOLERANCE = 0.01;
 
 type MateShape = {
   obb: PartOBB;
+  sourceFeatureId?: string;
   /** Shoulder-to-tip length for an authored tenon. */
   insertionDepth?: number;
   /** Blind-cut mates must present the opposite opening face to the host. */
   complementaryOpeningNormal?: Vec3;
+  mateKind?: 'mortise-tenon' | 'half-lap';
 };
+
+function mateShapeIsCompatibleWithSocket(mateShape: MateShape, socket: FeatureSocket): boolean {
+  if (mateShape.mateKind === 'mortise-tenon') return socket.mateKind === 'mortise';
+  if (mateShape.mateKind === 'half-lap') {
+    if (socket.mateKind !== 'dado' && socket.mateKind !== 'stopped_dado') return false;
+    return (
+      mateShape.insertionDepth !== undefined && Math.abs(mateShape.insertionDepth - socket.depth) < MATE_DIM_TOLERANCE
+    );
+  }
+  return true;
+}
 
 function getMateShapes(part: Part, position: Vec3): MateShape[] {
   const resolvedRectCuts = (part.features ?? [])
@@ -3708,12 +3784,15 @@ function getMateShapes(part: Part, position: Vec3): MateShape[] {
       const insertionAxis = leftEnd ? axisX : mulVec(axisX, -1);
 
       return {
+        sourceFeatureId: tenon.id,
         obb: {
           center: addVec(position, addVec(mulVec(axisX, localCenterX), mulVec(axisZ, localCenterZ))),
           axes: [insertionAxis, axisY, axisZ],
           halfExtents: [tenonLength / 2, tongueThickness / 2, tongueWidth / 2]
         },
-        insertionDepth: tenonLength
+        insertionDepth: tenonLength,
+        complementaryOpeningNormal: mulVec(insertionAxis, -1),
+        mateKind: 'mortise-tenon'
       };
     });
   }
@@ -3730,6 +3809,7 @@ function getMateShapes(part: Part, position: Vec3): MateShape[] {
     const localCenterZ = getRenderedLocalZRange(part.width, bounds.minZ, cut.parameters.size.width).center;
     const localCenterY = isBottomTarget(cut) ? cutDepth / 2 : -cutDepth / 2;
     shapes.push({
+      sourceFeatureId: cut.id,
       obb: {
         center: addVec(
           position,
@@ -3739,11 +3819,238 @@ function getMateShapes(part: Part, position: Vec3): MateShape[] {
         halfExtents: [remainingThickness / 2, cut.parameters.size.length / 2, cut.parameters.size.width / 2]
       },
       insertionDepth: remainingThickness,
-      complementaryOpeningNormal: isBottomTarget(cut) ? mulVec(axisY, -1) : axisY
+      complementaryOpeningNormal: isBottomTarget(cut) ? mulVec(axisY, -1) : axisY,
+      mateKind: cut.cutType === 'dado' || cut.cutType === 'stopped_dado' ? 'half-lap' : undefined
     });
   }
 
   return shapes;
+}
+
+function circularPoseWorld(
+  part: Part,
+  feature: CircularCutFeature,
+  position: Vec3
+): { entry: Vec3; axis: Vec3 } | undefined {
+  const expanded = expandCircularCut(feature, part)[0];
+  if (!expanded) return undefined;
+  const local = expanded.entryPoint;
+  const [axisX, axisY, axisZ] = getPartOBB(part, position).axes;
+  return {
+    entry: addVec(position, addVec(addVec(mulVec(axisX, local.x), mulVec(axisY, local.y)), mulVec(axisZ, local.z))),
+    axis: normalizeVec(
+      addVec(addVec(mulVec(axisX, expanded.axis.x), mulVec(axisY, expanded.axis.y)), mulVec(axisZ, expanded.axis.z))
+    )
+  };
+}
+
+/** Paired dowel holes carry stable relationship metadata, so they can be
+ * matched without guessing from nearby circular cuts. Aligning entry points
+ * simultaneously seats the mating faces and makes every hole coaxial. */
+function collectPairedDowelMates(
+  draggingPart: Part,
+  currentPosition: Vec3,
+  referenceParts: Part[],
+  snapThreshold: number
+): Array<{ delta: Vec3; distance: number; hostPartId: string; sourceKey: string }> {
+  const matches: Array<{ delta: Vec3; distance: number; hostPartId: string; sourceKey: string }> = [];
+  for (const feature of draggingPart.features ?? []) {
+    if (!feature.enabled || feature.kind !== 'circular_cut') continue;
+    const metadata = feature.metadata?.dowelJoint as DowelJointMetadata | undefined;
+    if (!metadata) continue;
+    const host = referenceParts.find((part) => part.id === metadata.matePartId);
+    if (!host) continue;
+    const mateFeature = (host.features ?? []).find((candidate): candidate is CircularCutFeature => {
+      if (!candidate.enabled || candidate.kind !== 'circular_cut') return false;
+      const mate = candidate.metadata?.dowelJoint as DowelJointMetadata | undefined;
+      return mate?.jointId === metadata.jointId && mate.memberIndex === metadata.memberIndex;
+    });
+    if (!mateFeature) continue;
+    const movingPose = circularPoseWorld(draggingPart, feature, currentPosition);
+    const hostPose = circularPoseWorld(host, mateFeature, host.position);
+    if (!movingPose || !hostPose || dotVec(movingPose.axis, hostPose.axis) > -0.995) continue;
+    const delta = {
+      x: hostPose.entry.x - movingPose.entry.x,
+      y: hostPose.entry.y - movingPose.entry.y,
+      z: hostPose.entry.z - movingPose.entry.z
+    };
+    const distance = lenVec(delta);
+    if (distance > snapThreshold) continue;
+    matches.push({ delta, distance, hostPartId: host.id, sourceKey: `${draggingPart.id}:${feature.id}` });
+  }
+  return matches;
+}
+
+type FeatureMateCandidate = {
+  delta: Vec3;
+  distance: number;
+  hostPartId: string;
+  constrainedAxes: { x: boolean; y: boolean; z: boolean };
+  mateKind: string;
+  sourceKey: string;
+};
+
+/** Return every geometrically eligible rectangular joint proposal. Keeping
+ * the full set is important for rigid assemblies: an apron with a tenon on
+ * each end must prove that both mortises request the same translation. */
+function collectFeatureMateCandidates(
+  draggingPart: Part,
+  currentPosition: Vec3,
+  allParts: Part[],
+  draggingPartIds: string[],
+  snapThreshold: number
+): FeatureMateCandidate[] {
+  const mateShapes = getMateShapes(draggingPart, currentPosition);
+  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
+  const nearParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
+  const candidates: FeatureMateCandidate[] = [];
+
+  // Dowel metadata names its mate explicitly, so do not subject that host to
+  // the generic ten-nearest-parts performance cap.
+  for (const dowelMate of collectPairedDowelMates(draggingPart, currentPosition, allParts, snapThreshold)) {
+    candidates.push({
+      ...dowelMate,
+      constrainedAxes: { x: true, y: true, z: true },
+      mateKind: 'dowel'
+    });
+  }
+
+  const movingEndFaces = getAuthoredEndCutFaces(draggingPart, currentPosition);
+  for (const hostPart of nearParts) {
+    const hostEndFaces = getAuthoredEndCutFaces(hostPart, hostPart.position);
+    for (const moving of movingEndFaces) {
+      for (const host of hostEndFaces) {
+        if (moving.feature.cutType !== host.feature.cutType) continue;
+        if (dotVec(moving.face.normal, host.face.normal) > -0.995) continue;
+        const movingDimensions = [moving.face.half1, moving.face.half2].sort((left, right) => left - right);
+        const hostDimensions = [host.face.half1, host.face.half2].sort((left, right) => left - right);
+        if (
+          Math.abs(movingDimensions[0] - hostDimensions[0]) >= MATE_DIM_TOLERANCE ||
+          Math.abs(movingDimensions[1] - hostDimensions[1]) >= MATE_DIM_TOLERANCE
+        ) {
+          continue;
+        }
+        const delta = subVec(host.face.center, moving.face.center);
+        const distance = lenVec(delta);
+        if (distance > snapThreshold) continue;
+        candidates.push({
+          delta,
+          distance,
+          hostPartId: hostPart.id,
+          constrainedAxes: { x: true, y: true, z: true },
+          mateKind: moving.feature.cutType,
+          sourceKey: `${draggingPart.id}:${moving.feature.id}`
+        });
+      }
+    }
+  }
+
+  for (const hostPart of nearParts) {
+    const sockets = getPartFeatureSockets(hostPart);
+    for (const socket of sockets) {
+      for (const mateShape of mateShapes) {
+        if (!mateShapeIsCompatibleWithSocket(mateShape, socket)) continue;
+        if (
+          mateShape.complementaryOpeningNormal &&
+          dotVec(mateShape.complementaryOpeningNormal, socket.openingNormal) > -MATE_ALIGN_THRESHOLD
+        ) {
+          continue;
+        }
+        if (mateShape.insertionDepth !== undefined && mateShape.insertionDepth - socket.depth >= MATE_DIM_TOLERANCE) {
+          continue;
+        }
+        const seatingSocket =
+          mateShape.insertionDepth !== undefined && socket.depth > mateShape.insertionDepth
+            ? { ...socket, depth: mateShape.insertionDepth }
+            : socket;
+        const match = findBestMateMatch(mateShape.obb, seatingSocket, snapThreshold);
+        if (!match) continue;
+        candidates.push({
+          ...match,
+          hostPartId: hostPart.id,
+          mateKind: mateShape.mateKind ?? socket.mateKind,
+          sourceKey: `${draggingPart.id}:${mateShape.sourceFeatureId ?? 'body'}`
+        });
+      }
+    }
+  }
+
+  return candidates.sort((left, right) => left.distance - right.distance);
+}
+
+function candidateToMateSnapResult(currentPosition: Vec3, candidate: FeatureMateCandidate): MateSnapResult {
+  const adjustedPosition = addVec(currentPosition, candidate.delta);
+  const axis = dominantAxisFromDelta(candidate.delta);
+  return {
+    adjustedPosition,
+    snappedX: candidate.constrainedAxes.x,
+    snappedY: candidate.constrainedAxes.y,
+    snappedZ: candidate.constrainedAxes.z,
+    snapLines: [
+      {
+        axis,
+        type: 'face',
+        family: 'joinery',
+        subtype: candidate.mateKind,
+        start: { ...currentPosition },
+        end: { ...adjustedPosition },
+        snapValue: axis === 'x' ? adjustedPosition.x : axis === 'y' ? adjustedPosition.y : adjustedPosition.z
+      }
+    ],
+    mateHostPartId: candidate.hostPartId
+  };
+}
+
+function resolvePartMateCandidateConsensus(
+  currentPosition: Vec3,
+  candidates: FeatureMateCandidate[]
+): MateSnapResult | undefined {
+  if (candidates.length === 0) return undefined;
+  const allSources = new Set(candidates.map((candidate) => candidate.sourceKey));
+  if (allSources.size === 1) return candidateToMateSnapResult(currentPosition, candidates[0]);
+
+  const clusters = candidates.map((seed) => {
+    const members = candidates.filter(
+      (candidate) => lenVec(subVec(candidate.delta, seed.delta)) <= GROUP_MATE_CONSENSUS_TOLERANCE
+    );
+    return { members, sources: new Set(members.map((candidate) => candidate.sourceKey)) };
+  });
+  clusters.sort((left, right) => right.sources.size - left.sources.size || right.members.length - left.members.length);
+  const winning = clusters[0];
+  if (winning.sources.size < allSources.size) {
+    let maxDisagreement = 0;
+    for (let leftIndex = 0; leftIndex < candidates.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < candidates.length; rightIndex += 1) {
+        if (candidates[leftIndex].sourceKey === candidates[rightIndex].sourceKey) continue;
+        maxDisagreement = Math.max(
+          maxDisagreement,
+          lenVec(subVec(candidates[leftIndex].delta, candidates[rightIndex].delta))
+        );
+      }
+    }
+    return {
+      adjustedPosition: currentPosition,
+      snappedX: false,
+      snappedY: false,
+      snappedZ: false,
+      snapLines: [],
+      mateConflict: { candidateCount: allSources.size, maxDisagreement }
+    };
+  }
+
+  const consensus = winning.members.reduce((sum, candidate) => addVec(sum, candidate.delta), { x: 0, y: 0, z: 0 });
+  consensus.x /= winning.members.length;
+  consensus.y /= winning.members.length;
+  consensus.z /= winning.members.length;
+  const results = winning.members.map((candidate) => candidateToMateSnapResult(currentPosition, candidate));
+  return {
+    adjustedPosition: addVec(currentPosition, consensus),
+    snappedX: results.some((result) => result.snappedX),
+    snappedY: results.some((result) => result.snappedY),
+    snappedZ: results.some((result) => result.snappedZ),
+    snapLines: results.flatMap((result) => result.snapLines),
+    mateHostPartId: results[0].mateHostPartId
+  };
 }
 
 /**
@@ -3762,44 +4069,12 @@ export function detectFeatureMateSnaps(
   draggingPartIds: string[],
   snapThreshold: number
 ): MateSnapResult {
-  const mateShapes = getMateShapes(draggingPart, currentPosition);
-  const draggingBounds = getPartBoundsAtPosition(draggingPart, currentPosition);
-  const nearParts = getNearestParts(draggingBounds, allParts, draggingPartIds);
+  const consensus = resolvePartMateCandidateConsensus(
+    currentPosition,
+    collectFeatureMateCandidates(draggingPart, currentPosition, allParts, draggingPartIds, snapThreshold)
+  );
 
-  let bestDelta: Vec3 | undefined;
-  let bestDistance = Infinity;
-  let bestHostPartId: string | undefined;
-  let bestConstrainedAxes: { x: boolean; y: boolean; z: boolean } | undefined;
-
-  for (const hostPart of nearParts) {
-    const sockets = getPartFeatureSockets(hostPart);
-    if (sockets.length === 0) continue;
-
-    for (const socket of sockets) {
-      for (const mateShape of mateShapes) {
-        if (
-          mateShape.complementaryOpeningNormal &&
-          dotVec(mateShape.complementaryOpeningNormal, socket.openingNormal) > -MATE_ALIGN_THRESHOLD
-        ) {
-          continue;
-        }
-        if (
-          mateShape.insertionDepth !== undefined &&
-          Math.abs(mateShape.insertionDepth - socket.depth) >= MATE_DIM_TOLERANCE
-        ) {
-          continue;
-        }
-        const match = findBestMateMatch(mateShape.obb, socket, snapThreshold);
-        if (!match || match.distance >= bestDistance) continue;
-        bestDistance = match.distance;
-        bestDelta = match.delta;
-        bestHostPartId = hostPart.id;
-        bestConstrainedAxes = match.constrainedAxes;
-      }
-    }
-  }
-
-  if (!bestDelta) {
+  if (!consensus) {
     return {
       adjustedPosition: currentPosition,
       snappedX: false,
@@ -3809,27 +4084,104 @@ export function detectFeatureMateSnaps(
     };
   }
 
-  const adjustedPosition = addVec(currentPosition, bestDelta);
-  const snappedX = bestConstrainedAxes?.x ?? false;
-  const snappedY = bestConstrainedAxes?.y ?? false;
-  const snappedZ = bestConstrainedAxes?.z ?? false;
-  const axis = dominantAxisFromDelta(bestDelta);
+  return consensus;
+}
+
+/**
+ * Detect a single rigid translation that mates the real joinery features of
+ * a multi-part selection. Group snapping used to run against a featureless
+ * bounding-box proxy, which meant authored tenons and half-laps disappeared
+ * as soon as their parts were grouped.
+ *
+ * Every moving part proposes its best feature mate at the preview transform.
+ * When several joints are in range they must agree on the same translation;
+ * otherwise no mate snap is emitted and collision handling remains in charge.
+ */
+export function detectGroupFeatureMateSnaps(
+  movingParts: Part[],
+  currentDelta: Vec3,
+  anchorPosition: Vec3,
+  referenceParts: Part[],
+  movingPartIds: string[],
+  snapThreshold: number
+): MateSnapResult {
+  const proposals = movingParts.flatMap((part) => {
+    const currentPosition = addVec(part.position, currentDelta);
+    return collectFeatureMateCandidates(part, currentPosition, referenceParts, movingPartIds, snapThreshold).map(
+      (candidate) => ({ candidate, currentPosition, result: candidateToMateSnapResult(currentPosition, candidate) })
+    );
+  });
+
+  if (proposals.length === 0) {
+    return {
+      adjustedPosition: anchorPosition,
+      snappedX: false,
+      snappedY: false,
+      snappedZ: false,
+      snapLines: []
+    };
+  }
+
+  // Find the translation supported by the greatest number of distinct joint
+  // features. Alternative nearby sockets for one tenon must not outvote the
+  // second tenon on the same apron.
+  const clusters = proposals.map((seed) => {
+    const members = proposals.filter(({ candidate }) => {
+      const delta = candidate.delta;
+      const seedDelta = seed.candidate.delta;
+      return (
+        lenVec({ x: delta.x - seedDelta.x, y: delta.y - seedDelta.y, z: delta.z - seedDelta.z }) <=
+        GROUP_MATE_CONSENSUS_TOLERANCE
+      );
+    });
+    const distinctSources = new Set(members.map(({ candidate }) => candidate.sourceKey));
+    return { members, distinctSources };
+  });
+  clusters.sort(
+    (left, right) =>
+      right.distinctSources.size - left.distinctSources.size || right.members.length - left.members.length
+  );
+  const winning = clusters[0];
+  const allSources = new Set(proposals.map(({ candidate }) => candidate.sourceKey));
+  if (allSources.size > 1 && winning.distinctSources.size < allSources.size) {
+    let maxDisagreement = 0;
+    for (let leftIndex = 0; leftIndex < proposals.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < proposals.length; rightIndex += 1) {
+        if (proposals[leftIndex].candidate.sourceKey === proposals[rightIndex].candidate.sourceKey) continue;
+        const left = proposals[leftIndex].candidate.delta;
+        const right = proposals[rightIndex].candidate.delta;
+        maxDisagreement = Math.max(
+          maxDisagreement,
+          lenVec({ x: left.x - right.x, y: left.y - right.y, z: left.z - right.z })
+        );
+      }
+    }
+    return {
+      adjustedPosition: anchorPosition,
+      snappedX: false,
+      snappedY: false,
+      snappedZ: false,
+      snapLines: [],
+      mateConflict: { candidateCount: allSources.size, maxDisagreement }
+    };
+  }
+
+  const consensus = winning.members.reduce((sum, proposal) => addVec(sum, proposal.candidate.delta), {
+    x: 0,
+    y: 0,
+    z: 0
+  });
+  consensus.x /= winning.members.length;
+  consensus.y /= winning.members.length;
+  consensus.z /= winning.members.length;
 
   return {
-    adjustedPosition,
-    snappedX,
-    snappedY,
-    snappedZ,
-    snapLines: [
-      {
-        axis,
-        type: 'face',
-        start: { x: currentPosition.x, y: currentPosition.y, z: currentPosition.z },
-        end: { x: adjustedPosition.x, y: adjustedPosition.y, z: adjustedPosition.z },
-        snapValue: axis === 'x' ? adjustedPosition.x : axis === 'y' ? adjustedPosition.y : adjustedPosition.z
-      }
-    ],
-    mateHostPartId: bestHostPartId
+    adjustedPosition: addVec(anchorPosition, consensus),
+    snappedX: winning.members.some(({ result }) => result.snappedX),
+    snappedY: winning.members.some(({ result }) => result.snappedY),
+    snappedZ: winning.members.some(({ result }) => result.snappedZ),
+    snapLines: winning.members.flatMap(({ result }) => result.snapLines),
+    mateHostPartId: winning.members[0].result.mateHostPartId
   };
 }
 

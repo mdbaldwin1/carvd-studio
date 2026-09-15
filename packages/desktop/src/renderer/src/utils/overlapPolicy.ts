@@ -321,6 +321,12 @@ function existingOverlapDoesNotWorsen(
   originalOther: Part = other
 ): boolean {
   if (!overlapCheckEnabled(part, other)) return true;
+  // The escape hatch is only for a pair that is genuinely overlapping at
+  // drag start. Material-cell OBBs are deliberately conservative and can
+  // overlap around a correctly seated mortise-and-tenon even when the exact
+  // rendered solids do not. Treating that coarse contact as an existing
+  // overlap allowed a slightly diagonal drag to bury the rail's shoulders.
+  if (!partsOverlap(part, originalOther, geometryCache)) return false;
   // A coarse OBB is only the true overlap representation for an uncut board.
   // Feature-bearing parts (custom cuts) interlock: their coarse OBBs overlap
   // deeply and stably, so every translation would read as "not worsening" and
