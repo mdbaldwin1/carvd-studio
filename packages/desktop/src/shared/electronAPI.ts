@@ -2,6 +2,31 @@ import type { OpenDialogOptions, OpenDialogReturnValue, SaveDialogOptions, SaveD
 
 import type { AnalyticsConsent, DesktopAnalyticsEvent } from './analytics';
 
+export interface RouterCatalogLibraryTransaction {
+  profileLibrary: unknown[];
+  toolLibrary: unknown[];
+  expectedCurrent?: { profileLibraryHash: string; toolLibraryHash: string };
+}
+export type RouterCatalogTransactionResult =
+  | { status: 'success' | 'conflict'; current: { profileLibraryHash: string; toolLibraryHash: string } }
+  | { status: 'failure'; reason: 'invalid_payload' | 'persistence_failed' };
+export type RouterCatalogSignatureStatus =
+  | 'unsigned'
+  | 'verified-untrusted'
+  | 'verified-trusted'
+  | 'invalid'
+  | 'unsupported';
+export interface RouterCatalogSignatureVerification {
+  status: RouterCatalogSignatureStatus;
+  publisherKeyId?: string;
+  fingerprint?: string;
+  reason?: string;
+  publicKeySpki?: string;
+  signedAt?: string;
+  payloadHash?: string;
+  source?: string;
+}
+
 // The contract the preload bridge exposes on `window.electronAPI`.
 // Both the preload implementation and the renderer's global declaration
 // import this, so the two cannot drift apart.
@@ -11,6 +36,10 @@ export interface ElectronAPI {
   onMenuCommand: (callback: (command: string, ...args: unknown[]) => void) => () => void;
   getPreference: (key: string) => Promise<unknown>;
   setPreference: (key: string, value: unknown) => Promise<void>;
+  transactRouterCatalogLibraries?: (
+    payload: RouterCatalogLibraryTransaction
+  ) => Promise<RouterCatalogTransactionResult>;
+  verifyRouterCatalogSignature?: (text: string) => Promise<RouterCatalogSignatureVerification>;
   captureAnalytics: (event: DesktopAnalyticsEvent) => void;
   getAnalyticsConsent: () => Promise<AnalyticsConsent>;
   setAnalyticsConsent: (consent: AnalyticsConsent, surface: 'onboarding' | 'settings') => Promise<{ success: boolean }>;

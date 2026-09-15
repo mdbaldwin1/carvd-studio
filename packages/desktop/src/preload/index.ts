@@ -35,6 +35,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Preferences
   getPreference: (key: string) => ipcRenderer.invoke('get-preference', key),
   setPreference: (key: string, value: unknown) => ipcRenderer.invoke('set-preference', key, value),
+  transactRouterCatalogLibraries: (payload: import('../shared/electronAPI').RouterCatalogLibraryTransaction) =>
+    ipcRenderer.invoke('router-catalog:transact-libraries', payload),
+  verifyRouterCatalogSignature: (text: string) => ipcRenderer.invoke('router-catalog:verify-signature', text),
 
   // Analytics consent and capture
   captureAnalytics: (event: DesktopAnalyticsEvent) => {

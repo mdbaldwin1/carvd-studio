@@ -548,6 +548,19 @@ ipcMain.handle('set-preference', (_event, key: string, value: unknown) => {
   store.set(key as keyof typeof store.store, value as never);
 });
 
+ipcMain.handle('router-catalog:transact-libraries', async (_event, payload: unknown) => {
+  const { transactRouterCatalogLibraries } = await import('./routerCatalogTransaction');
+  return transactRouterCatalogLibraries(store as unknown as { store: Record<string, unknown> }, payload, (changes) => {
+    BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('settings-changed', changes));
+  });
+});
+
+ipcMain.handle('router-catalog:verify-signature', async (_event, text: unknown) => {
+  if (typeof text !== 'string') return { status: 'invalid', reason: 'Catalog input is invalid.' };
+  const { verifyRouterCatalogSignature } = await import('./routerCatalogSignature');
+  return verifyRouterCatalogSignature(text, store.get('trustedRouterPublishers', []));
+});
+
 ipcMain.handle('show-save-dialog', async (event, options) => {
   const queuedResult = getQueuedTestSaveDialogResult();
   if (queuedResult) {
@@ -1394,6 +1407,8 @@ const syncedSettingsKeys = [
   'defaultUnits',
   'defaultGridSize',
   'stockLibrary',
+  'routerProfileLibrary',
+  'routerToolLibrary',
   'assemblyLibrary'
 ];
 

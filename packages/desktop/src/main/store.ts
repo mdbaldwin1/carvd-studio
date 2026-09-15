@@ -120,6 +120,9 @@ export interface AppPreferences {
   recentProjects: string[];
   favoriteProjects: string[]; // User-favorited project paths
   stockLibrary: StockLibraryItem[];
+  routerProfileLibrary: unknown[];
+  routerToolLibrary: unknown[];
+  trustedRouterPublishers: unknown[];
   assemblyLibrary: AssemblyLibraryItem[];
   userTemplates: UserTemplateItem[];
   customColors: string[]; // User-saved custom colors (max 16)
@@ -156,6 +159,9 @@ const defaults: AppPreferences = {
   recentProjects: [],
   favoriteProjects: [],
   stockLibrary: [],
+  routerProfileLibrary: [],
+  routerToolLibrary: [],
+  trustedRouterPublishers: [],
   assemblyLibrary: [],
   userTemplates: [],
   customColors: [],
