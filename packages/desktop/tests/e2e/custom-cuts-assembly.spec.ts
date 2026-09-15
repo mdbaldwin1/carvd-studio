@@ -619,7 +619,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
     expect(after.dividerTransform).toBe(before.dividerTransform);
   });
 
-  test('keeps a selected singleton group on the ordinary face-snap and collision path', async () => {
+  test('seats a selected singleton group into a matching dado through group joinery', async () => {
     await seedFixture(
       running.window,
       [
@@ -685,13 +685,13 @@ test.describe.serial('custom cuts assembly qualification', () => {
     expect(previewDelta!.selectedGroupIds).toHaveLength(1);
     expect(previewDelta!.snapLines).not.toHaveLength(0);
     expect(previewDelta!.snapLines.every((line: { family?: string }) => line.family !== undefined)).toBe(true);
-    expect(previewDelta!.snapLines.map((line: { family?: string }) => line.family)).toContain('face');
-    expect(2.8 + previewDelta!.delta.y).toBeCloseTo(2.75, 3);
+    expect(previewDelta!.snapLines.map((line: { family?: string }) => line.family)).toContain('joinery');
+    expect(2.8 + previewDelta!.delta.y).toBeCloseTo(2.375, 3);
     for (const axis of ['x', 'y', 'z'] as const) {
       const startPosition = { x: 4.1, y: 2.8, z: 4 };
       expect(state.position[axis]).toBeCloseTo(startPosition[axis] + previewDelta!.delta[axis], 3);
     }
-    expect(state.position.y).not.toBeCloseTo(2.375, 2);
+    expect(state.position.y).toBeCloseTo(2.375, 3);
     expect(state.selectedPartIds).toEqual([]);
     expect(state.selectedGroupIds).toHaveLength(1);
     expect(fallbackTrace).toMatchObject({ displacedMoveOwner: null, partId: 'grouped-dado-divider' });
@@ -756,7 +756,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
     expect(preview!.selectedPartIds).toEqual([]);
     expect(preview!.selectedGroupIds).toHaveLength(1);
     expect(preview!.snapLines.every((line: { family?: string }) => line.family !== undefined)).toBe(true);
-    expect(preview!.snapLines.map((line: { family?: string }) => line.family)).toContain('face');
+    expect(preview!.snapLines.map((line: { family?: string }) => line.family)).toContain('joinery');
     expect(preview!.inFlightRenderedPosition).not.toBeNull();
     for (const axis of ['x', 'y', 'z'] as const) {
       const startPosition = { x: 4.1, y: 2.8, z: 4 };
@@ -764,8 +764,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
       expect(preview!.inFlightRenderedPosition![axis]).toBeCloseTo(groupPreviewPosition, 3);
       expect(result.position[axis]).toBeCloseTo(preview!.inFlightRenderedPosition![axis], 3);
     }
-    expect(result.position.y).toBeCloseTo(2.75, 3);
-    expect(result.position.y).not.toBeCloseTo(2.375, 2);
+    expect(result.position.y).toBeCloseTo(2.375, 3);
     expect(result.selectedPartIds).toEqual([]);
     expect(result.selectedGroupIds).toHaveLength(1);
 
@@ -847,13 +846,13 @@ test.describe.serial('custom cuts assembly qualification', () => {
     expect(preview!.selectedGroupIds).toHaveLength(1);
     expect(preview!.snapLines).not.toHaveLength(0);
     expect(preview!.snapLines.every((line: { family?: string }) => line.family !== undefined)).toBe(true);
-    expect(preview!.snapLines.map((line: { family?: string }) => line.family)).toContain('face');
-    expect(2.8 + preview!.delta.y).toBeCloseTo(2.75, 3);
+    expect(preview!.snapLines.map((line: { family?: string }) => line.family)).toContain('joinery');
+    expect(2.8 + preview!.delta.y).toBeCloseTo(2.375, 3);
     for (const axis of ['x', 'y', 'z'] as const) {
       const startPosition = { x: 4.1, y: 2.8, z: 4 };
       expect(state.position[axis]).toBeCloseTo(startPosition[axis] + preview!.delta[axis], 3);
     }
-    expect(state.position.y).toBeCloseTo(2.75, 3);
+    expect(state.position.y).toBeCloseTo(2.375, 3);
     expect(state.selectedPartIds).toEqual([]);
     expect(state.selectedGroupIds).toHaveLength(1);
     await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);
