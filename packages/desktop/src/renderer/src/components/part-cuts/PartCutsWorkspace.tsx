@@ -11,6 +11,7 @@ import { CanvasControlHints } from '@renderer/components/common/CanvasControlHin
 import { useAppSettings } from '@renderer/hooks/useAppSettings';
 import {} from '@renderer/utils/rectCutUtils';
 import {} from '@renderer/components/ui/dropdown-menu';
+import { EdgeProfileCrossSectionInspector } from './EdgeProfileCrossSectionInspector';
 
 /**
  * The cut editor's viewport. The list, the type picker, and the inspector live
@@ -80,6 +81,9 @@ export function PartCutsWorkspace() {
 
         <HotkeyHints show={appSettings.showHotkeyHints} />
         {appSettings.showHotkeyHints && <CanvasControlHints />}
+        {inspectorDraft?.mode === 'edge_profile' && (
+          <EdgeProfileCrossSectionInspector draft={inspectorDraft} units={units} part={part} />
+        )}
 
         {featureConflicts.length > 0 && (
           <div className="absolute left-3 top-3 z-40 max-w-[min(88%,26rem)] rounded-md border border-warning/40 bg-warning/10 px-3 py-3 text-left backdrop-blur">

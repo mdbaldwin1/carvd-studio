@@ -9,6 +9,9 @@ export function HotkeyHints({ show }: { show: boolean }) {
   const isEditingPartCuts = usePartCutsEditingStore((s) => s.isEditingPartCuts);
   const selectedFeatureId = usePartCutsEditingStore((s) => s.selectedFeatureId);
   const draftFeatureCount = usePartCutsEditingStore((s) => s.draftFeatures.length);
+  const selectedCutKind = usePartCutsEditingStore(
+    (s) => s.draftFeatures.find((feature) => feature.id === s.selectedFeatureId)?.kind
+  );
 
   const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
   const modKey = isMac ? '⌘' : 'Ctrl';
@@ -25,8 +28,12 @@ export function HotkeyHints({ show }: { show: boolean }) {
   if (isEditingPartCuts) {
     hints = selectedFeatureId
       ? [
-          { key: 'Arrows', action: 'Nudge Cut' },
-          { key: 'Shift+Arrows', action: 'Nudge 1"' },
+          ...(selectedCutKind === 'edge_profile'
+            ? [{ key: 'Inspector', action: 'Choose Edge / Profile' }]
+            : [
+                { key: 'Arrows', action: 'Nudge Cut' },
+                { key: 'Shift+Arrows', action: 'Nudge 1"' }
+              ]),
           { key: 'Del', action: 'Delete Cut' },
           { key: 'F', action: 'Frame Part' },
           { key: `${modKey}+Z`, action: 'Undo Cut' },

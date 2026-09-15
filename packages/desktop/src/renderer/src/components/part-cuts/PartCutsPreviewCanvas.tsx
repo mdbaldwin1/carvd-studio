@@ -16,6 +16,7 @@ import {
   FeatureDraft,
   getFeatureDraftTarget,
   RectCutDraft,
+  RoutedPathDraft,
   RoundedCutDraft
 } from '@renderer/components/part-features/partFeatureEditorState';
 import { Button } from '@renderer/components/ui/button';
@@ -30,7 +31,7 @@ import {
   getValidPickableTargets,
   partFeatureTargetEquals
 } from '@renderer/utils/partCutPicking';
-import { getPartRenderGeometry } from '@renderer/utils/partFeatureGeometry';
+import { getPartOutlineGeometry, getPartRenderGeometry } from '@renderer/utils/partFeatureGeometry';
 import { getRectCutDepth, getResolvedRectCutFeature } from '@renderer/utils/rectCutUtils';
 import { getFaceFrame, validateCircularCut, validateRoundedCut } from '@renderer/utils/roundCutUtils';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -144,6 +145,11 @@ interface ActiveDragState {
   startDraft: FeatureDraft;
 }
 
+interface ActiveRoutePointDrag {
+  index: number;
+  pointerId: number;
+}
+
 const _localPoint = new THREE.Vector3();
 const HANDLE_EPSILON = 0.08;
 const MIN_DIMENSION = 0.125;
@@ -153,6 +159,413 @@ const HANDLE_HOVER_COLOR = '#fcd34d';
 // pull, it is not a measurement.
 const SNAP_GUIDE_COLOR = '#38bdf8';
 const AREA_COLOR = '#2563eb';
+const SELECTED_EDGE_COLOR = '#a78bfa';
+
+function facePoint(
+  frame: ReturnType<typeof getFaceFrame>,
+  primary: number,
+  secondary: number
+): [number, number, number] {
+  const outwardOffset = 0.09;
+  return [
+    frame.origin.x +
+      frame.primaryAxis.x * primary +
+      frame.secondaryAxis.x * secondary -
+      frame.inwardNormal.x * outwardOffset,
+    frame.origin.y +
+      frame.primaryAxis.y * primary +
+      frame.secondaryAxis.y * secondary -
+      frame.inwardNormal.y * outwardOffset,
+    frame.origin.z +
+      frame.primaryAxis.z * primary +
+      frame.secondaryAxis.z * secondary -
+      frame.inwardNormal.z * outwardOffset
+  ];
+}
+
+export function snapRoutedPathPoint(
+  raw: { primary: number; secondary: number },
+  index: number,
+  points: RoutedPathDraft['points'],
+  frame: { primarySize: number; secondarySize: number },
+  quantum: number
+): { primary: number; secondary: number } {
+  let { primary, secondary } = raw;
+  const previous = points[index - 1];
+  if (previous) {
+    const dx = primary - previous.primary;
+    const dy = secondary - previous.secondary;
+    const distance = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+    const snappedAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+    if (
+      distance > 0 &&
+      Math.abs(Math.atan2(Math.sin(angle - snappedAngle), Math.cos(angle - snappedAngle))) < THREE.MathUtils.degToRad(6)
+    ) {
+      primary = previous.primary + Math.cos(snappedAngle) * distance;
+      secondary = previous.secondary + Math.sin(snappedAngle) * distance;
+    }
+  }
+  const quantize = (value: number) => Math.round(value / quantum) * quantum;
+  const threshold = Math.max(quantum * 1.5, Math.min(frame.primarySize, frame.secondarySize) * 0.0125);
+  const otherPoints = points.filter((_, pointIndex) => pointIndex !== index);
+  const snapTo = (value: number, anchors: number[]) => {
+    const nearest = anchors.reduce(
+      (best, anchor) => (Math.abs(anchor - value) < Math.abs(best - value) ? anchor : best),
+      anchors[0]
+    );
+    return Math.abs(nearest - value) <= threshold ? nearest : quantize(value);
+  };
+  return {
+    primary: clamp(
+      snapTo(primary, [-frame.primarySize / 2, 0, frame.primarySize / 2, ...otherPoints.map((point) => point.primary)]),
+      -frame.primarySize / 2,
+      frame.primarySize / 2
+    ),
+    secondary: clamp(
+      snapTo(secondary, [
+        -frame.secondarySize / 2,
+        0,
+        frame.secondarySize / 2,
+        ...otherPoints.map((point) => point.secondary)
+      ]),
+      -frame.secondarySize / 2,
+      frame.secondarySize / 2
+    )
+  };
+}
+
+export function getRoutePointEdgeClearances(
+  point: { primary: number; secondary: number },
+  frame: { primarySize: number; secondarySize: number }
+) {
+  return {
+    left: point.primary + frame.primarySize / 2,
+    right: frame.primarySize / 2 - point.primary,
+    near: point.secondary + frame.secondarySize / 2,
+    far: frame.secondarySize / 2 - point.secondary
+  };
+}
+
+export function getEdgeHighlightPoints(part: Part, edge: string): [[number, number, number], [number, number, number]] {
+  const half = { x: part.length / 2, y: part.thickness / 2, z: part.width / 2 };
+  const fixed: Partial<Record<'x' | 'y' | 'z', number>> = {};
+  const outward = new THREE.Vector3();
+  if (edge.includes('left')) {
+    fixed.x = -half.x;
+    outward.x = -1;
+  } else if (edge.includes('right')) {
+    fixed.x = half.x;
+    outward.x = 1;
+  }
+  if (edge.includes('top')) {
+    fixed.y = half.y;
+    outward.y = 1;
+  } else if (edge.includes('bottom')) {
+    fixed.y = -half.y;
+    outward.y = -1;
+  }
+  if (edge.includes('front')) {
+    fixed.z = half.z;
+    outward.z = 1;
+  } else if (edge.includes('back')) {
+    fixed.z = -half.z;
+    outward.z = -1;
+  }
+  outward.normalize().multiplyScalar(Math.max(0.012, Math.min(part.length, part.width, part.thickness) * 0.018));
+  const varying = (['x', 'y', 'z'] as const).find((axis) => fixed[axis] === undefined) ?? 'x';
+  const point = (value: number): [number, number, number] => [
+    (fixed.x ?? (varying === 'x' ? value : 0)) + outward.x,
+    (fixed.y ?? (varying === 'y' ? value : 0)) + outward.y,
+    (fixed.z ?? (varying === 'z' ? value : 0)) + outward.z
+  ];
+  return [point(-half[varying]), point(half[varying])];
+}
+
+function SelectedEdgeHighlight({ part, edge }: { part: Part; edge: string }) {
+  const points = getEdgeHighlightPoints(part, edge);
+  const capRadius = Math.max(0.045, Math.min(part.length, part.width, part.thickness) * 0.055);
+  return (
+    <group renderOrder={13}>
+      <Line
+        points={points}
+        color={SELECTED_EDGE_COLOR}
+        lineWidth={5}
+        depthTest={false}
+        depthWrite={false}
+        raycast={() => {}}
+      />
+      {points.map((point, index) => (
+        <mesh key={index} position={point} raycast={() => {}}>
+          <sphereGeometry args={[capRadius, 16, 16]} />
+          <meshBasicMaterial color={SELECTED_EDGE_COLOR} depthTest={false} depthWrite={false} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function RoutedPathHandles({
+  part,
+  draft,
+  groupRef,
+  controlsRef,
+  dragQuantum,
+  units,
+  onDraftChange
+}: {
+  part: Part;
+  draft: RoutedPathDraft;
+  groupRef: React.RefObject<THREE.Group | null>;
+  controlsRef: React.RefObject<OrbitControlsImpl | null>;
+  dragQuantum: number;
+  units: 'imperial' | 'metric';
+  onDraftChange: (draft: FeatureDraft) => void;
+}) {
+  const frame = getFaceFrame(part, draft.faceTarget);
+  const activeRef = useRef<ActiveRoutePointDrag | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const points = draft.points.map((point) => facePoint(frame, point.primary, point.secondary));
+  const linePoints = draft.closed && points.length > 2 ? [...points, points[0]] : points;
+  const normal = new THREE.Vector3(-frame.inwardNormal.x, -frame.inwardNormal.y, -frame.inwardNormal.z);
+  const planeQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+  const activePoint = dragging && activeRef.current ? draft.points[activeRef.current.index] : null;
+  const edgeClearances = activePoint ? getRoutePointEdgeClearances(activePoint, frame) : null;
+  const alignedPrimary = activePoint
+    ? draft.points.some(
+        (point, index) => index !== activeRef.current?.index && point.primary === activePoint.primary
+      ) || activePoint.primary === 0
+    : false;
+  const alignedSecondary = activePoint
+    ? draft.points.some(
+        (point, index) => index !== activeRef.current?.index && point.secondary === activePoint.secondary
+      ) || activePoint.secondary === 0
+    : false;
+  const routeSegments = Array.from(
+    { length: draft.closed && draft.points.length > 2 ? draft.points.length : Math.max(0, draft.points.length - 1) },
+    (_, index) => {
+      const endIndex = (index + 1) % draft.points.length;
+      const start = draft.points[index];
+      const end = draft.points[endIndex];
+      return {
+        index,
+        endIndex,
+        primary: (start.primary + end.primary) / 2,
+        secondary: (start.secondary + end.secondary) / 2,
+        length: Math.hypot(end.primary - start.primary, end.secondary - start.secondary),
+        angle: ((Math.atan2(end.secondary - start.secondary, end.primary - start.primary) * 180) / Math.PI + 360) % 360
+      };
+    }
+  );
+  // HTML labels keep a roughly fixed screen size while their face-space
+  // midpoints can be very close. A generous exclusion radius prevents a
+  // compact zig-zag from becoming a pile of unreadable badges.
+  const labelSpacing = Math.min(frame.primarySize, frame.secondarySize) * 0.18;
+  const visibleSegmentIndexes = new Set<number>();
+  const activeIndex = activeRef.current?.index;
+  const prioritizedSegments =
+    dragging && activeIndex !== undefined
+      ? routeSegments.filter((segment) => segment.index === activeIndex || segment.endIndex === activeIndex)
+      : [...routeSegments].sort((a, b) => b.length - a.length);
+  const acceptedMidpoints: Array<{ primary: number; secondary: number }> = [];
+  for (const segment of prioritizedSegments) {
+    if (
+      acceptedMidpoints.every(
+        (midpoint) =>
+          Math.hypot(segment.primary - midpoint.primary, segment.secondary - midpoint.secondary) >= labelSpacing
+      )
+    ) {
+      visibleSegmentIndexes.add(segment.index);
+      acceptedMidpoints.push(segment);
+    }
+  }
+
+  const finish = () => {
+    activeRef.current = null;
+    setDragging(false);
+    if (controlsRef.current) controlsRef.current.enabled = true;
+  };
+
+  useEffect(() => {
+    if (!dragging) return;
+    const handleUp = () => {
+      activeRef.current = null;
+      setDragging(false);
+      if (controlsRef.current) controlsRef.current.enabled = true;
+    };
+    window.addEventListener('pointerup', handleUp);
+    window.addEventListener('pointercancel', handleUp);
+    return () => {
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('pointercancel', handleUp);
+    };
+  }, [controlsRef, dragging]);
+
+  const movePoint = (event: ThreeEvent<PointerEvent>) => {
+    const active = activeRef.current;
+    const group = groupRef.current;
+    if (!active || !group) return;
+    event.stopPropagation();
+    const local = group.worldToLocal(event.point.clone());
+    const relative = local.sub(new THREE.Vector3(frame.origin.x, frame.origin.y, frame.origin.z));
+    const snapped = snapRoutedPathPoint(
+      {
+        primary: relative.dot(new THREE.Vector3(frame.primaryAxis.x, frame.primaryAxis.y, frame.primaryAxis.z)),
+        secondary: relative.dot(new THREE.Vector3(frame.secondaryAxis.x, frame.secondaryAxis.y, frame.secondaryAxis.z))
+      },
+      active.index,
+      draft.points,
+      frame,
+      dragQuantum
+    );
+    onDraftChange({
+      ...draft,
+      points: draft.points.map((point, index) =>
+        index === active.index
+          ? {
+              ...point,
+              primary: snapped.primary,
+              secondary: snapped.secondary
+            }
+          : point
+      )
+    });
+  };
+
+  return (
+    <group>
+      {linePoints.length >= 2 ? (
+        <Line points={linePoints} color={HANDLE_COLOR} lineWidth={3} depthWrite={false} />
+      ) : null}
+      {activePoint && alignedPrimary ? (
+        <Line
+          points={[
+            facePoint(frame, activePoint.primary, -frame.secondarySize / 2),
+            facePoint(frame, activePoint.primary, frame.secondarySize / 2)
+          ]}
+          color={SNAP_GUIDE_COLOR}
+          lineWidth={2}
+          dashed
+          depthWrite={false}
+        />
+      ) : null}
+      {activePoint && alignedSecondary ? (
+        <Line
+          points={[
+            facePoint(frame, -frame.primarySize / 2, activePoint.secondary),
+            facePoint(frame, frame.primarySize / 2, activePoint.secondary)
+          ]}
+          color={SNAP_GUIDE_COLOR}
+          lineWidth={2}
+          dashed
+          depthWrite={false}
+        />
+      ) : null}
+      {activePoint && edgeClearances ? (
+        <group>
+          {[
+            {
+              key: 'left',
+              end: facePoint(frame, -frame.primarySize / 2, activePoint.secondary),
+              midpoint: facePoint(frame, (activePoint.primary - frame.primarySize / 2) / 2, activePoint.secondary),
+              value: edgeClearances.left
+            },
+            {
+              key: 'right',
+              end: facePoint(frame, frame.primarySize / 2, activePoint.secondary),
+              midpoint: facePoint(frame, (activePoint.primary + frame.primarySize / 2) / 2, activePoint.secondary),
+              value: edgeClearances.right
+            },
+            {
+              key: 'near',
+              end: facePoint(frame, activePoint.primary, -frame.secondarySize / 2),
+              midpoint: facePoint(frame, activePoint.primary, (activePoint.secondary - frame.secondarySize / 2) / 2),
+              value: edgeClearances.near
+            },
+            {
+              key: 'far',
+              end: facePoint(frame, activePoint.primary, frame.secondarySize / 2),
+              midpoint: facePoint(frame, activePoint.primary, (activePoint.secondary + frame.secondarySize / 2) / 2),
+              value: edgeClearances.far
+            }
+          ].map((clearance) => (
+            <group key={clearance.key}>
+              <Line
+                points={[facePoint(frame, activePoint.primary, activePoint.secondary), clearance.end]}
+                color={HANDLE_HOVER_COLOR}
+                lineWidth={1.5}
+                dashed
+                depthWrite={false}
+              />
+              <Html position={clearance.midpoint} center zIndexRange={[0, 70]} style={{ pointerEvents: 'none' }}>
+                <div className="whitespace-nowrap rounded border border-amber-400/60 bg-bg/95 px-1.5 py-0.5 text-[10px] font-medium text-text shadow">
+                  {formatMeasurementWithUnit(clearance.value, units)}
+                </div>
+              </Html>
+            </group>
+          ))}
+        </group>
+      ) : null}
+      {points.map((position, index) => (
+        <group key={index}>
+          <mesh
+            position={position}
+            renderOrder={12}
+            onPointerDown={(event) => {
+              event.stopPropagation();
+              activeRef.current = { index, pointerId: event.pointerId };
+              setDragging(true);
+              if (controlsRef.current) controlsRef.current.enabled = false;
+            }}
+          >
+            <sphereGeometry args={[Math.max(0.12, Math.min(frame.primarySize, frame.secondarySize) * 0.035), 20, 20]} />
+            <meshBasicMaterial color={index === 0 ? '#22c55e' : HANDLE_COLOR} depthTest={false} />
+          </mesh>
+        </group>
+      ))}
+      {routeSegments
+        .filter((segment) => visibleSegmentIndexes.has(segment.index))
+        .map((segment) => {
+          const midpoint = facePoint(
+            frame,
+            segment.primary,
+            clamp(
+              segment.secondary + Math.min(0.3, frame.secondarySize * 0.05),
+              -frame.secondarySize / 2,
+              frame.secondarySize / 2
+            )
+          );
+          return (
+            <Html
+              key={`segment-${segment.index}`}
+              position={midpoint}
+              center
+              zIndexRange={[0, 65]}
+              style={{ pointerEvents: 'none' }}
+            >
+              <div className="whitespace-nowrap rounded border border-amber-500/60 bg-bg/90 px-1.5 py-0.5 text-[10px] text-text shadow">
+                {formatMeasurementWithUnit(segment.length, units)} · {Math.round(segment.angle * 10) / 10}°
+              </div>
+            </Html>
+          );
+        })}
+      {dragging ? (
+        <mesh
+          position={[frame.origin.x, frame.origin.y, frame.origin.z]}
+          quaternion={planeQuaternion}
+          renderOrder={11}
+          onPointerMove={movePoint}
+          onPointerUp={(event) => {
+            if (activeRef.current?.pointerId === event.pointerId) finish();
+          }}
+        >
+          <planeGeometry args={[frame.primarySize * 3, frame.secondarySize * 3]} />
+          <meshBasicMaterial visible={false} side={THREE.DoubleSide} />
+        </mesh>
+      ) : null}
+    </group>
+  );
+}
 
 /**
  * Which placement axes each rectangular cut leaves free, and therefore which
@@ -192,7 +605,7 @@ export type HandleDraft = RectCutDraft | CircularCutDraft | RoundedCutDraft;
 
 export function supportsPreviewHandles(draft: FeatureDraft | null): draft is HandleDraft {
   if (!draft) return false;
-  if (draft.mode === 'end_cut') return false;
+  if (draft.mode === 'end_cut' || draft.mode === 'routed_path' || draft.mode === 'edge_profile') return false;
   if (draft.mode === 'circular_cut' || draft.mode === 'rounded_cut')
     return draft.faceTarget === 'top_face' || draft.faceTarget === 'bottom_face';
   return (
@@ -621,6 +1034,10 @@ export function getEditableHandleOverlay(
 ): EditableHandleOverlay | null {
   if (!draft) return null;
 
+  // Routed paths are edited numerically in the inspector for the MVP. Their
+  // polyline does not use the rectangular cut move/resize handle model.
+  if (draft.mode === 'routed_path') return null;
+
   // End cuts: dimension-only overlay (no interactive handles)
   if (draft.mode === 'end_cut') {
     const { lines, arcs } = buildEndCutDimensionLines(part, draft, allFeatures, units);
@@ -637,6 +1054,8 @@ export function getEditableHandleOverlay(
     if (!supportsPreviewHandles(draft)) return null;
     return buildRoundHandleOverlay(part, draft);
   }
+
+  if (draft.mode === 'edge_profile') return null;
 
   // Side-face pockets recess along Z; the top-down overlay math doesn't
   // apply, so fall back to inspector-only editing for them.
@@ -656,7 +1075,7 @@ export function getEditableHandleOverlay(
 
   // A cut pinned across one axis spans the board there, so neither its
   // position nor its size on that axis is draggable.
-  const axes = hasHandles ? getRectHandleAxes(draft.cutType) : null;
+  const axes = hasHandles && draft.mode === 'rect_cut' ? getRectHandleAxes(draft.cutType) : null;
 
   return {
     mode: 'rect',
@@ -698,7 +1117,7 @@ function applyCutSnap(
   settings: AppSettings
 ): { draft: FeatureDraft; guides: CutSnapGuide[]; caughtPrimary: boolean; caughtSecondary: boolean } {
   const none = { draft: dragged, guides: [] as CutSnapGuide[], caughtPrimary: false, caughtSecondary: false };
-  if (dragged.mode === 'end_cut') return none;
+  if (dragged.mode === 'end_cut' || dragged.mode === 'routed_path' || dragged.mode === 'edge_profile') return none;
   const moving = getCutFaceBox(part, buildFeatureFromDraft(dragged));
   if (!moving) return none;
 
@@ -1253,6 +1672,7 @@ function PartCutsPreviewScene({
   onHoverTarget,
   onActivateTarget,
   onDraftChange,
+  routePlacementMode,
   frameNonce,
   dragQuantum
 }: {
@@ -1265,9 +1685,11 @@ function PartCutsPreviewScene({
   onHoverTarget: (target: PartFeatureTarget | null) => void;
   onActivateTarget: (target: PartFeatureTarget | null) => void;
   onDraftChange: (draft: FeatureDraft) => void;
+  routePlacementMode: boolean;
   dragQuantum: number;
 }) {
   const geometry = useMemo(() => getPartRenderGeometry(previewPart), [previewPart]);
+  const outlineGeometry = useMemo(() => getPartOutlineGeometry(previewPart), [previewPart]);
   const pickTargets = useMemo(() => getValidPickableTargets(previewPart, draft), [draft, previewPart]);
   const maxDimension = Math.max(previewPart.length, previewPart.width, previewPart.thickness, 1);
   const handleOverlay = useMemo(
@@ -1276,8 +1698,23 @@ function PartCutsPreviewScene({
   );
   const viewsUnderside =
     !!draft &&
-    (draft.mode === 'rect_cut' || draft.mode === 'circular_cut' || draft.mode === 'rounded_cut') &&
+    (draft.mode === 'rect_cut' ||
+      draft.mode === 'circular_cut' ||
+      draft.mode === 'rounded_cut' ||
+      draft.mode === 'routed_path') &&
     draft.faceTarget === 'bottom_face';
+  const routedFaceRotation: [number, number, number] =
+    draft?.mode !== 'routed_path'
+      ? [viewsUnderside ? Math.PI - 0.35 : -0.35, 0.68, 0]
+      : draft.faceTarget === 'bottom_face'
+        ? [Math.PI - 0.35, 0.68, 0]
+        : draft.faceTarget === 'back_face'
+          ? [-0.35, 0.68 + Math.PI, 0]
+          : draft.faceTarget === 'left_end'
+            ? [-0.35, 0.68 - Math.PI / 2, 0]
+            : draft.faceTarget === 'right_end'
+              ? [-0.35, 0.68 + Math.PI / 2, 0]
+              : [-0.35, 0.68, 0];
   const groupRef = useRef<THREE.Group>(null);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const activeDragRef = useRef<ActiveDragState | null>(null);
@@ -1285,6 +1722,13 @@ function PartCutsPreviewScene({
   const [hoveredHandle, setHoveredHandle] = useState<HandleKind | null>(null);
   const [snapGuides, setSnapGuides] = useState<CutSnapGuide[]>([]);
   const { settings: appSettings } = useAppSettings();
+  const routeFrame = draft?.mode === 'routed_path' ? getFaceFrame(previewPart, draft.faceTarget) : null;
+  const routePlaneQuaternion = routeFrame
+    ? new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(-routeFrame.inwardNormal.x, -routeFrame.inwardNormal.y, -routeFrame.inwardNormal.z)
+      )
+    : null;
 
   const beginDrag = (kind: HandleKind, event: ThreeEvent<PointerEvent>) => {
     if (!supportsPreviewHandles(draft)) return;
@@ -1363,11 +1807,11 @@ function PartCutsPreviewScene({
   useEffect(() => {
     const controls = controlsRef.current;
     if (!controls || isDraggingHandle) return;
-    controls.enabled = hoveredHandle === null;
+    controls.enabled = !routePlacementMode && hoveredHandle === null;
     return () => {
       controls.enabled = true;
     };
-  }, [hoveredHandle, isDraggingHandle]);
+  }, [hoveredHandle, isDraggingHandle, routePlacementMode]);
 
   useEffect(() => {
     if (!isDraggingHandle) return;
@@ -1396,13 +1840,96 @@ function PartCutsPreviewScene({
       {/* Turn the board over for a cut on the underside. The preview's fixed
           three-quarter view otherwise leaves a bottom-face cut, and every
           handle on it, hidden beneath the board with no way to reach them. */}
-      <group ref={groupRef} rotation={[viewsUnderside ? Math.PI - 0.35 : -0.35, 0.68, 0]}>
+      <group ref={groupRef} rotation={routedFaceRotation}>
         <mesh geometry={geometry}>
           <meshStandardMaterial color="#d6c3a1" metalness={0.05} roughness={0.82} />
-          <Edges geometry={geometry} threshold={15} color="#433225" raycast={() => {}} renderOrder={4} scale={1.002} />
+          <Edges
+            geometry={outlineGeometry}
+            threshold={15}
+            color="#433225"
+            raycast={() => {}}
+            renderOrder={4}
+            scale={1.002}
+          />
         </mesh>
 
         <BlankDimensions part={previewPart} units={units} />
+
+        {draft?.mode === 'edge_profile' ? <SelectedEdgeHighlight part={previewPart} edge={draft.edgeTarget} /> : null}
+
+        {draft?.mode === 'routed_path' ? (
+          <RoutedPathHandles
+            part={previewPart}
+            draft={draft}
+            groupRef={groupRef}
+            controlsRef={controlsRef}
+            dragQuantum={dragQuantum}
+            units={units}
+            onDraftChange={onDraftChange}
+          />
+        ) : null}
+
+        {draft?.mode === 'routed_path' && routePlacementMode && routeFrame && routePlaneQuaternion ? (
+          <group>
+            <Line
+              points={[
+                facePoint(routeFrame, -routeFrame.primarySize / 2, -routeFrame.secondarySize / 2),
+                facePoint(routeFrame, routeFrame.primarySize / 2, -routeFrame.secondarySize / 2),
+                facePoint(routeFrame, routeFrame.primarySize / 2, routeFrame.secondarySize / 2),
+                facePoint(routeFrame, -routeFrame.primarySize / 2, routeFrame.secondarySize / 2),
+                facePoint(routeFrame, -routeFrame.primarySize / 2, -routeFrame.secondarySize / 2)
+              ]}
+              color="#38bdf8"
+              lineWidth={3}
+              depthWrite={false}
+            />
+            <mesh
+              position={facePoint(routeFrame, 0, 0)}
+              quaternion={routePlaneQuaternion}
+              renderOrder={10}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                const group = groupRef.current;
+                if (!group) return;
+                const local = group.worldToLocal(event.point.clone());
+                const relative = local.sub(
+                  new THREE.Vector3(routeFrame.origin.x, routeFrame.origin.y, routeFrame.origin.z)
+                );
+                const primary = relative.dot(
+                  new THREE.Vector3(routeFrame.primaryAxis.x, routeFrame.primaryAxis.y, routeFrame.primaryAxis.z)
+                );
+                const secondary = relative.dot(
+                  new THREE.Vector3(routeFrame.secondaryAxis.x, routeFrame.secondaryAxis.y, routeFrame.secondaryAxis.z)
+                );
+                const quantize = (value: number) => Math.round(value / dragQuantum) * dragQuantum;
+                onDraftChange({
+                  ...draft,
+                  points: [
+                    ...draft.points,
+                    {
+                      primary: clamp(quantize(primary), -routeFrame.primarySize / 2, routeFrame.primarySize / 2),
+                      secondary: clamp(
+                        quantize(secondary),
+                        -routeFrame.secondarySize / 2,
+                        routeFrame.secondarySize / 2
+                      ),
+                      cornerRadius: 0
+                    }
+                  ]
+                });
+              }}
+            >
+              <planeGeometry args={[routeFrame.primarySize, routeFrame.secondarySize]} />
+              <meshBasicMaterial
+                color="#38bdf8"
+                transparent
+                opacity={0.18}
+                side={THREE.DoubleSide}
+                depthWrite={false}
+              />
+            </mesh>
+          </group>
+        ) : null}
 
         {/* Invisible drag plane — only appears during handle drags so pointer events
             keep firing even when the cursor moves off the part geometry.
@@ -1519,7 +2046,7 @@ function PartCutsPreviewScene({
           const isPending = partFeatureTargetEquals(pendingTarget, pickTarget.target);
           // Hide the selected target's pane, and hide ALL panes when interactive handles are active
           // (handles take over the interaction — pick planes would steal clicks)
-          if (isPending || (handleOverlay && handleOverlay.center)) return null;
+          if (isPending || draft?.mode === 'routed_path' || (handleOverlay && handleOverlay.center)) return null;
           const opacity = isHovered ? 0.52 : 0.2;
           const scale = isHovered ? 1.06 : 1;
 
@@ -1563,6 +2090,7 @@ function PartCutsPreviewScene({
         zoomSpeed={0.5}
         minDistance={Math.min(0.5, maxDimension * 0.05)}
         maxDistance={maxDimension * 40}
+        enabled={!routePlacementMode}
       />
     </>
   );
@@ -1696,6 +2224,21 @@ export function PartCutsPreviewCanvas({
   const centerCameraAtOriginRequested = useCameraStore((s) => s.centerCameraAtOriginRequested);
   const clearCenterCameraRequest = useCameraStore((s) => s.clearCenterCameraRequest);
   const [frameNonce, setFrameNonce] = useState(0);
+  const [routePlacementMode, setRoutePlacementMode] = useState(false);
+  useEffect(() => {
+    if (draft?.mode !== 'routed_path') setRoutePlacementMode(false);
+  }, [draft?.mode]);
+  useEffect(() => {
+    if (!routePlacementMode) return;
+    const finishPlacementFromKeyboard = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' && event.key !== 'Enter') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setRoutePlacementMode(false);
+    };
+    window.addEventListener('keydown', finishPlacementFromKeyboard, { capture: true });
+    return () => window.removeEventListener('keydown', finishPlacementFromKeyboard, { capture: true });
+  }, [routePlacementMode]);
   useEffect(() => {
     if (!centerCameraRequested && !centerCameraAtOriginRequested) return;
     setFrameNonce((nonce) => nonce + 1);
@@ -1792,6 +2335,7 @@ export function PartCutsPreviewCanvas({
             onHoverTarget={onHoverTarget}
             onActivateTarget={onActivateTarget}
             onDraftChange={onDraftChange}
+            routePlacementMode={routePlacementMode}
             frameNonce={frameNonce}
             dragQuantum={dragQuantum}
           />
@@ -1809,6 +2353,78 @@ export function PartCutsPreviewCanvas({
         </div>
       )}
 
+      {draft?.mode === 'routed_path' ? (
+        <div className="pointer-events-auto absolute bottom-3 right-3 z-40 max-w-[min(88%,25rem)] rounded-md border border-accent/40 bg-bg/95 px-3 py-2 text-sm text-text shadow-sm backdrop-blur">
+          <div className="font-semibold">Edit route on the part</div>
+          <div className="mt-1 text-xs text-text-muted">
+            {routePlacementMode
+              ? 'Click the highlighted face to add each turn. Press Enter or Escape when finished.'
+              : "Drag the green start point or any orange point to shape the router's path."}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="xs"
+              active={routePlacementMode}
+              onClick={() => setRoutePlacementMode((active) => !active)}
+            >
+              {routePlacementMode ? 'Finish placing points' : 'Place points on face'}
+            </Button>
+            <Button
+              type="button"
+              size="xs"
+              onClick={() => {
+                const last = draft.points.at(-1) ?? { primary: 0, secondary: 0, cornerRadius: 0 };
+                const frame = getFaceFrame(part, draft.faceTarget);
+                onDraftChange({
+                  ...draft,
+                  points: [
+                    ...draft.points,
+                    {
+                      primary: clamp(
+                        last.primary + frame.primarySize / 8,
+                        -frame.primarySize / 2,
+                        frame.primarySize / 2
+                      ),
+                      secondary: last.secondary,
+                      cornerRadius: 0
+                    }
+                  ]
+                });
+              }}
+            >
+              Add route point
+            </Button>
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              active={draft.closed}
+              disabled={!draft.closed && draft.points.length < 3}
+              title={
+                !draft.closed && draft.points.length < 3
+                  ? 'Add at least three points before closing the route.'
+                  : undefined
+              }
+              onClick={() => {
+                const closed = !draft.closed;
+                onDraftChange({
+                  ...draft,
+                  closed,
+                  points: closed
+                    ? draft.points
+                    : draft.points.map((point, index) =>
+                        index === 0 || index === draft.points.length - 1 ? { ...point, cornerRadius: 0 } : point
+                      )
+                });
+              }}
+            >
+              {draft.closed ? 'Open route' : 'Close route'}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {(selectedFeatureSummary || draft) && (
         <div className="pointer-events-none absolute left-3 top-3 max-w-[min(88%,26rem)] rounded-md border border-accent/30 bg-bg/90 px-3 py-2 text-left text-sm text-text shadow-sm backdrop-blur">
           {selectedFeatureSummary && <div>{selectedFeatureSummary}</div>}
@@ -1825,6 +2441,8 @@ export function PartCutsPreviewCanvas({
                   controls, the arrow keys, or the inspector's offsets. */}
               {activeTargetLabel && activeTargetLabel !== selectedFeatureTargetLabel ? (
                 `Click to retarget this cut to the ${activeTargetLabel}.`
+              ) : draft.mode === 'routed_path' ? (
+                'Drag the colored route points. Use the Face buttons in Properties when you want to retarget the cut.'
               ) : (
                 <>
                   {/* Always "retarget": choosing a preset commits the cut and

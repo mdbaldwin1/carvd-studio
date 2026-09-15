@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { createTestPart } from '../../../../../tests/helpers/factories';
-import type { CircularCutFeature, EndCutFeature, RectCutFeature } from '@renderer/types';
+import type { CircularCutFeature, EndCutFeature, PartFeature, RectCutFeature } from '@renderer/types';
 import { useProjectStore } from '@renderer/store/projectStore';
 import { useSelectionStore } from '@renderer/store/selectionStore';
 import { validateCircularCut } from '@renderer/utils/roundCutUtils';
@@ -110,8 +110,168 @@ function lastFeatures(onDraftFeaturesChange: WorkspaceProps['onDraftFeaturesChan
   return mock.mock.calls[mock.mock.calls.length - 1][0] as RectCutFeature[];
 }
 
+function chooseRouterBit(name: 'Flat Bottom' | 'Round Bottom' | 'V-Groove' | 'Dovetail' | 'T-Slot' | 'Keyhole') {
+  fireEvent.click(screen.getByRole('button', { name: 'Choose router bit' }));
+  fireEvent.click(screen.getByRole('button', { name: `Select ${name} router bit` }));
+}
+
 describe('PartCutsWorkspace', () => {
   beforeEach(() => useProjectStore.setState({ units: 'imperial' }));
+  it('creates and edits a routed polyline with router-bit controls', () => {
+    const { props } = renderWorkspace();
+
+    startCut('Routed Path');
+    expect(screen.getByRole('button', { name: 'Choose router bit' })).toHaveTextContent('Flat Bottom');
+    expect(screen.getByLabelText('Depth')).toHaveValue('blind');
+    expect(screen.getByLabelText('Point 1 along face')).toBeInTheDocument();
+    expect(screen.getByLabelText('Point 2 along face')).toBeInTheDocument();
+    expect(screen.getByLabelText('Close path back to first point')).toBeDisabled();
+    expect(screen.getByText('Add at least three points to make a closed route.')).toBeInTheDocument();
+
+    chooseRouterBit('V-Groove');
+    fireEvent.change(screen.getByLabelText('Included Angle'), { target: { value: '60' } });
+    setMeasurementField('Cutter Diameter', '1/2');
+    fireEvent.click(screen.getByRole('button', { name: 'Add Point' }));
+    expect(screen.getByLabelText('Point 1 corner radius')).toBeDisabled();
+    const middleRadius = screen.getByLabelText('Point 2 corner radius');
+    fireEvent.focus(middleRadius);
+    fireEvent.change(middleRadius, { target: { value: '1/4' } });
+    fireEvent.blur(middleRadius);
+    const thirdAcross = screen.getByLabelText('Point 3 across face');
+    fireEvent.focus(thirdAcross);
+    fireEvent.change(thirdAcross, { target: { value: '3/4' } });
+    fireEvent.blur(thirdAcross);
+    fireEvent.click(screen.getByLabelText('Close path back to first point'));
+
+    const changeMock = props.onDraftFeaturesChange as Mock;
+    const route = (changeMock.mock.calls.at(-1)?.[0] as PartFeature[]).at(-1);
+    expect(route).toMatchObject({
+      kind: 'routed_path',
+      bit: { profile: 'v_bit', diameter: 0.5, includedAngle: 60 },
+      path: { closed: true }
+    });
+    expect(route?.kind).toBe('routed_path');
+    if (!route || route.kind !== 'routed_path') throw new Error('Expected a routed path');
+    expect(route.path.points).toHaveLength(3);
+    expect(route.path.points[1].cornerRadius).toBe(0.25);
+    expect(route.path.points[2].secondary).toBe(0.75);
+  });
+
+  it('edits an undercut router bit using woodworking dimensions', () => {
+    const { props } = renderWorkspace();
+    startCut('Routed Path');
+
+    chooseRouterBit('T-Slot');
+    setMeasurementField('Cutter Diameter', '3/4');
+    setMeasurementField('Shank Diameter', '1/4');
+    setMeasurementField('Cutter Height', '3/16');
+
+    expect(screen.getByText('Width of the neck that passes through the entry slot.')).toBeInTheDocument();
+    const changeMock = props.onDraftFeaturesChange as Mock;
+    const route = (changeMock.mock.calls.at(-1)?.[0] as PartFeature[]).at(-1);
+    expect(route).toMatchObject({
+      kind: 'routed_path',
+      bit: { profile: 't_slot', diameter: 0.75, shankDiameter: 0.25, cutterHeight: 0.1875 }
+    });
+  });
+
+  it('blocks router dimensions that the selected bit cannot physically cut', () => {
+    renderWorkspace();
+    startCut('Routed Path');
+
+    chooseRouterBit('V-Groove');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    setMeasurementField('Route Depth', '1/4');
+    expect(screen.getByRole('alert')).toHaveTextContent('can cut at most 1/8" deep');
+    setMeasurementField('Route Depth', '1/8');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    chooseRouterBit('T-Slot');
+    setMeasurementField('Shank Diameter', '1/2');
+    expect(screen.getByRole('alert')).toHaveTextContent('smaller than the cutter diameter');
+    setMeasurementField('Shank Diameter', '1/8');
+    setMeasurementField('Route Depth', '1/16');
+    expect(screen.getByRole('alert')).toHaveTextContent('at least the 1/8" cutter height');
+  });
+
+  it('reopens a closed route when point deletion leaves fewer than three points', () => {
+    renderWorkspace();
+    startCut('Routed Path');
+    fireEvent.click(screen.getByRole('button', { name: 'Add Point' }));
+    fireEvent.click(screen.getByLabelText('Close path back to first point'));
+    expect(screen.getByLabelText('Close path back to first point')).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove point 3' }));
+    expect(screen.getByLabelText('Close path back to first point')).not.toBeChecked();
+    expect(screen.getByLabelText('Close path back to first point')).toBeDisabled();
+    expect(screen.queryByText('A closed routed path needs at least three points.')).not.toBeInTheDocument();
+  });
+
+  it.each(['dovetail', 't_slot', 'keyhole'] as const)(
+    'switches the default straight bit to a usable %s profile',
+    (profile) => {
+      const { props } = renderWorkspace();
+      startCut('Routed Path');
+      setMeasurementField('Route Depth', '1/16');
+
+      chooseRouterBit(profile === 't_slot' ? 'T-Slot' : profile === 'keyhole' ? 'Keyhole' : 'Dovetail');
+
+      const changeMock = props.onDraftFeaturesChange as Mock;
+      const route = (changeMock.mock.calls.at(-1)?.[0] as PartFeature[]).at(-1);
+      expect(route?.kind).toBe('routed_path');
+      if (!route || route.kind !== 'routed_path' || !('shankDiameter' in route.bit)) {
+        throw new Error('Expected an undercut routed path');
+      }
+      expect(route.bit.shankDiameter).toBeLessThan(route.bit.diameter);
+      if (profile === 't_slot' || profile === 'keyhole') {
+        if (!('cutterHeight' in route.bit)) throw new Error('Expected a bit with an undercut cutter');
+        expect(route.parameters.depth).toBeGreaterThanOrEqual(route.bit.cutterHeight);
+      }
+    }
+  );
+
+  it('shows a visual profile card for every router bit and closes after selection', () => {
+    renderWorkspace();
+    startCut('Routed Path');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose router bit' }));
+    expect(screen.getByRole('dialog', { name: 'Choose Router Bit' })).toBeInTheDocument();
+    for (const name of ['Flat Bottom', 'Round Bottom', 'V-Groove', 'Dovetail', 'T-Slot', 'Keyhole']) {
+      expect(screen.getByRole('button', { name: `Select ${name} router bit` })).toBeInTheDocument();
+    }
+    expect(screen.getByRole('img', { name: 'straight cut profile' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select Round Bottom router bit' }));
+    expect(screen.queryByRole('dialog', { name: 'Choose Router Bit' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Choose router bit' })).toHaveTextContent('Round Bottom');
+  });
+
+  it('creates an edge profile through its own visual selector', () => {
+    const { props } = renderWorkspace();
+    startCut('Edge Profile');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose edge profile' }));
+    expect(screen.getByRole('dialog', { name: 'Choose Edge Profile' })).toBeInTheDocument();
+    for (const name of ['Roundover', 'Cove', 'Chamfer', 'Rabbet', 'Bead', 'Ogee', 'Thumbnail']) {
+      expect(screen.getByRole('button', { name: `Select ${name} edge profile` })).toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Select Cove edge profile' }));
+    const feature = ((props.onDraftFeaturesChange as Mock).mock.calls.at(-1)?.[0] as PartFeature[]).at(-1);
+    expect(feature).toMatchObject({ kind: 'edge_profile', profile: 'cove', target: { type: 'edge' } });
+  });
+
+  it('explains consecutive routed points that overlap', () => {
+    renderWorkspace();
+    startCut('Routed Path');
+    fireEvent.click(screen.getByRole('button', { name: 'Add Point' }));
+
+    const pointThreeAlong = screen.getByLabelText('Point 3 along face');
+    fireEvent.focus(pointThreeAlong);
+    fireEvent.change(pointThreeAlong, { target: { value: '1 1/2' } });
+    fireEvent.blur(pointThreeAlong);
+
+    expect(screen.getByText('Route points 2 and 3 overlap. Move or remove one point.')).toBeInTheDocument();
+  });
+
   it('UX exposes selected and unselected target states without relying on color', () => {
     renderWorkspace();
     startCut('Round Hole');

@@ -71,10 +71,13 @@ export function usePartCutsEditing() {
             ? validateCircularCut(feature, { ...currentPart, features: draftFeatures })
             : feature.kind === 'rounded_cut'
               ? validateRoundedCut(feature, { ...currentPart, features: draftFeatures })
-              : validateEndCutFeature(feature, { ...currentPart, features: draftFeatures });
+              : feature.kind === 'end_cut'
+                ? validateEndCutFeature(feature, { ...currentPart, features: draftFeatures })
+                : null;
       if (!featureIssue) continue;
       const featureLabel =
-        feature.label?.trim() || `${feature.cutType.replace(/_/g, ' ')} on ${getFeatureTargetLabel(feature)}`;
+        feature.label?.trim() ||
+        `${feature.kind === 'routed_path' ? 'routed path' : feature.kind === 'edge_profile' ? feature.profile.replace(/_/g, ' ') : feature.cutType.replace(/_/g, ' ')} on ${getFeatureTargetLabel(feature)}`;
       showToast(`${featureLabel}: ${featureIssue}`, 'error');
       return false;
     }

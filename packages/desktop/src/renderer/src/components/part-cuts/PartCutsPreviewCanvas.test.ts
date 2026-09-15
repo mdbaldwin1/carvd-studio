@@ -21,6 +21,9 @@ import {
   getPreviewGeometrySignature,
   nudgeDraft,
   PartCutsPreviewCanvas,
+  snapRoutedPathPoint,
+  getRoutePointEdgeClearances,
+  getEdgeHighlightPoints,
   supportsPreviewHandles
 } from './PartCutsPreviewCanvas';
 import { clearPartGeometryCache, getPartRenderGeometry } from '@renderer/utils/partFeatureGeometry';
@@ -236,6 +239,75 @@ describe('clamp', () => {
     expect(clamp(5, 0, 3)).toBe(3);
     expect(clamp(-1, 0, 3)).toBe(0);
     expect(clamp(2, 0, 3)).toBe(2);
+  });
+});
+
+describe('snapRoutedPathPoint', () => {
+  const frame = { primarySize: 10, secondarySize: 6 };
+  const points = [
+    { primary: -2, secondary: 0 },
+    { primary: 1, secondary: 1 },
+    { primary: 3, secondary: 2 }
+  ];
+
+  it('snaps to face centers, edges, and another route point axis', () => {
+    expect(snapRoutedPathPoint({ primary: 0.02, secondary: 1.04 }, 2, points, frame, 1 / 16)).toEqual({
+      primary: 0,
+      secondary: 1
+    });
+    expect(snapRoutedPathPoint({ primary: 4.98, secondary: 2.98 }, 2, points, frame, 1 / 16)).toEqual({
+      primary: 5,
+      secondary: 3
+    });
+  });
+
+  it('snaps a nearly diagonal segment to 45 degrees', () => {
+    const diagonalPoints = [
+      { primary: 0, secondary: 0 },
+      { primary: 2, secondary: 2 }
+    ];
+    const snapped = snapRoutedPathPoint({ primary: 2.02, secondary: 2.08 }, 1, diagonalPoints, frame, 1 / 64);
+    expect(snapped.primary).toBeCloseTo(snapped.secondary, 6);
+  });
+});
+
+describe('getRoutePointEdgeClearances', () => {
+  it('measures from a route point to all four face boundaries', () => {
+    expect(getRoutePointEdgeClearances({ primary: 2, secondary: -1 }, { primarySize: 10, secondarySize: 6 })).toEqual({
+      left: 7,
+      right: 3,
+      near: 2,
+      far: 4
+    });
+  });
+
+  it('reports zero at a face boundary', () => {
+    expect(getRoutePointEdgeClearances({ primary: -5, secondary: 3 }, { primarySize: 10, secondarySize: 6 })).toEqual({
+      left: 0,
+      right: 10,
+      near: 6,
+      far: 0
+    });
+  });
+});
+
+describe('getEdgeHighlightPoints', () => {
+  const part = createTestPart({ length: 10, width: 6, thickness: 2 });
+
+  it('spans the complete lengthwise selected edge', () => {
+    const [start, end] = getEdgeHighlightPoints(part, 'top_front_edge');
+    expect(start[0]).toBe(-5);
+    expect(end[0]).toBe(5);
+    expect(start[1]).toBeGreaterThan(1);
+    expect(start[2]).toBeGreaterThan(3);
+  });
+
+  it('spans the complete vertical selected edge', () => {
+    const [start, end] = getEdgeHighlightPoints(part, 'back_right_edge');
+    expect(start[1]).toBe(-1);
+    expect(end[1]).toBe(1);
+    expect(start[0]).toBeGreaterThan(5);
+    expect(start[2]).toBeLessThan(-3);
   });
 });
 

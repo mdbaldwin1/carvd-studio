@@ -19,6 +19,7 @@ import {
   rectCutIsBlindOnly
 } from '@renderer/components/part-features/partFeatureEditorState';
 import { PartFeature, PartFeatureTarget } from '@renderer/types';
+import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import {
   getDerivedLengthMeasurements,
   getDerivedWidthMeasurements,
@@ -37,7 +38,7 @@ import {
   TOP_BOTTOM_FACE_TARGETS,
   validateRectCutFeature
 } from '@renderer/utils/rectCutUtils';
-import { validateCircularCut, validateRoundedCut } from '@renderer/utils/roundCutUtils';
+import { getFaceFrame, validateCircularCut, validateRoundedCut } from '@renderer/utils/roundCutUtils';
 import {} from '@renderer/components/ui/dropdown-menu';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Part } from '@renderer/types';
@@ -178,6 +179,78 @@ export function usePartCutsEditorState({
       ? draftFeatures.map((existing) => (existing.id === draft.featureId ? feature : existing))
       : [...draftFeatures, feature];
     const candidate = { ...part, features };
+    if (feature.kind === 'routed_path') {
+      const frame = getFaceFrame(part, feature.target.face);
+      const depth = feature.parameters.depthMode === 'blind' ? Number(feature.parameters.depth) : null;
+      const materialDepth =
+        feature.target.face === 'top_face' || feature.target.face === 'bottom_face'
+          ? part.thickness
+          : feature.target.face === 'left_end' || feature.target.face === 'right_end'
+            ? part.length
+            : part.width;
+      if (!(feature.bit.diameter > 0)) return 'Cutter diameter must be greater than zero.';
+      if (depth !== null && (!(depth > 0) || depth > materialDepth)) {
+        return `Route depth must be greater than zero and no deeper than the ${formatMeasurementWithUnit(materialDepth, units)} material thickness. Use Through for a through-route.`;
+      }
+      const requestedDepth = depth ?? materialDepth;
+      if (feature.bit.profile === 'core_box' || feature.bit.profile === 'ball_nose') {
+        const maxDepth = feature.bit.diameter / 2;
+        if (requestedDepth > maxDepth) {
+          return `This round-bottom bit can cut at most ${formatMeasurementWithUnit(maxDepth, units)} deep at its ${formatMeasurementWithUnit(feature.bit.diameter, units)} diameter.`;
+        }
+      }
+      if (feature.bit.profile === 'v_bit' || feature.bit.profile === 'engraving') {
+        const maxDepth = feature.bit.diameter / (2 * Math.tan((feature.bit.includedAngle * Math.PI) / 360));
+        if (requestedDepth > maxDepth) {
+          return `At ${feature.bit.includedAngle}°, this V-bit can cut at most ${formatMeasurementWithUnit(maxDepth, units)} deep at its ${formatMeasurementWithUnit(feature.bit.diameter, units)} maximum diameter.`;
+        }
+      }
+      if (feature.bit.profile === 'dovetail' || feature.bit.profile === 't_slot' || feature.bit.profile === 'keyhole') {
+        if (!(feature.bit.shankDiameter > 0) || feature.bit.shankDiameter >= feature.bit.diameter) {
+          return 'Shank diameter must be greater than zero and smaller than the cutter diameter.';
+        }
+        const cutterHeight =
+          feature.bit.profile === 'dovetail'
+            ? (feature.bit.diameter - feature.bit.shankDiameter) /
+              (2 * Math.tan((feature.bit.includedAngle * Math.PI) / 360))
+            : feature.bit.cutterHeight;
+        if (!(cutterHeight > 0) || cutterHeight > requestedDepth) {
+          return `Route depth must be at least the ${formatMeasurementWithUnit(cutterHeight, units)} cutter height.`;
+        }
+      }
+      const outsidePoint = feature.path.points.findIndex(
+        (point) =>
+          Math.abs(point.primary) > frame.primarySize / 2 + 1e-9 ||
+          Math.abs(point.secondary) > frame.secondarySize / 2 + 1e-9
+      );
+      if (outsidePoint >= 0) return `Route point ${outsidePoint + 1} must stay on the selected face.`;
+      if (feature.path.closed && feature.path.points.length < 3) {
+        return 'A closed routed path needs at least three points.';
+      }
+      const spanCount = feature.path.closed ? feature.path.points.length : feature.path.points.length - 1;
+      for (let index = 0; index < spanCount; index += 1) {
+        const current = feature.path.points[index];
+        const next = feature.path.points[(index + 1) % feature.path.points.length];
+        if (Math.hypot(next.primary - current.primary, next.secondary - current.secondary) < 1e-9) {
+          return `Route points ${index + 1} and ${((index + 1) % feature.path.points.length) + 1} overlap. Move or remove one point.`;
+        }
+      }
+    }
+    if (feature.kind === 'edge_profile') {
+      if (!(feature.parameters.size > 0) || !(feature.parameters.depth > 0)) {
+        return 'Edge-profile size and depth must both be greater than zero.';
+      }
+      const edge = feature.target.edge;
+      const maxCrossSection =
+        edge.startsWith('front_') || edge.startsWith('back_')
+          ? Math.min(part.length, part.width)
+          : edge.endsWith('front_edge') || edge.endsWith('back_edge')
+            ? Math.min(part.thickness, part.width)
+            : Math.min(part.thickness, part.length);
+      if (feature.parameters.size > maxCrossSection || feature.parameters.depth > maxCrossSection) {
+        return `This profile must fit within the selected edge's ${formatMeasurementWithUnit(maxCrossSection, units)} cross-section.`;
+      }
+    }
     const issue =
       feature.kind === 'rect_cut'
         ? validateRectCutFeature(feature, candidate)
@@ -185,7 +258,9 @@ export function usePartCutsEditorState({
           ? validateCircularCut(feature, candidate)
           : feature.kind === 'rounded_cut'
             ? validateRoundedCut(feature, candidate)
-            : validateEndCutFeature(feature, candidate);
+            : feature.kind === 'end_cut'
+              ? validateEndCutFeature(feature, candidate)
+              : null;
     if (issue) return issue;
     return (
       getPartFeatureConflicts(features, part).find(
@@ -193,7 +268,7 @@ export function usePartCutsEditorState({
           conflict.severity === 'error' && (conflict.code === 'no_material' || conflict.code === 'material_removed')
       )?.message ?? null
     );
-  }, [draft, part, draftFeatures]);
+  }, [draft, part, draftFeatures, units]);
 
   const endCutPreviewMeasurements = useMemo(() => {
     if (!draft || !draftPreviewFeature || draftPreviewFeature.kind !== 'end_cut') return null;

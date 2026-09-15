@@ -51,6 +51,7 @@ export function AddCutDialog() {
                 },
                 { group: 'Edges & Corners', presets: ['rabbet', 'edge_notch', 'corner_notch'] },
                 { group: 'Pockets & Openings', presets: ['mortise', 'cutout'] },
+                { group: 'Routing', presets: ['routed_path', 'edge_profile'] },
                 { group: 'Round Cuts', presets: ['round_hole', 'countersink', 'counterbore'] },
                 { group: 'Rounded Openings', presets: ['rounded_slot', 'rounded_rectangle'] }
               ] as Array<{ group: string; presets: OperationPreset[] }>

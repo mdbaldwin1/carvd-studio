@@ -3,14 +3,18 @@ import {
   CircularCutFeature,
   CircularPattern,
   EdgeTarget,
+  EdgeProfileFeature,
   EndCutFeature,
   FaceTarget,
   PartFeature,
   PartFeatureTarget,
   RectCutFeature,
-  RoundedCutFeature
+  RoundedCutFeature,
+  RoutedPathFeature
 } from '@renderer/types';
 import { clonePartFeature } from '@renderer/utils/partFeatures';
+import { cloneRouterProfileDefinition } from '@renderer/utils/routerProfiles';
+import { cloneRouterToolDefinition } from '@renderer/utils/routerTools';
 import { isLengthwiseEdgeTarget } from '@renderer/utils/rectCutUtils';
 
 export const END_TARGETS: FaceTarget[] = ['left_end', 'right_end'];
@@ -91,7 +95,9 @@ export type OperationPreset =
   | 'countersink'
   | 'counterbore'
   | 'rounded_slot'
-  | 'rounded_rectangle';
+  | 'rounded_rectangle'
+  | 'routed_path'
+  | 'edge_profile';
 
 type EndCutReference = NonNullable<EndCutFeature['parameters']['reference']>;
 
@@ -171,7 +177,47 @@ export interface RoundedCutDraft {
   rotation: number;
 }
 
-export type FeatureDraft = EndCutDraft | RectCutDraft | CircularCutDraft | RoundedCutDraft;
+export interface RoutedPathDraft {
+  mode: 'routed_path';
+  featureId: string | null;
+  label: string;
+  enabled: boolean;
+  faceTarget: FaceTarget;
+  points: RoutedPathFeature['path']['points'];
+  closed: boolean;
+  bitProfile: RoutedPathFeature['bit']['profile'];
+  bitDiameter: number;
+  bitShankDiameter: number;
+  bitAngle: number;
+  bitCutterHeight: number;
+  depthMode: RoutedPathFeature['parameters']['depthMode'];
+  depth: number;
+}
+
+export interface EdgeProfileDraft {
+  mode: 'edge_profile';
+  featureId: string | null;
+  label: string;
+  enabled: boolean;
+  edgeTarget: EdgeTarget;
+  profile: EdgeProfileFeature['profile'];
+  routerProfileId?: string;
+  routerProfileRevision?: string;
+  routerProfileSnapshot?: EdgeProfileFeature['routerProfileSnapshot'];
+  routerToolId?: string;
+  routerToolRevision?: string;
+  routerToolSnapshot?: EdgeProfileFeature['routerToolSnapshot'];
+  size: number;
+  depth: number;
+}
+
+export type FeatureDraft =
+  | EndCutDraft
+  | RectCutDraft
+  | CircularCutDraft
+  | RoundedCutDraft
+  | RoutedPathDraft
+  | EdgeProfileDraft;
 
 type DraftPartDefaults = { partLength?: number; partWidth?: number; partThickness?: number };
 
@@ -440,6 +486,48 @@ export function generateFeatureId(): string {
 }
 
 export function buildDraftFromPreset(preset: OperationPreset, defaults?: DraftPartDefaults): FeatureDraft {
+  if (preset === 'edge_profile') {
+    return {
+      mode: 'edge_profile',
+      featureId: null,
+      label: '',
+      enabled: true,
+      edgeTarget: 'top_front_edge',
+      profile: 'roundover',
+      routerProfileId: undefined,
+      routerProfileRevision: undefined,
+      routerProfileSnapshot: undefined,
+      routerToolId: undefined,
+      routerToolRevision: undefined,
+      routerToolSnapshot: undefined,
+      size: Math.min(0.25, (defaults?.partThickness ?? 0.75) / 2),
+      depth: Math.min(0.25, (defaults?.partThickness ?? 0.75) / 2)
+    };
+  }
+
+  if (preset === 'routed_path') {
+    const run = Math.min(3, Math.max(0.5, (defaults?.partLength ?? 4) / 2));
+    return {
+      mode: 'routed_path',
+      featureId: null,
+      label: '',
+      enabled: true,
+      faceTarget: 'top_face',
+      points: [
+        { primary: -run / 2, secondary: 0, cornerRadius: 0 },
+        { primary: run / 2, secondary: 0, cornerRadius: 0 }
+      ],
+      closed: false,
+      bitProfile: 'straight',
+      bitDiameter: 0.25,
+      bitShankDiameter: 0.25,
+      bitAngle: 90,
+      bitCutterHeight: 0.125,
+      depthMode: 'blind',
+      depth: Math.min(0.25, (defaults?.partThickness ?? 0.75) / 2)
+    };
+  }
+
   if (preset === 'end_cut') {
     return {
       mode: 'end_cut',
@@ -545,6 +633,48 @@ export function buildDraftFromFeature(
   feature: PartFeature,
   _part?: Pick<{ length: number; width: number; thickness: number }, 'length' | 'width' | 'thickness'>
 ): FeatureDraft {
+  if (feature.kind === 'edge_profile') {
+    return {
+      mode: 'edge_profile',
+      featureId: feature.id,
+      label: feature.label ?? '',
+      enabled: feature.enabled,
+      edgeTarget: feature.target.edge,
+      profile: feature.profile,
+      routerProfileId: feature.routerProfileId,
+      routerProfileRevision: feature.routerProfileRevision,
+      routerProfileSnapshot: feature.routerProfileSnapshot
+        ? cloneRouterProfileDefinition(feature.routerProfileSnapshot)
+        : undefined,
+      routerToolId: feature.routerToolId,
+      routerToolRevision: feature.routerToolRevision,
+      routerToolSnapshot: feature.routerToolSnapshot
+        ? cloneRouterToolDefinition(feature.routerToolSnapshot)
+        : undefined,
+      size: feature.parameters.size,
+      depth: feature.parameters.depth
+    };
+  }
+
+  if (feature.kind === 'routed_path') {
+    return {
+      mode: 'routed_path',
+      featureId: feature.id,
+      label: feature.label ?? '',
+      enabled: feature.enabled,
+      faceTarget: feature.target.face,
+      points: feature.path.points.map((point) => ({ ...point, cornerRadius: point.cornerRadius ?? 0 })),
+      closed: feature.path.closed ?? false,
+      bitProfile: feature.bit.profile,
+      bitDiameter: feature.bit.diameter,
+      bitShankDiameter: 'shankDiameter' in feature.bit ? feature.bit.shankDiameter : feature.bit.diameter,
+      bitAngle: feature.bit.profile === 'v_bit' || feature.bit.profile === 'dovetail' ? feature.bit.includedAngle : 90,
+      bitCutterHeight: 'cutterHeight' in feature.bit ? feature.bit.cutterHeight : 0.125,
+      depthMode: feature.parameters.depthMode,
+      depth: feature.parameters.depth ?? 0.25
+    };
+  }
+
   if (feature.kind === 'end_cut') {
     return {
       mode: 'end_cut',
@@ -653,6 +783,51 @@ export function normalizeEndCutDraft(
 }
 
 export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
+  if (draft.mode === 'routed_path') {
+    return {
+      id: draft.featureId ?? generateFeatureId(),
+      kind: 'routed_path',
+      version: 1,
+      enabled: draft.enabled,
+      label: draft.label || undefined,
+      target: { type: 'face', face: draft.faceTarget },
+      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      path: {
+        points: draft.points.map((point, index) => {
+          const cornerRadius =
+            !draft.closed && (index === 0 || index === draft.points.length - 1)
+              ? 0
+              : Math.max(0, point.cornerRadius ?? 0);
+          const coordinates = { primary: point.primary, secondary: point.secondary };
+          return cornerRadius > 0 ? { ...coordinates, cornerRadius } : coordinates;
+        }),
+        closed: draft.closed || undefined
+      },
+      bit:
+        draft.bitProfile === 'v_bit' || draft.bitProfile === 'engraving'
+          ? { profile: draft.bitProfile, diameter: draft.bitDiameter, includedAngle: draft.bitAngle }
+          : draft.bitProfile === 'dovetail'
+            ? {
+                profile: 'dovetail',
+                diameter: draft.bitDiameter,
+                shankDiameter: draft.bitShankDiameter,
+                includedAngle: draft.bitAngle
+              }
+            : draft.bitProfile === 't_slot' || draft.bitProfile === 'keyhole'
+              ? {
+                  profile: draft.bitProfile,
+                  diameter: draft.bitDiameter,
+                  shankDiameter: draft.bitShankDiameter,
+                  cutterHeight: draft.bitCutterHeight
+                }
+              : { profile: draft.bitProfile, diameter: draft.bitDiameter },
+      parameters: {
+        depthMode: draft.depthMode,
+        depth: draft.depthMode === 'blind' ? draft.depth : undefined
+      }
+    };
+  }
+
   if (draft.mode === 'end_cut') {
     return {
       id: draft.featureId ?? generateFeatureId(),
@@ -739,6 +914,28 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
     };
   }
 
+  if (draft.mode === 'edge_profile') {
+    return {
+      id: draft.featureId ?? generateFeatureId(),
+      kind: 'edge_profile',
+      version: 1,
+      enabled: draft.enabled,
+      label: draft.label || undefined,
+      target: { type: 'edge', edge: draft.edgeTarget },
+      reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+      profile: draft.profile,
+      routerProfileId: draft.routerProfileId,
+      routerProfileRevision: draft.routerProfileRevision,
+      routerProfileSnapshot: draft.routerProfileSnapshot
+        ? cloneRouterProfileDefinition(draft.routerProfileSnapshot)
+        : undefined,
+      routerToolId: draft.routerToolId,
+      routerToolRevision: draft.routerToolRevision,
+      routerToolSnapshot: draft.routerToolSnapshot ? cloneRouterToolDefinition(draft.routerToolSnapshot) : undefined,
+      parameters: { size: draft.size, depth: draft.depth }
+    };
+  }
+
   const target =
     draft.cutType === 'corner_notch'
       ? { type: 'corner' as const, corner: draft.cornerTarget }
@@ -782,9 +979,10 @@ export function getFeatureDraftTarget(draft: FeatureDraft): PartFeatureTarget {
     return { type: 'face', face: draft.targetFace };
   }
 
-  if (draft.mode === 'circular_cut' || draft.mode === 'rounded_cut') {
+  if (draft.mode === 'circular_cut' || draft.mode === 'rounded_cut' || draft.mode === 'routed_path') {
     return { type: 'face', face: draft.faceTarget };
   }
+  if (draft.mode === 'edge_profile') return { type: 'edge', edge: draft.edgeTarget };
 
   if (draft.cutType === 'corner_notch') {
     return { type: 'corner', corner: draft.cornerTarget };
@@ -819,6 +1017,13 @@ export function applyTargetToFeatureDraft(draft: FeatureDraft, target: PartFeatu
     return target.type === 'face' && (target.face === 'top_face' || target.face === 'bottom_face')
       ? { ...draft, faceTarget: target.face }
       : draft;
+  }
+
+  if (draft.mode === 'routed_path') {
+    return target.type === 'face' ? { ...draft, faceTarget: target.face } : draft;
+  }
+  if (draft.mode === 'edge_profile') {
+    return target.type === 'edge' ? { ...draft, edgeTarget: target.edge } : draft;
   }
 
   if (draft.cutType === 'corner_notch') {
@@ -889,6 +1094,10 @@ export function getPresetLabel(preset: OperationPreset): string {
       return 'Rounded Slot';
     case 'rounded_rectangle':
       return 'Rounded Rectangle';
+    case 'routed_path':
+      return 'Routed Path';
+    case 'edge_profile':
+      return 'Edge Profile';
   }
 }
 
@@ -930,5 +1139,9 @@ export function getPresetHint(preset: OperationPreset): string {
       return 'Oblong opening with fully rounded ends.';
     case 'rounded_rectangle':
       return 'Rectangular opening with a controlled corner radius.';
+    case 'routed_path':
+      return 'Sweep a router bit along a straight or polyline path on a face.';
+    case 'edge_profile':
+      return 'Shape one continuous stock edge with a bearing-guided profile.';
   }
 }

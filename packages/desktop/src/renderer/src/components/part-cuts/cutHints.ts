@@ -21,6 +21,12 @@ export function getCutHint(draft: FeatureDraft): string {
   if (draft.mode === 'rounded_cut') {
     return 'Set the face, profile size, corner shape, depth, placement, and rotation.';
   }
+  if (draft.mode === 'routed_path') {
+    return 'Set the face, router bit, depth, and the points that define the routed path.';
+  }
+  if (draft.mode === 'edge_profile') {
+    return 'Choose a stock edge, profile shape, and the profile dimensions.';
+  }
 
   switch (draft.cutType) {
     case 'tenon':

@@ -304,6 +304,20 @@ describe('partFeatureEditorState', () => {
   });
 
   describe('buildDraftFromPreset', () => {
+    it('starts a routed path as a centered two-point straight-bit route', () => {
+      expect(buildDraftFromPreset('routed_path', PART_DEFAULTS)).toMatchObject({
+        mode: 'routed_path',
+        faceTarget: 'top_face',
+        points: [
+          { primary: -1.5, secondary: 0 },
+          { primary: 1.5, secondary: 0 }
+        ],
+        bitProfile: 'straight',
+        bitDiameter: 0.25,
+        depthMode: 'blind'
+      });
+    });
+
     it('builds the default end cut draft', () => {
       expect(buildDraftFromPreset('end_cut')).toEqual({
         mode: 'end_cut',
@@ -352,6 +366,120 @@ describe('partFeatureEditorState', () => {
   });
 
   describe('buildDraftFromFeature / buildFeatureFromDraft round trips', () => {
+    it('round-trips a custom edge profile library id and immutable snapshot', () => {
+      const feature: PartFeature = {
+        id: 'custom-edge-1',
+        kind: 'edge_profile',
+        version: 1,
+        enabled: true,
+        target: { type: 'edge', edge: 'top_front_edge' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        profile: 'custom',
+        routerProfileId: 'profile-1',
+        routerProfileSnapshot: {
+          version: 1,
+          id: 'profile-1',
+          name: 'Shop Ogee',
+          family: 'Decorative',
+          source: 'generic',
+          parameters: {},
+          boundary: { start: { u: 0, v: 0 }, segments: [{ kind: 'line', to: { u: 0.5, v: 0.25 } }] }
+        },
+        parameters: { size: 0.5, depth: 0.25 }
+      };
+      const draft = buildDraftFromFeature(feature);
+      expect(draft).toMatchObject({ mode: 'edge_profile', profile: 'custom', routerProfileId: 'profile-1' });
+      expect(buildFeatureFromDraft(draft)).toEqual(feature);
+    });
+
+    it('round-trips a routed polyline and V-bit settings', () => {
+      const feature: PartFeature = {
+        id: 'route-1',
+        kind: 'routed_path',
+        version: 1,
+        enabled: true,
+        label: 'Inlay channel',
+        target: { type: 'face', face: 'front_face' },
+        reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+        path: {
+          points: [
+            { primary: -2, secondary: 0 },
+            { primary: 0, secondary: 1, cornerRadius: 0.25 },
+            { primary: 2, secondary: 0 }
+          ],
+          closed: true
+        },
+        bit: { profile: 'v_bit', diameter: 0.5, includedAngle: 60 },
+        parameters: { depthMode: 'blind', depth: 0.125 }
+      };
+
+      const draft = buildDraftFromFeature(feature);
+      expect(draft).toMatchObject({
+        mode: 'routed_path',
+        faceTarget: 'front_face',
+        bitProfile: 'v_bit',
+        bitDiameter: 0.5,
+        bitAngle: 60,
+        closed: true,
+        points: expect.arrayContaining([{ primary: 0, secondary: 1, cornerRadius: 0.25 }])
+      });
+      expect(buildFeatureFromDraft(draft)).toEqual(feature);
+    });
+
+    it('zeros corner radii on open-path endpoints when building a feature', () => {
+      const draft = buildDraftFromPreset('routed_path', PART_DEFAULTS);
+      if (draft.mode !== 'routed_path') throw new Error('Expected a routed path draft');
+      draft.points = [
+        { primary: -2, secondary: 0, cornerRadius: 0.5 },
+        { primary: 0, secondary: 1, cornerRadius: 0.25 },
+        { primary: 2, secondary: 0, cornerRadius: 0.5 }
+      ];
+
+      const feature = buildFeatureFromDraft(draft);
+      if (feature.kind !== 'routed_path') throw new Error('Expected a routed path feature');
+      expect(feature.path.points).toEqual([
+        { primary: -2, secondary: 0 },
+        { primary: 0, secondary: 1, cornerRadius: 0.25 },
+        { primary: 2, secondary: 0 }
+      ]);
+    });
+
+    it.each([
+      {
+        bit: { profile: 'dovetail' as const, diameter: 0.5, shankDiameter: 0.25, includedAngle: 14 },
+        draft: { bitProfile: 'dovetail', bitDiameter: 0.5, bitShankDiameter: 0.25, bitAngle: 14 }
+      },
+      {
+        bit: { profile: 't_slot' as const, diameter: 0.75, shankDiameter: 0.25, cutterHeight: 0.1875 },
+        draft: { bitProfile: 't_slot', bitDiameter: 0.75, bitShankDiameter: 0.25, bitCutterHeight: 0.1875 }
+      },
+      {
+        bit: { profile: 'keyhole' as const, diameter: 0.375, shankDiameter: 0.125, cutterHeight: 0.125 },
+        draft: { bitProfile: 'keyhole', bitDiameter: 0.375, bitShankDiameter: 0.125, bitCutterHeight: 0.125 }
+      }
+    ])('round-trips $bit.profile router dimensions', ({ bit, draft: expectedDraft }) => {
+      const feature: PartFeature = {
+        id: `route-${bit.profile}`,
+        kind: 'routed_path',
+        version: 1,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+        path: {
+          points: [
+            { primary: -1, secondary: 0 },
+            { primary: 1, secondary: 0 }
+          ]
+        },
+        bit,
+        parameters: { depthMode: 'blind', depth: 0.25 }
+      };
+
+      const draft = buildDraftFromFeature(feature);
+      expect(draft).toMatchObject(expectedDraft);
+      expect(buildFeatureFromDraft(draft)).toEqual(feature);
+    });
+
     it('round-trips a rect cut feature preserving id, label, and blind depth', () => {
       const feature: RectCutFeature = {
         id: 'rect-1',

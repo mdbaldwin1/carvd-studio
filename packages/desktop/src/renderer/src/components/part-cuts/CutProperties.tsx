@@ -10,14 +10,19 @@ import {
   normalizeEndCutDraft
 } from '@renderer/components/part-features/partFeatureEditorState';
 import { Button } from '@renderer/components/ui/button';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { Select } from '@renderer/components/ui/select';
 import { EndCutFeature, RectCutFeature } from '@renderer/types';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import { CORNER_LABELS, EDGE_LABELS, FACE_LABELS } from '@renderer/utils/partFeatureSummary';
+import { getRouterProfileRevision } from '@renderer/utils/routerProfiles';
 
 import { usePartCutsEditor } from './PartCutsEditorContext';
+import { RouterBitSelector } from './RouterBitSelector';
+import { EdgeProfileSelector } from './EdgeProfileSelector';
+import { EdgeProfileLibraryControls } from './EdgeProfileLibraryControls';
 import { getCutHint } from './cutHints';
 
 /**
@@ -32,6 +37,8 @@ import { getCutHint } from './cutHints';
 export function CutProperties() {
   const {
     part,
+    draftFeatures,
+    onDraftFeaturesChange,
     units,
     setDraft,
     inspectorDraft,
@@ -297,7 +304,29 @@ export function CutProperties() {
           </div>
         )}
 
-        {(inspectorDraft.mode === 'circular_cut' || inspectorDraft.mode === 'rounded_cut') && (
+        {inspectorDraft.mode === 'edge_profile' && (
+          <div className="property-group">
+            <label>Edge</label>
+            <div className="flex flex-wrap gap-1.5">
+              {availableEdgeTargets.map((target) => (
+                <Button
+                  key={target}
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  active={inspectorDraft.edgeTarget === target}
+                  onClick={() => setDraft({ ...inspectorDraft, edgeTarget: target })}
+                >
+                  {EDGE_LABELS[target]}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(inspectorDraft.mode === 'circular_cut' ||
+          inspectorDraft.mode === 'rounded_cut' ||
+          inspectorDraft.mode === 'routed_path') && (
           <div className="property-group">
             <label>Face</label>
             <div className="flex flex-wrap gap-1.5">
@@ -609,6 +638,183 @@ export function CutProperties() {
           </>
         )}
 
+        {inspectorDraft.mode === 'routed_path' && (
+          <>
+            <p className="property-group text-[11px] text-text-muted">
+              Drag the colored points directly on the part to shape the route. Green is the start; orange points create
+              the path and its turns. Use the measurements below when you need exact placement.
+            </p>
+            <div className="property-group">
+              <Label>Bit Profile</Label>
+              <RouterBitSelector
+                value={inspectorDraft.bitProfile}
+                onSelect={(bitProfile) => {
+                  const usesShank = bitProfile === 'dovetail' || bitProfile === 't_slot' || bitProfile === 'keyhole';
+                  const bitShankDiameter =
+                    usesShank && inspectorDraft.bitShankDiameter >= inspectorDraft.bitDiameter
+                      ? Math.min(inspectorDraft.bitDiameter / 2, 0.25)
+                      : inspectorDraft.bitShankDiameter;
+                  let depth = inspectorDraft.depth;
+                  if (inspectorDraft.depthMode === 'blind') {
+                    if (bitProfile === 'core_box' || bitProfile === 'ball_nose') {
+                      depth = Math.min(depth, inspectorDraft.bitDiameter / 2);
+                    } else if (bitProfile === 'v_bit' || bitProfile === 'engraving') {
+                      depth = Math.min(
+                        depth,
+                        inspectorDraft.bitDiameter / (2 * Math.tan((inspectorDraft.bitAngle * Math.PI) / 360))
+                      );
+                    } else if (bitProfile === 'dovetail') {
+                      depth = Math.max(
+                        depth,
+                        (inspectorDraft.bitDiameter - bitShankDiameter) /
+                          (2 * Math.tan((inspectorDraft.bitAngle * Math.PI) / 360))
+                      );
+                    } else if (bitProfile === 't_slot' || bitProfile === 'keyhole') {
+                      depth = Math.max(depth, inspectorDraft.bitCutterHeight);
+                    }
+                  }
+                  setDraft({
+                    ...inspectorDraft,
+                    bitProfile,
+                    bitShankDiameter,
+                    depth
+                  });
+                }}
+              />
+            </div>
+            <div className="property-group">
+              <Label>Cutter Diameter</Label>
+              <FractionInput
+                ariaLabel="Cutter Diameter"
+                value={inspectorDraft.bitDiameter}
+                onChange={(bitDiameter) => setDraft({ ...inspectorDraft, bitDiameter })}
+                min={0.001}
+              />
+              <p className="mt-1 text-[11px] text-text-muted">Maximum width cut by the bit.</p>
+            </div>
+            {['dovetail', 't_slot', 'keyhole'].includes(inspectorDraft.bitProfile) && (
+              <div className="property-group">
+                <Label>Shank Diameter</Label>
+                <FractionInput
+                  ariaLabel="Shank Diameter"
+                  value={inspectorDraft.bitShankDiameter}
+                  onChange={(bitShankDiameter) => setDraft({ ...inspectorDraft, bitShankDiameter })}
+                  min={0.001}
+                />
+                <p className="mt-1 text-[11px] text-text-muted">
+                  Width of the neck that passes through the entry slot.
+                </p>
+              </div>
+            )}
+            {(['v_bit', 'engraving', 'dovetail'] as const).some((profile) => profile === inspectorDraft.bitProfile) && (
+              <div className="property-group">
+                <Label htmlFor="router-bit-angle">Included Angle</Label>
+                <Input
+                  id="router-bit-angle"
+                  type="number"
+                  min={1}
+                  max={179}
+                  value={inspectorDraft.bitAngle}
+                  onChange={(event) => setDraft({ ...inspectorDraft, bitAngle: Number(event.target.value) })}
+                />
+                {inspectorDraft.bitProfile === 'dovetail' && (
+                  <p className="mt-1 text-[11px] text-text-muted">Full angle between the two sloped cutting faces.</p>
+                )}
+              </div>
+            )}
+            {(inspectorDraft.bitProfile === 't_slot' || inspectorDraft.bitProfile === 'keyhole') && (
+              <div className="property-group">
+                <Label>Cutter Height</Label>
+                <FractionInput
+                  ariaLabel="Cutter Height"
+                  value={inspectorDraft.bitCutterHeight}
+                  onChange={(bitCutterHeight) => setDraft({ ...inspectorDraft, bitCutterHeight })}
+                  min={0.001}
+                />
+                <p className="mt-1 text-[11px] text-text-muted">
+                  Height of the wider cutter below the narrow entry slot.
+                </p>
+              </div>
+            )}
+            <div className="property-group">
+              <Label htmlFor="routed-path-depth-mode">Depth</Label>
+              <Select
+                id="routed-path-depth-mode"
+                value={inspectorDraft.depthMode}
+                onChange={(event) =>
+                  setDraft({ ...inspectorDraft, depthMode: event.target.value as 'through' | 'blind' })
+                }
+              >
+                <option value="blind">Blind</option>
+                <option value="through">Through</option>
+              </Select>
+            </div>
+            {inspectorDraft.depthMode === 'blind' && (
+              <div className="property-group">
+                <Label>Route Depth</Label>
+                <FractionInput
+                  ariaLabel="Route Depth"
+                  value={inspectorDraft.depth}
+                  onChange={(depth) => setDraft({ ...inspectorDraft, depth })}
+                  min={0.001}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {inspectorDraft.mode === 'edge_profile' && (
+          <>
+            <p className="property-group text-[11px] text-text-muted">
+              Select an edge directly on the part or use the edge controls above, then choose its finished profile.
+            </p>
+            <div className="property-group">
+              <Label>Edge Profile</Label>
+              <EdgeProfileSelector
+                value={inspectorDraft.profile}
+                customProfileId={inspectorDraft.routerProfileId}
+                onSelect={(profile, customProfile) =>
+                  setDraft({
+                    ...inspectorDraft,
+                    profile,
+                    routerProfileId: customProfile?.id,
+                    routerProfileRevision: customProfile ? getRouterProfileRevision(customProfile) : undefined,
+                    routerProfileSnapshot: customProfile
+                  })
+                }
+              />
+            </div>
+            <EdgeProfileLibraryControls
+              draft={inspectorDraft}
+              features={draftFeatures}
+              part={part}
+              onChange={setDraft}
+              onBatchChange={onDraftFeaturesChange}
+            />
+            <div className="property-group">
+              <Label>Profile Size</Label>
+              <FractionInput
+                ariaLabel="Profile Size"
+                value={inspectorDraft.size}
+                onChange={(size) => setDraft({ ...inspectorDraft, size })}
+                min={0.001}
+              />
+              <p className="mt-1 text-[11px] text-text-muted">
+                Radius for curved profiles; shoulder width for chamfers and rabbets.
+              </p>
+            </div>
+            <div className="property-group">
+              <Label>Profile Depth</Label>
+              <FractionInput
+                ariaLabel="Profile Depth"
+                value={inspectorDraft.depth}
+                onChange={(depth) => setDraft({ ...inspectorDraft, depth })}
+                min={0.001}
+              />
+            </div>
+          </>
+        )}
+
         {inspectorDraft.mode === 'rect_cut' && (
           <>
             {inspectorUsesBlindOnlyDepth ? (
@@ -717,6 +923,136 @@ export function CutProperties() {
           </>
         )}
       </div>
+
+      {inspectorDraft.mode === 'routed_path' && (
+        <div className="properties-card">
+          <div className="property-group">
+            <div className="flex items-center justify-between gap-2">
+              <label>Path Points</label>
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                onClick={() => {
+                  const last = inspectorDraft.points.at(-1) ?? { primary: 0, secondary: 0 };
+                  setDraft({
+                    ...inspectorDraft,
+                    points: [
+                      ...inspectorDraft.points,
+                      { primary: last.primary + 1, secondary: last.secondary, cornerRadius: 0 }
+                    ]
+                  });
+                }}
+              >
+                Add Point
+              </Button>
+            </div>
+            <p className="mt-1 text-[11px] text-text-muted">Coordinates are measured from the center of the face.</p>
+          </div>
+          {inspectorDraft.points.map((point, index) => (
+            <div className="property-group" key={index}>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-text">Point {index + 1}</span>
+                {inspectorDraft.points.length > 2 && (
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="ghost"
+                    aria-label={`Remove point ${index + 1}`}
+                    onClick={() => {
+                      const remaining = inspectorDraft.points.filter((_, pointIndex) => pointIndex !== index);
+                      const closed = inspectorDraft.closed && remaining.length >= 3;
+                      setDraft({
+                        ...inspectorDraft,
+                        closed,
+                        points: closed
+                          ? remaining
+                          : remaining.map((candidate, pointIndex) =>
+                              pointIndex === 0 || pointIndex === remaining.length - 1
+                                ? { ...candidate, cornerRadius: 0 }
+                                : candidate
+                            )
+                      });
+                    }}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <FractionInput
+                  ariaLabel={`Point ${index + 1} along face`}
+                  value={point.primary}
+                  onChange={(primary) =>
+                    setDraft({
+                      ...inspectorDraft,
+                      points: inspectorDraft.points.map((candidate, pointIndex) =>
+                        pointIndex === index ? { ...candidate, primary } : candidate
+                      )
+                    })
+                  }
+                />
+                <FractionInput
+                  ariaLabel={`Point ${index + 1} across face`}
+                  value={point.secondary}
+                  onChange={(secondary) =>
+                    setDraft({
+                      ...inspectorDraft,
+                      points: inspectorDraft.points.map((candidate, pointIndex) =>
+                        pointIndex === index ? { ...candidate, secondary } : candidate
+                      )
+                    })
+                  }
+                />
+              </div>
+              <div className="mt-2">
+                <FractionInput
+                  ariaLabel={`Point ${index + 1} corner radius`}
+                  value={point.cornerRadius ?? 0}
+                  onChange={(cornerRadius) =>
+                    setDraft({
+                      ...inspectorDraft,
+                      points: inspectorDraft.points.map((candidate, pointIndex) =>
+                        pointIndex === index ? { ...candidate, cornerRadius: Math.max(0, cornerRadius) } : candidate
+                      )
+                    })
+                  }
+                  min={0}
+                  disabled={!inspectorDraft.closed && (index === 0 || index === inspectorDraft.points.length - 1)}
+                />
+                {!inspectorDraft.closed && (index === 0 || index === inspectorDraft.points.length - 1) && (
+                  <p className="mt-1 text-[11px] text-text-muted">Open-path endpoints do not form corners.</p>
+                )}
+              </div>
+            </div>
+          ))}
+          <div className="property-group flex items-center gap-2">
+            <Checkbox
+              id="routed-path-closed"
+              checked={inspectorDraft.closed}
+              disabled={!inspectorDraft.closed && inspectorDraft.points.length < 3}
+              onChange={(event) => {
+                const closed = event.target.checked;
+                setDraft({
+                  ...inspectorDraft,
+                  closed,
+                  points: closed
+                    ? inspectorDraft.points
+                    : inspectorDraft.points.map((point, index) =>
+                        index === 0 || index === inspectorDraft.points.length - 1
+                          ? { ...point, cornerRadius: 0 }
+                          : point
+                      )
+                });
+              }}
+            />
+            <Label htmlFor="routed-path-closed">Close path back to first point</Label>
+            {!inspectorDraft.closed && inspectorDraft.points.length < 3 ? (
+              <p className="text-[11px] text-text-muted">Add at least three points to make a closed route.</p>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {/* Where it sits on the blank. */}
       {(inspectorDraft.mode === 'circular_cut' ||
