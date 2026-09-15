@@ -9,7 +9,7 @@ import {
   DialogTitle
 } from '@renderer/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs';
-import { BookOpen, Box, Cuboid } from 'lucide-react';
+import { BookOpen, Box, Cuboid, Shapes, Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLicenseStore } from '../../store/licenseStore';
 import { Assembly, Stock } from '../../types';
@@ -17,6 +17,8 @@ import { getFeatureLimits } from '../../utils/featureLimits';
 import { getDocsUrl } from '../../utils/docsLinks';
 import { AssembliesTab } from './AssembliesTab';
 import { StocksTab } from './StocksTab';
+import { RouterProfilesTab } from './RouterProfilesTab';
+import { RouterToolsTab } from './RouterToolsTab';
 
 interface StockLibraryModalProps {
   isOpen: boolean;
@@ -58,7 +60,9 @@ export function StockLibraryModal({
   const licenseMode = useLicenseStore((s) => s.licenseMode);
   const limits = getFeatureLimits(licenseMode);
   const canCreateAssemblies = limits.canUseAssemblies;
-  const [activeSection, setActiveSection] = useState<'stocks' | 'assemblies'>('stocks');
+  const [activeSection, setActiveSection] = useState<'stocks' | 'assemblies' | 'router-profiles' | 'router-tools'>(
+    'stocks'
+  );
   const [stocksFooterState, setStocksFooterState] = useState<LibraryFooterFormState>({ isFormMode: false });
   const [assembliesFooterState, setAssembliesFooterState] = useState<LibraryFooterFormState>({ isFormMode: false });
 
@@ -70,7 +74,12 @@ export function StockLibraryModal({
     }
   }, [isOpen]);
 
-  const activeFooterState = activeSection === 'stocks' ? stocksFooterState : assembliesFooterState;
+  const activeFooterState =
+    activeSection === 'stocks'
+      ? stocksFooterState
+      : activeSection === 'assemblies'
+        ? assembliesFooterState
+        : { isFormMode: false };
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       onClose();
@@ -85,7 +94,8 @@ export function StockLibraryModal({
             <div>
               <DialogTitle>App Library</DialogTitle>
               <p className="mt-1 text-sm text-text-muted">
-                Manage reusable stock materials and assemblies used across all projects.
+                Manage reusable stock materials, assemblies, router profiles, and physical router tools used across all
+                projects.
               </p>
             </div>
             <DialogClose onClose={onClose} />
@@ -94,7 +104,7 @@ export function StockLibraryModal({
 
         <Tabs
           value={activeSection}
-          onValueChange={(v) => setActiveSection(v as 'stocks' | 'assemblies')}
+          onValueChange={(v) => setActiveSection(v as 'stocks' | 'assemblies' | 'router-profiles' | 'router-tools')}
           className="flex flex-1 min-h-0 flex-col overflow-hidden"
         >
           <div className="px-5 py-4 border-b border-border">
@@ -110,19 +120,29 @@ export function StockLibraryModal({
                   Assemblies
                   <Badge variant="secondary">{assemblies.length}</Badge>
                 </TabsTrigger>
+                <TabsTrigger value="router-profiles" className="gap-2">
+                  <Shapes size={14} />
+                  Router Profiles
+                </TabsTrigger>
+                <TabsTrigger value="router-tools" className="gap-2">
+                  <Wrench size={14} />
+                  Router Tools
+                </TabsTrigger>
               </TabsList>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() =>
-                    window.electronAPI.openExternal(getDocsUrl(activeSection === 'stocks' ? 'stock' : 'assemblies'))
-                  }
-                  title={activeSection === 'stocks' ? 'View stock docs' : 'View assembly docs'}
-                >
-                  <BookOpen size={12} />
-                  Docs
-                </Button>
+                {(activeSection === 'stocks' || activeSection === 'assemblies') && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() =>
+                      window.electronAPI.openExternal(getDocsUrl(activeSection === 'stocks' ? 'stock' : 'assemblies'))
+                    }
+                    title={activeSection === 'stocks' ? 'View stock docs' : 'View assembly docs'}
+                  >
+                    <BookOpen size={12} />
+                    Docs
+                  </Button>
+                )}
                 {!canCreateAssemblies && (
                   <div className="rounded-md border border-border bg-bg px-3 py-1.5 text-[11px] text-text-muted">
                     Upgrade to create and edit assemblies.
@@ -161,6 +181,12 @@ export function StockLibraryModal({
                 onFormModeChange={setAssembliesFooterState}
               />
             </div>
+          </TabsContent>
+          <TabsContent value="router-profiles" className="min-h-0 flex-1 overflow-hidden">
+            <RouterProfilesTab />
+          </TabsContent>
+          <TabsContent value="router-tools" className="min-h-0 flex-1 overflow-hidden">
+            <RouterToolsTab />
           </TabsContent>
         </Tabs>
 
