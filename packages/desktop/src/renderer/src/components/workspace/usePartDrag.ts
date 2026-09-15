@@ -56,6 +56,13 @@ import { referenceRelationToIndicator, solveMoveReferencePreview } from '../../u
  * Hook encapsulating all drag (move) logic for a Part component.
  * Manages drag state, snap-to-parts, overlap prevention, and store updates.
  */
+/**
+ * Cosine of the angle within which a camera counts as looking straight down a
+ * world axis (~1.8 degrees). Inside it the drag plane is snapped to that axis
+ * so motion cannot leak into the perpendicular axis.
+ */
+const STRAIGHT_ON_VIEW_COSINE = 0.9995;
+
 export function usePartDrag(
   part: PartType,
   liveDims: LiveDimensions,
@@ -201,6 +208,22 @@ export function usePartDrag(
 
       _tempForward.current.set(0, 0, -1).applyQuaternion(camera.quaternion);
       _tempNormal.current.copy(_tempForward.current).normalize();
+      // In a straight-on view the plane must be exactly perpendicular to a
+      // world axis. Deriving it from the camera quaternion leaves a fraction
+      // of a degree of float noise, which leaks into the axis the view is
+      // looking down: dragging in a top view crept the part's height by a
+      // thousandth of an inch per move. Snap a near-aligned normal to the axis.
+      const nx = Math.abs(_tempNormal.current.x);
+      const ny = Math.abs(_tempNormal.current.y);
+      const nz = Math.abs(_tempNormal.current.z);
+      const dominant = Math.max(nx, ny, nz);
+      if (dominant >= STRAIGHT_ON_VIEW_COSINE) {
+        const sign =
+          Math.sign(
+            dominant === nx ? _tempNormal.current.x : dominant === ny ? _tempNormal.current.y : _tempNormal.current.z
+          ) || 1;
+        _tempNormal.current.set(dominant === nx ? sign : 0, dominant === ny ? sign : 0, dominant === nz ? sign : 0);
+      }
       planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current, partPosition);
 
       // Build movement "virtual axes" from the part's local axes projected onto the camera-facing drag plane.

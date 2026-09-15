@@ -148,29 +148,27 @@ async function dragSelectedOnFace(
     x: center.x + (target.x - center.x) * bodyOffset,
     y: center.y + (target.y - center.y) * bodyOffset
   };
-  await window.keyboard.down('Shift');
-  try {
-    await window.mouse.move(start.x, start.y);
-    await window.waitForTimeout(150);
-    await window.mouse.down();
-    await window.waitForTimeout(250);
-    for (let i = 1; i <= 12; i += 1) {
-      await window.mouse.move(start.x + (delta.x * i) / 12, start.y + (delta.y * i) / 12);
-      await window.waitForTimeout(20);
-    }
-    const previewDelta = await window.evaluate(() => {
-      const session = window.useInteractionStore.getState().activeSession;
-      return session?.kind === 'move' ? { ...session.delta } : null;
-    });
-    await window.mouse.up();
-    await window.waitForTimeout(500);
-    const debugLogs = await window.evaluate(
-      () => window.dumpDragDebugLogs?.().map(({ event, payload }) => ({ event, payload })) ?? []
-    );
-    return { previewDelta, debugLogs };
-  } finally {
-    await window.keyboard.up('Shift');
+  // Face-plane dragging is the default, so this helper no longer holds Shift:
+  // Shift now constrains the drag to the ground plane, which locks Y and
+  // defeats the point of dragging on the face.
+  await window.mouse.move(start.x, start.y);
+  await window.waitForTimeout(150);
+  await window.mouse.down();
+  await window.waitForTimeout(250);
+  for (let i = 1; i <= 12; i += 1) {
+    await window.mouse.move(start.x + (delta.x * i) / 12, start.y + (delta.y * i) / 12);
+    await window.waitForTimeout(20);
   }
+  const previewDelta = await window.evaluate(() => {
+    const session = window.useInteractionStore.getState().activeSession;
+    return session?.kind === 'move' ? { ...session.delta } : null;
+  });
+  await window.mouse.up();
+  await window.waitForTimeout(500);
+  const debugLogs = await window.evaluate(
+    () => window.dumpDragDebugLogs?.().map(({ event, payload }) => ({ event, payload })) ?? []
+  );
+  return { previewDelta, debugLogs };
 }
 
 async function selectedTransform(window: Page) {
