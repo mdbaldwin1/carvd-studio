@@ -727,6 +727,18 @@ describe('overlapPolicy', () => {
 
     expect(overlapsAtCurrentPosition(crossing)).toBe(false);
 
+    // Authored joinery routinely lands a thousandth out through ordinary
+    // rounding. That is still an assembled joint, not a collision: a mortise
+    // cut to the tenon's own size would otherwise refuse the whole assembly.
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const nudged = createPart({
+        ...crossing,
+        id: `nudged-${axis}`,
+        position: { ...crossing.position, [axis]: crossing.position[axis] + 0.001 }
+      });
+      expect(overlapsAtCurrentPosition(nudged), nudged.id).toBe(false);
+    }
+
     const wrongFace = createPart({
       ...crossing,
       id: 'wrong-face',

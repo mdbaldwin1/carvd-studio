@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Joints that sit a thousandth out through ordinary rounding now assemble instead of being refused as overlapping, while joinery that is genuinely cut wrong is still rejected.
+
 - Joinery now snaps from either side: dragging a mortised leg onto a rail that is already placed seats the joint, where previously only the tenoned part could be moved into position.
 
 - Fixed joinery mating landing between two matching joints instead of seating on one of them, which left every joint fractionally proud and could refuse the assembly outright.

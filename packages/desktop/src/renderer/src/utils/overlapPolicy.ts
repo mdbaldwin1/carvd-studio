@@ -20,6 +20,13 @@ import { dragDebug } from './dragDebug';
 import type { GeometryCache } from '../interaction/geometry/cache';
 
 const OBB_EPSILON = 1e-6;
+/**
+ * How far a part may sit from its seated position and still count as being in
+ * its joint. Authored joinery routinely lands a thousandth out through
+ * ordinary rounding, and a mortise cut to the tenon's own size turns that into
+ * a collision that refuses the whole assembly.
+ */
+const JOINERY_FIT_TOLERANCE = 0.005;
 const OBB_SEPARATION_TOLERANCE = 1e-8;
 const CONTOUR_TOLERANCE = 1e-6;
 const SAFE_SEARCH_STEPS = 14;
@@ -299,13 +306,18 @@ export function wouldTranslationCauseOverlap(
 function isCompatibleSocketMate(movedPart: Part, hostPart: Part): boolean {
   const mate = detectFeatureMateSnaps(movedPart, movedPart.position, [hostPart], [movedPart.id], 0.03);
   if (mate.mateHostPartId !== hostPart.id) return false;
-  const isExactMate =
-    Math.abs(mate.adjustedPosition.x - movedPart.position.x) <= OBB_EPSILON &&
-    Math.abs(mate.adjustedPosition.y - movedPart.position.y) <= OBB_EPSILON &&
-    Math.abs(mate.adjustedPosition.z - movedPart.position.z) <= OBB_EPSILON;
-  if (!isExactMate) return false;
+  const isSeatedMate =
+    Math.abs(mate.adjustedPosition.x - movedPart.position.x) <= JOINERY_FIT_TOLERANCE &&
+    Math.abs(mate.adjustedPosition.y - movedPart.position.y) <= JOINERY_FIT_TOLERANCE &&
+    Math.abs(mate.adjustedPosition.z - movedPart.position.z) <= JOINERY_FIT_TOLERANCE;
+  if (!isSeatedMate) return false;
 
-  const movingMaterial = getPartMaterialOBBs(movedPart);
+  // Judge the joint on its own geometry, fully seated, rather than on a
+  // placement that is a thousandth out. A joint cut to fit stays clear of its
+  // host once seated; one cut wrong still collides there, so this forgives
+  // placement error without forgiving bad joinery. The material test itself
+  // stays exact.
+  const movingMaterial = getPartMaterialOBBs({ ...movedPart, position: mate.adjustedPosition });
   const hostMaterial = getPartMaterialOBBs(hostPart);
   return !movingMaterial.some((movingCell) =>
     hostMaterial.some((hostCell) => obbsOverlap(movingCell, hostCell, OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false))
