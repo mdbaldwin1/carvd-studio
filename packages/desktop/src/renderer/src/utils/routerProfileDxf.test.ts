@@ -230,3 +230,120 @@ describe('router-profile contour transforms and validation', () => {
     expect(validateRouterProfileContour(contour)).toMatchObject({ valid: true, selfIntersects: false });
   });
 });
+
+describe('DXF spline rejections and repair', () => {
+  // A clamped cubic with four controls: the one shape that converts exactly.
+  const common = `71\n3\n72\n8\n73\n4\n40\n0\n40\n0\n40\n0\n40\n0\n40\n1\n40\n1\n40\n1\n40\n1\n10\n0\n20\n0\n10\n0\n20\n1\n10\n1\n20\n1\n10\n1\n20\n0\n`;
+
+  it('ignores a spline whose knot count does not match its degree and controls', () => {
+    const shortKnots = `71\n3\n72\n4\n73\n4\n40\n0\n40\n0\n40\n1\n40\n1\n10\n0\n20\n0\n10\n0\n20\n1\n10\n1\n20\n1\n10\n1\n20\n0\n`;
+    const result = parseAsciiDxfRouterProfile(dxf(`0\nSPLINE\n70\n8\n${shortKnots}`));
+    expect(result.warnings.join('\n')).toContain('malformed SPLINE');
+  });
+
+  it('ignores a spline whose weights are not positive numbers', () => {
+    const result = parseAsciiDxfRouterProfile(dxf(`0\nSPLINE\n70\n12\n${common}41\n1\n41\n0\n41\n2\n41\n1\n`));
+    expect(result.warnings.join('\n')).toContain('malformed SPLINE');
+  });
+
+  it('ignores a spline whose parameter domain is empty', () => {
+    // Every knot identical leaves no span to evaluate across.
+    const flat = `71\n3\n72\n8\n73\n4\n40\n1\n40\n1\n40\n1\n40\n1\n40\n1\n40\n1\n40\n1\n40\n1\n10\n0\n20\n0\n10\n0\n20\n1\n10\n1\n20\n1\n10\n1\n20\n0\n`;
+    const result = parseAsciiDxfRouterProfile(dxf(`0\nSPLINE\n70\n8\n${flat}`));
+    expect(result.warnings.join('\n')).toContain('parameter domain is empty');
+  });
+});
+
+describe('DXF parse limits and contour validation', () => {
+  it('refuses limits that are not whole non-negative counts', () => {
+    expect(() => parseAsciiDxfRouterProfile(dxf(line(0, 1, 1, 0)), { limits: { maxCoordinates: -1 } })).toThrow(
+      DxfProfileError
+    );
+    expect(() => parseAsciiDxfRouterProfile(dxf(line(0, 1, 1, 0)), { limits: { maxEntities: 1.5 } })).toThrow(
+      /non-negative safe integers/
+    );
+  });
+
+  it('refuses tolerances that are negative or not finite', () => {
+    for (const option of ['connectTolerance', 'repairTolerance', 'splineTolerance'] as const) {
+      expect(() => parseAsciiDxfRouterProfile(dxf(line(0, 1, 1, 0)), { [option]: -1 })).toThrow(
+        new RegExp(`${option} must be a non-negative finite number`)
+      );
+      expect(() => parseAsciiDxfRouterProfile(dxf(line(0, 1, 1, 0)), { [option]: Number.NaN })).toThrow(
+        DxfProfileError
+      );
+    }
+  });
+
+  it('measures the file against its byte length, not its character count', () => {
+    // "µ" is two UTF-8 bytes and "𝄞" is four, so a short string can still
+    // outweigh a byte budget that its character count would fit inside.
+    const drawing = dxf(line(0, 1, 1, 0), `9\n$PROJECTNAME\n1\nµ𝄞\n`);
+    expect(() => parseAsciiDxfRouterProfile(drawing, { limits: { maxFileBytes: drawing.length } })).toThrow(
+      /exceeds file size limit/
+    );
+    expect(() => parseAsciiDxfRouterProfile(drawing, { limits: { maxFileBytes: 4096 } })).not.toThrow();
+  });
+
+  it('stops reading once a drawing passes its coordinate budget', () => {
+    expect(() =>
+      parseAsciiDxfRouterProfile(dxf(line(0, 1, 1, 0) + line(2, 0, 3, 1)), { limits: { maxCoordinates: 2 } })
+    ).toThrow(/exceeds coordinate limit/);
+  });
+
+  it('reports a contour with no segments and one with non-finite coordinates', () => {
+    expect(validateRouterProfileContour({ start: { u: 0, v: 0 }, closed: false, segments: [] }).errors).toContain(
+      'Contour has no segments'
+    );
+    expect(
+      validateRouterProfileContour({
+        start: { u: 0, v: Number.NaN },
+        closed: false,
+        segments: [{ kind: 'line', to: { u: 1, v: 0 } }]
+      }).errors
+    ).toContain('Contour contains non-finite coordinates');
+  });
+
+  it('reports a segment that goes nowhere and an arc its endpoints cannot reach', () => {
+    expect(
+      validateRouterProfileContour({
+        start: { u: 0, v: 0 },
+        closed: false,
+        segments: [{ kind: 'line', to: { u: 0, v: 0 } }]
+      }).errors
+    ).toContain('Contour contains a degenerate segment');
+    // A 0.1" radius cannot span a 2" chord.
+    expect(
+      validateRouterProfileContour({
+        start: { u: 0, v: 0 },
+        closed: false,
+        segments: [{ kind: 'arc', to: { u: 2, v: 0 }, radius: 0.1, clockwise: false }]
+      }).errors
+    ).toContain('Contour contains an impossible arc radius');
+  });
+
+  it('reports a contour marked closed whose ends do not meet', () => {
+    expect(
+      validateRouterProfileContour({
+        start: { u: 0, v: 0 },
+        closed: true,
+        segments: [{ kind: 'line', to: { u: 1, v: 1 } }]
+      }).errors
+    ).toContain('Contour is marked closed but has an endpoint gap');
+  });
+
+  it('does not count a genuinely closed contour as self-intersecting at its seam', () => {
+    const square = validateRouterProfileContour({
+      start: { u: 0, v: 0 },
+      closed: true,
+      segments: [
+        { kind: 'line', to: { u: 1, v: 0 } },
+        { kind: 'line', to: { u: 1, v: 1 } },
+        { kind: 'line', to: { u: 0, v: 1 } },
+        { kind: 'line', to: { u: 0, v: 0 } }
+      ]
+    });
+    expect(square.selfIntersects).toBe(false);
+    expect(square.errors).toEqual([]);
+  });
+});

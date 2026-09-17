@@ -339,3 +339,72 @@ describe('routerTools validation rejections', () => {
     expect(errs({ safeColletInsertion: 0 })).toContain('safeColletInsertion is invalid');
   });
 });
+
+describe('router tool produced-profile links', () => {
+  const snapshot = {
+    version: 1 as const,
+    id: 'cove-12',
+    name: 'Cove 1/2"',
+    family: 'cove',
+    source: 'generic' as const,
+    parameters: {},
+    boundary: { start: { u: 0, v: 0.25 }, segments: [{ kind: 'line' as const, to: { u: 0.25, v: 0 } }] }
+  } as unknown as RouterProfileDefinition;
+
+  const link = (overrides: Record<string, unknown> = {}) => ({
+    profileId: 'cove-12',
+    profileRevision: getRouterProfileRevision(snapshot),
+    profileSnapshot: snapshot,
+    ...overrides
+  });
+  const errs = (producedProfiles: unknown) => validateRouterToolDefinition({ ...tool(), producedProfiles }).join(' | ');
+
+  it('accepts a tool that links the profile it cuts', () => {
+    expect(errs([link()])).toBe('');
+  });
+
+  it('rejects a link list that is empty, malformed, or duplicated', () => {
+    expect(errs([])).toContain('producedProfiles is invalid');
+    expect(errs(['cove-12'])).toContain('producedProfiles[0] is invalid');
+    expect(errs([link({ unexpected: true })])).toContain('producedProfiles[0] is invalid');
+    expect(errs([link(), link()])).toContain('profileId is invalid or duplicate');
+  });
+
+  it('requires the link to pin a revision that matches the snapshot it carries', () => {
+    expect(errs([link({ profileRevision: 42 })])).toContain('profileRevision is invalid');
+    expect(errs([link({ profileRevision: 'rev-that-never-was' })])).toContain(
+      'profileRevision must match profileSnapshot'
+    );
+    expect(errs([link({ profileId: 'some-other-profile' })])).toContain('profileId must match profileSnapshot.id');
+  });
+
+  it('rejects a nominal size no tool could have', () => {
+    expect(errs([link({ nominalSize: 0 })])).toContain('nominalSize is invalid');
+  });
+
+  it('rejects a scaling window the tool cannot honour', () => {
+    expect(errs([link({ applicability: { scalable: 'sometimes' } })])).toContain('applicability is invalid');
+    expect(errs([link({ applicability: { scalable: true, unexpected: 1 } })])).toContain('applicability is invalid');
+    expect(errs([link({ applicability: { scalable: true, minScale: -1 } })])).toContain(
+      'applicability.minScale is invalid'
+    );
+    expect(errs([link({ applicability: { scalable: true, maxScale: 0 } })])).toContain(
+      'applicability.maxScale is invalid'
+    );
+    // A window whose floor sits above its ceiling admits nothing.
+    expect(errs([link({ applicability: { scalable: true, minScale: 2, maxScale: 1 } })])).toContain(
+      'applicability scale range is invalid'
+    );
+    expect(errs([link({ applicability: { scalable: false, minScale: 1, maxScale: 2 } })])).toContain(
+      'applicability scale range requires scalable'
+    );
+  });
+
+  it('keeps a necked tool narrower than its cutter and no wider than its shank', () => {
+    const necked = (neckDiameter: unknown) => validateRouterToolDefinition({ ...tool(), neckDiameter }).join(' | ');
+    expect(necked(0)).toContain('neckDiameter is invalid');
+    expect(necked(1)).toContain('neckDiameter must be smaller than cutterDiameter');
+    expect(necked(0.75)).toContain('neckDiameter cannot exceed shankDiameter');
+    expect(necked(0.25)).toBe('');
+  });
+});

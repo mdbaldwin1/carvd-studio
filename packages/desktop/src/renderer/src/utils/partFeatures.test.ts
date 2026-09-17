@@ -936,3 +936,180 @@ describe('validating a hole read back from a file', () => {
     ).toEqual([]);
   });
 });
+
+describe('serialized feature rejections', () => {
+  const errors = (feature: unknown) => validateSerializedPartFeatures([feature], 'features').join(' | ');
+
+  it('rejects a routed path with malformed parameters', () => {
+    expect(errors({ ...createRoutedPathFeature(), parameters: 'deep' })).toContain('parameters are invalid');
+    expect(errors(createRoutedPathFeature({ parameters: { depthMode: 'halfway' } as never }))).toContain(
+      'parameters.depthMode is invalid'
+    );
+    // A blind route has to say how deep it goes.
+    expect(errors(createRoutedPathFeature({ parameters: { depthMode: 'blind' } as never }))).toContain(
+      'parameters.depth is invalid'
+    );
+    expect(errors(createRoutedPathFeature({ parameters: { depthMode: 'through', depth: -1 } as never }))).toContain(
+      'parameters.depth is invalid'
+    );
+  });
+
+  it('rejects a routed path with no usable bit', () => {
+    expect(errors({ ...createRoutedPathFeature(), bit: null })).toContain('bit is invalid');
+  });
+
+  it('requires a closed route to enclose an area', () => {
+    const twoPointLoop = createRoutedPathFeature({
+      path: {
+        closed: true,
+        points: [
+          { primary: -1, secondary: 0 },
+          { primary: 1, secondary: 0 }
+        ]
+      }
+    });
+    expect(errors(twoPointLoop)).toContain('at least three points when closed');
+    expect(
+      errors(
+        createRoutedPathFeature({
+          path: {
+            closed: 'yes',
+            points: [
+              { primary: -1, secondary: 0 },
+              { primary: 1, secondary: 0 },
+              { primary: 0, secondary: 1 }
+            ]
+          } as never
+        })
+      )
+    ).toContain('path.closed is invalid');
+  });
+
+  it('rejects a rounded cut with impossible dimensions', () => {
+    expect(
+      errors(createRoundedCutFeature({ parameters: { length: 0, width: 2, cornerRadius: 0.25 } as never }))
+    ).toContain('parameters.length is invalid');
+    expect(
+      errors(createRoundedCutFeature({ parameters: { length: 4, width: -2, cornerRadius: 0.25 } as never }))
+    ).toContain('parameters.width is invalid');
+    expect(errors({ ...createRoundedCutFeature(), parameters: 7 })).toContain('parameters are invalid');
+    expect(errors(createRoundedCutFeature({ cutType: 'not-a-shape' as never }))).toContain('cutType is invalid');
+  });
+
+  it('rejects a counterbore that is not wider than its hole', () => {
+    expect(
+      errors(
+        createCircularCutFeature({
+          cutType: 'counterbore',
+          parameters: {
+            ...(createCircularCutFeature().parameters as Record<string, unknown>),
+            diameter: 0.5,
+            // A counterbore narrower than its own hole is not a counterbore.
+            counterbore: { diameter: 0.25, depth: 0.2 }
+          } as never
+        })
+      )
+    ).toContain('counterbore is invalid');
+  });
+
+  it('rejects a malformed repeat pattern', () => {
+    expect(errors(createCircularCutFeature({ pattern: { type: 'linear', count: 0 } as never }))).toContain(
+      'pattern is invalid'
+    );
+  });
+});
+
+function createEdgeProfileFeature(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'edge-1',
+    kind: 'edge_profile',
+    version: 1,
+    enabled: true,
+    target: { type: 'edge', edge: 'top_front_edge' },
+    reference: { primaryFrom: 'center' },
+    profile: 'roundover',
+    placement: { x: 0, y: 0, z: 0 },
+    parameters: { size: 0.25, depth: 0.25 },
+    ...overrides
+  };
+}
+
+describe('serialized router bit and edge profile rejections', () => {
+  const errors = (feature: unknown) => validateSerializedPartFeatures([feature], 'features').join(' | ');
+  const withBit = (bit: Record<string, unknown>) => errors(createRoutedPathFeature({ bit } as never));
+
+  it('holds a V-style bit to a real included angle and a straight bit to none', () => {
+    expect(withBit({ profile: 'v_bit', diameter: 0.5 })).toContain('bit.includedAngle is invalid');
+    expect(withBit({ profile: 'v_bit', diameter: 0.5, includedAngle: 180 })).toContain('bit.includedAngle is invalid');
+    // An included angle is meaningless on a flat-bottomed cutter.
+    expect(withBit({ profile: 'straight', diameter: 0.25, includedAngle: 60 })).toContain(
+      'bit.includedAngle is invalid'
+    );
+    expect(withBit({ profile: 'v_bit', diameter: 0.5, includedAngle: 60 })).not.toContain('includedAngle');
+  });
+
+  it('requires an undercutting bit to have a shank narrower than its cutter', () => {
+    expect(withBit({ profile: 'dovetail', diameter: 0.5, includedAngle: 14, shankDiameter: 0.5 })).toContain(
+      'bit.shankDiameter is invalid'
+    );
+    expect(withBit({ profile: 'straight', diameter: 0.25, shankDiameter: 0.25 })).toContain(
+      'bit.shankDiameter is invalid'
+    );
+  });
+
+  it('requires a slotting bit to declare a cutter height the cut can reach', () => {
+    expect(withBit({ profile: 't_slot', diameter: 0.75, shankDiameter: 0.25 })).toContain(
+      'bit.cutterHeight is invalid'
+    );
+    expect(withBit({ profile: 'straight', diameter: 0.25, cutterHeight: 0.5 })).toContain(
+      'bit.cutterHeight is invalid'
+    );
+    // The routed path above is a 0.375" blind cut, shallower than this cutter.
+    expect(withBit({ profile: 't_slot', diameter: 0.75, shankDiameter: 0.25, cutterHeight: 0.5 })).toContain(
+      'parameters.depth must be at least the bit cutterHeight'
+    );
+  });
+
+  it('rejects an edge profile with unusable library identifiers', () => {
+    expect(errors(createEdgeProfileFeature({ routerProfileId: '' }))).toContain('routerProfileId is invalid');
+    expect(errors(createEdgeProfileFeature({ routerProfileRevision: 7 }))).toContain(
+      'routerProfileRevision is invalid'
+    );
+    expect(errors(createEdgeProfileFeature({ routerToolId: '' }))).toContain('routerToolId is invalid');
+    expect(errors(createEdgeProfileFeature({ routerToolRevision: 7 }))).toContain('routerToolRevision is invalid');
+  });
+
+  it('requires a custom edge profile to carry the snapshot it names', () => {
+    const custom = errors(createEdgeProfileFeature({ profile: 'custom' }));
+    expect(custom).toContain('routerProfileId is required for a custom profile');
+    expect(custom).toContain('routerProfileSnapshot is required for a custom profile');
+
+    const snapshot = {
+      version: 1,
+      id: 'other-profile',
+      name: 'Ogee',
+      family: 'Custom',
+      source: 'generic',
+      parameters: {},
+      boundary: { start: { u: 0, v: 0.25 }, segments: [{ kind: 'line', to: { u: 0.25, v: 0 } }] }
+    };
+    expect(
+      errors(
+        createEdgeProfileFeature({ profile: 'custom', routerProfileId: 'my-profile', routerProfileSnapshot: snapshot })
+      )
+    ).toContain('routerProfileSnapshot.id must match routerProfileId');
+  });
+
+  it('requires an assigned router tool to carry its snapshot', () => {
+    expect(errors(createEdgeProfileFeature({ routerToolId: 'tool-1' }))).toContain(
+      'routerToolSnapshot is required when a tool is assigned'
+    );
+  });
+
+  it('rejects an edge profile whose size or depth is unusable', () => {
+    expect(errors({ ...createEdgeProfileFeature(), parameters: 'deep' })).toContain('parameters are invalid');
+    expect(errors(createEdgeProfileFeature({ parameters: { size: 0.25, depth: 0 } }))).toContain(
+      'parameters.depth is invalid'
+    );
+  });
+});

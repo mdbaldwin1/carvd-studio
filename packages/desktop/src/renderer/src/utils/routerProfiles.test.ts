@@ -161,3 +161,93 @@ describe('routerProfiles', () => {
     expect(resolveEdgeProfileSnapshot(feature, [{ ...snapshot, name: 'Library Changed' }])?.name).toBe(snapshot.name);
   });
 });
+
+describe('router profile segment and file rejections', () => {
+  const withSegment = (segment: unknown) =>
+    validateRouterProfileDefinition(
+      profile({ boundary: { start: { u: 0, v: 0.5 }, segments: [segment] } } as never)
+    ).join(' | ');
+
+  it('rejects a segment that is not a shape with an endpoint', () => {
+    expect(withSegment(null)).toContain('segments[0] is invalid');
+    expect(withSegment({ kind: 'line', to: { u: Number.NaN, v: 0 } })).toContain('segments[0] is invalid');
+    // An unknown kind allows no properties at all, so it is reported that way.
+    expect(withSegment({ kind: 'spiral', to: { u: 1, v: 0 } })).toContain('segments[0] has unsupported properties');
+    expect(withSegment({ kind: 'line', to: { u: 1, v: 0 }, radius: 1 })).toContain(
+      'segments[0] has unsupported properties'
+    );
+  });
+
+  it('rejects a cubic segment missing either control point', () => {
+    expect(withSegment({ kind: 'cubicBezier', to: { u: 1, v: 0 }, control2: { u: 0.5, v: 0.5 } })).toContain(
+      'segments[0].control1 is invalid'
+    );
+    expect(withSegment({ kind: 'cubicBezier', to: { u: 1, v: 0 }, control1: { u: 0.5, v: 0.5 } })).toContain(
+      'segments[0].control2 is invalid'
+    );
+  });
+
+  it('rejects arcs and elliptical arcs with unusable radii or no direction', () => {
+    expect(withSegment({ kind: 'arc', to: { u: 1, v: 0 }, radius: 0, clockwise: true })).toContain(
+      'segments[0].radius is invalid'
+    );
+    expect(withSegment({ kind: 'arc', to: { u: 1, v: 0 }, radius: 1 })).toContain('segments[0].clockwise is invalid');
+    expect(
+      withSegment({ kind: 'ellipseArc', to: { u: 1, v: 0 }, radiusU: -1, radiusV: 0.5, clockwise: true })
+    ).toContain('segments[0].radiusU is invalid');
+    expect(
+      withSegment({ kind: 'ellipseArc', to: { u: 1, v: 0 }, radiusU: 0.5, radiusV: 0, clockwise: true })
+    ).toContain('segments[0].radiusV is invalid');
+    expect(withSegment({ kind: 'ellipseArc', to: { u: 1, v: 0 }, radiusU: 0.5, radiusV: 0.5 })).toContain(
+      'segments[0].clockwise is invalid'
+    );
+  });
+
+  it('rejects a cubic segment whose controls and endpoint all sit on its start', () => {
+    // Every control collapsed onto the start point describes no curve at all.
+    expect(
+      withSegment({
+        kind: 'cubicBezier',
+        to: { u: 0, v: 0.5 },
+        control1: { u: 0, v: 0.5 },
+        control2: { u: 0, v: 0.5 }
+      })
+    ).toContain('segments[0] is degenerate');
+  });
+
+  it('keeps only the first profile for each id when parsing a library', () => {
+    const first = profile({ name: 'First' });
+    const duplicate = profile({ name: 'Second' });
+    const parsed = parseRouterProfileLibrary([first, duplicate, 'not a profile', null]);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].name).toBe('First');
+    // Parsing stamps the content revision so later library edits are detectable.
+    expect(parsed[0].revision).toBe(getRouterProfileRevision(first));
+    expect(parseRouterProfileLibrary('not an array')).toEqual([]);
+  });
+
+  it('refuses to write a profile that could not be used as an edge profile', () => {
+    expect(() =>
+      stringifyRouterProfileFile(profile({ boundary: { start: { u: 0, v: 0 }, segments: [] } } as never))
+    ).toThrow();
+  });
+
+  it('refuses a profile file that is oversized, unparseable, or from another tool', () => {
+    expect(() => parseRouterProfileFile('x'.repeat(1024 * 1024 + 1))).toThrow(/1 MiB limit/);
+    expect(() => parseRouterProfileFile('{not json')).toThrow(/not valid JSON/);
+    expect(() =>
+      parseRouterProfileFile(JSON.stringify({ format: 'something-else', version: 1, profile: profile() }))
+    ).toThrow(/not a Carvd router profile file/);
+    expect(() =>
+      parseRouterProfileFile(
+        JSON.stringify({ format: 'carvd-router-profile', version: 1, profile: profile(), extra: 1 })
+      )
+    ).toThrow(/not a Carvd router profile file/);
+    expect(() =>
+      parseRouterProfileFile(JSON.stringify({ format: 'carvd-router-profile', version: 2, profile: profile() }))
+    ).toThrow(/version 2 is not supported/);
+    expect(() =>
+      parseRouterProfileFile(JSON.stringify({ format: 'carvd-router-profile', version: 1, profile: { version: 1 } }))
+    ).toThrow();
+  });
+});

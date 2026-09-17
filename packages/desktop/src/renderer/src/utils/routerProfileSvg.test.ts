@@ -149,3 +149,69 @@ describe('SVG transform and limit rejections', () => {
     expect(result.contours[0].start).toEqual({ u: 1, v: 2 });
   });
 });
+
+describe('SVG import limits, units, and malformed markup', () => {
+  it('refuses limits and tolerances that are not usable numbers', () => {
+    expect(() => parseSvgRouterProfile(svg('<path d="M0 1 L1 0"/>'), { limits: { maxSegments: -1 } })).toThrow(
+      /limits must be non-negative safe integers/
+    );
+    expect(() => parseSvgRouterProfile(svg('<path d="M0 1 L1 0"/>'), { limits: { maxCommands: 1.5 } })).toThrow(
+      SvgProfileError
+    );
+    expect(() => parseSvgRouterProfile(svg('<path d="M0 1 L1 0"/>'), { tolerance: 0 })).toThrow(
+      /tolerance must be a positive finite number/
+    );
+    expect(() => parseSvgRouterProfile(svg('<path d="M0 1 L1 0"/>'), { tolerance: Number.NaN })).toThrow(
+      SvgProfileError
+    );
+  });
+
+  it('measures the markup against its byte length, not its character count', () => {
+    // "µ" is two UTF-8 bytes and "𝄞" is four, so the byte budget bites sooner
+    // than the character count suggests.
+    const markup = svg('<path d="M0 1 L1 0"/><!-- µ𝄞 -->');
+    expect(() => parseSvgRouterProfile(markup, { limits: { maxFileBytes: markup.length } })).toThrow(SvgProfileError);
+    expect(() => parseSvgRouterProfile(markup, { limits: { maxFileBytes: 65536 } })).not.toThrow();
+  });
+
+  it('stops once the drawing passes its output segment budget', () => {
+    expect(() => parseSvgRouterProfile(svg('<path d="M0 3 L1 2 L2 1 L3 0"/>'), { limits: { maxSegments: 2 } })).toThrow(
+      /exceeds output segment limit/
+    );
+  });
+
+  it('rejects path data it cannot read as geometry', () => {
+    expect(() => parseSvgRouterProfile(svg('<path d="M0 1 K3"/>'))).toThrow(/Malformed SVG path data/);
+    expect(() => parseSvgRouterProfile(svg('<path d="M0 1 L1"/>'))).toThrow(/command is missing coordinates/);
+    expect(() => parseSvgRouterProfile(svg('<path d="M0 1 L1 1e400"/>'))).toThrow(
+      /coordinates are invalid or exceed the coordinate limit/
+    );
+  });
+
+  it('rejects unsupported transforms and unmatched tags', () => {
+    expect(() => parseSvgRouterProfile(svg('<path d="M0 1 L1 0" transform="skewX(20)"/>'))).toThrow(
+      /Unsupported SVG transform/
+    );
+    expect(() => parseSvgRouterProfile('<svg xmlns="http://www.w3.org/2000/svg"><g></g></g></svg>')).toThrow(
+      /unmatched closing tag/
+    );
+  });
+
+  it('rejects a viewBox that is not four numbers', () => {
+    expect(() => parseSvgRouterProfile(svg('<path d="M0 1 L1 0"/>', 'viewBox="0 0 10"'))).toThrow(/viewBox is invalid/);
+  });
+
+  it('leaves coordinates in user units when the drawing declares no physical size', () => {
+    const result = parseSvgRouterProfile(svg('<path d="M0 1 L1 0"/>', 'viewBox="0 0 10 10"'));
+    expect(result.warnings.join('\n')).toContain('coordinates remain in user units');
+    expect(result.units).toBe('unknown');
+    expect(result.unitScaleToInches).toBeNull();
+  });
+
+  it('treats a width with no recognisable unit as undeclared', () => {
+    const result = parseSvgRouterProfile(
+      svg('<path d="M0 1 L1 0"/>', 'viewBox="0 0 10 10" width="furlongs" height="furlongs"')
+    );
+    expect(result.units).toBe('unknown');
+  });
+});
