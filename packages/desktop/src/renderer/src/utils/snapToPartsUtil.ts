@@ -3975,6 +3975,47 @@ function collectFeatureMateCandidates(
     }
   }
 
+  // A joint can be assembled from either side. Everything above treats the
+  // dragged part as the male half -- a rail's tenon entering a leg's mortise --
+  // but a user is just as likely to drag the mortised leg onto a rail that is
+  // already placed. Without this the leg simply never snaps, and the only way
+  // to seat it is by eye, which leaves the joint a few thousandths out.
+  // Evaluate the host as the inserted half, then invert the result so it moves
+  // the part actually being dragged.
+  const draggingSockets = getPartFeatureSockets({ ...draggingPart, position: currentPosition });
+  if (draggingSockets.length > 0) {
+    for (const hostPart of nearParts) {
+      for (const hostShape of getMateShapes(hostPart, hostPart.position)) {
+        for (const socket of draggingSockets) {
+          if (!mateShapeIsCompatibleWithSocket(hostShape, socket)) continue;
+          if (
+            hostShape.complementaryOpeningNormal &&
+            dotVec(hostShape.complementaryOpeningNormal, socket.openingNormal) > -MATE_ALIGN_THRESHOLD
+          ) {
+            continue;
+          }
+          if (hostShape.insertionDepth !== undefined && hostShape.insertionDepth - socket.depth >= MATE_DIM_TOLERANCE) {
+            continue;
+          }
+          const seatingSocket =
+            hostShape.insertionDepth !== undefined && socket.depth > hostShape.insertionDepth
+              ? { ...socket, depth: hostShape.insertionDepth }
+              : socket;
+          const match = findBestMateMatch(hostShape.obb, seatingSocket, snapThreshold);
+          if (!match) continue;
+          candidates.push({
+            delta: mulVec(match.delta, -1),
+            distance: match.distance,
+            hostPartId: hostPart.id,
+            constrainedAxes: match.constrainedAxes,
+            mateKind: hostShape.mateKind ?? socket.mateKind,
+            sourceKey: `${draggingPart.id}:${socket.featureId}`
+          });
+        }
+      }
+    }
+  }
+
   return candidates.sort((left, right) => left.distance - right.distance);
 }
 

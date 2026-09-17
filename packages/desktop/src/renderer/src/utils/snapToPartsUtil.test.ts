@@ -2530,6 +2530,60 @@ describe('snapToPartsUtil', () => {
       expect(nearlyAligned.adjustedPosition.y).not.toBeCloseTo(0.002, 6);
     });
 
+    it('seats a mortised leg dragged onto an already placed tenon', () => {
+      const leg = createTestPart({
+        id: 'mortised-leg',
+        length: 6,
+        width: 2,
+        thickness: 1,
+        position: { x: -4.75, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: -90 },
+        features: [
+          {
+            id: 'leg-mortise',
+            kind: 'rect_cut' as const,
+            version: 1 as const,
+            enabled: true,
+            cutType: 'mortise' as const,
+            target: { type: 'face' as const, face: 'top_face' as const },
+            reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+            parameters: { size: { length: 0.51, width: 1.01 }, depthMode: 'blind' as const, depth: 0.75 },
+            placement: { x: 2.745, z: 0.495 }
+          }
+        ]
+      });
+      const rail = createTestPart({
+        id: 'placed-rail',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0, z: 0 },
+        features: [
+          {
+            id: 'rail-tenon',
+            kind: 'rect_cut' as const,
+            version: 1 as const,
+            enabled: true,
+            cutType: 'tenon' as const,
+            target: { type: 'face' as const, face: 'left_end' as const },
+            reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+            parameters: { size: { length: 0.75, width: 1 }, depthMode: 'blind' as const, depth: 0.5 },
+            placement: { x: 0, z: 0.5 }
+          }
+        ]
+      });
+
+      // A joint assembles from either side. Dragging the leg onto a rail that
+      // is already in place must seat just as dragging the rail into the leg
+      // does; otherwise the only way to place the leg is by eye.
+      const displaced = { ...leg, position: { x: leg.position.x - 0.2, y: 0.05, z: 0.1 } };
+      const seated = detectFeatureMateSnaps(displaced, displaced.position, [rail], [displaced.id], 0.5);
+      expect(seated.mateHostPartId).toBe(rail.id);
+      expect(seated.adjustedPosition.x).toBeCloseTo(leg.position.x);
+      expect(seated.adjustedPosition.y).toBeCloseTo(leg.position.y);
+      expect(seated.adjustedPosition.z).toBeCloseTo(leg.position.z);
+    });
+
     it('places an off-center tenon tongue on its rendered cross-width side', () => {
       const hostPart = createTestPart({
         id: 'centered-mortise-host',
