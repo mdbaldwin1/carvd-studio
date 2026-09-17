@@ -1,0 +1,578 @@
+{
+  "description": "Mortise-and-tenon desk frame derived from a real project. The mortises are cut to the tenons exact size, so a joint that is a thousandth out genuinely interferes -- synthetic fixtures with clearance do not reproduce it.",
+  "groupOne": [
+    {
+      "id": "back-left-leg",
+      "name": "Back Left Leg",
+      "length": 29.25,
+      "width": 1.75,
+      "thickness": 1.75,
+      "position": {
+        "x": 11.474971,
+        "y": 40.243843,
+        "z": -8.869472
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 90
+      },
+      "features": [
+        {
+          "id": "fb75c7e0-9944-408d-90a7-b9d2c6268549",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "mortise",
+          "target": {
+            "type": "face",
+            "face": "bottom_face"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 2,
+              "width": 0.5
+            },
+            "depthMode": "blind",
+            "depth": 0.5625
+          },
+          "placement": {
+            "x": 26.75,
+            "z": 0.625
+          }
+        },
+        {
+          "id": "6f694ceb-d91c-466e-b040-d6360f34383a",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "mortise",
+          "target": {
+            "type": "face",
+            "face": "front_face"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 2,
+              "width": 0.5
+            },
+            "depthMode": "blind",
+            "depth": 0.5625
+          },
+          "placement": {
+            "x": 26.75,
+            "z": 0.625
+          }
+        }
+      ]
+    },
+    {
+      "id": "left-side-apron",
+      "name": "Left Side Apron",
+      "length": 17.5,
+      "width": 3,
+      "thickness": 0.75,
+      "position": {
+        "x": 11.474971,
+        "y": 53.368843,
+        "z": 0.255528
+      },
+      "rotation": {
+        "x": 90,
+        "y": 0,
+        "z": 90
+      },
+      "features": [
+        {
+          "id": "5b2ba117-6b0b-4f88-9745-06414b169c0a",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "tenon",
+          "target": {
+            "type": "face",
+            "face": "right_end"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 0.5,
+              "width": 2
+            },
+            "depthMode": "blind",
+            "depth": 0.5
+          },
+          "placement": {
+            "x": 0,
+            "z": 0.5
+          }
+        },
+        {
+          "id": "c9198c2c-2c1b-4185-bd7c-fa487c6d498a",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "tenon",
+          "target": {
+            "type": "face",
+            "face": "left_end"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 0.5,
+              "width": 2
+            },
+            "depthMode": "blind",
+            "depth": 0.5
+          },
+          "placement": {
+            "x": 0,
+            "z": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "front-left-leg",
+      "name": "Front Left Leg",
+      "length": 29.25,
+      "width": 1.75,
+      "thickness": 1.75,
+      "position": {
+        "x": 11.474971,
+        "y": 40.243843,
+        "z": 9.38177
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 90
+      },
+      "features": [
+        {
+          "id": "7d968bdf-869a-4d17-9a27-563d30b0b006",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "mortise",
+          "target": {
+            "type": "face",
+            "face": "bottom_face"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 2,
+              "width": 0.5
+            },
+            "depthMode": "blind",
+            "depth": 0.5625
+          },
+          "placement": {
+            "x": 26.75,
+            "z": 0.625
+          }
+        },
+        {
+          "id": "a3b11121-8f1b-44d7-bfe6-08bae6592592",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "mortise",
+          "target": {
+            "type": "face",
+            "face": "back_face"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 2,
+              "width": 0.5
+            },
+            "depthMode": "blind",
+            "depth": 0.5625
+          },
+          "placement": {
+            "x": 26.75,
+            "z": 0.625
+          }
+        }
+      ]
+    }
+  ],
+  "groupTwo": [
+    {
+      "id": "rear-apron",
+      "name": "Rear Apron",
+      "length": 41.5,
+      "width": 3,
+      "thickness": 0.75,
+      "position": {
+        "x": 33.100077,
+        "y": 53.368843,
+        "z": -8.787065
+      },
+      "rotation": {
+        "x": 90,
+        "y": 0,
+        "z": 0
+      },
+      "features": [
+        {
+          "id": "bf6754f6-f230-4998-bd05-1efcd80ec463",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "tenon",
+          "target": {
+            "type": "face",
+            "face": "right_end"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 0.5,
+              "width": 2
+            },
+            "depthMode": "blind",
+            "depth": 0.5
+          },
+          "placement": {
+            "x": 0,
+            "z": 0.5
+          }
+        },
+        {
+          "id": "b35f4263-d979-43fd-965c-21d03cddbb90",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "tenon",
+          "target": {
+            "type": "face",
+            "face": "left_end"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 0.5,
+              "width": 2
+            },
+            "depthMode": "blind",
+            "depth": 0.5
+          },
+          "placement": {
+            "x": 0,
+            "z": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "back-right-leg",
+      "name": "Back Right Leg",
+      "length": 29.25,
+      "width": 1.75,
+      "thickness": 1.75,
+      "position": {
+        "x": 54.225077,
+        "y": 40.243843,
+        "z": -8.787065
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 90
+      },
+      "features": [
+        {
+          "id": "7e858e03-bfe5-4c22-8212-b2cac07dd452",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "mortise",
+          "target": {
+            "type": "face",
+            "face": "top_face"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 2,
+              "width": 0.5
+            },
+            "depthMode": "blind",
+            "depth": 0.5625
+          },
+          "placement": {
+            "x": 26.75,
+            "z": 0.625
+          }
+        },
+        {
+          "id": "0c380ab5-4c0c-4468-9240-b00c0127e183",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "mortise",
+          "target": {
+            "type": "face",
+            "face": "front_face"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 2,
+              "width": 0.5
+            },
+            "depthMode": "blind",
+            "depth": 0.5625
+          },
+          "placement": {
+            "x": 26.75,
+            "z": 0.625
+          }
+        }
+      ]
+    },
+    {
+      "id": "right-side-apron",
+      "name": "Right Side Apron",
+      "length": 17.5,
+      "width": 3,
+      "thickness": 0.75,
+      "position": {
+        "x": 54.225077,
+        "y": 53.368843,
+        "z": 0.337935
+      },
+      "rotation": {
+        "x": 90,
+        "y": 0,
+        "z": 90
+      },
+      "features": [
+        {
+          "id": "070eb7fb-1b30-4822-9c1a-a7467719f4f4",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "tenon",
+          "target": {
+            "type": "face",
+            "face": "right_end"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 0.5,
+              "width": 2
+            },
+            "depthMode": "blind",
+            "depth": 0.5
+          },
+          "placement": {
+            "x": 0,
+            "z": 0.5
+          }
+        },
+        {
+          "id": "3186c1f6-9728-41e8-97a1-202df59b6efb",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "tenon",
+          "target": {
+            "type": "face",
+            "face": "left_end"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 0.5,
+              "width": 2
+            },
+            "depthMode": "blind",
+            "depth": 0.5
+          },
+          "placement": {
+            "x": 0,
+            "z": 0.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "front-right-leg",
+      "name": "Front Right Leg",
+      "length": 29.25,
+      "width": 1.75,
+      "thickness": 1.75,
+      "position": {
+        "x": 54.225077,
+        "y": 40.243843,
+        "z": 9.462935
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 90
+      },
+      "features": [
+        {
+          "id": "2a1e1fd1-09e3-4b23-8843-3417a90e6ecc",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "mortise",
+          "target": {
+            "type": "face",
+            "face": "top_face"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 2,
+              "width": 0.5
+            },
+            "depthMode": "blind",
+            "depth": 0.5625
+          },
+          "placement": {
+            "x": 26.75,
+            "z": 0.625
+          }
+        },
+        {
+          "id": "1431b8f6-f81f-4c39-ba11-fff2f0f816d2",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "mortise",
+          "target": {
+            "type": "face",
+            "face": "back_face"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 2,
+              "width": 0.5
+            },
+            "depthMode": "blind",
+            "depth": 0.5625
+          },
+          "placement": {
+            "x": 26.75,
+            "z": 0.625
+          }
+        }
+      ]
+    },
+    {
+      "id": "front-apron",
+      "name": "Front Apron",
+      "length": 41.5,
+      "width": 3,
+      "thickness": 0.75,
+      "position": {
+        "x": 33.099977,
+        "y": 53.368843,
+        "z": 9.462935
+      },
+      "rotation": {
+        "x": 90,
+        "y": 0,
+        "z": 0
+      },
+      "features": [
+        {
+          "id": "d817c046-1965-401a-a1d6-6354a313aaad",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "tenon",
+          "target": {
+            "type": "face",
+            "face": "right_end"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 0.5,
+              "width": 2
+            },
+            "depthMode": "blind",
+            "depth": 0.5
+          },
+          "placement": {
+            "x": 0,
+            "z": 0.5
+          }
+        },
+        {
+          "id": "65f0bcf9-ad9d-4aa3-8f82-b03ba586bdae",
+          "kind": "rect_cut",
+          "version": 1,
+          "enabled": true,
+          "cutType": "tenon",
+          "target": {
+            "type": "face",
+            "face": "left_end"
+          },
+          "reference": {
+            "primaryFrom": "min"
+          },
+          "parameters": {
+            "size": {
+              "length": 0.5,
+              "width": 2
+            },
+            "depthMode": "blind",
+            "depth": 0.5
+          },
+          "placement": {
+            "x": 0,
+            "z": 0.5
+          }
+        }
+      ]
+    }
+  ],
+  "seatedDelta": {
+    "note": "delta that seats group one into group two, measured by the mate solver"
+  }
+}
