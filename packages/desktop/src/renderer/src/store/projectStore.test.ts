@@ -3210,7 +3210,7 @@ describe('cut list validation of router tool feasibility', () => {
     expect(feasibility.length).toBeGreaterThan(0);
     expect(feasibility.every((issue) => issue.type === 'feature_validation')).toBe(true);
     expect(feasibility.every((issue) => issue.featureId === 'edge-1')).toBe(true);
-    expect(feasibility.every((issue) => issue.severity !== 'info')).toBe(true);
+    expect(feasibility.every((issue) => issue.severity === 'error' || issue.severity === 'warning')).toBe(true);
   });
 
   it('ignores a disabled cut entirely', () => {
