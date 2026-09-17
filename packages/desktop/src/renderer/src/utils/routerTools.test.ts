@@ -238,3 +238,104 @@ describe('routerTools', () => {
     ).toThrow('version 2 is not supported');
   });
 });
+
+describe('routerTools validation rejections', () => {
+  const errs = (overrides: Record<string, unknown>) =>
+    validateRouterToolDefinition({ ...tool(), ...overrides }).join(' | ');
+
+  it('rejects a tool that is not a record at all', () => {
+    expect(validateRouterToolDefinition(null)).toEqual(['routerTool is invalid']);
+    expect(validateRouterToolDefinition('a tool')).toEqual(['routerTool is invalid']);
+  });
+
+  it('rejects unsupported properties and a wrong format version', () => {
+    expect(errs({ somethingElse: 1 })).toContain('unsupported properties');
+    expect(errs({ version: 2 })).toContain('version is invalid');
+  });
+
+  it('rejects a revision that does not match the content', () => {
+    expect(errs({ revision: 'not-the-real-hash' })).toContain('revision does not match its content');
+  });
+
+  it('requires identity fields to be non-empty', () => {
+    expect(errs({ id: '   ' })).toContain('.id is invalid');
+    expect(errs({ name: '' })).toContain('.name is invalid');
+    expect(errs({ profileFamily: '  ' })).toContain('.profileFamily is invalid');
+    expect(errs({ source: 'homemade' })).toContain('.source is invalid');
+  });
+
+  it('requires a manufacturer tool to name its maker and part number', () => {
+    expect(errs({ manufacturer: undefined })).toContain('manufacturer is required for a manufacturer tool');
+    expect(errs({ sku: undefined })).toContain('sku is required for a manufacturer tool');
+  });
+
+  it('rejects impossible physical dimensions', () => {
+    expect(errs({ cutterDiameter: 0 })).toContain('cutterDiameter is invalid');
+    expect(errs({ shankDiameter: -1 })).toContain('shankDiameter is invalid');
+    expect(errs({ bearingDiameter: Number.NaN })).toContain('bearingDiameter is invalid');
+  });
+
+  it('requires an envelope version to come with sections', () => {
+    expect(errs({ envelopeVersion: 1 })).toContain('envelopeVersion requires sections');
+  });
+
+  it('rejects a malformed axial envelope', () => {
+    const withSections = (sections: unknown, envelopeVersion: unknown = 1) =>
+      validateRouterToolDefinition({ ...tool(), envelopeVersion, sections }).join(' | ');
+    expect(withSections([], 1)).toContain('sections is invalid');
+    expect(withSections([{ role: 'cutter', start: 0, end: 0.5, diameter: 1 }], 2)).toContain(
+      'envelopeVersion is invalid'
+    );
+    expect(withSections([{ role: 'nonsense', start: 0, end: 1, diameter: 1 }])).toContain('is invalid');
+    expect(withSections([{ role: 'cutter', start: 0, end: 1, diameter: 1, extra: true }])).toContain(
+      'unsupported properties'
+    );
+    // A section must occupy a real span, so its end has to pass its start.
+    expect(withSections([{ role: 'cutter', start: 1, end: 0.5, diameter: 1 }])).toContain('.end is invalid');
+    expect(withSections([{ role: 'cutter', start: 0, end: 1, diameter: 0 }])).toContain('.diameter is invalid');
+  });
+
+  it('allows a stackable bearing and refuses stacking anything else', () => {
+    const sections = (role: string) => [
+      { role: 'cutter', start: 0, end: 0.5, diameter: 1 },
+      { role, start: 0.5, end: 1, diameter: 0.5, stackable: true }
+    ];
+    expect(
+      validateRouterToolDefinition({ ...tool(), envelopeVersion: 1, sections: sections('bearing') }).join(' | ')
+    ).not.toContain('stackable is only valid for bearings');
+    expect(
+      validateRouterToolDefinition({ ...tool(), envelopeVersion: 1, sections: sections('shank') }).join(' | ')
+    ).toContain('stackable is only valid for bearings');
+  });
+
+  it('requires the overall length to reach every section', () => {
+    const errors = validateRouterToolDefinition({
+      ...tool(),
+      envelopeVersion: 1,
+      sections: [
+        { role: 'cutter', start: 0, end: 0.5, diameter: 1 },
+        { role: 'shank', start: 0.5, end: 2, diameter: 0.5 }
+      ],
+      overallLength: 1
+    }).join(' | ');
+    expect(errors).toContain('overallLength must reach every axial section');
+  });
+
+  it('refuses a collet insertion deeper than the modeled shank', () => {
+    const errors = validateRouterToolDefinition({
+      ...tool(),
+      envelopeVersion: 1,
+      sections: [
+        { role: 'cutter', start: 0, end: 0.5, diameter: 1 },
+        { role: 'shank', start: 0.5, end: 1, diameter: 0.5 }
+      ],
+      safeColletInsertion: 3
+    }).join(' | ');
+    expect(errors).toContain('safeColletInsertion exceeds the modeled shank span');
+  });
+
+  it('checks plain dimensions when there is no envelope', () => {
+    expect(errs({ overallLength: -2 })).toContain('overallLength is invalid');
+    expect(errs({ safeColletInsertion: 0 })).toContain('safeColletInsertion is invalid');
+  });
+});

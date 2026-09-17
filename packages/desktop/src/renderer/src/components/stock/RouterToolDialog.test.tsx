@@ -197,3 +197,52 @@ describe('RouterToolDialog detailed envelope editing', () => {
     expect(generateRouterToolSections(basic).length).toBeGreaterThan(0);
   });
 });
+
+describe('RouterToolDialog catalogue fields and scaling bounds', () => {
+  it('records maker, part number and source for a catalogue tool', () => {
+    const onSave = vi.fn();
+    render(<RouterToolDialog open onOpenChange={vi.fn()} onSave={onSave} />);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Cove 1/2' } });
+    fireEvent.change(screen.getByLabelText('Profile Family'), { target: { value: 'cove' } });
+    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'manufacturer' } });
+    fireEvent.change(screen.getByLabelText('Manufacturer (required)'), { target: { value: 'Acme' } });
+    fireEvent.change(screen.getByLabelText('SKU / Model (required)'), { target: { value: 'C-12' } });
+    fireEvent.change(screen.getByLabelText('Product Source URL (optional)'), {
+      target: { value: 'https://example.com/c-12' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Tool' }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0]).toMatchObject({
+      manufacturer: 'Acme',
+      sku: 'C-12',
+      sourceUrl: 'https://example.com/c-12',
+      source: 'manufacturer'
+    });
+  });
+
+  it('keeps the simple envelope dimensions optional', () => {
+    const onSave = vi.fn();
+    render(<RouterToolDialog open initialTool={detailedTool} onOpenChange={vi.fn()} onSave={onSave} />);
+    fireEvent.change(screen.getByLabelText('Overall Length (optional)'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Safe Collet Insertion (optional)'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Tool' }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0].overallLength).toBeUndefined();
+    expect(onSave.mock.calls[0][0].safeColletInsertion).toBeUndefined();
+  });
+
+  it('records explicit scaling bounds on a certified profile link', () => {
+    const onSave = vi.fn();
+    render(<RouterToolDialog open onOpenChange={vi.fn()} onSave={onSave} />);
+    fireEvent.change(screen.getByLabelText('Library profile to link'), { target: { value: libraryProfile.id } });
+    fireEvent.click(screen.getByRole('button', { name: /Link Profile/i }));
+    // Scaling bounds only mean something once the maker certifies scaling.
+    fireEvent.click(screen.getByRole('checkbox', { name: /Manufacturer-certified uniform scaling/ }));
+    fireEvent.change(screen.getByLabelText('Minimum Scale'), { target: { value: '0.5' } });
+    fireEvent.change(screen.getByLabelText('Maximum Scale'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Tool' }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const link = onSave.mock.calls[0][0].producedProfiles?.[0];
+    expect(link?.applicability).toMatchObject({ minScale: 0.5, maxScale: 2 });
+  });
+});
