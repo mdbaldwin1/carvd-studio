@@ -349,14 +349,17 @@ export function solveGroupMoveSnapPreview(params: {
     }
   });
 
-  // A rigid mate is holistic: even when the camera drag plane exposes only
-  // two axes, the joint may need to center its cross-section on the third.
-  // Fill only axes that no higher-priority snap already owns.
+  // A rigid mate is holistic and all-or-nothing: the joint is a single seated
+  // position, not a per-axis preference. Letting another snap keep an axis
+  // leaves a blend of the two that seats nothing, and because the parts
+  // interlock there, that blend reads as a collision and the whole move is
+  // refused -- the assembly stops short with its joints open. Take every axis
+  // the mate asks for.
   if (groupMateResult?.mateHostPartId) {
     for (const axis of ['x', 'y', 'z'] as const) {
       const mateSnapped =
         axis === 'x' ? groupMateResult.snappedX : axis === 'y' ? groupMateResult.snappedY : groupMateResult.snappedZ;
-      if (!mateSnapped || winners[axis]) continue;
+      if (!mateSnapped) continue;
       workingDelta[axis] = groupMateResult.adjustedPosition[axis] - anchorPosition[axis];
       tryApplyAxisSnap(
         axis,

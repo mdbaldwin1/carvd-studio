@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed a grouped assembly refusing to close because its joinery mate was blended with other snaps into a position that seated nothing.
+
 - Fixed a frame stopping a tenon's length short of its joints when closing on more than one joint at once.
 
 - Joints that sit a thousandth out through ordinary rounding now assemble instead of being refused as overlapping, while joinery that is genuinely cut wrong is still rejected.
