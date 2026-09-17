@@ -59,6 +59,13 @@ const _groupProjectedV = new THREE.Vector3();
 
 const DRAG_THRESHOLD_SQ = 25; // 5px squared
 
+/**
+ * Cosine of the angle within which a camera counts as looking straight down a
+ * world axis (~1.8 degrees). Inside it the drag plane snaps to that axis so
+ * motion cannot leak into the perpendicular one.
+ */
+const STRAIGHT_ON_VIEW_COSINE = 0.9995;
+
 export function useGroupDrag(
   camera: THREE.Camera,
   gl: THREE.WebGLRenderer,
@@ -95,9 +102,28 @@ export function useGroupDrag(
   );
 
   const setupDragPlane = useCallback(
-    (anchorPos: THREE.Vector3, orientationQuat?: THREE.Quaternion) => {
-      _forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
-      _normal.copy(_forward).normalize();
+    (anchorPos: THREE.Vector3, orientationQuat?: THREE.Quaternion, mode: 'camera' | 'ground' = 'camera') => {
+      if (mode === 'ground') {
+        // Shift constrains a group to the floor, matching single-part drags.
+        // Without it a group dragged in an angled view slides through all
+        // three axes at once, so pushing a tenon straight in also carries the
+        // assembly down and sideways, out of reach of its own joint.
+        _normal.set(0, 1, 0);
+      } else {
+        _forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
+        _normal.copy(_forward).normalize();
+        // In a straight-on view the plane must be exactly perpendicular to a
+        // world axis; the camera quaternion leaves a fraction of a degree of
+        // float noise that otherwise creeps into the axis being looked down.
+        const nx = Math.abs(_normal.x);
+        const ny = Math.abs(_normal.y);
+        const nz = Math.abs(_normal.z);
+        const dominant = Math.max(nx, ny, nz);
+        if (dominant >= STRAIGHT_ON_VIEW_COSINE) {
+          const sign = Math.sign(dominant === nx ? _normal.x : dominant === ny ? _normal.y : _normal.z) || 1;
+          _normal.set(dominant === nx ? sign : 0, dominant === ny ? sign : 0, dominant === nz ? sign : 0);
+        }
+      }
       _plane.setFromNormalAndCoplanarPoint(_normal, anchorPos);
 
       const quat = orientationQuat ?? _groupQuat.identity();
@@ -192,6 +218,11 @@ export function useGroupDrag(
 
           dragStarted = true;
           dragActiveRef.current = true;
+          // Holding Shift as the drag begins constrains the group to the
+          // ground plane, as it does for a single part. Fixed for the whole
+          // gesture: the committed delta is measured from the anchor taken
+          // here, so swapping planes mid-drag would change what it means.
+          const planeMode: 'camera' | 'ground' = e.shiftKey ? 'ground' : 'camera';
 
           // Compute group center anchor
           const { selectedGroupIds, selectedPartIds, editingGroupId } = useSelectionStore.getState();
@@ -249,9 +280,9 @@ export function useGroupDrag(
               'XYZ'
             );
             _groupQuat.setFromEuler(_groupEuler);
-            setupDragPlane(anchor, _groupQuat);
+            setupDragPlane(anchor, _groupQuat, planeMode);
           } else {
-            setupDragPlane(anchor);
+            setupDragPlane(anchor, undefined, planeMode);
           }
           // The mesh hit point can lie on a face several world units away
           // from the camera-facing drag plane. Project the original pointer

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Group drags now honour Shift to constrain movement to the ground plane, and lock to the view axis in straight-on views, matching single-part drags.
+
 - Fixed a grouped assembly refusing to close because its joinery mate was blended with other snaps into a position that seated nothing.
 
 - Fixed a frame stopping a tenon's length short of its joints when closing on more than one joint at once.
