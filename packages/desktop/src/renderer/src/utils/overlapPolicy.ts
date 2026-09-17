@@ -302,6 +302,7 @@ export function wouldTranslationCauseOverlap(
         // cost off the common path: only a pair that already reads as
         // overlapping is tested.
         if (isCompatibleSocketMate(movedPart, other)) continue;
+        dragDebug('overlapPolicy:blockingPair', { moved: movedPart.id, blockedBy: other.id });
         return true;
       }
     }

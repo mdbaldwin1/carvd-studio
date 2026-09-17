@@ -56,10 +56,11 @@ function buildProxyPart(bounds: PartBounds, position: Position3D): Part {
  * Joinery mates capture from further out than ordinary snaps. A joint has one
  * correct position and a user dragging a tenon at a mortise is plainly aiming
  * for it, so snapping should close the last fraction of an inch rather than
- * making them land it by hand. Generic alignment snaps stay narrow: there are
- * many of them and any given one is a guess at intent.
+ * making them land it by hand. Kept modest: a joint that grabs from too far
+ * away fights the user instead of helping. Generic alignment snaps stay
+ * narrower still -- there are many of them and any one is a guess at intent.
  */
-const JOINERY_CAPTURE_MULTIPLIER = 4;
+const JOINERY_CAPTURE_MULTIPLIER = 2;
 
 export function createPartSnapContext(params: {
   part: Part;
