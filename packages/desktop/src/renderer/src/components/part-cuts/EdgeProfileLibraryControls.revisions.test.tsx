@@ -1,8 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EdgeProfileDraft } from '@renderer/components/part-features/partFeatureEditorState';
-import type { EdgeProfileFeature, Part, RouterProfileDefinition } from '@renderer/types';
+import type { EdgeProfileFeature, Part, RouterProfileDefinition, RouterToolDefinition } from '@renderer/types';
 import { getRouterProfileRevision } from '@renderer/utils/routerProfiles';
+import { getRouterToolRevision } from '@renderer/utils/routerTools';
 import { EdgeProfileLibraryControls } from './EdgeProfileLibraryControls';
 
 const original: RouterProfileDefinition = {
@@ -24,7 +25,8 @@ const libraryProfiles: RouterProfileDefinition[] = [edited];
 vi.mock('@renderer/hooks/useRouterProfileLibrary', () => ({
   useRouterProfileLibrary: () => ({ profiles: libraryProfiles })
 }));
-vi.mock('@renderer/hooks/useRouterToolLibrary', () => ({ useRouterToolLibrary: () => ({ tools: [] }) }));
+const libraryTools: RouterToolDefinition[] = [];
+vi.mock('@renderer/hooks/useRouterToolLibrary', () => ({ useRouterToolLibrary: () => ({ tools: libraryTools }) }));
 
 const part: Part = {
   id: 'part',
@@ -146,5 +148,78 @@ describe('EdgeProfileLibraryControls profile revisions', () => {
     for (const feature of updated) {
       expect(feature.routerProfileRevision).toBe(getRouterProfileRevision(edited));
     }
+  });
+});
+
+describe('EdgeProfileLibraryControls tool assignment', () => {
+  const baseTool: RouterToolDefinition = {
+    version: 1,
+    id: 'cove-bit',
+    name: 'Cove Bit',
+    source: 'generic',
+    profileFamily: 'cove',
+    cutterDiameter: 1,
+    shankDiameter: 0.25,
+    cuttingHeight: 0.5
+  };
+
+  beforeEach(() => {
+    libraryTools.length = 0;
+  });
+
+  const renderWith = (draftOverrides: Partial<EdgeProfileDraft>) => {
+    const onChange = vi.fn();
+    render(
+      <EdgeProfileLibraryControls
+        draft={{ ...draft, ...draftOverrides }}
+        features={[]}
+        part={part}
+        onChange={onChange}
+        onBatchChange={vi.fn()}
+      />
+    );
+    return onChange;
+  };
+
+  it('assigns a physical tool and records its snapshot', () => {
+    libraryTools.push(baseTool);
+    const onChange = renderWith({});
+    fireEvent.change(screen.getByLabelText('Physical Router Tool'), { target: { value: baseTool.id } });
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const next = onChange.mock.calls[0][0] as EdgeProfileDraft;
+    expect(next.routerToolId).toBe(baseTool.id);
+    expect(next.routerToolRevision).toBe(getRouterToolRevision(baseTool));
+    expect(next.routerToolSnapshot).toMatchObject({ id: baseTool.id, name: 'Cove Bit' });
+  });
+
+  it('clears the assignment back to a generic profile', () => {
+    libraryTools.push(baseTool);
+    const onChange = renderWith({
+      routerToolId: baseTool.id,
+      routerToolRevision: getRouterToolRevision(baseTool),
+      routerToolSnapshot: baseTool
+    });
+    fireEvent.change(screen.getByLabelText('Physical Router Tool'), { target: { value: '' } });
+    const next = onChange.mock.calls[0][0] as EdgeProfileDraft;
+    expect(next.routerToolId).toBeUndefined();
+    expect(next.routerToolSnapshot).toBeUndefined();
+  });
+
+  it('keeps the assigned snapshot when the library tool changes, until asked', () => {
+    // The library copy has been reground since this cut was authored.
+    const edited: RouterToolDefinition = { ...baseTool, cuttingHeight: 0.75 };
+    libraryTools.push(edited);
+    const onChange = renderWith({
+      routerToolId: baseTool.id,
+      routerToolRevision: getRouterToolRevision(baseTool),
+      routerToolSnapshot: baseTool
+    });
+    expect(screen.getByText(/library tool changed/i)).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Update Assigned Tool' }));
+    const next = onChange.mock.calls[0][0] as EdgeProfileDraft;
+    expect(next.routerToolRevision).toBe(getRouterToolRevision(edited));
+    expect(next.routerToolSnapshot?.cuttingHeight).toBe(0.75);
   });
 });
