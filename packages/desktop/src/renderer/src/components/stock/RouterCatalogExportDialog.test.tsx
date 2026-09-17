@@ -79,3 +79,62 @@ describe('RouterCatalogExportDialog', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Save failed: disk unavailable');
   });
 });
+
+describe('RouterCatalogExportDialog metadata and filters', () => {
+  beforeEach(() => {
+    window.electronAPI = {
+      ...window.electronAPI,
+      showSaveDialog: vi.fn().mockResolvedValue({ canceled: false, filePath: '/tmp/out.carvd-router-catalog' }),
+      writeFile: vi.fn().mockResolvedValue(undefined)
+    } as typeof window.electronAPI;
+  });
+
+  const open = () =>
+    render(
+      <RouterCatalogExportDialog open onOpenChange={vi.fn()} profiles={[profile]} tools={[tool]} initialScope="tools" />
+    );
+
+  it('writes the catalog under an edited name and id', async () => {
+    open();
+    fireEvent.change(screen.getByLabelText('Catalog Name'), { target: { value: 'Acme Spring Set' } });
+    fireEvent.change(screen.getByLabelText('Catalog ID'), { target: { value: 'acme-spring' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Catalog…' }));
+    await waitFor(() => expect(window.electronAPI.writeFile).toHaveBeenCalled());
+    const written = parseRouterCatalogFile(vi.mocked(window.electronAPI.writeFile).mock.calls[0][1]);
+    expect(written.name).toBe('Acme Spring Set');
+    expect(written.id).toBe('acme-spring');
+  });
+
+  it('records a manufacturer only for a manufacturer catalog', async () => {
+    open();
+    // The manufacturer field is meaningless for a shop-made bundle, so it only
+    // appears once the catalog claims a manufacturer source.
+    expect(screen.queryByLabelText('Manufacturer')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Source'), { target: { value: 'manufacturer' } });
+    fireEvent.change(screen.getByLabelText('Manufacturer'), { target: { value: 'Acme Tooling' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Catalog…' }));
+    await waitFor(() => expect(window.electronAPI.writeFile).toHaveBeenCalled());
+    const written = parseRouterCatalogFile(vi.mocked(window.electronAPI.writeFile).mock.calls[0][1]);
+    expect(written.source).toBe('manufacturer');
+    expect(written.manufacturer).toBe('Acme Tooling');
+  });
+
+  it('narrows the listing by family and by manufacturer', () => {
+    open();
+    fireEvent.change(screen.getByLabelText('Filter export by family'), { target: { value: 'cove' } });
+    expect(screen.getByText('Shop Cove')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Filter export by family'), { target: { value: 'all' } });
+    fireEvent.change(screen.getByLabelText('Filter export by manufacturer'), { target: { value: 'Acme' } });
+    expect(screen.getByText('Cove Tool')).toBeInTheDocument();
+  });
+
+  it('lets a profile be removed from the selection when nothing depends on it', async () => {
+    render(
+      <RouterCatalogExportDialog open onOpenChange={vi.fn()} profiles={[profile]} tools={[]} initialScope="profiles" />
+    );
+    const checkbox = screen.getByRole('checkbox', { name: /Shop Cove/ });
+    expect(checkbox).not.toBeDisabled();
+    fireEvent.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+  });
+});

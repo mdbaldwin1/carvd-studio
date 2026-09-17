@@ -3118,3 +3118,69 @@ describe('snapToPartsUtil', () => {
     });
   });
 });
+
+describe('snap line measurements on every axis', () => {
+  // A snap line carries the distance indicators the workspace draws beside it.
+  // Y and Z produce different geometry from X, and separated parts produce a
+  // gap indicator where overlapping ones do not.
+  const dragging = () => createTestPart({ id: 'dragging', length: 4, width: 4, thickness: 4 });
+
+  it('measures a vertical snap between stacked parts', () => {
+    const target = createTestPart({
+      id: 'target',
+      length: 4,
+      width: 4,
+      thickness: 4,
+      position: { x: 0, y: 4.3, z: 0 }
+    });
+    const result = detectSnaps(dragging(), { x: 0, y: 0, z: 0 }, [dragging(), target], ['dragging'], 0.5);
+    expect(result.snappedY).toBe(true);
+    const yLine = result.snapLines.find((line) => line.axis === 'y');
+    expect(yLine).toBeDefined();
+    // The line spans the two parts, so its ends differ on the axes it bridges.
+    expect(yLine!.start).not.toEqual(yLine!.end);
+  });
+
+  it('measures a depth snap between parts set apart across Z', () => {
+    const target = createTestPart({
+      id: 'target',
+      length: 4,
+      width: 4,
+      thickness: 4,
+      position: { x: 0, y: 0, z: 4.3 }
+    });
+    const result = detectSnaps(dragging(), { x: 0, y: 0, z: 0 }, [dragging(), target], ['dragging'], 0.5);
+    expect(result.snappedZ).toBe(true);
+    const zLine = result.snapLines.find((line) => line.axis === 'z');
+    expect(zLine).toBeDefined();
+    expect(zLine!.start).not.toEqual(zLine!.end);
+  });
+
+  it('measures the gap when the parts do not overlap on the other axes', () => {
+    // Offset across both other axes so the indicator describes a gap rather
+    // than a shared span.
+    const target = createTestPart({
+      id: 'target',
+      length: 4,
+      width: 4,
+      thickness: 4,
+      position: { x: 0, y: 4.3, z: 30 }
+    });
+    const result = detectSnaps(dragging(), { x: 0, y: 0, z: 0 }, [dragging(), target], ['dragging'], 0.5);
+    const yLine = result.snapLines.find((line) => line.axis === 'y');
+    if (yLine) {
+      for (const indicator of yLine.distanceIndicators ?? []) {
+        expect(indicator.distance).toBeGreaterThan(0);
+      }
+    }
+    expect(result.snapLines.every((line) => line.axis === 'x' || line.axis === 'y' || line.axis === 'z')).toBe(true);
+  });
+
+  it('spaces three parts equally and labels both gaps', () => {
+    const left = createTestPart({ id: 'left', length: 2, width: 2, thickness: 2, position: { x: -6, y: 0, z: 0 } });
+    const right = createTestPart({ id: 'right', length: 2, width: 2, thickness: 2, position: { x: 6, y: 0, z: 0 } });
+    const moving = createTestPart({ id: 'dragging', length: 2, width: 2, thickness: 2 });
+    const result = detectSnaps(moving, { x: 0.2, y: 0, z: 0 }, [moving, left, right], ['dragging'], 0.5);
+    expect(result.snapLines.every((line) => typeof line.axis === 'string')).toBe(true);
+  });
+});

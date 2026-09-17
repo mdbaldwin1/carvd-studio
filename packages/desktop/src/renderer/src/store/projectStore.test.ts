@@ -1163,6 +1163,77 @@ describe('projectStore', () => {
       });
     });
 
+    describe('duplicating a selection that contains groups', () => {
+      it('copies a group with its members and renames only the group itself', () => {
+        const store = useProjectStore.getState();
+        const partId = store.addPart({ name: 'Rail' })!;
+        const groupId = store.createGroup('Frame', [{ id: partId, type: 'part' }])!;
+        useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: [groupId] });
+
+        useProjectStore.getState().duplicateSelectedParts();
+
+        const state = useProjectStore.getState();
+        expect(state.groups).toHaveLength(2);
+        expect(state.parts).toHaveLength(2);
+        // The group is what was duplicated, so it carries the copy marker; its
+        // members keep their own names.
+        expect(state.groups.map((group) => group.name).sort()).toEqual(['Frame', 'Frame (copy)']);
+        expect(state.parts.every((part) => part.name === 'Rail')).toBe(true);
+      });
+
+      it('carries nested groups along with the parent', () => {
+        const store = useProjectStore.getState();
+        const innerPartId = store.addPart({ name: 'Inner Part' })!;
+        const outerPartId = store.addPart({ name: 'Outer Part' })!;
+        const innerGroupId = store.createGroup('Inner', [{ id: innerPartId, type: 'part' }])!;
+        const outerGroupId = store.createGroup('Outer', [
+          { id: innerGroupId, type: 'group' },
+          { id: outerPartId, type: 'part' }
+        ])!;
+        useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: [outerGroupId] });
+
+        useProjectStore.getState().duplicateSelectedParts();
+
+        const state = useProjectStore.getState();
+        expect(state.groups).toHaveLength(4);
+        expect(state.parts).toHaveLength(4);
+        // Only the group that was selected reads as a copy; the nested one is
+        // carried along and keeps its name.
+        expect(state.groups.filter((group) => group.name === 'Outer (copy)')).toHaveLength(1);
+        expect(state.groups.filter((group) => group.name === 'Inner')).toHaveLength(2);
+      });
+
+      it('rebuilds membership so the copy does not share the original parts', () => {
+        const store = useProjectStore.getState();
+        const partId = store.addPart({ name: 'Rail' })!;
+        const groupId = store.createGroup('Frame', [{ id: partId, type: 'part' }])!;
+        useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: [groupId] });
+
+        useProjectStore.getState().duplicateSelectedParts();
+
+        const state = useProjectStore.getState();
+        const copy = state.groups.find((group) => group.name === 'Frame (copy)')!;
+        const copyMembers = state.groupMembers.filter((member) => member.groupId === copy.id);
+        const originalMembers = state.groupMembers.filter((member) => member.groupId === groupId);
+        expect(copyMembers).toHaveLength(1);
+        expect(originalMembers).toHaveLength(1);
+        expect(copyMembers[0].memberId).not.toBe(originalMembers[0].memberId);
+      });
+
+      it('selects the duplicate so it can be moved straight away', () => {
+        const store = useProjectStore.getState();
+        const partId = store.addPart({ name: 'Rail' })!;
+        const groupId = store.createGroup('Frame', [{ id: partId, type: 'part' }])!;
+        useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: [groupId] });
+
+        useProjectStore.getState().duplicateSelectedParts();
+
+        const selection = useSelectionStore.getState();
+        expect(selection.selectedGroupIds).toHaveLength(1);
+        expect(selection.selectedGroupIds[0]).not.toBe(groupId);
+      });
+    });
+
     describe('nested groups', () => {
       it('supports groups containing other groups', () => {
         const store = useProjectStore.getState();

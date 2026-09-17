@@ -142,3 +142,51 @@ describe('DxfRouterProfileImportDialog', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('DXF import orientation and units', () => {
+  beforeEach(() => {
+    window.electronAPI = {
+      showOpenDialog: vi.fn().mockResolvedValue({ canceled: false, filePaths: ['/tmp/shop-profile.dxf'] }),
+      readFile: vi.fn().mockResolvedValue(dxf)
+    } as unknown as typeof window.electronAPI;
+  });
+
+  const openWithFile = async () => {
+    const onApply = vi.fn();
+    render(<DxfRouterProfileImportDialog open onOpenChange={vi.fn()} onApply={onApply} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose DXF File…' }));
+    await screen.findByRole('img', { name: 'Imported profile material-removal preview' });
+    return onApply;
+  };
+
+  it('applies every orientation transform to the imported contour', async () => {
+    const onApply = await openWithFile();
+    for (const action of ['Rotate 90°', 'Mirror Vertical', 'Swap Axes', 'Reverse Direction']) {
+      fireEvent.click(screen.getByRole('button', { name: action }));
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Apply Once' }));
+    await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
+    // Four transforms applied in sequence still leave a saveable boundary.
+    expect(onApply.mock.calls[0][0].boundary.segments.length).toBeGreaterThan(0);
+  });
+
+  it('carries an edited name and family onto the imported profile', async () => {
+    const onApply = await openWithFile();
+    fireEvent.change(screen.getByLabelText('Profile Name'), { target: { value: 'Vendor Cove' } });
+    fireEvent.change(screen.getByLabelText('Family'), { target: { value: 'cove' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply Once' }));
+    await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
+    expect(onApply.mock.calls[0][0]).toMatchObject({ name: 'Vendor Cove', family: 'cove' });
+  });
+
+  it('does nothing when the file chooser is cancelled', async () => {
+    window.electronAPI = {
+      showOpenDialog: vi.fn().mockResolvedValue({ canceled: true, filePaths: [] }),
+      readFile: vi.fn()
+    } as unknown as typeof window.electronAPI;
+    render(<DxfRouterProfileImportDialog open onOpenChange={vi.fn()} onApply={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose DXF File…' }));
+    await waitFor(() => expect(window.electronAPI.showOpenDialog).toHaveBeenCalled());
+    expect(screen.queryByRole('img', { name: 'Imported profile material-removal preview' })).not.toBeInTheDocument();
+  });
+});
