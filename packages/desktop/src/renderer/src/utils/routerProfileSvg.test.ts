@@ -113,3 +113,39 @@ describe('inert SVG router-profile import', () => {
     ).toThrow('nesting limit');
   });
 });
+
+describe('SVG transform and limit rejections', () => {
+  const parse = (body: string, options = {}) => parseSvgRouterProfile(svg(body), options);
+
+  it('rejects each malformed transform with the arity it expected', () => {
+    expect(() => parse('<path d="M0 1 L1 0" transform="matrix(1 0 0 1 0)"/>')).toThrow(/matrix\(\) requires six/);
+    expect(() => parse('<path d="M0 1 L1 0" transform="translate(1 2 3)"/>')).toThrow(
+      /translate\(\) requires one or two/
+    );
+    expect(() => parse('<path d="M0 1 L1 0" transform="scale(1 2 3)"/>')).toThrow(/scale\(\) requires one or two/);
+    expect(() => parse('<path d="M0 1 L1 0" transform="rotate(10 20)"/>')).toThrow(/rotate\(\) requires one or three/);
+  });
+
+  it('rejects a transform attribute it cannot parse at all', () => {
+    expect(() => parse('<path d="M0 1 L1 0" transform="not-a-transform"/>')).toThrow(SvgProfileError);
+  });
+
+  it('refuses a document with more transforms than the limit allows', () => {
+    const nested = 'translate(1 1) '.repeat(40);
+    expect(() => parse(`<path d="M0 1 L1 0" transform="${nested}"/>`, { limits: { maxTransforms: 4 } })).toThrow(
+      /transform limit/
+    );
+  });
+
+  it('measures the document against its byte size, not its character count', () => {
+    // Multi-byte characters must count for what they actually weigh.
+    const wide = '<path d="M0 1 L1 0"/>' + `<!-- ${'é'.repeat(200)} -->`;
+    expect(() => parse(wide, { limits: { maxFileBytes: 120 } })).toThrow(SvgProfileError);
+  });
+
+  it('applies a well formed transform rather than rejecting it', () => {
+    const result = parse('<path d="M0 1 L1 0" transform="translate(1 1)"/>');
+    expect(result.errors).toEqual([]);
+    expect(result.contours[0].start).toEqual({ u: 1, v: 2 });
+  });
+});

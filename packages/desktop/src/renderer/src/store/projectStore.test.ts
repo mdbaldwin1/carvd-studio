@@ -3157,3 +3157,78 @@ describe('validatePartsForCutList', () => {
     });
   });
 });
+
+describe('cut list validation of router tool feasibility', () => {
+  const edgeProfileWithTool = (tool: Record<string, unknown> | undefined) =>
+    createTestPart({
+      id: 'profiled',
+      name: 'Profiled Edge',
+      length: 24,
+      width: 6,
+      thickness: 0.75,
+      stockId: 'stock-1',
+      features: [
+        {
+          id: 'edge-1',
+          kind: 'edge_profile',
+          version: 1,
+          enabled: true,
+          target: { type: 'edge', edge: 'top_front_edge' },
+          reference: { primaryFrom: 'min' },
+          profile: 'roundover',
+          parameters: { size: 0.5, depth: 0.5 },
+          ...(tool ? { routerToolSnapshot: tool, routerToolId: String(tool.id) } : {})
+        } as unknown as PartFeature
+      ]
+    });
+
+  const stock = createTestStock({ id: 'stock-1', length: 96, width: 12, thickness: 0.75 });
+
+  it('says nothing about tooling when no physical tool is assigned', () => {
+    const issues = validatePartsForCutList([edgeProfileWithTool(undefined)], [stock]);
+    expect(issues.some((issue) => issue.message.startsWith('Router tool feasibility'))).toBe(false);
+  });
+
+  it('reports a tool that cannot reach the profile it is assigned to', () => {
+    // A cutter far shorter than the profile depth cannot produce this edge.
+    const issues = validatePartsForCutList(
+      [
+        edgeProfileWithTool({
+          version: 1,
+          id: 'too-small',
+          name: 'Tiny Roundover',
+          source: 'generic',
+          profileFamily: 'roundover',
+          cutterDiameter: 0.125,
+          shankDiameter: 0.25,
+          cuttingHeight: 0.05
+        })
+      ],
+      [stock]
+    );
+    const feasibility = issues.filter((issue) => issue.message.startsWith('Router tool feasibility'));
+    expect(feasibility.length).toBeGreaterThan(0);
+    expect(feasibility.every((issue) => issue.type === 'feature_validation')).toBe(true);
+    expect(feasibility.every((issue) => issue.featureId === 'edge-1')).toBe(true);
+    expect(feasibility.every((issue) => issue.severity !== 'info')).toBe(true);
+  });
+
+  it('ignores a disabled cut entirely', () => {
+    const part = edgeProfileWithTool({
+      version: 1,
+      id: 'too-small',
+      name: 'Tiny Roundover',
+      source: 'generic',
+      profileFamily: 'roundover',
+      cutterDiameter: 0.125,
+      shankDiameter: 0.25,
+      cuttingHeight: 0.05
+    });
+    const disabled = {
+      ...part,
+      features: part.features!.map((feature) => ({ ...feature, enabled: false }))
+    };
+    const issues = validatePartsForCutList([disabled], [stock]);
+    expect(issues.some((issue) => issue.message.startsWith('Router tool feasibility'))).toBe(false);
+  });
+});
