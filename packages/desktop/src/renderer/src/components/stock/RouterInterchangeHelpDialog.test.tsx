@@ -73,3 +73,97 @@ describe('router interchange help', () => {
     await waitFor(() => expect(opener).toHaveFocus());
   });
 });
+
+describe('trusted publisher management', () => {
+  const publisher = {
+    version: 1 as const,
+    keyId: 'acme-2026',
+    displayName: 'Acme Tooling',
+    publicKeySpki: 'MCowBQYDK2VwAyEAhIr8GzpyWEjSVqHQWcCoY71xr7ufM6h2OdLORXVq8dE=',
+    fingerprint: 'ead7b7fca9a8db5ed12024cbe819e2856cbcb45235b35a5d605d54ab530e14e0',
+    source: 'imported catalog',
+    addedAt: '2026-09-15T00:00:00Z'
+  };
+
+  const setup = (stored: unknown = [publisher]) => {
+    const setPreference = vi.fn().mockResolvedValue(undefined);
+    window.electronAPI = {
+      ...window.electronAPI,
+      getPreference: vi.fn().mockResolvedValue(stored),
+      setPreference
+    } as typeof window.electronAPI;
+    render(<RouterInterchangeHelpDialog open onOpenChange={vi.fn()} />);
+    return setPreference;
+  };
+
+  it('says plainly when no publisher is trusted', async () => {
+    setup([]);
+    expect(await screen.findByText('No publisher keys trusted.')).toBeInTheDocument();
+  });
+
+  it('shows a trusted publisher with its fingerprint grouped for reading', async () => {
+    setup();
+    expect(await screen.findByText('Acme Tooling')).toBeInTheDocument();
+    expect(screen.getByText(/Key ID: acme-2026/)).toBeInTheDocument();
+    // Grouped in fours so a person can actually check it against a published one.
+    expect(screen.getByText(/ead7 b7fc a9a8/)).toBeInTheDocument();
+    expect(screen.getByText(/imported catalog/)).toBeInTheDocument();
+  });
+
+  it('renames a publisher and stores only the public key', async () => {
+    const setPreference = setup();
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename' }));
+    fireEvent.change(screen.getByLabelText('Publisher name'), { target: { value: 'Acme Router Bits' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save name' }));
+    await waitFor(() => expect(setPreference).toHaveBeenCalledTimes(1));
+    const [key, value] = setPreference.mock.calls[0];
+    expect(key).toBe('trustedRouterPublishers');
+    const saved = (value as (typeof publisher)[])[0];
+    expect(saved.displayName).toBe('Acme Router Bits');
+    expect(saved.publicKeySpki).toBe(publisher.publicKeySpki);
+    expect(saved).not.toHaveProperty('privateKey');
+  });
+
+  it('refuses to save an empty publisher name', async () => {
+    const setPreference = setup();
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename' }));
+    fireEvent.change(screen.getByLabelText('Publisher name'), { target: { value: '   ' } });
+    expect(screen.getByRole('button', { name: 'Save name' })).toBeDisabled();
+    expect(setPreference).not.toHaveBeenCalled();
+  });
+
+  it('abandons a rename without saving', async () => {
+    const setPreference = setup();
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename' }));
+    fireEvent.change(screen.getByLabelText('Publisher name'), { target: { value: 'Discarded' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
+    expect(setPreference).not.toHaveBeenCalled();
+  });
+
+  it('warns what removing trust means and only removes on confirmation', async () => {
+    const setPreference = setup();
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove trust…' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('return to untrusted status');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(setPreference).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove trust…' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm removal' }));
+    await waitFor(() => expect(setPreference).toHaveBeenCalledTimes(1));
+    expect(setPreference.mock.calls[0][1]).toEqual([]);
+  });
+
+  it('reports a failed example save instead of claiming success', async () => {
+    window.electronAPI = {
+      ...window.electronAPI,
+      getPreference: vi.fn().mockResolvedValue([]),
+      showSaveDialog: vi.fn().mockResolvedValue({ canceled: false, filePath: '/tmp/x.carvd-profile' }),
+      writeFile: vi.fn().mockRejectedValue(new Error('Disk is read-only'))
+    } as typeof window.electronAPI;
+    render(<RouterInterchangeHelpDialog open onOpenChange={vi.fn()} />);
+    fireEvent.click(screen.getAllByRole('button', { name: /Save .*example/i })[0]);
+    expect(await screen.findByText('Disk is read-only')).toBeInTheDocument();
+  });
+});
