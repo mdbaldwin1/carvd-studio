@@ -4001,6 +4001,11 @@ function candidateToMateSnapResult(currentPosition: Vec3, candidate: FeatureMate
   };
 }
 
+/** The closest proposal in an agreeing cluster, whose delta seats its joint exactly. */
+function bestMateMember(members: FeatureMateCandidate[]): FeatureMateCandidate {
+  return members.reduce((best, candidate) => (candidate.distance < best.distance ? candidate : best));
+}
+
 function resolvePartMateCandidateConsensus(
   currentPosition: Vec3,
   candidates: FeatureMateCandidate[]
@@ -4038,10 +4043,10 @@ function resolvePartMateCandidateConsensus(
     };
   }
 
-  const consensus = winning.members.reduce((sum, candidate) => addVec(sum, candidate.delta), { x: 0, y: 0, z: 0 });
-  consensus.x /= winning.members.length;
-  consensus.y /= winning.members.length;
-  consensus.z /= winning.members.length;
+  // Seat on the closest agreeing joint's exact delta. Averaging the cluster
+  // lands between its members and seats none of them, which leaves every joint
+  // fractionally proud and reads as a collision instead of an assembly.
+  const consensus = bestMateMember(winning.members).delta;
   const results = winning.members.map((candidate) => candidateToMateSnapResult(currentPosition, candidate));
   return {
     adjustedPosition: addVec(currentPosition, consensus),
@@ -4166,14 +4171,9 @@ export function detectGroupFeatureMateSnaps(
     };
   }
 
-  const consensus = winning.members.reduce((sum, proposal) => addVec(sum, proposal.candidate.delta), {
-    x: 0,
-    y: 0,
-    z: 0
-  });
-  consensus.x /= winning.members.length;
-  consensus.y /= winning.members.length;
-  consensus.z /= winning.members.length;
+  // As above: a rigid group seats on one agreeing joint exactly rather than on
+  // the mean of the cluster, which would seat none of them.
+  const consensus = bestMateMember(winning.members.map(({ candidate }) => candidate)).delta;
 
   return {
     adjustedPosition: addVec(anchorPosition, consensus),

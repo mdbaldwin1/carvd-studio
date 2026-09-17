@@ -2516,6 +2516,18 @@ describe('snapToPartsUtil', () => {
       expect(conflicted.mateHostPartId).toBeUndefined();
       expect(conflicted.mateConflict?.candidateCount).toBe(2);
       expect(conflicted.mateConflict?.maxDisagreement).toBeCloseTo(0.2);
+
+      // A leg that is a few thousandths out still agrees closely enough to
+      // mate, but the two joints now ask for slightly different transforms.
+      // Averaging them lands between the two and seats neither: with a mortise
+      // cut to the tenon's own size that reads as interference and the whole
+      // assembly is refused. Seat on one joint exactly instead.
+      const nudgedRightLeg = { ...rightLeg, position: { ...rightLeg.position, y: 0.004 } };
+      const nearlyAligned = detectFeatureMateSnaps(apron, apron.position, [leftLeg, nudgedRightLeg], [apron.id], 0.5);
+      expect(nearlyAligned.mateHostPartId).toBeDefined();
+      expect(nearlyAligned.mateConflict).toBeUndefined();
+      expect([0, 0.004].some((seat) => Math.abs(nearlyAligned.adjustedPosition.y - seat) < 1e-9)).toBe(true);
+      expect(nearlyAligned.adjustedPosition.y).not.toBeCloseTo(0.002, 6);
     });
 
     it('places an off-center tenon tongue on its rendered cross-width side', () => {
