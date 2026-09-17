@@ -672,6 +672,11 @@ export const useProjectStore = create<ProjectState>()(
 
           if (state.stockConstraints.preventOverlap && affectsOverlap) {
             if (wouldTransformedPartsOverlap(state.parts, transformed)) {
+              // Silently dropping a whole batch is indistinguishable from the
+              // move never happening, so say so in the drag trace.
+              dragDebug('projectStore:batchUpdateParts:rejectOverlap', {
+                partIds: [...transformed.keys()]
+              });
               return state;
             }
           }

@@ -251,6 +251,13 @@ export function wouldTransformedPartsOverlap(
 
       if (!partsOverlap(transformedPart, effectiveOther, geometryCache)) continue;
 
+      // A part sitting in its joint is assembled, not colliding. The drag-time
+      // guard already allows this, and the commit has to agree: otherwise a
+      // tenon is drawn into its mortise, previews correctly, and the whole
+      // move is then discarded, dropping the assembly back where the drag
+      // began.
+      if (isCompatibleSocketMate(transformedPart, effectiveOther)) continue;
+
       // An overlap that already exists must not become a trap. The drag-time
       // guard lets a part strictly work itself free; commits have to agree, or
       // the drag previews fine and then snaps back on release.
