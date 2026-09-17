@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RouterCatalogImportDialog } from './RouterCatalogImportDialog';
 import { stringifyRouterCatalogFile } from '@renderer/utils/routerCatalogs';
@@ -123,5 +125,80 @@ describe('RouterCatalogImportDialog', () => {
     expect(install).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: /catalog is unsigned/i }));
     await waitFor(() => expect(install).toBeEnabled());
+  });
+});
+
+describe('RouterCatalogImportDialog conflicts and publisher trust', () => {
+  const signedCatalog = () =>
+    JSON.stringify(
+      JSON.parse(
+        // The published conformance fixture: a real signature over a real payload.
+        readFileSync(
+          resolve(
+            process.cwd(),
+            '../../docs/schemas/router-interchange/examples/valid/signed-test-only.carvd-catalog.json'
+          ),
+          'utf8'
+        )
+      )
+    );
+
+  const mountWith = (verification: Record<string, unknown>, text = signedCatalog()) => {
+    window.electronAPI = {
+      ...window.electronAPI,
+      showOpenDialog: vi.fn().mockResolvedValue({ canceled: false, filePaths: ['/tmp/signed.carvd-router-catalog'] }),
+      readFile: vi.fn().mockResolvedValue(text),
+      getPreference: vi.fn().mockResolvedValue([]),
+      setPreference: vi.fn().mockResolvedValue(undefined),
+      verifyRouterCatalogSignature: vi.fn().mockResolvedValue(verification),
+      transactRouterCatalogLibraries: vi.fn().mockResolvedValue({
+        status: 'success',
+        current: { profileLibraryHash: 'a'.repeat(64), toolLibraryHash: 'b'.repeat(64) }
+      })
+    } as typeof window.electronAPI;
+    render(<RouterCatalogImportDialog open onOpenChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose .carvd-router-catalog…' }));
+  };
+
+  it('requires the full fingerprint to be confirmed before trusting a publisher', async () => {
+    mountWith({
+      status: 'verified-untrusted',
+      publisherKeyId: 'carvd-test-only-2026',
+      fingerprint: 'ead7b7fca9a8db5ed12024cbe819e2856cbcb45235b35a5d605d54ab530e14e0',
+      publicKeySpki: 'MCowBQYDK2VwAyEAhIr8GzpyWEjSVqHQWcCoY71xr7ufM6h2OdLORXVq8dE=',
+      source: 'catalog file'
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /Trust/i }));
+    const dialog = await screen.findByRole('dialog', { name: 'Trust publisher key' });
+    const confirm = within(dialog).getByRole('button', { name: /Trust/i });
+    // Trust is a deliberate act: naming the publisher is not enough on its own.
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText(/Publisher name/), { target: { value: 'Acme' } });
+    expect(confirm).toBeDisabled();
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /compared the full fingerprint/i }));
+    await waitFor(() => expect(confirm).toBeEnabled());
+  });
+
+  it('stores only the public key when trust is granted', async () => {
+    mountWith({
+      status: 'verified-untrusted',
+      publisherKeyId: 'carvd-test-only-2026',
+      fingerprint: 'ead7b7fca9a8db5ed12024cbe819e2856cbcb45235b35a5d605d54ab530e14e0',
+      publicKeySpki: 'MCowBQYDK2VwAyEAhIr8GzpyWEjSVqHQWcCoY71xr7ufM6h2OdLORXVq8dE=',
+      source: 'catalog file'
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /Trust/i }));
+    const dialog = await screen.findByRole('dialog', { name: 'Trust publisher key' });
+    fireEvent.change(within(dialog).getByLabelText(/Publisher name/), { target: { value: 'Acme Tooling' } });
+    fireEvent.change(within(dialog).getByLabelText(/Verification source/), { target: { value: 'phone call' } });
+    fireEvent.click(within(dialog).getByRole('checkbox', { name: /compared the full fingerprint/i }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /Trust/i }));
+    await waitFor(() => expect(window.electronAPI.setPreference).toHaveBeenCalled());
+    const [key, value] = vi.mocked(window.electronAPI.setPreference).mock.calls[0];
+    expect(key).toBe('trustedRouterPublishers');
+    const stored = (value as Record<string, unknown>[])[0];
+    expect(stored.publicKeySpki).toBe('MCowBQYDK2VwAyEAhIr8GzpyWEjSVqHQWcCoY71xr7ufM6h2OdLORXVq8dE=');
+    expect(stored.displayName).toBe('Acme Tooling');
+    expect(Object.keys(stored).join(' ')).not.toMatch(/private/i);
   });
 });

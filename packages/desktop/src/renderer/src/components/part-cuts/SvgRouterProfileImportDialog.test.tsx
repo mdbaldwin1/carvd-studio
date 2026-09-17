@@ -64,3 +64,74 @@ describe('SvgRouterProfileImportDialog', () => {
     expect(screen.getByRole('button', { name: 'Save to Library' })).toBeDisabled();
   });
 });
+
+describe('SvgRouterProfileImportDialog outcomes and orientation', () => {
+  beforeEach(() => {
+    addProfile.mockReset().mockResolvedValue(undefined);
+    window.electronAPI = {
+      showOpenDialog: vi.fn().mockResolvedValue({ canceled: false, filePaths: ['/tmp/profile.svg'] }),
+      readFile: vi.fn().mockResolvedValue(svg('<path d="M0 .5 C.1 .5 .2 .1 .25 0"/>'))
+    } as unknown as typeof window.electronAPI;
+  });
+
+  const openWithFile = async (onApply?: () => void) => {
+    render(<SvgRouterProfileImportDialog open onOpenChange={vi.fn()} onApply={onApply} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose SVG File…' }));
+    await screen.findByText('Source units: inches; converted to inches.');
+  };
+
+  it('saves to the library without applying to the current cut', async () => {
+    const onApply = vi.fn();
+    await openWithFile(onApply);
+    fireEvent.click(screen.getByRole('button', { name: 'Save to Library' }));
+    await waitFor(() => expect(addProfile).toHaveBeenCalledTimes(1));
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('applies once without adding to the library', async () => {
+    const onApply = vi.fn();
+    await openWithFile(onApply);
+    fireEvent.click(screen.getByRole('button', { name: 'Apply Once' }));
+    await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
+    expect(addProfile).not.toHaveBeenCalled();
+  });
+
+  it('offers only the library outcome when there is no cut to apply to', async () => {
+    await openWithFile();
+    expect(screen.getByRole('button', { name: 'Save to Library' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply Once' })).not.toBeInTheDocument();
+  });
+
+  it('reorients the imported contour before saving', async () => {
+    const onApply = vi.fn();
+    await openWithFile(onApply);
+    for (const action of ['Rotate 90°', 'Mirror Horizontal', 'Swap Axes', 'Reverse Direction']) {
+      const button = screen.queryByRole('button', { name: action });
+      if (button) fireEvent.click(button);
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Apply Once' }));
+    await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
+    expect(onApply.mock.calls[0][0].boundary.segments.length).toBeGreaterThan(0);
+  });
+
+  it('carries an edited name and family onto the import', async () => {
+    const onApply = vi.fn();
+    await openWithFile(onApply);
+    fireEvent.change(screen.getByLabelText('Profile Name'), { target: { value: 'Vendor Ogee' } });
+    fireEvent.change(screen.getByLabelText('Family'), { target: { value: 'ogee' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply Once' }));
+    await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
+    expect(onApply.mock.calls[0][0]).toMatchObject({ name: 'Vendor Ogee', family: 'ogee' });
+  });
+
+  it('does nothing when the chooser is cancelled', async () => {
+    window.electronAPI = {
+      showOpenDialog: vi.fn().mockResolvedValue({ canceled: true, filePaths: [] }),
+      readFile: vi.fn()
+    } as unknown as typeof window.electronAPI;
+    render(<SvgRouterProfileImportDialog open onOpenChange={vi.fn()} onApply={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Choose SVG File…' }));
+    await waitFor(() => expect(window.electronAPI.showOpenDialog).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: 'Save to Library' })).toBeDisabled();
+  });
+});
