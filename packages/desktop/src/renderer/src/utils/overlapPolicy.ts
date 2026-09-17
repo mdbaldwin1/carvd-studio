@@ -295,6 +295,13 @@ export function wouldTranslationCauseOverlap(
         continue;
       }
       if (partsOverlap(movedPart, other, geometryCache)) {
+        // A part sitting in its joint is assembled, not colliding. The preview
+        // names a single host, but a rail seats into a leg at each end and a
+        // frame closes on every joint at once, so the parts that are not the
+        // reported host still have to be recognised. Checking here keeps the
+        // cost off the common path: only a pair that already reads as
+        // overlapping is tested.
+        if (isCompatibleSocketMate(movedPart, other)) continue;
         return true;
       }
     }
