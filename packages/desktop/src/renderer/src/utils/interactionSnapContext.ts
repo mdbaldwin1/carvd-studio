@@ -52,6 +52,15 @@ function buildProxyPart(bounds: PartBounds, position: Position3D): Part {
   };
 }
 
+/**
+ * Joinery mates capture from further out than ordinary snaps. A joint has one
+ * correct position and a user dragging a tenon at a mortise is plainly aiming
+ * for it, so snapping should close the last fraction of an inch rather than
+ * making them land it by hand. Generic alignment snaps stay narrow: there are
+ * many of them and any given one is a guess at intent.
+ */
+const JOINERY_CAPTURE_MULTIPLIER = 4;
+
 export function createPartSnapContext(params: {
   part: Part;
   position: Position3D;
@@ -94,7 +103,14 @@ export function createPartSnapContext(params: {
     guideSnaps: snapGuides.length > 0 ? detectGuideSnaps(guideBounds, snapGuides, snapThreshold) : undefined,
     originSnaps: snapToOrigin ? detectOriginSnaps(guideBounds, snapThreshold) : undefined,
     advancedDetectors: {
-      mate: () => detectFeatureMateSnaps(part, position, referenceParts, movingPartIds, snapThreshold),
+      mate: () =>
+        detectFeatureMateSnaps(
+          part,
+          position,
+          referenceParts,
+          movingPartIds,
+          snapThreshold * JOINERY_CAPTURE_MULTIPLIER
+        ),
       surface: () => detectSurfaceAnchorSnaps(part, position, referenceParts, movingPartIds, snapThreshold),
       fraction: () =>
         detectFractionalFaceSnaps(
@@ -180,7 +196,14 @@ export function createGroupProxySnapContext(params: {
     originSnaps: snapToOrigin ? detectOriginSnaps(guideBounds, snapThreshold) : undefined,
     advancedDetectors: {
       mate: () =>
-        detectGroupFeatureMateSnaps(movingParts, delta, featurePosition, referenceParts, movingPartIds, snapThreshold),
+        detectGroupFeatureMateSnaps(
+          movingParts,
+          delta,
+          featurePosition,
+          referenceParts,
+          movingPartIds,
+          snapThreshold * JOINERY_CAPTURE_MULTIPLIER
+        ),
       surface: () =>
         detectSurfaceAnchorSnaps(subjectPart, featurePosition, referenceParts, movingPartIds, snapThreshold),
       fraction: () =>

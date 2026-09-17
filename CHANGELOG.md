@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Joinery now captures from further out, so dragging a tenon near its mortise pulls the joint together instead of requiring it to be positioned by hand first.
+
 - Group drags now honour Shift to constrain movement to the ground plane, and lock to the view axis in straight-on views, matching single-part drags.
 
 - Fixed a grouped assembly refusing to close because its joinery mate was blended with other snaps into a position that seated nothing.
