@@ -708,3 +708,88 @@ describe('dowel rod in the cut list', () => {
     expect(summary.boardFeet).toBeGreaterThan(0);
   });
 });
+
+describe('inserts in the cut list', () => {
+  const biscuit = createTestStock({
+    id: 'biscuit-20',
+    name: '#20 Biscuit',
+    length: 56 / 25.4,
+    width: 23 / 25.4,
+    thickness: 4 / 25.4,
+    pricingUnit: 'per_item',
+    pricePerUnit: 13.99,
+    form: 'insert',
+    insertKind: 'biscuit',
+    packSize: 100
+  });
+
+  const biscuitParts = (count: number) =>
+    Array.from({ length: count }, (_, index) =>
+      createTestPart({
+        id: `biscuit-${index}`,
+        name: 'Biscuit',
+        length: 56 / 25.4,
+        width: 23 / 25.4,
+        thickness: 4 / 25.4,
+        stockId: 'biscuit-20',
+        grainSensitive: false
+      })
+    );
+
+  const run = (count: number) =>
+    generateOptimizedCutList(biscuitParts(count), [biscuit], 0.125, 0.1, new Date().toISOString(), []);
+
+  it('counts biscuits into whole boxes instead of nesting them', () => {
+    const cutList = run(24);
+    const summary = cutList.statistics.byStock[0];
+    expect(summary.form).toBe('insert');
+    expect(summary.insertsNeeded).toBe(24);
+    expect(summary.packSize).toBe(100);
+    expect(summary.boardsNeeded).toBe(1);
+    expect(summary.cost).toBeCloseTo(13.99);
+  });
+
+  it('never produces a cutting diagram or a cut instruction for one', () => {
+    const cutList = run(24);
+    // Nobody cuts a #20 biscuit to size, so it reaches neither the packer nor
+    // the cut list -- it belongs on the shopping list and nowhere else.
+    expect(cutList.stockBoards).toHaveLength(0);
+    expect(cutList.instructions).toHaveLength(0);
+    expect(cutList.skippedParts).toHaveLength(0);
+  });
+
+  it('buys a second box only once the first runs out', () => {
+    expect(run(100).statistics.byStock[0].boardsNeeded).toBe(1);
+    expect(run(101).statistics.byStock[0].boardsNeeded).toBe(2);
+  });
+
+  it('does not apply overage to a box that already holds hundreds', () => {
+    // A 10% overage on one box of 100 would sell a second box for 10 spare
+    // biscuits the first one already contains.
+    expect(run(24).statistics.byStock[0].boardsNeeded).toBe(1);
+  });
+
+  it('reports no board feet, waste, or utilisation for something never cut', () => {
+    const summary = run(24).statistics.byStock[0];
+    expect(summary.boardFeet).toBe(0);
+    expect(summary.wasteSquareInches).toBe(0);
+    expect(summary.averageUtilization).toBe(0);
+  });
+
+  it('still cuts the boards in a project that also uses biscuits', () => {
+    const ply = createPlywoodStock({ id: 'ply-1' });
+    const panel = createTestPart({ id: 'panel', length: 24, width: 12, thickness: 0.75, stockId: 'ply-1' });
+    const cutList = generateOptimizedCutList(
+      [...biscuitParts(24), panel],
+      [biscuit, ply],
+      0.125,
+      0,
+      new Date().toISOString(),
+      []
+    );
+    expect(cutList.stockBoards).toHaveLength(1);
+    expect(cutList.instructions).toHaveLength(1);
+    expect(cutList.statistics.byStock.map((summary) => summary.form).sort()).toEqual(['insert', 'sheet']);
+    expect(cutList.statistics.estimatedCost).toBeCloseTo(13.99 + ply.pricePerUnit);
+  });
+});

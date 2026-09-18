@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added biscuits, Dominoes and dowel pins as stock, with the sizes you actually buy: the complete biscuit range, the complete Domino line, and fluted pins in imperial and metric. Pick a size rather than typing one, because a #20 biscuit is a #20 biscuit. They are counted into whole boxes on the shopping list and never reach the cutting diagrams, since nobody cuts a biscuit to fit.
+
 - The cut list and shopping list now talk about dowel the way you buy it: rods rather than boards, a diameter and a length rather than three dimensions, priced per rod, and measured in linear feet. Board feet are withheld for round stock, because run through a dowel they measure the box around it. Cutting diagrams skip dowel rather than drawing a sliver.
 
 - Dowels now snap into bored holes through the same joinery engine that seats a tenon in a mortise. Hold a dowel near a hole and it is drawn in and bottomed out; a repeat of holes offers one seat per hole, and a board too flat to seat is refused.

@@ -10,29 +10,43 @@ interface ShoppingListItemProps {
 }
 
 export function ShoppingListItem({ summary, units, checked, onToggle }: ShoppingListItemProps) {
-  const dimensions =
-    summary.form === 'rod'
+  const isRod = summary.form === 'rod';
+  const isInsert = summary.form === 'insert';
+  const perPack = summary.packSize && summary.packSize > 1 ? summary.packSize : null;
+
+  const dimensions = isInsert
+    ? `${formatMeasurementWithUnit(summary.stockLength, units)} × ${formatMeasurementWithUnit(summary.stockWidth, units)} × ${formatMeasurementWithUnit(summary.stockThickness, units)}`
+    : summary.form === 'rod'
       ? `${formatMeasurementWithUnit(summary.stockWidth, units)} dia × ${formatMeasurementWithUnit(summary.stockLength, units)}`
       : `${formatMeasurementWithUnit(summary.stockLength, units)} × ${formatMeasurementWithUnit(summary.stockWidth, units)} × ${formatMeasurementWithUnit(summary.stockThickness, units)}`;
 
-  const isRod = summary.form === 'rod';
-  // You buy dowel by the rod, not by the board.
-  const qtyLabel = isRod
-    ? summary.boardsNeeded === 1
-      ? 'rod'
-      : 'rods'
-    : summary.boardsNeeded === 1
-      ? 'board'
-      : 'boards';
+  // You buy dowel by the rod and biscuits by the box, not by the board.
+  const qtyLabel = isInsert
+    ? perPack
+      ? summary.boardsNeeded === 1
+        ? 'box'
+        : 'boxes'
+      : summary.boardsNeeded === 1
+        ? 'piece'
+        : 'pieces'
+    : isRod
+      ? summary.boardsNeeded === 1
+        ? 'rod'
+        : 'rods'
+      : summary.boardsNeeded === 1
+        ? 'board'
+        : 'boards';
   const hasOverage = summary.boardsNeeded > summary.actualBoardsUsed;
   // Linear feet is the honest measure of a rod, so show it however it is priced.
-  const showLinearFeet = (isRod || summary.pricingUnit === 'board_foot') && summary.linearFeet > 0;
+  const showLinearFeet = !isInsert && (isRod || summary.pricingUnit === 'board_foot') && summary.linearFeet > 0;
   const linearFeetDisplay = showLinearFeet ? ` (${summary.linearFeet.toFixed(1)} linear ft)` : '';
-  const priceDisplay = isRod
-    ? `$${summary.pricePerUnit.toFixed(2)}/rod`
-    : summary.pricingUnit === 'board_foot'
-      ? `$${summary.pricePerUnit.toFixed(2)}/bf`
-      : `$${summary.pricePerUnit.toFixed(2)}/sheet`;
+  const priceDisplay = isInsert
+    ? `$${summary.pricePerUnit.toFixed(2)}/${perPack ? 'box' : 'ea'}`
+    : isRod
+      ? `$${summary.pricePerUnit.toFixed(2)}/rod`
+      : summary.pricingUnit === 'board_foot'
+        ? `$${summary.pricePerUnit.toFixed(2)}/bf`
+        : `$${summary.pricePerUnit.toFixed(2)}/sheet`;
 
   return (
     <div
@@ -61,7 +75,12 @@ export function ShoppingListItem({ summary, units, checked, onToggle }: Shopping
           )}
           {linearFeetDisplay}
         </div>
-        {!isRod && summary.pricingUnit === 'board_foot' && (
+        {isInsert && perPack && (
+          <div className="text-[11px] text-text-muted mt-0.5">
+            {summary.insertsNeeded} needed · {perPack} per box
+          </div>
+        )}
+        {!isRod && !isInsert && summary.pricingUnit === 'board_foot' && (
           <div className="text-[11px] text-text-muted mt-0.5">{summary.boardFeet.toFixed(2)} board feet total</div>
         )}
       </div>

@@ -16,7 +16,7 @@ import {
 } from '../types';
 import { logger } from './logger';
 import { clonePartFeatures } from './partFeatures';
-import { isRectangularStockForm, resolveStockForm } from '../../../shared/stock';
+import { getPacksNeeded, isCountedStockForm, isRectangularStockForm, resolveStockForm } from '../../../shared/stock';
 
 // Internal types for the algorithm
 interface Rectangle {
@@ -70,8 +70,18 @@ export function generateOptimizedCutList(
   const stockBoards: StockBoard[] = [];
   const allSkippedParts: string[] = [];
 
+  // Inserts are bought at a fixed size and used as they come, so they are
+  // counted here and never reach the packer or the cut instructions. Nobody
+  // cuts a #20 biscuit to size.
+  const insertCounts = new Map<string, number>();
+
   for (const [stockId, stockParts] of partsByStock) {
     const stock = stocks.find((s) => s.id === stockId)!;
+
+    if (isCountedStockForm(resolveStockForm(stock))) {
+      insertCounts.set(stockId, stockParts.length);
+      continue;
+    }
 
     // Generate cut instructions for all parts of this stock
     // For glue-up panels, this creates individual strip instructions
@@ -112,7 +122,7 @@ export function generateOptimizedCutList(
   }
 
   // Calculate statistics (use original part count, not expanded strips)
-  const statistics = calculateStatistics(stockBoards, stocks, overageFactor, validParts.length);
+  const statistics = calculateStatistics(stockBoards, stocks, overageFactor, validParts.length, insertCounts);
 
   return {
     id: uuidv4(),
@@ -508,7 +518,8 @@ function calculateStatistics(
   stockBoards: StockBoard[],
   stocks: Stock[],
   overageFactor: number,
-  totalParts: number
+  totalParts: number,
+  insertCounts: Map<string, number> = new Map()
 ): CutListStatistics {
   // Group boards by stock
   const boardsByStock = new Map<string, StockBoard[]>();
@@ -591,6 +602,38 @@ function calculateStatistics(
     totalUsed += stockUsed;
     estimatedCost += cost;
     totalWasteCost += stockWasteCost;
+  }
+
+  // Inserts never reach the packer, so they are summarised straight from the
+  // count. Overage is skipped: a box already holds far more than a project
+  // needs, and rounding a box count up again would just sell another box.
+  for (const [stockId, insertsNeeded] of insertCounts) {
+    const stock = stocks.find((s) => s.id === stockId);
+    if (!stock) continue;
+    const packsNeeded = getPacksNeeded(insertsNeeded, stock.packSize);
+    const cost = packsNeeded * stock.pricePerUnit;
+
+    byStock.push({
+      stockId,
+      stockName: stock.name,
+      boardsNeeded: packsNeeded,
+      boardFeet: 0,
+      cost,
+      stockLength: stock.length,
+      stockWidth: stock.width,
+      stockThickness: stock.thickness,
+      pricingUnit: stock.pricingUnit,
+      pricePerUnit: stock.pricePerUnit,
+      linearFeet: 0,
+      actualBoardsUsed: packsNeeded,
+      averageUtilization: 0,
+      wasteSquareInches: 0,
+      form: 'insert',
+      insertsNeeded,
+      packSize: stock.packSize
+    });
+
+    estimatedCost += cost;
   }
 
   const wastePercentage = totalUsed + totalWaste > 0 ? (totalWaste / (totalUsed + totalWaste)) * 100 : 0;

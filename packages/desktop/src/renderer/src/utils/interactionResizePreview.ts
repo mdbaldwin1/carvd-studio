@@ -12,7 +12,7 @@ import {
 import { resolveReferenceEntities } from './interactionSelection';
 import type { InteractionSelectionEntity } from './interactionSelection';
 import { solveResizeReferencePreview, type ReferenceRelation } from './referenceRelations';
-import { resolveStockForm } from '../../../shared/stock';
+import { isStockDimensionFixed } from '../../../shared/stock';
 
 type Vec3 = { x: number; y: number; z: number };
 type Dimensions = { length: number; width: number; thickness: number };
@@ -117,12 +117,21 @@ export function solveResizePreview(params: {
 
   // Ripping makes a board narrower; nothing makes a dowel thinner. A round
   // part's diameter therefore belongs to its stock, so every handle on it
-  // resizes length alone and dimension snapping never offers the other two.
-  if (assignedStock && resolveStockForm(assignedStock) === 'rod') {
-    newWidth = assignedStock.width;
-    newThickness = assignedStock.thickness;
-    resizingDimensions.width = false;
-    resizingDimensions.thickness = false;
+  // resizes length alone. An insert is fixed in every direction -- a #20
+  // biscuit is a #20 biscuit -- so no handle on one changes anything.
+  if (assignedStock) {
+    if (isStockDimensionFixed(assignedStock, 'length')) {
+      newLength = assignedStock.length;
+      resizingDimensions.length = false;
+    }
+    if (isStockDimensionFixed(assignedStock, 'width')) {
+      newWidth = assignedStock.width;
+      resizingDimensions.width = false;
+    }
+    if (isStockDimensionFixed(assignedStock, 'thickness')) {
+      newThickness = assignedStock.thickness;
+      resizingDimensions.thickness = false;
+    }
   }
 
   const snapTargetParts =

@@ -151,3 +151,68 @@ describe('StockFormFields stock type', () => {
     expect(screen.getByRole('option', { name: 'Per Rod' })).toBeInTheDocument();
   });
 });
+
+describe('StockFormFields inserts', () => {
+  const renderStock = (formData: StockFormData) => {
+    const onChange = vi.fn();
+    render(<StockFormFields formData={formData} onChange={onChange} />);
+    return onChange;
+  };
+
+  const biscuit: StockFormData = {
+    name: '#20 Biscuit',
+    length: 56 / 25.4,
+    width: 23 / 25.4,
+    thickness: 4 / 25.4,
+    grainDirection: 'none',
+    pricingUnit: 'per_item',
+    pricePerUnit: 13.99,
+    color: '#d9c49a',
+    form: 'insert',
+    insertKind: 'biscuit',
+    packSize: 100
+  };
+
+  it('picks an insert from the catalogue instead of typing its size', () => {
+    renderStock(biscuit);
+    expect((screen.getByLabelText('Insert Type') as HTMLSelectElement).value).toBe('biscuit');
+    expect((screen.getByLabelText('Size') as HTMLSelectElement).value).toBe('insert-biscuit-20');
+    // Nothing about a manufactured insert is typed in.
+    expect(screen.queryByRole('textbox', { name: 'Diameter' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Dimensions (L × W × T)')).not.toBeInTheDocument();
+  });
+
+  it('takes the whole manufactured size when a different one is chosen', () => {
+    const onChange = renderStock(biscuit);
+    fireEvent.change(screen.getByLabelText('Size'), { target: { value: 'insert-biscuit-0' } });
+    const next = onChange.mock.calls[0][0];
+    expect(next.name).toBe('#0 Biscuit');
+    expect(next.length).toBeCloseTo(47 / 25.4, 6);
+    // A biscuit's box quantity is part of what it is, not a separate setting.
+    expect(next.packSize).toBe(100);
+    expect(next.grainDirection).toBe('none');
+  });
+
+  it('switches families and lands on a real size', () => {
+    const onChange = renderStock(biscuit);
+    fireEvent.change(screen.getByLabelText('Insert Type'), { target: { value: 'domino' } });
+    const next = onChange.mock.calls[0][0];
+    expect(next.insertKind).toBe('domino');
+    expect(next.thickness).toBeCloseTo(4 / 25.4, 6);
+  });
+
+  it('shows how an insert is sold', () => {
+    renderStock(biscuit);
+    expect(screen.getByText(/sold 100 to the box/)).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Per Box' })).toBeInTheDocument();
+  });
+
+  it('starts a new insert on a catalogue entry rather than a blank one', () => {
+    const onChange = renderStock(walnut);
+    fireEvent.change(screen.getByLabelText('Stock Type'), { target: { value: 'insert' } });
+    const next = onChange.mock.calls[0][0];
+    expect(next.form).toBe('insert');
+    expect(next.insertKind).toBe('dowel_pin');
+    expect(next.packSize).toBeGreaterThan(1);
+  });
+});

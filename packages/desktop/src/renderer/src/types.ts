@@ -717,6 +717,8 @@ export interface StockSummary {
   averageUtilization: number; // average utilization across boards of this type
   wasteSquareInches: number; // total waste for this stock type
   form: StockForm; // how this stock is bought, which sets the words used for it
+  insertsNeeded?: number; // pieces the project uses, for stock counted not cut
+  packSize?: number; // how many come in one box, for stock counted not cut
 }
 
 // Statistics for the entire cut list
