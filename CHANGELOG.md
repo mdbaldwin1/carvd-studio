@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added Transfer Holes to Mating Part, the software version of dowel centres. Bore the holes where you want them, put the parts together, and right-click the bored part to mark them across the joint line. Every hole of a repeat is marked, and any that land off the edge of the mating part are reported rather than silently drilled into thin air.
+
 - Added biscuits, Dominoes and dowel pins as stock, with the sizes you actually buy: the complete biscuit range, the complete Domino line, and fluted pins in imperial and metric. Pick a size rather than typing one, because a #20 biscuit is a #20 biscuit. They are counted into whole boxes on the shopping list and never reach the cutting diagrams, since nobody cuts a biscuit to fit.
 
 - The cut list and shopping list now talk about dowel the way you buy it: rods rather than boards, a diameter and a length rather than three dimensions, priced per rod, and measured in linear feet. Board feet are withheld for round stock, because run through a dowel they measure the box around it. Cutting diagrams skip dowel rather than drawing a sliver.

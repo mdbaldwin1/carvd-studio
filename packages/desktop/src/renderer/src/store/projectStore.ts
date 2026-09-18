@@ -16,7 +16,9 @@ import {
   CutList,
   PartValidationIssue,
   EmbeddedStock,
-  CustomShoppingItem
+  CustomShoppingItem,
+  CircularCutFeature,
+  FaceTarget
 } from '../types';
 import { STOCK_COLORS } from '../constants';
 import { UNTITLED_PROJECT_NAME } from '../constants/appDefaults';
@@ -35,6 +37,8 @@ import {
   normalizeAssemblyPart,
   normalizePart
 } from '../utils/partFeatures';
+import { findHolesOffTheFace, findMatingFace, getHolesOnFace, transferHolesToMatingFace } from '../utils/holeTransfer';
+import { FACE_TARGETS } from '../components/part-features/partFeatureEditorState';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
 import { validateEndCutFeature } from '../utils/endCutUtils';
 import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
@@ -96,6 +100,7 @@ interface ProjectState {
   updateParts: (ids: string[], updates: Partial<Part>) => void;
   batchUpdateParts: (updates: Array<{ id: string; changes: Partial<Part> }>) => void;
   addDowelJoint: (input: AddDowelJointInput) => string | null;
+  transferHolesToMate: (partId: string, depth: number, face?: FaceTarget) => number;
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
   rotateSelectedParts: (axis: 'x' | 'y' | 'z', degrees: number, pivot: { x: number; y: number; z: number }) => void;
   deletePart: (id: string) => void;
@@ -730,6 +735,70 @@ export const useProjectStore = create<ProjectState>()(
             .showToast(error instanceof Error ? error.message : 'Unable to create the dowel joint.', 'warning');
           return null;
         }
+      },
+
+      /**
+       * Dowel centres: mark the holes already bored in one part onto whatever
+       * is pressed against it. Returns how many marks landed.
+       */
+      transferHolesToMate: (partId, depth, face) => {
+        const { parts } = get();
+        const source = parts.find((part) => part.id === partId);
+        if (!source) return 0;
+
+        // With no face named, mark from every bored face at once -- the same as
+        // dropping centres into every hole and pressing the pieces together.
+        const faces = face ? [face] : FACE_TARGETS;
+        const bored = faces.filter((candidate) => getHolesOnFace(source, candidate).length > 0);
+        if (bored.length === 0) {
+          useUIStore.getState().showToast('Bore the holes first, then transfer them.', 'warning');
+          return 0;
+        }
+
+        const additions = new Map<string, CircularCutFeature[]>();
+        let landedCount = 0;
+        let missedCount = 0;
+        let matedFaces = 0;
+
+        for (const boredFace of bored) {
+          const mate = findMatingFace(source, boredFace, parts);
+          if (!mate) continue;
+          matedFaces += 1;
+
+          const transferred = transferHolesToMatingFace(source, boredFace, mate.part, mate.face, depth);
+          const missed = new Set(findHolesOffTheFace(mate.part, mate.face, transferred));
+          missedCount += missed.size;
+
+          const landed = transferred.filter((entry) => !missed.has(entry)).map((entry) => entry.feature);
+          if (landed.length === 0) continue;
+          landedCount += landed.length;
+          additions.set(mate.part.id, [...(additions.get(mate.part.id) ?? []), ...landed]);
+        }
+
+        if (matedFaces === 0) {
+          useUIStore
+            .getState()
+            .showToast('Put the parts together first — there is nothing against the bored face.', 'warning');
+          return 0;
+        }
+
+        if (landedCount > 0) {
+          set((state) => ({
+            parts: state.parts.map((part) => {
+              const extra = additions.get(part.id);
+              return extra ? { ...part, features: [...(part.features ?? []), ...extra] } : part;
+            }),
+            isDirty: true
+          }));
+          get().markCutListStale();
+        }
+
+        if (missedCount > 0) {
+          useUIStore
+            .getState()
+            .showToast(`${missedCount} hole${missedCount === 1 ? '' : 's'} landed off the mating part.`, 'warning');
+        }
+        return landedCount;
       },
 
       moveSelectedParts: (delta) => {

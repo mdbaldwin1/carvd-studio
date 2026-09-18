@@ -11,6 +11,12 @@ import { getFeatureLimits } from '../../utils/featureLimits';
 import { analytics } from '../../utils/analytics';
 import { bucketCount } from '../../../../shared/analytics';
 import { getContainingGroupId, resolveExplicitSelectedPartIds } from '../../utils/interactionSelection';
+
+/**
+ * Half an inch is the depth a 3/8" dowel is usually taken into each half of a
+ * joint. It is a starting point the operator edits, not a rule.
+ */
+const DEFAULT_TRANSFER_DEPTH = 0.5;
 import { MenuPanel, MenuItemButton, MenuSeparator, MenuLabel, MenuSub } from '../ui/context-menu';
 
 interface PartContextMenuProps {
@@ -30,6 +36,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const requestDeleteParts = useUIStore((s) => s.requestDeleteParts);
   const requestDeleteGroups = useUIStore((s) => s.requestDeleteGroups);
   const resetSelectedPartsToStock = useProjectStore((s) => s.resetSelectedPartsToStock);
+  const transferHolesToMate = useProjectStore((s) => s.transferHolesToMate);
   const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
   const toggleReference = useSnapStore((s) => s.toggleReference);
@@ -64,6 +71,10 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
     selectedPartIds.length === 1 && selectedGroupIds.length === 0
       ? (parts.find((part) => part.id === selectedPartIds[0]) ?? null)
       : null;
+
+  // Only worth offering once there is something to mark across.
+  const singleSelectedPartHasHoles =
+    singleSelectedPart?.features?.some((feature) => feature.enabled && feature.kind === 'circular_cut') ?? false;
 
   // Check if any selected part has a stock assigned
   const selectedParts = parts.filter((p) => effectiveSelectedPartIds.includes(p.id));
@@ -215,6 +226,23 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
     onClose();
   };
 
+  /**
+   * Dowel centres. The parts are already together on the bench, so marking
+   * across the joint line is one action on holes that already exist.
+   */
+  const handleTransferHoles = () => {
+    if (!singleSelectedPart) {
+      showToast('Select the part you bored', 'warning');
+      onClose();
+      return;
+    }
+    const marked = transferHolesToMate(singleSelectedPart.id, DEFAULT_TRANSFER_DEPTH);
+    if (marked > 0) {
+      showToast(`Marked ${marked} hole${marked === 1 ? '' : 's'} on the mating part`, 'success');
+    }
+    onClose();
+  };
+
   const handleEditCuts = () => {
     if (isEditingPartCuts) {
       showToast('Finish editing part cuts first', 'warning');
@@ -248,6 +276,9 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
       <MenuItemButton onClick={handleCenter}>Center View</MenuItemButton>
       <MenuItemButton onClick={handleCopy}>Copy</MenuItemButton>
       {singleSelectedPart && <MenuItemButton onClick={handleEditCuts}>Edit Part Cuts...</MenuItemButton>}
+      {singleSelectedPartHasHoles && (
+        <MenuItemButton onClick={handleTransferHoles}>Transfer Holes to Mating Part</MenuItemButton>
+      )}
       {singleSelectedPart && (singleSelectedPart.features?.length ?? 0) > 0 && (
         <MenuItemButton onClick={handleCopyCuts}>Copy Cuts</MenuItemButton>
       )}
