@@ -2,9 +2,11 @@
  * File menu dropdown for the app header
  */
 
-import { ChevronDown, File, FolderOpen, Save, FilePlus } from 'lucide-react';
+import { ChevronDown, File, FolderOpen, Save, FilePlus, Wrench } from 'lucide-react';
 import { openProjectFromPath } from '../../utils/fileOperations';
 import { useUIStore } from '../../store/uiStore';
+import { useProjectStore } from '../../store/projectStore';
+import { countLegacyDowelJoints } from '../../utils/dowelJointMigration';
 import { Button } from '@renderer/components/ui/button';
 import {
   DropdownMenu,
@@ -28,6 +30,10 @@ interface FileMenuProps {
 }
 
 export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRefreshRecent }: FileMenuProps) {
+  // Only offered while there is something to convert, so it disappears for
+  // good once a project has been brought across.
+  const legacyDowelJoints = useProjectStore((s) => countLegacyDowelJoints(s.parts));
+  const convertLegacyDowelJoints = useProjectStore((s) => s.convertLegacyDowelJoints);
   const showToast = useUIStore((s) => s.showToast);
 
   const isMac = window.navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
@@ -98,6 +104,18 @@ export function FileMenu({ onNew, onOpen, onSave, onSaveAs, recentProjects, onRe
           <span className="flex-1">Save</span>
           <DropdownMenuShortcut>{modKey}S</DropdownMenuShortcut>
         </DropdownMenuItem>
+
+        {legacyDowelJoints > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => convertLegacyDowelJoints()}>
+              <Wrench size={16} />
+              <span className="flex-1">
+                Convert {legacyDowelJoints} Dowel Joint{legacyDowelJoints === 1 ? '' : 's'} to Dowels
+              </span>
+            </DropdownMenuItem>
+          </>
+        )}
 
         <DropdownMenuItem onSelect={onSaveAs}>
           <Save size={16} />

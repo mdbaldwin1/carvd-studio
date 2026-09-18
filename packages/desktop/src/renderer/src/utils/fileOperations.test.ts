@@ -110,7 +110,7 @@ beforeEach(() => {
 // ============================================================
 
 describe('saveProject', () => {
-  it('refuses to write a project containing an invalid dowel assembly', async () => {
+  it('still writes a project whose legacy dowel joints no longer agree', async () => {
     const assembly = createTestAssembly({
       parts: [
         {
@@ -147,9 +147,11 @@ describe('saveProject', () => {
 
     const result = await saveProject();
 
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/assembly .*matching hole/i);
-    expect(window.electronAPI.writeFile).not.toHaveBeenCalled();
+    // Losing an afternoon's work because two legacy holes disagree is far
+    // worse than saving a project that wants converting -- and converting is
+    // what fixes it.
+    expect(result.success).toBe(true);
+    expect(window.electronAPI.writeFile).toHaveBeenCalled();
   });
 
   it('M3 does not mark edits made during an older file write clean', async () => {

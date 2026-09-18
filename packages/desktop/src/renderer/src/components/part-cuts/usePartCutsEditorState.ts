@@ -113,7 +113,6 @@ export function usePartCutsEditorState({
   /** Identity of the cut as the list last presented it, to spot an outside change. */
   const lastSeenFeature = useRef<string | null>(null);
   const [panelMode, setPanelMode] = useState<CutsPanelMode>('list');
-  const [showDowelDialog, setShowDowelDialog] = useState(false);
   const workspaceRootRef = useRef<HTMLDivElement | null>(null);
 
   // The workspace replaces the whole editor surface; move focus into it so
@@ -622,8 +621,6 @@ export function usePartCutsEditorState({
     setDraft,
     panelMode,
     setPanelMode,
-    showDowelDialog,
-    setShowDowelDialog,
     workspaceRootRef,
     projectParts,
     addDowelJoint,

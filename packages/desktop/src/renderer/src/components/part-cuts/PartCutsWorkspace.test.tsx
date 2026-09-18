@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { createTestPart } from '../../../../../tests/helpers/factories';
 import type { CircularCutFeature, EndCutFeature, PartFeature, RectCutFeature } from '@renderer/types';
 import { useProjectStore } from '@renderer/store/projectStore';
-import { useSelectionStore } from '@renderer/store/selectionStore';
 import { validateCircularCut } from '@renderer/utils/roundCutUtils';
 import { expandCircularCut } from '@renderer/utils/roundCutUtils';
 import { buildDraftFromFeature } from '@renderer/components/part-features/partFeatureEditorState';
@@ -420,51 +419,6 @@ describe('PartCutsWorkspace', () => {
     renderWorkspace({ draftFeatures: [createMortiseFeature()] });
 
     expect(screen.getByRole('checkbox', { name: 'Enable cut 1' })).toBeChecked();
-  });
-
-  it('opens paired dowel joinery from the Joinery group', () => {
-    const part = createTestPart({ id: 'first', name: 'Lower rail' });
-    const mate = createTestPart({ id: 'second', name: 'Upper rail', position: { x: 0, y: 1, z: 0 } });
-    useProjectStore.setState({ parts: [part, mate] });
-    renderWorkspace({ part });
-
-    fireEvent.click(screen.getByTitle('Add Cut'));
-    expect(screen.getByText('Joinery')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^Create Dowel Joint/ }));
-
-    expect(screen.getByRole('dialog', { name: 'Create Dowel Joint' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Mating Part')).toHaveValue('second');
-  });
-
-  it('requires a dirty cuts draft to be saved or discarded before creating a dowel joint', () => {
-    const part = createTestPart({ id: 'first', name: 'Lower rail' });
-    const mate = createTestPart({ id: 'second', name: 'Upper rail', position: { x: 0, y: 1, z: 0 } });
-    useProjectStore.setState({ parts: [part, mate] });
-    renderWorkspace({ part, draftFeatures: [createMortiseFeature()], hasUnsavedChanges: true });
-
-    fireEvent.click(screen.getByTitle('Add Cut'));
-
-    expect(screen.getByText('Save or discard part changes first')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Create Dowel Joint/ })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: /^Create Dowel Joint/ }));
-    expect(screen.queryByRole('dialog', { name: 'Create Dowel Joint' })).not.toBeInTheDocument();
-  });
-
-  it('returns to the project with both dowel parts selected for alignment', () => {
-    const part = createTestPart({ id: 'first', name: 'Lower rail' });
-    const mate = createTestPart({ id: 'second', name: 'Upper rail', position: { x: 20, y: 10, z: 0 } });
-    const onExit = vi.fn();
-    useProjectStore.setState({ parts: [part, mate] });
-    useSelectionStore.getState().clearSelection();
-    renderWorkspace({ part, onExit });
-
-    fireEvent.click(screen.getByTitle('Add Cut'));
-    fireEvent.click(screen.getByRole('button', { name: /^Create Dowel Joint/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Back to Project & Align Parts' }));
-
-    expect(useSelectionStore.getState().selectedPartIds).toEqual(['first', 'second']);
-    expect(onExit).toHaveBeenCalled();
   });
 
   it('creates an angled patterned round hole from the Round Cuts group', () => {

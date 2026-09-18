@@ -1,7 +1,4 @@
 import { PartCutsPreviewCanvas } from '@renderer/components/part-cuts/PartCutsPreviewCanvas';
-import { DowelJointDialog } from '@renderer/components/part-cuts/DowelJointDialog';
-import { useProjectStore } from '@renderer/store/projectStore';
-import { useSelectionStore } from '@renderer/store/selectionStore';
 import { normalizeRectCutDraft } from '@renderer/components/part-features/partFeatureEditorState';
 import {} from '@renderer/utils/endCutUtils';
 import { usePartCutsEditor } from './PartCutsEditorContext';
@@ -25,16 +22,9 @@ export function PartCutsWorkspace() {
     units,
     hoveredTarget,
     pendingTarget,
-    onDraftFeaturesChange,
     onHoveredTargetChange,
-    onExit,
     setDraft,
-    setPanelMode,
-    showDowelDialog,
-    setShowDowelDialog,
     workspaceRootRef,
-    projectParts,
-    addDowelJoint,
     featureConflicts,
     inspectorDraft,
     handlePreviewTargetActivation,
@@ -101,30 +91,6 @@ export function PartCutsWorkspace() {
 
       {/* The inspector only; the cut list is a sidebar section and the type
             picker is a dialog. */}
-      {showDowelDialog && (
-        <DowelJointDialog
-          open
-          firstPart={part}
-          candidateParts={projectParts.filter((candidate) => candidate.id !== part.id)}
-          onClose={() => {
-            setShowDowelDialog(false);
-            setPanelMode('list');
-          }}
-          onCreate={(input) => {
-            const jointId = addDowelJoint(input);
-            if (!jointId) return null;
-            const refreshedPart = useProjectStore.getState().parts.find((candidate) => candidate.id === part.id);
-            if (refreshedPart) onDraftFeaturesChange(refreshedPart.features ?? []);
-            return jointId;
-          }}
-          onAlignRequested={({ firstPartId, secondPartId }) => {
-            setShowDowelDialog(false);
-            setPanelMode('list');
-            useSelectionStore.getState().selectParts([firstPartId, secondPartId]);
-            onExit();
-          }}
-        />
-      )}
       <AddCutDialog />
     </div>
   );

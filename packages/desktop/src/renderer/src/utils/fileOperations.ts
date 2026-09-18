@@ -21,7 +21,6 @@ import type { CarvdFile } from '../types';
 import { logger } from './logger';
 import { analytics } from './analytics';
 import { bucketCount } from '../../../shared/analytics';
-import { validateAssemblyDowelRelationships, validateDowelRelationships } from './dowelJointUtils';
 
 export interface FileOperationResult {
   success: boolean;
@@ -196,12 +195,10 @@ async function saveToPath(
   const snapshot = captureDocumentFields(state);
 
   try {
-    const dowelErrors = validateDowelRelationships(state.parts);
-    if (dowelErrors.length > 0) return { success: false, error: dowelErrors.join('\n') };
-    const assemblyDowelErrors = state.assemblies.flatMap((assembly) =>
-      validateAssemblyDowelRelationships(assembly.parts).map((error) => `Assembly "${assembly.name}": ${error}`)
-    );
-    if (assemblyDowelErrors.length > 0) return { success: false, error: assemblyDowelErrors.join('\n') };
+    // A dowel joint authored the old way no longer blocks a save. Losing an
+    // afternoon's work because two legacy holes disagree is a far worse
+    // outcome than saving a project that needs converting, and converting is
+    // what fixes it.
     // Generate thumbnail before saving (only if we have parts to show)
     let thumbnail: ProjectThumbnail | null = null;
     if (state.parts.length > 0) {
