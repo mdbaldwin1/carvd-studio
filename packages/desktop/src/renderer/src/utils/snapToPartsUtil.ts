@@ -2863,6 +2863,10 @@ function lenVec(a: Vec3): number {
   return Math.sqrt(dotVec(a, a));
 }
 
+function crossVec(a: Vec3, b: Vec3): Vec3 {
+  return { x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x };
+}
+
 function normalizeVec(a: Vec3): Vec3 {
   const l = lenVec(a);
   if (l < 1e-9) return { x: 0, y: 0, z: 0 };
@@ -3600,7 +3604,7 @@ export interface FeatureSocket {
   halfExtent2: number;
   /** Depth of the socket (along -openingNormal) */
   depth: number;
-  mateKind: RectCutFeature['cutType'];
+  mateKind: RectCutFeature['cutType'] | 'round_hole';
 }
 
 // Tolerance for dimension matching (inches) — parts whose dimension is within
@@ -3616,6 +3620,35 @@ const MATE_ALIGN_THRESHOLD = 0.85;
  * The architecture allows future feature types (dowels, dovetails) to
  * generate sockets through the same FeatureSocket interface.
  */
+/**
+ * How far a dowel can travel into a bored hole.
+ *
+ * A blind hole stops at its stated depth. A through hole runs the whole way
+ * across whichever dimension the bit entered, which for a face-normal hole is
+ * the part's extent along that face's normal.
+ */
+function getCircularSocketDepth(feature: CircularCutFeature, part: Part): number {
+  if (feature.parameters.depthMode === 'blind') return feature.parameters.depth ?? 0;
+  const face = feature.target.face;
+  if (face === 'left_end' || face === 'right_end') return part.length;
+  if (face === 'front_face' || face === 'back_face') return part.width;
+  return part.thickness;
+}
+
+/** Any two unit vectors spanning the plane normal to `axis`. A round opening is
+ * rotationally symmetric, so which pair is chosen does not matter. */
+function perpendicularBasis(axis: Vec3): [Vec3, Vec3] {
+  // Cross with whichever world axis the hole axis leans on least, so the
+  // product never collapses toward zero length.
+  const ax = Math.abs(axis.x);
+  const ay = Math.abs(axis.y);
+  const az = Math.abs(axis.z);
+  const seed: Vec3 =
+    ax <= ay && ax <= az ? { x: 1, y: 0, z: 0 } : ay <= az ? { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 };
+  const tangent1 = normalizeVec(crossVec(axis, seed));
+  return [tangent1, normalizeVec(crossVec(axis, tangent1))];
+}
+
 export function getPartFeatureSockets(part: Part): FeatureSocket[] {
   const features = part.features;
   if (!features || features.length === 0) return [];
@@ -3654,6 +3687,39 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
 
   for (const feature of features) {
     if (!feature.enabled) continue;
+
+    // A bored hole is a socket too. The abstraction was always meant to cover
+    // this -- a dowel seats in a hole the way a tenon seats in a mortise --
+    // and a pattern of holes presents one socket per member.
+    if (feature.kind === 'circular_cut') {
+      const radius = feature.parameters.diameter / 2;
+      if (!(radius > 0)) continue;
+      const depth = getCircularSocketDepth(feature, part);
+      if (depth <= 0) continue;
+
+      for (const member of expandCircularCut(feature, part)) {
+        const pose = circularPoseWorld(part, feature, part.position, member.memberIndex);
+        if (!pose) continue;
+        // The stored axis points the way the bit travels; a socket's normal
+        // points back out of the hole, against insertion.
+        const openingNormal = mulVec(pose.axis, -1);
+        const [tangent1, tangent2] = perpendicularBasis(openingNormal);
+        sockets.push({
+          hostPartId: part.id,
+          featureId: feature.id,
+          openingCenter: pose.entry,
+          openingNormal,
+          tangent1,
+          tangent2,
+          halfExtent1: radius,
+          halfExtent2: radius,
+          depth,
+          mateKind: 'round_hole'
+        });
+      }
+      continue;
+    }
+
     if (feature.kind !== 'rect_cut') continue;
 
     const rectFeature = feature as RectCutFeature;
@@ -3753,6 +3819,20 @@ type MateShape = {
 };
 
 function mateShapeIsCompatibleWithSocket(mateShape: MateShape, socket: FeatureSocket): boolean {
+  if (socket.mateKind === 'round_hole') {
+    // Only a square-sectioned member seats in a bored hole. That admits a dowel
+    // and the square or octagonal stock a drawbored peg is driven from, and
+    // keeps out a board thin enough to pass the fit test but too flat to seat.
+    const [a, b, c] = mateShape.obb.halfExtents;
+    return [
+      [a, b],
+      [a, c],
+      [b, c]
+    ].some(
+      ([first, second]) =>
+        Math.abs(first - second) < MATE_DIM_TOLERANCE && Math.abs(first - socket.halfExtent1) < MATE_DIM_TOLERANCE
+    );
+  }
   if (mateShape.mateKind === 'mortise-tenon') return socket.mateKind === 'mortise';
   if (mateShape.mateKind === 'half-lap') {
     if (socket.mateKind !== 'dado' && socket.mateKind !== 'stopped_dado') return false;
@@ -3830,9 +3910,11 @@ function getMateShapes(part: Part, position: Vec3): MateShape[] {
 function circularPoseWorld(
   part: Part,
   feature: CircularCutFeature,
-  position: Vec3
+  position: Vec3,
+  memberIndex = 0
 ): { entry: Vec3; axis: Vec3 } | undefined {
-  const expanded = expandCircularCut(feature, part)[0];
+  const members = expandCircularCut(feature, part);
+  const expanded = members.find((member) => member.memberIndex === memberIndex) ?? members[0];
   if (!expanded) return undefined;
   const local = expanded.entryPoint;
   const [axisX, axisY, axisZ] = getPartOBB(part, position).axes;
