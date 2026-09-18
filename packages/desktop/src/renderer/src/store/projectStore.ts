@@ -39,6 +39,7 @@ import {
 } from '../utils/partFeatures';
 import { findHolesOffTheFace, findMatingFace, getHolesOnFace, transferHolesToMatingFace } from '../utils/holeTransfer';
 import { FACE_TARGETS } from '../components/part-features/partFeatureEditorState';
+import { planDowelJointMigration } from '../utils/dowelJointMigration';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
 import { validateEndCutFeature } from '../utils/endCutUtils';
 import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
@@ -101,6 +102,7 @@ interface ProjectState {
   batchUpdateParts: (updates: Array<{ id: string; changes: Partial<Part> }>) => void;
   addDowelJoint: (input: AddDowelJointInput) => string | null;
   transferHolesToMate: (partId: string, depth: number, face?: FaceTarget) => number;
+  convertLegacyDowelJoints: () => number;
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
   rotateSelectedParts: (axis: 'x' | 'y' | 'z', degrees: number, pivot: { x: number; y: number; z: number }) => void;
   deletePart: (id: string) => void;
@@ -741,6 +743,33 @@ export const useProjectStore = create<ProjectState>()(
        * Dowel centres: mark the holes already bored in one part onto whatever
        * is pressed against it. Returns how many marks landed.
        */
+      /**
+       * Replace dowel joints authored the old way with real dowels.
+       *
+       * Offered rather than applied on open: rewriting someone's project the
+       * moment they look at it is not the app's call to make, and this way it
+       * lands on the undo stack like any other edit.
+       */
+      convertLegacyDowelJoints: () => {
+        const { parts, stocks, units } = get();
+        const plan = planDowelJointMigration(parts, stocks, units);
+        if (plan.jointCount === 0) return 0;
+
+        set({
+          parts: [...plan.updatedParts, ...plan.newParts],
+          stocks: [...stocks, ...plan.newStocks],
+          isDirty: true
+        });
+        get().markCutListStale();
+        useUIStore
+          .getState()
+          .showToast(
+            `Converted ${plan.jointCount} dowel joint${plan.jointCount === 1 ? '' : 's'} into ${plan.newParts.length} dowel${plan.newParts.length === 1 ? '' : 's'}`,
+            'success'
+          );
+        return plan.jointCount;
+      },
+
       transferHolesToMate: (partId, depth, face) => {
         const { parts } = get();
         const source = parts.find((part) => part.id === partId);

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Dowel joints made the old way can be converted into real dowels: the holes stay exactly where they were bored, the joint metadata goes, and a dowel cut from rod stock takes the place of the picture that used to stand in for it. It is offered rather than applied on open, and lands on the undo stack like any other edit.
+
 - Added Transfer Holes to Mating Part, the software version of dowel centres. Bore the holes where you want them, put the parts together, and right-click the bored part to mark them across the joint line. Every hole of a repeat is marked, and any that land off the edge of the mating part are reported rather than silently drilled into thin air.
 
 - Added biscuits, Dominoes and dowel pins as stock, with the sizes you actually buy: the complete biscuit range, the complete Domino line, and fluted pins in imperial and metric. Pick a size rather than typing one, because a #20 biscuit is a #20 biscuit. They are counted into whole boxes on the shopping list and never reach the cutting diagrams, since nobody cuts a biscuit to fit.
