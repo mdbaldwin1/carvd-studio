@@ -37,6 +37,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const requestDeleteGroups = useUIStore((s) => s.requestDeleteGroups);
   const resetSelectedPartsToStock = useProjectStore((s) => s.resetSelectedPartsToStock);
   const transferHolesToMate = useProjectStore((s) => s.transferHolesToMate);
+  const boreThroughAssembly = useProjectStore((s) => s.boreThroughAssembly);
   const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
   const toggleReference = useSnapStore((s) => s.toggleReference);
@@ -75,6 +76,12 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   // Only worth offering once there is something to mark across.
   const singleSelectedPartHasHoles =
     singleSelectedPart?.features?.some((feature) => feature.enabled && feature.kind === 'circular_cut') ?? false;
+
+  // Only a through hole has anything behind it to drill.
+  const singleSelectedPartHasThroughHoles =
+    singleSelectedPart?.features?.some(
+      (feature) => feature.enabled && feature.kind === 'circular_cut' && feature.parameters.depthMode === 'through'
+    ) ?? false;
 
   // Check if any selected part has a stock assigned
   const selectedParts = parts.filter((p) => effectiveSelectedPartIds.includes(p.id));
@@ -243,6 +250,23 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
     onClose();
   };
 
+  /**
+   * Clamp up and drill through. Works from a through hole only, because a
+   * blind hole is where the bit stopped.
+   */
+  const handleBoreThrough = () => {
+    if (!singleSelectedPart) {
+      showToast('Select the part you bored', 'warning');
+      onClose();
+      return;
+    }
+    const drilled = boreThroughAssembly(singleSelectedPart.id);
+    if (drilled > 0) {
+      showToast(`Bored ${drilled} hole${drilled === 1 ? '' : 's'} through the assembly`, 'success');
+    }
+    onClose();
+  };
+
   const handleEditCuts = () => {
     if (isEditingPartCuts) {
       showToast('Finish editing part cuts first', 'warning');
@@ -278,6 +302,9 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
       {singleSelectedPart && <MenuItemButton onClick={handleEditCuts}>Edit Part Cuts...</MenuItemButton>}
       {singleSelectedPartHasHoles && (
         <MenuItemButton onClick={handleTransferHoles}>Transfer Holes to Mating Part</MenuItemButton>
+      )}
+      {singleSelectedPartHasThroughHoles && (
+        <MenuItemButton onClick={handleBoreThrough}>Bore Through Assembly</MenuItemButton>
       )}
       {singleSelectedPart && (singleSelectedPart.features?.length ?? 0) > 0 && (
         <MenuItemButton onClick={handleCopyCuts}>Copy Cuts</MenuItemButton>

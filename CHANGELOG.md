@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added Bore Through Assembly: a through hole now drills every part stacked behind it in one pass, the way clamping up and drilling straight through does. It stops at the first gap, because a bit travels through wood and not air, and it does nothing from a blind hole, which is where the bit stopped.
+
+- Round holes are now bored with a bit chosen from a drill index rather than a typed number, and a blind hole deeper than the bit reaches says so. A Forstner runs out of flute long before a twist bit does.
+
 - Removed the Create Dowel Joint wizard. Dowel joinery is now done the way it is done at the bench: bore the holes where you want them, transfer them across the joint line, and drop in a dowel cut from dowel stock. Projects holding joints made the old way still open and still show their dowels, and the File menu offers to convert them.
 
 - Legacy dowel joints no longer block a project or an assembly from being saved.

@@ -40,6 +40,7 @@ import {
 import { findHolesOffTheFace, findMatingFace, getHolesOnFace, transferHolesToMatingFace } from '../utils/holeTransfer';
 import { FACE_TARGETS } from '../components/part-features/partFeatureEditorState';
 import { planDowelJointMigration } from '../utils/dowelJointMigration';
+import { boreThroughAssembly as boreThroughAssemblyHoles } from '../utils/boreThrough';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
 import { validateEndCutFeature } from '../utils/endCutUtils';
 import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
@@ -103,6 +104,7 @@ interface ProjectState {
   addDowelJoint: (input: AddDowelJointInput) => string | null;
   transferHolesToMate: (partId: string, depth: number, face?: FaceTarget) => number;
   convertLegacyDowelJoints: () => number;
+  boreThroughAssembly: (partId: string, face?: FaceTarget) => number;
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
   rotateSelectedParts: (axis: 'x' | 'y' | 'z', degrees: number, pivot: { x: number; y: number; z: number }) => void;
   deletePart: (id: string) => void;
@@ -768,6 +770,39 @@ export const useProjectStore = create<ProjectState>()(
             'success'
           );
         return plan.jointCount;
+      },
+
+      /**
+       * Clamp up and drill through: every part stacked behind a through hole
+       * gets the same hole, made by the same pass.
+       */
+      boreThroughAssembly: (partId, face) => {
+        const { parts } = get();
+        const source = parts.find((part) => part.id === partId);
+        if (!source) return 0;
+
+        const faces = face ? [face] : FACE_TARGETS;
+        const bored = faces.flatMap((candidate) => boreThroughAssemblyHoles(source, candidate, parts));
+
+        if (bored.length === 0) {
+          useUIStore.getState().showToast('Nothing is stacked behind a through hole on this part.', 'warning');
+          return 0;
+        }
+
+        const additions = new Map<string, CircularCutFeature[]>();
+        for (const entry of bored) {
+          additions.set(entry.partId, [...(additions.get(entry.partId) ?? []), entry.feature]);
+        }
+
+        set((state) => ({
+          parts: state.parts.map((part) => {
+            const extra = additions.get(part.id);
+            return extra ? { ...part, features: [...(part.features ?? []), ...extra] } : part;
+          }),
+          isDirty: true
+        }));
+        get().markCutListStale();
+        return bored.length;
       },
 
       transferHolesToMate: (partId, depth, face) => {

@@ -161,3 +161,38 @@ describe('CutProperties measurement and placement fields', () => {
     expect((screen.getByLabelText('Start Angle') as HTMLInputElement).value).toBe('45');
   });
 });
+
+describe('CutProperties drill bit', () => {
+  it('bores with a bit from the case, and the diameter follows', () => {
+    renderWorkspace();
+    startCut('Round Hole');
+    const bit = screen.getByLabelText('Bit') as HTMLSelectElement;
+    fireEvent.change(bit, { target: { value: 'bit-brad-8-16' } });
+    // 8/16 is marked 1/2 on the shank, and that is what the hole becomes.
+    expect(setMeasurement('Hole Diameter', '1/2').value).toBe('1/2');
+    expect((screen.getByLabelText('Bit') as HTMLSelectElement).value).toBe('bit-brad-8-16');
+  });
+
+  it('follows the bit when the diameter is typed instead', () => {
+    renderWorkspace();
+    startCut('Round Hole');
+    setMeasurement('Hole Diameter', '3/8');
+    expect((screen.getByLabelText('Bit') as HTMLSelectElement).value).toBe('bit-brad-6-16');
+  });
+
+  it('says so when no bit in the case bores that size', () => {
+    renderWorkspace();
+    startCut('Round Hole');
+    setMeasurement('Hole Diameter', '0.3');
+    expect(screen.getByRole('option', { name: 'No bit this size' })).toBeInTheDocument();
+  });
+
+  it('warns when a blind hole is deeper than the bit reaches', () => {
+    renderWorkspace();
+    startCut('Counterbore');
+    setMeasurement('Hole Diameter', '3/8');
+    fireEvent.change(screen.getByLabelText('Depth'), { target: { value: 'blind' } });
+    // A brad point reaches 4"; nothing in this part is that deep, so no warning.
+    expect(screen.queryByText(/reaches/)).not.toBeInTheDocument();
+  });
+});

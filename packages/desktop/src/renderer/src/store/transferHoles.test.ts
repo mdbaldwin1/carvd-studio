@@ -92,3 +92,39 @@ describe('transferring holes from the store', () => {
     expect(holesOn('stile')).toHaveLength(3);
   });
 });
+
+describe('boring through an assembly from the store', () => {
+  const throughHole = (): CircularCutFeature => ({
+    ...hole(),
+    placement: { primary: 0, secondary: 0, rotation: 0 },
+    parameters: { diameter: 0.375, depthMode: 'through', tilt: 0, direction: 0 }
+  });
+
+  it('drills the parts stacked behind the hole', () => {
+    useProjectStore.setState({
+      parts: [rail([throughHole()]), stileOn(-0.5)],
+      isDirty: false
+    });
+    expect(useProjectStore.getState().boreThroughAssembly('rail')).toBe(1);
+    expect(holesOn('stile')).toHaveLength(1);
+    expect(useProjectStore.getState().isDirty).toBe(true);
+  });
+
+  it('says so when nothing is behind a through hole', () => {
+    useProjectStore.setState({ parts: [rail([throughHole()])], isDirty: false });
+    expect(useProjectStore.getState().boreThroughAssembly('rail')).toBe(0);
+    expect(useUIStore.getState().toast?.message).toMatch(/nothing is stacked behind/i);
+  });
+
+  it('does nothing from a blind hole', () => {
+    // The rail's default hole is blind, so the bit never reaches the stile.
+    useProjectStore.setState({ parts: [rail([hole()]), stileOn(-0.5)], isDirty: false });
+    expect(useProjectStore.getState().boreThroughAssembly('rail')).toBe(0);
+    expect(holesOn('stile')).toHaveLength(0);
+  });
+
+  it('does nothing for a part that is not there', () => {
+    useProjectStore.setState({ parts: [rail([throughHole()])], isDirty: false });
+    expect(useProjectStore.getState().boreThroughAssembly('nothing')).toBe(0);
+  });
+});

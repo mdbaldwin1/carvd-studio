@@ -24,6 +24,7 @@ import { RouterBitSelector } from './RouterBitSelector';
 import { EdgeProfileSelector } from './EdgeProfileSelector';
 import { EdgeProfileLibraryControls } from './EdgeProfileLibraryControls';
 import { getCutHint } from './cutHints';
+import { bitReachesDepth, DRILL_BIT_CATALOG, findBitForDiameter } from '../../../../shared/drillBits';
 
 /**
  * The selected cut's fields, laid out the way the project editor lays out a
@@ -65,6 +66,14 @@ export function CutProperties() {
   if (!isEditingDraft || !inspectorDraft) return null;
 
   const isRect = inspectorDraft.mode === 'rect_cut';
+
+  // A Forstner runs out of flute long before a twist bit does, which is the
+  // kind of thing you find out at the drill press rather than in a drawing.
+  const chosenBit = inspectorDraft.mode === 'circular_cut' ? findBitForDiameter(inspectorDraft.diameter) : undefined;
+  const outOfReachBit =
+    chosenBit && inspectorDraft.mode === 'circular_cut' && !bitReachesDepth(chosenBit, inspectorDraft.depth ?? 0)
+      ? chosenBit
+      : undefined;
   const isSideFace =
     isRect && (inspectorDraft.faceTarget === 'front_face' || inspectorDraft.faceTarget === 'back_face');
 
@@ -490,6 +499,28 @@ export function CutProperties() {
         {inspectorDraft.mode === 'circular_cut' && (
           <>
             <div className="property-group">
+              <Label htmlFor="drill-bit">Bit</Label>
+              {/* You bore 3/8" because you own a 3/8" bit. Picking the bit is
+                  the real choice; the diameter follows from it. */}
+              <Select
+                id="drill-bit"
+                value={findBitForDiameter(inspectorDraft.diameter)?.id ?? ''}
+                onChange={(event) => {
+                  const chosen = DRILL_BIT_CATALOG.find((candidate) => candidate.id === event.target.value);
+                  if (chosen) setDraft({ ...inspectorDraft, diameter: chosen.diameter });
+                }}
+              >
+                {findBitForDiameter(inspectorDraft.diameter) === undefined && (
+                  <option value="">No bit this size</option>
+                )}
+                {DRILL_BIT_CATALOG.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="property-group">
               <Label>Hole Diameter</Label>
               <FractionInput
                 ariaLabel="Hole Diameter"
@@ -497,6 +528,12 @@ export function CutProperties() {
                 onChange={(diameter) => setDraft({ ...inspectorDraft, diameter })}
                 min={0.001}
               />
+              {inspectorDraft.depthMode === 'blind' && outOfReachBit && (
+                <p className="mt-1 text-[11px] text-warning">
+                  {outOfReachBit.name} reaches {formatMeasurementWithUnit(outOfReachBit.maxDepth, units)}; this hole is
+                  deeper.
+                </p>
+              )}
             </div>
             <div className="property-group">
               <Label htmlFor="round-depth-mode">Depth</Label>
