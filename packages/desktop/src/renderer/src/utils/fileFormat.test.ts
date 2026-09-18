@@ -8,10 +8,17 @@ import {
   getProjectNameFromPath,
   repairCarvdFile,
   getFileSummary,
+  resolveFileVersion,
   CARVD_FILE_EXTENSION,
   CARVD_FILE_FILTER
 } from './fileFormat';
-import { CARVD_FILE_VERSION, CARVD_FILE_VERSION_BASE, GroupMember, RectCutFeature } from '../types';
+import {
+  CARVD_FILE_VERSION,
+  CARVD_FILE_VERSION_BASE,
+  CARVD_FILE_VERSION_FEATURES,
+  GroupMember,
+  RectCutFeature
+} from '../types';
 import {
   createTestPart,
   createTestStock,
@@ -89,7 +96,8 @@ describe('fileFormat', () => {
       });
       const file = createValidCarvdFile({ parts: [featured] });
 
-      expect(file.version).toBe(CARVD_FILE_VERSION);
+      // Cuts need version 2; plain sheet and board stock does not push it to 3.
+      expect(file.version).toBe(CARVD_FILE_VERSION_FEATURES);
     });
 
     it('round-trips a patterned counterbore in file version 2', () => {
@@ -1493,5 +1501,61 @@ describe('repair regressions from the 2026-09-09 pre-release review', () => {
 
   it('still refuses a file newer than this build', () => {
     expect(repairCarvdFile(JSON.stringify({ ...sound, version: 99 })).success).toBe(false);
+  });
+});
+
+describe('stock form migration and file versioning', () => {
+  const rodStock = createTestStock({
+    id: 'rod-1',
+    name: '3/8" Birch Dowel',
+    length: 36,
+    width: 0.375,
+    thickness: 0.375,
+    pricingUnit: 'per_item',
+    form: 'rod'
+  });
+
+  it('stamps a form onto stock written before the field existed', () => {
+    const legacy = createValidCarvdFile({ stocks: [createTestStock({ id: 'ply', length: 96, width: 48 })] });
+    // Strip the form the way a file written before v3 has it on disk.
+    legacy.stocks = legacy.stocks.map((stock) => {
+      const copy = { ...stock } as Record<string, unknown>;
+      delete copy.form;
+      return copy as unknown as (typeof legacy.stocks)[number];
+    });
+    legacy.version = CARVD_FILE_VERSION_BASE;
+
+    const result = parseCarvdFile(JSON.stringify(legacy));
+    expect(result.valid).toBe(true);
+    // Legacy material can only ever be a sheet or a board.
+    expect(result.data?.stocks[0].form).toBe('sheet');
+  });
+
+  it('picks the oldest version that can represent the project', () => {
+    expect(resolveFileVersion([], false)).toBe(CARVD_FILE_VERSION_BASE);
+    expect(resolveFileVersion([], true)).toBe(CARVD_FILE_VERSION_FEATURES);
+    // Rod stock is material an older build cannot model, so the file moves up.
+    expect(resolveFileVersion([rodStock], false)).toBe(CARVD_FILE_VERSION);
+    expect(resolveFileVersion([rodStock], true)).toBe(CARVD_FILE_VERSION);
+  });
+
+  it('round-trips a project holding rod stock at version 3', () => {
+    const file = createValidCarvdFile({ stocks: [rodStock] });
+    expect(file.version).toBe(CARVD_FILE_VERSION);
+    const round = parseCarvdFile(stringifyCarvdFile(file));
+    expect(round.valid).toBe(true);
+    expect(round.data?.stocks[0].form).toBe('rod');
+  });
+
+  it('rejects a file that claims an old version but carries new material', () => {
+    const file = createValidCarvdFile({ stocks: [rodStock] });
+    (file as unknown as Record<string, unknown>).version = CARVD_FILE_VERSION_FEATURES;
+    expect(validateCarvdFile(file).errors).toContain(
+      'Projects containing dowel or insert stock require file version 3 or newer'
+    );
+  });
+
+  it('leaves a sheet-and-board project openable by an older build', () => {
+    expect(createValidCarvdFile({ stocks: [createTestStock()] }).version).toBeLessThan(CARVD_FILE_VERSION);
   });
 });

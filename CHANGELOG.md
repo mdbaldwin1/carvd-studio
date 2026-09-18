@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Stock now records how it is bought and broken down, so the library can tell sheet goods from dimensional lumber instead of guessing from a name. Existing projects and libraries are classified on open exactly the way they were already being displayed, and a project only moves to the newer file version once it holds material an older build cannot model.
+
+- Fixed the overlap-prevention preference not surviving a restart, because the main process stored only three of the four stock constraint settings.
+
 - Fixed an assembled joint being discarded on release, dropping the parts back where the drag began, because the commit check did not recognise a seated joint the way the drag did.
 
 - Joinery now captures from further out, so dragging a tenon near its mortise pulls the joint together instead of requiring it to be positioned by hand first.

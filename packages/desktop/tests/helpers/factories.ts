@@ -74,6 +74,7 @@ export function createPlywoodStock(overrides?: Partial<Stock>): Stock {
     grainDirection: 'length',
     pricingUnit: 'per_item',
     pricePerUnit: 45.0,
+    form: 'sheet',
     ...overrides
   });
 }
@@ -87,6 +88,7 @@ export function createBoardStock(overrides?: Partial<Stock>): Stock {
     grainDirection: 'length',
     pricingUnit: 'board_foot',
     pricePerUnit: 3.5,
+    form: 'board',
     ...overrides
   });
 }

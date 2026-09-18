@@ -8,6 +8,8 @@ import {
   CameraState,
   CARVD_FILE_VERSION,
   CARVD_FILE_VERSION_BASE,
+  CARVD_FILE_VERSION_FEATURES,
+  CARVD_FILE_VERSION_STOCK_FORMS,
   CarvdFile,
   CutList,
   CustomShoppingItem,
@@ -21,6 +23,7 @@ import {
   Stock,
   StockConstraintSettings
 } from '../types';
+import { isRectangularStockForm, resolveStockForm, type StockForm } from '../../../shared/stock';
 import { normalizeAssemblyPart, normalizePart, validateSerializedPartFeatures } from './partFeatures';
 import { validateAssemblyDowelRelationshipReferences, validateDowelRelationshipReferences } from './dowelJointUtils';
 
@@ -62,10 +65,11 @@ export function serializeProject(state: {
     state.assemblies.some((assembly) => assembly.parts.some((part) => (part.features?.length ?? 0) > 0));
 
   return {
-    // Featured projects need version 2 so older builds warn instead of
-    // silently dropping cuts; plain projects stay at the base version for
-    // maximum backward compatibility.
-    version: usesPartFeatures ? CARVD_FILE_VERSION : CARVD_FILE_VERSION_BASE,
+    // A file declares the oldest version that can represent it: rod and insert
+    // stock need 3, cuts need 2, and anything simpler stays at 1 so older
+    // builds keep opening it. Older builds then warn instead of silently
+    // dropping material they cannot model.
+    version: resolveFileVersion(state.stocks, usesPartFeatures),
     project: {
       name: state.projectName,
       createdAt: state.createdAt,
@@ -208,6 +212,17 @@ export function validateCarvdFile(data: unknown): FileValidationResult {
       );
     });
   });
+  if (
+    Array.isArray(obj.stocks) &&
+    typeof obj.version === 'number' &&
+    obj.version < CARVD_FILE_VERSION_STOCK_FORMS &&
+    obj.stocks.some((stock) => {
+      const form = (stock as Record<string, unknown>).form;
+      return typeof form === 'string' && !isRectangularStockForm(form as StockForm);
+    })
+  ) {
+    errors.push('Projects containing dowel or insert stock require file version 3 or newer');
+  }
   if (containsPartFeatures && typeof obj.version === 'number' && obj.version < 2) {
     errors.push('Projects containing part cuts require file version 2 or newer');
   }
@@ -282,6 +297,20 @@ function validateReferentialIntegrity(file: CarvdFile): { errors: string[]; warn
 }
 
 /**
+ * The oldest file version that can faithfully represent this project.
+ *
+ * Writing the lowest version that works is what keeps a plain project openable
+ * in an older build; only the projects that actually use newer material or
+ * newer cuts are pushed forward.
+ */
+export function resolveFileVersion(stocks: Stock[], usesPartFeatures: boolean): number {
+  const usesNewStockForms = stocks.some((stock) => !isRectangularStockForm(resolveStockForm(stock)));
+  if (usesNewStockForms) return CARVD_FILE_VERSION_STOCK_FORMS;
+  if (usesPartFeatures) return CARVD_FILE_VERSION_FEATURES;
+  return CARVD_FILE_VERSION_BASE;
+}
+
+/**
  * Migrate older file versions to current version
  */
 function migrateFile(file: CarvdFile): CarvdFile {
@@ -330,11 +359,14 @@ function migrateFile(file: CarvdFile): CarvdFile {
     }));
   }
 
-  // Ensure stocks have all required fields
+  // Ensure stocks have all required fields. Files written before v3 carry no
+  // form, so classify them the way the library has always been grouped --
+  // legacy stock can only be a sheet or a board, so nothing changes behaviour.
   migrated.stocks = migrated.stocks.map((stock) => ({
     ...stock,
     pricingUnit: stock.pricingUnit ?? 'per_item',
-    pricePerUnit: stock.pricePerUnit ?? 0
+    pricePerUnit: stock.pricePerUnit ?? 0,
+    form: resolveStockForm(stock)
   }));
 
   return migrated;

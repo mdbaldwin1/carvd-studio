@@ -6,6 +6,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import type { StockShape } from '../../../shared/stock';
 import {
   Project,
   Stock,
@@ -26,16 +27,8 @@ import { clonePartFeatures, normalizeAssemblyPart, normalizePart } from '../util
 // JSON Schema Types (what's stored in .template.json files)
 // ============================================================
 
-export interface TemplateStockDefinition {
+export interface TemplateStockDefinition extends StockShape {
   _refId: string;
-  name: string;
-  length: number;
-  width: number;
-  thickness: number;
-  grainDirection: 'length' | 'width' | 'none';
-  pricingUnit: 'board_foot' | 'per_item';
-  pricePerUnit: number;
-  color: string;
 }
 
 export interface TemplatePartDefinition {
@@ -111,16 +104,7 @@ export interface AssemblyPartDefinition {
   extraLength?: number;
   extraWidth?: number;
   features?: PartFeature[];
-  embeddedStock?: {
-    name: string;
-    length: number;
-    width: number;
-    thickness: number;
-    grainDirection: 'length' | 'width' | 'none';
-    pricingUnit: 'board_foot' | 'per_item';
-    pricePerUnit: number;
-    color: string;
-  };
+  embeddedStock?: StockShape;
 }
 
 export interface AssemblyGroupDefinition {

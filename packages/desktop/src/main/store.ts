@@ -1,18 +1,11 @@
 import Store from 'electron-store';
 import type { AnalyticsConsent } from '../shared/analytics';
+import { resolveStockForm, type StockShape } from '../shared/stock';
 import type { QueuedAnalyticsEvent } from './analytics/analyticsQueue';
 
-// Stock type for app-level library (mirrors renderer Stock type)
-export interface StockLibraryItem {
+// Stock type for app-level library (the renderer's Stock, same shared shape)
+export interface StockLibraryItem extends StockShape {
   id: string;
-  name: string;
-  length: number;
-  width: number;
-  thickness: number;
-  grainDirection: 'length' | 'width' | 'none';
-  pricingUnit: 'board_foot' | 'per_item';
-  pricePerUnit: number;
-  color: string;
 }
 
 // Assembly types for app-level library (mirrors renderer Assembly types)
@@ -69,6 +62,7 @@ export interface StockConstraintSettings {
   constrainDimensions: boolean;
   constrainGrain: boolean;
   constrainColor: boolean;
+  preventOverlap: boolean;
 }
 
 // User template (stores the serialized project)
@@ -143,7 +137,8 @@ const defaults: AppPreferences = {
   stockConstraints: {
     constrainDimensions: true,
     constrainGrain: true,
-    constrainColor: true
+    constrainColor: true,
+    preventOverlap: true
   },
   licenseKey: null,
   licenseEmail: null,
@@ -1661,7 +1656,10 @@ export function importStocks(
 
   const updatedLibrary = [...stockLibrary];
 
-  for (const stock of data.data) {
+  for (const incoming of data.data) {
+    // An export written before stock forms existed carries no form; classify
+    // it on the way in so the library never holds a record missing one.
+    const stock: StockLibraryItem = { ...incoming, form: resolveStockForm(incoming) };
     const existingIndex = updatedLibrary.findIndex((s) => s.id === stock.id);
     if (existingIndex >= 0) {
       if (options.replaceIfExists) {

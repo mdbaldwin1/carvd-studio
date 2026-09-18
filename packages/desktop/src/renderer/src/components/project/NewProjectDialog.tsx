@@ -11,28 +11,16 @@ import {
   DialogHeader,
   DialogTitle
 } from '@renderer/components/ui/dialog';
+import type { Stock } from '@renderer/types';
+import { resolveStockForm } from '../../../../shared/stock';
 
 // Stock item from the app-level stock library
-interface StockLibraryItem {
-  id: string;
-  name: string;
-  length: number;
-  width: number;
-  thickness: number;
-  grainDirection: 'length' | 'width' | 'none';
-  pricingUnit: 'board_foot' | 'per_item';
-  pricePerUnit: number;
-  color: string;
-}
+type StockLibraryItem = Stock;
 
-// Categorize stocks based on dimensions (sheet goods vs dimensional lumber)
+// Sheet goods are shelved apart from dimensional lumber, the same split the
+// stored form records; legacy library entries still fall back to dimensions.
 function categorizeStock(stock: StockLibraryItem): string {
-  // Sheet goods are typically 4x8 feet (48x96 inches) or similar large sheets
-  // Also includes MDF which has no grain direction
-  if ((stock.width >= 24 && stock.length >= 48) || stock.grainDirection === 'none') {
-    return 'Sheet Goods';
-  }
-  return 'Dimensional Lumber';
+  return resolveStockForm(stock) === 'sheet' ? 'Sheet Goods' : 'Dimensional Lumber';
 }
 
 interface NewProjectDialogProps {

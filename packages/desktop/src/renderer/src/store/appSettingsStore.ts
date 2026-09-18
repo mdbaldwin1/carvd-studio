@@ -185,7 +185,12 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
             confirmBeforeDelete !== undefined ? (confirmBeforeDelete as boolean) : DEFAULT_SETTINGS.confirmBeforeDelete,
           showHotkeyHints:
             showHotkeyHints !== undefined ? (showHotkeyHints as boolean) : DEFAULT_SETTINGS.showHotkeyHints,
-          stockConstraints: (stockConstraints as AppSettings['stockConstraints']) || DEFAULT_SETTINGS.stockConstraints,
+          // Settings stored before preventOverlap existed carry only three
+          // keys, so fill from the defaults rather than passing undefined on.
+          stockConstraints: {
+            ...DEFAULT_SETTINGS.stockConstraints,
+            ...((stockConstraints as Partial<AppSettings['stockConstraints']> | null) ?? {})
+          },
           liveGridSnap: liveGridSnap !== undefined ? (liveGridSnap as boolean) : DEFAULT_SETTINGS.liveGridSnap,
           snapSensitivity: (snapSensitivity as AppSettings['snapSensitivity']) || DEFAULT_SETTINGS.snapSensitivity,
           snapToOrigin: snapToOrigin !== undefined ? (snapToOrigin as boolean) : DEFAULT_SETTINGS.snapToOrigin,

@@ -1,28 +1,15 @@
 // Core domain types for Carvd Studio
 
-export interface Stock {
+import type { StockShape } from '../../shared/stock';
+
+export type { StockForm, StockGrainDirection, StockPricingUnit, StockShape } from '../../shared/stock';
+
+export interface Stock extends StockShape {
   id: string;
-  name: string;
-  length: number;
-  width: number;
-  thickness: number;
-  grainDirection: 'length' | 'width' | 'none';
-  pricingUnit: 'board_foot' | 'per_item'; // how this stock is priced
-  pricePerUnit: number;
-  color: string; // display color for parts using this stock
 }
 
 // Embedded stock snapshot for assemblies (allows assemblies to be self-contained)
-export interface EmbeddedStock {
-  name: string;
-  length: number;
-  width: number;
-  thickness: number;
-  grainDirection: 'length' | 'width' | 'none';
-  pricingUnit: 'board_foot' | 'per_item';
-  pricePerUnit: number;
-  color: string;
-}
+export type EmbeddedStock = StockShape;
 
 // A part template within an assembly (position relative to assembly origin)
 export interface AssemblyPart {
@@ -797,8 +784,14 @@ export interface CustomShoppingItem {
 // lowest version that can represent them so plain projects stay openable in
 // older builds, while featured projects make old builds warn instead of
 // silently showing uncut boxes.
-export const CARVD_FILE_VERSION = 2;
+/** Highest file version this build writes and can open. */
+export const CARVD_FILE_VERSION = 3;
+/** A project with no cuts and only sheet or board stock. */
 export const CARVD_FILE_VERSION_BASE = 1;
+/** A project that uses part cuts. */
+export const CARVD_FILE_VERSION_FEATURES = 2;
+/** A project that uses rod or insert stock. */
+export const CARVD_FILE_VERSION_STOCK_FORMS = 3;
 
 // The .carvd file format - plain JSON structure
 export interface CarvdFile {
