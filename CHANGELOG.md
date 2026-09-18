@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- The cut list and shopping list now talk about dowel the way you buy it: rods rather than boards, a diameter and a length rather than three dimensions, priced per rod, and measured in linear feet. Board feet are withheld for round stock, because run through a dowel they measure the box around it. Cutting diagrams skip dowel rather than drawing a sliver.
+
 - Dowels now snap into bored holes through the same joinery engine that seats a tenon in a mortise. Hold a dowel near a hole and it is drawn in and bottomed out; a repeat of holes offers one seat per hole, and a board too flat to seat is refused.
 
 - Added dowel stock. Choose Dowel as the stock type and give it a diameter and a length, and parts cut from it render as real cylinders. A dowel's diameter comes from its stock and only its length is yours to set, because ripping makes a board narrower but nothing makes a dowel thinner.

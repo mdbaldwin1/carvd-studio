@@ -25,6 +25,7 @@ function createTestInstruction(overrides: Partial<CutInstruction> = {}): CutInst
 
 function createTestStockSummary(overrides: Partial<StockSummary> = {}): StockSummary {
   return {
+    form: 'sheet',
     stockId: 's1',
     stockName: '3/4" Plywood',
     boardsNeeded: 1,

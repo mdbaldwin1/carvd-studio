@@ -35,6 +35,7 @@ function createStockSummary(overrides: Partial<StockSummary> = {}): StockSummary
   return {
     stockId: 's1',
     stockName: 'Plywood',
+    form: 'sheet',
     boardsNeeded: 2,
     boardFeet: 16,
     cost: 100,

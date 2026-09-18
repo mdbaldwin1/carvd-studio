@@ -130,6 +130,7 @@ const mockCutList: CutList = {
       {
         stockId: 'stock-1',
         stockName: 'Plywood 3/4"',
+        form: 'sheet' as const,
         stockLength: 96,
         stockWidth: 48,
         stockThickness: 0.75,

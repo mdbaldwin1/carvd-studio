@@ -1,6 +1,6 @@
 // Core domain types for Carvd Studio
 
-import type { StockShape } from '../../shared/stock';
+import type { StockForm, StockShape } from '../../shared/stock';
 
 export type { StockForm, StockGrainDirection, StockPricingUnit, StockShape } from '../../shared/stock';
 
@@ -716,6 +716,7 @@ export interface StockSummary {
   actualBoardsUsed: number; // boards from optimizer (before overage rounding)
   averageUtilization: number; // average utilization across boards of this type
   wasteSquareInches: number; // total waste for this stock type
+  form: StockForm; // how this stock is bought, which sets the words used for it
 }
 
 // Statistics for the entire cut list

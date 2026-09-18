@@ -636,3 +636,75 @@ describe('cutListOptimizer', () => {
     });
   });
 });
+
+describe('dowel rod in the cut list', () => {
+  const rod = createTestStock({
+    id: 'rod-1',
+    name: '3/8" Birch Dowel',
+    length: 36,
+    width: 0.375,
+    thickness: 0.375,
+    pricingUnit: 'per_item',
+    pricePerUnit: 3.5,
+    form: 'rod'
+  });
+
+  /** `count` dowels of `length`, all cut from the one rod. */
+  const dowelParts = (count: number, length: number) =>
+    Array.from({ length: count }, (_, index) =>
+      createTestPart({
+        id: `dowel-${index}`,
+        name: 'Dowel',
+        length,
+        width: 0.375,
+        thickness: 0.375,
+        stockId: 'rod-1',
+        grainSensitive: false
+      })
+    );
+
+  const rodSummary = (count: number, length: number, kerfWidth = 0.125) =>
+    generateOptimizedCutList(dowelParts(count, length), [rod], kerfWidth, 0, new Date().toISOString(), []).statistics
+      .byStock[0];
+
+  it('gets every dowel out of one rod when they fit end to end', () => {
+    // Twelve 2" dowels plus their kerfs is well inside 36".
+    const summary = rodSummary(12, 2);
+    expect(summary.form).toBe('rod');
+    expect(summary.boardsNeeded).toBe(1);
+    expect(summary.cost).toBeCloseTo(3.5);
+  });
+
+  it('buys a second rod once the first runs out', () => {
+    // Twenty 2" dowels is 40" of dowel before any kerf: more than one rod.
+    expect(rodSummary(20, 2).boardsNeeded).toBe(2);
+  });
+
+  it('charges a saw kerf along the rod but none across it', () => {
+    // A dowel is exactly as wide as its rod, so the packer never charges kerf
+    // on that axis -- cutting a dowel to length costs one kerf and no more.
+    // Eighteen 2" dowels fill a 36" rod exactly with no kerf, and overrun it
+    // once each cut costs 1/8".
+    const withKerf = rodSummary(18, 2, 0.125);
+    const withoutKerf = rodSummary(18, 2, 0);
+    expect(withoutKerf.boardsNeeded).toBe(1);
+    expect(withKerf.boardsNeeded).toBe(2);
+  });
+
+  it('reports a rod in linear feet rather than board feet', () => {
+    const summary = rodSummary(12, 2);
+    // Board feet measure a rectangular solid; run through a dowel they measure
+    // the box around it, so they are withheld rather than quietly wrong.
+    expect(summary.boardFeet).toBe(0);
+    expect(summary.linearFeet).toBeCloseTo(3);
+  });
+
+  it('still measures sheet goods in board feet', () => {
+    const sheet = createPlywoodStock({ id: 'ply-1' });
+    const part = createTestPart({ id: 'panel', length: 24, width: 12, thickness: 0.75, stockId: 'ply-1' });
+    const summary = generateOptimizedCutList([part], [sheet], 0.125, 0, new Date().toISOString(), []).statistics
+      .byStock[0];
+    expect(summary.form).toBe('sheet');
+    expect(summary.boardFeet).toBeGreaterThan(0);
+  });
+});

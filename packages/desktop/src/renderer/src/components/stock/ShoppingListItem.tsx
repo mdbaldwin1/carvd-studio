@@ -10,16 +10,27 @@ interface ShoppingListItemProps {
 }
 
 export function ShoppingListItem({ summary, units, checked, onToggle }: ShoppingListItemProps) {
-  const dimensions = `${formatMeasurementWithUnit(summary.stockLength, units)} × ${formatMeasurementWithUnit(summary.stockWidth, units)} × ${formatMeasurementWithUnit(summary.stockThickness, units)}`;
+  const dimensions =
+    summary.form === 'rod'
+      ? `${formatMeasurementWithUnit(summary.stockWidth, units)} dia × ${formatMeasurementWithUnit(summary.stockLength, units)}`
+      : `${formatMeasurementWithUnit(summary.stockLength, units)} × ${formatMeasurementWithUnit(summary.stockWidth, units)} × ${formatMeasurementWithUnit(summary.stockThickness, units)}`;
 
-  const qtyLabel = summary.boardsNeeded === 1 ? 'board' : 'boards';
+  const isRod = summary.form === 'rod';
+  // You buy dowel by the rod, not by the board.
+  const qtyLabel = isRod
+    ? summary.boardsNeeded === 1
+      ? 'rod'
+      : 'rods'
+    : summary.boardsNeeded === 1
+      ? 'board'
+      : 'boards';
   const hasOverage = summary.boardsNeeded > summary.actualBoardsUsed;
-  const linearFeetDisplay =
-    summary.pricingUnit === 'board_foot' && summary.linearFeet > 0
-      ? ` (${summary.linearFeet.toFixed(1)} linear ft)`
-      : '';
-  const priceDisplay =
-    summary.pricingUnit === 'board_foot'
+  // Linear feet is the honest measure of a rod, so show it however it is priced.
+  const showLinearFeet = (isRod || summary.pricingUnit === 'board_foot') && summary.linearFeet > 0;
+  const linearFeetDisplay = showLinearFeet ? ` (${summary.linearFeet.toFixed(1)} linear ft)` : '';
+  const priceDisplay = isRod
+    ? `$${summary.pricePerUnit.toFixed(2)}/rod`
+    : summary.pricingUnit === 'board_foot'
       ? `$${summary.pricePerUnit.toFixed(2)}/bf`
       : `$${summary.pricePerUnit.toFixed(2)}/sheet`;
 
@@ -50,7 +61,7 @@ export function ShoppingListItem({ summary, units, checked, onToggle }: Shopping
           )}
           {linearFeetDisplay}
         </div>
-        {summary.pricingUnit === 'board_foot' && (
+        {!isRod && summary.pricingUnit === 'board_foot' && (
           <div className="text-[11px] text-text-muted mt-0.5">{summary.boardFeet.toFixed(2)} board feet total</div>
         )}
       </div>

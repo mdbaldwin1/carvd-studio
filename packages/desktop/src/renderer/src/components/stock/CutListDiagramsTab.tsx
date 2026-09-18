@@ -34,16 +34,22 @@ export function CutListDiagramsTab({
   const [zoom, setZoom] = useState(1);
   const [selectedPlacement, setSelectedPlacement] = useState<CutPlacement | null>(null);
 
-  // Group boards by stock
+  // Group boards by stock. Round stock is left out: a cutting diagram for a
+  // dowel is a 36" by 3/8" sliver that tells you nothing you could not read
+  // off the cut list, and drawing it squeezes the real diagrams.
   const boardsByStock = useMemo(() => {
+    const rodStockIds = new Set(
+      cutList.statistics.byStock.filter((summary) => summary.form === 'rod').map((summary) => summary.stockId)
+    );
     const map = new Map<string, StockBoard[]>();
     for (const board of cutList.stockBoards) {
+      if (rodStockIds.has(board.stockId)) continue;
       const existing = map.get(board.stockId) || [];
       existing.push(board);
       map.set(board.stockId, existing);
     }
     return map;
-  }, [cutList.stockBoards]);
+  }, [cutList.stockBoards, cutList.statistics.byStock]);
 
   const handleExportPdf = useCallback(async () => {
     // Check license limits for PDF export

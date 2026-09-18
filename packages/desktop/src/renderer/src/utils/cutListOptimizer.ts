@@ -16,6 +16,7 @@ import {
 } from '../types';
 import { logger } from './logger';
 import { clonePartFeatures } from './partFeatures';
+import { isRectangularStockForm, resolveStockForm } from '../../../shared/stock';
 
 // Internal types for the algorithm
 interface Rectangle {
@@ -531,8 +532,13 @@ function calculateStatistics(
 
     const actualBoardsUsed = boards.length;
     const boardsNeeded = Math.ceil(actualBoardsUsed * (1 + overageFactor));
-    const boardFeetPerBoard = calculateBoardFeet(stock.length, stock.width, stock.thickness);
-    const boardFeet = boardFeetPerBoard * boardsNeeded;
+    const form = resolveStockForm(stock);
+    // Board feet measure a rectangular solid. Run through a dowel they measure
+    // the box it fits in, about a quarter more material than the rod holds, so
+    // round stock is bought and reported by the rod and its linear feet.
+    const boardFeet = isRectangularStockForm(form)
+      ? calculateBoardFeet(stock.length, stock.width, stock.thickness) * boardsNeeded
+      : 0;
     const linearFeet = (stock.length / 12) * boardsNeeded;
 
     let cost = 0;
@@ -576,7 +582,8 @@ function calculateStatistics(
       linearFeet,
       actualBoardsUsed,
       averageUtilization: avgUtilization,
-      wasteSquareInches: stockWaste
+      wasteSquareInches: stockWaste,
+      form
     });
 
     totalBoardFeet += boardFeet;
