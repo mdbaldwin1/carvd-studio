@@ -13,6 +13,7 @@ import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
 import { hasRenderablePartFeatures } from '../../utils/partFeatureGeometry';
+import { getPartShape } from '../../utils/partShape';
 import { Part } from './Part';
 import { InstancedParts } from './InstancedParts';
 import { useWorkspaceSceneGraph } from '../../interaction/useWorkspaceSceneGraph';
@@ -21,6 +22,7 @@ import { DowelVisualizations } from './DowelVisualizations';
 
 export function PartsRenderer() {
   const parts = useProjectStore((s) => s.parts);
+  const stocks = useProjectStore((s) => s.stocks);
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const hoveredPartId = useSelectionStore((s) => s.hoveredPartId);
@@ -71,8 +73,10 @@ export function PartsRenderer() {
     }
 
     // Feature-bearing parts use the dedicated geometry path instead of instancing.
+    // Round parts do too: the instanced draw shares one unit cube, which cannot
+    // represent a dowel.
     for (const part of parts) {
-      if (hasRenderablePartFeatures(part)) {
+      if (hasRenderablePartFeatures(part) || getPartShape(part, stocks) === 'round') {
         individualIds.add(part.id);
       }
     }
@@ -94,6 +98,7 @@ export function PartsRenderer() {
     return { individualPartIdSet: individualIds };
   }, [
     parts,
+    stocks,
     selectedPartIds,
     selectedGroupIds,
     hoveredPartId,

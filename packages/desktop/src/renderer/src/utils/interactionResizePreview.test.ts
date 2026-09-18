@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import type { AppSettings, Part } from '../types';
+import { createTestStock } from '../../../../tests/helpers/factories';
 import { resolveResizePositionFromDimensions, solveResizePreview } from './interactionResizePreview';
 
 function part(overrides: Partial<Part> = {}): Part {
@@ -227,5 +228,67 @@ describe('interactionResizePreview', () => {
     expect(position.x).toBeCloseTo(2);
     expect(position.y).toBeCloseTo(1);
     expect(position.z).toBeCloseTo(-1);
+  });
+});
+
+describe('round stock resize', () => {
+  const rod = createTestStock({
+    id: 'rod-1',
+    name: '3/8" Birch Dowel',
+    length: 36,
+    width: 0.375,
+    thickness: 0.375,
+    pricingUnit: 'per_item',
+    form: 'rod'
+  });
+
+  type ResizeParams = Parameters<typeof solveResizePreview>[0];
+  const resizeRod = (handlePos: ResizeParams['handlePos'], localDelta: ResizeParams['localDelta']) =>
+    solveResizePreview({
+      part: part({ id: 'dowel', length: 4, width: 0.375, thickness: 0.375, stockId: 'rod-1' }),
+      handlePos,
+      localDelta,
+      partPosition: { x: 0, y: 0.5, z: 0 },
+      startingDimensions: { length: 4, width: 0.375, thickness: 0.375 },
+      assignedStock: rod,
+      constrainDimensions: true,
+      rotationQuaternion: new THREE.Quaternion(),
+      referenceParts: [],
+      referencePartIds: [],
+      groupMembers: [],
+      snapToPartsEnabled: false,
+      appSettings: settings,
+      units: 'imperial',
+      cameraDistance: 20
+    });
+
+  it('cuts a dowel to length', () => {
+    const preview = resizeRod({ x: 1, y: 0, z: 0, type: 'edge-y' }, { x: 2, y: 0, z: 0 });
+    expect(preview.dimensions.length).toBeCloseTo(6);
+    expect(preview.dimensions.width).toBeCloseTo(0.375);
+  });
+
+  it('refuses to make a dowel thinner, whichever handle is dragged', () => {
+    // Ripping narrows a board; nothing narrows a dowel short of a lathe, so
+    // every handle on round stock resizes its length alone.
+    const handles: ResizeParams['handlePos'][] = [
+      { x: 0, y: 1, z: 1, type: 'edge-x' },
+      { x: 1, y: 0, z: 1, type: 'edge-y' },
+      { x: 1, y: 1, z: 0, type: 'edge-z' },
+      { x: 1, y: 1, z: 1, type: 'corner' }
+    ];
+    for (const handlePos of handles) {
+      const preview = resizeRod(handlePos, { x: 0, y: -0.2, z: -0.2 });
+      expect(preview.dimensions.width).toBeCloseTo(0.375);
+      expect(preview.dimensions.thickness).toBeCloseTo(0.375);
+    }
+  });
+
+  it('pulls a mismatched dowel back onto its stock diameter', () => {
+    const preview = resizeRod({ x: 1, y: 1, z: 1, type: 'corner' }, { x: 1, y: 5, z: 5 });
+    // The diameter belongs to the stock, so a stale part value is corrected
+    // rather than merely capped.
+    expect(preview.dimensions.width).toBeCloseTo(rod.width);
+    expect(preview.dimensions.thickness).toBeCloseTo(rod.thickness);
   });
 });

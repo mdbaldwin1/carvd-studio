@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added dowel stock. Choose Dowel as the stock type and give it a diameter and a length, and parts cut from it render as real cylinders. A dowel's diameter comes from its stock and only its length is yours to set, because ripping makes a board narrower but nothing makes a dowel thinner.
+
 - Stock now records how it is bought and broken down, so the library can tell sheet goods from dimensional lumber instead of guessing from a name. Existing projects and libraries are classified on open exactly the way they were already being displayed, and a project only moves to the newer file version once it holds material an older build cannot model.
 
 - Fixed the overlap-prevention preference not surviving a restart, because the main process stored only three of the four stock constraint settings.

@@ -2,6 +2,7 @@ import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { Select } from '@renderer/components/ui/select';
 import { Stock } from '../../types';
+import { resolveStockForm, type StockForm } from '../../../../shared/stock';
 import { ColorPicker } from '../common/ColorPicker';
 import { FractionInput } from '../common/FractionInput';
 
@@ -13,6 +14,23 @@ interface StockFormFieldsProps {
 }
 
 export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
+  const form = resolveStockForm(formData);
+  const isRod = form === 'rod';
+
+  // Round stock is square in section, so one diameter writes both dimensions.
+  const setDiameter = (diameter: number) => onChange({ ...formData, width: diameter, thickness: diameter });
+
+  const changeForm = (next: StockForm) => {
+    if (next !== 'rod') {
+      onChange({ ...formData, form: next });
+      return;
+    }
+    // Coming from a board, the old width and thickness describe a rectangle.
+    // Seed a plausible dowel instead of carrying a 6" "diameter" across.
+    const diameter = formData.width === formData.thickness ? formData.width : 0.375;
+    onChange({ ...formData, form: next, width: diameter, thickness: diameter, grainDirection: 'length' });
+  };
+
   return (
     <>
       <div className="flex flex-col mb-4 gap-2.5">
@@ -21,21 +39,48 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
       </div>
 
       <div className="flex flex-col mb-4 gap-2.5">
-        <Label>Dimensions (L × W × T)</Label>
-        <div className="flex items-center gap-1">
-          <FractionInput value={formData.length} onChange={(length) => onChange({ ...formData, length })} min={1} />
-          <span>×</span>
-          <FractionInput value={formData.width} onChange={(width) => onChange({ ...formData, width })} min={1} />
-          <span>×</span>
-          <FractionInput
-            value={formData.thickness}
-            onChange={(thickness) => onChange({ ...formData, thickness })}
-            min={0.25}
-          />
-        </div>
+        <Label htmlFor="stock-form">Stock Type</Label>
+        <Select id="stock-form" value={form} onChange={(e) => changeForm(e.target.value as StockForm)}>
+          <option value="sheet">Sheet (plywood, MDF)</option>
+          <option value="board">Board (dimensional lumber)</option>
+          <option value="rod">Dowel (round, cut to length)</option>
+        </Select>
       </div>
 
-      <div className="flex flex-col mb-4 gap-2.5">
+      {isRod ? (
+        <div className="flex gap-4">
+          <div className="flex flex-col mb-4 gap-2.5 flex-1">
+            <Label>Diameter</Label>
+            <FractionInput ariaLabel="Diameter" value={formData.width} onChange={setDiameter} min={0.0625} />
+          </div>
+          <div className="flex flex-col mb-4 gap-2.5 flex-1">
+            <Label>Length</Label>
+            <FractionInput
+              ariaLabel="Length"
+              value={formData.length}
+              onChange={(length) => onChange({ ...formData, length })}
+              min={1}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col mb-4 gap-2.5">
+          <Label>Dimensions (L × W × T)</Label>
+          <div className="flex items-center gap-1">
+            <FractionInput value={formData.length} onChange={(length) => onChange({ ...formData, length })} min={1} />
+            <span>×</span>
+            <FractionInput value={formData.width} onChange={(width) => onChange({ ...formData, width })} min={1} />
+            <span>×</span>
+            <FractionInput
+              value={formData.thickness}
+              onChange={(thickness) => onChange({ ...formData, thickness })}
+              min={0.25}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className={isRod ? 'hidden' : 'flex flex-col mb-4 gap-2.5'}>
         <Label>Grain Direction</Label>
         <Select
           value={formData.grainDirection}
@@ -64,7 +109,7 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
               })
             }
           >
-            <option value="per_item">Per Sheet/Board</option>
+            <option value="per_item">{isRod ? 'Per Rod' : 'Per Sheet/Board'}</option>
             <option value="board_foot">Per Board Foot</option>
           </Select>
         </div>

@@ -12,6 +12,7 @@ import {
 import { resolveReferenceEntities } from './interactionSelection';
 import type { InteractionSelectionEntity } from './interactionSelection';
 import { solveResizeReferencePreview, type ReferenceRelation } from './referenceRelations';
+import { resolveStockForm } from '../../../shared/stock';
 
 type Vec3 = { x: number; y: number; z: number };
 type Dimensions = { length: number; width: number; thickness: number };
@@ -112,6 +113,16 @@ export function solveResizePreview(params: {
       newWidth = Math.min(maxWidth, Math.max(0.5, startingDimensions.width + localDelta.z * handlePos.z));
       resizingDimensions.width = true;
     }
+  }
+
+  // Ripping makes a board narrower; nothing makes a dowel thinner. A round
+  // part's diameter therefore belongs to its stock, so every handle on it
+  // resizes length alone and dimension snapping never offers the other two.
+  if (assignedStock && resolveStockForm(assignedStock) === 'rod') {
+    newWidth = assignedStock.width;
+    newThickness = assignedStock.thickness;
+    resizingDimensions.width = false;
+    resizingDimensions.thickness = false;
   }
 
   const snapTargetParts =

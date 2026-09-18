@@ -1287,6 +1287,43 @@ function getFeatureContour(part: Part): Point2[] {
   return polygons.length === 1 ? polygons[0][0].slice(0, -1).map(([x, z]) => ({ x, z })) : contour;
 }
 
+/**
+ * Round parts repeat heavily -- a project uses a handful of dowel diameters and
+ * a handful of lengths -- so pool them by size rather than rebuilding per part.
+ */
+const rodGeometryCache = new Map<string, THREE.BufferGeometry>();
+const MAX_ROD_GEOMETRY_CACHE_ENTRIES = 64;
+/**
+ * Fine enough that drei's 15-degree Edges threshold suppresses the lateral
+ * seams and draws only the two end circles, which is what reads as a dowel.
+ */
+const ROD_RADIAL_SEGMENTS = 32;
+
+/** A dowel: round in cross-section, with its axis along the part's length. */
+export function getRodRenderGeometry(length: number, diameter: number): THREE.BufferGeometry {
+  const key = `${length}:${diameter}`;
+  const cached = rodGeometryCache.get(key);
+  if (cached) {
+    rodGeometryCache.delete(key);
+    rodGeometryCache.set(key, cached);
+    return cached;
+  }
+
+  const radius = Math.max(diameter, 0) / 2;
+  const geometry = new THREE.CylinderGeometry(radius, radius, Math.max(length, 0), ROD_RADIAL_SEGMENTS);
+  // Three builds a cylinder along Y; a part's length runs along its local X.
+  geometry.rotateZ(Math.PI / 2);
+
+  if (rodGeometryCache.size >= MAX_ROD_GEOMETRY_CACHE_ENTRIES) {
+    const oldestKey = rodGeometryCache.keys().next().value;
+    // Evict the reference but never dispose, for the reason getPartRenderGeometry
+    // gives: an evicted geometry is very likely still mounted.
+    if (oldestKey !== undefined) rodGeometryCache.delete(oldestKey);
+  }
+  rodGeometryCache.set(key, geometry);
+  return geometry;
+}
+
 export function getPartRenderGeometry(part: Part): THREE.BufferGeometry {
   if (!hasRenderablePartFeatures(part)) {
     return new THREE.BoxGeometry(part.length, part.thickness, part.width);

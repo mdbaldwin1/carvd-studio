@@ -13,8 +13,10 @@ import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 import {
   getPartOutlineGeometry,
   getPartRenderGeometry,
+  getRodRenderGeometry,
   hasRenderablePartFeatures
 } from '../../utils/partFeatureGeometry';
+import { getPartShape } from '../../utils/partShape';
 import {
   beginRotateInteractionSession,
   clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances,
@@ -315,11 +317,19 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
     clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances();
   }, [controls]);
 
-  const renderGeometry = useMemo(() => getPartRenderGeometry(part), [part]);
   const isFeaturePart = hasRenderablePartFeatures(part);
+  // A part is round because it was cut from a dowel. Derived from stock rather
+  // than stored, so it stays honest when the part is reassigned; selecting a
+  // plain string keeps this from re-rendering when unrelated stock changes.
+  const partShape = useProjectStore((s) => getPartShape(part, s.stocks));
+  const isRodPart = partShape === 'round' && !isFeaturePart;
+  const renderGeometry = useMemo(
+    () => (isRodPart ? getRodRenderGeometry(part.length, part.width) : getPartRenderGeometry(part)),
+    [isRodPart, part]
+  );
   const outlineGeometry = useMemo(
-    () => (isFeaturePart ? getPartOutlineGeometry(part) : undefined),
-    [isFeaturePart, part]
+    () => (isFeaturePart ? getPartOutlineGeometry(part) : isRodPart ? renderGeometry : undefined),
+    [isFeaturePart, isRodPart, renderGeometry, part]
   );
 
   const interactionPreview = resolvePartInteractionPreview(part, activeSession);
@@ -457,7 +467,11 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             hitTarget: { kind: 'part-body', nodeId: part.id, partId: part.id }
           }}
         >
-          {isFeaturePart ? <primitive object={renderGeometry} attach="geometry" /> : <boxGeometry args={dims} />}
+          {isFeaturePart || isRodPart ? (
+            <primitive object={renderGeometry} attach="geometry" />
+          ) : (
+            <boxGeometry args={dims} />
+          )}
           {displayMode === 'solid' && <meshStandardMaterial color={part.color} />}
           {displayMode === 'wireframe' && <meshBasicMaterial color={part.color} wireframe />}
           {displayMode === 'translucent' && (

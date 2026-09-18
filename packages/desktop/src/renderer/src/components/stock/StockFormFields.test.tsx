@@ -84,3 +84,70 @@ describe('StockFormFields', () => {
     expect(screen.getByText('Display Color')).toBeInTheDocument();
   });
 });
+
+describe('StockFormFields stock type', () => {
+  const dowel: StockFormData = {
+    name: '3/8" Birch Dowel',
+    length: 36,
+    width: 0.375,
+    thickness: 0.375,
+    grainDirection: 'length',
+    pricingUnit: 'per_item',
+    pricePerUnit: 3.5,
+    color: '#d8bd8a',
+    form: 'rod'
+  };
+
+  const renderStock = (formData: StockFormData) => {
+    const onChange = vi.fn();
+    render(<StockFormFields formData={formData} onChange={onChange} />);
+    return onChange;
+  };
+
+  it('classifies stock that predates the field rather than showing it blank', () => {
+    renderStock(walnut);
+    expect((screen.getByLabelText('Stock Type') as HTMLSelectElement).value).toBe('board');
+    renderStock({ ...walnut, name: 'Plywood', length: 96, width: 48 });
+    expect((screen.getAllByLabelText('Stock Type')[1] as HTMLSelectElement).value).toBe('sheet');
+  });
+
+  it('asks a dowel for a diameter and a length, not three dimensions', () => {
+    renderStock(dowel);
+    expect(screen.getByRole('textbox', { name: 'Diameter' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Length' })).toBeInTheDocument();
+    expect(screen.queryByText('Dimensions (L × W × T)')).not.toBeInTheDocument();
+    // A dowel's grain always runs along its axis, so there is nothing to choose.
+    expect(screen.getByText('Grain Direction').closest('div')).toHaveClass('hidden');
+  });
+
+  it('writes one diameter into both section dimensions', () => {
+    const onChange = renderStock(dowel);
+    const diameter = screen.getByRole('textbox', { name: 'Diameter' });
+    fireEvent.focus(diameter);
+    fireEvent.change(diameter, { target: { value: '1/2' } });
+    fireEvent.blur(diameter);
+    expect(onChange.mock.calls[0][0]).toMatchObject({ width: 0.5, thickness: 0.5 });
+  });
+
+  it('seeds a plausible dowel instead of carrying a board width across as a diameter', () => {
+    const onChange = renderStock(walnut);
+    fireEvent.change(screen.getByLabelText('Stock Type'), { target: { value: 'rod' } });
+    const next = onChange.mock.calls[0][0];
+    // 8" is a board width, not a dowel; a default beats a nonsense diameter.
+    expect(next.width).toBe(0.375);
+    expect(next.thickness).toBe(0.375);
+    expect(next.form).toBe('rod');
+    expect(next.grainDirection).toBe('length');
+  });
+
+  it('keeps a square section when one is already there', () => {
+    const onChange = renderStock({ ...walnut, width: 1, thickness: 1 });
+    fireEvent.change(screen.getByLabelText('Stock Type'), { target: { value: 'rod' } });
+    expect(onChange.mock.calls[0][0]).toMatchObject({ width: 1, thickness: 1 });
+  });
+
+  it('prices a dowel by the rod', () => {
+    renderStock(dowel);
+    expect(screen.getByRole('option', { name: 'Per Rod' })).toBeInTheDocument();
+  });
+});
