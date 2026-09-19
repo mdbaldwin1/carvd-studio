@@ -11,6 +11,7 @@ import { getFeatureLimits } from '../../utils/featureLimits';
 import { analytics } from '../../utils/analytics';
 import { bucketCount } from '../../../../shared/analytics';
 import { getContainingGroupId, resolveExplicitSelectedPartIds } from '../../utils/interactionSelection';
+import { resolveTenonAndMortiseParts } from '../../utils/fitJoinery';
 
 /**
  * Half an inch is the depth a 3/8" dowel is usually taken into each half of a
@@ -37,6 +38,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const requestDeleteGroups = useUIStore((s) => s.requestDeleteGroups);
   const resetSelectedPartsToStock = useProjectStore((s) => s.resetSelectedPartsToStock);
   const transferHolesToMate = useProjectStore((s) => s.transferHolesToMate);
+  const fitTenonsToMortise = useProjectStore((s) => s.fitTenonsToMortise);
   const boreThroughAssembly = useProjectStore((s) => s.boreThroughAssembly);
   const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
@@ -82,6 +84,16 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
     singleSelectedPart?.features?.some(
       (feature) => feature.enabled && feature.kind === 'circular_cut' && feature.parameters.depthMode === 'through'
     ) ?? false;
+
+  // Two parts, one with tenons and one with mortises: the joint can be fitted.
+  const tenonMortisePair =
+    selectedPartIds.length === 2 && selectedGroupIds.length === 0
+      ? (() => {
+          const first = parts.find((part) => part.id === selectedPartIds[0]);
+          const second = parts.find((part) => part.id === selectedPartIds[1]);
+          return first && second ? resolveTenonAndMortiseParts(first, second) : null;
+        })()
+      : null;
 
   // Check if any selected part has a stock assigned
   const selectedParts = parts.filter((p) => effectiveSelectedPartIds.includes(p.id));
@@ -267,6 +279,22 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
     onClose();
   };
 
+  /**
+   * Cut the tenon to the mortise. The mortise is the harder half to alter once
+   * it is made, so it is the tenon that gets fitted.
+   */
+  const handleFitTenon = () => {
+    if (!tenonMortisePair) {
+      onClose();
+      return;
+    }
+    const fitted = fitTenonsToMortise(tenonMortisePair.tenonPart.id, tenonMortisePair.mortisePart.id);
+    if (fitted > 0) {
+      showToast(`Fitted ${fitted} tenon${fitted === 1 ? '' : 's'} to the mortise`, 'success');
+    }
+    onClose();
+  };
+
   const handleEditCuts = () => {
     if (isEditingPartCuts) {
       showToast('Finish editing part cuts first', 'warning');
@@ -306,6 +334,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
       {singleSelectedPartHasThroughHoles && (
         <MenuItemButton onClick={handleBoreThrough}>Bore Through Assembly</MenuItemButton>
       )}
+      {tenonMortisePair && <MenuItemButton onClick={handleFitTenon}>Fit Tenon to Mortise</MenuItemButton>}
       {singleSelectedPart && (singleSelectedPart.features?.length ?? 0) > 0 && (
         <MenuItemButton onClick={handleCopyCuts}>Copy Cuts</MenuItemButton>
       )}

@@ -18,6 +18,7 @@ import {
   EmbeddedStock,
   CustomShoppingItem,
   CircularCutFeature,
+  PartFeature,
   FaceTarget
 } from '../types';
 import { STOCK_COLORS } from '../constants';
@@ -41,6 +42,7 @@ import { findHolesOffTheFace, findMatingFace, getHolesOnFace, transferHolesToMat
 import { FACE_TARGETS } from '../components/part-features/partFeatureEditorState';
 import { planDowelJointMigration } from '../utils/dowelJointMigration';
 import { boreThroughAssembly as boreThroughAssemblyHoles } from '../utils/boreThrough';
+import { planTenonFit, resolveTenonAndMortiseParts } from '../utils/fitJoinery';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
 import { validateEndCutFeature } from '../utils/endCutUtils';
 import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
@@ -105,6 +107,7 @@ interface ProjectState {
   transferHolesToMate: (partId: string, depth: number, face?: FaceTarget) => number;
   convertLegacyDowelJoints: () => number;
   boreThroughAssembly: (partId: string, face?: FaceTarget) => number;
+  fitTenonsToMortise: (firstPartId: string, secondPartId: string) => number;
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
   rotateSelectedParts: (axis: 'x' | 'y' | 'z', degrees: number, pivot: { x: number; y: number; z: number }) => void;
   deletePart: (id: string) => void;
@@ -803,6 +806,49 @@ export const useProjectStore = create<ProjectState>()(
         }));
         get().markCutListStale();
         return bored.length;
+      },
+
+      /**
+       * Cut the tenon to the mortise, the way you would at the bench: the
+       * mortise is the harder half to alter, so the tenon is what gets fitted.
+       */
+      fitTenonsToMortise: (firstPartId, secondPartId) => {
+        const { parts } = get();
+        const first = parts.find((part) => part.id === firstPartId);
+        const second = parts.find((part) => part.id === secondPartId);
+        if (!first || !second) return 0;
+
+        const roles = resolveTenonAndMortiseParts(first, second);
+        if (!roles) {
+          useUIStore.getState().showToast('Select the rail with the tenon and the part with the mortise.', 'warning');
+          return 0;
+        }
+
+        const plan = planTenonFit(roles.tenonPart, roles.mortisePart);
+        if (!plan) return 0;
+
+        const fitted = plan.tenons.filter((tenon) => tenon.changed);
+        if (fitted.length === 0) {
+          useUIStore.getState().showToast('That tenon already fits its mortise.', 'info');
+          return 0;
+        }
+
+        const byId = new Map(plan.tenons.map((tenon) => [tenon.featureId, tenon.parameters]));
+        const fitFeatures = (features: PartFeature[]): PartFeature[] =>
+          features.map((feature) => {
+            if (feature.kind !== 'rect_cut') return feature;
+            const parameters = byId.get(feature.id);
+            return parameters ? { ...feature, parameters } : feature;
+          });
+
+        set((state) => ({
+          parts: state.parts.map((part) =>
+            part.id === plan.tenonPartId ? { ...part, features: fitFeatures(part.features ?? []) } : part
+          ),
+          isDirty: true
+        }));
+        get().markCutListStale();
+        return fitted.length;
       },
 
       transferHolesToMate: (partId, depth, face) => {

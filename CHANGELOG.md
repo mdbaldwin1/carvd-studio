@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added Fit Tenon to Mortise. Select the rail and the part it goes into, and the tenon is cut to the mortise: the mortise's width becomes the tongue's thickness, its length the tongue's width, and the tenon stops a sixteenth short of the bottom so it seats on its shoulders. The mortise is never altered, because it is the harder half to change once it is cut.
+
 - A new mortise and a new tenon now fit each other. Accepting both defaults previously drew a tenon six times too long for its mortise and a third of the width it needed; a tenon is now about a third of the stock it is cut on, and a mortise is cut a sixteenth deeper than the tenon is long so it seats on its shoulders.
 
 - Half Lap is a real joint rather than a dado wearing a label. Its depth is half the board, derived on every read, so resizing a part keeps the lap a half and two laps on matching stock meet flush.
