@@ -174,6 +174,15 @@ export interface RectCutFeature extends PartFeatureBase {
     };
     depthMode: 'through' | 'blind';
     depth?: number;
+    /**
+     * The inside corners a rotating bit leaves behind.
+     *
+     * A pocket chopped with a hollow chisel has square corners. One routed
+     * has corners radiused to the bit -- and since a mortise is usually cut
+     * with a bit its own width, its ends come out half-round. Absent or zero
+     * means square, which is what a chisel or a hand-squared pocket gives.
+     */
+    cornerRadius?: number;
   };
   placement: {
     x: number;

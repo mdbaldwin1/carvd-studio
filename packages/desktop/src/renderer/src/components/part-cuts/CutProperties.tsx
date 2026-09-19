@@ -68,6 +68,15 @@ export function CutProperties() {
 
   const isRect = inspectorDraft.mode === 'rect_cut';
 
+  // Only a four-cornered pocket has corners a rotating bit can round. A dado
+  // or a groove runs out to an edge and has none.
+  const isRoundablePocket =
+    inspectorDraft.mode === 'rect_cut' && (inspectorDraft.cutType === 'mortise' || inspectorDraft.cutType === 'cutout');
+  // Routed with a bit the pocket's own width, which is the usual way, the ends
+  // come out half-round. A narrower bit in several passes leaves less.
+  const routedCornerRadius =
+    inspectorDraft.mode === 'rect_cut' ? Math.min(inspectorDraft.sizeLength, inspectorDraft.sizeWidth) / 2 : 0;
+
   // A Forstner runs out of flute long before a twist bit does, which is the
   // kind of thing you find out at the drill press rather than in a drawing.
   const chosenBit = inspectorDraft.mode === 'circular_cut' ? findBitForDiameter(inspectorDraft.diameter) : undefined;
@@ -531,6 +540,7 @@ export function CutProperties() {
                 onChange={(diameter) => setDraft({ ...inspectorDraft, diameter })}
                 min={0.001}
               />
+
               {inspectorDraft.depthMode === 'blind' && outOfReachBit && (
                 <p className="mt-1 text-[11px] text-warning">
                   {outOfReachBit.name} reaches {formatMeasurementWithUnit(outOfReachBit.maxDepth, units)}; this hole is
@@ -948,6 +958,44 @@ export function CutProperties() {
                 </p>
               )}
             </div>
+
+            {isRoundablePocket && (
+              <div className="property-group">
+                <Label htmlFor="pocket-corners">Corners</Label>
+                {/* How it is cut decides its shape, and the mating tenon has
+                    to match: a routed pocket has round ends. */}
+                <Select
+                  id="pocket-corners"
+                  value={inspectorDraft.cornerRadius > 0 ? 'routed' : 'square'}
+                  onChange={(event) =>
+                    updateRectDraft({
+                      cornerRadius: event.target.value === 'routed' ? routedCornerRadius : 0
+                    })
+                  }
+                >
+                  <option value="square">Square (chopped)</option>
+                  <option value="routed">Rounded (routed)</option>
+                </Select>
+                {inspectorDraft.cornerRadius > 0 ? (
+                  <p className="mt-1 text-[11px] text-text-muted">
+                    A bit leaves {formatMeasurementWithUnit(inspectorDraft.cornerRadius, units)} radius corners. Round
+                    the mating tenon to match, or chop these square.
+                  </p>
+                ) : null}
+              </div>
+            )}
+
+            {isRoundablePocket && inspectorDraft.cornerRadius > 0 && (
+              <div className="property-group">
+                <Label>Corner Radius</Label>
+                <FractionInput
+                  ariaLabel="Corner Radius"
+                  value={inspectorDraft.cornerRadius}
+                  onChange={(cornerRadius) => updateRectDraft({ cornerRadius })}
+                  min={0.0156}
+                />
+              </div>
+            )}
 
             {inspectorDraft.depthMode === 'blind' &&
               (inspectorUsesDerivedDepth ? (

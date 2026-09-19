@@ -403,6 +403,15 @@ export function validateRectCutFeature(
     }
   }
 
+  const cornerRadius = resolvedFeature.parameters.cornerRadius ?? 0;
+  if (cornerRadius < 0) return 'Corner radius cannot be negative.';
+  if (cornerRadius > 0) {
+    // At half the smaller span the pocket is already a stadium; past that the
+    // arcs would cross and the shape stops being a pocket at all.
+    const limit = Math.min(sizeLength, resolvedFeature.parameters.size.width) / 2;
+    if (cornerRadius > limit + 1e-9) return 'Corner radius is larger than the pocket can hold.';
+  }
+
   if (resolvedFeature.cutType === 'half_lap') {
     if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
       return 'Half lap must target the top or bottom face.';

@@ -202,18 +202,59 @@ function shapeFromContour(contour: Point2[], holes: Point2[][]): THREE.Shape {
   return shape;
 }
 
+/**
+ * The pockets whose inside corners a bit actually leaves behind.
+ *
+ * A dado or a groove runs out to an edge, so it has no inside corner to
+ * round. A stopped run has one rounded end rather than four rounded corners,
+ * which wants its own treatment. These two are the true four-cornered pockets.
+ */
+const ROUNDABLE_RECT_CUT_TYPES: RectCutFeature['cutType'][] = ['mortise', 'cutout'];
+
+/** How finely a corner arc is walked. Matches the rounded-cut builder. */
+const CORNER_ARC_STEPS = 8;
+
+export function getRectCutCornerRadius(feature: RectCutFeature, part: Part): number {
+  if (!ROUNDABLE_RECT_CUT_TYPES.includes(feature.cutType)) return 0;
+  const radius = feature.parameters.cornerRadius ?? 0;
+  if (!(radius > 0)) return 0;
+  const bounds = getRectCutPlanBounds(feature, part);
+  // Never more than fits: at half the smaller span the pocket is a stadium.
+  return Math.min(radius, (bounds.maxX - bounds.minX) / 2, (bounds.maxZ - bounds.minZ) / 2);
+}
+
 function getRectCutHole(feature: RectCutFeature, part: Part): Point2[] {
   const bounds = getRectCutPlanBounds(feature, part);
   const minX = bounds.minX - part.length / 2;
   const maxX = bounds.maxX - part.length / 2;
   const minZ = bounds.minZ - part.width / 2;
   const maxZ = bounds.maxZ - part.width / 2;
-  return [
-    { x: minX, z: minZ },
-    { x: maxX, z: minZ },
-    { x: maxX, z: maxZ },
-    { x: minX, z: maxZ }
+
+  const radius = getRectCutCornerRadius(feature, part);
+  if (radius <= 0) {
+    return [
+      { x: minX, z: minZ },
+      { x: maxX, z: minZ },
+      { x: maxX, z: maxZ },
+      { x: minX, z: maxZ }
+    ];
+  }
+
+  // Walk the same four corners, replacing each with the arc the bit swept.
+  const points: Point2[] = [];
+  const corners: Array<[number, number, number]> = [
+    [minX + radius, minZ + radius, Math.PI],
+    [maxX - radius, minZ + radius, -Math.PI / 2],
+    [maxX - radius, maxZ - radius, 0],
+    [minX + radius, maxZ - radius, Math.PI / 2]
   ];
+  for (const [cx, cz, start] of corners) {
+    for (let step = 0; step <= CORNER_ARC_STEPS; step += 1) {
+      const angle = start + (step * Math.PI) / (2 * CORNER_ARC_STEPS);
+      points.push({ x: cx + Math.cos(angle) * radius, z: cz + Math.sin(angle) * radius });
+    }
+  }
+  return points;
 }
 
 function getCircularCutHoles(

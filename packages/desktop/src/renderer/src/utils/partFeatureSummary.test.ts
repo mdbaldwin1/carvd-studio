@@ -300,7 +300,9 @@ describe('partFeatureSummary', () => {
           createRectCut({ cutType: 'mortise', size: { length: 2, width: 0.75 }, depthMode: 'blind', depth: 0.5 }),
           'imperial'
         )
-      ).toBe('Mortise on Top Face · 2" × 3/4" × 1/2" deep');
+        // A mortise says how its corners come out, because the mating tenon
+        // has to match: square if chopped, rounded if routed.
+      ).toBe('Mortise on Top Face · 2" × 3/4" × 1/2" deep · square corners');
     });
 
     it('reports a zero depth when a blind cut has no stored depth', () => {

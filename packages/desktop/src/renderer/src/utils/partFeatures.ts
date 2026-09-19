@@ -495,6 +495,12 @@ export function validateSerializedPartFeatures(value: unknown, path: string): st
       // editor conflict instead of an import error.
       if (candidate.parameters.depthMode === 'blind' && !isPositiveFiniteNumber(candidate.parameters.depth))
         errors.push(`${featurePath}.parameters.depth is invalid`);
+      // Absent means square corners, which is what a chisel leaves.
+      if (
+        candidate.parameters.cornerRadius !== undefined &&
+        (!isFiniteNumber(candidate.parameters.cornerRadius) || candidate.parameters.cornerRadius < 0)
+      )
+        errors.push(`${featurePath}.parameters.cornerRadius is invalid`);
     }
     if (
       !isRecord(candidate.placement) ||

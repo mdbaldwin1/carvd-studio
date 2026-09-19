@@ -37,6 +37,7 @@ function createRectDraft(overrides?: Partial<RectDraft>): RectDraft {
     sizeWidth: 2,
     depthMode: 'through',
     depth: 0.25,
+    cornerRadius: 0,
     placementX: 1,
     placementZ: 1,
     ...overrides

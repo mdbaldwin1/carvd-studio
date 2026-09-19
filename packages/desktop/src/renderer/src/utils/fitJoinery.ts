@@ -101,17 +101,28 @@ export function fitTenonParameters(
   // too shallow to hold the relief just gets a tenon as long as it is deep.
   const length = mortiseDepth > MORTISE_RELIEF ? mortiseDepth - MORTISE_RELIEF : mortiseDepth;
 
+  // A routed mortise has round ends, so the tongue has to be rounded to match
+  // -- or the mortise chopped square. Carrying the radius across is what makes
+  // the drawing honest about the step the maker still has to do.
+  const cornerRadius = resolved.parameters.cornerRadius ?? 0;
+
   return {
     ...tenon.parameters,
     size: { length: Math.max(0, length), width: Math.max(0, width) },
     depthMode: 'blind',
-    depth: Math.max(0, thickness)
+    depth: Math.max(0, thickness),
+    cornerRadius: cornerRadius > 0 ? Math.min(cornerRadius, Math.max(0, thickness) / 2) : undefined
   };
 }
 
 function sameParameters(a: RectCutFeature['parameters'], b: RectCutFeature['parameters']): boolean {
   const near = (x: number, y: number) => Math.abs(x - y) < 1e-9;
-  return near(a.size.length, b.size.length) && near(a.size.width, b.size.width) && near(a.depth ?? 0, b.depth ?? 0);
+  return (
+    near(a.size.length, b.size.length) &&
+    near(a.size.width, b.size.width) &&
+    near(a.depth ?? 0, b.depth ?? 0) &&
+    near(a.cornerRadius ?? 0, b.cornerRadius ?? 0)
+  );
 }
 
 /**

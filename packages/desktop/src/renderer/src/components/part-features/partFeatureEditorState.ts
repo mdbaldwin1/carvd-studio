@@ -132,6 +132,8 @@ export interface RectCutDraft {
   sizeWidth: number;
   depthMode: RectCutFeature['parameters']['depthMode'];
   depth: number;
+  /** Zero for a pocket chopped square; the bit radius for one routed. */
+  cornerRadius: number;
   placementX: number;
   placementZ: number;
 }
@@ -350,6 +352,9 @@ function getDefaultRectDraft(cutType: RectCutFeature['cutType']): Extract<Featur
             : 0.75,
     depthMode: BLIND_BY_DEFAULT_RECT_CUT_TYPES.includes(cutType) ? 'blind' : 'through',
     depth: 0.25,
+    // Square by default: a chisel-chopped pocket is the shape the drawing has
+    // always shown, so nothing changes until the maker says it was routed.
+    cornerRadius: 0,
     placementX: 0,
     placementZ: 0
   };
@@ -475,6 +480,14 @@ export function normalizeRectCutDraft(
   if (normalized.cutType === 'dado' || normalized.cutType === 'stopped_dado') {
     normalized.sizeWidth = partWidth;
     normalized.placementZ = 0;
+  }
+
+  if (normalized.cutType === 'mortise' || normalized.cutType === 'cutout') {
+    const limit = Math.min(normalized.sizeLength, normalized.sizeWidth) / 2;
+    normalized.cornerRadius = clamp(sanitizeFinite(normalized.cornerRadius, 0), 0, limit);
+  } else {
+    // Only a four-cornered pocket has corners a bit can round.
+    normalized.cornerRadius = 0;
   }
 
   if (normalized.cutType === 'half_lap') {
@@ -825,6 +838,7 @@ export function buildDraftFromFeature(
       sizeWidth: feature.parameters.size.width,
       depthMode: feature.parameters.depthMode,
       depth: feature.parameters.depth ?? 0.25,
+      cornerRadius: feature.parameters.cornerRadius ?? 0,
       placementX: feature.placement.x,
       placementZ: feature.placement.z
     },
@@ -1034,7 +1048,10 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
         width: draft.sizeWidth
       },
       depthMode: draft.depthMode,
-      depth: draft.depthMode === 'blind' ? draft.depth : undefined
+      depth: draft.depthMode === 'blind' ? draft.depth : undefined,
+      // Absent rather than zero for a square pocket, so a file only carries
+      // the field when a bit actually left something behind.
+      cornerRadius: draft.cornerRadius > 0 ? draft.cornerRadius : undefined
     },
     placement: {
       x: draft.cutType === 'corner_notch' && Number.isFinite(draft.placementX) ? 0 : draft.placementX,

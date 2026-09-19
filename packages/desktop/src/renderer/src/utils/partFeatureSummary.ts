@@ -206,7 +206,14 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
 
   if (feature.cutType === 'tenon') {
     const tongueThickness = feature.parameters.depth ?? 0;
-    return `Tenon on ${getFeatureTargetLabel(feature)} \u00b7 ${formatMeasurementWithUnit(feature.parameters.size.length, units)} long \u00d7 ${formatMeasurementWithUnit(feature.parameters.size.width, units)} wide \u00d7 ${formatMeasurementWithUnit(tongueThickness, units)} thick`;
+    // A tongue going into a routed mortise has to be rounded to match it. The
+    // drawing shows a square tongue, so the instruction has to say otherwise.
+    const tenonCornerRadius = feature.parameters.cornerRadius ?? 0;
+    const rounding =
+      tenonCornerRadius > 0
+        ? ` \u00b7 round the corners to ${formatMeasurementWithUnit(tenonCornerRadius, units)} radius`
+        : '';
+    return `Tenon on ${getFeatureTargetLabel(feature)} \u00b7 ${formatMeasurementWithUnit(feature.parameters.size.length, units)} long \u00d7 ${formatMeasurementWithUnit(feature.parameters.size.width, units)} wide \u00d7 ${formatMeasurementWithUnit(tongueThickness, units)} thick${rounding}`;
   }
 
   if (feature.cutType === 'half_lap') {
@@ -240,7 +247,14 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
   }
 
   if (feature.cutType === 'mortise') {
-    return `Mortise on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)} × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+    // Say how the corners come out, because the mating tenon depends on it: a
+    // routed pocket has round ends, and the tongue has to be rounded to match.
+    const cornerRadius = feature.parameters.cornerRadius ?? 0;
+    const corners =
+      cornerRadius > 0
+        ? ` · routed, ${formatMeasurementWithUnit(cornerRadius, units)} radius corners`
+        : ' · square corners';
+    return `Mortise on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)} × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep${corners}`;
   }
 
   const size = `${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)}`;
