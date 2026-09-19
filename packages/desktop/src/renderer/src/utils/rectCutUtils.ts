@@ -80,6 +80,30 @@ export function getResolvedRectCutFeature(
   feature: RectCutFeature,
   part: Pick<Part, 'length' | 'width' | 'thickness'>
 ): RectCutFeature {
+  if (feature.cutType === 'half_lap') {
+    // A half lap is half the stock. That is the whole definition of the joint,
+    // so the depth is derived on every read rather than typed once: resize the
+    // board and its lap stays a half, the way it must to still be a half lap.
+    const targetFace = feature.target.type === 'face' ? feature.target.face : 'top_face';
+    return {
+      ...cloneRectCutFeature(feature),
+      target: { type: 'face', face: targetFace },
+      parameters: {
+        ...feature.parameters,
+        size: {
+          length: feature.parameters.size.length,
+          width: part.width
+        },
+        depthMode: 'blind',
+        depth: part.thickness / 2
+      },
+      placement: {
+        x: feature.placement.x,
+        z: 0
+      }
+    };
+  }
+
   if (feature.cutType === 'dado') {
     const targetFace = feature.target.type === 'face' ? feature.target.face : 'top_face';
     return {
@@ -289,6 +313,7 @@ export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPrevie
     feature.cutType === 'cutout' ||
     feature.cutType === 'dado' ||
     feature.cutType === 'stopped_dado' ||
+    feature.cutType === 'half_lap' ||
     feature.cutType === 'groove' ||
     feature.cutType === 'stopped_groove' ||
     feature.cutType === 'mortise'
@@ -314,7 +339,9 @@ export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPrevie
                   ? 'Stopped groove previews currently support only top and bottom face targets.'
                   : feature.cutType === 'mortise'
                     ? 'Mortise previews currently support only top and bottom face targets.'
-                    : 'Cutout previews currently support only top and bottom face targets.'
+                    : feature.cutType === 'half_lap'
+                      ? 'Half lap previews currently support only top and bottom face targets.'
+                      : 'Cutout previews currently support only top and bottom face targets.'
       };
     }
     return { supported: true };
@@ -374,6 +401,14 @@ export function validateRectCutFeature(
     } else if (depth >= part.thickness) {
       return 'Blind depth must stay less than part thickness.';
     }
+  }
+
+  if (resolvedFeature.cutType === 'half_lap') {
+    if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
+      return 'Half lap must target the top or bottom face.';
+    }
+    if (resolvedFeature.placement.x < 0) return 'Half lap offset cannot be negative.';
+    if (resolvedFeature.placement.x + sizeLength > part.length) return 'Half lap run extends past the blank.';
   }
 
   if (resolvedFeature.cutType === 'dado') {

@@ -22,6 +22,7 @@ export interface PartFeatureConflict {
     | 'rect_consumed'
     | 'rect_anchor_removed'
     | 'rect_depth_intersection'
+    | 'rect_perpendicular_intersection'
     | 'no_material'
     | 'material_removed';
   severity: 'warning' | 'error';
@@ -206,6 +207,60 @@ function getSideDepthInterval(
 
 function intervalsOverlap(a: DepthInterval, b: DepthInterval): boolean {
   return a.min < b.max && a.max > b.min;
+}
+
+/**
+ * How far a cut reaches across the thickness.
+ *
+ * A pocket in the top or bottom is bounded by its depth. One in a side face is
+ * bounded by where it sits on that face, since the cut runs into the width
+ * rather than down through the board.
+ */
+function getVerticalInterval(
+  feature: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): DepthInterval {
+  const resolved = getResolvedRectCutFeature(feature, part);
+  if (isSideFaceTarget(resolved)) {
+    const min = Math.max(0, resolved.placement.z);
+    return { min, max: Math.min(part.thickness, min + resolved.parameters.size.width) };
+  }
+  return getDepthInterval(resolved, part);
+}
+
+/**
+ * Two cuts entering from faces at right angles, meeting inside the blank.
+ *
+ * This is the leg of a table: the front apron's mortise comes in from one
+ * face and the side apron's from the next one round, at the same height. If
+ * they are deep enough they meet in the corner, and so do the tenons -- which
+ * is why the ends get mitred where they cross.
+ *
+ * It is reported rather than rejected, because meeting is often the intent.
+ */
+function isPerpendicularBlindIntersection(
+  priorFeature: RectCutFeature,
+  currentFeature: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): boolean {
+  if (priorFeature.parameters.depthMode !== 'blind' || currentFeature.parameters.depthMode !== 'blind') return false;
+
+  const priorResolved = getResolvedRectCutFeature(priorFeature, part);
+  const currentResolved = getResolvedRectCutFeature(currentFeature, part);
+  // Perpendicular means exactly one of the pair comes in from a side face.
+  if (isSideFaceTarget(priorResolved) === isSideFaceTarget(currentResolved)) return false;
+
+  const a = getRectFeatureBounds(priorFeature, part);
+  const b = getRectFeatureBounds(currentFeature, part);
+  if (!a || !b) return false;
+
+  // The plan bounds already carry each cut's depth on the axis it entered, so
+  // all that is left is the extent across the thickness.
+  return (
+    intervalsOverlap({ min: a.minX, max: a.maxX }, { min: b.minX, max: b.maxX }) &&
+    intervalsOverlap({ min: a.minZ, max: a.maxZ }, { min: b.minZ, max: b.maxZ }) &&
+    intervalsOverlap(getVerticalInterval(priorFeature, part), getVerticalInterval(currentFeature, part))
+  );
 }
 
 function isOpposingBlindIntersection(
@@ -433,6 +488,12 @@ export function getPartFeatureConflicts(
       } else if (isOpposingBlindIntersection(prior.feature, feature, part)) {
         code = 'rect_depth_intersection';
         message = `Operation ${index + 1} intersects Operation ${prior.index + 1} from the opposite face. Combined depths remove the same interior material.`;
+      } else if (isPerpendicularBlindIntersection(prior.feature, feature, part)) {
+        code = 'rect_perpendicular_intersection';
+        // Not an error: two mortises meeting in a leg is ordinary once the
+        // tenon ends are mitred where they cross. Say so rather than refuse.
+        severity = 'warning';
+        message = `Operation ${index + 1} meets Operation ${prior.index + 1} inside the blank, entering from faces at right angles. Shorten one, or mitre the tenon ends where they cross.`;
       }
 
       if (!code) continue;

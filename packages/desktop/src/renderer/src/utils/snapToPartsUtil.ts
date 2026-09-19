@@ -3835,7 +3835,8 @@ function mateShapeIsCompatibleWithSocket(mateShape: MateShape, socket: FeatureSo
   }
   if (mateShape.mateKind === 'mortise-tenon') return socket.mateKind === 'mortise';
   if (mateShape.mateKind === 'half-lap') {
-    if (socket.mateKind !== 'dado' && socket.mateKind !== 'stopped_dado') return false;
+    if (socket.mateKind !== 'dado' && socket.mateKind !== 'stopped_dado' && socket.mateKind !== 'half_lap')
+      return false;
     return (
       mateShape.insertionDepth !== undefined && Math.abs(mateShape.insertionDepth - socket.depth) < MATE_DIM_TOLERANCE
     );
@@ -3900,7 +3901,8 @@ function getMateShapes(part: Part, position: Vec3): MateShape[] {
       },
       insertionDepth: remainingThickness,
       complementaryOpeningNormal: isBottomTarget(cut) ? mulVec(axisY, -1) : axisY,
-      mateKind: cut.cutType === 'dado' || cut.cutType === 'stopped_dado' ? 'half-lap' : undefined
+      mateKind:
+        cut.cutType === 'dado' || cut.cutType === 'stopped_dado' || cut.cutType === 'half_lap' ? 'half-lap' : undefined
     });
   }
 

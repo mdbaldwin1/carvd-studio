@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- A new mortise and a new tenon now fit each other. Accepting both defaults previously drew a tenon six times too long for its mortise and a third of the width it needed; a tenon is now about a third of the stock it is cut on, and a mortise is cut a sixteenth deeper than the tenon is long so it seats on its shoulders.
+
+- Half Lap is a real joint rather than a dado wearing a label. Its depth is half the board, derived on every read, so resizing a part keeps the lap a half and two laps on matching stock meet flush.
+
+- Cuts entering a part from faces at right angles are now checked against each other. Two mortises meeting in a leg is reported with the remedy — shorten one, or mitre the tenon ends where they cross — rather than refused, because meeting is often the intent.
+
 - Added Bore Through Assembly: a through hole now drills every part stacked behind it in one pass, the way clamping up and drilling straight through does. It stops at the first gap, because a bit travels through wood and not air, and it does nothing from a blind hole, which is where the bit stopped.
 
 - Round holes are now bored with a bit chosen from a drill index rather than a typed number, and a blind hole deeper than the bit reaches says so. A Forstner runs out of flute long before a twist bit does.

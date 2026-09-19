@@ -1562,7 +1562,9 @@ describe('PartCutsWorkspace', () => {
     const features = lastFeatures(props.onDraftFeaturesChange);
     expect(features[0]).toMatchObject({
       cutType: 'mortise',
-      parameters: expect.objectContaining({ size: { length: 2.25, width: 1 } }),
+      // A mortise starts 1/4" wide now -- the tenon a 3/4" rail carries -- so
+      // the same two widen steps land at 1/2" rather than at 1".
+      parameters: expect.objectContaining({ size: { length: 2.25, width: 0.5 } }),
       // Two rights and one left net a single step along the length; the move
       // handle does not travel across the width.
       placement: { x: 0.25, z: 0 }

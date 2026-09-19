@@ -597,7 +597,10 @@ export function usePartCutsEditorState({
         // A tenon is sized by its tongue, not by a through/blind choice.
         inspectorDraft.cutType === 'tenon'));
   const inspectorUsesDerivedCrossWidth =
-    inspectorDraft?.mode === 'rect_cut' && ['dado', 'stopped_dado', 'rabbet'].includes(inspectorDraft.cutType);
+    inspectorDraft?.mode === 'rect_cut' &&
+    ['dado', 'stopped_dado', 'rabbet', 'half_lap'].includes(inspectorDraft.cutType);
+  /** A half lap is half the stock, so its depth is not the maker's to type. */
+  const inspectorUsesDerivedDepth = inspectorDraft?.mode === 'rect_cut' && inspectorDraft.cutType === 'half_lap';
   const preservedEndCutReferenceNote =
     inspectorDraft?.mode === 'end_cut' &&
     (inspectorDraft.lengthMode !== 'long_point' || inspectorDraft.referenceMode !== null)
@@ -662,6 +665,7 @@ export function usePartCutsEditorState({
     rabbetShoulderValue,
     inspectorUsesBlindOnlyDepth,
     inspectorHidesDepthSelector,
+    inspectorUsesDerivedDepth,
     inspectorUsesDerivedCrossWidth,
     preservedEndCutReferenceNote
   };

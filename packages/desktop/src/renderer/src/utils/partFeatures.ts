@@ -40,6 +40,7 @@ const RECT_CUT_TYPES = new Set([
   'rabbet',
   'groove',
   'stopped_groove',
+  'half_lap',
   'mortise',
   'tenon'
 ]);

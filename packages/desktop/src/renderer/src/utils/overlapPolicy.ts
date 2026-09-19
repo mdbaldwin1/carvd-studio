@@ -83,6 +83,7 @@ const HOUSING_RECT_CUT_TYPES = new Set<RectCutFeature['cutType']>([
   'stopped_dado',
   'groove',
   'stopped_groove',
+  'half_lap',
   'rabbet',
   'mortise',
   'tenon'

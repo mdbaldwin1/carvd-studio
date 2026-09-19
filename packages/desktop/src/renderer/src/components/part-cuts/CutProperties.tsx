@@ -59,6 +59,7 @@ export function CutProperties() {
     inspectorUsesBlindOnlyDepth,
     inspectorHidesDepthSelector,
     inspectorUsesDerivedCrossWidth,
+    inspectorUsesDerivedDepth,
     rabbetShoulderValue,
     rabbetRunsAlongLength
   } = usePartCutsEditor();
@@ -92,11 +93,13 @@ export function CutProperties() {
               ? 'Groove runs the full board length. Set the groove width across the board and the blind depth.'
               : inspectorDraft.cutType === 'stopped_groove'
                 ? 'Stopped groove uses a limited run and explicit placement. Set run length, groove width, offsets, and blind depth.'
-                : inspectorDraft.cutType === 'mortise'
-                  ? 'Mortise is a face pocket for a tenon. Set pocket size and placement, and choose a blind depth or take it through for a wedged or exposed tenon.'
-                  : inspectorDraft.cutType === 'tenon'
-                    ? 'Tenon leaves a tongue on the end, centred in the board thickness. Size it to the mortise it fits — the board length already includes the tenon, so no extra allowance is needed.'
-                    : null;
+                : inspectorDraft.cutType === 'half_lap'
+                  ? 'Half lap removes half the board so two pieces cross flush. Set the run and where it starts; the depth follows the stock.'
+                  : inspectorDraft.cutType === 'mortise'
+                    ? 'Mortise is a face pocket for a tenon. Set pocket size and placement, and choose a blind depth or take it through for a wedged or exposed tenon.'
+                    : inspectorDraft.cutType === 'tenon'
+                      ? 'Tenon leaves a tongue on the end, centred in the board thickness. Size it to the mortise it fits — the board length already includes the tenon, so no extra allowance is needed.'
+                      : null;
 
   const runLabel =
     !isRect || inspectorDraft.mode !== 'rect_cut'
@@ -946,17 +949,26 @@ export function CutProperties() {
               )}
             </div>
 
-            {inspectorDraft.depthMode === 'blind' && (
-              <div className="property-group">
-                <Label>{blindDepthLabel}</Label>
-                <FractionInput
-                  ariaLabel={blindDepthLabel}
-                  value={inspectorDraft.depth}
-                  onChange={(value) => updateRectDraft({ depth: value })}
-                  min={0.125}
-                />
-              </div>
-            )}
+            {inspectorDraft.depthMode === 'blind' &&
+              (inspectorUsesDerivedDepth ? (
+                <div className="property-group">
+                  <Label>Depth</Label>
+                  <div className="text-sm text-text">{formatMeasurementWithUnit(inspectorDraft.depth, units)}</div>
+                  <p className="mt-1 text-[11px] text-text-muted">
+                    Half the board thickness. Two laps cut this way meet flush.
+                  </p>
+                </div>
+              ) : (
+                <div className="property-group">
+                  <Label>{blindDepthLabel}</Label>
+                  <FractionInput
+                    ariaLabel={blindDepthLabel}
+                    value={inspectorDraft.depth}
+                    onChange={(value) => updateRectDraft({ depth: value })}
+                    min={0.125}
+                  />
+                </div>
+              ))}
           </>
         )}
       </div>

@@ -221,12 +221,75 @@ export type FeatureDraft =
 
 type DraftPartDefaults = { partLength?: number; partWidth?: number; partThickness?: number };
 
+/**
+ * A tenon is about a third of the stock: strong enough to carry the joint,
+ * with shoulders left either side to seat against.
+ */
+const TENON_THICKNESS_RATIO = 1 / 3;
+/** Shoulders top and bottom leave roughly two thirds of the board as tongue. */
+const TENON_WIDTH_RATIO = 2 / 3;
+/** A workaday furniture tenon. Long enough to hold, short enough to clear. */
+const DEFAULT_TENON_LENGTH = 1;
+/**
+ * A mortise is cut a shade deeper than its tenon is long, so the tenon seats
+ * on its shoulders rather than bottoming out, and glue has somewhere to go.
+ */
+const MORTISE_RELIEF = 1 / 16;
+
+/** Shop measurements land on a sixteenth; a third of 3/4" is not 0.2499. */
+function toNearestSixteenth(value: number): number {
+  return Math.round(value * 16) / 16;
+}
+
+/**
+ * Defaults for the two halves of a mortise and tenon, chosen so that accepting
+ * both produces a joint that actually closes.
+ *
+ * The tenon scales with the board it is cut on. The mortise cannot -- it is cut
+ * into the leg, and nothing here knows which rail is coming -- so it defaults to
+ * the tenon that 3/4" stock carries, which is the common case and the one the
+ * app should demonstrate. Sizing a mortise to its actual mate is what the fit
+ * operation is for.
+ */
+function getJoineryRectDraft(
+  cutType: 'tenon' | 'mortise',
+  defaults: DraftPartDefaults
+): Extract<FeatureDraft, { mode: 'rect_cut' }> {
+  const stockTenonThickness = Math.max(
+    1 / 8,
+    toNearestSixteenth((defaults.partThickness ?? 0.75) * TENON_THICKNESS_RATIO)
+  );
+
+  if (cutType === 'tenon') {
+    return {
+      ...getDefaultRectDraft('tenon'),
+      sizeLength: DEFAULT_TENON_LENGTH,
+      sizeWidth: Math.max(1 / 4, toNearestSixteenth((defaults.partWidth ?? 3) * TENON_WIDTH_RATIO)),
+      depth: stockTenonThickness
+    };
+  }
+
+  // A leg takes the full tenon. Thin stock cannot, so the mortise goes as deep
+  // as it can while leaving a wall behind it -- and the tenon then wants
+  // fitting to it rather than left at its own default.
+  const deepestSensible = (defaults.partThickness ?? 1.75) * (2 / 3);
+
+  return {
+    ...getDefaultRectDraft('mortise'),
+    // Length takes the tenon's width, width takes its thickness.
+    sizeWidth: Math.max(1 / 8, toNearestSixteenth(0.75 * TENON_THICKNESS_RATIO)),
+    depth: Math.min(DEFAULT_TENON_LENGTH + MORTISE_RELIEF, deepestSensible)
+  };
+}
+
 const BLIND_ONLY_RECT_CUT_TYPES: RectCutFeature['cutType'][] = [
   'dado',
   'stopped_dado',
   'rabbet',
   'groove',
-  'stopped_groove'
+  'stopped_groove',
+  // A lap taken all the way through is not a lap; it is a cut-off end.
+  'half_lap'
 ];
 
 /**
@@ -412,6 +475,14 @@ export function normalizeRectCutDraft(
   if (normalized.cutType === 'dado' || normalized.cutType === 'stopped_dado') {
     normalized.sizeWidth = partWidth;
     normalized.placementZ = 0;
+  }
+
+  if (normalized.cutType === 'half_lap') {
+    normalized.sizeWidth = partWidth;
+    normalized.placementZ = 0;
+    // Half the stock, always. Two laps cut this way meet flush by construction
+    // whenever the boards match, which is the only way the joint works.
+    normalized.depth = partThickness / 2;
   }
 
   if (normalized.cutType === 'groove') {
@@ -609,21 +680,23 @@ export function buildDraftFromPreset(preset: OperationPreset, defaults?: DraftPa
   }
 
   if (preset === 'half_lap') {
-    // A half lap is a blind dado at half the board thickness. Default to an
-    // end lap (channel at the left end); the maker adjusts run and position
-    // for cross laps.
-    const thickness = defaults?.partThickness ?? 0.75;
+    // Default to an end lap -- a channel at the left end, the width of the
+    // board it crosses. The maker moves it along for a cross lap. Depth is not
+    // offered because a half lap is half the stock by definition.
     return normalizeRectCutDraft(
       {
         ...getDefaultRectDraft('dado'),
-        label: 'Half Lap',
+        cutType: 'half_lap',
         depthMode: 'blind',
-        depth: Math.max(0.125, thickness / 2),
         sizeLength: Math.min(defaults?.partWidth ?? 3, defaults?.partLength ?? 3),
         placementX: 0
       },
       defaults
     );
+  }
+
+  if (preset === 'tenon' || preset === 'mortise') {
+    return normalizeRectCutDraft(getJoineryRectDraft(preset, defaults ?? {}), defaults);
   }
 
   return normalizeRectCutDraft(getDefaultRectDraft(preset), defaults);

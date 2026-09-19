@@ -753,16 +753,16 @@ describe('partFeatureEditorState', () => {
     });
   });
   describe('half lap preset', () => {
-    it('seeds a blind dado at half the part thickness at the board end', () => {
+    it('seeds a half lap at half the part thickness at the board end', () => {
       const draft = buildDraftFromPreset('half_lap', { partLength: 24, partWidth: 4, partThickness: 1.5 });
 
       expect(draft.mode).toBe('rect_cut');
       if (draft.mode !== 'rect_cut') return;
-      expect(draft.cutType).toBe('dado');
+      // It is its own joint now, not a dado wearing a label.
+      expect(draft.cutType).toBe('half_lap');
       expect(draft.depthMode).toBe('blind');
       expect(draft.depth).toBeCloseTo(0.75);
       expect(draft.placementX).toBe(0);
-      expect(draft.label).toBe('Half Lap');
     });
   });
   describe('edge bevel drafts', () => {

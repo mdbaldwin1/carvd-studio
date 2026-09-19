@@ -415,7 +415,9 @@ describe('buildRectDimensionOverlay', () => {
     expect(overlay?.x1).toBeCloseTo(-6);
     expect(overlay?.y).toBeGreaterThan(part.thickness / 2);
     expect(overlay?.depthData.topY).toBeCloseTo(0.375);
-    expect(overlay?.depthData.bottomY).toBeCloseTo(0.125);
+    // A mortise now defaults as deep as the stock sensibly allows -- two
+    // thirds of a 3/4" board -- rather than a flat quarter inch.
+    expect(overlay?.depthData.bottomY).toBeCloseTo(-0.125);
     expect(overlay?.depthData.label).not.toContain('thru');
   });
 
@@ -443,7 +445,7 @@ describe('buildRectDimensionOverlay', () => {
 
     expect(overlay?.y).toBeLessThan(0);
     expect(overlay?.depthData.topY).toBeCloseTo(-0.375);
-    expect(overlay?.depthData.bottomY).toBeCloseTo(-0.125);
+    expect(overlay?.depthData.bottomY).toBeCloseTo(0.125);
   });
 });
 

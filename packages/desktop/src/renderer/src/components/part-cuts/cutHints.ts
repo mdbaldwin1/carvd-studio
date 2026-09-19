@@ -39,6 +39,8 @@ export function getCutHint(draft: FeatureDraft): string {
       return 'Set the face, the opening size, the depth, and the placement.';
     case 'dado':
       return 'Set the face, the dado width, and the depth.';
+    case 'half_lap':
+      return 'Set the face, the lap run, and where it starts. Depth is always half the board.';
     case 'stopped_dado':
       return 'Set the face, the stopped run, the width, the start offset, and the depth.';
     case 'rabbet':

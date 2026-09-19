@@ -209,6 +209,12 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
     return `Tenon on ${getFeatureTargetLabel(feature)} \u00b7 ${formatMeasurementWithUnit(feature.parameters.size.length, units)} long \u00d7 ${formatMeasurementWithUnit(feature.parameters.size.width, units)} wide \u00d7 ${formatMeasurementWithUnit(tongueThickness, units)} thick`;
   }
 
+  if (feature.cutType === 'half_lap') {
+    // Say the depth is half the stock rather than just quoting the number, so
+    // the fabricator knows it follows the board and is not a free measurement.
+    return `Half Lap on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} run × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep (half the stock)`;
+  }
+
   if (feature.cutType === 'dado') {
     return `Dado on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} wide × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
   }
@@ -270,7 +276,7 @@ export function getFeaturePlacementSummary(feature: PartFeature, units: 'imperia
       return feature.parameters.depthMode === 'blind' ? 'Enter from Top Face at the selected corner' : null;
     if (feature.cutType === 'tenon')
       return `Tongue starts ${measure(feature.placement.z)} from Front; centered through thickness`;
-    if (feature.cutType === 'dado' || feature.cutType === 'stopped_dado')
+    if (feature.cutType === 'dado' || feature.cutType === 'stopped_dado' || feature.cutType === 'half_lap')
       return `${measure(feature.placement.x)} from Left; full width`;
     if (feature.cutType === 'groove') return `${measure(feature.placement.z)} from Front; full length`;
     const secondaryEdge =
