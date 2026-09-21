@@ -227,8 +227,10 @@ function getRectCutHole(feature: RectCutFeature, part: Part): Point2[] {
   const bounds = getRectCutPlanBounds(feature, part);
   const minX = bounds.minX - part.length / 2;
   const maxX = bounds.maxX - part.length / 2;
-  const minZ = bounds.minZ - part.width / 2;
-  const maxZ = bounds.maxZ - part.width / 2;
+  // The contour is punched in a plan whose second axis runs against the
+  // part's own, so an offset taken from the back edge turns round here.
+  const minZ = part.width / 2 - bounds.maxZ;
+  const maxZ = part.width / 2 - bounds.minZ;
 
   const radius = getRectCutCornerRadius(feature, part);
   if (radius <= 0) {

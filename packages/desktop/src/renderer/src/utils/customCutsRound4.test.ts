@@ -72,7 +72,7 @@ describe('closure review disconnected stock and pattern performance', () => {
   it('E separating stock cannot restore collision in an earlier opening', () => {
     const before = blank([end(), cutout()]);
     const after = { ...before, features: [...before.features!, cutout(2, 0, 1, 4)] };
-    const probe = createTestPart({ length: 0.1, width: 0.1, thickness: 0.1, position: { x: 0, y: 0, z: 1.5 } });
+    const probe = createTestPart({ length: 0.1, width: 0.1, thickness: 0.1, position: { x: 0, y: 0, z: -1.5 } });
     expect(getPartMaterialVolume(before)).toBeCloseTo(35.85640646, 5);
     expect(getPartMaterialVolume(after)).toBeCloseTo(31.85640646, 5);
     expect(getPartFeatureConflicts(after.features ?? [], after)).toEqual([]);
@@ -104,7 +104,7 @@ describe('closure review disconnected stock and pattern performance', () => {
         const after = { ...before, features };
         expect(getPartMaterialVolume(after)).toBeCloseTo(getPartMaterialVolume(before) - 4, 5);
         for (const [x, z, overlap] of [
-          [0, back ? -1.5 : 1.5, false],
+          [0, back ? 1.5 : -1.5, false],
           [-2.5, 0, false],
           [0, 0, true],
           [-3.5, 0, true],

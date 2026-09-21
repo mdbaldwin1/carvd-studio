@@ -54,7 +54,9 @@ const pocket = (): RectCutFeature => ({
   cutType: 'mortise',
   target: { type: 'face', face: 'top_face' },
   reference: { primaryFrom: 'min' },
-  placement: { x: 8.75, z: 2.75 },
+  // Three quarters in from the back edge, which puts it on the same side of
+  // the board as the rounded pocket it is paired with in these cases.
+  placement: { x: 8.75, z: 0.75 },
   parameters: { size: { length: 0.5, width: 0.5 }, depthMode: 'blind', depth: 0.25 }
 });
 const rounded = (): RoundedCutFeature => ({

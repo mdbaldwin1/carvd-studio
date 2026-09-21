@@ -534,7 +534,8 @@ describe('independent review round 2', () => {
       };
       const part = blank([cut]);
       expect(validateRectCutFeature(cut, part)).toBeNull();
-      expect(firstHit(part, [-2.5, bottom ? -2 : 2, 0.5], [0, bottom ? 1 : -1, 0])?.y).toBeCloseTo(
+      // An inch in from the back edge, so the floor is on that side.
+      expect(firstHit(part, [-2.5, bottom ? -2 : 2, -0.5], [0, bottom ? 1 : -1, 0])?.y).toBeCloseTo(
         bottom ? depth - 0.5 : 0.5 - depth,
         7
       );

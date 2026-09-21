@@ -1481,7 +1481,7 @@ describe('partFeatureGeometry', () => {
   });
 
   it.each(['mortise', 'stopped_groove', 'cutout'] as const)(
-    'renders an off-center %s void on the sign-inverted cross-width side',
+    'renders an off-center %s void on the side it was placed',
     (cutType) => {
       const part = createTestPart({
         length: 12,
@@ -1506,8 +1506,9 @@ describe('partFeatureGeometry', () => {
       const hitY = (z: number) =>
         new THREE.Raycaster(new THREE.Vector3(0, 3, z), new THREE.Vector3(0, -1, 0)).intersectObject(mesh)[0].point.y;
 
-      expect(hitY(2)).toBeCloseTo(0);
-      expect(hitY(-2)).toBeCloseTo(0.5);
+      // Half an inch in from the back edge, so the void is on the back.
+      expect(hitY(-2)).toBeCloseTo(0);
+      expect(hitY(2)).toBeCloseTo(0.5);
     }
   );
 

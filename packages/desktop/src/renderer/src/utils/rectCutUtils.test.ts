@@ -851,15 +851,18 @@ describe('regressions from the 2026-09-09 pre-release review', () => {
     expect(frontLeft.minX).toBeCloseTo(0);
     expect(frontRight.maxX).toBeCloseTo(part.length);
 
+    // Plan z is measured from the back edge, so a back notch starts at zero
+    // and a front one finishes at the far side.
     const backLeft = getRectCutPlanBounds(notch('back_left_edge'), part);
-    expect(backLeft.maxZ).toBeCloseTo(part.width);
-    expect(frontLeft.minZ).toBeCloseTo(0);
+    expect(backLeft.minZ).toBeCloseTo(0);
+    expect(frontLeft.maxZ).toBeCloseTo(part.width);
   });
 
   it('still treats the horizontal edges as lengthwise or widthwise', () => {
     expect(getRectCutPlanBounds(notch('top_left_edge'), part).minX).toBeCloseTo(0);
     expect(getRectCutPlanBounds(notch('top_right_edge'), part).maxX).toBeCloseTo(part.length);
-    expect(getRectCutPlanBounds(notch('top_back_edge'), part).maxZ).toBeCloseTo(part.width);
+    expect(getRectCutPlanBounds(notch('top_back_edge'), part).minZ).toBeCloseTo(0);
+    expect(getRectCutPlanBounds(notch('top_front_edge'), part).maxZ).toBeCloseTo(part.width);
   });
 });
 

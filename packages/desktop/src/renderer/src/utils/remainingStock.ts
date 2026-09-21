@@ -17,8 +17,10 @@ export function fitsRemainingStock(
     const side = feature.target.type === 'face' && feature.target.face === 'left_end' ? -1 : 1;
     const shoulder = part.length / 2 - feature.parameters.size.length;
     if (absoluteSupport({ x: side, y: 0, z: 0 }) <= shoulder + 1e-9) continue;
-    const maxZ = part.width / 2 - feature.placement.z;
-    const minZ = maxZ - feature.parameters.size.width;
+    // A tongue's offset runs from the board's back edge, like every other
+    // cross-board placement.
+    const minZ = -part.width / 2 + feature.placement.z;
+    const maxZ = minZ + feature.parameters.size.width;
     for (const [normal, limit] of [
       [{ x: 0, y: 1, z: 0 }, Number(feature.parameters.depth) / 2],
       [{ x: 0, y: -1, z: 0 }, Number(feature.parameters.depth) / 2],

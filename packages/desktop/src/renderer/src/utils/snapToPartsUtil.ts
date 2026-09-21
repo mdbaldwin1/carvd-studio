@@ -63,13 +63,11 @@ export interface PartOBB {
 // Rect-cut contours are authored in XY and rotated -90 degrees about X for the
 // board, so authored contour Z maps to the opposite sign in part-local Z.
 function getRenderedLocalZRange(partWidth: number, placementZ: number, featureWidth: number) {
-  const contourMin = -partWidth / 2 + placementZ;
-  const contourMax = contourMin + featureWidth;
-  return {
-    min: -contourMax,
-    max: -contourMin,
-    center: -(contourMin + contourMax) / 2
-  };
+  // Measured from the back edge, the part's own minimum, so it lands on
+  // local coordinates with nothing to turn round.
+  const min = -partWidth / 2 + placementZ;
+  const max = min + featureWidth;
+  return { min, max, center: (min + max) / 2 };
 }
 
 // Snap suggestion for a single axis

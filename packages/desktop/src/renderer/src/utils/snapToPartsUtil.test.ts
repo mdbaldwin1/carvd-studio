@@ -2610,7 +2610,9 @@ describe('snapToPartsUtil', () => {
         length: 4,
         width: 2,
         thickness: 1,
-        position: { x: 0, y: 2.25, z: -0.25 },
+        // The tongue sits a quarter off centre, so the rail stands a quarter
+        // the other way to bring it onto the mortise.
+        position: { x: 0, y: 2.25, z: 0.25 },
         rotation: { x: 0, y: 0, z: 90 },
         features: [
           {
@@ -2714,7 +2716,9 @@ describe('snapToPartsUtil', () => {
         length: 6,
         width: 2,
         thickness: 0.75,
-        position: { x: 0, y: 0.375, z: -0.25 },
+        // Its pocket sits a quarter off centre, so the part stands a quarter
+        // the other way to bring the two solids together.
+        position: { x: 0, y: 0.375, z: 0.25 },
         features: [blindCut('off-center-bottom-cut', 'bottom_face', 0.25)]
       });
 
@@ -2882,11 +2886,10 @@ describe('snapToPartsUtil', () => {
         position: { x: 0, y: 0, z: 0 }
       });
 
-      // Mortise world center:
-      // localCenterX = -12 + 10 + 1 = -1. The rendered geometry rotates
-      // contour Z through -90 degrees, so authored local Z -0.5 renders at +0.5.
-      // worldCenter = (-1, 1.5, 0.5)
-      const currentPos = { x: -1, y: 2.5, z: 0.5 };
+      // Mortise world centre: localCenterX = -12 + 10 + 1 = -1, and z runs
+      // from the back edge, so 2 into a 6 wide board with a 1 wide mortise
+      // centres it at -0.5. worldCenter = (-1, 1.5, -0.5)
+      const currentPos = { x: -1, y: 2.5, z: -0.5 };
 
       const result = detectFeatureMateSnaps(dragPart, currentPos, [hostPart, dragPart], ['drag'], 0.5);
       expect(result.mateHostPartId).toBe('host');

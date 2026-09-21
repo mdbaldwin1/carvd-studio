@@ -399,7 +399,7 @@ describe('whole-branch custom cut regression findings', () => {
     const part = { ...blank(), features: reverse ? [flush, corner] : [corner, flush] };
     expect(volume(part)).toBeCloseTo(38, 5);
     expect(firstHit(part, [-4.5, 2, 1.5], [0, -1, 0])).toBeUndefined();
-    expect(firstHit(part, [1.5, 2, -1.5], [0, -1, 0])).toBeUndefined();
+    expect(firstHit(part, [1.5, 2, 1.5], [0, -1, 0])).toBeUndefined();
     expect(firstHit(part, [0, 2, 0], [0, -1, 0])?.y).toBeCloseTo(0.5, 5);
   });
 

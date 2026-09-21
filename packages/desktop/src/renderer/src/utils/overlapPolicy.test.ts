@@ -758,7 +758,10 @@ describe('overlapPolicy', () => {
     const offsetCut = createPart({
       ...crossing,
       id: 'offset-cut',
-      position: { x: 0.25, y: 0.375, z: 0 },
+      // A quarter turn about Y sends this part's cross-board offset onto
+      // world x, so the quarter inch the cut sits off centre is taken back
+      // there to leave the two still meeting as one mate shape.
+      position: { x: -0.25, y: 0.375, z: 0 },
       features: [{ ...halfLap('offset-cut-feature', 'bottom_face', 0.375, 2, 2, 2, 0.25), cutType: 'cutout' }]
     });
     const depthMismatch = createPart({
@@ -789,7 +792,7 @@ describe('overlapPolicy', () => {
   });
 
   it.each(['mortise', 'stopped_groove', 'cutout'] as const)(
-    'uses the rendered cross-width side for an off-center %s socket exemption',
+    'exempts a mate on the side an off-center %s socket was cut',
     (cutType) => {
       const host = createPart({
         id: `${cutType}-host`,
@@ -820,9 +823,10 @@ describe('overlapPolicy', () => {
           position: { x: 0, y: 2.5, z },
           rotation: { x: 0, y: 0, z: 90 }
         });
-      // Authored contour Z [-2.5, -1.5] renders at world Z [1.5, 2.5].
-      const visibleVoidMate = mateAt('visible-void-mate', 2);
-      const mirroredSolidMate = mateAt('mirrored-solid-mate', -2);
+      // Half an inch in from the back edge, so the void is at world z
+      // [-2.5, -1.5] and the far side of the board is still solid.
+      const visibleVoidMate = mateAt('visible-void-mate', -2);
+      const mirroredSolidMate = mateAt('solid-side-mate', 2);
       const exactMate = (candidate: Part) =>
         detectFeatureMateSnaps(candidate, candidate.position, [host], [candidate.id], 0.03);
       const overlapWithClaimedHost = (candidate: Part) =>
@@ -841,7 +845,7 @@ describe('overlapPolicy', () => {
     }
   );
 
-  it('uses the rendered cross-width side for an off-center tenon material shape', () => {
+  it('places an off-center tenon material shape on the side it was cut', () => {
     const host = createPart({
       id: 'tenon-material-host',
       length: 12,
@@ -867,7 +871,9 @@ describe('overlapPolicy', () => {
       length: 4,
       width: 2,
       thickness: 1,
-      position: { x: 0, y: 2.25, z: -0.25 },
+      // The tongue sits a quarter off centre across the rail, so the rail
+      // stands a quarter the other way to bring it onto the mortise.
+      position: { x: 0, y: 2.25, z: 0.25 },
       rotation: { x: 0, y: 0, z: 90 },
       features: [
         {
@@ -897,7 +903,7 @@ describe('overlapPolicy', () => {
     ).toBe(false);
     expect(
       wouldTranslationCauseOverlap(
-        [host, { ...tenonedRail, position: { ...tenonedRail.position, z: 0.25 } }],
+        [host, { ...tenonedRail, position: { ...tenonedRail.position, z: 0.75 } }],
         new Set([tenonedRail.id]),
         { x: 0, y: 0, z: 0 },
         undefined,

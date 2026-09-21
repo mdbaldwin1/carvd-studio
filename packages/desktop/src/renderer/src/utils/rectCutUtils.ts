@@ -269,7 +269,7 @@ export function getRectCutPlanBounds(feature: RectCutFeature, part: Pick<Part, '
   let z = resolved.placement.z;
   if (resolved.target.type === 'corner') {
     x = resolved.target.corner.includes('right') ? part.length - length : 0;
-    z = resolved.target.corner.includes('back') ? part.width - width : 0;
+    z = resolved.target.corner.includes('front') ? part.width - width : 0;
   } else if (resolved.target.type === 'edge') {
     const edge = resolved.target.edge;
     if (isVerticalEdgeTarget(edge)) {
@@ -277,9 +277,9 @@ export function getRectCutPlanBounds(feature: RectCutFeature, part: Pick<Part, '
       // in both plan axes like a corner notch. Treating it as lengthwise left
       // front_left_edge and front_right_edge with identical geometry.
       x = edge.includes('right') ? part.length - length : 0;
-      z = edge.startsWith('back_') ? part.width - width : 0;
+      z = edge.startsWith('front_') ? part.width - width : 0;
     } else if (isLengthwiseEdgeTarget(edge)) {
-      z = edge.includes('back') ? part.width - width : 0;
+      z = edge.includes('front') ? part.width - width : 0;
     } else {
       x = edge.includes('right') ? part.length - length : 0;
     }
@@ -571,7 +571,7 @@ export function validateRectCutFeature(
         : ((isTopTarget(resolvedFeature) ? 1 : -1) * (part.thickness - depth)) / 2,
       z: sideFace
         ? ((front ? 1 : -1) * (part.width - depth)) / 2
-        : part.width / 2 - resolvedFeature.placement.z - sizeWidth / 2
+        : -part.width / 2 + resolvedFeature.placement.z + sizeWidth / 2
     };
     if (
       !fitsRemainingStock(
