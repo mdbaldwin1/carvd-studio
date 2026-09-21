@@ -26,14 +26,35 @@ const MM = 1 / 25.4;
 const EXPLODE = 0.75;
 
 // ---------------------------------------------------------------- stock
+// Three species, light, dark and pale, so the two halves of a joint and
+// whatever goes between them are told apart at a glance. Contrasting woods
+// are what a real sample board is made of, for exactly this reason.
 const OAK = { id: id(), name: '4/4 White Oak', length: 96, width: 8, thickness: 0.75, grainDirection: 'length', pricingUnit: 'board_foot', pricePerUnit: 9, color: '#c9a978', form: 'board' };
-const OAK8 = { id: id(), name: '8/4 White Oak', length: 96, width: 6, thickness: 1.75, grainDirection: 'length', pricingUnit: 'board_foot', pricePerUnit: 14, color: '#b08f5f', form: 'board' };
+const OAK8 = { id: id(), name: '8/4 White Oak', length: 96, width: 6, thickness: 1.75, grainDirection: 'length', pricingUnit: 'board_foot', pricePerUnit: 14, color: '#c9a978', form: 'board' };
+const WAL = { id: id(), name: '4/4 Black Walnut', length: 96, width: 8, thickness: 0.75, grainDirection: 'length', pricingUnit: 'board_foot', pricePerUnit: 16, color: '#4a3524', form: 'board' };
+const WAL8 = { id: id(), name: '8/4 Black Walnut', length: 96, width: 6, thickness: 1.75, grainDirection: 'length', pricingUnit: 'board_foot', pricePerUnit: 24, color: '#4a3524', form: 'board' };
+const MAP = { id: id(), name: '4/4 Hard Maple', length: 96, width: 8, thickness: 0.75, grainDirection: 'length', pricingUnit: 'board_foot', pricePerUnit: 11, color: '#efe2c2', form: 'board' };
+const MAP8 = { id: id(), name: '8/4 Hard Maple', length: 96, width: 6, thickness: 1.75, grainDirection: 'length', pricingUnit: 'board_foot', pricePerUnit: 18, color: '#efe2c2', form: 'board' };
 const PLY = { id: id(), name: '3/4" Baltic Birch Plywood', length: 96, width: 48, thickness: 0.71875, grainDirection: 'none', pricingUnit: 'per_item', pricePerUnit: 72, color: '#d8c39a', form: 'sheet' };
-const DOWEL38 = { id: id(), name: '3/8" Birch Dowel', length: 36, width: 0.375, thickness: 0.375, grainDirection: 'length', pricingUnit: 'per_item', pricePerUnit: 3.5, color: '#c89b5b', form: 'rod' };
-const DOWEL14 = { id: id(), name: '1/4" Birch Dowel', length: 36, width: 0.25, thickness: 0.25, grainDirection: 'length', pricingUnit: 'per_item', pricePerUnit: 2.75, color: '#c89b5b', form: 'rod' };
-const BISCUIT = { id: id(), name: '#20 Biscuit', length: 56 * MM, width: 23 * MM, thickness: 4 * MM, grainDirection: 'none', pricingUnit: 'per_item', pricePerUnit: 13.99, color: '#d9c49a', form: 'insert', insertKind: 'biscuit', packSize: 100 };
-const DOMINO = { id: id(), name: '6 × 20 × 40 mm Domino', length: 40 * MM, width: 20 * MM, thickness: 6 * MM, grainDirection: 'length', pricingUnit: 'per_item', pricePerUnit: 28, color: '#9a6b45', form: 'insert', insertKind: 'domino', packSize: 190 };
-const stocks = [OAK, OAK8, PLY, DOWEL38, DOWEL14, BISCUIT, DOMINO];
+const DOWEL38 = { id: id(), name: '3/8" Birch Dowel', length: 36, width: 0.375, thickness: 0.375, grainDirection: 'length', pricingUnit: 'per_item', pricePerUnit: 3.5, color: '#e8d9ae', form: 'rod' };
+const DOWEL14 = { id: id(), name: '1/4" Birch Dowel', length: 36, width: 0.25, thickness: 0.25, grainDirection: 'length', pricingUnit: 'per_item', pricePerUnit: 2.75, color: '#e8d9ae', form: 'rod' };
+const BISCUIT = { id: id(), name: '#20 Biscuit', length: 56 * MM, width: 23 * MM, thickness: 4 * MM, grainDirection: 'none', pricingUnit: 'per_item', pricePerUnit: 13.99, color: '#e6d7ad', form: 'insert', insertKind: 'biscuit', packSize: 100 };
+const DOMINO = { id: id(), name: '6 × 20 × 40 mm Domino', length: 40 * MM, width: 20 * MM, thickness: 6 * MM, grainDirection: 'length', pricingUnit: 'per_item', pricePerUnit: 28, color: '#d9bd85', form: 'insert', insertKind: 'domino', packSize: 190 };
+const stocks = [OAK, OAK8, WAL, WAL8, MAP, MAP8, PLY, DOWEL38, DOWEL14, BISCUIT, DOMINO];
+
+/**
+ * Which board a species comes out of, thin or thick.
+ *
+ * A part is given a species by the part it plays in its joint, and the stock
+ * follows from how thick it has to be -- 8/4 for a leg, 4/4 for a rail.
+ */
+const SPECIES = {
+  oak: [OAK, OAK8],
+  walnut: [WAL, WAL8],
+  maple: [MAP, MAP8]
+};
+/** First part of a joint, then its mate, then whatever goes between them. */
+const ROLE_SPECIES = ['oak', 'walnut', 'maple'];
 
 // ------------------------------------------------------------- features
 const rect = (label, cutType, target, parameters, placement, reference) => ({
@@ -168,8 +189,22 @@ const groupMembers = [];
 function station(name, note, build) {
   const group = { id: id(), name };
   groups.push(group);
+  let role = 0;
   for (const part of build()) {
     if (note && !part.notes) part.notes = note;
+    if (!part.__chosen) {
+      // Beyond the second piece everything is "the bit that goes between",
+      // so the wedges of one joint all match rather than turning into a
+      // rainbow.
+      const species = part.__species ?? ROLE_SPECIES[Math.min(role, ROLE_SPECIES.length - 1)];
+      const [thin, thick] = SPECIES[species];
+      const stock = part.thickness > thin.thickness ? thick : thin;
+      part.stockId = stock.id;
+      part.color = stock.color;
+      role += 1;
+    }
+    delete part.__species;
+    delete part.__chosen;
     parts.push(part);
     groupMembers.push({ id: id(), groupId: group.id, memberType: 'part', memberId: part.id });
   }
@@ -190,10 +225,15 @@ const board = (name, o, opts = {}) => {
     length: opts.length ?? 12, width: opts.width ?? 3, thickness: opts.thickness ?? 0.75,
     position: { x: o.x + (opts.dx ?? 0), y: 0, z: o.z + (opts.dz ?? 0) },
     rotation: opts.rotation ?? { x: 0, y: 0, z: 0 },
-    stockId: opts.stockId ?? OAK.id,
+    stockId: opts.stockId ?? null,
     grainSensitive: opts.grainSensitive ?? true,
     grainDirection: 'length',
-    color: opts.color ?? OAK.color,
+    color: opts.color ?? null,
+    // Filled in by the station unless the caller named a stock itself, which
+    // it does for the pieces that are a particular thing: a dowel, a biscuit,
+    // a sheet of ply.
+    __species: opts.species ?? null,
+    __chosen: opts.stockId !== undefined,
     features: opts.features ?? [],
     ...(opts.notes ? { notes: opts.notes } : {})
   };
@@ -263,7 +303,7 @@ station('04 Biscuit Joint', 'SEATED: slots cut in the meeting edges, the biscuit
 // 05 Dado — the shelf sits home in the housing -------------------------
 station('05 Dado Joint', 'SEATED: real 23/32 plywood in a dado typed 3/4 — try Fit Dado to Mating Part.', () => {
   const o = origin();
-  const side = board('Dado — Side', o, { length: 18, width: 8, features: [rect('Shelf dado', 'dado', face('top_face'), { size: { length: 0.75, width: 8 }, depthMode: 'blind', depth: 0.25 }, { x: 8, z: 0 })] });
+  const side = board('Dado — Side', o, { species: 'walnut', length: 18, width: 8, features: [rect('Shelf dado', 'dado', face('top_face'), { size: { length: 0.75, width: 8 }, depthMode: 'blind', depth: 0.25 }, { x: 8, z: 0 })] });
   // Standing in the housing: down into the dado by its depth, centred on it.
   const shelf = board('Dado — Shelf', o, { length: 8, width: 8, thickness: 0.71875, stockId: PLY.id, color: PLY.color, grainSensitive: false, rotation: { x: 0, y: 0, z: 90 } });
   shelf.position.x = side.position.x - ext(side).x + 8 + 0.375;
@@ -297,7 +337,7 @@ station('06 Rabbet Joint', 'SEATED: a back panel standing in a rabbet run along 
 // 07 Mortise & tenon — tenon home in the mortise -----------------------
 station('07 Mortise & Tenon', 'SEATED: try Fit Tenon to Mortise on these two.', () => {
   const o = origin();
-  const leg = board('M&T — Leg', o, { length: 16, width: 1.75, thickness: 1.75, stockId: OAK8.id, color: OAK8.color, rotation: { x: 0, y: 0, z: 90 }, features: [rect('Rail mortise', 'mortise', face('top_face'), { size: { length: 2, width: 0.25 }, depthMode: 'blind', depth: 1.0625 }, { x: 12, z: 0.75 })] });
+  const leg = board('M&T — Leg', o, { length: 16, width: 1.75, thickness: 1.75, rotation: { x: 0, y: 0, z: 90 }, features: [rect('Rail mortise', 'mortise', face('top_face'), { size: { length: 2, width: 0.25 }, depthMode: 'blind', depth: 1.0625 }, { x: 12, z: 0.75 })] });
   const rail = board('M&T — Rail', o, { rotation: { x: 90, y: 0, z: 0 }, features: [rect('Tenon', 'tenon', face('right_end'), { size: { length: 1, width: 2 }, depthMode: 'blind', depth: 0.25 }, { x: 0, z: 0.5 })] });
   // A quarter turn about Z puts the leg's top face toward -X, so the mortise
   // opens that way and the rail approaches from there, tenon leading.
@@ -520,6 +560,7 @@ station('17 Tambour Joint', 'SEATED and APPROXIMATE: slats shiplapped so they in
     const slat = board(`Tambour — Slat ${i + 1}`, o, {
       length: 6, width: SLAT_W, thickness: SLAT_T,
       rotation: { x: 0, y: 90, z: 0 },
+      species: 'walnut',
       features: [shiplap('top', 'front'), shiplap('bottom', 'back')]
     });
     slat.position.x = side.position.x - 4 + i * (SLAT_W - LAP);
@@ -582,7 +623,7 @@ station('21 Full Lap Joint', 'SEATED: the crossing rail is let in whole and is n
   // makes sense when the housing member has thickness to spare -- so this one
   // is 8/4 stock and the crossing rail is ordinary 4/4.
   const housed = board('Full Lap — Housed Rail', o, {
-    thickness: 1.75, stockId: OAK8.id, color: OAK8.color,
+    thickness: 1.75,
     features: [rect('Full lap housing', 'dado', face('top_face'), { size: { length: 3, width: 3 }, depthMode: 'blind', depth: CROSSING_T }, { x: 4.5, z: 0 })]
   });
   const crossing = board('Full Lap — Crossing Rail', o, { rotation: { x: 0, y: 90, z: 0 } });
@@ -654,7 +695,7 @@ station('25 Pin Joint', 'SEATED: a through pin holding a lap — a pinned joint,
 // 26 Pegged M&T — assembled, so Bore Through Assembly has a stack -------
 station('26 Pegged Mortise & Tenon', 'SEATED, with the peg withdrawn: driven home it passes through the tenon, and the tongue\'s faces are not faces of the board, so Carvd cannot bore it. Try Bore Through Assembly on the leg.', () => {
   const o = origin();
-  const leg = board('Pegged — Leg', o, { length: 16, width: 1.75, thickness: 1.75, stockId: OAK8.id, color: OAK8.color, rotation: { x: 0, y: 0, z: 90 }, features: [
+  const leg = board('Pegged — Leg', o, { length: 16, width: 1.75, thickness: 1.75, rotation: { x: 0, y: 0, z: 90 }, features: [
     rect('Rail mortise', 'mortise', face('top_face'), { size: { length: 2, width: 0.25 }, depthMode: 'blind', depth: 1.0625 }, { x: 12, z: 0.75 }),
     // Bored through the mortise, because a peg that misses the tenon holds
     // nothing. Five inches up from the leg's middle is where the mortise is.
@@ -688,7 +729,7 @@ station('27 Birdsmouth Joint', 'SEATED and APPROXIMATE: a square seat stands in 
     length: 14,
     features: [rect('Birdsmouth seat', 'dado', face('bottom_face'), { size: { length: PLATE, width: 3 }, depthMode: 'blind', depth: SEAT }, { x: 2, z: 0 })]
   });
-  const plate = board('Birdsmouth — Wall Plate', o, { length: 10, width: PLATE, thickness: PLATE, rotation: { x: 0, y: 90, z: 0 }, stockId: OAK8.id, color: OAK8.color });
+  const plate = board('Birdsmouth — Wall Plate', o, { length: 10, width: PLATE, thickness: PLATE, rotation: { x: 0, y: 90, z: 0 } });
   plate.position.x = rafter.position.x - ext(rafter).x + 2 + PLATE / 2;
   plate.position.z = rafter.position.z;
   // The plate's top sits in the seat; the rafter rides on it.
@@ -779,7 +820,7 @@ station('32 End Lap Joint', 'SEATED: both ends lapped, closing flush at a corner
 station('31 Fox Wedge Mortise & Tenon', 'SEATED and APPROXIMATE: the wedges are shown beside, and the flare they open in the mortise is not modelled.', () => {
   const o = origin();
   const leg = board('Fox Wedge — Leg', o, {
-    length: 14, width: 1.75, thickness: 1.75, stockId: OAK8.id, color: OAK8.color,
+    length: 14, width: 1.75, thickness: 1.75,
     rotation: { x: 0, y: 0, z: 90 },
     features: [rect('Flared mortise', 'mortise', face('top_face'), { size: { length: 2, width: 0.25 }, depthMode: 'blind', depth: 1 }, { x: 10, z: 0.75 })]
   });
@@ -827,8 +868,7 @@ station(
         width: KERF,
         thickness: DEPTH,
         rotation: { x: 0, y: 90, z: 0 },
-        stockId: OAK8.id,
-        color: '#6b4a2f'
+        species: 'maple'
       });
       key.position.x = a.position.x - ext(a).x + 6 + acrossCorner;
       key.position.z = a.position.z;
