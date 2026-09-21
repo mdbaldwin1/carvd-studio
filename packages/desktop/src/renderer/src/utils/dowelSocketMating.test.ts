@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
-import type { CircularCutFeature, Part } from '../types';
+import type { CircularCutFeature, FaceTarget, Part } from '../types';
 import { detectFeatureMateSnaps, getPartFeatureSockets } from './snapToPartsUtil';
 import { wouldTransformedPartsOverlap } from './overlapPolicy';
 
@@ -174,6 +174,80 @@ describe('dowels mate through the shared socket engine', () => {
 
     const parked: Part = { ...pin, position: { x: 500, y: 0.5, z: 0 } };
     expect(wouldTransformedPartsOverlap([left, right, parked], new Map([[pin.id, pin]]))).toBe(false);
+  });
+
+  /** A board bored into one face, optionally off square. */
+  function boredOn(face: FaceTarget, tilt = 0): Part {
+    const bore: CircularCutFeature = {
+      id: `bore-${face}-${tilt}`,
+      kind: 'circular_cut',
+      version: 1,
+      enabled: true,
+      cutType: 'round_hole',
+      target: { type: 'face', face },
+      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      placement: { primary: 0, secondary: 0, rotation: 0 },
+      parameters: { diameter: DIAMETER, depthMode: 'blind', depth: 0.75, tilt, direction: 0 }
+    };
+    return createTestPart({
+      id: 'host',
+      length: 12,
+      width: 6,
+      thickness: 1.5,
+      position: { x: 0, y: 0.75, z: 0 },
+      features: [bore]
+    });
+  }
+
+  /** A 2" pin driven home: laid along the bore, leading face on the floor. */
+  function pinDrivenInto(host: Part, rotation: Part['rotation']): Part {
+    const [socket] = getPartFeatureSockets(host);
+    const n = socket.openingNormal;
+    const reach = 1 - socket.depth;
+    return createTestPart({
+      id: 'pin',
+      length: 2,
+      width: DIAMETER,
+      thickness: DIAMETER,
+      position: {
+        x: socket.openingCenter.x + n.x * reach,
+        y: socket.openingCenter.y + n.y * reach,
+        z: socket.openingCenter.z + n.z * reach
+      },
+      rotation,
+      features: []
+    });
+  }
+
+  // A socket takes work from any direction within about 32 degrees of its
+  // opening normal -- a cone, not a list of directions. Half that cone was
+  // once dead: a pin whose length axis pointed into the opposite half-space
+  // was measured at its far end, a whole length adrift, and refused. A dowel
+  // is symmetric, so those were the same joints as the ones that worked, just
+  // modelled end for end. These two cover the sign and the continuity.
+  const QUARTER_TURNS: Array<[FaceTarget, Part['rotation']]> = [
+    ['top_face', { x: 0, y: 0, z: 90 }],
+    ['bottom_face', { x: 0, y: 0, z: 90 }],
+    ['front_face', { x: 0, y: 90, z: 0 }],
+    ['back_face', { x: 0, y: 90, z: 0 }],
+    ['left_end', { x: 0, y: 0, z: 0 }],
+    ['right_end', { x: 0, y: 0, z: 0 }]
+  ];
+
+  it.each(QUARTER_TURNS)('seats a dowel in a hole bored into the %s', (face, rotation) => {
+    const host = boredOn(face);
+    const pin = pinDrivenInto(host, rotation);
+    const snap = detectFeatureMateSnaps(pin, pin.position, [host], [pin.id], 0.03);
+    expect(snap.mateHostPartId).toBe(host.id);
+  });
+
+  it.each([5, 15, 30, 45, 60])('seats a dowel in a hole bored %d degrees off square', (tilt) => {
+    // Tilting the bore swings the socket's opening normal off the face
+    // normal, and the pin lies along it. Nothing here is axis-aligned.
+    const host = boredOn('top_face', tilt);
+    const pin = pinDrivenInto(host, { x: 0, y: 0, z: 90 + tilt });
+    const snap = detectFeatureMateSnaps(pin, pin.position, [host], [pin.id], 0.03);
+    expect(snap.mateHostPartId).toBe(host.id);
   });
 
   it('ignores a hole on a disabled cut', () => {
