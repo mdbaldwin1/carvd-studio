@@ -531,7 +531,10 @@ const now = new Date().toISOString();
 const file = {
   version: 3,
   project: {
-    name: 'Joinery Test Bench',
+    // Stamped so the title bar says which build of the bench is open. The
+    // stations change as the app does, and a stale copy is otherwise
+    // indistinguishable from a fresh one.
+    name: process.env.BENCH_NAME || 'Joinery Test Bench',
     createdAt: now,
     modifiedAt: now,
     units: 'imperial',
