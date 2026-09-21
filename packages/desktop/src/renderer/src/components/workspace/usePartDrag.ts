@@ -159,6 +159,7 @@ export function usePartDrag(
     clearPreview: () => void = () => clearTransformInteractionPreview('part')
   ) => {
     setIsDragging(false);
+    useProjectStore.getState().endHistoryStep();
     resetDragRefs();
     markJustFinishedDragging(didMove);
     useSelectionStore.getState().clearDragIntent();
@@ -365,6 +366,8 @@ export function usePartDrag(
       }
 
       setIsDragging(true);
+      // A drag moves the part once per frame; collapse the lot into one undo.
+      useProjectStore.getState().beginHistoryStep();
       beginMoveInteractionSession({
         affectedPartIds: moveSelection.affectedPartIds,
         primaryPartId: part.id,
@@ -1143,6 +1146,8 @@ export function usePartDrag(
     const partOriginalPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
     if (startPoint) {
       setIsDragging(true);
+      // A drag moves the part once per frame; collapse the lot into one undo.
+      useProjectStore.getState().beginHistoryStep();
       beginMoveInteractionSession({
         affectedPartIds: moveSelection.affectedPartIds,
         primaryPartId: part.id,

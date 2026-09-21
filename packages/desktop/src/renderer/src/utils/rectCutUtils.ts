@@ -435,24 +435,40 @@ export function validateRectCutFeature(
   }
 
   if (resolvedFeature.cutType === 'groove') {
-    if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
-      return 'Groove must target the top or bottom face.';
+    // A groove is ploughed in a face for a shelf or a back, and in a long
+    // edge for a panel, a spline or a tongue. On an edge it is set across the
+    // board's thickness rather than its width, so the bounds differ too.
+    const onEdge = isSideFaceTarget(resolvedFeature);
+    if (resolvedFeature.target.type !== 'face' || (!isTopOrBottomFace(resolvedFeature.target.face) && !onEdge)) {
+      return 'Groove must be ploughed in a face or a long edge.';
+    }
+    const across = onEdge ? part.thickness : part.width;
+    if (onEdge && (resolvedFeature.parameters.depth ?? 0) > part.width) {
+      return 'Groove is deeper than the board is wide.';
     }
     if (resolvedFeature.parameters.depthMode !== 'blind') return 'Groove currently uses blind depth only.';
     if (resolvedFeature.placement.z < 0) return 'Groove offset cannot be negative.';
-    if (resolvedFeature.placement.z + sizeWidth > part.width) return 'Groove width runs past the blank.';
+    if (resolvedFeature.placement.z + sizeWidth > across) return 'Groove width runs past the blank.';
   }
 
   if (resolvedFeature.cutType === 'stopped_groove') {
-    if (resolvedFeature.target.type !== 'face' || !isTopOrBottomFace(resolvedFeature.target.face)) {
-      return 'Stopped groove must target the top or bottom face.';
+    // A groove is ploughed in a face for a shelf or a back, and in a long
+    // edge for a panel, a spline or a tongue. On an edge it is set across the
+    // board's thickness rather than its width, so the bounds differ too.
+    const onEdge = isSideFaceTarget(resolvedFeature);
+    if (resolvedFeature.target.type !== 'face' || (!isTopOrBottomFace(resolvedFeature.target.face) && !onEdge)) {
+      return 'Stopped groove must be ploughed in a face or a long edge.';
+    }
+    const across = onEdge ? part.thickness : part.width;
+    if (onEdge && (resolvedFeature.parameters.depth ?? 0) > part.width) {
+      return 'Stopped groove is deeper than the board is wide.';
     }
     if (resolvedFeature.parameters.depthMode !== 'blind') return 'Stopped groove currently uses blind depth only.';
     if (resolvedFeature.placement.x < 0 || resolvedFeature.placement.z < 0) {
       return 'Stopped groove offsets cannot be negative.';
     }
     if (resolvedFeature.placement.x + sizeLength > part.length) return 'Stopped groove run extends past the blank.';
-    if (resolvedFeature.placement.z + sizeWidth > part.width) return 'Stopped groove width runs past the blank.';
+    if (resolvedFeature.placement.z + sizeWidth > across) return 'Stopped groove width runs past the blank.';
   }
 
   if (resolvedFeature.cutType === 'tenon') {

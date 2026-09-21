@@ -1,7 +1,13 @@
 import type { Part } from '../types';
 import { formatFabricationMeasurement } from './fractions';
 import { RECT_CUT_TRAITS } from './rectCutTraits';
-import { getPartFeatureSockets, getPartOBB, type FeatureSocket, type PartOBB } from './snapToPartsUtil';
+import {
+  getPartFeatureSockets,
+  getPartMaterialOBBs,
+  getPartOBB,
+  type FeatureSocket,
+  type PartOBB
+} from './snapToPartsUtil';
 
 /** Local mirror of the snap engine's vector shape, which it keeps private. */
 type Vec3 = { x: number; y: number; z: number };
@@ -141,7 +147,12 @@ export function getJointFitIssues(parts: Part[], units: 'imperial' | 'metric' = 
     return {
       part,
       obb,
-      radius: Math.hypot(obb.halfExtents[0], obb.halfExtents[1], obb.halfExtents[2])
+      radius: Math.hypot(obb.halfExtents[0], obb.halfExtents[1], obb.halfExtents[2]),
+      // What is actually left of the board after its own cuts. A tongued
+      // board is three quarters thick and enters a quarter-inch groove on a
+      // quarter-inch tongue; measured as a whole box it reads half an inch
+      // too fat for a joint that fits perfectly well.
+      material: null as PartOBB[] | null
     };
   });
 
@@ -159,12 +170,23 @@ export function getJointFitIssues(parts: Part[], units: 'imperial' | 'metric' = 
         const dy = candidate.obb.center.y - socket.openingCenter.y;
         const dz = candidate.obb.center.z - socket.openingCenter.z;
         if (dx * dx + dy * dy + dz * dz > reach * reach) continue;
-        const obb = candidate.obb;
-        if (!occupies(obb, socket)) continue;
+        if (!occupies(candidate.obb, socket)) continue;
+        // Judge the piece by the part of it that is in the socket. On an
+        // uncut board that is the whole board; on one that carries a tongue
+        // or a tenon it is only that.
+        candidate.material ??= getPartMaterialOBBs(mate);
+        const seated = candidate.material.filter((cell) => occupies(cell, socket));
+        if (seated.length === 0) continue;
 
         let worst: { problem: JointFitProblem; amount: number } | null = null;
         for (const { axis, opening } of fitAxes(socket)) {
-          const delta = extentAlong(obb, axis) - opening;
+          // Where a cut has split the piece into several cells across this
+          // axis, the joint is as wide as all of them together.
+          const reach = seated.map((cell) => ({
+            lo: dot(cell.center, axis) - extentAlong(cell, axis) / 2,
+            hi: dot(cell.center, axis) + extentAlong(cell, axis) / 2
+          }));
+          const delta = Math.max(...reach.map((r) => r.hi)) - Math.min(...reach.map((r) => r.lo)) - opening;
           const amount = Math.abs(delta);
           if (amount <= GOOD_FIT || amount > MAX_MISFIT) continue;
           if (worst && worst.amount >= amount) continue;

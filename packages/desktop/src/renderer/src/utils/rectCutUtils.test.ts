@@ -929,14 +929,17 @@ describe('through mortises', () => {
 describe('what a cut refuses, and what it says', () => {
   it.each([
     [
-      'a groove asked for on an edge',
+      // An arris between two faces, which is where a rabbet or a notch goes.
+      // A groove is ploughed in a face or in a long edge -- meaning the front
+      // or back face of the board, not the line where two faces meet.
+      'a groove asked for on an arris',
       { cutType: 'groove' as const, target: { type: 'edge' as const, edge: 'top_front_edge' as const } },
-      'Groove must target the top or bottom face.'
+      'Groove must be ploughed in a face or a long edge.'
     ],
     [
-      'a stopped groove asked for on an edge',
+      'a stopped groove asked for on an arris',
       { cutType: 'stopped_groove' as const, target: { type: 'edge' as const, edge: 'top_front_edge' as const } },
-      'Stopped groove must target the top or bottom face.'
+      'Stopped groove must be ploughed in a face or a long edge.'
     ]
   ])('refuses %s', (_name, overrides, message) => {
     expect(validateRectCutFeature(createRectCut(overrides), PART)).toBe(message);

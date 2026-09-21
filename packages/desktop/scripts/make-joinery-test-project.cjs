@@ -90,6 +90,17 @@ const slot = (label, f, length, width, depth, primary, secondary) => ({
  * Placement on an edge face is measured from the near end and the near face,
  * never from the middle, so the centring is done here.
  */
+/**
+ * Half the stock out of one face, for a lap.
+ *
+ * The two halves of a lap are mirror images: the piece underneath gives up
+ * its top, the piece on top gives up its underside, and the two finish flush
+ * with one another. Cutting both on the top face leaves the upper piece
+ * sitting on the lower one like a plank on a plank.
+ */
+const lapCut = (label, f, x, size = 3) =>
+  rect(label, 'half_lap', face(f), { size: { length: size, width: size }, depthMode: 'blind', depth: 0.375 }, { x, z: 0 });
+
 const edgeGroove = (label, f, width, depth, thickness = 0.75, length = 12) =>
   rect(label, 'groove', face(f), { size: { length, width }, depthMode: 'blind', depth }, { x: 0, z: (thickness - width) / 2 });
 
@@ -323,15 +334,15 @@ for (const [n, label, why] of [
 // 12 End lap — half out of each, so they close flush --------------------
 station('12 Half Lap (T-Lap)', 'SEATED: a lapped end let into the face of a rail, half the stock out of each.', () => {
   const o = origin();
-  const lap = (x) => rect('Half lap', 'half_lap', face('top_face'), { size: { length: 3, width: 3 }, depthMode: 'blind', depth: 0.375 }, { x, z: 0 });
   // Notched across the middle of the rail, and at the very end of the stile.
-  const rail = board('T-Lap — Rail', o, { features: [lap(4.5)] });
-  const stile = board('T-Lap — Stile', o, { rotation: { x: 0, y: 90, z: 0 }, features: [lap(0)] });
+  const rail = board('T-Lap — Rail', o, { features: [lapCut('Half lap', 'top_face', 4.5)] });
+  const stile = board('T-Lap — Stile', o, { rotation: { x: 0, y: 90, z: 0 }, features: [lapCut('Half lap', 'bottom_face', 0)] });
   // A quarter turn about Y sends the stile's length down -Z, so its min end --
   // the lapped one -- ends up at +Z. Sit that end over the rail's notch.
   stile.position.x = rail.position.x;
   stile.position.z = rail.position.z - ext(stile).z + ext(rail).z;
-  stile.position.y = rail.position.y + 0.375;
+  // Interlocking, not stacked: both pieces finish level.
+  stile.position.y = rail.position.y;
   return [rail, stile];
 });
 
@@ -416,10 +427,9 @@ station('19 Spline Joint', 'SEATED: a groove in each meeting edge and a loose sp
 // 20 Cross lap — half out of each, crossing flush ------------------------
 station('20 Cross Lap Joint', 'SEATED: half out of each in the middle, so the two cross flush.', () => {
   const o = origin();
-  const lap = (x) => rect('Cross lap', 'half_lap', face('top_face'), { size: { length: 3, width: 3 }, depthMode: 'blind', depth: 0.375 }, { x, z: 0 });
-  const rail = board('Cross Lap — Rail', o, { features: [lap(4.5)] });
-  const stile = board('Cross Lap — Stile', o, { rotation: { x: 0, y: 90, z: 0 }, features: [lap(4.5)] });
-  stile.position.y = rail.position.y + 0.375;
+  const rail = board('Cross Lap — Rail', o, { features: [lapCut('Cross lap', 'top_face', 4.5)] });
+  const stile = board('Cross Lap — Stile', o, { rotation: { x: 0, y: 90, z: 0 }, features: [lapCut('Cross lap', 'bottom_face', 4.5)] });
+  stile.position.y = rail.position.y;
   return [rail, stile];
 });
 
@@ -481,10 +491,9 @@ station('24 Domino Joint', 'SEATED: the same idea bought in a box, edge to edge 
 // 25 Pin — a through pin holding a lap ----------------------------------
 station('25 Pin Joint', 'SEATED: a through pin holding a lap — a pinned joint, not dovetail pins.', () => {
   const o = origin();
-  const lap = (x) => rect('Half lap', 'half_lap', face('top_face'), { size: { length: 3, width: 3 }, depthMode: 'blind', depth: 0.375 }, { x, z: 0 });
-  const rail = board('Pin — Rail', o, { features: [lap(4.5), hole('Pin hole', 'top_face', 0.25, null, 0, 0)] });
-  const stile = board('Pin — Stile', o, { rotation: { x: 0, y: 90, z: 0 }, features: [lap(4.5), hole('Pin hole', 'top_face', 0.25, null, 0, 0)] });
-  stile.position.y = rail.position.y + 0.375;
+  const rail = board('Pin — Rail', o, { features: [lapCut('Half lap', 'top_face', 4.5), hole('Pin hole', 'top_face', 0.25, null, 0, 0)] });
+  const stile = board('Pin — Stile', o, { rotation: { x: 0, y: 90, z: 0 }, features: [lapCut('Half lap', 'bottom_face', 4.5), hole('Pin hole', 'top_face', 0.25, null, 0, 0)] });
+  stile.position.y = rail.position.y;
   // Driven right through the lap: the rail's lower half and the stile's,
   // which together are one board's thickness once the two halves close.
   const peg = board('Pin — Peg', o, { length: 0.75, width: 0.25, thickness: 0.25, stockId: DOWEL14.id, color: DOWEL14.color, rotation: { x: 0, y: 0, z: 90 } });
@@ -565,12 +574,12 @@ station('30 Keyed Joint', 'EXPLODED: a mitred corner reinforced with a key; the 
 // 32 End lap — the corner case of a half lap ---------------------------
 station('32 End Lap Joint', 'SEATED: both ends lapped, closing flush at a corner.', () => {
   const o = origin();
-  const lap = (x) => rect('End lap', 'half_lap', face('top_face'), { size: { length: 3, width: 3 }, depthMode: 'blind', depth: 0.375 }, { x, z: 0 });
-  const rail = board('End Lap — Rail', o, { features: [lap(9)] });
-  const stile = board('End Lap — Stile', o, { features: [lap(0)] });
-  // The lapped ends cover each other; each gave up half its thickness.
+  const rail = board('End Lap — Rail', o, { features: [lapCut('End lap', 'top_face', 9)] });
+  const stile = board('End Lap — Stile', o, { features: [lapCut('End lap', 'bottom_face', 0)] });
+  // The lapped ends cover each other; each gave up half its thickness, so the
+  // pair finishes one board thick, not two.
   stile.position.x = rail.position.x + ext(rail).x + ext(stile).x - 3;
-  stile.position.y = rail.position.y + 0.375;
+  stile.position.y = rail.position.y;
   return [rail, stile];
 });
 

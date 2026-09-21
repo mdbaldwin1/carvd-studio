@@ -114,6 +114,17 @@ interface ProjectState {
   fitHousingToPart: (firstPartId: string, secondPartId: string) => boolean;
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
   rotateSelectedParts: (axis: 'x' | 'y' | 'z', degrees: number, pivot: { x: number; y: number; z: number }) => void;
+  /**
+   * Treat everything until the matching end as one step in the history.
+   *
+   * A gizmo drag asks the store to rotate once per frame so the part turns
+   * under the cursor. Each of those is a change in its own right, so a drag
+   * of thirty degrees left thirty-odd entries behind and one undo stepped
+   * back a fraction of a degree -- which reads, correctly, as undo not
+   * working at all.
+   */
+  beginHistoryStep: () => void;
+  endHistoryStep: () => void;
   deletePart: (id: string) => void;
   deleteSelectedParts: () => void;
   confirmDeleteParts: () => void;
@@ -345,6 +356,9 @@ const getDuplicateOffset = (partsToDuplicate: Part[]): { x: number; y: number; z
     z: spanZ + clearance
   };
 };
+
+/** Where the history stood when the current drag began; null when idle. */
+let historyStepMark: number | null = null;
 
 /** Validate parts for cut list generation, returning any issues found. */
 export const validatePartsForCutList = (
@@ -1078,6 +1092,22 @@ export const useProjectStore = create<ProjectState>()(
           isDirty: true
         }));
         useSnapStore.getState().updateReferenceDistances();
+      },
+
+      beginHistoryStep: () => {
+        historyStepMark = useProjectStore.temporal.getState().pastStates.length;
+      },
+
+      endHistoryStep: () => {
+        if (historyStepMark === null) return;
+        const mark = historyStepMark;
+        historyStepMark = null;
+        const { pastStates } = useProjectStore.temporal.getState();
+        // The first entry pushed during the drag holds the state as it was
+        // before it began; the rest are frames. Keep that one and drop them.
+        if (pastStates.length > mark + 1) {
+          useProjectStore.temporal.setState({ pastStates: pastStates.slice(0, mark + 1) });
+        }
       },
 
       rotateSelectedParts: (axis, degrees, pivot) => {
