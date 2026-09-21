@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
 import type { CircularCutFeature, Part } from '../types';
 import { detectFeatureMateSnaps, getPartFeatureSockets } from './snapToPartsUtil';
+import { wouldTransformedPartsOverlap } from './overlapPolicy';
 
 vi.unmock('three');
 
@@ -105,6 +106,74 @@ describe('dowels mate through the shared socket engine', () => {
     const shim = dowel(held, { id: 'shim', width: 0.05 });
     const snap = detectFeatureMateSnaps(shim, held, [rail, shim], ['shim'], 0.75);
     expect(snap.mateHostPartId).toBeUndefined();
+  });
+
+  it('keeps a seated dowel on commit, not just during the drag', () => {
+    // The material grid is made of boxes and never subtracted the bore, so
+    // without the round-hole exemption a dowel snapped home was rejected the
+    // instant it was released -- the same pop-out the tenon work fixed.
+    const rail = boredRail();
+    const seated = dowel({ x: 0, y: 1, z: 0 });
+    const parked: Part = { ...seated, position: { x: 500, y: 1, z: 0 } };
+    expect(wouldTransformedPartsOverlap([rail, parked], new Map([[seated.id, seated]]))).toBe(false);
+  });
+
+  it('still refuses a dowel driven somewhere there is no hole', () => {
+    const rail = boredRail();
+    // Square in the middle of solid material, nowhere near the bore.
+    const buried = dowel({ x: 6, y: 0.5, z: 0 });
+    const parked: Part = { ...buried, position: { x: 500, y: 0.5, z: 0 } };
+    expect(wouldTransformedPartsOverlap([rail, parked], new Map([[buried.id, buried]]))).toBe(true);
+  });
+
+  it('seats a dowel in a hole no matter which way the hole faces', () => {
+    // Two rails butted end to end, each bored half an inch into the meeting
+    // end, and one pin bridging the pair. The holes face opposite ways, which
+    // is the whole point of a dowelled edge joint -- both have to take the pin.
+    const endBore = (face: 'left_end' | 'right_end'): CircularCutFeature => ({
+      id: `bore-${face}`,
+      kind: 'circular_cut',
+      version: 1,
+      enabled: true,
+      cutType: 'round_hole',
+      target: { type: 'face', face },
+      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      placement: { primary: 0, secondary: 0, rotation: 0 },
+      parameters: { diameter: DIAMETER, depthMode: 'blind', depth: 0.5, tilt: 0, direction: 0 }
+    });
+    const left = createTestPart({
+      id: 'left',
+      length: 12,
+      width: 3,
+      thickness: 1,
+      position: { x: -6, y: 0.5, z: 0 },
+      features: [endBore('right_end')]
+    });
+    const right = createTestPart({
+      id: 'right',
+      length: 12,
+      width: 3,
+      thickness: 1,
+      position: { x: 6, y: 0.5, z: 0 },
+      features: [endBore('left_end')]
+    });
+    // A 1" pin lying along X, centred on the seam, half in each rail.
+    const pin = createTestPart({
+      id: 'pin',
+      length: 1,
+      width: DIAMETER,
+      thickness: DIAMETER,
+      position: { x: 0, y: 0.5, z: 0 },
+      features: []
+    });
+
+    for (const host of [left, right]) {
+      const snap = detectFeatureMateSnaps(pin, pin.position, [host], [pin.id], 0.03);
+      expect(snap.mateHostPartId).toBe(host.id);
+    }
+
+    const parked: Part = { ...pin, position: { x: 500, y: 0.5, z: 0 } };
+    expect(wouldTransformedPartsOverlap([left, right, parked], new Map([[pin.id, pin]]))).toBe(false);
   });
 
   it('ignores a hole on a disabled cut', () => {

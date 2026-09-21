@@ -319,7 +319,21 @@ export function wouldTranslationCauseOverlap(
   return false;
 }
 
-function isCompatibleSocketMate(movedPart: Part, hostPart: Part): boolean {
+/**
+ * Whether these two are assembled rather than colliding.
+ *
+ * Seating is a property of the pair, not of whichever piece is under the
+ * cursor. A peg driven through a leg is in that leg whether you pick up the
+ * peg or the leg, so both directions are tried: asking only whether the moved
+ * piece sits in the other one's socket made the leg impossible to drag once
+ * the peg was in it.
+ */
+function isCompatibleSocketMate(a: Part, b: Part): boolean {
+  return seatsInto(a, b) || seatsInto(b, a);
+}
+
+/** Whether the first piece is seated in a socket cut in the second. */
+function seatsInto(movedPart: Part, hostPart: Part): boolean {
   const mate = detectFeatureMateSnaps(movedPart, movedPart.position, [hostPart], [movedPart.id], 0.03);
   if (mate.mateHostPartId !== hostPart.id) return false;
   const isSeatedMate =
@@ -327,6 +341,14 @@ function isCompatibleSocketMate(movedPart: Part, hostPart: Part): boolean {
     Math.abs(mate.adjustedPosition.y - movedPart.position.y) <= JOINERY_FIT_TOLERANCE &&
     Math.abs(mate.adjustedPosition.z - movedPart.position.z) <= JOINERY_FIT_TOLERANCE;
   if (!isSeatedMate) return false;
+
+  // A bore is round and the material grid is made of boxes, so for a dowel
+  // the grid has nothing true to say: it never subtracted the hole, and the
+  // host therefore still reads as solid where the dowel is. Seating is the
+  // check that applies here, and it is a real one -- the mate engine already
+  // required a square section matching the bore's radius and a placement good
+  // to a thousandth, so a dowel that is too fat never mates at all.
+  if (mate.mateKind === 'round_hole') return true;
 
   // Judge the joint on its own geometry, fully seated, rather than on a
   // placement that is a thousandth out. A joint cut to fit stays clear of its

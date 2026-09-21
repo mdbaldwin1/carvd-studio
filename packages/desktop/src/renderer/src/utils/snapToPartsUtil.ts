@@ -3800,6 +3800,8 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
 
 export interface MateSnapResult extends SnapResult {
   mateHostPartId?: string;
+  /** Which joint closed, so a caller can judge it on the right terms. */
+  mateKind?: string;
   mateConflict?: { candidateCount: number; maxDisagreement: number };
 }
 
@@ -4122,7 +4124,8 @@ function candidateToMateSnapResult(currentPosition: Vec3, candidate: FeatureMate
         snapValue: axis === 'x' ? adjustedPosition.x : axis === 'y' ? adjustedPosition.y : adjustedPosition.z
       }
     ],
-    mateHostPartId: candidate.hostPartId
+    mateHostPartId: candidate.hostPartId,
+    mateKind: candidate.mateKind
   };
 }
 
@@ -4179,7 +4182,8 @@ function resolvePartMateCandidateConsensus(
     snappedY: results.some((result) => result.snappedY),
     snappedZ: results.some((result) => result.snappedZ),
     snapLines: results.flatMap((result) => result.snapLines),
-    mateHostPartId: results[0].mateHostPartId
+    mateHostPartId: results[0].mateHostPartId,
+    mateKind: results[0].mateKind
   };
 }
 
@@ -4306,7 +4310,8 @@ export function detectGroupFeatureMateSnaps(
     snappedY: winning.members.some(({ result }) => result.snappedY),
     snappedZ: winning.members.some(({ result }) => result.snappedZ),
     snapLines: winning.members.flatMap(({ result }) => result.snapLines),
-    mateHostPartId: winning.members[0].result.mateHostPartId
+    mateHostPartId: winning.members[0].result.mateHostPartId,
+    mateKind: winning.members[0].result.mateKind
   };
 }
 
@@ -4412,9 +4417,15 @@ function findBestMateMatch(
     // --- Insertion axis delta ---
     // The entering face of the dragged part should sit at the socket floor.
     const n = socket.openingNormal;
-    const sign = alignment > 0 ? 1 : -1;
     const partCenterAlongN = dotVec(draggingOBB.center, n);
-    const enterFaceAlongN = partCenterAlongN - sign * cand.halfExt;
+    // Whichever end of the part is nearer the floor is the end that goes in,
+    // and that is the face at the low side along the normal -- always. Reading
+    // the face off the sign of the axis instead would hang the answer on which
+    // way round the part happens to be modelled: a dowel driven into a hole
+    // facing left is the same dowel as one driven into a hole facing right,
+    // but its length axis points the other way, and the far end would be
+    // measured as the entering one and the joint refused.
+    const enterFaceAlongN = partCenterAlongN - Math.abs(alignment) * cand.halfExt;
     const openingAlongN = dotVec(socket.openingCenter, n);
     const floorAlongN = openingAlongN - socket.depth;
 
