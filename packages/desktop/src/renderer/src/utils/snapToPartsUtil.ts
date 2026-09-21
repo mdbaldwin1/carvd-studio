@@ -4509,6 +4509,20 @@ function resolvePartMateCandidateConsensus(
  * it only inspects the FeatureSocket geometry. This makes it extensible
  * for future feature types (dowels, dovetails, etc.).
  */
+/**
+ * How far a piece must be dragged out of a joint before the joint lets go.
+ *
+ * Capture is deliberately generous on the way in, and scales with the zoom
+ * so a joint is easy to find from across the model. Coming out, that same
+ * generosity is a trap: wide enough out and the capture reaches several
+ * inches, so every drag shorter than that puts the piece straight back where
+ * it started, and a joint cannot be taken apart by hand at all -- only by
+ * nudging it clear a keypress at a time, which is not what anyone means by
+ * moving a part. Letting go is therefore a fixed distance, short enough to
+ * feel immediate and long enough that a joint still holds against a wobble.
+ */
+const MATE_RELEASE_DISTANCE = 0.25;
+
 export function detectFeatureMateSnaps(
   draggingPart: Part,
   currentPosition: Vec3,
@@ -4516,9 +4530,25 @@ export function detectFeatureMateSnaps(
   draggingPartIds: string[],
   snapThreshold: number
 ): MateSnapResult {
+  const candidates = collectFeatureMateCandidates(
+    draggingPart,
+    currentPosition,
+    allParts,
+    draggingPartIds,
+    snapThreshold
+  );
+  // Once the piece has been pulled clear, drop any candidate that only puts
+  // it back where it began. A mate onto anything else still stands, so a
+  // piece dragged out of one joint and into the next is caught by the next.
+  const pulledOut = lenVec(subVec(currentPosition, draggingPart.position)) > MATE_RELEASE_DISTANCE;
   const consensus = resolvePartMateCandidateConsensus(
     currentPosition,
-    collectFeatureMateCandidates(draggingPart, currentPosition, allParts, draggingPartIds, snapThreshold)
+    pulledOut
+      ? candidates.filter(
+          (candidate) =>
+            lenVec(subVec(addVec(currentPosition, candidate.delta), draggingPart.position)) > MATE_RELEASE_DISTANCE
+        )
+      : candidates
   );
 
   if (!consensus) {

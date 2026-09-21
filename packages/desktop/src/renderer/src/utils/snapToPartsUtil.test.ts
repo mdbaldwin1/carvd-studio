@@ -3272,6 +3272,27 @@ describe('a joint whose male half was cut rather than left', () => {
     for (const mover of [a, b]) for (const error of seats([a, b], mover)) expect(error).toBeCloseTo(0, 6);
   });
 
+  it('lets go once the piece is pulled clear, however wide the zoom', () => {
+    const [a, b] = corner([cut('a1', 0, 0.75), cut('a2', 1.5, 0.75)], [cut('b1', 0.75, 0.75), cut('b2', 2.25, 0.75)]);
+    // A wide zoom: capture reaches two inches, which is most of this board.
+    const drag = (distance: number) =>
+      detectFeatureMateSnaps(b, { ...b.position, x: b.position.x + distance }, [a, b], [b.id], 2);
+    const offSeat = (result: { adjustedPosition: { x: number; y: number; z: number } }) =>
+      Math.hypot(
+        result.adjustedPosition.x - b.position.x,
+        result.adjustedPosition.y - b.position.y,
+        result.adjustedPosition.z - b.position.z
+      );
+    // A wobble is still pulled home.
+    expect(offSeat(drag(0.1))).toBeCloseTo(0, 6);
+    // Pulled deliberately clear, it stays where it was put rather than being
+    // dropped back into the joint for another inch and a half.
+    // It may still find another joint -- a box joint really does go together
+    // a finger over -- but it is no longer dropped back into the one it was
+    // just pulled out of, which is what made it impossible to take apart.
+    expect(offSeat(drag(0.6))).toBeGreaterThan(0.25);
+  });
+
   it('leaves a board with a single notch alone', () => {
     // One cut is a notch, not a finger: a finger has a socket either side.
     const [a, b] = corner([cut('a1', 1, 0.75)], [cut('b1', 1, 0.75)]);

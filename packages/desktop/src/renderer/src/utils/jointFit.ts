@@ -125,6 +125,31 @@ function fitAxes(socket: FeatureSocket): Array<{ axis: Vec3; opening: number }> 
 }
 
 /**
+ * Only the cells that are in this socket, not merely alongside it.
+ *
+ * Seating is judged loosely on purpose -- a shelf runs well past the ends of
+ * its dado and is still in it -- but measuring has to be stricter. A secret
+ * mitred dovetail puts the tail board's mitred lip right beside its tails,
+ * in a rebate of its own; counted in with them the piece measures a quarter
+ * of an inch wider than the socket and reads as one that will not go
+ * together, when what is next to the socket was never going into it.
+ */
+function cellsInOpening(
+  cells: PartOBB[],
+  socket: FeatureSocket,
+  axes: Array<{ axis: Vec3; opening: number }>
+): PartOBB[] {
+  if (axes.length === 0) return cells;
+  const within = cells.filter((cell) =>
+    axes.every(
+      ({ axis, opening }) =>
+        Math.abs(dot(cell.center, axis) - dot(socket.openingCenter, axis)) <= opening / 2 + GOOD_FIT
+    )
+  );
+  return within.length > 0 ? within : cells;
+}
+
+/**
  * The part of the piece that is level with the mouth of the socket.
  *
  * Neither half of a joint need be the same size all the way down. A dovetail
@@ -207,10 +232,11 @@ export function getJointFitIssues(parts: Part[], units: 'imperial' | 'metric' = 
         candidate.material ??= getPartMaterialOBBs(mate);
         const seated = candidate.material.filter((cell) => occupies(cell, socket));
         if (seated.length === 0) continue;
-        const atMouth = cellsAtOpening(seated, socket);
+        const axes = fitAxes(socket);
+        const atMouth = cellsInOpening(cellsAtOpening(seated, socket), socket, axes);
 
         let worst: { problem: JointFitProblem; amount: number } | null = null;
-        for (const { axis, opening } of fitAxes(socket)) {
+        for (const { axis, opening } of axes) {
           // Where a cut has split the piece into several cells across this
           // axis, the joint is as wide as all of them together.
           const reach = atMouth.map((cell) => ({

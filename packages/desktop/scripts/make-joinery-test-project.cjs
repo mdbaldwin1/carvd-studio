@@ -769,68 +769,97 @@ station(
 // 15 Mitred blind dovetail — a mitre outside, dovetails behind it -----
 station(
   '15 Mitred Blind Dovetail',
-  'SEATED and APPROXIMATE: the hardest joint there is. A mitre runs on the outer sliver, and behind it the pins interlock where nobody ever sees them — square, because both boards lie flat here and the flare would have to run across each socket rather than along it.',
+  'SEATED: the hardest joint there is. Outside, a mitre and nothing else; behind it, half-blind dovetails nobody will ever see.',
   () => {
     const o = origin();
     const T = 0.75;
-    const MITRE = 0.1875;
-    const BEHIND = T - MITRE;
-    // The mitre takes only the outer three sixteenths of the thickness. Below
-    // it the two ends are square, and that is where the pins are -- which is
-    // the whole trick of the joint: all you see outside is a mitre.
-    //
-    // The pins are left square. Both boards lie flat in this corner, so the
-    // fingers reach across the joint in the horizontal plane and the flare
-    // would have to widen each socket along the axis it is spaced on -- which
-    // is the taper one way round on board A and the other way round on board
-    // B, and a rect cut is only laid out one way round. Behind the mitre
-    // nobody has ever seen it either way.
-    const outerMitre = (flip) => {
-      const cut = endCut('Mitre', 'right_end', 45, flip);
-      cut.parameters.band = { from: BEHIND, to: T };
-      return cut;
-    };
-    // Cut up from the underside so the mitre sliver above is left whole, and
-    // splayed opposite ways so the two halves lock into one another.
-    const pins = (offsets, lengthAlong) =>
-      offsets.map(([x, z], n) =>
+    // The mitred lip, and the depth of everything hidden behind it.
+    const LAP = 0.25;
+    const BEHIND = T - LAP;
+    const SPLAY = 10;
+    const flare = Math.tan((SPLAY * Math.PI) / 180) * BEHIND;
+
+    // The mitre is a bevel across the thickness, taken in a band. A 45
+    // degree bevel leans an inch in for every inch of height, so a band a
+    // quarter-inch tall is a quarter-inch mitre and the rest of the end
+    // stays square -- which is the whole joint: a lip mitred at the corner,
+    // and the dovetails hidden underneath it.
+    const mitre = (flip, from, to) => ({
+      id: id(),
+      kind: 'end_cut',
+      version: 1,
+      enabled: true,
+      label: 'Mitre',
+      target: face('left_end'),
+      reference: { primaryFrom: 'min' },
+      cutType: 'bevel',
+      lengthMode: 'long_point',
+      parameters: { horizontalAngle: 0, verticalAngle: 45, verticalFlip: flip, band: { from, to } }
+    });
+
+    // The socket board lies flat. Its end carries a rebate the other board's
+    // mitred lip drops into, and behind that the tail sockets, undercut so
+    // they are wider at the floor than at the mouth.
+    const front = board('Mitred Blind DT — Front', o, {
+      features: [
         rect(
-          `Pin socket ${n + 1}`,
+          'Lip housing',
+          'cutout',
+          face('top_face'),
+          { size: { length: LAP, width: 3 }, depthMode: 'blind', depth: BEHIND },
+          { x: 0, z: 0 }
+        ),
+        ...[0.4, 1.7].map((z, n) =>
+          rect(
+            `Tail socket ${n + 1}`,
+            'mortise',
+            face('top_face'),
+            {
+              size: { length: BEHIND, width: 0.9 - 2 * flare },
+              depthMode: 'blind',
+              depth: BEHIND,
+              sideWallAngle: SPLAY
+            },
+            { x: LAP, z: z + flare }
+          )
+        ),
+        // Inset 0 at the underside, a quarter-inch by the top of the band.
+        mitre(false, 0, LAP)
+      ]
+    });
+
+    // The tail board stands on it. Its outer quarter-inch runs on past the
+    // tails as an unbroken lip -- that is what hides them -- and is mitred
+    // to meet the other. Everything else is cut away for the lap to pass.
+    const side = board('Mitred Blind DT — Side', o, {
+      rotation: { x: 0, y: 0, z: 90 },
+      features: [
+        rect(
+          'Lap housing',
           'cutout',
           face('bottom_face'),
-          { size: { length: lengthAlong, width: 0.75 }, depthMode: 'blind', depth: BEHIND },
-          { x, z }
-        )
-      );
-    const a = board('Mitred Blind DT — Board A', o, {
-      features: [
-        outerMitre(true),
-        ...pins(
-          [
-            [9, 0.75],
-            [9, 2.25]
-          ],
-          3
-        ).map((cut) => ({ ...cut, parameters: { ...cut.parameters, size: { length: 3, width: 0.75 } } }))
-      ]
-    });
-    const b = board('Mitred Blind DT — Board B', o, {
-      rotation: { x: 0, y: 90, z: 0 },
-      features: [
-        outerMitre(false),
-        ...[11.25, 9.75].map((x, n) =>
+          { size: { length: LAP, width: 3 }, depthMode: 'blind', depth: BEHIND },
+          { x: 0, z: 0 }
+        ),
+        ...[0, 1.3, 2.6].map((z, n) =>
           rect(
-            `Pin socket ${n + 1}`,
+            `Between tails ${n + 1}`,
             'cutout',
             face('bottom_face'),
-            { size: { length: 0.75, width: 3 }, depthMode: 'blind', depth: BEHIND },
-            { x, z: 0 }
+            { size: { length: BEHIND, width: 0.4 }, depthMode: 'blind', depth: BEHIND, taperAngle: SPLAY },
+            { x: LAP, z }
           )
-        )
+        ),
+        // Flipped: inset 0 at the outer face, a quarter-inch in from there.
+        mitre(true, BEHIND, T)
       ]
     });
-    mitreCorner(a, b);
-    return [a, b];
+    side.position.x = front.position.x - ext(front).x + T / 2;
+    // Standing so its lip reaches the underside of the other board, where
+    // the two mitres meet at the corner.
+    side.position.y = front.position.y - ext(front).y + ext(side).y;
+    side.position.z = front.position.z;
+    return [front, side];
   }
 );
 
