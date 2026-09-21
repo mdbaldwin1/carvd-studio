@@ -41,6 +41,7 @@ import {
 import { findHolesOffTheFace, findMatingFace, getHolesOnFace, transferHolesToMatingFace } from '../utils/holeTransfer';
 import { FACE_TARGETS } from '../components/part-features/partFeatureEditorState';
 import { planDowelJointMigration } from '../utils/dowelJointMigration';
+import { getJointFitIssues } from '../utils/jointFit';
 import { boreThroughAssembly as boreThroughAssemblyHoles } from '../utils/boreThrough';
 import { planTenonFit, resolveTenonAndMortiseParts } from '../utils/fitJoinery';
 import { findGrainCutMismatches } from '../utils/grainDirectionCuts';
@@ -346,7 +347,11 @@ const getDuplicateOffset = (partsToDuplicate: Part[]): { x: number; y: number; z
 };
 
 /** Validate parts for cut list generation, returning any issues found. */
-export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartValidationIssue[] => {
+export const validatePartsForCutList = (
+  parts: Part[],
+  stocks: Stock[],
+  units: 'imperial' | 'metric' = 'imperial'
+): PartValidationIssue[] => {
   const issues: PartValidationIssue[] = [];
 
   for (const part of parts) {
@@ -490,6 +495,26 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
         featureId: conflict.featureId
       });
     }
+  }
+
+  // A joint's two halves are cut to each other once and not linked after, so
+  // nothing carries a later edit across. Narrowing a mortise does not even go
+  // through the overlap check, which only watches size and position. Measure
+  // the joints that are actually assembled and say when one stopped fitting.
+  for (const issue of getJointFitIssues(parts, units)) {
+    const host = parts.find((part) => part.id === issue.hostPartId);
+    if (!host) continue;
+    issues.push({
+      partId: host.id,
+      partName: host.name,
+      type: 'joint_fit',
+      // A joint that no longer fits is still a drawing you can work from, and
+      // which way to correct it is the maker's call -- recut the housing, or
+      // replane the piece. Say so and leave the decision alone.
+      severity: 'warning',
+      message: issue.message,
+      featureId: issue.hostFeatureId
+    });
   }
 
   // Relationships span parts, so validate once after individual operations.

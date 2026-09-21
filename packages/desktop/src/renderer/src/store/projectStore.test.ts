@@ -2590,6 +2590,62 @@ describe('projectStore', () => {
 
 // ============================================================
 describe('validatePartsForCutList', () => {
+  describe('joint fit validation', () => {
+    it('warns when a joint is no longer cut to the piece in it', () => {
+      // A dado typed to the nominal 3/4" with real 23/32" ply standing in it.
+      // Nothing links the two halves of a joint, and a feature edit does not
+      // even go through the overlap check, so this is the only thing that
+      // notices the joint stopped fitting.
+      const side = createTestPart({
+        id: 'side',
+        name: 'Cabinet Side',
+        length: 18,
+        width: 8,
+        thickness: 0.75,
+        stockId: null,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [
+          {
+            id: 'shelf-dado',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'dado',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min' },
+            parameters: { size: { length: 0.75, width: 8 }, depthMode: 'blind', depth: 0.25 },
+            placement: { x: 8, z: 0 }
+          }
+        ]
+      });
+      const shelf = createTestPart({
+        id: 'shelf',
+        name: 'Shelf',
+        length: 8,
+        width: 8,
+        thickness: 0.71875,
+        stockId: null,
+        rotation: { x: 0, y: 0, z: 90 },
+        position: { x: -0.625, y: 4.125, z: 0 }
+      });
+
+      const issues = validatePartsForCutList([side, shelf], []);
+      const fit = issues.filter((issue) => issue.type === 'joint_fit');
+
+      expect(fit).toHaveLength(1);
+      expect(fit[0].severity).toBe('warning');
+      expect(fit[0].message).toContain('loose');
+      // Points at the housing, so the modal opens the cut that needs changing.
+      expect(fit[0].partId).toBe('side');
+      expect(fit[0].featureId).toBe('shelf-dado');
+    });
+
+    it('says nothing about parts that are not joined', () => {
+      const parts = [createTestPart({ id: 'a', stockId: null }), createTestPart({ id: 'b', stockId: null })];
+      expect(validatePartsForCutList(parts, []).some((issue) => issue.type === 'joint_fit')).toBe(false);
+    });
+  });
+
   describe('stock assignment validation', () => {
     it('returns error when part has no stock assigned', () => {
       const parts = [createTestPart({ name: 'Unassigned Part', stockId: null })];

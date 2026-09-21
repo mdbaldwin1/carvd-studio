@@ -664,6 +664,7 @@ export interface PartValidationIssue {
     | 'exceeds_thickness'
     | 'grain_mismatch'
     | 'grain_cut_direction'
+    | 'joint_fit'
     | 'feature_validation';
   message: string;
   severity: 'error' | 'warning';

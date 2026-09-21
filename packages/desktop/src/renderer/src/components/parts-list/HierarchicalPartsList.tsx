@@ -473,7 +473,7 @@ export function HierarchicalPartsList({
   // Batch validation: run once for all parts, build lookup
   const validationByPart = useMemo(() => {
     const map = new Map<string, PartValidationIssue[]>();
-    const allIssues = validatePartsForCutList(parts, stocks);
+    const allIssues = validatePartsForCutList(parts, stocks, units);
     for (const issue of allIssues) {
       const existing = map.get(issue.partId) || [];
       existing.push(issue);
@@ -494,7 +494,7 @@ export function HierarchicalPartsList({
       }
     }
     return map;
-  }, [parts, stocks]);
+  }, [parts, stocks, units]);
 
   // Build tree
   const tree = useMemo(() => buildTree(parts, groups, groupMembers), [parts, groups, groupMembers]);

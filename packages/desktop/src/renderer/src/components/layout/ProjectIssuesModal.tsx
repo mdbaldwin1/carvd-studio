@@ -26,14 +26,15 @@ export function ProjectIssuesModal(): React.JSX.Element | null {
 
   const parts = useProjectStore((s) => s.parts);
   const stocks = useProjectStore((s) => s.stocks);
+  const units = useProjectStore((s) => s.units);
   const selectPart = useSelectionStore((s) => s.selectPart);
   const startEditingPartCuts = usePartCutsEditingStore((s) => s.startEditingPartCuts);
   const selectFeature = usePartCutsEditingStore((s) => s.selectFeature);
   const isEditingPartCuts = usePartCutsEditingStore((s) => s.isEditingPartCuts);
 
   const summary = useMemo(
-    () => (isOpen ? summarizeProjectIssues(validatePartsForCutList(parts, stocks)) : null),
-    [isOpen, parts, stocks]
+    () => (isOpen ? summarizeProjectIssues(validatePartsForCutList(parts, stocks, units)) : null),
+    [isOpen, parts, stocks, units]
   );
 
   const focusRef = useRef<HTMLDivElement | null>(null);
@@ -53,7 +54,7 @@ export function ProjectIssuesModal(): React.JSX.Element | null {
     // An operation is only reachable in the cuts editor, so take the user
     // there rather than leaving them to find it. Never interrupt a session
     // that is already open on another part -- that would discard their draft.
-    if (issue.type === 'feature_validation' && !isEditingPartCuts) {
+    if ((issue.type === 'feature_validation' || issue.type === 'joint_fit') && !isEditingPartCuts) {
       startEditingPartCuts(part.id, part.name, part.features);
       if (issue.featureId) selectFeature(issue.featureId);
     }
@@ -113,7 +114,9 @@ export function ProjectIssuesModal(): React.JSX.Element | null {
                           )}
                           <span className="min-w-0 flex-1">{issue.message}</span>
                           <span className="mt-0.5 flex shrink-0 items-center gap-1 text-xs text-text-muted opacity-0 transition-opacity group-hover/issue:opacity-100">
-                            {issue.type === 'feature_validation' ? 'Open cut' : 'Go to part'}
+                            {issue.type === 'feature_validation' || issue.type === 'joint_fit'
+                              ? 'Open cut'
+                              : 'Go to part'}
                             <ChevronRight size={12} />
                           </span>
                         </button>

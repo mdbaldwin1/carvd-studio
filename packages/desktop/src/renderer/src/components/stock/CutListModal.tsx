@@ -62,7 +62,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
     }
 
     // Validate parts first
-    const issues = validatePartsForCutList(parts, stocks);
+    const issues = validatePartsForCutList(parts, stocks, units);
     const blockingIssues = issues.filter((i) => i.severity === 'error' && !i.canBypass);
 
     if (blockingIssues.length > 0) {
@@ -86,7 +86,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
       stock_count_bucket: bucketCount(stocks.length),
       success: true
     });
-  }, [parts, stocks, kerfWidth, overageFactor, modifiedAt, setCutList, limits.canUseOptimizer, showToast]);
+  }, [parts, stocks, units, kerfWidth, overageFactor, modifiedAt, setCutList, limits.canUseOptimizer, showToast]);
 
   // Export project report PDF
   const handleDownloadProjectReport = useCallback(async () => {

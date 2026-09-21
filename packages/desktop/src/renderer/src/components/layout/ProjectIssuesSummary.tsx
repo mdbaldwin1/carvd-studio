@@ -15,9 +15,13 @@ import { describeIssueCounts, summarizeProjectIssues } from '../../utils/project
 export function ProjectIssuesSummary(): React.JSX.Element | null {
   const parts = useProjectStore((s) => s.parts);
   const stocks = useProjectStore((s) => s.stocks);
+  const units = useProjectStore((s) => s.units);
   const openIssuesModal = useUIStore((s) => s.openIssuesModal);
 
-  const summary = useMemo(() => summarizeProjectIssues(validatePartsForCutList(parts, stocks)), [parts, stocks]);
+  const summary = useMemo(
+    () => summarizeProjectIssues(validatePartsForCutList(parts, stocks, units)),
+    [parts, stocks, units]
+  );
 
   if (summary.total === 0) return null;
 
