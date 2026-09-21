@@ -12,6 +12,16 @@ import { analytics } from '../../utils/analytics';
 import { bucketCount } from '../../../../shared/analytics';
 import { getContainingGroupId, resolveExplicitSelectedPartIds } from '../../utils/interactionSelection';
 import { resolveTenonAndMortiseParts } from '../../utils/fitJoinery';
+import { planHousingFit, resolveHousingRoles } from '../../utils/fitHousing';
+
+/** Name the cut being fitted, so the action says what it will actually do. */
+const HOUSING_LABELS: Record<string, string> = {
+  dado: 'Dado',
+  stopped_dado: 'Stopped Dado',
+  groove: 'Groove',
+  stopped_groove: 'Stopped Groove',
+  half_lap: 'Half Lap'
+};
 
 /**
  * Half an inch is the depth a 3/8" dowel is usually taken into each half of a
@@ -39,6 +49,7 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
   const resetSelectedPartsToStock = useProjectStore((s) => s.resetSelectedPartsToStock);
   const transferHolesToMate = useProjectStore((s) => s.transferHolesToMate);
   const fitTenonsToMortise = useProjectStore((s) => s.fitTenonsToMortise);
+  const fitHousingToPart = useProjectStore((s) => s.fitHousingToPart);
   const boreThroughAssembly = useProjectStore((s) => s.boreThroughAssembly);
   const requestCenterCamera = useCameraStore((s) => s.requestCenterCamera);
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
@@ -94,6 +105,18 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
           return first && second ? resolveTenonAndMortiseParts(first, second) : null;
         })()
       : null;
+
+  // Two parts where one is channelled and the other faces that channel: the
+  // dado or groove can be cut to the piece going into it.
+  const housingPair =
+    selectedPartIds.length === 2 && selectedGroupIds.length === 0
+      ? (() => {
+          const first = parts.find((part) => part.id === selectedPartIds[0]);
+          const second = parts.find((part) => part.id === selectedPartIds[1]);
+          return first && second ? resolveHousingRoles(first, second) : null;
+        })()
+      : null;
+  const housingPlan = housingPair ? planHousingFit(housingPair.shelfPart, housingPair.housingPart) : null;
 
   // Check if any selected part has a stock assigned
   const selectedParts = parts.filter((p) => effectiveSelectedPartIds.includes(p.id));
@@ -295,6 +318,21 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
     onClose();
   };
 
+  /**
+   * Cut the dado to the shelf. A shelf's thickness is the stock you bought, so
+   * the housing is the half that moves.
+   */
+  const handleFitHousing = () => {
+    if (!housingPair) {
+      onClose();
+      return;
+    }
+    if (fitHousingToPart(housingPair.shelfPart.id, housingPair.housingPart.id)) {
+      showToast('Cut the housing to fit', 'success');
+    }
+    onClose();
+  };
+
   const handleEditCuts = () => {
     if (isEditingPartCuts) {
       showToast('Finish editing part cuts first', 'warning');
@@ -335,6 +373,11 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
         <MenuItemButton onClick={handleBoreThrough}>Bore Through Assembly</MenuItemButton>
       )}
       {tenonMortisePair && <MenuItemButton onClick={handleFitTenon}>Fit Tenon to Mortise</MenuItemButton>}
+      {housingPlan && (
+        <MenuItemButton onClick={handleFitHousing}>
+          Fit {HOUSING_LABELS[housingPlan.cutType] ?? 'Housing'} to Mating Part
+        </MenuItemButton>
+      )}
       {singleSelectedPart && (singleSelectedPart.features?.length ?? 0) > 0 && (
         <MenuItemButton onClick={handleCopyCuts}>Copy Cuts</MenuItemButton>
       )}

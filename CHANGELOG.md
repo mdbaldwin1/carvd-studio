@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added Fit Dado to Mating Part, and the same for grooves, stopped runs and half laps. Select the piece and the part it goes into, and the channel is cut to the piece rather than to a typed number. This quietly fixes the oldest trap in sheet goods: nominal 3/4" plywood is nearer 23/32", so a dado cut to a typed 3/4" is loose every time, while one cut to the actual part is not.
+
 - The cut list now also groups operations by setup. Nobody works part by part: you set the dado stack to three quarters, run every piece that takes that dado, and only then change it. Cuts that need the same machine setting are gathered together, and where a cut sits along a board no longer separates them, because an offset is not a machine setting.
 
 - The cut list now says how far a solid panel will move. Wood takes up moisture in a damp August and gives it back in a dry January, almost entirely across the grain, so wide solid parts carry an allowance and a reminder that a housed panel has to stay free to move. Sheet goods say nothing, because plywood stays put.

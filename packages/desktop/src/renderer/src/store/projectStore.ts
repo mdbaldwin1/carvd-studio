@@ -44,6 +44,7 @@ import { planDowelJointMigration } from '../utils/dowelJointMigration';
 import { boreThroughAssembly as boreThroughAssemblyHoles } from '../utils/boreThrough';
 import { planTenonFit, resolveTenonAndMortiseParts } from '../utils/fitJoinery';
 import { findGrainCutMismatches } from '../utils/grainDirectionCuts';
+import { planHousingFit, resolveHousingRoles } from '../utils/fitHousing';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
 import { validateEndCutFeature } from '../utils/endCutUtils';
 import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
@@ -109,6 +110,7 @@ interface ProjectState {
   convertLegacyDowelJoints: () => number;
   boreThroughAssembly: (partId: string, face?: FaceTarget) => number;
   fitTenonsToMortise: (firstPartId: string, secondPartId: string) => number;
+  fitHousingToPart: (firstPartId: string, secondPartId: string) => boolean;
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
   rotateSelectedParts: (axis: 'x' | 'y' | 'z', degrees: number, pivot: { x: number; y: number; z: number }) => void;
   deletePart: (id: string) => void;
@@ -863,6 +865,57 @@ export const useProjectStore = create<ProjectState>()(
         }));
         get().markCutListStale();
         return fitted.length;
+      },
+
+      /**
+       * Cut the housing to the piece that goes in it -- the other half of the
+       * rule behind fitting a tenon. A shelf's thickness is the stock you
+       * bought and cannot be altered, so the dado is what moves.
+       */
+      fitHousingToPart: (firstPartId, secondPartId) => {
+        const { parts } = get();
+        const first = parts.find((part) => part.id === firstPartId);
+        const second = parts.find((part) => part.id === secondPartId);
+        if (!first || !second) return false;
+
+        const roles = resolveHousingRoles(first, second);
+        if (!roles) {
+          useUIStore
+            .getState()
+            .showToast('Select the piece and the part whose dado or groove it goes into.', 'warning');
+          return false;
+        }
+
+        const plan = planHousingFit(roles.shelfPart, roles.housingPart);
+        if (!plan) return false;
+        if (!plan.changed) {
+          useUIStore.getState().showToast('That housing already fits.', 'info');
+          return false;
+        }
+
+        set((state) => ({
+          parts: state.parts.map((part) =>
+            part.id === plan.housingPartId
+              ? {
+                  ...part,
+                  features: (part.features ?? []).map((feature) =>
+                    feature.kind === 'rect_cut' && feature.id === plan.housingFeatureId
+                      ? {
+                          ...feature,
+                          parameters: {
+                            ...feature.parameters,
+                            size: { ...feature.parameters.size, [plan.field]: plan.width }
+                          }
+                        }
+                      : feature
+                  )
+                }
+              : part
+          ),
+          isDirty: true
+        }));
+        get().markCutListStale();
+        return true;
       },
 
       transferHolesToMate: (partId, depth, face) => {
