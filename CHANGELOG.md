@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- The cut list now also groups operations by setup. Nobody works part by part: you set the dado stack to three quarters, run every piece that takes that dado, and only then change it. Cuts that need the same machine setting are gathered together, and where a cut sits along a board no longer separates them, because an offset is not a machine setting.
+
 - The cut list now says how far a solid panel will move. Wood takes up moisture in a damp August and gives it back in a dry January, almost entirely across the grain, so wide solid parts carry an allowance and a reminder that a housed panel has to stay free to move. Sheet goods say nothing, because plywood stays put.
 
 - A dado cut with the grain, or a groove cut across it, is now called out. The two words mean grain direction, and on a board whose grain runs across its width the names come out backwards.
