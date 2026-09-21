@@ -412,7 +412,8 @@ export function getPartMaterialOBBs(
       const halfWidth = part.width / 2;
       const halfThickness = part.thickness / 2;
       const isBack = feature.target.type === 'face' && feature.target.face === 'back_face';
-      const depth = Math.min(feature.parameters.depth ?? 0, part.width);
+      const depth =
+        feature.parameters.depthMode === 'through' ? part.width : Math.min(feature.parameters.depth ?? 0, part.width);
       const rawXMin = -halfLength + feature.placement.x;
       const bandLow = -halfThickness + feature.placement.z;
       return {

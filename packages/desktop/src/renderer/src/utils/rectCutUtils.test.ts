@@ -881,10 +881,10 @@ describe('through mortises', () => {
     ).toBeNull();
   });
 
-  it('keeps a pocket cut into an edge face blind', () => {
-    // Cut into the front face, a pocket runs across the thickness and has no
-    // far side to come out of. The editor does not offer Through there, and a
-    // file that asks for it is settled quietly rather than refused.
+  it('lets a pocket cut into an edge face be taken right through', () => {
+    // Cut into the front face, a pocket runs into the board's width and comes
+    // out of the back face -- which is exactly what a bridle's open mortise
+    // does, sawn down the end and out through the width.
     const sideFace = createRectCut({
       cutType: 'mortise',
       target: { type: 'face', face: 'front_face' },
@@ -892,7 +892,7 @@ describe('through mortises', () => {
       depthMode: 'through',
       placement: { x: 4, z: 0.125 }
     });
-    expect(getResolvedRectCutFeature(sideFace, PART).parameters.depthMode).toBe('blind');
+    expect(getResolvedRectCutFeature(sideFace, PART).parameters.depthMode).toBe('through');
     expect(validateRectCutFeature(sideFace, PART)).toBeNull();
   });
 

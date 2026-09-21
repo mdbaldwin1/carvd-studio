@@ -106,11 +106,11 @@ function occupies(obb: PartOBB, socket: FeatureSocket): boolean {
  * both ways, so both are measured.
  */
 function fitAxes(socket: FeatureSocket): Array<{ axis: Vec3; opening: number }> {
-  // A rabbet is open on two sides. Whatever lies in it -- a back panel, the
-  // lapped edge of the next slat -- is free to be any size across it, and a
-  // lap read as a misfit every time it was measured as though the rabbet
-  // were a pocket.
-  if (socket.mateKind === 'rabbet') return [];
+  // Neither a rabbet nor a cutout closes round what sits in it: a rabbet is
+  // open on two sides, a cutout is a window straight through the board. What
+  // lies in either may be any size across it, and measuring them as though
+  // they were pockets called every lap and every finger joint a misfit.
+  if (socket.mateKind === 'rabbet' || socket.mateKind === 'cutout') return [];
   const both = [
     { axis: socket.tangent1, opening: 2 * socket.halfExtent1 },
     { axis: socket.tangent2, opening: 2 * socket.halfExtent2 }

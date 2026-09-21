@@ -237,17 +237,16 @@ export function getResolvedRectCutFeature(
     const target =
       feature.target.type === 'face' ? { type: 'face' as const, face: feature.target.face } : feature.target;
     // A mortise is usually blind but may be taken through, as a wedged or
-    // exposed tenon needs. Cut into the front or back face it runs across the
-    // thickness, where there is no far side to come out of, so that stays
-    // blind whatever was authored.
-    const sideFace = target.type === 'face' && (target.face === 'front_face' || target.face === 'back_face');
-    const depthMode = sideFace ? 'blind' : feature.parameters.depthMode;
+    // exposed tenon needs -- and so does a bridle's open mortise, which is
+    // sawn down the end and out through the width. Taken in a long edge it
+    // runs into the board's width and comes out of the opposite edge, so
+    // through means the same thing there as anywhere else.
     return {
       ...cloneRectCutFeature(feature),
       target,
       parameters: {
         ...feature.parameters,
-        depthMode,
+        depthMode: feature.parameters.depthMode,
         depth: feature.parameters.depth
       }
     };
@@ -497,8 +496,9 @@ export function validateRectCutFeature(
     ) {
       return 'Mortise must target the top, bottom, front, or back face.';
     }
-    // A through mortise is an ordinary joint. Side-face pockets are still
-    // blind-only, which the shared pocket rules below enforce.
+    // A through mortise is an ordinary joint, in a face or in a long edge --
+    // taken in an edge it comes out of the opposite edge, which is what a
+    // bridle's open mortise does.
   }
 
   if (
@@ -510,8 +510,12 @@ export function validateRectCutFeature(
     if (resolvedFeature.placement.x + sizeLength > part.length) return 'Cutout length runs past the blank.';
     if (isSideFaceTarget(resolvedFeature)) {
       // On front/back faces, the cross measurement and offset run across the
-      // board thickness rather than its width.
-      if (resolvedFeature.parameters.depthMode !== 'blind') return 'Side-face pockets use blind depth only.';
+      // board thickness rather than its width. A stopped groove is stopped by
+      // definition; a mortise or a cutout may be taken right through, out of
+      // the opposite edge.
+      if (resolvedFeature.parameters.depthMode !== 'blind' && resolvedFeature.cutType === 'stopped_groove') {
+        return 'A stopped groove is stopped by definition, so it cannot be taken through.';
+      }
       if (resolvedFeature.placement.z + sizeWidth > part.thickness) {
         return 'Pocket height runs past the board thickness.';
       }

@@ -348,19 +348,30 @@ station('09 Through Dovetail', 'SEATED and APPROXIMATE: shown as square fingers,
   return [a, b];
 });
 
-// 10 Half-blind dovetail — sockets in the end, which cannot be cut -----
-station('10 Half-Blind Dovetail', 'NOT MODELLED: its sockets are cut into the front\'s end and stop short of the outer face, and Carvd will not cut an end — the tailed side is shown, the front blank.', () => {
+// 10 Half-blind dovetail — the sockets stop short of the outer face ---
+station('10 Half-Blind Dovetail', 'SEATED and APPROXIMATE: the sockets are blind, which is what half blind means, and nothing shows on the front\'s outer face — but they are square, and the splay needs angled cuts.', () => {
   const o = origin();
-  // The tailed half models fine: square fingers at the end of the side. It is
-  // the front that cannot be made, so it is left blank rather than faked.
-  const side = board('Half-Blind DT — Side', o, {
-    features: [0.75, 2.25].map((z, i) =>
-      rect(`Between tails ${i + 1}`, 'cutout', face('top_face'), { size: { length: 0.5, width: 0.75 }, depthMode: 'through' }, { x: 0, z })
+  const T = 0.75;
+  const SOCKET_DEPTH = 0.5;
+  // Same arrangement as the through dovetail next door, with one difference,
+  // and it is the difference the joint is named for: the sockets stop half
+  // an inch into a three-quarter board, so the outer face stays whole.
+  const front = board('Half-Blind DT — Front', o, {
+    features: [0, 1.5].map((z, i) =>
+      rect(`Tail socket ${i + 1}`, 'mortise', face('top_face'), { size: { length: T, width: 0.75 }, depthMode: 'blind', depth: SOCKET_DEPTH }, { x: 0, z })
     )
   });
-  const front = board('Half-Blind DT — Front', o, { thickness: 1 });
-  apartFrom(side, front, 'z');
-  return [side, front];
+  const side = board('Half-Blind DT — Side', o, {
+    rotation: { x: 0, y: 0, z: 90 },
+    features: [0.75, 2.25].map((z, i) =>
+      rect(`Between tails ${i + 1}`, 'cutout', face('top_face'), { size: { length: SOCKET_DEPTH, width: 0.75 }, depthMode: 'through' }, { x: 0, z })
+    )
+  });
+  side.position.x = front.position.x - ext(front).x + T / 2;
+  // Down into the sockets by their depth, and no further.
+  side.position.y = front.position.y + ext(front).y - SOCKET_DEPTH + ext(side).y;
+  side.position.z = front.position.z;
+  return [front, side];
 });
 
 // 11 Sliding dovetail — a sliding dado, less the splay -----------------
@@ -379,8 +390,8 @@ station('11 Sliding Dovetail', 'SEATED and APPROXIMATE: a sliding housing and th
   return [side, shelf];
 });
 
-// 15 Mitred blind dovetail — the corner, without the secret inside -----
-station('15 Mitred Blind Dovetail', 'SEATED and APPROXIMATE: the mitre is all of this joint that shows, and it closes; the dovetails hidden behind it need angled cuts.', () => {
+// 15 Mitred blind dovetail — only the mitre can be shown --------------
+station('15 Mitred Blind Dovetail', 'NOT MODELLED beyond the mitre: behind it sit a rebate and splayed pins, and the rebate and the pins occupy the same corner, so Carvd reads the second cut as starting in material the first removed. The mitre you see is all of the joint that ever shows.', () => {
   const o = origin();
   const a = board('Mitred Blind DT — Board A', o, { features: [endCut('Mitre', 'right_end', 45, true)] });
   const b = board('Mitred Blind DT — Board B', o, { rotation: { x: 0, y: 90, z: 0 }, features: [endCut('Mitre', 'right_end', 45)] });
@@ -414,7 +425,7 @@ station('13 Bridle Joint', 'SEATED: an open mortise sawn down the post\'s end, t
   // edge, the cut's own depth runs across the board's width, which is what
   // carries it out of the far face.
   const post = board('Bridle — Post', o, {
-    features: [rect('Open mortise', 'mortise', face('front_face'), { size: { length: DEPTH, width: SLOT }, depthMode: 'blind', depth: 3 }, { x: 0, z: (T - SLOT) / 2 })]
+    features: [rect('Open mortise', 'mortise', face('front_face'), { size: { length: DEPTH, width: SLOT }, depthMode: 'through' }, { x: 0, z: (T - SLOT) / 2 })]
   });
   const rail = board('Bridle — Rail', o, {
     features: [rect('Tenon', 'tenon', face('right_end'), { size: { length: DEPTH, width: 3 }, depthMode: 'blind', depth: (T - SLOT) / 2 }, { x: 0, z: 0 })]
@@ -607,7 +618,7 @@ station('25 Pin Joint', 'SEATED: a through pin holding a lap — a pinned joint,
 });
 
 // 26 Pegged M&T — assembled, so Bore Through Assembly has a stack -------
-station('26 Pegged Mortise & Tenon', 'SEATED and assembled: try Bore Through Assembly on the leg.', () => {
+station('26 Pegged Mortise & Tenon', 'SEATED, with the peg withdrawn: driven home it passes through the tenon, and the tongue\'s faces are not faces of the board, so Carvd cannot bore it. Try Bore Through Assembly on the leg.', () => {
   const o = origin();
   const leg = board('Pegged — Leg', o, { length: 16, width: 1.75, thickness: 1.75, stockId: OAK8.id, color: OAK8.color, rotation: { x: 0, y: 0, z: 90 }, features: [
     rect('Rail mortise', 'mortise', face('top_face'), { size: { length: 2, width: 0.25 }, depthMode: 'blind', depth: 1.0625 }, { x: 12, z: 0.75 }),
@@ -618,17 +629,16 @@ station('26 Pegged Mortise & Tenon', 'SEATED and assembled: try Bore Through Ass
   const rail = board('Pegged — Rail', o, {
     rotation: { x: 90, y: 0, z: 0 },
     features: [
-      rect('Tenon', 'tenon', face('right_end'), { size: { length: 1, width: 2 }, depthMode: 'blind', depth: 0.25 }, { x: 0, z: 0.5 }),
-      // Through the tenon, on the leg's line. A peg bored through the leg
-      // alone passes through solid tenon and holds nothing.
-      hole('Peg hole', 'top_face', 0.25, null, 5.875, 0)
+      rect('Tenon', 'tenon', face('right_end'), { size: { length: 1, width: 2 }, depthMode: 'blind', depth: 0.25 }, { x: 0, z: 0.5 })
     ]
   });
   seatTenon(leg, rail, { tenonLength: 1, mortiseFromMin: 12, mortiseLength: 2 });
   // The peg goes through the leg's width, so it lies along Z at the hole.
   const peg = board('Pegged — Peg', o, { length: 2.5, width: 0.25, thickness: 0.25, stockId: DOWEL14.id, color: DOWEL14.color, rotation: { x: 0, y: 90, z: 0 } });
+  // Lined up on the hole, resting against the leg, ready to be driven.
   peg.position.x = leg.position.x;
   peg.position.y = leg.position.y + 5;
+  peg.position.z = leg.position.z + ext(leg).z + 1.25 + EXPLODE;
   peg.position.z = leg.position.z - ext(leg).z + 1.25;
   return [leg, rail, peg];
 });

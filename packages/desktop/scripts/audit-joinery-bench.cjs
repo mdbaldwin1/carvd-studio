@@ -64,7 +64,11 @@ for (const group of file.groups) {
     worst = Math.max(worst, Math.min(...others.map((o) => gap(p, o))));
   }
   const touching = worst < 1e-6;
-  const wrong = claim === 'UNMARKED' || (claim === 'SEATED') !== touching;
+  // NOT MODELLED makes no claim about placement: the joint is not
+  // represented, whether or not the parts happen to touch. Station 15 is the
+  // case in point -- its mitre closes and everything behind the mitre, which
+  // is the joint proper, is missing.
+  const wrong = claim === 'UNMARKED' || (claim !== 'NOT MODELLED' && (claim === 'SEATED') !== touching);
   if (wrong) bad += 1;
   const state = touching ? 'touching' : `apart by ${worst.toFixed(3)}"`;
   console.log(`${wrong ? 'XX' : '  '} ${group.name.padEnd(34)} says ${claim.padEnd(9)} is ${state}`);

@@ -326,6 +326,18 @@ function sideRoundedBand(feature: RoundedCutFeature, part: Part): { center: numb
   };
 }
 
+/**
+ * How far a rectangular cut reaches in from the long edge it was taken in.
+ *
+ * Through means right out of the far face, which is what a bridle's open
+ * mortise does -- sawn down the end and out through the width, leaving a
+ * cheek either side.
+ */
+function sideRectDepth(feature: RectCutFeature, part: Part): number {
+  if (feature.parameters.depthMode === 'through') return part.width;
+  return Math.min(feature.parameters.depth ?? 0, part.width);
+}
+
 /** How deep a rounded cut goes in from the edge it was cut into. */
 function sideRoundedDepth(feature: RoundedCutFeature, part: Part): number {
   return feature.parameters.depthMode === 'through' ? part.width : (feature.parameters.depth ?? 0);
@@ -533,7 +545,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
       }
       continue;
     }
-    if (feature.parameters.depthMode !== 'blind') continue;
+    if (feature.parameters.depthMode !== 'blind' && !isSideFaceTarget(feature)) continue;
     if (isSideFaceTarget(feature)) {
       // Side-face pockets occupy a band across the thickness: slice at the
       // band edges so only those layers get the front/back recess.
@@ -606,7 +618,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     for (const feature of supportedRectCuts) {
       if (feature.cutType === 'tenon') continue;
       if (isSideFaceTarget(feature)) {
-        const pocketDepth = Math.min(feature.parameters.depth ?? 0, part.width);
+        const pocketDepth = sideRectDepth(feature, part);
         const bandLow = -part.thickness / 2 + feature.placement.z;
         const bandHigh = bandLow + feature.parameters.size.width;
         if (pocketDepth <= 0 || yMid < bandLow || yMid > bandHigh) continue;
