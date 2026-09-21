@@ -294,6 +294,68 @@ function referencedFeatureOffset(value: number, size: number, from: 'min' | 'cen
   return value;
 }
 
+/**
+ * How many slices trace the arc of a rounded opening cut into an edge.
+ *
+ * An edge slot's curve lies in the plane the part is sliced along, so unlike
+ * a slot in a face it cannot be one outline. Each layer takes a rectangle as
+ * long as the slot is at that height, and the stack of them makes the curve.
+ */
+const SIDE_ROUNDED_SLICES = 12;
+
+/** Half the opening's length, measured across its width from the middle. */
+function roundedHalfLengthAt(feature: RoundedCutFeature, offset: number): number {
+  const halfLength = feature.parameters.length / 2;
+  const halfWidth = feature.parameters.width / 2;
+  // A slot is a stadium: its ends are half-circles the full width of the cut,
+  // whatever corner radius happens to be stored on it.
+  const radius = feature.cutType === 'rounded_slot' ? halfWidth : Math.min(feature.parameters.cornerRadius, halfWidth);
+  const distance = Math.abs(offset);
+  if (distance >= halfWidth) return 0;
+  const straight = halfWidth - radius;
+  if (distance <= straight) return halfLength;
+  const into = distance - straight;
+  return halfLength - radius + Math.sqrt(Math.max(0, radius * radius - into * into));
+}
+
+/** Where a side-face rounded cut sits across the part's thickness. */
+function sideRoundedBand(feature: RoundedCutFeature, part: Part): { center: number; half: number } {
+  return {
+    center: referencedFeatureOffset(feature.placement.secondary, part.thickness, feature.reference.secondaryFrom),
+    half: feature.parameters.width / 2
+  };
+}
+
+/** How deep a rounded cut goes in from the edge it was cut into. */
+function sideRoundedDepth(feature: RoundedCutFeature, part: Part): number {
+  return feature.parameters.depthMode === 'through' ? part.width : (feature.parameters.depth ?? 0);
+}
+
+/** One slice of a rounded opening cut into a long edge. */
+function getSideRoundedCutHole(feature: RoundedCutFeature, part: Part, yMid: number): Point2[] | null {
+  const depth = sideRoundedDepth(feature, part);
+  if (depth <= 0) return null;
+  const band = sideRoundedBand(feature, part);
+  const halfLength = roundedHalfLengthAt(feature, yMid - band.center);
+  if (halfLength <= 0) return null;
+
+  const centerX = referencedFeatureOffset(feature.placement.primary, part.length, feature.reference.primaryFrom);
+  // Plan coordinates run opposite the face frame's second axis, which is why
+  // the front edge is the one at negative plan z. Rect cuts reach the same
+  // place through getRectCutPlanBounds; this arrives at it directly, so the
+  // sign has to be applied here.
+  const isBack = feature.target.type === 'face' && feature.target.face === 'back_face';
+  const halfWidth = part.width / 2;
+  const minZ = isBack ? halfWidth - depth : -halfWidth;
+  const maxZ = isBack ? halfWidth : -halfWidth + depth;
+  return [
+    { x: centerX - halfLength, z: minZ },
+    { x: centerX + halfLength, z: minZ },
+    { x: centerX + halfLength, z: maxZ },
+    { x: centerX - halfLength, z: maxZ }
+  ];
+}
+
 function getRoundedCutHole(feature: RoundedCutFeature, part: Part): Point2[] {
   const frame = getFaceFrame(part, feature.target.face);
   const centerX = referencedFeatureOffset(feature.placement.primary, part.length, feature.reference.primaryFrom);
@@ -454,6 +516,12 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
       feature.target.type === 'face' &&
       (feature.target.face === 'top_face' || feature.target.face === 'bottom_face')
   );
+  const sideRoundedCuts = getEnabledFeatures(part).filter(
+    (feature): feature is RoundedCutFeature =>
+      feature.kind === 'rounded_cut' &&
+      feature.target.type === 'face' &&
+      (feature.target.face === 'front_face' || feature.target.face === 'back_face')
+  );
   const sliceY = new Set<number>([-part.thickness / 2, part.thickness / 2]);
 
   for (const feature of supportedRectCuts) {
@@ -496,6 +564,16 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     if (feature.parameters.depthMode !== 'blind' || !feature.parameters.depth) continue;
     if (feature.target.face === 'top_face') sliceY.add(part.thickness / 2 - feature.parameters.depth);
     else sliceY.add(-part.thickness / 2 + feature.parameters.depth);
+  }
+  for (const feature of sideRoundedCuts) {
+    if (sideRoundedDepth(feature, part) <= 0) continue;
+    // Slice across the slot's width so each layer can take a different
+    // length; that stack of steps is what renders the curved ends.
+    const band = sideRoundedBand(feature, part);
+    for (let step = 0; step <= SIDE_ROUNDED_SLICES; step += 1) {
+      const y = band.center - band.half + (step * 2 * band.half) / SIDE_ROUNDED_SLICES;
+      if (y > -part.thickness / 2 && y < part.thickness / 2) sliceY.add(y);
+    }
   }
   for (const feature of circularCuts) {
     const recessDepth = feature.cutType === 'counterbore' ? (feature.parameters.counterbore?.depth ?? 0) : 0;
@@ -592,6 +670,10 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
           ? yMid >= part.thickness / 2 - Number(feature.parameters.depth)
           : yMid <= -part.thickness / 2 + Number(feature.parameters.depth));
       if (active) layerHoles.push(getRoundedCutHole(feature, part));
+    }
+    for (const feature of sideRoundedCuts) {
+      const hole = getSideRoundedCutHole(feature, part, yMid);
+      if (hole) layerHoles.push(hole);
     }
 
     let layer = getLayerGeometry(contour, layerHoles, layerDepth, yMin);

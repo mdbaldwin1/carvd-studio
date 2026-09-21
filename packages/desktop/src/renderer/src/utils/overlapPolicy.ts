@@ -320,10 +320,37 @@ function isCompatibleSocketMate(a: Part, b: Part): boolean {
 function seatsInto(movedPart: Part, hostPart: Part): boolean {
   const mate = detectFeatureMateSnaps(movedPart, movedPart.position, [hostPart], [movedPart.id], 0.03);
   if (mate.mateHostPartId !== hostPart.id) return false;
-  const isSeatedMate =
-    Math.abs(mate.adjustedPosition.x - movedPart.position.x) <= JOINERY_FIT_TOLERANCE &&
-    Math.abs(mate.adjustedPosition.y - movedPart.position.y) <= JOINERY_FIT_TOLERANCE &&
-    Math.abs(mate.adjustedPosition.z - movedPart.position.z) <= JOINERY_FIT_TOLERANCE;
+
+  const drift = {
+    x: mate.adjustedPosition.x - movedPart.position.x,
+    y: mate.adjustedPosition.y - movedPart.position.y,
+    z: mate.adjustedPosition.z - movedPart.position.z
+  };
+  const normal = mate.mateInsertionNormal;
+  let isSeatedMate: boolean;
+  if (normal) {
+    // Split the adjustment into the way out of the socket and the rest.
+    // Sideways is the piece sitting off-centre in its opening, which is a
+    // real misfit. Along the way in is only how near the floor it is -- and
+    // a piece that stops short of the floor is not a fault but the whole
+    // point of a great many joints: a biscuit, a domino, a loose tenon and a
+    // dowel are all deliberately shorter than the two holes that take them,
+    // so the boards can still be slid into line before the glue grabs. What
+    // is not allowed is the other sign, which means the piece has been driven
+    // past the floor and is standing in solid wood.
+    const outward = drift.x * normal.x + drift.y * normal.y + drift.z * normal.z;
+    const sideways = Math.hypot(
+      drift.x - normal.x * outward,
+      drift.y - normal.y * outward,
+      drift.z - normal.z * outward
+    );
+    isSeatedMate = sideways <= JOINERY_FIT_TOLERANCE && outward <= JOINERY_FIT_TOLERANCE;
+  } else {
+    isSeatedMate =
+      Math.abs(drift.x) <= JOINERY_FIT_TOLERANCE &&
+      Math.abs(drift.y) <= JOINERY_FIT_TOLERANCE &&
+      Math.abs(drift.z) <= JOINERY_FIT_TOLERANCE;
+  }
   if (!isSeatedMate) return false;
 
   // A bore is round and the material grid is made of boxes, so for a dowel
@@ -332,7 +359,8 @@ function seatsInto(movedPart: Part, hostPart: Part): boolean {
   // check that applies here, and it is a real one -- the mate engine already
   // required a square section matching the bore's radius and a placement good
   // to a thousandth, so a dowel that is too fat never mates at all.
-  if (mate.mateKind === 'round_hole') return true;
+  if (mate.mateKind === 'round_hole' || mate.mateKind === 'rounded_slot' || mate.mateKind === 'rounded_rectangle')
+    return true;
 
   // Judge the joint on its own geometry, fully seated, rather than on a
   // placement that is a thousandth out. A joint cut to fit stays clear of its

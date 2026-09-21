@@ -6,6 +6,7 @@ import {
   Part,
   RectCutFeature,
   ReferenceDistanceIndicator,
+  RoundedCutFeature,
   SnapDistanceIndicator,
   SnapGuide,
   SnapLine
@@ -26,7 +27,7 @@ import {
   isTopTarget
 } from './rectCutUtils';
 import type { GeometryCache } from '../interaction/geometry/cache';
-import { expandCircularCut } from './roundCutUtils';
+import { expandCircularCut, getFaceFrame } from './roundCutUtils';
 
 // Module-level reusable objects for getPartBounds calculations.
 // Safe because JS is single-threaded and callers only see the returned plain PartBounds object.
@@ -3604,7 +3605,7 @@ export interface FeatureSocket {
   halfExtent2: number;
   /** Depth of the socket (along -openingNormal) */
   depth: number;
-  mateKind: RectCutFeature['cutType'] | 'round_hole';
+  mateKind: RectCutFeature['cutType'] | RoundedCutFeature['cutType'] | 'round_hole';
 }
 
 // Tolerance for dimension matching (inches) — parts whose dimension is within
@@ -3647,6 +3648,13 @@ function perpendicularBasis(axis: Vec3): [Vec3, Vec3] {
     ax <= ay && ax <= az ? { x: 1, y: 0, z: 0 } : ay <= az ? { x: 0, y: 1, z: 0 } : { x: 0, y: 0, z: 1 };
   const tangent1 = normalizeVec(crossVec(axis, seed));
   return [tangent1, normalizeVec(crossVec(axis, tangent1))];
+}
+
+/** Where a placement value sits once its reference edge is taken into account. */
+function placementOffset(value: number, size: number, from: 'min' | 'center' | 'max' | undefined): number {
+  if (from === 'min') return -size / 2 + value;
+  if (from === 'max') return size / 2 - value;
+  return value;
 }
 
 export function getPartFeatureSockets(part: Part): FeatureSocket[] {
@@ -3717,6 +3725,84 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
           mateKind: 'round_hole'
         });
       }
+      continue;
+    }
+
+    // A rounded opening is a socket on the same terms as a mortise: a biscuit
+    // seats in its slot the way a tenon seats in a pocket. Only the faces the
+    // geometry actually cuts are offered, so nothing ever mates into a recess
+    // the part is not showing.
+    if (feature.kind === 'rounded_cut') {
+      const face = feature.target.face;
+      const isSideFace = face === 'front_face' || face === 'back_face';
+      const isFlatFace = face === 'top_face' || face === 'bottom_face';
+      if (!isSideFace && !isFlatFace) continue;
+
+      const depth =
+        feature.parameters.depthMode === 'through'
+          ? isSideFace
+            ? part.width
+            : part.thickness
+          : (feature.parameters.depth ?? 0);
+      if (depth <= 0) continue;
+
+      const frame = getFaceFrame(part, face);
+      const centerPrimary = placementOffset(
+        feature.placement.primary,
+        frame.primarySize,
+        feature.reference.primaryFrom
+      );
+      const centerSecondary = placementOffset(
+        feature.placement.secondary,
+        frame.secondarySize,
+        feature.reference.secondaryFrom
+      );
+
+      // The opening may be turned within its own face, which carries its two
+      // half-extents round with it.
+      const angle = (feature.placement.rotation * Math.PI) / 180;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const localPrimary = {
+        x: frame.primaryAxis.x * cos + frame.secondaryAxis.x * sin,
+        y: frame.primaryAxis.y * cos + frame.secondaryAxis.y * sin,
+        z: frame.primaryAxis.z * cos + frame.secondaryAxis.z * sin
+      };
+      const localSecondary = {
+        x: frame.secondaryAxis.x * cos - frame.primaryAxis.x * sin,
+        y: frame.secondaryAxis.y * cos - frame.primaryAxis.y * sin,
+        z: frame.secondaryAxis.z * cos - frame.primaryAxis.z * sin
+      };
+      const toWorld = (v: { x: number; y: number; z: number }): Vec3 => ({
+        x: axX.x * v.x + axY.x * v.y + axZ.x * v.z,
+        y: axX.y * v.x + axY.y * v.y + axZ.y * v.z,
+        z: axX.z * v.x + axY.z * v.y + axZ.z * v.z
+      });
+      const localCenter = {
+        x: frame.origin.x + frame.primaryAxis.x * centerPrimary + frame.secondaryAxis.x * centerSecondary,
+        y: frame.origin.y + frame.primaryAxis.y * centerPrimary + frame.secondaryAxis.y * centerSecondary,
+        z: frame.origin.z + frame.primaryAxis.z * centerPrimary + frame.secondaryAxis.z * centerSecondary
+      };
+      const worldCenter = toWorld(localCenter);
+
+      sockets.push({
+        hostPartId: part.id,
+        featureId: feature.id,
+        openingCenter: {
+          x: part.position.x + worldCenter.x,
+          y: part.position.y + worldCenter.y,
+          z: part.position.z + worldCenter.z
+        },
+        // The frame's normal points the way the cutter travels; a socket's
+        // points back out against it.
+        openingNormal: mulVec(toWorld(frame.inwardNormal), -1),
+        tangent1: toWorld(localPrimary),
+        tangent2: toWorld(localSecondary),
+        halfExtent1: feature.parameters.length / 2,
+        halfExtent2: feature.parameters.width / 2,
+        depth,
+        mateKind: feature.cutType
+      });
       continue;
     }
 
@@ -3802,6 +3888,15 @@ export interface MateSnapResult extends SnapResult {
   mateHostPartId?: string;
   /** Which joint closed, so a caller can judge it on the right terms. */
   mateKind?: string;
+  /**
+   * Out of the socket, against the way the piece went in.
+   *
+   * Lets a caller tell the two halves of an adjustment apart: sideways is the
+   * piece being off-centre in its opening, which is a real misfit, while
+   * along this is only how far it is from the floor -- and a piece floating
+   * short of the floor is a great many joints working exactly as intended.
+   */
+  mateInsertionNormal?: Vec3;
   mateConflict?: { candidateCount: number; maxDisagreement: number };
 }
 
@@ -3974,6 +4069,8 @@ type FeatureMateCandidate = {
   constrainedAxes: { x: boolean; y: boolean; z: boolean };
   mateKind: string;
   sourceKey: string;
+  /** Out of the socket, against the way the piece went in. */
+  insertionNormal?: Vec3;
 };
 
 /** Return every geometrically eligible rectangular joint proposal. Keeping
@@ -4091,6 +4188,9 @@ function collectFeatureMateCandidates(
           if (!match) continue;
           candidates.push({
             delta: mulVec(match.delta, -1),
+            // The host was tried as the inserted half, so the way out of the
+            // socket points the other way for the part actually being moved.
+            insertionNormal: mulVec(match.insertionNormal, -1),
             distance: match.distance,
             hostPartId: hostPart.id,
             constrainedAxes: match.constrainedAxes,
@@ -4125,7 +4225,8 @@ function candidateToMateSnapResult(currentPosition: Vec3, candidate: FeatureMate
       }
     ],
     mateHostPartId: candidate.hostPartId,
-    mateKind: candidate.mateKind
+    mateKind: candidate.mateKind,
+    mateInsertionNormal: candidate.insertionNormal
   };
 }
 
@@ -4323,7 +4424,9 @@ function findBestMateMatch(
   draggingOBB: PartOBB,
   socket: FeatureSocket,
   snapThreshold: number
-): { delta: Vec3; distance: number; constrainedAxes: { x: boolean; y: boolean; z: boolean } } | undefined {
+):
+  | { delta: Vec3; distance: number; constrainedAxes: { x: boolean; y: boolean; z: boolean }; insertionNormal: Vec3 }
+  | undefined {
   const [axisX, axisY, axisZ] = draggingOBB.axes;
   const [hx, hy, hz] = draggingOBB.halfExtents;
 
@@ -4356,7 +4459,12 @@ function findBestMateMatch(
   ];
 
   let bestResult:
-    | { delta: Vec3; distance: number; constrainedAxes: { x: boolean; y: boolean; z: boolean } }
+    | {
+        delta: Vec3;
+        distance: number;
+        constrainedAxes: { x: boolean; y: boolean; z: boolean };
+        insertionNormal: Vec3;
+      }
     | undefined;
   let bestDist = Infinity;
 
@@ -4454,6 +4562,7 @@ function findBestMateMatch(
       bestResult = {
         delta,
         distance,
+        insertionNormal: n,
         constrainedAxes: {
           x: constrainedDirections.some((direction) => Math.abs(direction.x) > 1e-5),
           y: constrainedDirections.some((direction) => Math.abs(direction.y) > 1e-5),

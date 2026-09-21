@@ -415,8 +415,13 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
 }
 
 export function validateRoundedCut(feature: RoundedCutFeature, part: Part): string | null {
-  if (feature.target.face !== 'top_face' && feature.target.face !== 'bottom_face')
-    return 'Rounded openings currently support only the top and bottom faces.';
+  if (
+    feature.target.face !== 'top_face' &&
+    feature.target.face !== 'bottom_face' &&
+    feature.target.face !== 'front_face' &&
+    feature.target.face !== 'back_face'
+  )
+    return 'Rounded openings support the faces and the long edges, not the ends.';
   if (
     !Number.isFinite(feature.parameters.length) ||
     !Number.isFinite(feature.parameters.width) ||

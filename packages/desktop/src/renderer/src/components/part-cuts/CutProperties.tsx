@@ -351,20 +351,21 @@ export function CutProperties() {
           <div className="property-group">
             <label>Face</label>
             <div className="flex flex-wrap gap-1.5">
-              {(inspectorDraft.mode === 'rounded_cut' ? (['top_face', 'bottom_face'] as const) : FACE_TARGETS).map(
-                (target) => (
-                  <Button
-                    key={target}
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    active={inspectorDraft.faceTarget === target}
-                    onClick={() => setDraft({ ...inspectorDraft, faceTarget: target })}
-                  >
-                    {FACE_LABELS[target]}
-                  </Button>
-                )
-              )}
+              {(inspectorDraft.mode === 'rounded_cut'
+                ? (['top_face', 'bottom_face', 'front_face', 'back_face'] as const)
+                : FACE_TARGETS
+              ).map((target) => (
+                <Button
+                  key={target}
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  active={inspectorDraft.faceTarget === target}
+                  onClick={() => setDraft({ ...inspectorDraft, faceTarget: target })}
+                >
+                  {FACE_LABELS[target]}
+                </Button>
+              ))}
             </div>
           </div>
         )}

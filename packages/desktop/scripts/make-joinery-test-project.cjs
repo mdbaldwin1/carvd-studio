@@ -198,47 +198,28 @@ station('03 Dowel Joint', 'SEATED and assembled: try Transfer Holes to Mating Pa
   return [rail, stile, pin(1, -1), pin(2, 1)];
 });
 
-// 04 Biscuit — slots in the meeting edges, biscuit floating between --------
-station(
-  '04 Biscuit Joint',
-  'SEATED and APPROXIMATE: a plate joiner cuts an arc, so these slots are square-ended stand-ins.',
-  () => {
-    const o = origin();
-    const T = 0.75;
-    const SLOT_DEPTH = 0.5;
-    // A biscuit slot is cut into the edge the boards meet on, not the face --
-    // the joiner is run along the edge with its fence on the face. Squared off
-    // here because Carvd's rounded slot cannot host a mate yet, and a joint
-    // that assembles is worth more on a test bench than one that only looks
-    // right. Centred along the board and centred in its thickness; placement
-    // on an edge face is measured from the near end, not the middle.
-    const biscuitSlot = (f) =>
-      rect(
-        'Biscuit slot',
-        'mortise',
-        face(f),
-        { size: { length: 56 * MM, width: 4 * MM }, depthMode: 'blind', depth: SLOT_DEPTH },
-        { x: 6 - 28 * MM, z: (T - 4 * MM) / 2 }
-      );
-    const a = board('Biscuit — Board A', o, { width: 6, features: [biscuitSlot('front_face')] });
-    const b = board('Biscuit — Board B', o, { width: 6, features: [biscuitSlot('back_face')] });
-    against(a, b, 'z');
-    // 23mm across the seam into two 1/2" slots, so it floats at both ends --
-    // which is what lets the boards still slide for alignment before glue-up.
-    const biscuit = board('Biscuit — #20', o, {
-      length: 56 * MM,
-      width: 23 * MM,
-      thickness: 4 * MM,
-      stockId: BISCUIT.id,
-      color: BISCUIT.color,
-      grainSensitive: false
-    });
-    biscuit.position.x = a.position.x;
-    biscuit.position.y = a.position.y;
-    biscuit.position.z = a.position.z + ext(a).z;
-    return [a, b, biscuit];
-  }
-);
+// 04 Biscuit — arc-ended slots in the meeting edges ----------------------
+station('04 Biscuit Joint', 'SEATED: slots cut in the meeting edges, the biscuit floating in both.', () => {
+  const o = origin();
+  const T = 0.75;
+  // A plate joiner is run along the edge the boards meet on, with its fence
+  // registered off the face, and the blade being round leaves an arc at each
+  // end -- which is why this is a rounded slot and not a squared-off mortise.
+  const biscuitSlot = (f) => slot('Biscuit slot', f, 56 * MM, 4 * MM, 0.5, 0, 0);
+  const a = board('Biscuit — Board A', o, { width: 6, features: [biscuitSlot('front_face')] });
+  const b = board('Biscuit — Board B', o, { width: 6, features: [biscuitSlot('back_face')] });
+  against(a, b, 'z');
+  // 23mm across the seam into two 1/2" slots, so it floats at both ends --
+  // which is what lets the boards still slide into line before the glue grabs.
+  const biscuit = board('Biscuit — #20', o, {
+    length: 56 * MM, width: 23 * MM, thickness: 4 * MM,
+    stockId: BISCUIT.id, color: BISCUIT.color, grainSensitive: false
+  });
+  biscuit.position.x = a.position.x;
+  biscuit.position.y = a.position.y;
+  biscuit.position.z = a.position.z + ext(a).z;
+  return [a, b, biscuit];
+});
 
 // 05 Dado — the shelf sits home in the housing -------------------------
 station('05 Dado Joint', 'SEATED: real 23/32 plywood in a dado typed 3/4 — try Fit Dado to Mating Part.', () => {

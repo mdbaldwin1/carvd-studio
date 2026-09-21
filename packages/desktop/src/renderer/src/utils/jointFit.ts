@@ -104,7 +104,10 @@ function fitAxes(socket: FeatureSocket): Array<{ axis: Vec3; opening: number }> 
     { axis: socket.tangent1, opening: 2 * socket.halfExtent1 },
     { axis: socket.tangent2, opening: 2 * socket.halfExtent2 }
   ];
-  if (socket.mateKind === 'round_hole') return both;
+  // A bore and a rounded slot both hold their piece on every side, so both
+  // dimensions are a fit. Only the rectangular channels run anywhere.
+  if (socket.mateKind === 'round_hole' || socket.mateKind === 'rounded_slot' || socket.mateKind === 'rounded_rectangle')
+    return both;
   const channel = RECT_CUT_TRAITS[socket.mateKind].channel;
   if (!channel) return both;
   return [channel.tangent === 1 ? both[0] : both[1]];
@@ -113,6 +116,8 @@ function fitAxes(socket: FeatureSocket): Array<{ axis: Vec3; opening: number }> 
 /** What to call the cut in a sentence. */
 function cutName(socket: FeatureSocket): string {
   if (socket.mateKind === 'round_hole') return 'hole';
+  if (socket.mateKind === 'rounded_slot') return 'slot';
+  if (socket.mateKind === 'rounded_rectangle') return 'rounded opening';
   return RECT_CUT_TRAITS[socket.mateKind].label.toLowerCase();
 }
 
