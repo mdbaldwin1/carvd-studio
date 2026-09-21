@@ -4,6 +4,7 @@ import type { Part, RectCutFeature } from '../types';
 import { clearPartGeometryCache, getPartMaterialVolume } from './partFeatureGeometry';
 import { getPartFeatureConflicts } from './partFeatureConflicts';
 import { partsOverlap } from './overlapPolicy';
+import { getPartMaterialOBBs } from './snapToPartsUtil';
 import { validateRectCutFeature } from './rectCutUtils';
 
 vi.unmock('three');
@@ -267,6 +268,57 @@ describe('the two halves of a dovetail', () => {
     );
     const standing = 0.75 * DW * T - removedFrom(tails);
     expect(standing).not.toBeCloseTo(removedFrom(pins), 2);
+  });
+});
+
+/**
+ * The cell grid that mate seating is judged against is boxes, and a leaning
+ * or tapering cut is not. It has to err by modelling the cut a shade large:
+ * modelled small it leaves wood in the grid that the saw took out, and the
+ * joint cut to fit is refused as driven into solid stock.
+ */
+describe('the cells a splayed cut leaves behind', () => {
+  const board = (over: Partial<RectCutFeature['parameters']>) =>
+    createTestPart({
+      id: 'b',
+      length: L,
+      width: W,
+      thickness: T,
+      position: { x: 0, y: 0, z: 0 },
+      features: [
+        {
+          ...socket(),
+          cutType: 'mortise',
+          parameters: { size: { length: 1, width: 1 }, depthMode: 'blind', depth: 0.5, ...over },
+          placement: { x: 4.5, z: 1 }
+        }
+      ]
+    });
+  const inAnyCell = (part: Part, point: { x: number; y: number; z: number }) =>
+    getPartMaterialOBBs(part).some((obb) =>
+      (['x', 'y', 'z'] as const).every(
+        (axis, index) => Math.abs(point[axis] - obb.center[axis]) <= obb.halfExtents[index] + 1e-9
+      )
+    );
+
+  it('clears the wood a leaning wall took, not just the mouth of the pocket', () => {
+    const angled = board({ sideWallAngle: 20 });
+    // Just outside the mouth, but well inside the pocket down at the floor.
+    // The pocket is z -0.5..0.5 at its mouth and opens to 0.68 at its floor.
+    const flared = { x: 0, y: -0.12, z: 0.6 };
+    expect(inAnyCell(board({}), flared)).toBe(true);
+    expect(inAnyCell(angled, flared)).toBe(false);
+    // Wood the cut never reaches stays wood.
+    expect(inAnyCell(angled, { x: 0, y: 0, z: -1.4 })).toBe(true);
+  });
+
+  it('clears the wood a taper took at the far end of the pocket', () => {
+    const tapered = board({ depthMode: 'through', taperAngle: 20 });
+    // Square, the pocket never passes z 0.5; tapered it reaches 0.86 by its
+    // far end, so this point is wood in the one and air in the other.
+    const flared = { x: 0.45, y: 0, z: 0.6 };
+    expect(inAnyCell(board({ depthMode: 'through' }), flared)).toBe(true);
+    expect(inAnyCell(tapered, flared)).toBe(false);
   });
 });
 

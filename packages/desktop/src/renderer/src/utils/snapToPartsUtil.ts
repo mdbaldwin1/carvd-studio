@@ -359,6 +359,70 @@ export function getPartSubOBBs(part: Part, position: { x: number; y: number; z: 
  * after a mate candidate has been identified: a host-wide collision exemption
  * is safe only when no material cell of the mover intersects a host cell.
  */
+/**
+ * How many steps a leaning or tapering cut is approximated in for collision.
+ *
+ * The grid is a box decomposition and the cut is a wedge, so the two can only
+ * ever meet in the limit. Eight steps puts the residual well inside the width
+ * of a saw kerf while keeping the cell count something the SAT loop can carry.
+ */
+const SPLAY_COLLISION_SLABS = 8;
+
+/**
+ * Break a cut whose section changes into slabs that each hold its widest part.
+ *
+ * Erring the other way is the expensive mistake. A cut modelled smaller than
+ * the one actually taken leaves wood in the model that the saw removed, and
+ * every joint cut to fit is then rejected as driven into solid stock -- which
+ * is exactly what a correctly seated dovetail was being told. Modelled a
+ * little large it merely loses a shaving of tightness, bounded by one step.
+ */
+function splayedCutSlabs(
+  nominal: { xMin: number; xMax: number; yMin: number; yMax: number; zMin: number; zMax: number },
+  splay: { wall: number; side: number; taper: number; bottom: boolean; halfThickness: number }
+): Array<{ xMin: number; xMax: number; yMin: number; yMax: number; zMin: number; zMax: number }> {
+  const tan = (degrees: number) => Math.tan((degrees * Math.PI) / 180);
+  const leans = splay.wall !== 0 || splay.side !== 0;
+  const ySteps = leans ? SPLAY_COLLISION_SLABS : 1;
+  const xSteps = splay.taper !== 0 ? SPLAY_COLLISION_SLABS : 1;
+  const ySpan = (nominal.yMax - nominal.yMin) / ySteps;
+  const slabs: Array<{ xMin: number; xMax: number; yMin: number; yMax: number; zMin: number; zMax: number }> = [];
+
+  for (let yStep = 0; yStep < ySteps; yStep += 1) {
+    const yLow = nominal.yMin + yStep * ySpan;
+    const yHigh = yLow + ySpan;
+    // How far below the surface the cut was entered from this slab reaches.
+    const depths = splay.bottom
+      ? [yLow + splay.halfThickness, yHigh + splay.halfThickness]
+      : [splay.halfThickness - yHigh, splay.halfThickness - yLow];
+    const widest = (angle: number) =>
+      angle === 0 ? 0 : tan(angle) * (angle > 0 ? Math.max(...depths) : Math.min(...depths));
+    const growWall = widest(splay.wall);
+    const growSide = widest(splay.side);
+    const xLow = nominal.xMin - growWall;
+    const xHigh = nominal.xMax + growWall;
+    const xSpan = (xHigh - xLow) / xSteps;
+
+    for (let xStep = 0; xStep < xSteps; xStep += 1) {
+      const left = xLow + xStep * xSpan;
+      const right = left + xSpan;
+      // The taper is measured from the near end of the cut, so the widest
+      // reach within this slab is at whichever of its edges is further along.
+      const along = splay.taper > 0 ? right - xLow : left - xLow;
+      const flare = splay.taper === 0 ? 0 : tan(splay.taper) * along;
+      slabs.push({
+        xMin: left,
+        xMax: right,
+        yMin: yLow,
+        yMax: yHigh,
+        zMin: nominal.zMin - growSide - flare,
+        zMax: nominal.zMax + growSide + flare
+      });
+    }
+  }
+  return slabs;
+}
+
 export function getPartMaterialOBBs(
   part: Part,
   position: { x: number; y: number; z: number } = part.position
@@ -375,7 +439,7 @@ export function getPartMaterialOBBs(
           (isTopTarget(feature) || isBottomTarget(feature)) &&
           (feature.parameters.depthMode === 'through' || (feature.parameters.depth ?? 0) > 0)
       )
-      .map((feature) => {
+      .flatMap((feature) => {
         const halfLength = part.length / 2;
         const halfWidth = part.width / 2;
         const halfThickness = part.thickness / 2;
@@ -383,13 +447,35 @@ export function getPartMaterialOBBs(
         const bounds = getRectCutPlanBounds(feature, part);
         const rawXMin = -halfLength + bounds.minX;
         const renderedZ = getRenderedLocalZRange(part.width, bounds.minZ, feature.parameters.size.width);
-        const xMin = Math.max(-halfLength, rawXMin);
-        const xMax = Math.min(halfLength, rawXMin + feature.parameters.size.length);
-        const zMin = Math.max(-halfWidth, renderedZ.min);
-        const zMax = Math.min(halfWidth, renderedZ.max);
-        const yMin = isBottomTarget(feature) ? -halfThickness : halfThickness - depth;
-        const yMax = isBottomTarget(feature) ? -halfThickness + depth : halfThickness;
-        return { xMin, xMax, yMin, yMax, zMin, zMax };
+        const bottom = isBottomTarget(feature);
+        const clip = (volume: {
+          xMin: number;
+          xMax: number;
+          yMin: number;
+          yMax: number;
+          zMin: number;
+          zMax: number;
+        }) => ({
+          xMin: Math.max(-halfLength, volume.xMin),
+          xMax: Math.min(halfLength, volume.xMax),
+          yMin: volume.yMin,
+          yMax: volume.yMax,
+          zMin: Math.max(-halfWidth, volume.zMin),
+          zMax: Math.min(halfWidth, volume.zMax)
+        });
+        const nominal = {
+          xMin: rawXMin,
+          xMax: rawXMin + feature.parameters.size.length,
+          yMin: bottom ? -halfThickness : halfThickness - depth,
+          yMax: bottom ? -halfThickness + depth : halfThickness,
+          zMin: renderedZ.min,
+          zMax: renderedZ.max
+        };
+        const wall = feature.parameters.wallAngle ?? 0;
+        const side = feature.parameters.sideWallAngle ?? 0;
+        const taper = feature.parameters.taperAngle ?? 0;
+        if (!wall && !side && !taper) return [clip(nominal)];
+        return splayedCutSlabs(nominal, { wall, side, taper, bottom, halfThickness }).map(clip);
       })
       .filter(
         (volume) =>

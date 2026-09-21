@@ -306,13 +306,17 @@ function referencedFeatureOffset(value: number, size: number, from: 'min' | 'cen
   return value;
 }
 
-/** How many steps a splayed wall is cut into. */
-const WALL_ANGLE_SLICES = 10;
-
-/** How far a pocket's walls lean out by a given depth below the surface. */
+/**
+ * How far a pocket's walls lean out by a given depth below the surface.
+ *
+ * A negative depth is above the mouth and carries on up the same plane. The
+ * cutter is lofted between a ring standing clear of the surface and one past
+ * the floor, and both have to sit on the true wall or the loft leans at a
+ * slightly wrong angle between them.
+ */
 function wallSplay(angle: number | undefined, depthBelowSurface: number): number {
   if (!angle) return 0;
-  return Math.tan((angle * Math.PI) / 180) * Math.max(0, depthBelowSurface);
+  return Math.tan((angle * Math.PI) / 180) * depthBelowSurface;
 }
 
 /** How far below the cut surface this layer sits, for a face-placed pocket. */
@@ -320,13 +324,19 @@ function depthBelowCutFace(feature: RectCutFeature, part: Part, yMid: number): n
   return isBottomTarget(feature) ? yMid + part.thickness / 2 : part.thickness / 2 - yMid;
 }
 
+/** Whether either pair of this pocket's walls leans off square. */
+function hasLeaningWalls(feature: RectCutFeature): boolean {
+  return Boolean(feature.parameters.wallAngle || feature.parameters.sideWallAngle);
+}
+
 /**
- * One slice of a pocket whose ends lean off square.
+ * The footprint of a pocket whose walls lean, at one depth into the board.
  *
- * A dovetail's walls splay, and the splay is the whole joint: it is what
- * stops the two halves being drawn apart. The slicer takes the part in
- * layers, so each layer takes a slightly longer rectangle than the one above
- * it, and the stack of them is the lean.
+ * Two of these -- the mouth and the floor -- are the ends of the solid that
+ * gets subtracted. They used to be a stack of ten, one per layer, which read
+ * as a lean from across the room but was a staircase: half of every step
+ * stood proud of the true wall. A tail sawn to the real slope therefore
+ * could not sit in its socket at all, which is no way to cut a dovetail.
  */
 function getSplayedRectCutHole(feature: RectCutFeature, part: Part, yMid: number): Point2[] {
   const below = depthBelowCutFace(feature, part, yMid);
@@ -605,13 +615,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     // A leaning wall needs slicing whether the pocket stops inside the board
     // or runs right through it -- a through dovetail's sockets do both at
     // once, splayed and open at the far face.
-    if (
-      feature.parameters.depthMode !== 'blind' &&
-      !isSideFaceTarget(feature) &&
-      !feature.parameters.wallAngle &&
-      !feature.parameters.sideWallAngle
-    )
-      continue;
+    if (feature.parameters.depthMode !== 'blind' && !isSideFaceTarget(feature)) continue;
     if (isSideFaceTarget(feature)) {
       // Side-face pockets occupy a band across the thickness: slice at the
       // band edges so only those layers get the front/back recess.
@@ -630,13 +634,6 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
         sliceY.add(part.thickness / 2 - depth);
       } else if (isBottomTarget(feature)) {
         sliceY.add(-part.thickness / 2 + depth);
-      }
-    }
-    // A leaning wall is cut in steps, so the depth it spans needs slicing.
-    if (feature.parameters.wallAngle || feature.parameters.sideWallAngle) {
-      for (let step = 1; step < WALL_ANGLE_SLICES; step += 1) {
-        const into = (depth * step) / WALL_ANGLE_SLICES;
-        sliceY.add(isBottomTarget(feature) ? -part.thickness / 2 + into : part.thickness / 2 - into);
       }
     }
   }
@@ -750,7 +747,10 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
 
       if (!active) continue;
 
-      layerHoles.push(getSplayedRectCutHole(feature, part, yMid));
+      // A leaning wall is cut as one exact solid further down, not stepped
+      // through the layers, so the layer leaves it alone.
+      if (hasLeaningWalls(feature)) continue;
+      layerHoles.push(getRectCutHole(feature, part));
     }
 
     for (const feature of circularCuts) {
@@ -800,11 +800,15 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
   }
   stock?.geometry.dispose();
 
-  const geometry =
+  let geometry =
     layerGeometries.length === 1
       ? layerGeometries[0]
       : (mergeGeometries(layerGeometries, false) ?? getLayerGeometry(contour, [], part.thickness, -part.thickness / 2));
   for (const layer of layerGeometries) if (layer !== geometry) layer.dispose();
+
+  const leaned = subtractLeanedPockets(geometry, part);
+  if (leaned !== geometry) geometry.dispose();
+  geometry = leaned;
 
   geometry.computeVertexNormals();
   if (geometry.getAttribute('position').count === 0) {
@@ -1231,6 +1235,101 @@ function expandRoutedPath(feature: RoutedPathFeature, part: Part): THREE.Vector3
   }
   expanded.push(expanded[0].clone());
   return expanded;
+}
+
+/**
+ * Cut every pocket whose walls lean, as one solid with the walls it was given.
+ *
+ * The walls of such a pocket are flat planes, so the removal is a hexahedron
+ * between the footprint at the mouth and the footprint at the floor -- a
+ * loft, which also carries a radiused corner round with it because both
+ * rings come off the same contour. Cutting it whole is the only way the two
+ * halves of a dovetail can meet: one is sawn to a slope and the other has to
+ * be the same slope, not an approximation of it.
+ */
+function subtractLeanedPockets(baseGeometry: THREE.BufferGeometry, part: Part): THREE.BufferGeometry {
+  const features = getEnabledFeatures(part)
+    .filter((feature): feature is RectCutFeature => feature.kind === 'rect_cut')
+    .map((feature) => getResolvedRectCutFeature(feature, part))
+    .filter(
+      (feature) =>
+        hasLeaningWalls(feature) && (isTopTarget(feature) || isBottomTarget(feature)) && !isSideFaceTarget(feature)
+    );
+  if (features.length === 0) return baseGeometry;
+
+  const evaluator = new Evaluator();
+  evaluator.attributes = ['position', 'normal'];
+  evaluator.useGroups = false;
+  let current = new Brush(baseGeometry);
+  current.updateMatrixWorld(true);
+
+  for (const feature of features) {
+    const geometry = leanedPocketGeometry(feature, part);
+    if (!geometry) continue;
+    const cutter = new Brush(geometry);
+    cutter.updateMatrixWorld(true);
+    const result = evaluator.evaluate(current, cutter, SUBTRACTION) as Brush;
+    result.geometry.computeVertexNormals();
+    if (current.geometry !== baseGeometry) current.geometry.dispose();
+    geometry.dispose();
+    current = result;
+    current.updateMatrixWorld(true);
+  }
+  return current.geometry;
+}
+
+function leanedPocketGeometry(feature: RectCutFeature, part: Part): THREE.BufferGeometry | null {
+  const depth = getRectCutDepth(feature, part.thickness);
+  if (!(depth > 0)) return null;
+  const bottom = isBottomTarget(feature);
+  // Stand the mouth off the surface, and a through pocket out past the far
+  // face, so neither cap lands exactly on a face the boolean has to keep.
+  const overshoot = Math.max(part.thickness, 1) * 1e-3;
+  const floorDepth = feature.parameters.depthMode === 'through' ? depth + overshoot : depth;
+  const yAt = (into: number) => (bottom ? -part.thickness / 2 + into : part.thickness / 2 - into);
+  // Contour Z is mirrored into local Z by the layer builder's rotateX(-pi/2).
+  const ringAt = (into: number) => {
+    const y = yAt(into);
+    return getSplayedRectCutHole(feature, part, y).map((point) => ({ x: point.x, y, z: -point.z }));
+  };
+  const mouth = ringAt(-overshoot);
+  const floor = ringAt(floorDepth);
+  if (mouth.length < 3 || mouth.length !== floor.length) return null;
+
+  const vertices: number[] = [];
+  const triangle = (a: Point3, b: Point3, c: Point3) => vertices.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+  for (let index = 0; index < mouth.length; index += 1) {
+    const next = (index + 1) % mouth.length;
+    triangle(mouth[index], mouth[next], floor[next]);
+    triangle(mouth[index], floor[next], floor[index]);
+  }
+  // Both rings run the same way round, so the caps have to be fanned against
+  // each other: every edge of a closed solid is walked once in each
+  // direction, and the walls have already taken the mouth ring forwards.
+  for (let index = 1; index + 1 < mouth.length; index += 1) triangle(mouth[0], mouth[index + 1], mouth[index]);
+  for (let index = 1; index + 1 < floor.length; index += 1) triangle(floor[0], floor[index], floor[index + 1]);
+
+  // That closes it, but front-to-back depends on which way round the contour
+  // came, so settle the facing on the finished solid: a negative signed
+  // volume means the whole thing is inside out.
+  let signed = 0;
+  for (let index = 0; index < vertices.length; index += 9) {
+    const [ax, ay, az, bx, by, bz, cx, cy, cz] = vertices.slice(index, index + 9);
+    signed += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+  }
+  if (signed < 0)
+    for (let index = 0; index < vertices.length; index += 9) {
+      for (let axis = 0; axis < 3; axis += 1) {
+        const swap = vertices[index + axis];
+        vertices[index + axis] = vertices[index + 6 + axis];
+        vertices[index + 6 + axis] = swap;
+      }
+    }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 /** Subtract a router bit swept along each straight path span. The MVP path is

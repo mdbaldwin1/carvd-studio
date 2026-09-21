@@ -84,6 +84,11 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
  * groove, rabbet, or mortise is worse: it removes nothing in plan at all, so
  * the housed part reads as driven into solid stock and every correctly
  * seated shelf, back panel, and door panel is rejected as a collision.
+ *
+ * A pocket whose walls lean is the same problem in a different direction. It
+ * has a different section at every depth and the contour can only hold one
+ * of them, so a dovetail socket reads as its widest all the way down and the
+ * tail rattles in a hole that, in the wood, grips it.
  */
 function needsMaterialOverlapTest(part: Part): boolean {
   return (
@@ -92,7 +97,10 @@ function needsMaterialOverlapTest(part: Part): boolean {
         feature.enabled &&
         (feature.kind === 'circular_cut' ||
           feature.kind === 'rounded_cut' ||
-          (feature.kind === 'rect_cut' && isHousingCut(feature.cutType)))
+          (feature.kind === 'rect_cut' &&
+            (isHousingCut(feature.cutType) ||
+              Boolean(feature.parameters.wallAngle) ||
+              Boolean(feature.parameters.sideWallAngle))))
     ) ?? false
   );
 }
