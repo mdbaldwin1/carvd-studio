@@ -57,7 +57,11 @@ function describeSetting(feature: PartFeature, units: Units): { operation: strin
   if (feature.kind === 'rect_cut') {
     const traits = RECT_CUT_TRAITS[feature.cutType];
     const operation = traits.label;
-    const depth = feature.parameters.depthMode === 'through' ? 'through' : `${measure(feature.parameters.depth)} deep`;
+    const depthOnly =
+      feature.parameters.depthMode === 'through' ? 'through' : `${measure(feature.parameters.depth)} deep`;
+    // A leaning wall is a different cutter, not a different number on the
+    // same one, so two cuts at different angles are never the same setup.
+    const depth = feature.parameters.wallAngle ? `${depthOnly}, ${feature.parameters.wallAngle}° walls` : depthOnly;
 
     // Every channel is set up the same way -- the stack width is the run
     // across the board and the height is the depth. Which stored dimension

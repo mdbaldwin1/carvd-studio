@@ -45,14 +45,29 @@ describe('getPartFeatureConflicts', () => {
       ]
     });
 
-    // The bore overlapping the dado is ordinary and reported as nothing; the
-    // cutout starting inside material the dado already removed is the real
-    // fault, and is still an error.
-    const conflicts = getPartFeatureConflicts(part.features ?? [], part);
+    // All three are ordinary work. The bore overlapping the dado is nothing,
+    // and so is a through cutout inside it: you plough the dado, then saw
+    // through its floor, and the saw removes real wood on the way.
+    expect(getPartFeatureConflicts(part.features ?? [], part)).toEqual([]);
+
+    // What is a fault is a blind cut that reaches no further than the one
+    // before it, because it takes nothing out at all.
+    const shallow = {
+      ...part,
+      features: [
+        part.features![0],
+        {
+          ...(part.features![2] as RectCutFeature),
+          id: 'shallow',
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'blind' as const, depth: 0.25 }
+        }
+      ]
+    };
+    const conflicts = getPartFeatureConflicts(shallow.features ?? [], shallow);
     expect(conflicts.every((conflict) => conflict.code === 'rect_consumed' && conflict.severity === 'error')).toBe(
       true
     );
-    expect(conflicts.map((conflict) => conflict.featureId).sort()).toEqual(['cutout', 'dado']);
+    expect(conflicts.map((conflict) => conflict.featureId).sort()).toEqual(['dado', 'shallow']);
   });
 
   it('flags duplicate coaxial circular cuts on the same face', () => {

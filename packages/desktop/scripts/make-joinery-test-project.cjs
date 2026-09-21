@@ -333,12 +333,15 @@ station('08 Box Joint', 'SEATED: fingers interleaved at a corner, cut one at a t
 // note says exactly what is missing.
 
 // 09 Through dovetail — square fingers standing in for tails and pins --
-station('09 Through Dovetail', 'SEATED and APPROXIMATE: shown as square fingers, which is a box joint — the splay that makes them dovetails needs angled cuts.', () => {
+station('09 Through Dovetail', 'SEATED: tails and pins with the splay that holds them — 10 degrees, cut right through.', () => {
   const o = origin();
   const T = 0.75;
+  const SPLAY = 10;
+  // The walls lean, which is the whole joint: a square-walled version of
+  // this is a box joint and pulls apart.
   const fingers = (offsets) =>
     offsets.map((z, i) =>
-      rect(`Tail socket ${i + 1}`, 'cutout', face('top_face'), { size: { length: T, width: 0.75 }, depthMode: 'through' }, { x: 0, z })
+      rect(`Tail socket ${i + 1}`, 'cutout', face('top_face'), { size: { length: T, width: 0.75 }, depthMode: 'through', wallAngle: SPLAY }, { x: 0, z })
     );
   const a = board('Through DT — Tail Board', o, { features: fingers([0, 1.5]) });
   const b = board('Through DT — Pin Board', o, { rotation: { x: 0, y: 0, z: 90 }, features: fingers([0.75, 2.25]) });
@@ -375,13 +378,13 @@ station('10 Half-Blind Dovetail', 'SEATED and APPROXIMATE: the sockets are blind
 });
 
 // 11 Sliding dovetail — a sliding dado, less the splay -----------------
-station('11 Sliding Dovetail', 'SEATED and APPROXIMATE: a sliding housing and the piece that runs in it; the dovetail\'s undercut needs an angled bit.', () => {
+station('11 Sliding Dovetail', 'SEATED and APPROXIMATE: the housing is undercut as a dovetail bit cuts it; the shelf is left square, so it slides but would lift.', () => {
   const o = origin();
   const T = 0.75;
   const HOUSING = 0.375;
   const side = board('Sliding DT — Side', o, {
     length: 18, width: 8,
-    features: [rect('Sliding housing', 'dado', face('top_face'), { size: { length: T, width: 8 }, depthMode: 'blind', depth: HOUSING }, { x: 8, z: 0 })]
+    features: [rect('Sliding housing', 'dado', face('top_face'), { size: { length: T, width: 8 }, depthMode: 'blind', depth: HOUSING, wallAngle: 10 }, { x: 8, z: 0 })]
   });
   const shelf = board('Sliding DT — Shelf', o, { length: 8, width: 8, rotation: { x: 0, y: 0, z: 90 } });
   shelf.position.x = side.position.x - ext(side).x + 8 + T / 2;

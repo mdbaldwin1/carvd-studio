@@ -173,6 +173,28 @@ function sharesReachableSurface(
   return false;
 }
 
+/**
+ * Whether a later cut inside an earlier one's footprint still removes wood.
+ *
+ * Lying within an earlier opening in plan is not by itself a mistake. A bit
+ * travels through air and then cuts: the pins of a secret mitred dovetail are
+ * chopped in the floor of the rebate that hides them, and the rebate's
+ * footprint holds every one of them. What is wrong is a cut that reaches no
+ * further than the one before it, because that removes nothing at all.
+ */
+function reachesPastFloorOf(
+  prior: RectCutFeature,
+  current: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): boolean {
+  const priorDepth = getDepthInterval(prior, part);
+  const currentDepth = getDepthInterval(current, part);
+  // Both are measured from the same end of the thickness, so the later cut
+  // does real work only where its interval runs outside the earlier one's.
+  const DEPTH_EPSILON = 1e-9;
+  return currentDepth.min >= priorDepth.min - DEPTH_EPSILON && currentDepth.max <= priorDepth.max + DEPTH_EPSILON;
+}
+
 function getDepthInterval(feature: RectCutFeature, part: Pick<Part, 'thickness'>): DepthInterval {
   const depth =
     getResolvedRectCutFeature(feature, { length: 1, width: 1, thickness: part.thickness }).parameters.depthMode ===
@@ -481,7 +503,7 @@ export function getPartFeatureConflicts(
         if (isAnchorDependent(feature)) {
           code = 'rect_anchor_removed';
           message = `Operation ${index + 1} depends on ${getFeatureTargetLabel(feature)}, but Operation ${prior.index + 1} already removes that anchor material.`;
-        } else if (contains(a, b)) {
+        } else if (contains(a, b) && reachesPastFloorOf(prior.feature, feature, part)) {
           code = 'rect_consumed';
           message = `Operation ${index + 1} starts inside material already removed by Operation ${prior.index + 1}.`;
         }

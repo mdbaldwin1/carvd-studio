@@ -175,6 +175,19 @@ export interface RectCutFeature extends PartFeatureBase {
     depthMode: 'through' | 'blind';
     depth?: number;
     /**
+     * How far the pocket's ends lean off square, in degrees.
+     *
+     * The one cut a woodworking tool makes that a router table cannot: a
+     * dovetail's walls splay so the joint cannot be drawn apart, and it is
+     * the splay that does the holding. Positive leans the ends outward with
+     * depth, so the pocket is wider at the floor than at the mouth -- a tail
+     * socket. Absent or zero is an ordinary square-walled pocket.
+     *
+     * Only the ends of the pocket's length lean; its width stays square,
+     * which is what a dovetail bit or a saw kerf at an angle actually cuts.
+     */
+    wallAngle?: number;
+    /**
      * The inside corners a rotating bit leaves behind.
      *
      * A pocket chopped with a hollow chisel has square corners. One routed

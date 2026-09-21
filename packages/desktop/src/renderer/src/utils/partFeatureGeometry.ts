@@ -296,6 +296,43 @@ function referencedFeatureOffset(value: number, size: number, from: 'min' | 'cen
   return value;
 }
 
+/** How many steps a splayed wall is cut into. */
+const WALL_ANGLE_SLICES = 10;
+
+/** How far a pocket's ends lean out by a given depth below the surface. */
+function wallSplay(feature: RectCutFeature, depthBelowSurface: number): number {
+  const angle = feature.parameters.wallAngle ?? 0;
+  if (!angle) return 0;
+  return Math.tan((angle * Math.PI) / 180) * Math.max(0, depthBelowSurface);
+}
+
+/** How far below the cut surface this layer sits, for a face-placed pocket. */
+function depthBelowCutFace(feature: RectCutFeature, part: Part, yMid: number): number {
+  return isBottomTarget(feature) ? yMid + part.thickness / 2 : part.thickness / 2 - yMid;
+}
+
+/**
+ * One slice of a pocket whose ends lean off square.
+ *
+ * A dovetail's walls splay, and the splay is the whole joint: it is what
+ * stops the two halves being drawn apart. The slicer takes the part in
+ * layers, so each layer takes a slightly longer rectangle than the one above
+ * it, and the stack of them is the lean.
+ */
+function getSplayedRectCutHole(feature: RectCutFeature, part: Part, yMid: number): Point2[] {
+  const grow = wallSplay(feature, depthBelowCutFace(feature, part, yMid));
+  if (grow === 0) return getRectCutHole(feature, part);
+  const widened: RectCutFeature = {
+    ...feature,
+    parameters: {
+      ...feature.parameters,
+      size: { length: feature.parameters.size.length + 2 * grow, width: feature.parameters.size.width }
+    },
+    placement: { x: feature.placement.x - grow, z: feature.placement.z }
+  };
+  return getRectCutHole(widened, part);
+}
+
 /**
  * How many slices trace the arc of a rounded opening cut into an edge.
  *
@@ -547,7 +584,11 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
       }
       continue;
     }
-    if (feature.parameters.depthMode !== 'blind' && !isSideFaceTarget(feature)) continue;
+    // A leaning wall needs slicing whether the pocket stops inside the board
+    // or runs right through it -- a through dovetail's sockets do both at
+    // once, splayed and open at the far face.
+    if (feature.parameters.depthMode !== 'blind' && !isSideFaceTarget(feature) && !feature.parameters.wallAngle)
+      continue;
     if (isSideFaceTarget(feature)) {
       // Side-face pockets occupy a band across the thickness: slice at the
       // band edges so only those layers get the front/back recess.
@@ -561,10 +602,19 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     }
     const depth = getRectCutDepth(feature, part.thickness);
     if (depth <= 0) continue;
-    if (isTopTarget(feature)) {
-      sliceY.add(part.thickness / 2 - depth);
-    } else if (isBottomTarget(feature)) {
-      sliceY.add(-part.thickness / 2 + depth);
+    if (feature.parameters.depthMode === 'blind') {
+      if (isTopTarget(feature)) {
+        sliceY.add(part.thickness / 2 - depth);
+      } else if (isBottomTarget(feature)) {
+        sliceY.add(-part.thickness / 2 + depth);
+      }
+    }
+    // A leaning wall is cut in steps, so the depth it spans needs slicing.
+    if (feature.parameters.wallAngle) {
+      for (let step = 1; step < WALL_ANGLE_SLICES; step += 1) {
+        const into = (depth * step) / WALL_ANGLE_SLICES;
+        sliceY.add(isBottomTarget(feature) ? -part.thickness / 2 + into : part.thickness / 2 - into);
+      }
     }
   }
 
@@ -654,7 +704,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
 
       if (!active) continue;
 
-      layerHoles.push(getRectCutHole(feature, part));
+      layerHoles.push(getSplayedRectCutHole(feature, part, yMid));
     }
 
     for (const feature of circularCuts) {

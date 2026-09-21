@@ -398,6 +398,12 @@ export function validateRectCutFeature(
     }
   }
 
+  const wallAngle = resolvedFeature.parameters.wallAngle ?? 0;
+  if (!Number.isFinite(wallAngle)) return 'Wall angle must be a finite number.';
+  // Past 45 degrees the walls lean further out than the pocket goes deep,
+  // which no bit or saw will cut and no joint has ever wanted.
+  if (Math.abs(wallAngle) > 45) return 'Wall angle must be within 45 degrees of square.';
+
   const cornerRadius = resolvedFeature.parameters.cornerRadius ?? 0;
   if (cornerRadius < 0) return 'Corner radius cannot be negative.';
   if (cornerRadius > 0) {
