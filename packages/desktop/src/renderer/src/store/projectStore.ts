@@ -43,6 +43,7 @@ import { FACE_TARGETS } from '../components/part-features/partFeatureEditorState
 import { planDowelJointMigration } from '../utils/dowelJointMigration';
 import { boreThroughAssembly as boreThroughAssemblyHoles } from '../utils/boreThrough';
 import { planTenonFit, resolveTenonAndMortiseParts } from '../utils/fitJoinery';
+import { findGrainCutMismatches } from '../utils/grainDirectionCuts';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
 import { validateEndCutFeature } from '../utils/endCutUtils';
 import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
@@ -401,6 +402,19 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
             severity: 'error'
           });
         }
+      }
+
+      // A dado is cut across the grain and a groove runs with it. On a board
+      // whose grain runs across its width those two names come out backwards.
+      for (const mismatch of findGrainCutMismatches(part)) {
+        issues.push({
+          partId: part.id,
+          partName: part.name,
+          type: 'grain_cut_direction',
+          message: mismatch.message,
+          severity: 'warning',
+          featureId: mismatch.featureId
+        });
       }
 
       // Check grain mismatch (warning only)

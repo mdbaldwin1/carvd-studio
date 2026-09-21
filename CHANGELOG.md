@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- The cut list now says how far a solid panel will move. Wood takes up moisture in a damp August and gives it back in a dry January, almost entirely across the grain, so wide solid parts carry an allowance and a reminder that a housed panel has to stay free to move. Sheet goods say nothing, because plywood stays put.
+
+- A dado cut with the grain, or a groove cut across it, is now called out. The two words mean grain direction, and on a board whose grain runs across its width the names come out backwards.
+
 - A mortise or a cutout now records how it was made. Chopped with a chisel it has square corners; routed it has corners radiused to the bit, which for a pocket cut with a bit its own width makes the ends half-round. Fitting a tenon to a routed mortise carries the requirement across, and the cut list says to round the tongue to match rather than drawing a square one and staying quiet.
 
 - Added Fit Tenon to Mortise. Select the rail and the part it goes into, and the tenon is cut to the mortise: the mortise's width becomes the tongue's thickness, its length the tongue's width, and the tenon stops a sixteenth short of the bottom so it seats on its shoulders. The mortise is never altered, because it is the harder half to change once it is cut.

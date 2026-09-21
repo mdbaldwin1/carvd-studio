@@ -126,6 +126,16 @@ export function getInstructionFabricationLines(instruction: CutInstruction, unit
     }
   }
   const lines = descriptions.map((description, index) => `${index + 1}. ${description}`);
+
+  // Solid wood moves across the grain whatever the drawing says, so the number
+  // belongs next to the cut rather than in somebody's head. Unnumbered: it is
+  // something to allow for, not an operation to perform.
+  if (instruction.movementAllowance) {
+    lines.push(
+      `Solid wood: allow about ${formatMeasurementWithUnit(instruction.movementAllowance, units)} of seasonal movement across the grain. Housed panels must stay free to move.`
+    );
+  }
+
   const note = instruction.notes?.trim();
   if (note) lines.push(note);
   return lines;

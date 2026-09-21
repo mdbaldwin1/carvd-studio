@@ -658,7 +658,13 @@ export interface ReferenceRuler {
 export interface PartValidationIssue {
   partId: string;
   partName: string;
-  type: 'no_stock' | 'exceeds_dimensions' | 'exceeds_thickness' | 'grain_mismatch' | 'feature_validation';
+  type:
+    | 'no_stock'
+    | 'exceeds_dimensions'
+    | 'exceeds_thickness'
+    | 'grain_mismatch'
+    | 'grain_cut_direction'
+    | 'feature_validation';
   message: string;
   severity: 'error' | 'warning';
   canBypass?: boolean; // true for glue-up panels exceeding width
@@ -682,6 +688,12 @@ export interface CutInstruction {
   boardsNeeded?: number; // number of boards for glue-up panels
   features?: PartFeature[];
   notes?: string;
+  /**
+   * Roughly how far this part will move across the grain over a year, for the
+   * solid-wood parts wide enough for it to matter. Absent for sheet goods and
+   * for anything narrow enough that the movement disappears into the joint.
+   */
+  movementAllowance?: number;
 }
 
 // Placement of a part on a stock board for cutting

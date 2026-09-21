@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createTestPart } from '../../../../tests/helpers/factories';
 import { getInstructionFabricationLines, groupCutInstructions } from './cutListInstructions';
+import type { CutInstruction } from '../types';
 
 describe('cutListInstructions', () => {
   it('preserves a right-end compound cut rendered long point in fabrication output', () => {
@@ -518,5 +519,47 @@ describe('cutListInstructions', () => {
 
     expect(lines[0]).toContain('Stopped Dado on Top Face');
     expect(lines[1]).toContain('Stopped Groove on Bottom Face');
+  });
+});
+
+describe('seasonal movement in the cut list', () => {
+  const instruction = (overrides: Partial<CutInstruction> = {}): CutInstruction => ({
+    partId: 'panel',
+    partName: 'Table Top',
+    cutLength: 48,
+    cutWidth: 24,
+    thickness: 0.75,
+    stockId: 'walnut',
+    stockName: '4/4 Walnut',
+    grainSensitive: true,
+    canRotate: false,
+    isGlueUp: false,
+    features: [],
+    ...overrides
+  });
+
+  it('tells the maker how far a wide solid panel will move', () => {
+    const lines = getInstructionFabricationLines(instruction({ movementAllowance: 0.25 }), 'imperial');
+    expect(lines.join('\n')).toMatch(/allow about 1\/4" of seasonal movement/i);
+  });
+
+  it('says it unnumbered, because it is not an operation to perform', () => {
+    const lines = getInstructionFabricationLines(instruction({ movementAllowance: 0.25 }), 'imperial');
+    const movement = lines.find((line) => line.includes('seasonal movement'))!;
+    expect(movement).not.toMatch(/^\d+\./);
+  });
+
+  it('reminds that a housed panel has to stay free', () => {
+    const lines = getInstructionFabricationLines(instruction({ movementAllowance: 0.25 }), 'imperial');
+    expect(lines.join('\n')).toMatch(/free to move/i);
+  });
+
+  it('stays quiet for sheet goods and narrow rails', () => {
+    expect(getInstructionFabricationLines(instruction(), 'imperial').join('\n')).not.toMatch(/seasonal movement/i);
+  });
+
+  it('measures it in the project’s own units', () => {
+    const lines = getInstructionFabricationLines(instruction({ movementAllowance: 0.25 }), 'metric');
+    expect(lines.join('\n')).toMatch(/mm of seasonal movement/i);
   });
 });

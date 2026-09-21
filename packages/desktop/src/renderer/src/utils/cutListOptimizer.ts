@@ -17,6 +17,7 @@ import {
 import { logger } from './logger';
 import { clonePartFeatures } from './partFeatures';
 import { getPacksNeeded, isCountedStockForm, isRectangularStockForm, resolveStockForm } from '../../../shared/stock';
+import { estimateSeasonalMovement, needsMovementAllowance } from './woodMovement';
 
 // Internal types for the algorithm
 interface Rectangle {
@@ -183,7 +184,8 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
         canRotate: !part.grainSensitive,
         isGlueUp: false,
         features: getEnabledPartFeatures(part),
-        notes: part.notes
+        notes: part.notes,
+        movementAllowance: needsMovementAllowance(part) ? estimateSeasonalMovement(part) : undefined
       }
     ];
   }
