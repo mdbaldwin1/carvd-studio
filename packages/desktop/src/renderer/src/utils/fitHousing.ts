@@ -3,6 +3,7 @@ import type { Part, RectCutFeature } from '../types';
 /** Local mirror of the snap engine's vector shape, which it keeps private. */
 type Vec3 = { x: number; y: number; z: number };
 import { getPartFeatureSockets, getPartOBB, type FeatureSocket, type PartOBB } from './snapToPartsUtil';
+import { RECT_CUT_TRAITS } from './rectCutTraits';
 
 /**
  * Cut the housing to the piece that goes in it.
@@ -20,22 +21,6 @@ import { getPartFeatureSockets, getPartOBB, type FeatureSocket, type PartOBB } f
 
 /** Slack for a piece as deep as it is wide, like a square stick in its housing. */
 const ENTRY_TOLERANCE = 1e-9;
-
-/**
- * Where each channel keeps its width.
- *
- * A dado's channel width lives in `size.length` and is measured across the
- * host's length; a groove's lives in `size.width` and is measured across its
- * width. They are genuinely different axes, not a naming quirk, because the
- * two cuts run at right angles to each other.
- */
-const CHANNEL: Partial<Record<RectCutFeature['cutType'], { field: 'length' | 'width'; tangent: 1 | 2 }>> = {
-  dado: { field: 'length', tangent: 1 },
-  stopped_dado: { field: 'length', tangent: 1 },
-  half_lap: { field: 'length', tangent: 1 },
-  groove: { field: 'width', tangent: 2 },
-  stopped_groove: { field: 'width', tangent: 2 }
-};
 
 export interface HousingFitPlan {
   housingPartId: string;
@@ -89,7 +74,7 @@ function distanceTo(obb: PartOBB, socket: FeatureSocket): number {
 export function getHousings(part: Part): RectCutFeature[] {
   return (part.features ?? []).filter(
     (feature): feature is RectCutFeature =>
-      feature.enabled && feature.kind === 'rect_cut' && CHANNEL[feature.cutType] !== undefined
+      feature.enabled && feature.kind === 'rect_cut' && RECT_CUT_TRAITS[feature.cutType].channel !== null
   );
 }
 
@@ -114,7 +99,7 @@ function chooseHousing(
   for (const feature of housings) {
     const socket = sockets.find((candidate) => candidate.featureId === feature.id);
     if (!socket) continue;
-    const channel = CHANNEL[feature.cutType];
+    const channel = RECT_CUT_TRAITS[feature.cutType].channel;
     if (!channel) continue;
     const channelAxis = channel.tangent === 1 ? socket.tangent1 : socket.tangent2;
     if (!entersOpening(shelfObb, socket, channelAxis)) continue;
@@ -136,7 +121,7 @@ export function planHousingFit(shelfPart: Part, housingPart: Part): HousingFitPl
   const chosen = chooseHousing(shelfObb, housingPart);
   if (!chosen) return null;
 
-  const channel = CHANNEL[chosen.feature.cutType];
+  const channel = RECT_CUT_TRAITS[chosen.feature.cutType].channel;
   if (!channel) return null;
 
   // Measure the piece across the channel, not down its own thickness. Which

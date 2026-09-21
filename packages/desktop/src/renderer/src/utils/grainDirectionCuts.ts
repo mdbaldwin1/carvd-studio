@@ -1,4 +1,5 @@
 import type { Part, RectCutFeature } from '../types';
+import { RECT_CUT_TRAITS, type CutRun } from './rectCutTraits';
 
 /**
  * A dado is cut across the grain. A groove runs with it.
@@ -14,16 +15,10 @@ import type { Part, RectCutFeature } from '../types';
  * the width, the same two cuts swap meaning and the names come out backwards.
  */
 
-/** Which way a rect cut travels across the board it is cut in. */
-export type CutRun = 'across_width' | 'along_length';
-
-const ACROSS_WIDTH: RectCutFeature['cutType'][] = ['dado', 'stopped_dado', 'half_lap'];
-const ALONG_LENGTH: RectCutFeature['cutType'][] = ['groove', 'stopped_groove'];
+export type { CutRun };
 
 export function getCutRun(cutType: RectCutFeature['cutType']): CutRun | null {
-  if (ACROSS_WIDTH.includes(cutType)) return 'across_width';
-  if (ALONG_LENGTH.includes(cutType)) return 'along_length';
-  return null;
+  return RECT_CUT_TRAITS[cutType].run;
 }
 
 export interface GrainCutMismatch {

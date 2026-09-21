@@ -14,6 +14,7 @@ import {
   validateRouterProfileDefinition
 } from './routerProfiles';
 import { cloneRouterToolDefinition, getRouterToolRevision, validateRouterToolDefinition } from './routerTools';
+import { ALL_RECT_CUT_TYPES } from './rectCutTraits';
 
 const FACE_TARGETS = new Set(['left_end', 'right_end', 'top_face', 'bottom_face', 'front_face', 'back_face']);
 const EDGE_TARGETS = new Set([
@@ -31,19 +32,7 @@ const EDGE_TARGETS = new Set([
   'back_right_edge'
 ]);
 const CORNER_TARGETS = new Set(['front_left_corner', 'front_right_corner', 'back_left_corner', 'back_right_corner']);
-const RECT_CUT_TYPES = new Set([
-  'corner_notch',
-  'edge_notch',
-  'cutout',
-  'dado',
-  'stopped_dado',
-  'rabbet',
-  'groove',
-  'stopped_groove',
-  'half_lap',
-  'mortise',
-  'tenon'
-]);
+const RECT_CUT_TYPES = new Set<string>(ALL_RECT_CUT_TYPES);
 const REFERENCE_ORIGINS = new Set(['min', 'center', 'max']);
 const END_CUT_FACES = new Set(['left_end', 'right_end', 'front_face', 'back_face']);
 const LENGTH_MODES = new Set(['long_point', 'short_point', 'centerline']);

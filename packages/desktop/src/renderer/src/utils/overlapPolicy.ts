@@ -1,4 +1,4 @@
-import { Part, RectCutFeature } from '../types';
+import { Part } from '../types';
 import { getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
 import {
   hasRenderablePartFeatures,
@@ -18,6 +18,7 @@ import {
 } from './snapToPartsUtil';
 import { dragDebug } from './dragDebug';
 import type { GeometryCache } from '../interaction/geometry/cache';
+import { isHousingCut } from './rectCutTraits';
 
 const OBB_EPSILON = 1e-6;
 /**
@@ -73,23 +74,6 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
 }
 
 /**
- * Rectangular cuts that seat another part in the pocket they open. Housed
- * joinery is only correct when the mating part sits *inside* this recess, so
- * these have to be settled against the real material rather than the
- * full-thickness contour.
- */
-const HOUSING_RECT_CUT_TYPES = new Set<RectCutFeature['cutType']>([
-  'dado',
-  'stopped_dado',
-  'groove',
-  'stopped_groove',
-  'half_lap',
-  'rabbet',
-  'mortise',
-  'tenon'
-]);
-
-/**
  * Features whose removal the top-view contour cannot express, so the pair has
  * to be settled against the real material instead.
  *
@@ -108,7 +92,7 @@ function needsMaterialOverlapTest(part: Part): boolean {
         feature.enabled &&
         (feature.kind === 'circular_cut' ||
           feature.kind === 'rounded_cut' ||
-          (feature.kind === 'rect_cut' && HOUSING_RECT_CUT_TYPES.has(feature.cutType)))
+          (feature.kind === 'rect_cut' && isHousingCut(feature.cutType)))
     ) ?? false
   );
 }

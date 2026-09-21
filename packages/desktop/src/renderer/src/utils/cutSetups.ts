@@ -1,6 +1,7 @@
 import type { CutInstruction, PartFeature } from '../types';
 import { formatFabricationMeasurement as formatMeasurementWithUnit } from './fractions';
 import { getInstructionEnabledFeatures } from './cutListInstructions';
+import { RECT_CUT_TRAITS } from './rectCutTraits';
 
 /**
  * The same cut, on every piece that needs it.
@@ -28,18 +29,8 @@ export interface CutSetup {
   passes: number;
 }
 
+/** Names for the cuts that are not rectangular; the rest come from traits. */
 const OPERATION_LABELS: Record<string, string> = {
-  dado: 'Dado',
-  stopped_dado: 'Stopped dado',
-  half_lap: 'Half lap',
-  groove: 'Groove',
-  stopped_groove: 'Stopped groove',
-  rabbet: 'Rabbet',
-  mortise: 'Mortise',
-  tenon: 'Tenon',
-  cutout: 'Cutout',
-  corner_notch: 'Corner notch',
-  edge_notch: 'Edge notch',
   round_hole: 'Drill',
   countersink: 'Countersink',
   counterbore: 'Counterbore',
@@ -64,18 +55,19 @@ function describeSetting(feature: PartFeature, units: Units): { operation: strin
   const measure = (value: number | undefined) => formatMeasurementWithUnit(value ?? 0, units);
 
   if (feature.kind === 'rect_cut') {
-    const operation = OPERATION_LABELS[feature.cutType] ?? feature.cutType;
+    const traits = RECT_CUT_TRAITS[feature.cutType];
+    const operation = traits.label;
     const depth = feature.parameters.depthMode === 'through' ? 'through' : `${measure(feature.parameters.depth)} deep`;
 
+    // Every channel is set up the same way -- the stack width is the run
+    // across the board and the height is the depth. Which stored dimension
+    // holds that width is the one thing that differs between a dado and a
+    // groove, and the traits table is where that is already recorded.
+    if (traits.channel) {
+      return { operation, setting: `${measure(feature.parameters.size[traits.channel.field])} wide, ${depth}` };
+    }
+
     switch (feature.cutType) {
-      case 'dado':
-      case 'stopped_dado':
-      case 'half_lap':
-        // The stack width is the run across the board; the height is the depth.
-        return { operation, setting: `${measure(feature.parameters.size.length)} wide, ${depth}` };
-      case 'groove':
-      case 'stopped_groove':
-        return { operation, setting: `${measure(feature.parameters.size.width)} wide, ${depth}` };
       case 'rabbet':
         return { operation, setting: `${measure(feature.parameters.size.width)} shoulder, ${depth}` };
       case 'mortise': {

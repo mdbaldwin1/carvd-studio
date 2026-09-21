@@ -1,5 +1,6 @@
 import type { DocsSection } from './docsLinks';
 import type { Assembly, Group, Part, PartFeature, SnapGuide } from '../types';
+import { isJoineryCut } from './rectCutTraits';
 
 /**
  * Just the parts of a project this reads.
@@ -105,20 +106,8 @@ export const CAPABILITY_INFO: Record<Capability, CapabilityInfo> = {
 
 export const ALL_CAPABILITIES = Object.keys(CAPABILITY_INFO) as Capability[];
 
-/** Cut types that are joinery rather than a plain opening. */
-const JOINERY_CUT_TYPES = new Set([
-  'dado',
-  'stopped_dado',
-  'groove',
-  'stopped_groove',
-  'rabbet',
-  'mortise',
-  'tenon',
-  'half_lap'
-]);
-
 function isJoinery(feature: PartFeature): boolean {
-  return feature.kind === 'rect_cut' && JOINERY_CUT_TYPES.has(feature.cutType);
+  return feature.kind === 'rect_cut' && isJoineryCut(feature.cutType);
 }
 
 /** Which capabilities this project is evidence of. */

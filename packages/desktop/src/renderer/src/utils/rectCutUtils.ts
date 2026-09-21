@@ -1,5 +1,6 @@
 import { CornerTarget, EdgeTarget, FaceTarget, Part, RectCutFeature } from '../types';
 import { fitsRemainingStock } from './remainingStock';
+import { RECT_CUT_TRAITS } from './rectCutTraits';
 
 export type RectCutPreviewSupport =
   | { supported: true }
@@ -328,20 +329,7 @@ export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPrevie
     if (feature.target.type !== 'face' || !isTopOrBottomFace(feature.target.face)) {
       return {
         supported: false,
-        reason:
-          feature.cutType === 'dado'
-            ? 'Dado previews currently support only top and bottom face targets.'
-            : feature.cutType === 'stopped_dado'
-              ? 'Stopped dado previews currently support only top and bottom face targets.'
-              : feature.cutType === 'groove'
-                ? 'Groove previews currently support only top and bottom face targets.'
-                : feature.cutType === 'stopped_groove'
-                  ? 'Stopped groove previews currently support only top and bottom face targets.'
-                  : feature.cutType === 'mortise'
-                    ? 'Mortise previews currently support only top and bottom face targets.'
-                    : feature.cutType === 'half_lap'
-                      ? 'Half lap previews currently support only top and bottom face targets.'
-                      : 'Cutout previews currently support only top and bottom face targets.'
+        reason: `${RECT_CUT_TRAITS[feature.cutType].label} previews currently support only top and bottom face targets.`
       };
     }
     return { supported: true };
