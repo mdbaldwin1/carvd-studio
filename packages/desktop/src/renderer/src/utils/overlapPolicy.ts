@@ -89,6 +89,12 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
  * has a different section at every depth and the contour can only hold one
  * of them, so a dovetail socket reads as its widest all the way down and the
  * tail rattles in a hole that, in the wood, grips it.
+ *
+ * An end cut that runs in a band of the thickness is the same again, and the
+ * worst of the three, because the contour shows the cut applied to the whole
+ * end. The secret mitred dovetail is mitred on its outer sliver only and
+ * square below, where its pins are; read from the top it is two mitres that
+ * cannot touch, and the boards slide through one another.
  */
 function needsMaterialOverlapTest(part: Part): boolean {
   return (
@@ -97,8 +103,10 @@ function needsMaterialOverlapTest(part: Part): boolean {
         feature.enabled &&
         (feature.kind === 'circular_cut' ||
           feature.kind === 'rounded_cut' ||
+          (feature.kind === 'end_cut' && feature.parameters.band !== undefined) ||
           (feature.kind === 'rect_cut' &&
             (isHousingCut(feature.cutType) ||
+              feature.parameters.depthMode === 'blind' ||
               Boolean(feature.parameters.wallAngle) ||
               Boolean(feature.parameters.sideWallAngle))))
     ) ?? false

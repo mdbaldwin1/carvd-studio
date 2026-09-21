@@ -124,6 +124,31 @@ function fitAxes(socket: FeatureSocket): Array<{ axis: Vec3; opening: number }> 
   return [channel.tangent === 1 ? both[0] : both[1]];
 }
 
+/**
+ * The part of the piece that is level with the mouth of the socket.
+ *
+ * Neither half of a joint need be the same size all the way down. A dovetail
+ * is the case in point: its socket is undercut and its tail flares to match,
+ * so the widest part of the one sits against the widest part of the other,
+ * deep inside. Measuring the piece at its widest against the mouth at its
+ * narrowest compares two places that never touch, and calls every dovetail
+ * ever cut too big to go together.
+ *
+ * What decides it is the section at each depth, and the mouth is where a
+ * piece too fat is stopped. A piece sunk out of reach of its own mouth --
+ * a peg driven below the surface -- is judged whole, as before.
+ */
+function cellsAtOpening(seated: PartOBB[], socket: FeatureSocket): PartOBB[] {
+  const n = socket.openingNormal;
+  const openingN = dot(socket.openingCenter, n);
+  const atMouth = seated.filter((cell) => {
+    const halfN = extentAlong(cell, n) / 2;
+    const centerN = dot(cell.center, n);
+    return centerN - halfN <= openingN + GOOD_FIT && centerN + halfN >= openingN - GOOD_FIT;
+  });
+  return atMouth.length > 0 ? atMouth : seated;
+}
+
 /** What to call the cut in a sentence. */
 function cutName(socket: FeatureSocket): string {
   if (socket.mateKind === 'round_hole') return 'hole';
@@ -182,12 +207,13 @@ export function getJointFitIssues(parts: Part[], units: 'imperial' | 'metric' = 
         candidate.material ??= getPartMaterialOBBs(mate);
         const seated = candidate.material.filter((cell) => occupies(cell, socket));
         if (seated.length === 0) continue;
+        const atMouth = cellsAtOpening(seated, socket);
 
         let worst: { problem: JointFitProblem; amount: number } | null = null;
         for (const { axis, opening } of fitAxes(socket)) {
           // Where a cut has split the piece into several cells across this
           // axis, the joint is as wide as all of them together.
-          const reach = seated.map((cell) => ({
+          const reach = atMouth.map((cell) => ({
             lo: dot(cell.center, axis) - extentAlong(cell, axis) / 2,
             hi: dot(cell.center, axis) + extentAlong(cell, axis) / 2
           }));
@@ -200,7 +226,10 @@ export function getJointFitIssues(parts: Part[], units: 'imperial' | 'metric' = 
         if (!worst) continue;
 
         const measure = formatFabricationMeasurement(worst.amount, units);
-        const where = `the ${cutName(socket)} in ${host.name}`;
+        const source = host.features?.find((feature) => feature.id === socket.featureId);
+        const named = source && 'name' in source ? source.name : undefined;
+        const which = named ? `${cutName(socket)} (${named})` : cutName(socket);
+        const where = `the ${which} in ${host.name}`;
         issues.push({
           hostPartId: host.id,
           hostFeatureId: socket.featureId,

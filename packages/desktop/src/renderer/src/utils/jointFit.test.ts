@@ -112,3 +112,94 @@ describe('joint fit', () => {
     expect(issues[0].message).toContain('mm');
   });
 });
+
+describe('a joint that is not the same size all the way down', () => {
+  const T = 0.75;
+  const W = 3;
+  const DEPTH = 0.5;
+  const SPLAY = 10;
+  const flare = Math.tan((SPLAY * Math.PI) / 180) * DEPTH;
+
+  /**
+   * A half-blind dovetail: the front's sockets are undercut, and the side's
+   * tails flare to match. Widest meets widest at the socket floor, narrowest
+   * at its mouth, and the joint closes.
+   */
+  const halfBlind = (tailWidth: number): Part[] => {
+    const front = createTestPart({
+      id: 'front',
+      length: 12,
+      width: W,
+      thickness: T,
+      position: { x: 0, y: T / 2, z: 0 },
+      features: [0.4, 1.7].map(
+        (z, index): RectCutFeature => ({
+          id: `socket-${index}`,
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'mortise',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min' },
+          parameters: {
+            size: { length: T, width: 0.9 - 2 * flare },
+            depthMode: 'blind',
+            depth: DEPTH,
+            sideWallAngle: SPLAY
+          },
+          placement: { x: 0, z: z + flare }
+        })
+      )
+    });
+    const side = createTestPart({
+      id: 'side',
+      length: 12,
+      width: W,
+      thickness: T,
+      rotation: { x: 0, y: 0, z: 90 },
+      // Its tip stops at the socket floor, half an inch into a 3/4 board.
+      position: { x: -6 + T / 2, y: 6 + T - DEPTH, z: 0 },
+      features: [0, 1.3, 2.6].map(
+        (z, index): RectCutFeature => ({
+          id: `gap-${index}`,
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'cutout',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min' },
+          parameters: { size: { length: DEPTH, width: 1.3 - tailWidth }, depthMode: 'through', taperAngle: SPLAY },
+          placement: { x: 0, z }
+        })
+      )
+    });
+    return [front, side];
+  };
+
+  it('passes a dovetail whose tail flares to the socket that took it', () => {
+    // Measured at its widest against the mouth at its narrowest, this reads
+    // as an eighth of an inch too fat -- comparing two places that, in the
+    // wood, are at opposite ends of the joint and never touch.
+    expect(getJointFitIssues(halfBlind(0.9))).toEqual([]);
+  });
+
+  it('still catches a tail that is genuinely too fat for its socket', () => {
+    const issues = getJointFitIssues(halfBlind(1.05));
+    const tight = issues.filter((issue) => issue.problem === 'tight');
+    expect(tight.length).toBeGreaterThan(0);
+    // Cut 0.15 over at the shoulder, which is the section that meets the mouth.
+    expect(tight[0].amount).toBeCloseTo(0.15, 4);
+  });
+
+  it('names the cut, so two sockets on one board do not read as one warning twice', () => {
+    const [front, side] = halfBlind(1.05);
+    const named: Part = {
+      ...front,
+      features: (front.features ?? []).map((feature, index) => ({ ...feature, name: `Tail socket ${index + 1}` }))
+    };
+    const messages = getJointFitIssues([named, side]).map((issue) => issue.message);
+    expect(messages.length).toBeGreaterThan(0);
+    expect(new Set(messages).size).toBe(messages.length);
+    expect(messages[0]).toContain('Tail socket');
+  });
+});

@@ -4,6 +4,7 @@ import type { EndCutFeature, Part, RectCutFeature } from '../types';
 import { clearPartGeometryCache, getPartMaterialVolume } from './partFeatureGeometry';
 import { validateEndCutFeature } from './endCutUtils';
 import { validateRectCutFeature } from './rectCutUtils';
+import { partsOverlap } from './overlapPolicy';
 
 vi.unmock('three');
 
@@ -86,5 +87,47 @@ describe('an end cut that runs in a band of the thickness', () => {
     // The same pocket under a mitre that takes the whole end is still wrong.
     const under: Part = createTestPart({ length: L, width: W, thickness: T, features: [mitre(), pin] });
     expect(validateRectCutFeature(pin, under)).toContain('remaining material');
+  });
+});
+
+describe('a mitre that runs in a band, and what can be pushed into it', () => {
+  const T = 0.75;
+  const mitredBoard = (banded: boolean): Part => {
+    const mitre: EndCutFeature = {
+      id: 'm',
+      kind: 'end_cut',
+      version: 1,
+      enabled: true,
+      cutType: 'mitre',
+      target: { type: 'face', face: 'right_end' },
+      lengthMode: 'long_point',
+      reference: { primaryFrom: 'max' },
+      parameters: { horizontalAngle: 45, verticalAngle: 0, ...(banded ? { band: { from: 0.5625, to: T } } : {}) }
+    };
+    return createTestPart({
+      id: 'a',
+      length: 12,
+      width: 3,
+      thickness: T,
+      position: { x: 0, y: T / 2, z: 0 },
+      features: [mitre]
+    });
+  };
+
+  it('keeps the wood below the band solid against anything driven into it', () => {
+    // Behind the mitred sliver the end is square, and that is where a secret
+    // mitred dovetail keeps its pins. Read from the top the whole end looks
+    // mitred away, which let the other half of the joint pass through it.
+    const block = createTestPart({
+      id: 'b',
+      length: 0.3,
+      width: 0.3,
+      thickness: 0.3,
+      position: { x: 5, y: 0.2, z: -1.2 }
+    });
+    expect(partsOverlap(mitredBoard(true), block)).toBe(true);
+    // Mitred the whole way through, that corner really is gone -- which is
+    // the shape the top view was reading, and why it said so.
+    expect(partsOverlap(mitredBoard(false), block)).toBe(false);
   });
 });
