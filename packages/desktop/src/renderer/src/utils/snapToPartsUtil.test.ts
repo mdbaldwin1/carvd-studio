@@ -3187,3 +3187,94 @@ describe('snap line measurements on every axis', () => {
     expect(result.snapLines.every((line) => typeof line.axis === 'string')).toBe(true);
   });
 });
+
+/**
+ * A box joint and a dovetail have no male feature anywhere in the file --
+ * the half that goes in is the wood left standing between the sockets -- so
+ * these are the joints that assembled by eye and then would not snap.
+ */
+describe('a joint whose male half was cut rather than left', () => {
+  const T = 0.75;
+  const W = 3;
+  const cut = (
+    id: string,
+    z: number,
+    width: number,
+    extra: Record<string, unknown> = {}
+  ): NonNullable<Part['features']>[number] =>
+    ({
+      id,
+      kind: 'rect_cut',
+      version: 1,
+      enabled: true,
+      cutType: 'cutout',
+      target: { type: 'face', face: 'top_face' },
+      reference: { primaryFrom: 'min' },
+      parameters: { size: { length: T, width }, depthMode: 'through', ...extra },
+      placement: { x: 0, z }
+    }) as NonNullable<Part['features']>[number];
+
+  /** Two boards meeting at a corner, the second stood on end against the first. */
+  const corner = (aCuts: NonNullable<Part['features']>, bCuts: NonNullable<Part['features']>) => {
+    const a = createTestPart({
+      id: 'a',
+      length: 12,
+      width: W,
+      thickness: T,
+      position: { x: 0, y: T / 2, z: 0 },
+      features: aCuts
+    });
+    const b = createTestPart({
+      id: 'b',
+      length: 12,
+      width: W,
+      thickness: T,
+      rotation: { x: 0, y: 0, z: 90 },
+      // Stood on end, its half-length is now the vertical extent, and its
+      // half-thickness the horizontal one.
+      position: { x: -6 + T / 2, y: 6, z: 0 },
+      features: bCuts
+    });
+    return [a, b];
+  };
+
+  const seats = (parts: Part[], mover: Part) => {
+    const offsets = [
+      { x: 0.15, y: 0.1, z: 0 },
+      { x: -0.1, y: 0.05, z: -0.08 }
+    ];
+    return offsets.map((offset) => {
+      const from = {
+        x: mover.position.x + offset.x,
+        y: mover.position.y + offset.y,
+        z: mover.position.z + offset.z
+      };
+      const result = detectFeatureMateSnaps(mover, from, parts, [mover.id], 1);
+      if (!(result.snappedX || result.snappedY || result.snappedZ)) return Number.POSITIVE_INFINITY;
+      return Math.hypot(
+        result.adjustedPosition.x - mover.position.x,
+        result.adjustedPosition.y - mover.position.y,
+        result.adjustedPosition.z - mover.position.z
+      );
+    });
+  };
+
+  it('seats a box joint dragged from either side', () => {
+    const [a, b] = corner([cut('a1', 0, 0.75), cut('a2', 1.5, 0.75)], [cut('b1', 0.75, 0.75), cut('b2', 2.25, 0.75)]);
+    for (const mover of [a, b]) for (const error of seats([a, b], mover)) expect(error).toBeCloseTo(0, 6);
+  });
+
+  it('seats a through dovetail, whose fingers are not even parallel', () => {
+    const [a, b] = corner(
+      [0, 1.3, 2.6].map((z, index) => cut(`a${index}`, z, 0.4, { taperAngle: 10 })),
+      [0.4, 1.7].map((z, index) => cut(`b${index}`, z, 0.9, { sideWallAngle: -10 }))
+    );
+    for (const mover of [a, b]) for (const error of seats([a, b], mover)) expect(error).toBeCloseTo(0, 6);
+  });
+
+  it('leaves a board with a single notch alone', () => {
+    // One cut is a notch, not a finger: a finger has a socket either side.
+    const [a, b] = corner([cut('a1', 1, 0.75)], [cut('b1', 1, 0.75)]);
+    for (const error of seats([a, b], b)) expect(error).toBe(Number.POSITIVE_INFINITY);
+  });
+});

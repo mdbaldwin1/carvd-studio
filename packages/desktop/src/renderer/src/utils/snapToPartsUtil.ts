@@ -4045,7 +4045,7 @@ type MateShape = {
   insertionDepth?: number;
   /** Blind-cut mates must present the opposite opening face to the host. */
   complementaryOpeningNormal?: Vec3;
-  mateKind?: 'mortise-tenon' | 'half-lap';
+  mateKind?: 'mortise-tenon' | 'half-lap' | 'interlock';
 };
 
 function mateShapeIsCompatibleWithSocket(mateShape: MateShape, socket: FeatureSocket): boolean {
@@ -4072,6 +4072,79 @@ function mateShapeIsCompatibleWithSocket(mateShape: MateShape, socket: FeatureSo
     );
   }
   return true;
+}
+
+/**
+ * The male half of a joint made by cutting away rather than by leaving a
+ * tongue: the fingers of a box joint, the tails and pins of a dovetail.
+ *
+ * A tenon is authored as a feature, so it announces itself. A tail never
+ * does. It is the wood standing between two sockets, and nothing in the file
+ * says it is anything at all -- which is why these joints would assemble by
+ * eye and then refuse to snap, with the male half of the joint invisible to
+ * an engine that only knew how to look for features. So read it off the
+ * cuts: through cuts running off the same end of a board leave fingers
+ * between them, and those fingers are what goes into the other half.
+ */
+function getEndFingerShapes(part: Part, axes: [Vec3, Vec3, Vec3], cuts: RectCutFeature[]): MateShape[] {
+  const [axisX, axisY, axisZ] = axes;
+  const halfLength = part.length / 2;
+  const shapes: MateShape[] = [];
+
+  for (const end of ['left', 'right'] as const) {
+    const spans = cuts
+      .filter((cut) => cut.parameters.depthMode === 'through' && (isTopTarget(cut) || isBottomTarget(cut)))
+      .map((cut) => ({ cut, bounds: getRectCutPlanBounds(cut, part) }))
+      .filter(({ bounds }) => (end === 'left' ? bounds.minX <= 1e-6 : bounds.maxX >= part.length - 1e-6))
+      .map(({ cut, bounds }) => {
+        const z = getRenderedLocalZRange(part.width, bounds.minZ, cut.parameters.size.width);
+        // A tapered socket is square where it starts and open at its far end,
+        // so a finger between two of them is a different width at its tip
+        // than at its shoulder. Carry both.
+        const flare = Math.tan(((cut.parameters.taperAngle ?? 0) * Math.PI) / 180) * cut.parameters.size.length;
+        const atTip = end === 'left' ? 0 : flare;
+        const atShoulder = end === 'left' ? flare : 0;
+        return {
+          length: cut.parameters.size.length,
+          tip: { min: z.min - atTip, max: z.max + atTip },
+          shoulder: { min: z.min - atShoulder, max: z.max + atShoulder }
+        };
+      })
+      .sort((left, right) => left.tip.min - right.tip.min);
+    // One cut leaves no finger, only a notch: a finger has a socket either
+    // side of it, and anything less is just the end of the board.
+    if (spans.length < 2) continue;
+
+    for (let index = 0; index + 1 < spans.length; index += 1) {
+      const before = spans[index];
+      const after = spans[index + 1];
+      const fingerLength = Math.min(before.length, after.length);
+      const widths = [after.tip.min - before.tip.max, after.shoulder.min - before.shoulder.max];
+      if (widths[0] <= MATE_DIM_TOLERANCE || fingerLength <= MATE_DIM_TOLERANCE) continue;
+      const centerZ = (before.tip.max + after.tip.min) / 2;
+      const insertionAxis = end === 'left' ? axisX : mulVec(axisX, -1);
+      const localCenterX = end === 'left' ? -halfLength + fingerLength / 2 : halfLength - fingerLength / 2;
+      const center = addVec(part.position, addVec(mulVec(axisX, localCenterX), mulVec(axisZ, centerZ)));
+      // Where the two ends of a tapered finger differ, either may be the one
+      // that meets the socket -- the tail of a through dovetail stands proud
+      // at its widest, a half-blind one buries that end in the socket floor.
+      const sections =
+        Math.abs(widths[1] - widths[0]) > MATE_DIM_TOLERANCE && widths[1] > MATE_DIM_TOLERANCE ? widths : [widths[0]];
+      for (const width of sections) {
+        shapes.push({
+          obb: {
+            center,
+            axes: [insertionAxis, axisY, axisZ],
+            halfExtents: [fingerLength / 2, part.thickness / 2, width / 2]
+          },
+          insertionDepth: fingerLength,
+          complementaryOpeningNormal: mulVec(insertionAxis, -1),
+          mateKind: 'interlock'
+        });
+      }
+    }
+  }
+  return shapes;
 }
 
 function getMateShapes(part: Part, position: Vec3): MateShape[] {
@@ -4109,6 +4182,7 @@ function getMateShapes(part: Part, position: Vec3): MateShape[] {
   }
 
   const shapes: MateShape[] = [{ obb: getPartOBB(part, position) }];
+  shapes.push(...getEndFingerShapes({ ...part, position }, [axisX, axisY, axisZ], resolvedRectCuts));
   for (const cut of resolvedRectCuts) {
     if (cut.parameters.depthMode !== 'blind' || (!isTopTarget(cut) && !isBottomTarget(cut))) continue;
     const cutDepth = getRectCutDepth(cut, part.thickness);
