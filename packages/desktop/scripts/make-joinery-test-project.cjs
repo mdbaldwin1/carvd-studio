@@ -198,16 +198,47 @@ station('03 Dowel Joint', 'SEATED and assembled: try Transfer Holes to Mating Pa
   return [rail, stile, pin(1, -1), pin(2, 1)];
 });
 
-// 04 Biscuit — the slot is a face slot, so the biscuit is shown beside it
-station('04 Biscuit Joint', 'EXPLODED and APPROXIMATE: a stadium slot stands in for the arc a joiner cuts.', () => {
-  const o = origin();
-  const a = board('Biscuit — Board A', o, { width: 6, features: [slot('Biscuit slot', 'top_face', 56 * MM, 4 * MM, 0.4, 0, 2.5)] });
-  const b = board('Biscuit — Board B', o, { width: 6, features: [slot('Biscuit slot', 'top_face', 56 * MM, 4 * MM, 0.4, 0, -2.5)] });
-  against(a, b, 'z');
-  const biscuit = board('Biscuit — #20', o, { length: 56 * MM, width: 23 * MM, thickness: 4 * MM, stockId: BISCUIT.id, color: BISCUIT.color, grainSensitive: false });
-  apartFrom(b, biscuit, 'z');
-  return [a, b, biscuit];
-});
+// 04 Biscuit — slots in the meeting edges, biscuit floating between --------
+station(
+  '04 Biscuit Joint',
+  'SEATED and APPROXIMATE: a plate joiner cuts an arc, so these slots are square-ended stand-ins.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    const SLOT_DEPTH = 0.5;
+    // A biscuit slot is cut into the edge the boards meet on, not the face --
+    // the joiner is run along the edge with its fence on the face. Squared off
+    // here because Carvd's rounded slot cannot host a mate yet, and a joint
+    // that assembles is worth more on a test bench than one that only looks
+    // right. Centred along the board and centred in its thickness; placement
+    // on an edge face is measured from the near end, not the middle.
+    const biscuitSlot = (f) =>
+      rect(
+        'Biscuit slot',
+        'mortise',
+        face(f),
+        { size: { length: 56 * MM, width: 4 * MM }, depthMode: 'blind', depth: SLOT_DEPTH },
+        { x: 6 - 28 * MM, z: (T - 4 * MM) / 2 }
+      );
+    const a = board('Biscuit — Board A', o, { width: 6, features: [biscuitSlot('front_face')] });
+    const b = board('Biscuit — Board B', o, { width: 6, features: [biscuitSlot('back_face')] });
+    against(a, b, 'z');
+    // 23mm across the seam into two 1/2" slots, so it floats at both ends --
+    // which is what lets the boards still slide for alignment before glue-up.
+    const biscuit = board('Biscuit — #20', o, {
+      length: 56 * MM,
+      width: 23 * MM,
+      thickness: 4 * MM,
+      stockId: BISCUIT.id,
+      color: BISCUIT.color,
+      grainSensitive: false
+    });
+    biscuit.position.x = a.position.x;
+    biscuit.position.y = a.position.y;
+    biscuit.position.z = a.position.z + ext(a).z;
+    return [a, b, biscuit];
+  }
+);
 
 // 05 Dado — the shelf sits home in the housing -------------------------
 station('05 Dado Joint', 'SEATED: real 23/32 plywood in a dado typed 3/4 — try Fit Dado to Mating Part.', () => {
@@ -387,8 +418,13 @@ station('23 Loose Tenon Joint', 'SEATED: edge to edge, because Carvd will not mo
   const a = board('Loose Tenon — Board A', o, { width: 4, features: [mortise(face('front_face'))] });
   const b = board('Loose Tenon — Board B', o, { width: 4, features: [mortise(face('back_face'))] });
   against(a, b, 'z');
-  const tenon = board('Loose Tenon — Tenon', o, { length: 2, width: 1.1, thickness: 0.25, rotation: { x: 0, y: 90, z: 0 } });
-  apartFrom(b, tenon, 'z');
+  const tenon = board('Loose Tenon — Tenon', o, { length: 1.1, width: 2, thickness: 0.25, rotation: { x: 0, y: 90, z: 0 } });
+  // Home in both mortises, floating clear of each floor the way a loose tenon
+  // does. Its own length runs across the seam once it is turned a quarter.
+  tenon.position.x = a.position.x - ext(a).x + 5 + 1;
+  tenon.position.y = a.position.y - ext(a).y + 0.25 + 0.125;
+  tenon.position.z = a.position.z + ext(a).z;
+  
   return [a, b, tenon];
 });
 
@@ -400,7 +436,9 @@ station('24 Domino Joint', 'SEATED: the same idea bought in a box, edge to edge 
   const b = board('Domino — Board B', o, { width: 4, features: [mortise(face('back_face'))] });
   against(a, b, 'z');
   const domino = board('Domino — 6 × 20 × 40', o, { length: 40 * MM, width: 20 * MM, thickness: 6 * MM, stockId: DOMINO.id, color: DOMINO.color, rotation: { x: 0, y: 90, z: 0 } });
-  apartFrom(b, domino, 'z');
+  domino.position.x = a.position.x - ext(a).x + 6;
+  domino.position.y = a.position.y - ext(a).y + (0.75 - 6 * MM) / 2 + 3 * MM;
+  domino.position.z = a.position.z + ext(a).z;
   return [a, b, domino];
 });
 
