@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import polygonClipping from 'polygon-clipping';
-import { Brush, Evaluator, INTERSECTION, SUBTRACTION } from 'three-bvh-csg';
+import { ADDITION, Brush, Evaluator, INTERSECTION, SUBTRACTION } from 'three-bvh-csg';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { getEdgeProfileFeatureBoundary, type EdgeProfilePoint } from './edgeProfileShape';
 import { ConvexHull } from 'three/examples/jsm/math/ConvexHull.js';
@@ -11,6 +11,7 @@ import {
   EdgeProfileFeature,
   Part,
   PartFeature,
+  EndCutFeature,
   RectCutFeature,
   RoundedCutFeature,
   RoutedPathFeature
@@ -154,7 +155,9 @@ export function hasRenderablePartFeatures(part: Part): boolean {
 
 function hasOnlyEndCutFeatures(part: Part): boolean {
   const features = getEnabledFeatures(part);
-  return features.length > 0 && features.every((feature) => feature.kind === 'end_cut');
+  // A cut running in a band needs the clip the layered path builds; the
+  // shortcut here clips the whole blank with the plain end-cut planes.
+  return features.length > 0 && features.every((feature) => feature.kind === 'end_cut' && !feature.parameters.band);
 }
 
 function buildOuterContour(part: Part): Point2[] {
@@ -649,10 +652,33 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
 
   const layers = Array.from(sliceY).sort((a, b) => a - b);
   const layerGeometries: THREE.BufferGeometry[] = [];
-  const stock = getEnabledFeatures(part).some((feature) => feature.kind === 'end_cut')
-    ? new Brush(createStockClipGeometry(part))
-    : null;
+  const endCuts = getEnabledFeatures(part).filter((feature): feature is EndCutFeature => feature.kind === 'end_cut');
+  const wholeEnd = endCuts.filter((feature) => !feature.parameters.band);
+  const banded = endCuts.filter((feature) => feature.parameters.band);
+  // One clip for the lot: the cuts that take the whole end, narrowed by each
+  // cut that runs in a band. Every layer is then clipped the same way, which
+  // is what keeps a band that falls between slices from being lost.
+  let stock: Brush | null =
+    wholeEnd.length > 0 ? new Brush(createStockClipGeometry({ ...part, features: wholeEnd })) : null;
   stock?.updateMatrixWorld(true);
+  if (banded.length > 0) {
+    const bandEvaluator = new Evaluator();
+    bandEvaluator.attributes = ['position', 'normal'];
+    bandEvaluator.useGroups = false;
+    for (const feature of banded) {
+      const bandClip = new Brush(createBandedStockClipGeometry(part, feature));
+      bandClip.updateMatrixWorld(true);
+      if (!stock) {
+        stock = bandClip;
+        continue;
+      }
+      const narrowed = bandEvaluator.evaluate(stock, bandClip, INTERSECTION);
+      narrowed.updateMatrixWorld(true);
+      stock.geometry.dispose();
+      bandClip.geometry.dispose();
+      stock = narrowed;
+    }
+  }
   const evaluator = new Evaluator();
   evaluator.attributes = ['position', 'normal'];
   evaluator.useGroups = false;
@@ -774,6 +800,56 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
 /** Keep authored cutting planes exact, but move irrelevant blank walls outside
  * the layer. Coplanar perforated caps otherwise trigger quadratic triangle
  * splitting in CSG even though those caps require no clipping at all. */
+/** A box spanning the whole blank in plan, between two heights. */
+function slabBrush(part: Part, yMin: number, yMax: number): Brush {
+  const pad = Math.max(part.length, part.width) * 0.02 + 1;
+  const height = Math.max(1e-6, yMax - yMin);
+  const geometry = new THREE.BoxGeometry(part.length + pad, height, part.width + pad);
+  geometry.translate(0, (yMin + yMax) / 2, 0);
+  const brush = new Brush(geometry);
+  brush.updateMatrixWorld(true);
+  return brush;
+}
+
+/**
+ * The clip for an end cut that runs in a band of the thickness.
+ *
+ * Everywhere outside the band the blank is left whole, so the solid is the
+ * mitre's own clip cut down to the band and then the untouched blank added
+ * back above and below it. Restricting a layer at a time instead means the
+ * clip has to land on a slice boundary, and a band that does not is quietly
+ * ignored -- which is how the first attempt at this removed nothing.
+ */
+function createBandedStockClipGeometry(part: Part, feature: EndCutFeature): THREE.BufferGeometry {
+  const band = feature.parameters.band!;
+  const half = part.thickness / 2;
+  const from = Math.max(-half, -half + Math.min(band.from, band.to));
+  const to = Math.min(half, -half + Math.max(band.from, band.to));
+
+  const evaluator = new Evaluator();
+  evaluator.attributes = ['position', 'normal'];
+  evaluator.useGroups = false;
+
+  const mitred = new Brush(createStockClipGeometry({ ...part, features: [feature] }));
+  mitred.updateMatrixWorld(true);
+  const withinBand = evaluator.evaluate(mitred, slabBrush(part, from, to), INTERSECTION);
+  withinBand.updateMatrixWorld(true);
+
+  let combined: Brush = withinBand;
+  const pad = part.thickness;
+  for (const [low, high] of [
+    [-half - pad, from],
+    [to, half + pad]
+  ]) {
+    if (high - low <= 1e-9) continue;
+    const outside = slabBrush(part, low, high);
+    combined = evaluator.evaluate(combined, outside, ADDITION);
+    combined.updateMatrixWorld(true);
+  }
+  mitred.geometry.dispose();
+  return combined.geometry;
+}
+
 function createStockClipGeometry(part: Part): THREE.BufferGeometry {
   const padding = Math.min(part.length, part.width, part.thickness) * 0.01;
   const planes = getPartStockPlanes(part).map((plane) => ({

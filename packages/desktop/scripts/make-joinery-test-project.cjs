@@ -393,11 +393,42 @@ station('11 Sliding Dovetail', 'SEATED and APPROXIMATE: the housing is undercut 
   return [side, shelf];
 });
 
-// 15 Mitred blind dovetail — only the mitre can be shown --------------
-station('15 Mitred Blind Dovetail', 'NOT MODELLED beyond the mitre: behind it sit a rebate and splayed pins, and the rebate and the pins occupy the same corner, so Carvd reads the second cut as starting in material the first removed. The mitre you see is all of the joint that ever shows.', () => {
+// 15 Mitred blind dovetail — a mitre outside, dovetails behind it -----
+station('15 Mitred Blind Dovetail', 'SEATED: the hardest joint there is. A mitre runs on the outer sliver, and behind it the pins interlock where nobody ever sees them.', () => {
   const o = origin();
-  const a = board('Mitred Blind DT — Board A', o, { features: [endCut('Mitre', 'right_end', 45, true)] });
-  const b = board('Mitred Blind DT — Board B', o, { rotation: { x: 0, y: 90, z: 0 }, features: [endCut('Mitre', 'right_end', 45)] });
+  const T = 0.75;
+  const MITRE = 0.1875;
+  const BEHIND = T - MITRE;
+  const SPLAY = 10;
+  // The mitre takes only the outer three sixteenths of the thickness. Below
+  // it the two ends are square, and that is where the pins are -- which is
+  // the whole trick of the joint: all you see outside is a mitre.
+  const outerMitre = (flip) => {
+    const cut = endCut('Mitre', 'right_end', 45, flip);
+    cut.parameters.band = { from: BEHIND, to: T };
+    return cut;
+  };
+  // Cut up from the underside so the mitre sliver above is left whole, and
+  // splayed opposite ways so the two halves lock into one another.
+  const pins = (offsets, lengthAlong, splay) =>
+    offsets.map(([x, z], n) =>
+      rect(`Pin socket ${n + 1}`, 'cutout', face('bottom_face'), { size: { length: lengthAlong, width: 0.75 }, depthMode: 'blind', depth: BEHIND, wallAngle: splay }, { x, z })
+    );
+  const a = board('Mitred Blind DT — Board A', o, {
+    features: [
+      outerMitre(true),
+      ...pins([[9, 0.75], [9, 2.25]], 3, SPLAY).map((cut) => ({ ...cut, parameters: { ...cut.parameters, size: { length: 3, width: 0.75 } } }))
+    ]
+  });
+  const b = board('Mitred Blind DT — Board B', o, {
+    rotation: { x: 0, y: 90, z: 0 },
+    features: [
+      outerMitre(false),
+      ...[11.25, 9.75].map((x, n) =>
+        rect(`Pin socket ${n + 1}`, 'cutout', face('bottom_face'), { size: { length: 0.75, width: 3 }, depthMode: 'blind', depth: BEHIND, wallAngle: -SPLAY }, { x, z: 0 })
+      )
+    ]
+  });
   mitreCorner(a, b);
   return [a, b];
 });

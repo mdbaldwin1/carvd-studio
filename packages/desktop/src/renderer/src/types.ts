@@ -146,6 +146,16 @@ export interface EndCutFeature extends PartFeatureBase {
     horizontalFlip?: boolean;
     verticalAngle?: number;
     verticalFlip?: boolean;
+    /**
+     * The band across the thickness the cut runs in, measured up from the
+     * bottom face. Absent means the whole thickness, which is every ordinary
+     * mitre there is.
+     *
+     * A secret mitred dovetail's mitre is not ordinary: it runs on the outer
+     * sliver only, and behind it sit the rebate and the pins the mitre is
+     * there to hide.
+     */
+    band?: { from: number; to: number };
     reference?: {
       mode: 'long_point' | 'short_point' | 'centerline';
       value: number;

@@ -7,6 +7,16 @@ export function validateEndCutFeature(
   const angles = [feature.parameters.horizontalAngle, feature.parameters.verticalAngle ?? 0];
   if (angles.some((angle) => !Number.isFinite(angle) || Math.abs(angle) >= 90))
     return 'Cut angles must be finite and less than 90°.';
+
+  const band = feature.parameters.band;
+  if (band) {
+    if (!Number.isFinite(band.from) || !Number.isFinite(band.to))
+      return 'The band this cut runs in must be given as two finite heights.';
+    const low = Math.min(band.from, band.to);
+    const high = Math.max(band.from, band.to);
+    if (high - low <= 0) return 'The band this cut runs in has no height.';
+    if (low < 0 || high > part.thickness) return 'The band this cut runs in must lie within the board thickness.';
+  }
   const candidate = {
     ...part,
     features: [...(part.features ?? []).filter((existing) => existing.id !== feature.id), feature]
@@ -148,14 +158,41 @@ export function getEndCutInsetAt(
   return profile.baseInset + profile.horizontalInset * horizontalRatio + profile.verticalInset * verticalRatio;
 }
 
-/** Remaining-stock half spaces in rendered local coordinates (Front is +Z). */
+/**
+ * Remaining-stock half spaces in rendered local coordinates (Front is +Z).
+ *
+ * An end cut that runs in a band of the thickness only takes stock away
+ * inside that band, so its plane carries the band it came from. A caller
+ * asking whether a pocket fits has to ignore a plane whose band the pocket
+ * never reaches -- the pins of a secret mitred dovetail sit below the mitre
+ * that hides them, and are no business of its.
+ */
 export function getPartStockPlanes(part: Pick<Part, 'length' | 'width' | 'thickness' | 'features'>): Array<{
   normal: { x: number; y: number; z: number };
   limit: number;
+  band?: { min: number; max: number };
 }> {
   const ends = getPartEndCutProfiles(part);
   const edges = getPartEdgeBevelProfiles(part);
-  const planes = (['left', 'right'] as const).map((side) => {
+  const bandFor = (side: 'left' | 'right') => {
+    const face = side === 'left' ? 'left_end' : 'right_end';
+    const banded = (part.features ?? []).find(
+      (feature): feature is EndCutFeature =>
+        feature.enabled &&
+        feature.kind === 'end_cut' &&
+        feature.target.face === face &&
+        feature.parameters.band !== undefined
+    );
+    if (!banded) return undefined;
+    const { from, to } = banded.parameters.band!;
+    const half = part.thickness / 2;
+    return { min: -half + Math.min(from, to), max: -half + Math.max(from, to) };
+  };
+  const planes: Array<{
+    normal: { x: number; y: number; z: number };
+    limit: number;
+    band?: { min: number; max: number };
+  }> = (['left', 'right'] as const).map((side) => {
     const inset = (y: number, z: number) => getEndCutInsetAt(side, ends, part, { y, z: -z });
     return {
       normal: {
@@ -163,7 +200,8 @@ export function getPartStockPlanes(part: Pick<Part, 'length' | 'width' | 'thickn
         y: (inset(part.thickness / 2, 0) - inset(-part.thickness / 2, 0)) / part.thickness,
         z: (inset(0, part.width / 2) - inset(0, -part.width / 2)) / part.width
       },
-      limit: part.length / 2 - inset(0, 0)
+      limit: part.length / 2 - inset(0, 0),
+      band: bandFor(side)
     };
   });
   for (const side of ['front', 'back'] as const) {

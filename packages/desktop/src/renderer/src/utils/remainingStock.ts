@@ -11,7 +11,17 @@ export function fitsRemainingStock(
   support: (normal: Point3) => number
 ): boolean {
   const absoluteSupport = (normal: Point3) => dot(normal, center) + support(normal);
-  if (getPartStockPlanes(part).some((plane) => absoluteSupport(plane.normal) > plane.limit + 1e-9)) return false;
+  // How far the candidate reaches up and down, so a plane that only takes
+  // stock away inside a band of the thickness can be skipped where the
+  // candidate never reaches it.
+  const candidateMaxY = absoluteSupport({ x: 0, y: 1, z: 0 });
+  const candidateMinY = -absoluteSupport({ x: 0, y: -1, z: 0 });
+  const reaches = (band?: { min: number; max: number }) =>
+    !band || (candidateMaxY > band.min + 1e-9 && candidateMinY < band.max - 1e-9);
+  if (
+    getPartStockPlanes(part).some((plane) => reaches(plane.band) && absoluteSupport(plane.normal) > plane.limit + 1e-9)
+  )
+    return false;
   for (const feature of part.features ?? []) {
     if (!feature.enabled || feature.kind !== 'rect_cut' || feature.cutType !== 'tenon') continue;
     const side = feature.target.type === 'face' && feature.target.face === 'left_end' ? -1 : 1;
