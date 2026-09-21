@@ -638,8 +638,7 @@ station('26 Pegged Mortise & Tenon', 'SEATED, with the peg withdrawn: driven hom
   // Lined up on the hole, resting against the leg, ready to be driven.
   peg.position.x = leg.position.x;
   peg.position.y = leg.position.y + 5;
-  peg.position.z = leg.position.z + ext(leg).z + 1.25 + EXPLODE;
-  peg.position.z = leg.position.z - ext(leg).z + 1.25;
+  peg.position.z = leg.position.z + ext(leg).z + ext(peg).z;
   return [leg, rail, peg];
 });
 
@@ -770,23 +769,42 @@ station('31 Fox Wedge Mortise & Tenon', 'SEATED and APPROXIMATE: the wedges are 
   return [leg, rail, ...wedges];
 });
 
-// 33 Splined mitre — the spline lies in the mitre face itself ---------
-station('33 Splined Mitre', 'SEATED and APPROXIMATE: the corner closes, and the spline is laid where it goes — its groove is ploughed in the mitre face, at 45 degrees to both boards, which Carvd cannot cut.', () => {
-  const o = origin();
-  // Distinct from the keyed mitre next door: a key is let in across the
-  // outside of a corner after it is glued, a spline lies buried inside the
-  // mitre and goes in as the joint is assembled.
-  const a = board('Splined Mitre — Board A', o, { features: [endCut('Mitre', 'right_end', 45, true)] });
-  const b = board('Splined Mitre — Board B', o, { rotation: { x: 0, y: 90, z: 0 }, features: [endCut('Mitre', 'right_end', 45)] });
-  mitreCorner(a, b);
-  // Lying along the mitre line, which runs corner to corner of the square the
-  // two boards share.
-  const spline = board('Splined Mitre — Spline', o, { length: 3, width: 0.75, thickness: 0.25, rotation: { x: 0, y: 90, z: 0 } });
-  spline.position.x = a.position.x + ext(a).x + ext(spline).x;
-  spline.position.y = a.position.y;
-  spline.position.z = a.position.z;
-  return [a, b, spline];
-});
+// 33 Splined mitre — the keys that hold a mitre shut -------------------
+station(
+  '33 Splined Mitre',
+  'EXPLODED: the keys are laid where they are driven, across the corner. Their kerf is sawn through the assembled joint and so runs into the waste of both mitres at once, which Carvd checks each board against on its own and refuses.',
+  () => {
+    const o = origin();
+    const KERF = 0.125;
+    const DEPTH = 0.55;
+    // A key crosses the glue line of a mitre and holds it shut, which is the
+    // whole of its job -- and is exactly what cannot be drawn here. Cut as
+    // one kerf across the assembled corner, it lies partly in material each
+    // board's own mitre has taken away, and a cut is checked against one
+    // board at a time. Sized to stop at the mitre instead, the two halves
+    // meet on the line where both boards run out, and the key can be seated
+    // in neither without fouling the other.
+    const a = board('Splined Mitre — Board A', o, { features: [endCut('Mitre', 'right_end', 45, true)] });
+    const b = board('Splined Mitre — Board B', o, { rotation: { x: 0, y: 90, z: 0 }, features: [endCut('Mitre', 'right_end', 45)] });
+    mitreCorner(a, b);
+    const keys = [4.2, 5.1].map((acrossCorner, n) => {
+      const key = board(`Splined Mitre — Key ${n + 1}`, o, {
+        length: 3,
+        width: KERF,
+        thickness: DEPTH,
+        rotation: { x: 0, y: 90, z: 0 },
+        stockId: OAK8.id,
+        color: '#6b4a2f'
+      });
+      key.position.x = a.position.x - ext(a).x + 6 + acrossCorner;
+      key.position.z = a.position.z;
+      // Held just above the corner, on the line each kerf would be sawn.
+      key.position.y = a.position.y + ext(a).y + EXPLODE + ext(key).y;
+      return key;
+    });
+    return [a, b, ...keys];
+  }
+);
 
 const now = new Date().toISOString();
 const file = {
