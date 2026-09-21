@@ -405,8 +405,10 @@ describe('rectCutUtils', () => {
         const support = getRectCutPreviewSupport(
           createRectCut({ cutType, target: { type: 'face', face: 'front_face' } })
         );
-        if (cutType === 'mortise' || cutType === 'cutout') {
-          // Side-face pockets are now first-class (leg mortises).
+        // Cuts taken in a long edge are first-class: a leg mortise, a pocket,
+        // and the groove that takes a panel, a spline or a tongue. A dado is
+        // not among them on purpose -- it runs across a face by definition.
+        if (cutType === 'mortise' || cutType === 'cutout' || cutType === 'groove' || cutType === 'stopped_groove') {
           expect(support.supported).toBe(true);
           continue;
         }

@@ -82,6 +82,17 @@ const slot = (label, f, length, width, depth, primary, secondary) => ({
   placement: { primary, secondary, rotation: 0 }
 });
 
+/**
+ * A groove run the length of one of a board's long edges, centred in its
+ * thickness -- which is where a tongue, a spline or a panel actually goes.
+ * A groove ploughed in the face instead would be a dado for a shelf.
+ *
+ * Placement on an edge face is measured from the near end and the near face,
+ * never from the middle, so the centring is done here.
+ */
+const edgeGroove = (label, f, width, depth, thickness = 0.75, length = 12) =>
+  rect(label, 'groove', face(f), { size: { length, width }, depthMode: 'blind', depth }, { x: 0, z: (thickness - width) / 2 });
+
 // ------------------------------------------------------------ placement
 /**
  * Half extents in world axes. Only quarter turns are used here, so the local
@@ -251,11 +262,24 @@ station('05 Dado Joint', 'SEATED: real 23/32 plywood in a dado typed 3/4 — try
 });
 
 // 06 Rabbet — the back sits in the rabbet ------------------------------
-station('06 Rabbet Joint', 'SEATED: a back panel let into a rabbet along the edge.', () => {
+station('06 Rabbet Joint', 'SEATED: a back panel standing in a rabbet run along the edge.', () => {
   const o = origin();
-  const side = board('Rabbet — Side', o, { length: 14, width: 6, features: [rect('Back rabbet', 'rabbet', edge('top_back_edge'), { size: { length: 14, width: 0.5 }, depthMode: 'blind', depth: 0.375 }, { x: 0, z: 0 })] });
-  const back = board('Rabbet — Back', o, { length: 14, width: 4, thickness: 0.375 });
-  apartFrom(side, back, 'z');
+  const T = 0.75;
+  const DEPTH = 0.375;
+  // The rabbet is run the length of the side's back edge, as wide as the
+  // panel is thick and half the side's thickness deep, which is what leaves
+  // a step for the panel to stand in and hide its end grain.
+  const side = board('Rabbet — Side', o, {
+    length: 14, width: 6,
+    features: [rect('Back rabbet', 'rabbet', edge('top_back_edge'), { size: { length: 14, width: T }, depthMode: 'blind', depth: DEPTH }, { x: 0, z: 0 })]
+  });
+  // Stood on edge: a quarter turn about X puts the panel's width upright, so
+  // its thickness fills the rabbet and its face carries on up.
+  const back = board('Rabbet — Back', o, { length: 14, width: 6, thickness: T, rotation: { x: 90, y: 0, z: 0 } });
+  back.position.x = side.position.x;
+  // Standing on the floor of the rabbet, its outer face flush with the side.
+  back.position.y = side.position.y - ext(side).y + (T - DEPTH) + ext(back).y;
+  back.position.z = side.position.z - ext(side).z + T / 2;
   return [side, back];
 });
 
@@ -312,7 +336,7 @@ station('12 Half Lap (T-Lap)', 'SEATED: a lapped end let into the face of a rail
 });
 
 // 13 Bridle — the tenon sits in the open mortise ------------------------
-station('13 Bridle Joint', 'SEATED: an open mortise, a groove run out through the end.', () => {
+station('13 Bridle Joint', 'EXPLODED and APPROXIMATE: a bridle\'s open mortise is cut into the end, and Carvd will not cut an end — the slot here stands in for it.', () => {
   const o = origin();
   const post = board('Bridle — Post', o, { features: [rect('Open mortise', 'stopped_groove', face('top_face'), { size: { length: 1.5, width: 0.25 }, depthMode: 'blind', depth: 0.749 }, { x: 0, z: 1.375 })] });
   const rail = board('Bridle — Rail', o, { features: [rect('Tenon', 'tenon', face('left_end'), { size: { length: 1.5, width: 3 }, depthMode: 'blind', depth: 0.25 }, { x: 0, z: 0 })] });
@@ -321,15 +345,18 @@ station('13 Bridle Joint', 'SEATED: an open mortise, a groove run out through th
 });
 
 // 14 Tongue & groove — the tongue runs home in the groove ---------------
-station('14 Tongue & Groove', 'SEATED: a groove one side, two rabbets leaving a tongue the other.', () => {
+station('14 Tongue & Groove', 'SEATED: a groove in one edge, two rabbets leaving a tongue on the other.', () => {
   const o = origin();
-  const grooved = board('T&G — Grooved Board', o, { width: 5, features: [rect('Groove', 'groove', face('top_face'), { size: { length: 12, width: 0.25 }, depthMode: 'blind', depth: 0.375 }, { x: 0, z: 4.75 })] });
-  const tongued = board('T&G — Tongued Board', o, { width: 5, features: [
-    rect('Tongue shoulder — top', 'rabbet', edge('top_front_edge'), { size: { length: 12, width: 0.25 }, depthMode: 'blind', depth: 0.25 }, { x: 0, z: 0 }),
-    rect('Tongue shoulder — bottom', 'rabbet', edge('bottom_front_edge'), { size: { length: 12, width: 0.25 }, depthMode: 'blind', depth: 0.25 }, { x: 0, z: 0 })
-  ] });
-  // The tongue runs into the groove, so the boards close to within its depth.
-  apartFrom(grooved, tongued, 'z');
+  const T = 0.75;
+  const TONGUE = 0.25;
+  const GROOVE_DEPTH = 0.375;
+  const grooved = board('T&G — Grooved Board', o, { width: 5, features: [edgeGroove('Groove', 'back_face', TONGUE, GROOVE_DEPTH, T)] });
+  const shoulder = (e) => rect(`Tongue shoulder — ${e}`, 'rabbet', edge(`${e}_front_edge`), { size: { length: 12, width: TONGUE }, depthMode: 'blind', depth: (T - TONGUE) / 2 }, { x: 0, z: 0 });
+  const tongued = board('T&G — Tongued Board', o, { width: 5, features: [shoulder('top'), shoulder('bottom')] });
+  // Shoulders closed on the grooved board's edge, which leaves the tongue
+  // standing clear of the groove's floor -- a tongue that bottoms out holds
+  // the shoulders open and the joint shows a line.
+  tongued.position.z = grooved.position.z - ext(grooved).z - ext(tongued).z + TONGUE;
   return [grooved, tongued];
 });
 
@@ -370,13 +397,19 @@ station('18 Scarf Joint', 'EXPLODED: an 8 to 1 slope, which eats 24 inches of a 
 });
 
 // 19 Spline — the spline sits in both grooves ---------------------------
-station('19 Spline Joint', 'SEATED: a groove in each edge and a loose spline between them.', () => {
+station('19 Spline Joint', 'SEATED: a groove in each meeting edge and a loose spline between them.', () => {
   const o = origin();
-  const a = board('Spline — Board A', o, { width: 5, features: [rect('Spline groove', 'groove', face('top_face'), { size: { length: 12, width: 0.25 }, depthMode: 'blind', depth: 0.375 }, { x: 0, z: 4.75 })] });
-  const b = board('Spline — Board B', o, { width: 5, features: [rect('Spline groove', 'groove', face('top_face'), { size: { length: 12, width: 0.25 }, depthMode: 'blind', depth: 0 + 0.375 }, { x: 0, z: 0 })] });
+  const T = 0.75;
+  const W = 0.25;
+  const DEPTH = 0.375;
+  const a = board('Spline — Board A', o, { width: 5, features: [edgeGroove('Spline groove', 'front_face', W, DEPTH, T)] });
+  const b = board('Spline — Board B', o, { width: 5, features: [edgeGroove('Spline groove', 'back_face', W, DEPTH, T)] });
   against(a, b, 'z');
-  const spline = board('Spline — Spline', o, { length: 12, width: 0.7, thickness: 0.25 });
-  apartFrom(b, spline, 'z');
+  // 0.7 across a pair of 3/8" grooves, so it floats at both ends.
+  const spline = board('Spline — Spline', o, { length: 12, width: 0.7, thickness: W });
+  spline.position.x = a.position.x;
+  spline.position.y = a.position.y;
+  spline.position.z = a.position.z + ext(a).z;
   return [a, b, spline];
 });
 
@@ -400,12 +433,17 @@ station('21 Full Lap Joint', 'SEATED: all of one piece let into the other; the c
 });
 
 // 22 Groove — the panel floats in the groove ----------------------------
-station('22 Groove Joint', 'SEATED: a panel in a groove — read the seasonal movement note in the cut list.', () => {
+station('22 Groove Joint', 'SEATED: a panel floating in a groove — read the seasonal movement note in the cut list.', () => {
   const o = origin();
-  const railCut = rect('Panel groove', 'groove', face('top_face'), { size: { length: 12, width: 0.25 }, depthMode: 'blind', depth: 0.375 }, { x: 0, z: 2.25 });
-  const rail = board('Groove — Frame Rail', o, { width: 2.5, features: [railCut] });
-  const panel = board('Groove — Panel', o, { length: 12, width: 7, thickness: 0.25 });
-  apartFrom(rail, panel, 'z');
+  const T = 0.75;
+  const W = 0.25;
+  const rail = board('Groove — Frame Rail', o, { width: 2.5, features: [edgeGroove('Panel groove', 'back_face', W, 0.375, T)] });
+  const panel = board('Groove — Panel', o, { length: 12, width: 7, thickness: W });
+  panel.position.x = rail.position.x;
+  panel.position.y = rail.position.y;
+  // Standing in the groove but off its floor, which is the whole reason a
+  // panel is never glued in: it has to be free to move across the seasons.
+  panel.position.z = rail.position.z - ext(rail).z - ext(panel).z + 0.25;
   return [rail, panel];
 });
 
@@ -447,8 +485,12 @@ station('25 Pin Joint', 'SEATED: a through pin holding a lap — a pinned joint,
   const rail = board('Pin — Rail', o, { features: [lap(4.5), hole('Pin hole', 'top_face', 0.25, null, 0, 0)] });
   const stile = board('Pin — Stile', o, { rotation: { x: 0, y: 90, z: 0 }, features: [lap(4.5), hole('Pin hole', 'top_face', 0.25, null, 0, 0)] });
   stile.position.y = rail.position.y + 0.375;
-  const peg = board('Pin — Peg', o, { length: 1.5, width: 0.25, thickness: 0.25, stockId: DOWEL14.id, color: DOWEL14.color, rotation: { x: 0, y: 0, z: 90 } });
-  apartFrom(stile, peg, 'z');
+  // Driven right through the lap: the rail's lower half and the stile's,
+  // which together are one board's thickness once the two halves close.
+  const peg = board('Pin — Peg', o, { length: 0.75, width: 0.25, thickness: 0.25, stockId: DOWEL14.id, color: DOWEL14.color, rotation: { x: 0, y: 0, z: 90 } });
+  peg.position.x = rail.position.x;
+  peg.position.z = rail.position.z;
+  peg.position.y = rail.position.y;
   return [rail, stile, peg];
 });
 
@@ -483,9 +525,13 @@ station('28 Scallop & Dowel', 'SEATED and APPROXIMATE: the scallop is a stadium,
   const o = origin();
   const a = board('Scallop — Board A', o, { width: 4, features: [slot('Scallop', 'top_face', 2, 1, 0.25, 0, 0), hole('Dowel hole', 'top_face', 0.375, 0.375, 0, 0)] });
   const b = board('Scallop — Board B', o, { width: 4, features: [hole('Dowel hole', 'bottom_face', 0.375, 0.375, 0, 0)] });
-  apartFrom(a, b, 'z');
+  // Face to face, with the dowel standing in the bore of each.
+  b.position.z = a.position.z;
+  b.position.y = a.position.y + ext(a).y + ext(b).y;
   const dowel = board('Scallop — Dowel', o, { length: 0.75, width: 0.375, thickness: 0.375, stockId: DOWEL38.id, color: DOWEL38.color, rotation: { x: 0, y: 0, z: 90 } });
-  apartFrom(b, dowel, 'x');
+  dowel.position.x = a.position.x;
+  dowel.position.z = a.position.z;
+  dowel.position.y = a.position.y + ext(a).y;
   return [a, b, dowel];
 });
 
@@ -493,10 +539,13 @@ station('28 Scallop & Dowel', 'SEATED and APPROXIMATE: the scallop is a stadium,
 station('29 Cross Dowel Joint', 'SEATED and APPROXIMATE: the barrel nut cross bore is not modelled.', () => {
   const o = origin();
   const rail = board('Cross Dowel — Rail', o, { features: [hole('Bolt clearance', 'left_end', 0.25, null, 0, 0)] });
-  const post = board('Cross Dowel — Post', o, { width: 3, features: [hole('Barrel pocket', 'top_face', 0.4375, 0.749, -2.5, 0)] });
+  // Bored to the barrel, not to a nominal size: a barrel nut is a push fit.
+  const post = board('Cross Dowel — Post', o, { width: 3, features: [hole('Barrel pocket', 'top_face', 0.375, 0.749, -2.5, 0)] });
   post.position.x = rail.position.x - ext(rail).x - ext(post).x;
-  const barrel = board('Cross Dowel — Barrel', o, { length: 0.75, width: 0.375, thickness: 0.375, stockId: DOWEL38.id, color: '#8a8a8a', grainSensitive: false, rotation: { x: 0, y: 0, z: 90 } });
-  apartFrom(post, barrel, 'z');
+  const barrel = board('Cross Dowel — Barrel', o, { length: 0.749, width: 0.375, thickness: 0.375, stockId: DOWEL38.id, color: '#8a8a8a', grainSensitive: false, rotation: { x: 0, y: 0, z: 90 } });
+  barrel.position.x = post.position.x - 2.5;
+  barrel.position.z = post.position.z;
+  barrel.position.y = post.position.y + ext(post).y - 0.749 / 2;
   return [rail, post, barrel];
 });
 

@@ -24,6 +24,7 @@ import {
   getRectCutPlanBounds,
   getResolvedRectCutFeature,
   isBottomTarget,
+  isSideFaceTarget,
   isTopTarget
 } from './rectCutUtils';
 import type { GeometryCache } from '../interaction/geometry/cache';
@@ -368,33 +369,66 @@ export function getPartMaterialOBBs(
     .filter((feature): feature is RectCutFeature => feature.enabled && feature.kind === 'rect_cut')
     .map((feature) => getResolvedRectCutFeature(feature, part));
   const tenons = resolvedRectCuts.filter((feature) => feature.cutType === 'tenon');
-  const cutVolumes = resolvedRectCuts
+  const cutVolumes: Array<{ xMin: number; xMax: number; yMin: number; yMax: number; zMin: number; zMax: number }> =
+    resolvedRectCuts
+      .filter(
+        (feature) =>
+          feature.cutType !== 'tenon' &&
+          (isTopTarget(feature) || isBottomTarget(feature)) &&
+          (feature.parameters.depthMode === 'through' || (feature.parameters.depth ?? 0) > 0)
+      )
+      .map((feature) => {
+        const halfLength = part.length / 2;
+        const halfWidth = part.width / 2;
+        const halfThickness = part.thickness / 2;
+        const depth = getRectCutDepth(feature, part.thickness);
+        const bounds = getRectCutPlanBounds(feature, part);
+        const rawXMin = -halfLength + bounds.minX;
+        const renderedZ = getRenderedLocalZRange(part.width, bounds.minZ, feature.parameters.size.width);
+        const xMin = Math.max(-halfLength, rawXMin);
+        const xMax = Math.min(halfLength, rawXMin + feature.parameters.size.length);
+        const zMin = Math.max(-halfWidth, renderedZ.min);
+        const zMax = Math.min(halfWidth, renderedZ.max);
+        const yMin = isBottomTarget(feature) ? -halfThickness : halfThickness - depth;
+        const yMax = isBottomTarget(feature) ? -halfThickness + depth : halfThickness;
+        return { xMin, xMax, yMin, yMax, zMin, zMax };
+      })
+      .filter(
+        (volume) =>
+          volume.xMax - volume.xMin > 1e-6 && volume.yMax - volume.yMin > 1e-6 && volume.zMax - volume.zMin > 1e-6
+      );
+
+  // A cut taken in a long edge -- a groove for a panel, a mortise for a
+  // domino, the slot a biscuit sits in -- removes material just as a pocket
+  // in the face does, but it is measured from a different pair of faces. Left
+  // out, the grid reads the board as solid right where the joint goes, and
+  // every correctly seated panel and spline is rejected as driven into wood.
+  const sideCutVolumes = resolvedRectCuts
     .filter(
-      (feature) =>
-        feature.cutType !== 'tenon' &&
-        (isTopTarget(feature) || isBottomTarget(feature)) &&
-        (feature.parameters.depthMode === 'through' || (feature.parameters.depth ?? 0) > 0)
+      (feature) => feature.cutType !== 'tenon' && isSideFaceTarget(feature) && (feature.parameters.depth ?? 0) > 0
     )
     .map((feature) => {
       const halfLength = part.length / 2;
       const halfWidth = part.width / 2;
       const halfThickness = part.thickness / 2;
-      const depth = getRectCutDepth(feature, part.thickness);
-      const bounds = getRectCutPlanBounds(feature, part);
-      const rawXMin = -halfLength + bounds.minX;
-      const renderedZ = getRenderedLocalZRange(part.width, bounds.minZ, feature.parameters.size.width);
-      const xMin = Math.max(-halfLength, rawXMin);
-      const xMax = Math.min(halfLength, rawXMin + feature.parameters.size.length);
-      const zMin = Math.max(-halfWidth, renderedZ.min);
-      const zMax = Math.min(halfWidth, renderedZ.max);
-      const yMin = isBottomTarget(feature) ? -halfThickness : halfThickness - depth;
-      const yMax = isBottomTarget(feature) ? -halfThickness + depth : halfThickness;
-      return { xMin, xMax, yMin, yMax, zMin, zMax };
+      const isBack = feature.target.type === 'face' && feature.target.face === 'back_face';
+      const depth = Math.min(feature.parameters.depth ?? 0, part.width);
+      const rawXMin = -halfLength + feature.placement.x;
+      const bandLow = -halfThickness + feature.placement.z;
+      return {
+        xMin: Math.max(-halfLength, rawXMin),
+        xMax: Math.min(halfLength, rawXMin + feature.parameters.size.length),
+        yMin: Math.max(-halfThickness, bandLow),
+        yMax: Math.min(halfThickness, bandLow + feature.parameters.size.width),
+        zMin: isBack ? -halfWidth : halfWidth - depth,
+        zMax: isBack ? -halfWidth + depth : halfWidth
+      };
     })
     .filter(
       (volume) =>
         volume.xMax - volume.xMin > 1e-6 && volume.yMax - volume.yMin > 1e-6 && volume.zMax - volume.zMin > 1e-6
     );
+  cutVolumes.push(...sideCutVolumes);
 
   if (tenons.length === 0 && cutVolumes.length === 0) return getPartSubOBBs(part, position);
 
@@ -3606,6 +3640,14 @@ export interface FeatureSocket {
   /** Depth of the socket (along -openingNormal) */
   depth: number;
   mateKind: RectCutFeature['cutType'] | RoundedCutFeature['cutType'] | 'round_hole';
+  /**
+   * Open at the far end as well as the mouth.
+   *
+   * A through hole has no floor to bottom out on -- a peg driven right
+   * through a lapped joint comes out the other side, which is the whole idea
+   * of a pin. Only a blind socket can be said to have been driven too deep.
+   */
+  through: boolean;
 }
 
 // Tolerance for dimension matching (inches) — parts whose dimension is within
@@ -3722,6 +3764,7 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
           halfExtent1: radius,
           halfExtent2: radius,
           depth,
+          through: feature.parameters.depthMode === 'through',
           mateKind: 'round_hole'
         });
       }
@@ -3801,6 +3844,7 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
         halfExtent1: feature.parameters.length / 2,
         halfExtent2: feature.parameters.width / 2,
         depth,
+        through: feature.parameters.depthMode === 'through',
         mateKind: feature.cutType
       });
       continue;
@@ -3843,6 +3887,7 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
         halfExtent1: resolved.parameters.size.length / 2,
         halfExtent2: resolved.parameters.size.width / 2,
         depth,
+        through: resolved.parameters.depthMode === 'through',
         mateKind: resolved.cutType
       });
       continue;
@@ -3877,6 +3922,7 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
       halfExtent1: resolved.parameters.size.length / 2,
       halfExtent2: resolved.parameters.size.width / 2,
       depth,
+      through: resolved.parameters.depthMode === 'through',
       mateKind: resolved.cutType
     });
   }
@@ -3897,6 +3943,8 @@ export interface MateSnapResult extends SnapResult {
    * short of the floor is a great many joints working exactly as intended.
    */
   mateInsertionNormal?: Vec3;
+  /** The socket is open at its far end, so there is no floor to bottom on. */
+  mateThrough?: boolean;
   mateConflict?: { candidateCount: number; maxDisagreement: number };
 }
 
@@ -4071,6 +4119,8 @@ type FeatureMateCandidate = {
   sourceKey: string;
   /** Out of the socket, against the way the piece went in. */
   insertionNormal?: Vec3;
+  /** The socket is open at its far end, so there is no floor to bottom on. */
+  through?: boolean;
 };
 
 /** Return every geometrically eligible rectangular joint proposal. Keeping
@@ -4151,6 +4201,7 @@ function collectFeatureMateCandidates(
         candidates.push({
           ...match,
           hostPartId: hostPart.id,
+          through: socket.through,
           mateKind: mateShape.mateKind ?? socket.mateKind,
           sourceKey: `${draggingPart.id}:${mateShape.sourceFeatureId ?? 'body'}`
         });
@@ -4191,6 +4242,7 @@ function collectFeatureMateCandidates(
             // The host was tried as the inserted half, so the way out of the
             // socket points the other way for the part actually being moved.
             insertionNormal: mulVec(match.insertionNormal, -1),
+            through: socket.through,
             distance: match.distance,
             hostPartId: hostPart.id,
             constrainedAxes: match.constrainedAxes,
@@ -4226,7 +4278,8 @@ function candidateToMateSnapResult(currentPosition: Vec3, candidate: FeatureMate
     ],
     mateHostPartId: candidate.hostPartId,
     mateKind: candidate.mateKind,
-    mateInsertionNormal: candidate.insertionNormal
+    mateInsertionNormal: candidate.insertionNormal,
+    mateThrough: candidate.through
   };
 }
 
@@ -4539,8 +4592,18 @@ function findBestMateMatch(
 
     // Only snap when the part is reasonably close to the socket surface.
     const distFromSurface = enterFaceAlongN - openingAlongN;
-    if (distFromSurface < -socket.depth - snapThreshold) continue;
-    if (distFromSurface > snapThreshold) continue;
+    if (socket.through) {
+      // A hole open at both ends has no floor to stop against. A peg driven
+      // through a lapped joint runs out the far side and on into the piece
+      // beneath, so measuring how far past the bottom it has gone says
+      // nothing: what matters is that it is in the hole at all.
+      const farFaceAlongN = partCenterAlongN + Math.abs(alignment) * cand.halfExt;
+      if (farFaceAlongN < floorAlongN - snapThreshold) continue;
+      if (enterFaceAlongN > openingAlongN + snapThreshold) continue;
+    } else {
+      if (distFromSurface < -socket.depth - snapThreshold) continue;
+      if (distFromSurface > snapThreshold) continue;
+    }
 
     const insertionDelta = floorAlongN - enterFaceAlongN;
     let delta = mulVec(n, insertionDelta);

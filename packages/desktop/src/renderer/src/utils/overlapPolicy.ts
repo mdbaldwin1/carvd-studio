@@ -344,7 +344,10 @@ function seatsInto(movedPart: Part, hostPart: Part): boolean {
       drift.y - normal.y * outward,
       drift.z - normal.z * outward
     );
-    isSeatedMate = sideways <= JOINERY_FIT_TOLERANCE && outward <= JOINERY_FIT_TOLERANCE;
+    // A through socket has no floor at all -- a peg driven through a lapped
+    // joint is meant to come out the far side -- so only a blind one can be
+    // said to have been driven too deep.
+    isSeatedMate = sideways <= JOINERY_FIT_TOLERANCE && (mate.mateThrough === true || outward <= JOINERY_FIT_TOLERANCE);
   } else {
     isSeatedMate =
       Math.abs(drift.x) <= JOINERY_FIT_TOLERANCE &&

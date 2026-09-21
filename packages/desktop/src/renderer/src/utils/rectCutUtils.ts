@@ -319,8 +319,16 @@ export function getRectCutPreviewSupport(feature: RectCutFeature): RectCutPrevie
     feature.cutType === 'stopped_groove' ||
     feature.cutType === 'mortise'
   ) {
+    // Cuts that are taken in a long edge rather than across a face. A groove
+    // ploughed in an edge is the commonest of them all -- it is where a
+    // panel, a spline and a tongue each go -- and leaving it out meant those
+    // three joints could be drawn but never appeared in the board. A dado is
+    // not in the list on purpose: it runs across a face by definition.
     const isSideFacePocket =
-      (feature.cutType === 'mortise' || feature.cutType === 'cutout') &&
+      (feature.cutType === 'mortise' ||
+        feature.cutType === 'cutout' ||
+        feature.cutType === 'groove' ||
+        feature.cutType === 'stopped_groove') &&
       feature.target.type === 'face' &&
       (feature.target.face === 'front_face' || feature.target.face === 'back_face');
     if (isSideFacePocket) {
