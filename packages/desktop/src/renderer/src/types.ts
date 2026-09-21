@@ -193,10 +193,42 @@ export interface RectCutFeature extends PartFeatureBase {
      * depth, so the pocket is wider at the floor than at the mouth -- a tail
      * socket. Absent or zero is an ordinary square-walled pocket.
      *
-     * Only the ends of the pocket's length lean; its width stays square,
-     * which is what a dovetail bit or a saw kerf at an angle actually cuts.
+     * Only the ends of the pocket's length lean; its width stays square.
+     * This is the undercut a dovetail bit leaves as it is plunged -- a
+     * sliding dovetail's housing, wider at its floor than at its mouth. For
+     * the flare of a through dovetail's tails, see `taperAngle`.
      */
     wallAngle?: number;
+    /**
+     * The same lean, taken on the other pair of walls: how far the pocket's
+     * long sides lean off square through the depth, in degrees.
+     *
+     * A pocket has two pairs of walls and they lean independently, so both
+     * angles are needed to describe one. It is the pin board of a through
+     * dovetail that wants this one: its sockets are bored through the
+     * thickness rather than sawn along the length, so the flare that
+     * receives the tails runs down the depth of the cut instead of across
+     * its face. Positive widens toward the floor, as `wallAngle` does.
+     */
+    sideWallAngle?: number;
+    /**
+     * How far the pocket's long sides lean off parallel, in degrees.
+     *
+     * Where `wallAngle` leans the walls through the thickness, this leans
+     * them within the face: the footprint is a trapezoid rather than a
+     * rectangle, and the walls stay square to the surface. That is the shape
+     * of a through or half-blind dovetail, whose tails are cut right through
+     * the board and hold by flaring across the joint line, not by
+     * undercutting into it. Positive widens the pocket toward the far end of
+     * its length; negative narrows it. Absent or zero is a parallel pocket.
+     *
+     * The taper only runs this way round -- the width varying along the
+     * length, never the reverse -- because a rect cut has no rotation within
+     * the face to turn it by. A joint that needs the transpose is one whose
+     * sockets are spaced along the cut's own length, which so far is only
+     * the pins of a secret mitred dovetail, hidden behind its mitre.
+     */
+    taperAngle?: number;
     /**
      * The inside corners a rotating bit leaves behind.
      *

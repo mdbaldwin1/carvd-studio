@@ -235,12 +235,19 @@ function getRectCutHole(feature: RectCutFeature, part: Part): Point2[] {
   const minZ = part.width / 2 - bounds.maxZ;
   const maxZ = part.width / 2 - bounds.minZ;
 
+  // A dovetail's flare lives in the face, not in the thickness: the far end
+  // of the pocket is wider than the near one and the walls stay square to the
+  // surface. Symmetric about the pocket's own centreline, so the mirrored
+  // plan axis costs nothing here.
+  const taper = feature.parameters.taperAngle ?? 0;
+  const flare = taper ? Math.tan((taper * Math.PI) / 180) * (maxX - minX) : 0;
+
   const radius = getRectCutCornerRadius(feature, part);
   if (radius <= 0) {
     return [
       { x: minX, z: minZ },
-      { x: maxX, z: minZ },
-      { x: maxX, z: maxZ },
+      { x: maxX, z: minZ - flare },
+      { x: maxX, z: maxZ + flare },
       { x: minX, z: maxZ }
     ];
   }
@@ -302,9 +309,8 @@ function referencedFeatureOffset(value: number, size: number, from: 'min' | 'cen
 /** How many steps a splayed wall is cut into. */
 const WALL_ANGLE_SLICES = 10;
 
-/** How far a pocket's ends lean out by a given depth below the surface. */
-function wallSplay(feature: RectCutFeature, depthBelowSurface: number): number {
-  const angle = feature.parameters.wallAngle ?? 0;
+/** How far a pocket's walls lean out by a given depth below the surface. */
+function wallSplay(angle: number | undefined, depthBelowSurface: number): number {
   if (!angle) return 0;
   return Math.tan((angle * Math.PI) / 180) * Math.max(0, depthBelowSurface);
 }
@@ -323,15 +329,24 @@ function depthBelowCutFace(feature: RectCutFeature, part: Part, yMid: number): n
  * it, and the stack of them is the lean.
  */
 function getSplayedRectCutHole(feature: RectCutFeature, part: Part, yMid: number): Point2[] {
-  const grow = wallSplay(feature, depthBelowCutFace(feature, part, yMid));
-  if (grow === 0) return getRectCutHole(feature, part);
+  const below = depthBelowCutFace(feature, part, yMid);
+  const grow = wallSplay(feature.parameters.wallAngle, below);
+  const growSide = wallSplay(feature.parameters.sideWallAngle, below);
+  if (grow === 0 && growSide === 0) return getRectCutHole(feature, part);
+  // Leaning inward, a wall can in principle meet its opposite number before
+  // the floor. Validation keeps authored cuts clear of that; this keeps a
+  // degenerate contour out of the slicer either way.
+  const span = (nominal: number, change: number) => Math.max(1e-6, nominal + 2 * change);
   const widened: RectCutFeature = {
     ...feature,
     parameters: {
       ...feature.parameters,
-      size: { length: feature.parameters.size.length + 2 * grow, width: feature.parameters.size.width }
+      size: {
+        length: span(feature.parameters.size.length, grow),
+        width: span(feature.parameters.size.width, growSide)
+      }
     },
-    placement: { x: feature.placement.x - grow, z: feature.placement.z }
+    placement: { x: feature.placement.x - grow, z: feature.placement.z - growSide }
   };
   return getRectCutHole(widened, part);
 }
@@ -590,7 +605,12 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     // A leaning wall needs slicing whether the pocket stops inside the board
     // or runs right through it -- a through dovetail's sockets do both at
     // once, splayed and open at the far face.
-    if (feature.parameters.depthMode !== 'blind' && !isSideFaceTarget(feature) && !feature.parameters.wallAngle)
+    if (
+      feature.parameters.depthMode !== 'blind' &&
+      !isSideFaceTarget(feature) &&
+      !feature.parameters.wallAngle &&
+      !feature.parameters.sideWallAngle
+    )
       continue;
     if (isSideFaceTarget(feature)) {
       // Side-face pockets occupy a band across the thickness: slice at the
@@ -613,7 +633,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
       }
     }
     // A leaning wall is cut in steps, so the depth it spans needs slicing.
-    if (feature.parameters.wallAngle) {
+    if (feature.parameters.wallAngle || feature.parameters.sideWallAngle) {
       for (let step = 1; step < WALL_ANGLE_SLICES; step += 1) {
         const into = (depth * step) / WALL_ANGLE_SLICES;
         sliceY.add(isBottomTarget(feature) ? -part.thickness / 2 + into : part.thickness / 2 - into);

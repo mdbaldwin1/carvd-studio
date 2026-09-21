@@ -61,7 +61,12 @@ function describeSetting(feature: PartFeature, units: Units): { operation: strin
       feature.parameters.depthMode === 'through' ? 'through' : `${measure(feature.parameters.depth)} deep`;
     // A leaning wall is a different cutter, not a different number on the
     // same one, so two cuts at different angles are never the same setup.
-    const depth = feature.parameters.wallAngle ? `${depthOnly}, ${feature.parameters.wallAngle}° walls` : depthOnly;
+    const wallAngles = [feature.parameters.wallAngle, feature.parameters.sideWallAngle].filter(Boolean);
+    const walls = wallAngles.length ? `, ${wallAngles.join('/')}° walls` : '';
+    // A taper is laid out from the same setup but sawn to a different line,
+    // so it belongs in the note the same way the leaning wall does.
+    const taper = feature.parameters.taperAngle ? `, ${feature.parameters.taperAngle}° taper` : '';
+    const depth = `${depthOnly}${walls}${taper}`;
 
     // Every channel is set up the same way -- the stack width is the run
     // across the board and the height is the depth. Which stored dimension

@@ -404,6 +404,25 @@ export function validateRectCutFeature(
   // which no bit or saw will cut and no joint has ever wanted.
   if (Math.abs(wallAngle) > 45) return 'Wall angle must be within 45 degrees of square.';
 
+  const sideWallAngle = resolvedFeature.parameters.sideWallAngle ?? 0;
+  if (!Number.isFinite(sideWallAngle)) return 'Side wall angle must be a finite number.';
+  if (Math.abs(sideWallAngle) > 45) return 'Side wall angle must be within 45 degrees of square.';
+
+  const taperAngle = resolvedFeature.parameters.taperAngle ?? 0;
+  if (!Number.isFinite(taperAngle)) return 'Taper angle must be a finite number.';
+  // Dovetails are cut between 1:8 and 1:5 -- about 7 to 11 degrees. Past 30
+  // the tails are so slender they snap off with the waste.
+  if (Math.abs(taperAngle) > 30) return 'Taper angle must be within 30 degrees of parallel.';
+  if (taperAngle) {
+    const flare = Math.tan((taperAngle * Math.PI) / 180) * sizeLength;
+    // Narrowed past its own width the trapezoid crosses itself and stops
+    // describing a pocket.
+    if (sizeWidth + 2 * flare <= 0) return 'Taper angle closes the pocket before its far end.';
+    // A flare that runs off the edge of the blank is not an error: it is the
+    // half pin at the end of every dovetailed board, where the socket opens
+    // out past the corner and takes it away.
+  }
+
   const cornerRadius = resolvedFeature.parameters.cornerRadius ?? 0;
   if (cornerRadius < 0) return 'Corner radius cannot be negative.';
   if (cornerRadius > 0) {
@@ -411,6 +430,8 @@ export function validateRectCutFeature(
     // arcs would cross and the shape stops being a pocket at all.
     const limit = Math.min(sizeLength, resolvedFeature.parameters.size.width) / 2;
     if (cornerRadius > limit + 1e-9) return 'Corner radius is larger than the pocket can hold.';
+    // A bit cannot sweep a radius into a wall that is itself leaning away.
+    if (taperAngle) return 'A tapered pocket cannot also have radiused corners.';
   }
 
   if (resolvedFeature.cutType === 'half_lap') {
