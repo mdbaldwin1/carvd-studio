@@ -53,11 +53,27 @@ const hole = (label, f, diameter, depth, primary, secondary) => ({
     : { diameter, depthMode: 'blind', depth, tilt: 0, direction: 0 }
 });
 
-const endCut = (label, f, horizontalAngle) => ({
+const endCut = (label, f, horizontalAngle, horizontalFlip = false) => ({
   id: id(), kind: 'end_cut', version: 1, enabled: true, label,
   target: face(f), reference: { primaryFrom: f === 'left_end' ? 'min' : 'max' },
-  cutType: 'mitre', lengthMode: 'long_point', parameters: { horizontalAngle }
+  cutType: 'mitre', lengthMode: 'long_point', parameters: { horizontalAngle, horizontalFlip }
 });
+
+/**
+ * Close a mitred corner: two flat pieces meeting at a right angle, each
+ * giving up half the square where they cross.
+ *
+ * The leg is turned a quarter about Y, which sends its length down -Z -- so
+ * the end that reaches the corner is its *right*, not its left, and mitring
+ * the left end puts the cut twelve inches away at the far end instead. The
+ * two mitres must also lean opposite ways, or both pieces keep the same half
+ * of the square and drive straight through each other.
+ */
+const mitreCorner = (rail, stile) => {
+  stile.position.x = rail.position.x + ext(rail).x - ext(stile).x;
+  stile.position.z = rail.position.z - ext(rail).z + ext(stile).z;
+  return stile;
+};
 
 const slot = (label, f, length, width, depth, primary, secondary) => ({
   id: id(), kind: 'rounded_cut', version: 1, enabled: true, label, cutType: 'rounded_slot',
@@ -174,11 +190,12 @@ station('01 Butt Joint', 'SEATED: no joinery at all, the end of one against the 
 // 02 Mitred butt — an L corner, both ends mitred ------------------------
 station('02 Mitred Butt Joint', 'SEATED: an L corner with both ends cut at 45 degrees.', () => {
   const o = origin();
-  const rail = board('Mitred Butt — Rail', o, { features: [endCut('Mitre', 'right_end', 45)] });
-  const stile = board('Mitred Butt — Stile', o, { rotation: { x: 0, y: 90, z: 0 }, features: [endCut('Mitre', 'left_end', 45)] });
-  // Tuck the stile into the corner: flush with the rail's right end, running away in Z.
-  stile.position.x = rail.position.x + ext(rail).x - ext(stile).x;
-  against(rail, stile, 'z');
+  const rail = board('Mitred Butt — Rail', o, { features: [endCut('Mitre', 'right_end', 45, true)] });
+  const stile = board('Mitred Butt — Stile', o, {
+    rotation: { x: 0, y: 90, z: 0 },
+    features: [endCut('Mitre', 'right_end', 45)]
+  });
+  mitreCorner(rail, stile);
   return [rail, stile];
 });
 
@@ -486,10 +503,9 @@ station('29 Cross Dowel Joint', 'SEATED and APPROXIMATE: the barrel nut cross bo
 // 30 Keyed mitre — the key is sawn in after assembly, so show it apart --
 station('30 Keyed Joint', 'EXPLODED: a mitred corner reinforced with a key; the kerf is sawn after assembly.', () => {
   const o = origin();
-  const a = board('Keyed — Board A', o, { features: [endCut('Mitre', 'right_end', 45), rect('Key kerf', 'stopped_groove', face('top_face'), { size: { length: 0.75, width: 0.125 }, depthMode: 'blind', depth: 0.6 }, { x: 7.5, z: 1 })] });
-  const b = board('Keyed — Board B', o, { rotation: { x: 0, y: 90, z: 0 }, features: [endCut('Mitre', 'left_end', 45)] });
-  b.position.x = a.position.x + ext(a).x - ext(b).x;
-  against(a, b, 'z');
+  const a = board('Keyed — Board A', o, { features: [endCut('Mitre', 'right_end', 45, true), rect('Key kerf', 'stopped_groove', face('top_face'), { size: { length: 0.75, width: 0.125 }, depthMode: 'blind', depth: 0.6 }, { x: 7.5, z: 1 })] });
+  const b = board('Keyed — Board B', o, { rotation: { x: 0, y: 90, z: 0 }, features: [endCut('Mitre', 'right_end', 45)] });
+  mitreCorner(a, b);
   const key = board('Keyed — Key', o, { length: 0.75, width: 1.5, thickness: 0.125 });
   key.position.x = a.position.x - ext(a).x + 7.5 + 0.375;
   key.position.z = a.position.z;
