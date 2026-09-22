@@ -1611,7 +1611,7 @@ station(
 // 38 Stopped dado — the housing that does not show at the front --------
 station(
   '38 Stopped Dado',
-  'SEATED: the housing stops short of the front edge so nothing shows, and the shelf is notched to clear where it stops.',
+  'SEATED: the housing stops short of the front edge so nothing shows. Routed, so it stops round, and the shelf is notched to clear it.',
   () => {
     const o = origin();
     const T = 0.75;
@@ -1625,7 +1625,7 @@ station(
           'Stopped housing',
           'stopped_dado',
           face('top_face'),
-          { size: { length: T, width: 8 - STOP }, depthMode: 'blind', depth: DEPTH },
+          { size: { length: T, width: 8 - STOP }, depthMode: 'blind', depth: DEPTH, cornerRadius: T / 2 },
           { x: 8, z: 0 }
         )
       ]
@@ -2007,6 +2007,360 @@ station(
     // lands -- measuring from the first mortise puts it out by half the gap.
     seatTenon(leg, rail, { tenonLength: TENON, mortiseFromMin: 12.25, mortiseLength: 1 });
     return [leg, rail];
+  }
+);
+
+// 47 Screwed cleat — countersunk, and the same hole three times -------
+station(
+  '47 Screwed Cleat',
+  'SEATED: a cleat screwed to a panel, the heads countersunk flush. One hole, set out three times along the cleat.',
+  () => {
+    const o = origin();
+    const panel = board('Screwed — Panel', o, { width: 8 });
+    const cleat = board('Screwed — Cleat', o, {
+      length: 10,
+      width: 2,
+      features: [
+        {
+          id: id(),
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          label: 'Screw',
+          cutType: 'countersink',
+          target: face('top_face'),
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          placement: { primary: -3, secondary: 0, rotation: 0 },
+          parameters: {
+            diameter: 5 / 32,
+            depthMode: 'through',
+            tilt: 0,
+            direction: 0,
+            countersink: { majorDiameter: 3 / 8, includedAngle: 82 },
+            // A cleat is screwed at intervals, not one screw at a time.
+            pattern: { type: 'linear', count: 3, spacing: 3, direction: 0 }
+          }
+        }
+      ]
+    });
+    cleat.position.x = panel.position.x;
+    cleat.position.z = panel.position.z;
+    cleat.position.y = panel.position.y + ext(panel).y + ext(cleat).y;
+    return [panel, cleat];
+  }
+);
+
+// 48 Egg-crate divider — two panels notched into one another ----------
+station(
+  '48 Egg-Crate Divider',
+  'SEATED: each panel notched half its width, one from the top and one from the bottom, and slid together.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    const W = 6;
+    const notch = (e) =>
+      rect(
+        'Notch',
+        'edge_notch',
+        edge(e),
+        { size: { length: T, width: W / 2 }, depthMode: 'through' },
+        { x: 6 - T / 2, z: 0 }
+      );
+    // Stood on edge, length along X; the second turned so its length runs
+    // along Z instead, which is the crossing.
+    const a = board('Egg Crate — Panel A', o, {
+      width: W,
+      rotation: { x: 90, y: 0, z: 0 },
+      features: [notch('top_front_edge')]
+    });
+    const b = board('Egg Crate — Panel B', o, {
+      width: W,
+      rotation: { x: 90, y: 0, z: 90 },
+      features: [notch('top_back_edge')]
+    });
+    b.position.x = a.position.x;
+    b.position.y = a.position.y;
+    b.position.z = a.position.z;
+    return [a, b];
+  }
+);
+
+// 49 Hinge mortise — the shallow recess a leaf sits in ---------------
+station(
+  '49 Hinge Mortise',
+  'SEATED: a hinge let in flush, half its thickness into each piece, in recesses a router leaves round-cornered.',
+  () => {
+    const o = origin();
+    const LEAF = 0.09;
+    const recess = (f) => ({
+      id: id(),
+      kind: 'rounded_cut',
+      version: 1,
+      enabled: true,
+      label: 'Hinge recess',
+      cutType: 'rounded_rectangle',
+      target: face(f),
+      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      parameters: { length: 2.5, width: 1.25, cornerRadius: 0.125, depthMode: 'blind', depth: LEAF },
+      placement: { primary: 0, secondary: 0, rotation: 0 }
+    });
+    const jamb = board('Hinge — Jamb', o, { width: 4, features: [recess('top_face')] });
+    const door = board('Hinge — Door', o, { width: 4, features: [recess('bottom_face')] });
+    door.position.y = jamb.position.y + ext(jamb).y + ext(door).y;
+    door.position.x = jamb.position.x;
+    door.position.z = jamb.position.z;
+    // The hinge itself is ironmongery, not stock, so it is not a part here.
+    // What the bench is for is the pair of recesses: routed, round-cornered,
+    // and exactly half the leaf deep in each piece so the two close flush.
+    return [jamb, door];
+  }
+);
+
+// 51 T-slot — a bolt head running in a routed track -------------------
+station(
+  '51 T-Slot Joint',
+  'SEATED: a track routed with a T-slot cutter, and a bar running in the undercut that no straight bit could have made.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    const SLOT = 0.25;
+    const HEAD = 0.5;
+    const HEAD_HEIGHT = 0.1875;
+    const rail = board('T-Slot — Rail', o, {
+      width: 3,
+      features: [
+        {
+          id: id(),
+          kind: 'routed_path',
+          version: 1,
+          enabled: true,
+          label: 'T-slot',
+          target: face('top_face'),
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          path: {
+            points: [
+              { primary: -5, secondary: 0 },
+              { primary: 5, secondary: 0 }
+            ]
+          },
+          bit: { profile: 't_slot', diameter: HEAD, shankDiameter: SLOT, cutterHeight: HEAD_HEIGHT },
+          parameters: { depthMode: 'blind', depth: 0.4375 }
+        }
+      ]
+    });
+    // The bar lives in the wide part of the track and cannot be lifted out.
+    const bar = board('T-Slot — Bar', o, {
+      length: 4,
+      width: HEAD - 0.03,
+      thickness: HEAD_HEIGHT - 0.02,
+      grainSensitive: false
+    });
+    bar.position.x = rail.position.x;
+    bar.position.z = rail.position.z;
+    bar.position.y = rail.position.y + ext(rail).y - 0.4375 + ext(bar).y;
+    return [rail, bar];
+  }
+);
+
+// 52 Beaded board — a bead and a chamfer on a tongued edge ------------
+station(
+  '52 Beaded Board',
+  'SEATED: tongued and grooved boards with a bead worked on one edge and the other chamfered, so the seam reads as a line and not a gap.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    const TONGUE = 0.25;
+    const profile = (label, e, kind, size) => ({
+      id: id(),
+      kind: 'edge_profile',
+      version: 1,
+      enabled: true,
+      label,
+      target: edge(e),
+      reference: { primaryFrom: 'min' },
+      profile: kind,
+      parameters: { size, depth: size }
+    });
+    const a = board('Beaded — Board A', o, {
+      features: [
+        rect(
+          'Groove',
+          'groove',
+          face('front_face'),
+          { size: { length: 12, width: TONGUE }, depthMode: 'blind', depth: 0.375 },
+          { x: 0, z: (T - TONGUE) / 2 }
+        ),
+        profile('Bead', 'top_front_edge', 'bead', 0.125)
+      ]
+    });
+    const b = board('Beaded — Board B', o, {
+      features: [
+        rect(
+          'Tongue shoulder (top)',
+          'cutout',
+          face('top_face'),
+          { size: { length: 12, width: 0.375 }, depthMode: 'blind', depth: (T - TONGUE) / 2 },
+          { x: 0, z: 0 }
+        ),
+        rect(
+          'Tongue shoulder (under)',
+          'cutout',
+          face('bottom_face'),
+          { size: { length: 12, width: 0.375 }, depthMode: 'blind', depth: (T - TONGUE) / 2 },
+          { x: 0, z: 0 }
+        ),
+        profile('Chamfer', 'top_back_edge', 'chamfer', 0.125)
+      ]
+    });
+    b.position.z = a.position.z + 3 - 0.375;
+    return [a, b];
+  }
+);
+
+// 53 Shelf pin holes — a grid of them, and a shelf sitting on it ------
+station(
+  '53 Shelf Pin Holes',
+  'SEATED: two rows of 5mm holes set out as a grid, and a shelf resting on the pins. Adjustable, which no cut joint is.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    const side = board('Shelf Pins — Side', o, {
+      length: 18,
+      width: 8,
+      features: [
+        {
+          id: id(),
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          label: 'Pin hole',
+          cutType: 'round_hole',
+          target: face('top_face'),
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          placement: { primary: -3, secondary: -1.5, rotation: 0 },
+          parameters: {
+            diameter: 5 * MM,
+            depthMode: 'blind',
+            depth: 0.375,
+            tilt: 0,
+            direction: 0,
+            // Two rows front and back, stepped up the side at 32mm centres.
+            pattern: { type: 'grid', rows: 5, columns: 2, rowSpacing: 32 * MM, columnSpacing: 3, rotation: 0 }
+          }
+        }
+      ]
+    });
+    const shelf = board('Shelf Pins — Shelf', o, { length: 8, width: 8, rotation: { x: 0, y: 0, z: 90 } });
+    shelf.position.x = side.position.x - ext(side).x + 8;
+    shelf.position.z = side.position.z;
+    shelf.position.y = side.position.y + ext(side).y + ext(shelf).y;
+    return [side, shelf];
+  }
+);
+
+// 54 Cutter sampler — every other bit and profile, on two boards ------
+station(
+  '54 Cutter Sampler',
+  'EXPLODED: not a joint at all. One board carries a pass of every remaining router bit, the other every remaining edge profile, so nothing in the cutter list goes untested.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    const pass = (label, bit, secondary, depth = 0.1875) => ({
+      id: id(),
+      kind: 'routed_path',
+      version: 1,
+      enabled: true,
+      label,
+      target: face('top_face'),
+      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      path: {
+        points: [
+          { primary: -5, secondary },
+          { primary: 5, secondary }
+        ]
+      },
+      bit,
+      parameters: { depthMode: 'blind', depth }
+    });
+    const bits = board('Sampler — Router Bits', o, {
+      width: 14,
+      features: [
+        pass('Straight', { profile: 'straight', diameter: 0.25 }, -6.5),
+        pass('Mortising', { profile: 'mortising', diameter: 0.5 }, -5.5),
+        pass('Spiral upcut', { profile: 'spiral_upcut', diameter: 0.25 }, -4.5),
+        pass('Spiral downcut', { profile: 'spiral_downcut', diameter: 0.25 }, -3.5),
+        pass('Compression', { profile: 'compression', diameter: 0.25 }, -2.5),
+        pass('Surfacing', { profile: 'surfacing', diameter: 1 }, -1.5, 0.0625),
+        pass('Core box', { profile: 'core_box', diameter: 0.5 }, -0.5),
+        pass('Ball nose', { profile: 'ball_nose', diameter: 0.375 }, 0.5),
+        pass('V bit', { profile: 'v_bit', diameter: 0.5, includedAngle: 90 }, 1.5),
+        pass('Engraving', { profile: 'engraving', diameter: 0.125, includedAngle: 60 }, 2.5, 0.0625),
+        // The two that undercut, and so cut a shape no straight bit can.
+        pass('Dovetail', { profile: 'dovetail', diameter: 0.5, shankDiameter: 0.25, includedAngle: 14 }, 3.5, 0.375),
+        pass('Keyhole', { profile: 'keyhole', diameter: 0.5, shankDiameter: 0.25, cutterHeight: 0.125 }, 4.5, 0.375)
+      ]
+    });
+    const profile = (label, e, kind, size) => ({
+      id: id(),
+      kind: 'edge_profile',
+      version: 1,
+      enabled: true,
+      label,
+      target: edge(e),
+      reference: { primaryFrom: 'min' },
+      profile: kind,
+      parameters: { size, depth: size }
+    });
+    // A profile of one's own: the boundary a cutter leaves, given outright as
+    // coordinates from the arris instead of picked from the standard list.
+    const stepped = {
+      version: 1,
+      id: id(),
+      name: 'Stepped bead',
+      family: 'custom',
+      source: 'generic',
+      parameters: {},
+      boundary: {
+        start: { u: 0.375, v: 0 },
+        segments: [
+          { kind: 'line', to: { u: 0.375, v: 0.1875 } },
+          { kind: 'line', to: { u: 0.1875, v: 0.1875 } },
+          { kind: 'line', to: { u: 0.1875, v: 0.375 } },
+          { kind: 'line', to: { u: 0, v: 0.375 } }
+        ]
+      }
+    };
+    const profiles = board('Sampler — Edge Profiles', o, {
+      width: 6,
+      features: [
+        profile('Ogee', 'top_front_edge', 'ogee', 0.25),
+        profile('Thumbnail', 'top_back_edge', 'thumbnail', 0.25),
+        profile('Rabbet', 'bottom_front_edge', 'rabbet', 0.25),
+        { ...profile('Stepped bead', 'bottom_back_edge', 'custom', 0.375), routerProfileSnapshot: stepped },
+        {
+          id: id(),
+          kind: 'circular_cut',
+          version: 1,
+          enabled: true,
+          label: 'Bolt circle',
+          cutType: 'round_hole',
+          target: face('top_face'),
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          placement: { primary: 0, secondary: 0, rotation: 0 },
+          // Set out round a centre rather than along a line, the way a
+          // bearing or a lazy susan is bolted down.
+          parameters: {
+            diameter: 0.25,
+            depthMode: 'through',
+            tilt: 0,
+            direction: 0,
+            pattern: { type: 'circular', count: 6, radius: 1.75, startAngle: 0 }
+          }
+        }
+      ]
+    });
+    clearOf(bits, profiles, 'z', 1);
+    return [bits, profiles];
   }
 );
 
