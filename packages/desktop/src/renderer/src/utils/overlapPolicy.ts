@@ -90,6 +90,13 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
  * of them, so a dovetail socket reads as its widest all the way down and the
  * tail rattles in a hole that, in the wood, grips it.
  *
+ * A shaped edge is the plainest case of all. A roundover, a cove, a chamfer,
+ * any router profile at all takes its wood off in section and leaves the
+ * outline it was cut from exactly as it was. So every joint that works by
+ * two profiles fitting one another -- a rule joint, cope and stick, a lock
+ * mitre -- is two square edges as far as the top view knows, and no amount
+ * of moving them will close it.
+ *
  * An end cut that runs in a band of the thickness is the same again, and the
  * worst of the three, because the contour shows the cut applied to the whole
  * end. The secret mitred dovetail is mitred on its outer sliver only and
@@ -103,6 +110,8 @@ function needsMaterialOverlapTest(part: Part): boolean {
         feature.enabled &&
         (feature.kind === 'circular_cut' ||
           feature.kind === 'rounded_cut' ||
+          feature.kind === 'edge_profile' ||
+          feature.kind === 'routed_path' ||
           (feature.kind === 'end_cut' && feature.parameters.band !== undefined) ||
           (feature.kind === 'rect_cut' &&
             (isHousingCut(feature.cutType) ||

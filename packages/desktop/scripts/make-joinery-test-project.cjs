@@ -1492,6 +1492,524 @@ station(
   }
 );
 
+// 34 Pocket hole — a screw driven in on the slant ----------------------
+station(
+  '34 Pocket Hole',
+  'SEATED: a butt joint held by two screws driven in on the slant, each down a counterbored pocket.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    // The jig bores at fifteen degrees off the face and steps the hole part
+    // way down for the screw head to pull against, which is the whole point:
+    // the head bears on a flat shoulder inside the rail, not on end grain.
+    const pocket = (secondary) => ({
+      id: id(),
+      kind: 'circular_cut',
+      version: 1,
+      enabled: true,
+      label: 'Pocket',
+      cutType: 'counterbore',
+      target: face('top_face'),
+      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+      placement: { primary: -4.5, secondary, rotation: 0 },
+      parameters: {
+        diameter: 5 / 32,
+        depthMode: 'through',
+        tilt: 15,
+        direction: 180,
+        counterbore: { diameter: 3 / 8, depth: 0.375 }
+      }
+    });
+    const rail = board('Pocket — Rail', o, { features: [pocket(-0.75), pocket(0.75)] });
+    const stile = board('Pocket — Stile', o, { rotation: { x: 0, y: 90, z: 0 } });
+    stile.position.x = rail.position.x - ext(rail).x - ext(stile).x;
+    stile.position.z = rail.position.z;
+    return [rail, stile];
+  }
+);
+
+// 35 Haunched mortise & tenon — the corner of a panelled door ---------
+station(
+  '35 Haunched Mortise & Tenon',
+  'SEATED: a door corner. The panel groove runs out at the top of the stile, and a stub of the tenon fills it.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    const TENON = 1;
+    const HAUNCH = 0.375;
+    const CHEEK = 0.1875;
+    const TONGUE = T - 2 * CHEEK;
+    const inThickness = { x: 0, z: (T - TONGUE) / 2 };
+    // The groove that carries the panel is ploughed the whole length of the
+    // stile, which means it runs out at the top and would leave a slot open
+    // in the corner. The haunch fills it: a stub of the tenon, as long as
+    // the groove is deep and no longer.
+    const stile = board('Haunched — Stile', o, {
+      length: 16,
+      features: [
+        rect(
+          'Panel groove',
+          'groove',
+          face('front_face'),
+          { size: { length: 16, width: TONGUE }, depthMode: 'blind', depth: HAUNCH },
+          inThickness
+        ),
+        rect(
+          'Mortise',
+          'mortise',
+          face('front_face'),
+          { size: { length: 2, width: TONGUE }, depthMode: 'blind', depth: TENON },
+          { x: 13.5, z: inThickness.z }
+        )
+      ]
+    });
+    const rail = board('Haunched — Rail', o, {
+      rotation: { x: 0, y: 90, z: 0 },
+      features: [
+        // Two cheeks leave a tongue centred in the thickness.
+        rect(
+          'Cheek (top)',
+          'cutout',
+          face('top_face'),
+          { size: { length: TENON, width: 3 }, depthMode: 'blind', depth: CHEEK },
+          { x: 12 - TENON, z: 0 }
+        ),
+        rect(
+          'Cheek (under)',
+          'cutout',
+          face('bottom_face'),
+          { size: { length: TENON, width: 3 }, depthMode: 'blind', depth: CHEEK },
+          { x: 12 - TENON, z: 0 }
+        ),
+        // Two shoulders narrow it. The one on the haunch side starts further
+        // along, and the stub it leaves behind is the haunch.
+        rect(
+          'Shoulder',
+          'cutout',
+          face('top_face'),
+          { size: { length: TENON, width: 0.5 }, depthMode: 'through' },
+          { x: 12 - TENON, z: 0 }
+        ),
+        rect(
+          'Haunch shoulder',
+          'cutout',
+          face('top_face'),
+          { size: { length: TENON - HAUNCH, width: 0.5 }, depthMode: 'through' },
+          { x: 12 - TENON + HAUNCH, z: 2.5 }
+        )
+      ]
+    });
+    // A quarter turn about Y sends the rail's length down -Z and its width
+    // along +X, so its far end is the one that reaches the stile.
+    rail.position.x = stile.position.x + 6.5;
+    rail.position.z = stile.position.z + 6.5;
+    rail.position.y = stile.position.y;
+    return [stile, rail];
+  }
+);
+
+// 38 Stopped dado — the housing that does not show at the front --------
+station(
+  '38 Stopped Dado',
+  'SEATED: the housing stops short of the front edge so nothing shows, and the shelf is notched to clear where it stops.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    const STOP = 1;
+    const DEPTH = 0.25;
+    const side = board('Stopped Dado — Side', o, {
+      length: 18,
+      width: 8,
+      features: [
+        rect(
+          'Stopped housing',
+          'stopped_dado',
+          face('top_face'),
+          { size: { length: T, width: 8 - STOP }, depthMode: 'blind', depth: DEPTH },
+          { x: 8, z: 0 }
+        )
+      ]
+    });
+    const shelf = board('Stopped Dado — Shelf', o, {
+      length: 8,
+      width: 8,
+      rotation: { x: 0, y: 0, z: 90 },
+      features: [
+        // Notched at the front corner so the shelf can still come forward
+        // flush, past the inch of housing that was never cut.
+        rect(
+          'Notch',
+          'corner_notch',
+          corner('front_right_corner'),
+          { size: { length: DEPTH, width: STOP }, depthMode: 'through' },
+          { x: 0, z: 0 }
+        )
+      ]
+    });
+    shelf.position.x = side.position.x - ext(side).x + 8 + T / 2;
+    shelf.position.z = side.position.z;
+    shelf.position.y = side.position.y + ext(side).y - DEPTH + ext(shelf).y;
+    return [side, shelf];
+  }
+);
+
+// 39 Rabbeted dado — the tongue-and-dado of plywood casework ----------
+station(
+  '39 Rabbeted Dado',
+  'SEATED: a narrow housing and a tongue rabbeted to fit it, which is how a plywood carcase goes together without a wide dado.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    const TONGUE = 0.25;
+    const side = board('Rabbeted Dado — Side', o, {
+      length: 18,
+      width: 8,
+      features: [
+        rect(
+          'Housing',
+          'dado',
+          face('top_face'),
+          { size: { length: TONGUE, width: 8 }, depthMode: 'blind', depth: TONGUE },
+          { x: 8, z: 0 }
+        )
+      ]
+    });
+    const shelf = board('Rabbeted Dado — Shelf', o, {
+      length: 8,
+      width: 8,
+      rotation: { x: 0, y: 0, z: 90 },
+      features: [
+        // A rabbet at the end leaves a tongue a quarter thick, which is all
+        // that goes in: the shoulder lands on the face and hides the housing.
+        rect(
+          'Rabbet',
+          'cutout',
+          face('bottom_face'),
+          { size: { length: TONGUE, width: 8 }, depthMode: 'blind', depth: T - TONGUE },
+          { x: 0, z: 0 }
+        )
+      ]
+    });
+    shelf.position.x = side.position.x - ext(side).x + 8 + T / 2;
+    shelf.position.z = side.position.z;
+    shelf.position.y = side.position.y + ext(side).y - TONGUE + ext(shelf).y;
+    return [side, shelf];
+  }
+);
+
+// 40 Shiplap — two rabbets that lie over one another -------------------
+station(
+  '40 Shiplap',
+  'SEATED: each board rabbeted on the opposite face, so the two lie over one another and can still move.',
+  () => {
+    const o = origin();
+    const LAP = 0.5;
+    const a = board('Shiplap — Board A', o, {
+      features: [
+        rect(
+          'Lap',
+          'rabbet',
+          edge('top_front_edge'),
+          { size: { length: 12, width: LAP }, depthMode: 'blind', depth: 0.375 },
+          { x: 0, z: 0 }
+        )
+      ]
+    });
+    const b = board('Shiplap — Board B', o, {
+      features: [
+        rect(
+          'Lap',
+          'rabbet',
+          edge('bottom_back_edge'),
+          { size: { length: 12, width: LAP }, depthMode: 'blind', depth: 0.375 },
+          { x: 0, z: 0 }
+        )
+      ]
+    });
+    // Set over by a board's width less the lap, so the two rabbets coincide.
+    b.position.z = a.position.z + 3 - LAP;
+    return [a, b];
+  }
+);
+
+// 41 Mitred half lap — a mitre on the face, a lap behind it ------------
+station(
+  '41 Mitred Half Lap',
+  'SEATED: the show face reads as a mitre; behind it the two halves lap, which is what actually holds.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    const HALF = T / 2;
+    // Only the upper half is mitred. Underneath, one piece keeps the whole
+    // square and the other gives it up entirely -- an ordinary lap, hidden.
+    const topMitre = (flip) => {
+      const cut = endCut('Mitre', 'right_end', 45, flip);
+      cut.parameters.band = { from: HALF, to: T };
+      return cut;
+    };
+    const rail = board('Mitred Lap — Rail', o, { features: [topMitre(true)] });
+    const stile = board('Mitred Lap — Stile', o, {
+      rotation: { x: 0, y: 90, z: 0 },
+      features: [
+        topMitre(false),
+        rect(
+          'Lap',
+          'half_lap',
+          face('bottom_face'),
+          { size: { length: 3, width: 3 }, depthMode: 'blind', depth: HALF },
+          { x: 9, z: 0 }
+        )
+      ]
+    });
+    mitreCorner(rail, stile);
+    return [rail, stile];
+  }
+);
+
+// 42 Dovetailed lap splice — two boards lapped end to end --------------
+station(
+  '42 Dovetailed Lap Splice',
+  'SEATED: a lap splice whose tongue is cut on the slant, so the two boards cannot be drawn apart along their length.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    const LAP = 1.5;
+    const SPLAY = 10;
+    const flare = Math.tan((SPLAY * Math.PI) / 180) * LAP;
+    // The tongue is widest at its tip and the socket widest at its mouth, so
+    // the two only pass each other sideways -- pull along the boards and the
+    // slope closes on itself.
+    const b = board('Dovetail Splice — Board B', o, {
+      features: [
+        rect(
+          'Socket',
+          'mortise',
+          face('top_face'),
+          { size: { length: LAP, width: 2 }, depthMode: 'blind', depth: T / 2, taperAngle: -SPLAY },
+          { x: 12 - LAP, z: 0.5 }
+        )
+      ]
+    });
+    const a = board('Dovetail Splice — Board A', o, {
+      features: [
+        rect(
+          'Lap',
+          'half_lap',
+          face('bottom_face'),
+          { size: { length: LAP, width: 3 }, depthMode: 'blind', depth: T / 2 },
+          { x: 0, z: 0 }
+        ),
+        // Sawn in from both edges, on the slant, to leave the tongue.
+        rect(
+          'Waste (near)',
+          'cutout',
+          face('top_face'),
+          { size: { length: LAP, width: 0.5 }, depthMode: 'blind', depth: T / 2, taperAngle: SPLAY },
+          { x: 0, z: 0 }
+        ),
+        rect(
+          'Waste (far)',
+          'cutout',
+          face('top_face'),
+          { size: { length: LAP, width: 0.5 }, depthMode: 'blind', depth: T / 2, taperAngle: SPLAY },
+          { x: 0, z: 2.5 }
+        )
+      ]
+    });
+    a.position.x = b.position.x + 12 - LAP;
+    a.position.z = b.position.z;
+    a.position.y = b.position.y;
+    return [b, a];
+  }
+);
+
+// 44 Compound mitre — a corner that leans as well as turns -------------
+station(
+  '44 Compound Mitre',
+  'SEATED: the corner of a canted box, where the cut has to turn and lean at once — one setting on the saw, two angles in the wood.',
+  () => {
+    const o = origin();
+    const compound = (flip) => ({
+      id: id(),
+      kind: 'end_cut',
+      version: 1,
+      enabled: true,
+      label: 'Compound mitre',
+      target: face('right_end'),
+      reference: { primaryFrom: 'max' },
+      cutType: 'compound',
+      lengthMode: 'long_point',
+      parameters: { horizontalAngle: 45, verticalAngle: 15, horizontalFlip: flip, verticalFlip: flip }
+    });
+    const rail = board('Compound — Rail', o, { features: [compound(true)] });
+    const stile = board('Compound — Stile', o, { rotation: { x: 0, y: 90, z: 0 }, features: [compound(false)] });
+    mitreCorner(rail, stile);
+    return [rail, stile];
+  }
+);
+
+// 46 Rule joint — the drop-leaf hinge that stays closed ----------------
+station(
+  '46 Rule Joint',
+  'SEATED: a drop-leaf edge. A roundover on the table and a cove on the leaf, cut to the same radius so the two stay in contact all the way down.',
+  () => {
+    const o = origin();
+    const T = 0.75;
+    const R = 0.375;
+    const profile = (label, e, kind) => ({
+      id: id(),
+      kind: 'edge_profile',
+      version: 1,
+      enabled: true,
+      label,
+      target: edge(e),
+      reference: { primaryFrom: 'min' },
+      profile: kind,
+      parameters: { size: R, depth: R }
+    });
+    const top = board('Rule — Table Top', o, {
+      width: 8,
+      features: [profile('Roundover', 'top_back_edge', 'roundover')]
+    });
+    const leaf = board('Rule — Leaf', o, { width: 8, features: [profile('Cove', 'top_front_edge', 'cove')] });
+    leaf.position.z = top.position.z + 8;
+    return [top, leaf];
+  }
+);
+
+// 36 Wedged through tenon — driven right through and spread -----------
+station(
+  '36 Wedged Through Tenon',
+  'SEATED: the tenon goes right through and stands proud, and two wedges driven into its kerfs spread it so it cannot come back.',
+  () => {
+    const o = origin();
+    const LEG = 1.75;
+    const PROUD = 0.375;
+    const KERF = 0.125;
+    const leg = board('Wedged — Leg', o, {
+      length: 16,
+      width: LEG,
+      thickness: LEG,
+      rotation: { x: 0, y: 0, z: 90 },
+      features: [
+        rect(
+          'Through mortise',
+          'mortise',
+          face('top_face'),
+          { size: { length: 2, width: 0.375 }, depthMode: 'through' },
+          { x: 12, z: (LEG - 0.375) / 2 }
+        )
+      ]
+    });
+    const rail = board('Wedged — Rail', o, {
+      rotation: { x: 90, y: 0, z: 0 },
+      features: [
+        rect(
+          'Tenon',
+          'tenon',
+          face('right_end'),
+          { size: { length: LEG + PROUD, width: 2 }, depthMode: 'blind', depth: 0.375 },
+          { x: 0, z: 0.5 }
+        ),
+        // Two saw kerfs down the length of the tenon, for the wedges to open.
+        ...[1, 1.875].map((z, n) =>
+          rect(
+            `Kerf ${n + 1}`,
+            'cutout',
+            face('top_face'),
+            { size: { length: LEG + PROUD, width: KERF }, depthMode: 'through' },
+            { x: 12 - (LEG + PROUD), z }
+          )
+        )
+      ]
+    });
+    seatTenon(leg, rail, { tenonLength: LEG + PROUD, mortiseFromMin: 12, mortiseLength: 2 });
+    // The rail is turned a quarter about X, which stands its width upright:
+    // the kerfs are therefore spaced in Y, and the wedges with them.
+    const wedge = (n, dy) => {
+      const w = board(`Wedged — Wedge ${n}`, o, {
+        length: 1,
+        width: KERF,
+        thickness: 0.375,
+        rotation: { x: 90, y: 0, z: 0 },
+        features: [
+          {
+            id: id(),
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            label: 'Taper',
+            target: face('left_end'),
+            reference: { primaryFrom: 'min' },
+            cutType: 'bevel',
+            lengthMode: 'long_point',
+            parameters: { horizontalAngle: 0, verticalAngle: 8, verticalFlip: false }
+          }
+        ]
+      });
+      // Driven home, its outer end flush with the tip of the tenon.
+      w.position.x = leg.position.x + ext(leg).x + PROUD - ext(w).x;
+      w.position.y = rail.position.y + dy;
+      w.position.z = rail.position.z;
+      return w;
+    };
+    return [leg, rail, wedge(1, 0.4375), wedge(2, -0.4375)];
+  }
+);
+
+// 37 Twin tenon — one wide tenon split in two -------------------------
+station(
+  '37 Twin Tenon',
+  'SEATED: a tenon too wide to trust as one, split in two with a stub of shoulder between them.',
+  () => {
+    const o = origin();
+    const LEG = 2.5;
+    const TENON = 1;
+    const leg = board('Twin — Leg', o, {
+      length: 16,
+      width: LEG,
+      thickness: LEG,
+      rotation: { x: 0, y: 0, z: 90 },
+      features: [
+        ...[0.5, 1.75].map((z, n) =>
+          rect(
+            `Mortise ${n + 1}`,
+            'mortise',
+            face('top_face'),
+            { size: { length: 1, width: 0.375 }, depthMode: 'blind', depth: TENON + 0.0625 },
+            { x: 11.5 + n * 1.5, z: (LEG - 0.375) / 2 }
+          )
+        )
+      ]
+    });
+    const rail = board('Twin — Rail', o, {
+      width: 4,
+      rotation: { x: 90, y: 0, z: 0 },
+      features: [
+        rect(
+          'Tenon',
+          'tenon',
+          face('right_end'),
+          { size: { length: TENON, width: 2.5 }, depthMode: 'blind', depth: 0.375 },
+          { x: 0, z: 0.75 }
+        ),
+        // The waste between the two, taken back to the shoulder line.
+        rect(
+          'Between tenons',
+          'cutout',
+          face('top_face'),
+          { size: { length: TENON, width: 0.5 }, depthMode: 'through' },
+          { x: 12 - TENON, z: 1.75 }
+        )
+      ]
+    });
+    // Seated on the midpoint of the pair, which is where the rail's centre
+    // lands -- measuring from the first mortise puts it out by half the gap.
+    seatTenon(leg, rail, { tenonLength: TENON, mortiseFromMin: 12.25, mortiseLength: 1 });
+    return [leg, rail];
+  }
+);
+
 const now = new Date().toISOString();
 const file = {
   version: 3,

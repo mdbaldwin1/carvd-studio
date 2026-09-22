@@ -1,5 +1,6 @@
+import { createTestPart } from '../../../../tests/helpers/factories';
 import { describe, expect, it, vi } from 'vitest';
-import { Part, RectCutFeature } from '../types';
+import { EdgeProfileFeature, Part, RectCutFeature } from '../types';
 import {
   overlapCheckEnabled,
   partsOverlap,
@@ -1667,5 +1668,37 @@ describe('overlapPolicy', () => {
     // Same slat against the unbeveled version of the part must overlap.
     const plain = { ...beveled, features: [] };
     expect(partsOverlap(plain, slat)).toBe(true);
+  });
+});
+
+describe('an edge that has been shaped', () => {
+  const T = 0.75;
+  const board = (features: Part['features']) =>
+    createTestPart({ id: 'a', length: 12, width: 3, thickness: T, position: { x: 0, y: T / 2, z: 0 }, features });
+  const chamfer: EdgeProfileFeature = {
+    id: 'e',
+    kind: 'edge_profile',
+    version: 1,
+    enabled: true,
+    target: { type: 'edge', edge: 'top_front_edge' },
+    reference: { primaryFrom: 'min' },
+    profile: 'chamfer',
+    parameters: { size: 0.375, depth: 0.375 }
+  };
+
+  it('gives up the wood it took, so a profile can be met by another', () => {
+    // A profile takes its wood off in section and leaves the top view exactly
+    // as it was, so read from above these two are still square edges -- and
+    // a rule joint, cope and stick, or a lock mitre could never close.
+    const speck = createTestPart({
+      id: 'b',
+      length: 0.1,
+      width: 0.06,
+      thickness: 0.06,
+      position: { x: 0, y: 0.7, z: 1.45 }
+    });
+    expect(partsOverlap(board([chamfer]), speck)).toBe(false);
+    // The same speck against the unshaped board is buried in it.
+    expect(partsOverlap(board([]), speck)).toBe(true);
   });
 });
