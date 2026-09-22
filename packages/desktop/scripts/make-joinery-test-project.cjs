@@ -2313,9 +2313,10 @@ station(
     });
     // A profile of one's own: the boundary a cutter leaves, given outright as
     // coordinates from the arris instead of picked from the standard list.
+    const steppedId = id();
     const stepped = {
       version: 1,
-      id: id(),
+      id: steppedId,
       name: 'Stepped bead',
       family: 'custom',
       source: 'generic',
@@ -2336,7 +2337,14 @@ station(
         profile('Ogee', 'top_front_edge', 'ogee', 0.25),
         profile('Thumbnail', 'top_back_edge', 'thumbnail', 0.25),
         profile('Rabbet', 'bottom_front_edge', 'rabbet', 0.25),
-        { ...profile('Stepped bead', 'bottom_back_edge', 'custom', 0.375), routerProfileSnapshot: stepped },
+        {
+          ...profile('Stepped bead', 'bottom_back_edge', 'custom', 0.375),
+          // A custom profile has to name the definition it was cut from as
+          // well as carry it, so the file can still be read if the library
+          // entry is edited or thrown away.
+          routerProfileId: steppedId,
+          routerProfileSnapshot: stepped
+        },
         {
           id: id(),
           kind: 'circular_cut',

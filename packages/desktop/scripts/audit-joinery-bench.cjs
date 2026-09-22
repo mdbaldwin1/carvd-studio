@@ -10,6 +10,11 @@
  * useless -- it reads as a bug in the app when it is a bug in the fixture,
  * which is how six of them went unnoticed.
  *
+ * What this does not check is whether the app will open the file at all.
+ * That needs the app's own validator, which is TypeScript and lives in the
+ * renderer, so the guard for it is a test instead:
+ * src/renderer/src/utils/joineryBench.test.ts.
+ *
  * Run with the bench path:  node scripts/audit-joinery-bench.cjs bench.carvd
  */
 const { readFileSync } = require('fs');
@@ -25,8 +30,10 @@ for (const part of file.parts) {
 
 /** Half extents in world axes, for the quarter turns the bench uses. */
 function ext(p) {
-  const turn = (a) => ((((a ?? 0) % 360) + 360) % 360);
-  const rx = turn(p.rotation?.x), ry = turn(p.rotation?.y), rz = turn(p.rotation?.z);
+  const turn = (a) => (((a ?? 0) % 360) + 360) % 360;
+  const rx = turn(p.rotation?.x),
+    ry = turn(p.rotation?.y),
+    rz = turn(p.rotation?.z);
   let e = { x: p.length / 2, y: p.thickness / 2, z: p.width / 2 };
   if (rz === 90 || rz === 270) e = { x: e.y, y: e.x, z: e.z };
   if (ry === 90 || ry === 270) e = { x: e.z, y: e.y, z: e.x };
@@ -36,7 +43,8 @@ function ext(p) {
 
 /** Closest approach between two parts' boxes; zero means they touch. */
 function gap(a, b) {
-  const ea = ext(a), eb = ext(b);
+  const ea = ext(a),
+    eb = ext(b);
   let total = 0;
   for (const axis of ['x', 'y', 'z']) {
     const d = Math.abs(a.position[axis] - b.position[axis]) - ea[axis] - eb[axis];
@@ -74,5 +82,7 @@ for (const group of file.groups) {
   console.log(`${wrong ? 'XX' : '  '} ${group.name.padEnd(34)} says ${claim.padEnd(9)} is ${state}`);
 }
 
-console.log(bad === 0 ? `\nAll ${file.groups.length} stations say what they do.` : `\n${bad} station(s) disagree with their note.`);
+console.log(
+  bad === 0 ? `\nAll ${file.groups.length} stations say what they do.` : `\n${bad} station(s) disagree with their note.`
+);
 process.exit(bad === 0 ? 0 : 1);
