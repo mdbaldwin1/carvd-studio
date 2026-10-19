@@ -44,7 +44,8 @@ describe("desktop release workflow", () => {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
-  });
+    // Loading the real packaging toolchain can exceed the default 5s on cold CI workers.
+  }, 30_000);
 
   it("includes the compiled output parent and every runtime entry in the package", () => {
     const desktopRoot = resolve(import.meta.dirname, "../../desktop");
@@ -153,7 +154,7 @@ describe("release publication gates", () => {
       expect(tests.jobs[job]["continue-on-error"]).not.toBe(true);
     }
     expect(tests.jobs["e2e-tests"].strategy.matrix.os).toEqual([
-      "ubuntu-latest",
+      "ubuntu-24.04",
       "macos-latest",
       "windows-latest",
     ]);
@@ -381,4 +382,52 @@ describe("release publication gates", () => {
       }),
     );
   });
+});
+
+describe("runtime license inventory line endings", () => {
+  const require = createRequire(import.meta.url);
+  const fs = require("node:fs");
+  const script = resolve(
+    import.meta.dirname,
+    "../../desktop/scripts/update-license-inventory.cjs",
+  );
+  const source = readFileSync(script, "utf8");
+
+  it.each(["\n", "\r\n"])(
+    "checks current and stale inventories with %j endings",
+    (ending) => {
+      for (const stale of [false, true]) {
+        const process = {
+          argv: ["node", script, "--check"],
+          exitCode: undefined as number | undefined,
+        };
+        const errors = vi.fn();
+        runInNewContext(source, {
+          __dirname: resolve(script, ".."),
+          process,
+          console: { error: errors },
+          require: (name: string) =>
+            name === "node:fs"
+              ? {
+                  ...fs,
+                  readFileSync: (file: string, encoding: string) => {
+                    const value = fs.readFileSync(file, encoding);
+                    if (!file.endsWith("THIRD_PARTY_LICENSES.txt"))
+                      return value;
+                    const inventory = stale
+                      ? value.replace(
+                          "@radix-ui/react-accordion",
+                          "@radix-ui/react-accordion-stale",
+                        )
+                      : value;
+                    return inventory.replace(/\r?\n/g, ending);
+                  },
+                }
+              : require(name),
+        });
+        expect(process.exitCode).toBe(stale ? 1 : undefined);
+        expect(errors).toHaveBeenCalledTimes(stale ? 1 : 0);
+      }
+    },
+  );
 });

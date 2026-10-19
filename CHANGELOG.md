@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep release validation compatible with Windows text-file line endings, the current packaging toolchain, and the supported Ubuntu browser-test runner.
+
 - Include Windows installer blockmaps in releases so automatic updates can download changed data instead of the full installer.
 
 - Complete unsaved-project and cut-edit checks before starting an update installer, so canceling or retrying a restart does not start installation or register native update callbacks prematurely.

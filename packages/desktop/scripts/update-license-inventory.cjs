@@ -5,7 +5,8 @@ const desktop = path.resolve(__dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(desktop, 'package.json'), 'utf8'));
 const lock = JSON.parse(fs.readFileSync(path.join(desktop, '../../package-lock.json'), 'utf8'));
 const file = path.join(desktop, 'resources/THIRD_PARTY_LICENSES.txt');
-const original = fs.readFileSync(file, 'utf8');
+// Git may check this text file out with Windows CRLF line endings.
+const original = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
 const names = [...Object.keys(manifest.dependencies), 'electron'].sort();
 const counts = new Map();
 const rows = names.map((name) => {

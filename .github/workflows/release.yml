@@ -13,7 +13,7 @@ jobs:
 
   release-credentials:
     name: Verify Release Credentials
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Require signing and notarization credentials
         shell: bash
@@ -40,7 +40,7 @@ jobs:
     needs: [validate, release-credentials]
     # Skip version-bump commits to prevent infinite loops
     if: "!contains(github.event.head_commit.message, 'chore(release):')"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     outputs:
@@ -127,7 +127,7 @@ jobs:
             platform: mac
           - os: windows-latest
             platform: win
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             platform: linux
 
     steps:
@@ -144,32 +144,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      # Copy app-builder binary to a safe location outside node_modules.
-      # electron-builder runs "npm install --production" during packaging,
-      # which in a workspace context can delete devDependencies (including
-      # app-builder-bin) from the hoisted root node_modules.
-      - name: Prepare app-builder binary
-        id: app-builder
-        shell: bash
-        run: |
-          BINARY=$(node -p "require('app-builder-bin').appBuilderPath")
-          BASENAME=$(basename "$BINARY")
-          SAFE_PATH="${RUNNER_TEMP}/${BASENAME}"
-
-          echo "Source: $BINARY"
-          echo "Safe copy: $SAFE_PATH"
-
-          cp "$BINARY" "$SAFE_PATH"
-          chmod +x "$SAFE_PATH"
-
-          # Verify the copy executes
-          "$SAFE_PATH" --help > /dev/null 2>&1 && echo "Binary OK" || {
-            echo "ERROR: Binary copy failed to execute"
-            exit 1
-          }
-
-          echo "safe_path=$SAFE_PATH" >> $GITHUB_OUTPUT
 
       - name: Setup license key
         run: echo "${{ secrets.LICENSE_PRIVATE_KEY }}" > license-private-key.pem
@@ -226,7 +200,6 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_KEYCHAIN: ${{ steps.keychain.outputs.path }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
         working-directory: packages/desktop
         run: npx --no-install electron-builder --mac --arm64 --x64 --publish never --config.forceCodeSigning=true
 
@@ -235,7 +208,6 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
         working-directory: packages/desktop
         run: npx --no-install electron-builder --win --publish never
 
@@ -244,7 +216,6 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
         working-directory: packages/desktop
         run: npx --no-install electron-builder --linux AppImage deb --x64 --publish never
 
@@ -311,7 +282,7 @@ jobs:
     name: Create GitHub Release
     needs: [prepare, build]
     if: needs.prepare.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
 
@@ -366,7 +337,7 @@ jobs:
     name: Bump Version on Develop
     needs: [prepare, create-release]
     if: needs.prepare.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
@@ -422,7 +393,7 @@ jobs:
     name: Release Summary
     needs: [prepare, build, create-release, bump-develop]
     if: always() && needs.prepare.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Print summary

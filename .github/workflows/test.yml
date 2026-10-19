@@ -11,7 +11,7 @@ on:
 jobs:
   unit-tests:
     name: Unit & Integration Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code
@@ -48,7 +48,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-latest, windows-latest]
 
     steps:
       - name: Checkout code
@@ -110,7 +110,7 @@ jobs:
 
   linux-package:
     name: Linux Package Smoke Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code
@@ -125,16 +125,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Prepare app-builder binary
-        id: app-builder
-        shell: bash
-        run: |
-          BINARY=$(node -p "require('app-builder-bin').appBuilderPath")
-          SAFE_PATH="${RUNNER_TEMP}/$(basename "$BINARY")"
-          cp "$BINARY" "$SAFE_PATH"
-          chmod +x "$SAFE_PATH"
-          echo "safe_path=$SAFE_PATH" >> "$GITHUB_OUTPUT"
-
       - name: Setup test license key
         run: echo "${{ secrets.LICENSE_PRIVATE_KEY }}" > license-private-key.pem
         working-directory: packages/desktop
@@ -145,8 +135,6 @@ jobs:
       # Package the dependencies installed by npm ci; do not resolve a second, unlocked tree.
       - name: Package and verify Linux artifacts
         working-directory: packages/desktop
-        env:
-          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
         run: |
           npx --no-install electron-builder --linux AppImage deb --x64 --publish never
 
@@ -164,7 +152,7 @@ jobs:
 
   lint:
     name: Lint & Type Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code
@@ -199,7 +187,7 @@ jobs:
 
   website-tests:
     name: Website Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code
@@ -228,7 +216,7 @@ jobs:
 
   website-e2e:
     name: Website E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code
