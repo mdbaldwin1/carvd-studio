@@ -1116,113 +1116,110 @@ test.describe.serial('custom cuts assembly qualification', () => {
     await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);
   });
 
-  test('authors, rotates, and drags complementary mitres into exact corners for both flip directions', async () => {
-    let configuredSnapping = false;
-    for (const scenario of [
-      {
-        title: 'Back/Front long points at the positive-Z corner',
-        firstFlip: true,
-        secondFlip: false,
-        start: { x: 8, y: 0.5, z: 8 },
-        assembled: { x: 4, y: 0.5, z: 4 },
-        turns: 1,
-        expectedRotation: 90
-      },
-      {
-        title: 'Front/Back long points at the negative-Z corner',
-        firstFlip: false,
-        secondFlip: true,
-        start: { x: 8, y: 0.5, z: -8 },
-        assembled: { x: 4, y: 0.5, z: -4 },
-        turns: 3,
-        expectedRotation: -90
-      }
-    ] as const) {
-      await test.step(scenario.title, async () => {
-        await seedFixture(
-          running.window,
-          [
-            {
-              id: 'mitre-horizontal',
-              name: 'Mitre Horizontal',
-              length: 10,
-              width: 2,
-              thickness: 1,
-              position: { x: 0, y: 0.5, z: 0 }
-            },
-            {
-              id: 'mitre-turn',
-              name: 'Mitre Turn',
-              length: 10,
-              width: 2,
-              thickness: 1,
-              position: scenario.start
-            }
-          ],
-          'mitre-turn'
-        );
-        if (!configuredSnapping) {
-          await enablePrecisionSnapping(running.window);
-          configuredSnapping = true;
-        }
-        await authorRightMitre(running.window, 'mitre-horizontal', scenario.firstFlip);
-        await authorRightMitre(running.window, 'mitre-turn', scenario.secondFlip);
-        await selectCanvasPart(running.window, 'mitre-turn');
-        await rotateSelected(running.window, 'Y', scenario.turns);
+  for (const scenario of [
+    {
+      title: 'Back/Front long points at the positive-Z corner',
+      firstFlip: true,
+      secondFlip: false,
+      start: { x: 8, y: 0.5, z: 8 },
+      assembled: { x: 4, y: 0.5, z: 4 },
+      turns: 1,
+      expectedRotation: 90
+    },
+    {
+      title: 'Front/Back long points at the negative-Z corner',
+      firstFlip: false,
+      secondFlip: true,
+      start: { x: 8, y: 0.5, z: -8 },
+      assembled: { x: 4, y: 0.5, z: -4 },
+      turns: 3,
+      expectedRotation: -90
+    }
+  ] as const) {
+    test(`authors, rotates, and drags complementary mitres: ${scenario.title}`, async () => {
+      await seedFixture(
+        running.window,
+        [
+          {
+            id: 'mitre-horizontal',
+            name: 'Mitre Horizontal',
+            length: 10,
+            width: 2,
+            thickness: 1,
+            position: { x: 0, y: 0.5, z: 0 }
+          },
+          {
+            id: 'mitre-turn',
+            name: 'Mitre Turn',
+            length: 10,
+            width: 2,
+            thickness: 1,
+            position: scenario.start
+          }
+        ],
+        'mitre-turn'
+      );
+      await enablePrecisionSnapping(running.window);
+      await authorRightMitre(running.window, 'mitre-horizontal', scenario.firstFlip);
+      await authorRightMitre(running.window, 'mitre-turn', scenario.secondFlip);
+      await selectCanvasPart(running.window, 'mitre-turn');
+      await rotateSelected(running.window, 'Y', scenario.turns);
+      await expect
+        .poll(() =>
+          running.window.evaluate(() => {
+            const part = window.useProjectStore
+              .getState()
+              .parts.find((candidate: { id: string }) => candidate.id === 'mitre-turn');
+            return part.rotation.y;
+          })
+        )
+        .toBe(scenario.expectedRotation);
+      expect(
+        await running.window.evaluate(
+          ({ position }) => window.__carvdE2E?.partsOverlap('mitre-horizontal', 'mitre-turn', position),
+          { position: scenario.assembled }
+        )
+      ).toBe(false);
+      await setCamera(running.window, 'top');
+      const drag = await dragSelectedToWorld(running.window, scenario.assembled, 0.25, { x: -2.5, y: 0, z: -0.5 });
+      expect(drag.previewDelta, JSON.stringify(drag.debugLogs.slice(-8))).not.toBeNull();
+
+      const result = await running.window.evaluate(() => {
+        const parts = window.useProjectStore.getState().parts;
+        const moving = parts.find((part: { id: string }) => part.id === 'mitre-turn');
+        return {
+          position: moving.position,
+          rotation: moving.rotation,
+          overlap: window.__carvdE2E?.partsOverlap('mitre-horizontal', 'mitre-turn')
+        };
+      });
+      expect(result.position.x, JSON.stringify(drag.debugLogs)).toBeCloseTo(scenario.assembled.x, 3);
+      expect(result.position.y).toBeCloseTo(scenario.assembled.y, 3);
+      expect(result.position.z, JSON.stringify(drag.debugLogs)).toBeCloseTo(scenario.assembled.z, 3);
+      expect(result.rotation.y).toBe(scenario.expectedRotation);
+      expect(result.overlap).toBe(false);
+      await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);
+
+      if (!scenario.firstFlip) {
+        await editFirstMitreAngle(running.window, 'mitre-horizontal', 30);
         await expect
           .poll(() =>
             running.window.evaluate(() => {
               const part = window.useProjectStore
                 .getState()
-                .parts.find((candidate: { id: string }) => candidate.id === 'mitre-turn');
-              return part.rotation.y;
+                .parts.find((candidate: { id: string }) => candidate.id === 'mitre-horizontal');
+              return part.features[0].parameters.horizontalAngle;
             })
           )
-          .toBe(scenario.expectedRotation);
-        expect(
-          await running.window.evaluate(
-            ({ position }) => window.__carvdE2E?.partsOverlap('mitre-horizontal', 'mitre-turn', position),
-            { position: scenario.assembled }
-          )
-        ).toBe(false);
-        await setCamera(running.window, 'top');
-        const drag = await dragSelectedToWorld(running.window, scenario.assembled, 0.25, { x: -2.5, y: 0, z: -0.5 });
-        expect(drag.previewDelta, JSON.stringify(drag.debugLogs.slice(-8))).not.toBeNull();
-
-        const result = await running.window.evaluate(() => {
-          const parts = window.useProjectStore.getState().parts;
-          const moving = parts.find((part: { id: string }) => part.id === 'mitre-turn');
-          return {
-            position: moving.position,
-            rotation: moving.rotation,
-            overlap: window.__carvdE2E?.partsOverlap('mitre-horizontal', 'mitre-turn')
-          };
-        });
-        expect(result.position.x, JSON.stringify(drag.debugLogs)).toBeCloseTo(scenario.assembled.x, 3);
-        expect(result.position.y).toBeCloseTo(scenario.assembled.y, 3);
-        expect(result.position.z, JSON.stringify(drag.debugLogs)).toBeCloseTo(scenario.assembled.z, 3);
-        expect(result.rotation.y).toBe(scenario.expectedRotation);
-        expect(result.overlap).toBe(false);
-        await expect(running.window.getByText('Movement limited to avoid overlap')).toHaveCount(0);
-
-        if (!scenario.firstFlip) {
-          await editFirstMitreAngle(running.window, 'mitre-horizontal', 30);
-          await expect
-            .poll(() =>
-              running.window.evaluate(() => {
-                const part = window.useProjectStore
-                  .getState()
-                  .parts.find((candidate: { id: string }) => candidate.id === 'mitre-horizontal');
-                return part.features[0].parameters.horizontalAngle;
-              })
-            )
-            .toBe(30);
-        }
-      });
-    }
-  });
+          .toBe(30);
+      }
+    });
+  }
 
   test('loads a legacy paired 3/8 inch dowel joint, diagnoses movement, and rejects a 1/4 to 1/2 mismatch', async () => {
+    // This workflow includes both movement directions and two cut-editor changes.
+    // Windows CI needs a larger total budget; each UI action retains its timeout.
+    test.slow(process.platform === 'win32', 'Combined dowel movement and editing workflow on Windows');
     await seedFixture(
       running.window,
       [
