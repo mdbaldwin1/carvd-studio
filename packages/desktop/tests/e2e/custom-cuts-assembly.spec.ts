@@ -106,6 +106,7 @@ async function enablePrecisionSnapping(window: Page): Promise<void> {
   await window.getByTitle('App Settings').click();
   const dialog = window.getByRole('dialog', { name: 'App Settings' });
   const preset = dialog.locator('.settings-row').filter({ hasText: 'Advanced Snap Preset' }).locator('select');
+  await preset.scrollIntoViewIfNeeded();
   await preset.selectOption('simple');
   await preset.selectOption('precision');
   await dialog.getByRole('button', { name: 'Done' }).click();
@@ -501,14 +502,19 @@ async function dragSelectedGroupOnFace(
   }
 }
 
-test.describe.serial('custom cuts assembly qualification', () => {
+test.describe('custom cuts assembly qualification', () => {
+  // Each scenario seeds its own project. Do not carry renderer caches, settings,
+  // or native window state across the whole qualification sequence on Windows.
+  // Keep one active native window per worker, but retry only the failed scenario.
+  test.describe.configure({ mode: 'default' });
   let running: RunningElectronApp;
 
-  test.beforeAll(async () => {
+  test.beforeEach(async () => {
     running = await launchElectronApp();
+    await running.window.bringToFront();
   });
 
-  test.afterAll(async () => {
+  test.afterEach(async () => {
     await closeElectronApp(running);
   });
 
