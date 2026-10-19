@@ -212,21 +212,22 @@ describe('the generated joinery bench', () => {
     expect(() => execFileSync(process.execPath, ['scripts/audit-joinery-bench.cjs', bench])).not.toThrow();
   });
 
-  it('cuts visible material with each demonstrated router pass and edge profile', () => {
-    const ineffective: string[] = [];
-    for (const part of generate().parts) {
-      for (const feature of part.features ?? []) {
-        if (feature.kind !== 'edge_profile' && feature.kind !== 'routed_path') continue;
-        const without = { ...part, features: part.features!.filter((candidate) => candidate.id !== feature.id) };
-        if (getPartMaterialVolume(without) - getPartMaterialVolume(part) < 0.0001) {
-          ineffective.push(
-            `${part.name}: ${feature.label} (${getPartMaterialVolume(without) - getPartMaterialVolume(part)})`
-          );
-        }
-      }
-    }
-    expect(ineffective).toEqual([]);
-  }, 60000);
+  // Each router operation is an independent geometry assertion. Keeping all of
+  // them in one test made the total runtime exceed its budget on CI runners.
+  it.each(
+    generate().parts.flatMap((part) =>
+      (part.features ?? [])
+        .filter((feature) => feature.kind === 'edge_profile' || feature.kind === 'routed_path')
+        .map((feature) => ({ name: `${part.name}: ${feature.label}`, part, feature }))
+    )
+  )(
+    'cuts visible material for $name',
+    ({ part, feature }) => {
+      const without = { ...part, features: part.features!.filter((candidate) => candidate.id !== feature.id) };
+      expect(getPartMaterialVolume(without) - getPartMaterialVolume(part)).toBeGreaterThanOrEqual(0.0001);
+    },
+    60000
+  );
 
   it('closes the compound-mitre planes without a bevel-sized gap', () => {
     const parts = generate().parts.filter((part) => part.name.startsWith('Compound —'));
