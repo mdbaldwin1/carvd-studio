@@ -345,7 +345,14 @@ async function closeElectronProcess(
         // Tolerate only that departure. Anything else -- notably on macOS, where
         // the app outlives its last window and is still answering -- is a real
         // teardown failure and must surface exactly as it did before.
-        const ignoreIfAppDeparted = (error: unknown) => {
+        const ignoreIfAppDeparted = async (error: unknown) => {
+          // Electron can destroy its main execution context before Node reports
+          // process exit. Confirm the actual exit instead of treating this as a
+          // live-app error. The outer 30-second deadline still rejects a hang.
+          if (/Execution context was destroyed/i.test(String(error))) {
+            await exited;
+            return;
+          }
           const departed =
             proc.exitCode !== null ||
             proc.signalCode !== null ||
