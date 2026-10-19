@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-19
+
 - Release publication now waits for the full validation workflow and required credentials. macOS release builds require signing and notarization, and reused version tags must match the validated commit.
 - Electron CI validation fails when a test passes only on retry, so an intermittent shutdown failure cannot silently satisfy the release gate.
 
@@ -715,7 +717,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Cross-Platform** - macOS and Windows desktop application
 - **Marketing Website** - Product website with features, pricing, documentation, and download pages
 
-[Unreleased]: https://github.com/mdbaldwin1/carvd-studio/compare/v1.0.5...HEAD
+[Unreleased]: https://github.com/mdbaldwin1/carvd-studio/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/mdbaldwin1/carvd-studio/compare/v1.2.0...v1.3.0
 [1.0.5]: https://github.com/mdbaldwin1/carvd-studio/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/mdbaldwin1/carvd-studio/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/mdbaldwin1/carvd-studio/compare/v1.0.2...v1.0.3

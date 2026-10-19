@@ -43,7 +43,8 @@ jobs:
           fail_ci_if_error: false
 
   e2e-tests:
-    name: E2E Tests
+    # Keep the protected check names stable while pinning the Linux runner.
+    name: E2E Tests (${{ matrix.os == 'ubuntu-24.04' && 'ubuntu-latest' || matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
