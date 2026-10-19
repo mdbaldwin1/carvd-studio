@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test } from '@playwright/test';
 import type { Page } from 'playwright';
 import fs from 'fs';
@@ -75,7 +76,7 @@ async function expectCutAccepted(window: Page): Promise<void> {
 async function saveProjectTo(window: Page, filePath: string): Promise<void> {
   await queueSavePath(window, filePath);
   await window.keyboard.press(`${MODIFIER}+S`);
-  await expect.poll(() => fs.existsSync(filePath), { timeout: 5000 }).toBe(true);
+  await waitForJsonFile(filePath, 5000);
   await window.getByRole('dialog', { name: 'Import to Library' }).getByRole('button', { name: 'Skip' }).click();
 }
 

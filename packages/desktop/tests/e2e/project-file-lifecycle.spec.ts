@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
@@ -87,7 +88,7 @@ test.describe('project file lifecycle', () => {
     await addPartFromSidebar(window);
     await queueSavePath(window, filePath);
     await pressShortcut(window, 's');
-    await expect.poll(() => fs.existsSync(filePath)).toBe(true);
+    await waitForJsonFile(filePath);
     await expect.poll(() => window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(false);
 
     await renameProjectFromHeader(window, 'Saved renamed project');
@@ -150,7 +151,7 @@ test.describe('project file lifecycle', () => {
     await window.getByRole('button', { name: 'Carvd Studio home' }).click();
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect.poll(() => fs.existsSync(savedPath), { timeout: 5000 }).toBe(true);
+    await waitForJsonFile(savedPath, 5000);
     await expect(window.locator('.start-screen')).toBeVisible();
     expect(readCarvdFile(savedPath).parts).toHaveLength(1);
   });
@@ -161,7 +162,7 @@ test.describe('project file lifecycle', () => {
 
     await queueSavePath(window, projectPath);
     await pressShortcut(window, 's');
-    await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
+    await waitForJsonFile(projectPath, 5000);
 
     await window.getByRole('button', { name: 'Project Settings' }).click();
     const settings = window.getByRole('dialog', { name: 'Project Settings' });

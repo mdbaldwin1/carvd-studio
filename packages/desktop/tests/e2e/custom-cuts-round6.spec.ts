@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -79,7 +80,7 @@ test.describe('round 6 active cut inspector lifecycle', () => {
           .poll(() => window.evaluate(() => window.usePartCutsEditingStore.getState().isEditingPartCuts))
           .toBe(false);
         await saveProjectFile();
-        await expect.poll(() => fs.existsSync(file)).toBe(true);
+        await waitForJsonFile(file);
         await expect
           .poll(() => {
             // Existence precedes completion of the asynchronous file write.

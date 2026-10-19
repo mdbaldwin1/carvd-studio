@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
@@ -87,7 +88,7 @@ test.describe('window and app behavior', () => {
         await addPartFromSidebar(running.window);
         await queueSavePath(running.window, projectPath);
         await pressShortcut(running.window, 's');
-        await expect.poll(() => fs.existsSync(projectPath)).toBe(true);
+        await waitForJsonFile(projectPath);
         await closeElectronApp(running);
         running = await launchElectronApp({
           projectPaths: [transport === 'file-url' ? pathToFileURL(projectPath).href : projectPath]
@@ -111,7 +112,7 @@ test.describe('window and app behavior', () => {
     await addPartFromSidebar(window);
     await queueSavePath(window, projectPath);
     await pressShortcut(window, 's');
-    await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
+    await waitForJsonFile(projectPath, 5000);
 
     await emitOpenFile(running, projectPath);
     const targetWindow = await waitForProjectWindow(running, projectPath);

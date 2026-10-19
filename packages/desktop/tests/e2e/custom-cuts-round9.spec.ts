@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -49,7 +50,7 @@ test.describe('round 9 file transaction ownership and quit', () => {
     second = path.join(running.userDataDir, 'second.carvd');
     await queueSavePath(running.window, first);
     await sendNativeMenuCommand(running, 'save-project');
-    await expect.poll(() => fs.existsSync(first)).toBe(true);
+    await waitForJsonFile(first);
     await expect.poll(() => running.window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(false);
     const data = JSON.parse(fs.readFileSync(first, 'utf8'));
     data.project.name = 'Second';

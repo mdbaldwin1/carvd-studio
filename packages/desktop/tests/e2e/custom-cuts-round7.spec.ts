@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -49,7 +50,7 @@ test.describe('round 7 native close and Save As', () => {
     originalFile = path.join(running.userDataDir, 'original.carvd');
     await queueSavePath(running.window, originalFile);
     await sendNativeMenuCommand(running, 'save-project');
-    await expect.poll(() => fs.existsSync(originalFile)).toBe(true);
+    await waitForJsonFile(originalFile);
     await expect.poll(() => running.window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(false);
   });
   test.afterEach(async () => {
@@ -147,7 +148,7 @@ test.describe('round 7 native close and Save As', () => {
         const file = path.join(userDataDir, `${route}-${kind}.carvd`);
         await queueSavePath(window, file);
         await saveAs();
-        await expect.poll(() => fs.existsSync(file)).toBe(true);
+        await waitForJsonFile(file);
         expect(JSON.parse(fs.readFileSync(file, 'utf8')).parts[0].features[0]).toMatchObject({
           label: 'Saved As label',
           ...(kind === 'diameter' ? { parameters: { diameter: 0.74 } } : {})

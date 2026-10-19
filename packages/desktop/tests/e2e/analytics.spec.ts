@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
@@ -38,7 +39,7 @@ async function performProductWorkflows(running: RunningElectronApp, suffix: stri
   const projectPath = path.join(userDataDir, `${suffix}.carvd`);
   await queueSavePath(window, projectPath);
   await window.keyboard.press(process.platform === 'darwin' ? 'Meta+s' : 'Control+s');
-  await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
+  await waitForJsonFile(projectPath, 5000);
   const importDialog = window.getByRole('dialog', { name: /Import to Library/i });
   await expect(importDialog).toBeVisible();
   await importDialog.getByRole('button', { name: 'Skip' }).click();

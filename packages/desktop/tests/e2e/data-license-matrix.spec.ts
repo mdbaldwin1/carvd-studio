@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,7 +35,7 @@ test.describe('Data management and license flows', () => {
     await queueSavePath(window, backupPath);
     await settings.getByRole('button', { name: 'Export' }).click();
     await expect(settings.getByRole('button', { name: 'Export', exact: true })).toBeEnabled();
-    await expect.poll(() => fs.existsSync(backupPath)).toBe(true);
+    await waitForJsonFile(backupPath);
     expect(JSON.parse(fs.readFileSync(backupPath, 'utf8'))).toMatchObject({
       version: 1,
       data: { userTemplates: [], customColors: [] }

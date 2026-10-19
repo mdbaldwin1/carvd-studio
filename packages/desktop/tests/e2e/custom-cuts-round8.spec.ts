@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -48,7 +49,7 @@ test.describe('round 8 destructive file actions', () => {
     file = path.join(running.userDataDir, 'original.carvd');
     await queueSavePath(running.window, file);
     await sendNativeMenuCommand(running, 'save-project');
-    await expect.poll(() => fs.existsSync(file)).toBe(true);
+    await waitForJsonFile(file);
     await expect.poll(() => running.window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(false);
     await running.window.getByRole('button', { name: 'Edit Part Cuts' }).click();
     await running.window.getByRole('button', { name: /^1\./ }).click();

@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 /** Automated fresh-blank operation coverage for the 23 pending station families.
  * These are representative operations, not full-joint assembly or native manual acceptance.
  * No completed features are seeded: every cut is created through the Part Cuts UI.
@@ -201,7 +202,7 @@ test.describe('release operation-family authoring', () => {
       const projectPath = path.join(userDataDir, `release-${scenario.station}.carvd`);
       await queueSavePath(page, projectPath);
       await page.keyboard.press(`${modifier}+S`);
-      await expect.poll(() => fs.existsSync(projectPath)).toBe(true);
+      await waitForJsonFile(projectPath);
       const importDialog = page.getByRole('dialog', { name: 'Import to Library' });
       await importDialog.getByRole('button', { name: 'Skip' }).click();
       await page.getByRole('button', { name: 'Carvd Studio home' }).click();

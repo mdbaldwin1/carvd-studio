@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test } from '@playwright/test';
 import type { Page } from 'playwright';
 import type {
@@ -1249,7 +1250,7 @@ test.describe('part cuts editing lifecycle', () => {
     await savePartCutsFromHeader(window);
     await pressSaveShortcut(window);
 
-    await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
+    await waitForJsonFile(projectPath, 5000);
     const saved = JSON.parse(fs.readFileSync(projectPath, 'utf8')) as {
       version: number;
       parts: Array<{ features?: Array<{ kind: string; cutType: string }> }>;
@@ -1443,7 +1444,7 @@ test.describe('part cuts editing lifecycle', () => {
 
     await queueSavePath(window, projectPath);
     await pressSaveShortcut(window);
-    await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
+    await waitForJsonFile(projectPath, 5000);
     // The first file-path transition checks this fixture's non-library stock
     // after saving. Complete that prompt before leaving, rather than racing
     // its delayed appearance with the Home click.
@@ -1560,7 +1561,7 @@ test.describe('part cuts editing lifecycle', () => {
 
     await queueSavePath(window, projectPath);
     await pressSaveShortcut(window);
-    await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
+    await waitForJsonFile(projectPath, 5000);
 
     await window.getByRole('button', { name: 'Carvd Studio home' }).click();
     await queueOpenPaths(window, [projectPath]);
