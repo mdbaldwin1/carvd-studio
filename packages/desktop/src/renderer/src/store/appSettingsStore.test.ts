@@ -359,6 +359,31 @@ describe('appSettingsStore', () => {
       expect(mockSetPreference).toHaveBeenCalledWith('theme', 'light');
     });
 
+    it('does not rewrite unrelated preferences when changing a setting', async () => {
+      mockSetPreference.mockClear();
+      await useAppSettingsStore.getState().updateSettings({ theme: 'light' });
+      expect(mockSetPreference.mock.calls).toEqual([['theme', 'light']]);
+    });
+
+    it('persists successive preset fields without replaying older values', async () => {
+      mockSetPreference.mockClear();
+      await Promise.all([
+        useAppSettingsStore.getState().updateSettings({ advancedSnapPreset: 'simple' }),
+        useAppSettingsStore.getState().updateSettings({ enableFeatureAnchors: false }),
+        useAppSettingsStore.getState().updateSettings({ enableLayoutSnaps: false })
+      ]);
+      expect(mockSetPreference.mock.calls).toEqual([
+        ['advancedSnapPreset', 'simple'],
+        ['enableFeatureAnchors', false],
+        ['enableLayoutSnaps', false]
+      ]);
+      expect(useAppSettingsStore.getState().settings).toMatchObject({
+        advancedSnapPreset: 'simple',
+        enableFeatureAnchors: false,
+        enableLayoutSnaps: false
+      });
+    });
+
     it('persists all individual settings to preferences', async () => {
       await useAppSettingsStore.getState().updateSettings({
         defaultUnits: 'metric',

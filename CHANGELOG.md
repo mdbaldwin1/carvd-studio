@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.3.0] - 2026-10-19
 
+### Fixed
+
+- **Responsive settings on Windows** — Changing snapping presets now saves only the affected preferences, avoiding hundreds of redundant disk writes.
+
 - Release publication now waits for the full validation workflow and required credentials. macOS release builds require signing and notarization, and reused version tags must match the validated commit.
 - Electron CI validation fails when a test passes only on retry, so an intermittent shutdown failure cannot silently satisfy the release gate.
 

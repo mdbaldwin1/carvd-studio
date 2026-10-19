@@ -55,11 +55,12 @@ test.describe('project file lifecycle', () => {
     await addPartFromSidebar(window);
     await queueSavePath(window, firstPath);
     await pressShortcut(window, 's');
-    await expect.poll(() => fs.existsSync(firstPath), { timeout: 5000 }).toBe(true);
-
-    const firstFile = readCarvdFile(firstPath);
-    expect(firstFile.project.name).toBe('lifecycle-original');
-    expect(firstFile.parts).toHaveLength(1);
+    // File creation precedes completion of the asynchronous write on Windows.
+    await expect(() => {
+      const firstFile = readCarvdFile(firstPath);
+      expect(firstFile.project.name).toBe('lifecycle-original');
+      expect(firstFile.parts).toHaveLength(1);
+    }).toPass({ timeout: 5000 });
     await expect.poll(async () => window.evaluate(() => window.electronAPI.getRecentProjects())).toContain(firstPath);
 
     await window.getByRole('button', { name: 'Carvd Studio home' }).click();
@@ -72,8 +73,9 @@ test.describe('project file lifecycle', () => {
 
     await queueSavePath(window, secondPath);
     await pressShortcut(window, 's', { shift: true });
-    await expect.poll(() => fs.existsSync(secondPath), { timeout: 5000 }).toBe(true);
-    expect(readCarvdFile(secondPath).project.name).toBe('lifecycle-renamed');
+    await expect(() => {
+      expect(readCarvdFile(secondPath).project.name).toBe('lifecycle-renamed');
+    }).toPass({ timeout: 5000 });
     await expect
       .poll(async () => window.evaluate(() => window.electronAPI.getRecentProjects()))
       .toEqual(expect.arrayContaining([secondPath, firstPath]));

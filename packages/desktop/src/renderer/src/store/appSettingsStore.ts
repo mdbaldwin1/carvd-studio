@@ -263,37 +263,15 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     set({ settings: newSettings });
 
     try {
-      // Save individual fields for compatibility with main process
-      // Use fallback values to prevent electron-store errors with undefined values
-      await Promise.all([
-        window.electronAPI.setPreference('defaultUnits', newSettings.defaultUnits ?? 'imperial'),
-        window.electronAPI.setPreference('defaultGridSize', newSettings.defaultGridSize ?? 0.0625),
-        window.electronAPI.setPreference('theme', newSettings.theme ?? 'dark'),
-        window.electronAPI.setPreference('confirmBeforeDelete', newSettings.confirmBeforeDelete ?? true),
-        window.electronAPI.setPreference('showHotkeyHints', newSettings.showHotkeyHints ?? true),
-        window.electronAPI.setPreference(
-          'stockConstraints',
-          newSettings.stockConstraints ?? DEFAULT_SETTINGS.stockConstraints
-        ),
-        window.electronAPI.setPreference('liveGridSnap', newSettings.liveGridSnap ?? false),
-        window.electronAPI.setPreference('snapSensitivity', newSettings.snapSensitivity ?? 'normal'),
-        window.electronAPI.setPreference('snapToOrigin', newSettings.snapToOrigin ?? true),
-        window.electronAPI.setPreference('dimensionSnapSameTypeOnly', newSettings.dimensionSnapSameTypeOnly ?? false),
-        window.electronAPI.setPreference('advancedSnapPreset', newSettings.advancedSnapPreset ?? 'precision'),
-        window.electronAPI.setPreference('enableSurfaceAnchors', newSettings.enableSurfaceAnchors ?? true),
-        window.electronAPI.setPreference('enableFractionalAnchors', newSettings.enableFractionalAnchors ?? true),
-        window.electronAPI.setPreference('enableGoldenRatioAnchors', newSettings.enableGoldenRatioAnchors ?? false),
-        window.electronAPI.setPreference('enableFeatureAnchors', newSettings.enableFeatureAnchors ?? true),
-        window.electronAPI.setPreference('enableLayoutSnaps', newSettings.enableLayoutSnaps ?? true),
-        window.electronAPI.setPreference('enableEqualSpacingSnap', newSettings.enableEqualSpacingSnap ?? true),
-        window.electronAPI.setPreference('enableDistributionSnap', newSettings.enableDistributionSnap ?? true),
-        window.electronAPI.setPreference('enablePatternSnap', newSettings.enablePatternSnap ?? true),
-        window.electronAPI.setPreference('enableAxisLegacySnaps', newSettings.enableAxisLegacySnaps ?? true),
-        window.electronAPI.setPreference('showSnapCandidates', newSettings.showSnapCandidates ?? false),
-        window.electronAPI.setPreference('lightingMode', newSettings.lightingMode ?? 'default'),
-        window.electronAPI.setPreference('brightnessMultiplier', newSettings.brightnessMultiplier ?? 1.0),
-        window.electronAPI.setPreference('autoSave', newSettings.autoSave ?? false)
-      ]);
+      // A preset changes several fields in succession. Persist only its supplied
+      // keys: rewriting the entire snapshot for each field floods the main
+      // process with synchronous disk writes and replays stale unrelated values.
+      const keys = (Object.keys(DEFAULT_SETTINGS) as (keyof AppSettings)[]).filter((key) =>
+        Object.prototype.hasOwnProperty.call(updates, key)
+      );
+      await Promise.all(
+        keys.map((key) => window.electronAPI.setPreference(key, newSettings[key] ?? DEFAULT_SETTINGS[key]))
+      );
     } catch (error) {
       logger.error('Failed to save app settings:', error);
       // Revert on error
